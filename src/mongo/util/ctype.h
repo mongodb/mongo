@@ -67,6 +67,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 
 namespace mongo::ctype {
 namespace detail {
