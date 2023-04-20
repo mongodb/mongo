@@ -44,6 +44,42 @@ ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
     : ns(std::move(ns)), pipeline(std::move(pipeline)), uuid(collUUID) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
+                                     const FindCommandRequest& findCmd,
+                                     std::unique_ptr<CollatorInterface> collator,
+                                     bool mayDbProfile,
+                                     boost::optional<ExplainOptions::Verbosity> verbosity,
+                                     bool allowDiskUseDefault)
+    // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
+    // members in the ExpressionContext are used exclusively by the aggregation subsystem. This
+    // includes the following fields which here we simply initialize to some meaningless default
+    // value:
+    //  - explain
+    //  - fromMongos
+    //  - needsMerge
+    //  - bypassDocumentValidation
+    //  - mongoProcessInterface
+    //  - resolvedNamespaces
+    //  - uuid
+    //
+    // As we change the code to make the find and agg systems more tightly coupled, it would make
+    // sense to start initializing these fields for find operations as well.
+    : ExpressionContext(opCtx,
+                        verbosity,
+                        false,  // fromMongos
+                        false,  // needsMerge
+                        findCmd.getAllowDiskUse().value_or(allowDiskUseDefault),
+                        false,  // bypassDocumentValidation
+                        false,  // isMapReduceCommand
+                        findCmd.getNamespaceOrUUID().nss().value_or(NamespaceString{}),
+                        findCmd.getLegacyRuntimeConstants(),
+                        std::move(collator),
+                        nullptr,  // mongoProcessInterface
+                        {},       // resolvedNamespaces
+                        findCmd.getNamespaceOrUUID().uuid(),
+                        findCmd.getLet(),
+                        mayDbProfile) {}
+
+ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,
                                      std::unique_ptr<CollatorInterface> collator,
                                      std::shared_ptr<MongoProcessInterface> processInterface,

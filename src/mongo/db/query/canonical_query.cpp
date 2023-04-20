@@ -100,11 +100,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     boost::intrusive_ptr<ExpressionContext> newExpCtx;
     if (!expCtx.get()) {
         invariant(findCommand->getNamespaceOrUUID().nss());
-        newExpCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                      std::move(collator),
-                                                      *findCommand->getNamespaceOrUUID().nss(),
-                                                      findCommand->getLegacyRuntimeConstants(),
-                                                      findCommand->getLet());
+        newExpCtx = make_intrusive<ExpressionContext>(
+            opCtx, *findCommand, std::move(collator), true /* mayDbProfile */);
     } else {
         newExpCtx = expCtx;
         // A collator can enter through both the FindCommandRequest and ExpressionContext arguments.

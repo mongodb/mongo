@@ -558,4 +558,79 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         redacted);
 }
 
+TEST_F(TelemetryStoreTest, DefinesLetVariables) {
+    // Test that the expression context we use to redact will understand the 'let' part of the find
+    // command while parsing the other pieces of the command.
+
+    // Note that this ExpressionContext will not have the let variables defined - we expect the
+    // 'makeTelemetryKey' call to do that.
+    auto opCtx = makeOperationContext();
+    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    fcr.setLet(BSON("var" << 2));
+    fcr.setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
+    fcr.setProjection(fromjson("{varIs: '$$var'}"));
+
+    const auto cmdObj = fcr.toBSON(BSON("$db"
+                                        << "testDB"));
+    TelemetryMetrics testMetrics{cmdObj, boost::none, fcr.getNamespaceOrUUID()};
+
+    bool redactIdentifiers = false;
+    auto redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
+    ASSERT_OK(redacted.getStatus());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "testColl",
+            "filter": {
+                "$expr": [
+                    {
+                        "$eq": [
+                            "$a",
+                            "$$var"
+                        ]
+                    }
+                ]
+            },
+            "projection": {
+                "varIs": "$$var"
+            },
+            "let": {
+                "var": 2
+            },
+            "$db": "testDB"
+        })",
+        redacted.getValue());
+
+    // Now be sure the variable names are redacted. We don't currently expose a different way to do
+    // the hashing, so we'll just stick with the big long strings here for now.
+    redactIdentifiers = true;
+    redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
+    ASSERT_OK(redacted.getStatus());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
+                "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
+            },
+            "find": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c=",
+            "filter": {
+                "$expr": [
+                    {
+                        "$eq": [
+                            "$lhWpXUozYRjENbnNVMXoZEq5VrVzqikmJ0oSgLZnRxM=",
+                            "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8="
+                        ]
+                    }
+                ]
+            },
+            "let": {
+                "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
+            },
+            "projection": {
+                "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
+                "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
+            }
+        })",
+        redacted.getValue());
+}
 }  // namespace mongo::telemetry

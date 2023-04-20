@@ -97,38 +97,13 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         // ExpressionContext.
         collator = collPtr->getDefaultCollator()->clone();
     }
-
-    // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
-    // members in the ExpressionContext are used exclusively by the aggregation subsystem. This
-    // includes the following fields which here we simply initialize to some meaningless default
-    // value:
-    //  - explain
-    //  - fromMongos
-    //  - needsMerge
-    //  - bypassDocumentValidation
-    //  - mongoProcessInterface
-    //  - resolvedNamespaces
-    //  - uuid
-    //
-    // As we change the code to make the find and agg systems more tightly coupled, it would make
-    // sense to start initializing these fields for find operations as well.
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        verbosity,
-        false,  // fromMongos
-        false,  // needsMerge
-        findCommand.getAllowDiskUse().value_or(allowDiskUseByDefault.load()),
-        false,  // bypassDocumentValidation
-        false,  // isMapReduceCommand
-        findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()),
-        findCommand.getLegacyRuntimeConstants(),
-        std::move(collator),
-        nullptr,  // mongoProcessInterface
-        StringMap<ExpressionContext::ResolvedNamespace>{},
-        boost::none,                             // uuid
-        findCommand.getLet(),                    // let
-        CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
-    );
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx,
+                                          findCommand,
+                                          std::move(collator),
+                                          CurOp::get(opCtx)->dbProfileLevel() > 0,  // mayDbProfile
+                                          verbosity,
+                                          allowDiskUseByDefault.load());
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->startExpressionCounters();
 

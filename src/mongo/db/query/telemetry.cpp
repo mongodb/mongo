@@ -37,6 +37,7 @@
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/projection_ast_util.h"
@@ -599,16 +600,20 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
         tassert(7198600, "Find command must have a namespace string.", this->nss.nss().has_value());
         auto findCommand =
             query_request_helper::makeFromFindCommand(cmdObj, this->nss.nss().value(), false);
+        auto nss = findCommand->getNamespaceOrUUID().nss();
+        uassert(7349400, "Namespace must be defined", nss.has_value());
 
         SerializationOptions options(
             [&](StringData sd) { return sha256HmacStringDataHasher(redactionKey, sd); },
             LiteralSerializationPolicy::kToDebugTypeString);
-        auto nss = findCommand->getNamespaceOrUUID().nss();
-        uassert(7349400, "Namespace must be defined", nss.has_value());
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss.value());
-        expCtx->variables.setDefaultRuntimeConstants(opCtx);
+
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                        *findCommand,
+                                                        nullptr /* collator doesn't matter here.*/,
+                                                        false /* mayDbProfile */);
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         expCtx->stopExpressionCounters();
+
         auto swRedactedKey = makeTelemetryKey(*findCommand, options, expCtx, *this);
         if (!swRedactedKey.isOK()) {
             return swRedactedKey.getStatus();
