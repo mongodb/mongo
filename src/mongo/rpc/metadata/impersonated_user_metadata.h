@@ -70,5 +70,11 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
  */
 void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBuilder* out);
 
+/*
+ * Estimates the size of impersonation metadata which will be written by
+ * writeAuthDataToImpersonatedUserMetadata.
+ */
+std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx);
+
 }  // namespace rpc
 }  // namespace mongo
