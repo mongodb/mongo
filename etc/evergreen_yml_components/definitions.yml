@@ -6401,6 +6401,12 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
+  tags: ["sharding"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: ssl_gen
   tags: ["encrypt", "ssl", "patch_build"]
   commands:

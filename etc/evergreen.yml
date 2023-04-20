@@ -1184,6 +1184,7 @@ buildvariants:
     variant: generate-tasks-for-version
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
+  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough

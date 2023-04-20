@@ -1,0 +1,62 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/write/**/*.js
+  exclude_files:
+  # The following tests fail because a certain command or functionality is not supported by mongos.
+  # This command or functionality is placed in a comment next to the failing test.
+  - jstests/core/**/collection_truncate.js  # emptycapped.
+  # These tests create secondary unique: true indexes without the shard key prefix.
+  - jstests/core/**/batch_write_command_update.js
+  - jstests/core/**/batch_write_command_w0.js
+  - jstests/core/**/bulk_api_unordered.js
+  - jstests/core/**/bulk_api_ordered.js
+  # Test assertions expect a certain document is deleted whereas updateOnes, deleteOnes, and
+  # findAndModify without shard key can pick and modify any matching document.
+  - jstests/core/**/crud_api.js
+  # TODO SERVER-69922: Requires explain for single writes without shard key.
+  - jstests/core/**/update_hint.js
+  - jstests/core/**/delete_hint.js
+  - jstests/core/**/find_and_modify_hint.js
+  # Aggregation does not support $where.
+  - jstests/core/**/find_and_modify_concurrent_update.js
+  - jstests/core/**/find_and_modify_where.js
+  # {multi: true} upsert requires specifying the full shard key.
+  - jstests/core/**/update_multi_halts.js
+  - jstests/core/**/updatei.js
+  # {multi: true} update testing behavior not applicable to sharded clusters
+  - jstests/core/**/updatej.js
+  - jstests/core/**/write_result.js
+
+  exclude_with_any_tags:
+  - assumes_against_mongod_not_mongos
+  # Tests tagged with the following will fail because they assume collections are not sharded.
+  - assumes_no_implicit_collection_creation_after_drop
+  - cannot_create_unique_index_when_using_hashed_shard_key
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+  hooks:
+  - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

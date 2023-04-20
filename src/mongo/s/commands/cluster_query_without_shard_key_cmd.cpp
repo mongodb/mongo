@@ -100,6 +100,38 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
     return allShardsContainingChunksForNs;
 }
 
+// TODO: SERVER-75760 Remove this validation since mongos should be doing this upfront.
+void validateFindAndModifyCommand(const write_ops::FindAndModifyCommandRequest& request) {
+    uassert(ErrorCodes::FailedToParse,
+            "Either an update or remove=true must be specified",
+            request.getRemove().value_or(false) || request.getUpdate());
+    if (request.getRemove().value_or(false)) {
+        uassert(ErrorCodes::FailedToParse,
+                "Cannot specify both an 'update' and 'remove'=true",
+                !request.getUpdate());
+
+        uassert(ErrorCodes::FailedToParse,
+                "Cannot specify both 'upsert'=true and 'remove'=true ",
+                !request.getUpsert() || !*request.getUpsert());
+
+        uassert(
+            ErrorCodes::FailedToParse,
+            "Cannot specify both 'new'=true and 'remove'=true; 'remove' always returns the deleted "
+            "document",
+            !request.getNew() || !*request.getNew());
+
+        uassert(ErrorCodes::FailedToParse,
+                "Cannot specify 'arrayFilters' and 'remove'=true",
+                !request.getArrayFilters());
+    }
+
+    if (request.getUpdate() &&
+        request.getUpdate()->type() == write_ops::UpdateModification::Type::kPipeline &&
+        request.getArrayFilters()) {
+        uasserted(ErrorCodes::FailedToParse, "Cannot specify 'arrayFilters' and a pipeline update");
+    }
+}
+
 BSONObj createAggregateCmdObj(
     OperationContext* opCtx,
     const ParsedCommandInfo& parsedInfo,
@@ -182,9 +214,14 @@ ParsedCommandInfo parseWriteCommand(OperationContext* opCtx,
                commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
             IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"), writeCmdObj);
+        validateFindAndModifyCommand(findAndModifyRequest);
+
         parsedInfo.query = findAndModifyRequest.getQuery();
         parsedInfo.stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
-        parsedInfo.sort = findAndModifyRequest.getSort();
+        parsedInfo.sort =
+            findAndModifyRequest.getSort() && !findAndModifyRequest.getSort()->isEmpty()
+            ? findAndModifyRequest.getSort()
+            : boost::none;
 
         if ((parsedInfo.upsert = findAndModifyRequest.getUpsert().get_value_or(false))) {
             parsedInfo.updateRequest = UpdateRequest{};
