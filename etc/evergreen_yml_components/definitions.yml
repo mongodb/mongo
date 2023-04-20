@@ -5128,6 +5128,18 @@ tasks:
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
 
+- <<: *task_template
+  name: config_fuzzer_concurrency_simultaneous_replication_gen
+  tags: ["config_fuzzer", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: concurrency_simultaneous_replication
+      resmoke_args: >-
+        --fuzzMongodConfigs=normal
+        --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
+
 - <<: *gen_task_template
   name: config_fuzzer_concurrency_sharded_replication_gen
   tags: ["config_fuzzer", "large"]
@@ -5925,22 +5937,6 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_replication_wiredtiger_cursor_sweeps_gen
-  tags: ["concurrency", "repl"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_replication_wiredtiger_eviction_debug_gen
-  tags: ["concurrency", "repl", "debug_only"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
   name: concurrency_sharded_replication_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
@@ -6155,24 +6151,6 @@ tasks:
   tags: ["concurrency", "common", "large", "repl", "random_name"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps
-  tags: ["concurrency", "repl", "random_name"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: concurrency_simultaneous_replication_wiredtiger_eviction_debug
-  tags: ["concurrency", "repl", "debug_only", "random_name"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
     vars:
       resmoke_jobs_max: 1
 

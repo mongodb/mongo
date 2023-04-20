@@ -40,7 +40,7 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate !.requires_wt
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.requires_wt
     distros:
     - rhel80-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: initial_sync_fuzzer_gen
