@@ -465,8 +465,8 @@ bool isTelemetryEnabled(const ServiceContext* serviceCtx) {
     // check whether telemetry should be enabled without FCV, so default to not recording
     // those queries.
     // TODO SERVER-75935 Remove FCV Check.
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility) &&
+    return feature_flags::gFeatureFlagTelemetry.isEnabled(
+               serverGlobalParams.featureCompatibility) &&
         telemetryStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 

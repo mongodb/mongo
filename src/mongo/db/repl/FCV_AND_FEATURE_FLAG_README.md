@@ -599,28 +599,9 @@ if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompat
 }
 ```
 
-Note that this assumes that `serverGlobalParams.featureCompatibility` has already been initialized. 
-If we are calling `isEnabled(serverGlobalParams.featureCompatibility)` in a location where it might
-not already be initialized, we must do this instead:
-
-```
-if(serverGlobalParams.featureCompatibility.isVersionInitialized() && 
-feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibility)) {
-	// code if feature is enabled.
-} else {
-	// code if feature is not enabled.
-}
-```
-or we can use the [`isEnabledUseDefaultFCVWhenUninitialized` helper](https://github.com/10gen/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/feature_flag.cpp#L67).
-```
-if(feature_flags::gFeatureFlagToaster.isEnabledUseDefaultFCVWhenUninitialized(serverGlobalParams.featureCompatibility)) {
-	// code if feature is enabled on current FCV if initialized or if feature is enabled on lastLTS FCV.
-} else {
-	// code if feature is not enabled.
-}
-```
-This returns true if the flag is set to true and enabled for this FCV version. If the FCV version is
-unset, it instead checks against the default last LTS FCV version.
+Note that `isEnabled` checks if the feature flag is enabled on the input FCV, which is usually 
+the server's current FCV `serverGlobalParams.featureCompatibility`. If the FCV has not been 
+initialized yet, it will check if the feature flag is enabled on the lastLTS FCV.
 
 There are some places where we only want to check if the feature flag is turned on, regardless of
 which FCV we are on. For example, this could be the case if we need to perform the check in a spot

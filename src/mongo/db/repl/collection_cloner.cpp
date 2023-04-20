@@ -131,7 +131,7 @@ void CollectionCloner::preStage() {
     _stats.start = getSharedData()->getClock()->now();
 
     BSONObjBuilder b(BSON("collStats" << _sourceNss.coll().toString()));
-    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    if (gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) &&
         _sourceNss.tenantId()) {
         _sourceNss.tenantId()->serializeToBSON("$tenant", &b);

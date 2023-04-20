@@ -1308,7 +1308,6 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
     // sort optimization. We check eligibility and perform the rewrite here.
     auto [unpack, sort] = findUnpackThenSort(pipeline->_sources);
     const bool timeseriesBoundedSortOptimization =
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabled(
             serverGlobalParams.featureCompatibility) &&
         unpack && sort;

@@ -54,8 +54,7 @@ std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
 
 std::string DatabaseNameUtil::serializeForStorage(const DatabaseName& dbName,
                                                   const SerializationContext& context) {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         return dbName.toString();
     }
     return dbName.toStringWithTenantId();
@@ -136,8 +135,7 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
 DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
                                                      StringData db,
                                                      const SerializationContext& context) {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         // TODO SERVER-73113 Uncomment out this conditional to check that we always have a tenantId.
         /* if (db != "admin" && db != "config" && db != "local")
             massert(7005300, "TenantId must be set", tenantId != boost::none);

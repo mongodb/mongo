@@ -81,7 +81,6 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
     if (nss.tenantId() && gMultitenancySupport &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         nss.tenantId()->serializeToBSON(OplogEntryBase::kTidFieldName, &builder);
     }
@@ -211,7 +210,7 @@ void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundl
 }
 
 void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
-    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    if (gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
         DurableReplOperation::setTid(value);
 }
@@ -356,7 +355,7 @@ ReplOperation MutableOplogEntry::toReplOperation() const noexcept {
 }
 
 void MutableOplogEntry::setTid(boost::optional<mongo::TenantId> value) & {
-    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    if (gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
         getDurableReplOperation().setTid(std::move(value));
 }
