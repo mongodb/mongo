@@ -227,6 +227,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
                                       bucketsColl.getCollection(),
                                       recordId,
                                       op,
+                                      {},
                                       /*fromMigrate=*/false,
                                       /*stmtId=*/kUninitializedStmtId));
     }
@@ -294,6 +295,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
                                       bucketsColl.getCollection(),
                                       recordId,
                                       op,
+                                      {},
                                       /*fromMigrate=*/false,
                                       /*stmtId=*/kUninitializedStmtId));
     }
@@ -306,6 +308,199 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
         ASSERT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+    }
+}
+
+TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "PerformAtomicDeleteAndInsert");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    // Inserts a bucket document.
+    const BSONObj bucketDoc1 = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    OID bucketId1 = bucketDoc1["_id"].OID();
+    auto recordId1 = record_id_helpers::keyForOID(bucketId1);
+
+    AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wunit{opCtx};
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, *bucketsColl, InsertStatement{bucketDoc1}, nullptr));
+        wunit.commit();
+    }
+
+    // Deletes the bucket document and inserts a new bucket document.
+    const BSONObj bucketDoc2 = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a518"},
+                "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},
+                                              "a":10,
+                                              "b":10},
+                                       "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},
+                                              "a":30,
+                                              "b":30}},
+                "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                                "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                                "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                        "a":{"0":10,"1":20,"2":30},
+                        "b":{"0":10,"1":20,"2":30}}})");
+    OID bucketId2 = bucketDoc2["_id"].OID();
+    auto recordId2 = record_id_helpers::keyForOID(bucketId2);
+    {
+        write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId1), false);
+        write_ops::DeleteCommandRequest deleteOp(ns.makeTimeseriesBucketsNamespace(),
+                                                 {deleteEntry});
+        write_ops::WriteCommandRequestBase base;
+        base.setBypassDocumentValidation(true);
+        base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
+        deleteOp.setWriteCommandRequestBase(base);
+
+        write_ops::InsertCommandRequest insertOp(ns.makeTimeseriesBucketsNamespace(), {bucketDoc2});
+        insertOp.setWriteCommandRequestBase(base);
+
+        ASSERT_OK(performAtomicWrites(opCtx,
+                                      bucketsColl.getCollection(),
+                                      recordId1,
+                                      deleteOp,
+                                      {insertOp},
+                                      /*fromMigrate=*/false,
+                                      /*stmtId=*/kUninitializedStmtId));
+    }
+
+    // Checks document1 is removed and document2 is added.
+    {
+        Snapshotted<BSONObj> doc;
+        bool found = bucketsColl->findDoc(opCtx, recordId1, &doc);
+        ASSERT_FALSE(found);
+
+        found = bucketsColl->findDoc(opCtx, recordId2, &doc);
+        ASSERT_TRUE(found);
+        UnorderedFieldsBSONObjComparator comparator;
+        ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
+    }
+}
+
+TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "PerformAtomicUpdateAndInserts");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    // Inserts a bucket document.
+    const BSONObj bucketDoc1 = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "meta":1,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    OID bucketId1 = bucketDoc1["_id"].OID();
+    auto recordId1 = record_id_helpers::keyForOID(bucketId1);
+
+    AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wunit{opCtx};
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, *bucketsColl, InsertStatement{bucketDoc1}, nullptr));
+        wunit.commit();
+    }
+
+    // Updates the bucket document and inserts two new bucket documents.
+    const BSONObj replaceDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":3,"b":3},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "meta":1,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":3},
+                    "b":{"0":3}}})");
+    const BSONObj bucketDoc2 = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a518"},
+                "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},
+                                              "a":1,
+                                              "b":1},
+                                       "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},
+                                              "a":1,
+                                              "b":1}},
+                "meta":2,
+                "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
+                        "a":{"0":1},
+                        "b":{"0":1}}})");
+    OID bucketId2 = bucketDoc2["_id"].OID();
+    auto recordId2 = record_id_helpers::keyForOID(bucketId2);
+    const BSONObj bucketDoc3 = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a519"},
+                "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},
+                                              "a":2,
+                                              "b":2},
+                                       "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},
+                                              "a":2,
+                                              "b":2}},
+                "meta":3,
+                "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
+                        "a":{"0":2},
+                        "b":{"0":2}}})");
+    OID bucketId3 = bucketDoc3["_id"].OID();
+    auto recordId3 = record_id_helpers::keyForOID(bucketId3);
+    {
+        write_ops::UpdateModification u(replaceDoc);
+        write_ops::UpdateOpEntry update(BSON("_id" << bucketId1), std::move(u));
+        write_ops::UpdateCommandRequest updateOp(ns.makeTimeseriesBucketsNamespace(), {update});
+        write_ops::WriteCommandRequestBase base;
+        base.setBypassDocumentValidation(true);
+        base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
+        updateOp.setWriteCommandRequestBase(base);
+
+        write_ops::InsertCommandRequest insertOp1(ns.makeTimeseriesBucketsNamespace(),
+                                                  {bucketDoc2});
+        insertOp1.setWriteCommandRequestBase(base);
+        write_ops::InsertCommandRequest insertOp2(ns.makeTimeseriesBucketsNamespace(),
+                                                  {bucketDoc3});
+        insertOp2.setWriteCommandRequestBase(base);
+
+        ASSERT_OK(performAtomicWrites(opCtx,
+                                      bucketsColl.getCollection(),
+                                      recordId1,
+                                      updateOp,
+                                      {insertOp1, insertOp2},
+                                      /*fromMigrate=*/false,
+                                      /*stmtId=*/kUninitializedStmtId));
+    }
+
+    // Checks document1 is updated and document2 and document3 are added.
+    {
+        Snapshotted<BSONObj> doc;
+        bool found = bucketsColl->findDoc(opCtx, recordId1, &doc);
+        ASSERT_TRUE(found);
+        UnorderedFieldsBSONObjComparator comparator;
+        ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+
+        found = bucketsColl->findDoc(opCtx, recordId2, &doc);
+        ASSERT_TRUE(found);
+        ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
+
+        found = bucketsColl->findDoc(opCtx, recordId3, &doc);
+        ASSERT_TRUE(found);
+        ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc3));
     }
 }
 
