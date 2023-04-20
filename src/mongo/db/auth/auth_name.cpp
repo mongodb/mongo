@@ -164,6 +164,15 @@ BSONObj AuthName<T>::toBSON(bool encodeTenant) const {
     return bob.obj();
 }
 
+template <typename T>
+std::size_t AuthName<T>::getBSONObjSize() const {
+    return 4UL +                            // BSONObj size
+        1UL + T::kFieldName.size() + 1UL +  // FieldName elem type, FieldName, terminating NULL.
+        4UL + getName().size() + 1UL +      // Length of name data, name data, terminating NULL.
+        1UL + ("db"_sd).size() + 1UL +      // DB field elem type, "db", terminating NULL.
+        4UL + getDB().size() + 1UL +        // DB value length, DB value, terminating NULL.
+        1UL;                                // EOD marker.
+}
 
 // Materialize the types we care about.
 template class AuthName<RoleName>;
