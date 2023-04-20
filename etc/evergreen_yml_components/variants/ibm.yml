@@ -98,7 +98,7 @@ buildvariants:
       -j3
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
