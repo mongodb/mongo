@@ -25,20 +25,20 @@ assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 const getLatencyStats = () => {
     const stats = coll.aggregate([{$collStats: {latencyStats: {}}}]).next();
-    assert(stats.hasOwnProperty("latencyStats"));
-    assert(stats.latencyStats.hasOwnProperty("writes"));
+    assert(stats.hasOwnProperty("latencyStats"), tojson(stats));
+    assert(stats.latencyStats.hasOwnProperty("writes"), tojson(stats));
     return stats.latencyStats.writes;
 };
 
 const stats1 = getLatencyStats();
-assert.eq(stats1.ops, 0);
-assert.eq(stats1.latency, 0);
+assert.eq(stats1.ops, 0, tojson(stats1));
+assert.eq(stats1.latency, 0, tojson(stats1));
 
 assert.commandWorked(coll.insert({[timeFieldName]: new Date(), x: 1}));
 
 const stats2 = getLatencyStats();
-assert.eq(stats2.ops, 1);
-assert.gt(stats2.latency, stats1.latency);
+assert.eq(stats2.ops, 1, tojson(stats2));
+assert.gt(stats2.latency, stats1.latency, tojson(stats2));
 
 const reps = 10;
 for (let i = 0; i < reps; ++i) {
@@ -46,8 +46,8 @@ for (let i = 0; i < reps; ++i) {
 }
 
 const stats3 = getLatencyStats();
-assert.eq(stats3.ops, 1 + reps);
-assert.gt(stats3.latency, stats2.latency);
+assert.eq(stats3.ops, 1 + reps, tojson(stats3));
+assert.gt(stats3.latency, stats2.latency, tojson(stats3));
 
 MongoRunner.stopMongod(conn);
 })();
