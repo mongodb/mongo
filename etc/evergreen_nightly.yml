@@ -242,8 +242,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency !.large !.ubsan !.no_txns
+  - name: .concurrency .large !.ubsan !.no_txns
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large

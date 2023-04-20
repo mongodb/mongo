@@ -569,7 +569,11 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js !.non_win_dbg
-  - name: .concurrency .debug_only
+  - name: .concurrency
+    distros:
+    - windows-vsCurrent-large
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
     distros:
     - windows-vsCurrent-large
   - name: disk_wiredtiger
@@ -964,8 +968,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency !.large !.ubsan !.no_txns
+  - name: .concurrency .large !.ubsan !.no_txns
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
@@ -1071,8 +1075,8 @@ buildvariants:
   - name: .change_streams !.no_debug_mode
   - name: .change_stream_fuzzer
   - name: .misc_js !.no_debug_mode
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.no_debug_mode
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.no_debug_mode
+  - name: .concurrency !.large !.ubsan !.no_txns !.no_debug_mode
+  - name: .concurrency .large !.ubsan !.no_txns !.no_debug_mode
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
@@ -1207,8 +1211,8 @@ buildvariants:
   - name: change_streams_multitenant_sharded_collections_passthrough
   - name: .misc_js
   - name: .clustered_collections
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency !.large !.ubsan !.no_txns
+  - name: .concurrency .large !.ubsan !.no_txns
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
@@ -1365,8 +1369,8 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
   - name: .change_streams
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.compute_mode
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.compute_mode
+  - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode
+  - name: .concurrency .large !.ubsan !.no_txns !.compute_mode
     distros:
     - rhel80-medium
   - name: .encrypt
@@ -1871,8 +1875,8 @@ buildvariants:
   - name: change_streams_multitenant_sharded_collections_passthrough
   - name: .misc_js
   - name: .clustered_collections
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency !.large !.ubsan !.no_txns
+  - name: .concurrency .large !.ubsan !.no_txns
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:
@@ -2324,8 +2328,8 @@ buildvariants:
   # - name: .change_streams # Not passing
   # - name: .change_stream_fuzzer # Not passing
   # - name: .misc_js # Not passing
-  # - name: .concurrency !.large !.ubsan !.no_txns !.debug_only # Not passing
-  # - name: .concurrency .large !.ubsan !.no_txns !.debug_only # Not passing
+  # - name: .concurrency !.large !.ubsan !.no_txns # Not passing
+  # - name: .concurrency .large !.ubsan !.no_txns # Not passing
   #   distros:
   #   - rhel80-medium
   - name: disk_wiredtiger
@@ -2425,8 +2429,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.compute_mode
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.compute_mode
+  - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode
+  - name: .concurrency .large !.ubsan !.no_txns !.compute_mode
     distros:
     - rhel80-large
   - name: .config_fuzzer
