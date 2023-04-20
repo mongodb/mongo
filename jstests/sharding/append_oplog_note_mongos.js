@@ -1,6 +1,10 @@
 /**
  * Tests that the 'appendOplogNote' command on mongos correctly performs a no-op write on each
  * shard and advances the $clusterTime.
+ *
+ * Expects a particular oplog entry to be the latest in a shard's oplog, but if the shard is the
+ * config server, background writes, like to config.mongos, can break its assumption.
+ * @tags: [catalog_shard_incompatible]
  */
 
 (function() {

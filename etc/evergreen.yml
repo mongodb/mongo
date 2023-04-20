@@ -1325,8 +1325,12 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
   - name: sharding_auth_gen
+  # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
+  # variant will be removed when config shards become the default, so this is only temporary.
+  - name: sharding_multiversion_gen
   - name: .sharding .txns
-  - name: .sharding .common
+  # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
+  - name: .sharding .common !.csrs
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   # - name: .concurrency .sharded !.large
   # - name: .concurrency .sharded .large

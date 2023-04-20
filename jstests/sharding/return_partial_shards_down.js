@@ -1,6 +1,10 @@
 //
 // Tests that zero results are correctly returned with returnPartial and shards down
 //
+// Shuts down all shards, which includes the config server. Can be made to pass by restarting the
+// config server, but this makes the test flaky.
+// @tags: [catalog_shard_incompatible]
+//
 
 // Checking UUID and index consistency involves talking to shards, but this test shuts down shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
@@ -84,13 +88,5 @@ checkDocCount(collOneShard, returnPartialFlag, true, 0);
 checkDocCount(collAllShards, returnPartialFlag, true, 0);
 
 jsTest.log("DONE!");
-
-if (TestData.catalogShard) {
-    // Sharding test stop requires the config server to be up, so restart the first shard if it's
-    // the config server.
-    st.rs0.startSet({restart: true});
-    st.rs0.initiate();
-    st.rs0.awaitReplication();
-}
 
 st.stop();

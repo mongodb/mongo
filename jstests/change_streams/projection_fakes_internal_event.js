@@ -2,7 +2,10 @@
  * Tests that a user projection which fakes an internal topology-change event is handled gracefully
  * in a sharded cluster.
  * TODO SERVER-65778: rework this test when we can handle faked internal events more robustly.
- * @tags: [assumes_read_preference_unchanged]
+ *
+ * Tests that if a user fakes an internal event with a projection nothing crashes, so not valuable
+ * to test with a config shard.
+ * @tags: [assumes_read_preference_unchanged, catalog_shard_incompatible]
  */
 (function() {
 "use strict";

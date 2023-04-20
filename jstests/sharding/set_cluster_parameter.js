@@ -368,6 +368,12 @@ if (!TestData.catalogShard) {
                                catalogShard.getPrimary(),
                                catalogShard.getPrimary());
 
+        if (TestData.mongosBinVersion) {
+            // Lower the config shard's FCV so an earlier binary mongos can connect.
+            const targetFCV = binVersionToFCV(TestData.mongosBinVersion);
+            assert.commandWorked(catalogShard.getPrimary().adminCommand(
+                {setFeatureCompatibilityVersion: targetFCV}));
+        }
         var mongos = MongoRunner.runMongos({configdb: catalogShard.getURL()});
         assert.commandWorked(mongos.adminCommand({transitionToCatalogShard: 1}));
         checkClusterParameters(clusterParameter2Name,

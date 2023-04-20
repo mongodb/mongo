@@ -235,13 +235,15 @@ function verifyChangeStreamOnWholeCluster({
         verbosity: "executionStats"
     });
 
-    assertNumMatchingOplogEventsForShard(stats, st.rs0.name, expectedOplogNReturnedPerShard[0]);
-    assertNumMatchingOplogEventsForShard(stats, st.rs1.name, expectedOplogNReturnedPerShard[1]);
+    assertNumMatchingOplogEventsForShard(
+        stats, st.shard0.shardName, expectedOplogNReturnedPerShard[0]);
+    assertNumMatchingOplogEventsForShard(
+        stats, st.shard1.shardName, expectedOplogNReturnedPerShard[1]);
 
     if (expectedChangeStreamDocsReturnedPerShard !== undefined) {
         assertNumChangeStreamDocsReturnedFromShard(
-            stats, st.rs0.name, expectedChangeStreamDocsReturnedPerShard[0]);
+            stats, st.shard0.shardName, expectedChangeStreamDocsReturnedPerShard[0]);
         assertNumChangeStreamDocsReturnedFromShard(
-            stats, st.rs1.name, expectedChangeStreamDocsReturnedPerShard[1]);
+            stats, st.shard1.shardName, expectedChangeStreamDocsReturnedPerShard[1]);
     }
 }
