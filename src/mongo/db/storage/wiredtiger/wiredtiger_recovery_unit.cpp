@@ -404,7 +404,11 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
-    _untimestampedWriteAssertion = WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kEnforce;
+    if (_untimestampedWriteAssertionLevel !=
+        RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways) {
+        _untimestampedWriteAssertionLevel =
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce;
+    }
     // Reset the kLastApplied read source back to the default of kNoTimestamp. Any reader requiring
     // kLastApplied will set the read source again before reading. Resetting this read source
     // simplifies the handling when stepup happens concurrently with read operations.
@@ -503,7 +507,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kNoRoundError,
-                                    _untimestampedWriteAssertion)
+                                    _untimestampedWriteAssertionLevel)
                 .done();
             break;
         }
@@ -512,7 +516,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kNoRoundError,
-                                    _untimestampedWriteAssertion)
+                                    _untimestampedWriteAssertionLevel)
                 .done();
             break;
         }
@@ -521,7 +525,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                 session,
                 _prepareConflictBehavior,
                 _roundUpPreparedTimestamps,
-                _untimestampedWriteAssertion);
+                _untimestampedWriteAssertionLevel);
             break;
         }
         case ReadSource::kLastApplied: {
@@ -544,7 +548,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                             _prepareConflictBehavior,
                                             _roundUpPreparedTimestamps,
                                             RoundUpReadTimestamp::kNoRoundError,
-                                            _untimestampedWriteAssertion);
+                                            _untimestampedWriteAssertionLevel);
             auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
 
             if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
@@ -573,7 +577,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp(WT_SESS
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _untimestampedWriteAssertion);
+                                    _untimestampedWriteAssertionLevel);
     Timestamp txnTimestamp = _sessionCache->getKVEngine()->getAllDurableTimestamp();
     auto status = txnOpen.setReadSnapshot(txnTimestamp);
     fassert(50948, status);
@@ -601,7 +605,7 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SESSION*
                                         _prepareConflictBehavior,
                                         _roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
-                                        _untimestampedWriteAssertion);
+                                        _untimestampedWriteAssertionLevel);
         LOGV2_DEBUG(4847500, 2, "no read timestamp available for kLastApplied");
         txnOpen.done();
         return;
@@ -611,7 +615,7 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SESSION*
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _untimestampedWriteAssertion);
+                                    _untimestampedWriteAssertionLevel);
     auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
     fassert(4847501, status);
 
@@ -667,7 +671,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
                                         _prepareConflictBehavior,
                                         _roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
-                                        _untimestampedWriteAssertion);
+                                        _untimestampedWriteAssertionLevel);
         LOGV2_DEBUG(4452900, 1, "no read timestamp available for kNoOverlap");
         txnOpen.done();
         return readTimestamp;
@@ -677,7 +681,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _untimestampedWriteAssertion);
+                                    _untimestampedWriteAssertionLevel);
     auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);
 

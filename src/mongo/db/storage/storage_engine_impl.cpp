@@ -957,7 +957,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     });
 
     // This code makes untimestamped writes to the _mdb_catalog.
-    opCtx->recoveryUnit()->allowUntimestampedWrite();
+    opCtx->recoveryUnit()->allowOneUntimestampedWrite();
 
     Status firstError = Status::OK();
     WriteUnitOfWork untimestampedDropWuow(opCtx);

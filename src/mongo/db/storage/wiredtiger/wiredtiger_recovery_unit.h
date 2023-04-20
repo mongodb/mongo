@@ -113,10 +113,16 @@ public:
 
     Timestamp getCatalogConflictingTimestamp() const override;
 
-    void allowUntimestampedWrite() override {
+    void allowOneUntimestampedWrite() override {
         invariant(!_isActive());
-        _untimestampedWriteAssertion =
-            WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kSuppress;
+        _untimestampedWriteAssertionLevel =
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressOnce;
+    }
+
+    void allowAllUntimestampedWrites() override {
+        invariant(!_isActive());
+        _untimestampedWriteAssertionLevel =
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways;
     }
 
     void setTimestampReadSource(ReadSource source,
@@ -280,8 +286,8 @@ private:
     boost::optional<Timestamp> _lastTimestampSet;
     Timestamp _readAtTimestamp;
     Timestamp _catalogConflictTimestamp;
-    WiredTigerBeginTxnBlock::UntimestampedWriteAssertion _untimestampedWriteAssertion =
-        WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kEnforce;
+    UntimestampedWriteAssertionLevel _untimestampedWriteAssertionLevel =
+        UntimestampedWriteAssertionLevel::kEnforce;
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     boost::optional<int64_t> _oplogVisibleTs = boost::none;

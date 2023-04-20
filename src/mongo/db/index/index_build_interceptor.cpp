@@ -175,7 +175,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // Note that index builds will only "resume" once. A second resume results in the index
         // build starting from scratch. A "resumed" index build does not use a majority read
         // concern. And thus will observe data that can be rolled back via replication.
-        opCtx->recoveryUnit()->allowUntimestampedWrite();
+        opCtx->recoveryUnit()->allowOneUntimestampedWrite();
         WriteUnitOfWork wuow(opCtx);
 
         int32_t batchSize = 0;
