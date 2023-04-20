@@ -83,4 +83,6 @@ commands:
                 
             validAfter:
                 type: timestamp 
-                description: "The time after which this chunk is at the new shard"
+                description: "The time after which this chunk is at the new shard.
+                              NOTE: v7.0 is deprecating this field and it should not be used to 
+                              develop new functionality (see SERVER-74469 for details)."
