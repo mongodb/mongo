@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <system_error>
 #include <utility>
 
 #include "mongo/base/string_data.h"
@@ -51,5 +52,16 @@ std::pair<int, std::string> errnoAndDescription();
  * Useful in conjunction with uassert/massert.
  */
 std::string errnoWithPrefix(StringData prefix);
+
+/**
+ * Returns `ec.message()`, possibly augmented to disambiguate unknowns.
+ *
+ * In libstdc++, the unknown error messages include the number. Windows and
+ * Libc++ do not include it. So if the code is an unknown, it is replaced with the
+ * message that libstdc++ would have given, which is the expanded format
+ * expression:
+ *     `"Unknown error {}"_format(ec.value())`
+ */
+std::string errorMessage(std::error_code ec);
 
 }  // namespace mongo

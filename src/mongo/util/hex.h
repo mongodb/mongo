@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fmt/format.h>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -129,4 +130,10 @@ std::string unsignedIntToFixedLengthHex(uint32_t val);
 
 /* @return a dump of the buffer as hex byte ascii output */
 std::string hexdump(const char* data, unsigned len);
+
+/** Render the unsigned equivalent of `val` in upper case hex. */
+template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
+std::string unsignedHex(T val) {
+    return format(FMT_STRING("{:X}"), std::make_unsigned_t<T>(val));
+}
 }  // namespace mongo

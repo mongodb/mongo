@@ -31,6 +31,7 @@
 
 #include "mongo/util/errno_util.h"
 
+#include <fmt/format.h>
 #include <sstream>
 
 #ifndef _WIN32
@@ -43,6 +44,8 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 namespace {
 const char kUnknownMsg[] = "Unknown error ";
@@ -123,6 +126,19 @@ std::string errnoWithPrefix(StringData prefix) {
         ss << prefix << ": ";
     ss << suffix;
     return ss.str();
+}
+
+std::string errorMessage(std::error_code ec) {
+    std::string r = ec.message();
+    bool vague = false;
+#if defined(_WIN32)
+    vague = (r == "unknown error"_sd);
+#elif defined(_LIBCPP_VERSION)
+    vague = StringData{r}.startsWith("unspecified"_sd);
+#endif
+    if (vague)
+        return "Unknown error {}"_format(ec.value());
+    return r;
 }
 
 }  // namespace mongo

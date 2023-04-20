@@ -358,6 +358,7 @@ mongod = env.Program(
         'db/read_write_concern_defaults_cache_lookup_mongod.cpp',
     ] + env.WindowsResourceFile("db/db.rc"),
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/pin_code_segments' if env.TargetOSIs('linux') else [],
         '$BUILD_DIR/third_party/shim_snappy',
         'base',
         'db/auth/auth_op_observer',
