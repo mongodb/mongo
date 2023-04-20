@@ -33,6 +33,7 @@
 #include <queue>
 
 #include "mongo/crypto/block_packer.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 
@@ -295,6 +296,69 @@ TEST(BlockPacker, AlignedThenOverfill) {
     ASSERT_EQ(1, leftovers.length());
 }
 
+// ... Try using insufficiently large output buffers for encryption and decryption
+TEST(SymmetricEncryptor, InsufficientOutputBuffer) {
+    SymmetricKey key = crypto::aesGenerate(crypto::sym256KeySize, "InsufficientOutputBufferTest");
+    constexpr auto plaintextMessage = "DOLOREM IPSUM"_sd;
+    std::vector<uint8_t> encodedPlaintext(plaintextMessage.begin(), plaintextMessage.end());
+    const std::array<uint8_t, 16> iv = {};
+    std::array<std::uint8_t, 1024> cryptoBuffer;
+    DataRange cryptoRange(cryptoBuffer.data(), cryptoBuffer.size());
+
+    auto swEnc = crypto::SymmetricEncryptor::create(key, crypto::aesMode::cbc, iv);
+    ASSERT_OK(swEnc.getStatus());
+    auto encryptor = std::move(swEnc.getValue());
+    DataRangeCursor cryptoCursor(cryptoRange);
+
+    // Validate that encryption with insufficient output buffer does not succeed
+    DataRange smallOutputBuffer(cryptoBuffer.data(), 1);
+    ASSERT_NOT_OK(encryptor->update(encodedPlaintext, smallOutputBuffer));
+
+    // Validate that encryption with zero output buffer does not succeed
+    DataRange zeroOutputBuffer(cryptoBuffer.data(), 0);
+    ASSERT_NOT_OK(
+        encryptor->update({plaintextMessage.rawData(), plaintextMessage.size()}, zeroOutputBuffer));
+
+    auto swSize = encryptor->update(encodedPlaintext, cryptoCursor);
+    ASSERT_OK(swSize);
+    cryptoCursor.advance(swSize.getValue());
+
+    swSize = encryptor->finalize(cryptoCursor);
+    ASSERT_OK(swSize);
+
+    // finalize is guaranteed to output at least 16 bytes for the CBC blockmode
+    ASSERT_GTE(swSize.getValue(), 16);
+    cryptoCursor.advance(swSize.getValue());
+
+    // Validate beginning of decryption process
+    auto swDec = crypto::SymmetricDecryptor::create(key, crypto::aesMode::cbc, iv);
+    ASSERT_OK(swDec.getStatus());
+    auto decryptor = std::move(swDec.getValue());
+
+    // Validate that decryption with insufficient output buffer does not succeed
+    std::array<uint8_t, 1> shortOutputBuffer;
+    DataRangeCursor shortOutputCursor(shortOutputBuffer);
+    ASSERT_NOT_OK(decryptor->update(
+        {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, shortOutputCursor));
+
+    // Validate that decryption with zero output buffer does not succeed
+    DataRangeCursor zeroOutputCursor(zeroOutputBuffer);
+    ASSERT_NOT_OK(decryptor->update(
+        {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, zeroOutputCursor));
+
+    // Validate that decryption update/finalize with sufficient output buffer succeeds
+    std::array<uint8_t, 1024> decryptionBuffer;
+    DataRangeCursor decryptionCursor(decryptionBuffer);
+    auto swUpdateSize = decryptor->update(
+        {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, decryptionCursor);
+    ASSERT_OK(swUpdateSize.getStatus());
+    decryptionCursor.advance(swUpdateSize.getValue());
+    auto swFinalizeSize = decryptor->finalize(decryptionCursor);
+    ASSERT_OK(swFinalizeSize.getStatus());
+
+    // Validate that the decrypted ciphertext matches the original plaintext
+    ASSERT(std::equal(plaintextMessage.begin(), plaintextMessage.end(), decryptionBuffer.begin()));
+}
 
 // The following tests validate that SymmetricEncryptors function when called with inputs with
 // varying block alignments.
