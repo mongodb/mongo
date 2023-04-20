@@ -224,22 +224,6 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanBuildIndex() {
     MONGO_UNREACHABLE;
 }
 
-Status TenantMigrationDonorAccessBlocker::checkIfCanGetMoreChangeStream() {
-    stdx::lock_guard<Latch> lg(_mutex);
-    switch (_state.getState()) {
-        case BlockerState::State::kAllow:
-        case BlockerState::State::kBlockWrites:
-        case BlockerState::State::kBlockWritesAndReads:
-            return Status::OK();
-        case BlockerState::State::kReject:
-            return {ErrorCodes::ResumeTenantChangeStream,
-                    "Change stream must be resumed on the new owner of this tenant"};
-        case BlockerState::State::kAborted:
-            return Status::OK();
-    }
-    MONGO_UNREACHABLE;
-}
-
 void TenantMigrationDonorAccessBlocker::startBlockingWrites() {
     stdx::lock_guard<Latch> lg(_mutex);
 

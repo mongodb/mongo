@@ -529,8 +529,6 @@ error_codes:
 
     - {code: 399, name: MovePrimaryRecipientPastAbortableStage, categories: [InternalOnly]}
 
-    - {code: 400, name: ResumeTenantChangeStream}
-
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
@@ -560,3 +558,4 @@ error_codes:
     - {code: 50768,name: NotARetryableWriteCommand}
     - {code: 50915,name: BackupCursorOpenConflictWithCheckpoint, categories: [RetriableError]}
     - {code: 56846,name: ConfigServerUnreachable}
+
