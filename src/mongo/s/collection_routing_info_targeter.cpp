@@ -386,13 +386,17 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // replacement document for targeting purposes.
 
     const auto& updateOp = itemRef.getUpdate();
+    const bool isMulti = updateOp.getMulti();
 
-    if (updateOp.getMulti()) {
+    if (isMulti) {
         updateManyCount.increment(1);
     }
 
     // If the collection is not sharded, forward the update to the primary shard.
     if (!_cri.cm.isSharded()) {
+        if (!isMulti) {
+            updateOneUnshardedCount.increment(1);
+        }
         // TODO (SERVER-51070): Remove the boost::none when the config server can support
         // shardVersion in commands
         return std::vector{ShardEndpoint(
@@ -422,7 +426,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
-                updateOp.getMulti());
+                isMulti);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
@@ -446,14 +450,22 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         getUpdateExprForTargeting(expCtx, shardKeyPattern, query, updateOp.getU());
 
     // Utility function to target an update by shard key, and to handle any potential error results.
-    auto targetByShardKey = [this, &collation, &chunkRanges](StatusWith<BSONObj> swShardKey,
-                                                             std::string msg) {
+    auto targetByShardKey = [this, &collation, &chunkRanges, isUpsert, isMulti](
+                                StatusWith<BSONObj> swShardKey, std::string msg) {
         const auto& shardKey = uassertStatusOKWithContext(std::move(swShardKey), msg);
-        uassert(ErrorCodes::ShardKeyNotFound,
-                str::stream() << msg << " :: could not extract exact shard key",
-                !shardKey.isEmpty());
-        return std::vector{
-            uassertStatusOKWithContext(_targetShardKey(shardKey, collation, chunkRanges), msg)};
+        if (shardKey.isEmpty()) {
+            if (isUpsert && !isMulti) {  // Single upsert
+                updateOneNonTargetedShardedCount.increment(1);
+            }
+            uasserted(ErrorCodes::ShardKeyNotFound,
+                      str::stream() << msg << " :: could not extract exact shard key");
+        } else {
+            if (isUpsert && !isMulti) {  // Single upsert
+                updateOneTargetedShardedCount.increment(1);
+            }
+            return std::vector{
+                uassertStatusOKWithContext(_targetShardKey(shardKey, collation, chunkRanges), msg)};
+        }
     };
 
     // With the introduction of PM-1632, we can use the two phase write protocol to successfully
@@ -473,6 +485,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // or upsert to a single shard, so return immediately if we are able to target a single shard.
     auto endPoints = uassertStatusOK(_targetQuery(expCtx, query, collation, chunkRanges));
     if (endPoints.size() == 1) {
+        updateOneTargetedShardedCount.increment(1);
         return endPoints;
     }
 
@@ -503,13 +516,15 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                    "single shard (and have the simple collation), but this update targeted "
                 << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
                 << ", shard key pattern: " << shardKeyPattern.toString(),
-            updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) ||
+            isMulti || isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
-    // If the request is {multi:false}, then this is a single op-style update which we are
-    // broadcasting to multiple shards by exact _id. Record this event in our serverStatus metrics.
-    if (!updateOp.getMulti()) {
+    // If the request is {multi:false} and it's not a write without shard key, then this is a single
+    // op-style update which we are broadcasting to multiple shards by exact _id. Record this event
+    // in our serverStatus metrics.
+    if (!isMulti && isExactIdQuery(opCtx, _nss, query, collation, _cri.cm)) {
+        updateOneTargetedShardedCount.increment(1);
         updateOneOpStyleBroadcastWithExactIDCount.increment(1);
     }
 
@@ -571,6 +586,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     if (!shardKey.isEmpty()) {
         auto swEndpoint = _targetShardKey(shardKey, collation, chunkRanges);
         if (swEndpoint.isOK()) {
+            deleteOneTargetedShardedCount.increment(1);
             return std::vector{std::move(swEndpoint.getValue())};
         }
     }
@@ -612,6 +628,13 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     if (chunkRanges) {
         chunkRanges->clear();
     }
+
+    if (!_cri.cm.isSharded()) {
+        deleteOneUnshardedCount.increment(1);
+    } else if (isExactIdQuery(opCtx, *cq, _cri.cm)) {
+        deleteOneTargetedShardedCount.increment(1);
+    }
+
     return uassertStatusOK(_targetQuery(expCtx, deleteQuery, collation, chunkRanges));
 }
 

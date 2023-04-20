@@ -571,5 +571,23 @@ extern OperatorCounters operatorCountersWindowAccumulatorExpressions;
 extern CounterMetric updateManyCount;
 // Track the number of deleteMany calls.
 extern CounterMetric deleteManyCount;
+// Track the number of targeted updateOne commands on sharded collections.
+extern CounterMetric updateOneTargetedShardedCount;
+// Track the number of targeted deleteOne commands on sharded collections.
+extern CounterMetric deleteOneTargetedShardedCount;
+// Track the number of targeted findAndModify commands on sharded collections.
+extern CounterMetric findAndModifyTargetedShardedCount;
+// Track the number of updateOne commands on unsharded collections.
+extern CounterMetric updateOneUnshardedCount;
+// Track the number of deleteOne commands on unsharded collections.
+extern CounterMetric deleteOneUnshardedCount;
+// Track the number of findAndModify commands on unsharded collections.
+extern CounterMetric findAndModifyUnshardedCount;
+// Track the number of non-targeted updateOne commands on sharded collections
+extern CounterMetric updateOneNonTargetedShardedCount;
+// Track the number of non-targeted deleteOne commands on sharded collections
+extern CounterMetric deleteOneNonTargetedShardedCount;
+// Track the number of non-targeted findAndModify commands on sharded collections
+extern CounterMetric findAndModifyNonTargetedShardedCount;
 
 }  // namespace mongo

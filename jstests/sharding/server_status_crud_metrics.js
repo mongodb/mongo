@@ -88,7 +88,7 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
             "retryWrites: true."));
     }
 
-    // Shouldn't increment the metrics for unsharded collection.
+    // Should increment the metrics for unsharded collection.
     assert.commandWorked(unshardedColl.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));
     assert.commandWorked(unshardedColl.update({_id: 1}, {$set: {a: 2}}, {multi: false}));
 
@@ -99,9 +99,10 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 
     mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
-    // TODO: SERVER-69810 ServerStatus metrics for tracking number of
-    // updateOnes/deleteOnes/findAndModifies
-    // assert.eq(5, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+    // Verifying metrics for updateOnes commands.
+    assert.eq(1, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
+    assert.eq(2, mongosServerStatus.metrics.query.updateOneUnshardedCount);
+
 } else {
     // Shouldn't increment the metric when routing fails.
     assert.commandFailedWithCode(testColl.update({}, {$set: {x: 2}}, {multi: false}),

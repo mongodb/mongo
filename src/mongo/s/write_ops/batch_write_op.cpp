@@ -38,6 +38,7 @@
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/transaction_router.h"
@@ -428,12 +429,17 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
                                                              isUpsert,
                                                              query,
                                                              collation)) {
-
                 // Writes without shard key should be in their own batch.
                 if (!batchMap.empty()) {
                     writeOp.cancelWrites(nullptr);
                     break;
                 } else {
+                    if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
+                        updateOneNonTargetedShardedCount.increment(1);
+                    } else {
+                        deleteOneNonTargetedShardedCount.increment(1);
+                    }
+
                     isWriteWithoutShardKeyOrId = true;
                 }
             };

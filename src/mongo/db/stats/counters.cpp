@@ -348,5 +348,14 @@ OperatorCounters operatorCountersWindowAccumulatorExpressions{
     "operatorCounters.windowAccumulators."};
 CounterMetric updateManyCount("query.updateManyCount");
 CounterMetric deleteManyCount("query.deleteManyCount");
+CounterMetric updateOneTargetedShardedCount("query.updateOneTargetedShardedCount");
+CounterMetric deleteOneTargetedShardedCount("query.deleteOneTargetedShardedCount");
+CounterMetric findAndModifyTargetedShardedCount("query.findAndModifyTargetedShardedCount");
+CounterMetric updateOneUnshardedCount("query.updateOneUnshardedCount");
+CounterMetric deleteOneUnshardedCount("query.deleteOneUnshardedCount");
+CounterMetric findAndModifyUnshardedCount("query.findAndModifyUnshardedCount");
+CounterMetric updateOneNonTargetedShardedCount("query.updateOneNonTargetedShardedCount");
+CounterMetric deleteOneNonTargetedShardedCount("query.deleteOneNonTargetedShardedCount");
+CounterMetric findAndModifyNonTargetedShardedCount("query.findAndModifyNonTargetedShardedCount");
 
 }  // namespace mongo
