@@ -70,6 +70,7 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("countBytesClonedOnCatchUpOnRecipient",
                     countBytesClonedOnCatchUpOnRecipient.load());
     builder->append("countDocsClonedOnDonor", countDocsClonedOnDonor.load());
+    builder->append("countBytesClonedOnDonor", countBytesClonedOnDonor.load());
     builder->append("countRecipientMoveChunkStarted", countRecipientMoveChunkStarted.load());
     builder->append("countDocsDeletedOnDonor", countDocsDeletedOnDonor.load());
     builder->append("countDonorMoveChunkLockTimeout", countDonorMoveChunkLockTimeout.load());
