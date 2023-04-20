@@ -72,6 +72,9 @@ selector:
   # TODO SERVER-61050
   - jstests/core/timeseries/timeseries_merge.js
 
+  # Explain doesn't support read concern majority in sharding.
+  - jstests/core/**/command_let_variables.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod
