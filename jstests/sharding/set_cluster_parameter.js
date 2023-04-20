@@ -368,6 +368,12 @@ if (!TestData.configShard) {
                                configShard.getPrimary(),
                                configShard.getPrimary());
 
+        if (TestData.mongosBinVersion) {
+            // Lower the config shard's FCV so an earlier binary mongos can connect.
+            const targetFCV = binVersionToFCV(TestData.mongosBinVersion);
+            assert.commandWorked(
+                configShard.getPrimary().adminCommand({setFeatureCompatibilityVersion: targetFCV}));
+        }
         var mongos = MongoRunner.runMongos({configdb: configShard.getURL()});
         assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
         checkClusterParameters(clusterParameter2Name,

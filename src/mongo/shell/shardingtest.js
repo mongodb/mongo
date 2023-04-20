@@ -1376,7 +1376,9 @@ var ShardingTest = function(params) {
                 rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
                 rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
             } else {
-                if (jsTestOptions().shardMixedBinVersions) {
+                // Our documented upgrade/downgrade paths let us assume config server nodes will
+                // always be fully upgraded before shard nodes, so skip a config shard.
+                if (jsTestOptions().shardMixedBinVersions && !setIsConfigSvr) {
                     if (!otherParams.shardOptions) {
                         otherParams.shardOptions = {};
                     }
