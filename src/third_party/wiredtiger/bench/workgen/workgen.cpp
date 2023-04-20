@@ -1685,10 +1685,11 @@ ThreadRunner::op_run(Operation *op)
         cursor = _cursors[tint];
     }
 
-    measure_latency = track != nullptr &&
-      (track->ops != 0 && track->track_latency() &&
-          (track->ops % _workload->options.sample_rate == 0) ||
-        op->_optype == Operation::OP_RTS || op->_optype == Operation::OP_CHECKPOINT);
+    // Don't skip measuring the first checkpoint or RTS.
+    measure_latency = track != nullptr && track->track_latency() &&
+      (track->ops % _workload->options.sample_rate == 0) &&
+      (track->ops != 0 || op->_optype == Operation::OP_RTS ||
+        op->_optype == Operation::OP_CHECKPOINT);
 
     uint64_t start;
     if (measure_latency)
