@@ -339,7 +339,10 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
             }
 
             if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
-                return RangeDeleterService::get(opCtx)->getOverlappingRangeDeletionsFuture(
+                const auto rangeDeleterService = RangeDeleterService::get(opCtx);
+                rangeDeleterService->getRangeDeleterServiceInitializationFuture().get(opCtx);
+
+                return rangeDeleterService->getOverlappingRangeDeletionsFuture(
                     self->_metadataManager->getCollectionUuid(), orphanRange);
             } else {
                 return self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
