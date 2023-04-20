@@ -279,8 +279,6 @@ def unpack_uint64(b):
 
 # Print the bytes, which may be keys or values.
 def raw_bytes(b):
-    result = ''
-
     if type(b) != type(b''):
         # Not bytes, it's already a string.
         return b
@@ -288,15 +286,32 @@ def raw_bytes(b):
     # If the high bit of the first byte is on, it's likely we have
     # a packed integer.  If the high bit is off, it's possible we have
     # a packed integer (it would be negative) but it's harder to guess,
-    # we'll presume ASCII.  But if the byte is 0x7f, that's ASCII DEL,
+    # we'll presume a string.  But if the byte is 0x7f, that's ASCII DEL,
     # very unlikely to be the beginning of a string, but it decodes as -1,
-    # so seems more likely to be an int.
-    while len(b) > 0 and b[0] >= 0x7f:
-        val, b = unpack_int(b)
+    # so seems more likely to be an int.  If the UTF-8 decoding of the
+    # string fails, we probably just have binary data.
+
+    # Try decoding as one or more packed ints
+    result = ''
+    s = b
+    while len(s) > 0 and s[0] >= 0x7f:
+        val, s = unpack_int(s)
+        if result != '':
+            result += ' '
         result += f'<packed {d_and_h(val)}>'
-    if len(b) > 0 or len(result) == 0:
-        result += f'"{b.decode()}"'
-    return result
+    if len(s) == 0:
+        return result
+    
+    # See if the rest of the bytes can be decoded as a string
+    try:
+        if result != '':
+            result += ' '
+        return f'"{result + s.decode()}"'
+    except:
+        pass
+    
+    # The earlier steps failed, so it must be binary data
+    return binary_to_pretty_string(b, start_with_line_prefix=False)
 
 # Return a length as used in a cell that isn't a "short" cell.  Lengths that are
 # less or equal to 64 (WT_CELL_SIZE_ADJUST) are packed in a short cell, so if a
@@ -311,35 +326,39 @@ def long_length(p, b):
 def d_and_h(n):
     return f'{n} (0x{n:x})'
 
+# Convert binary data to a multi-line string with hex and printable characters
+def binary_to_pretty_string(b, per_line=16, line_prefix='  ', start_with_line_prefix=True):
+    printable = ''
+    result = ''
+    if start_with_line_prefix:
+        result += line_prefix
+    for i in range(0, len(b)):
+        if i > 0:
+            if i % per_line == 0:
+                result += '  ' + printable + '\n' + line_prefix
+                printable = ''
+            else:
+                result += ' '
+        result += '%02x' % b[i]
+        if b[i] >= ord(' ') and b[i] < 0x7f:
+            printable += chr(b[i])
+        else:
+            printable += '.'
+    if i % per_line != per_line - 1:
+        for j in range(i % per_line + 1, per_line):
+            result += '   '
+        result += '  ' + printable
+    return result
+
 def dumpraw(p, b, pos):
     savepos = b.tell()
     b.seek(pos)
     i = 0
-    line = hex(savepos) + ': '
-    asc = ''
-    while i < 256:
-        byte = b.read(1)[0]
-        line += ' ' + ("%02x" % byte)
-        cbyte = chr(byte)
-        if byte >= 127 or byte == 0 or chr(byte) not in string.printable:
-            asc += '.'
-        else:
-            cbyte = chr(byte)
-            if cbyte == '\\':
-                asc += '\\\\'
-            elif cbyte == '\n':
-                asc += '\\n'
-            elif cbyte == '\r':
-                asc += '\\r'
-            elif cbyte == '\t':
-                asc += '\\t'
-            else:
-                asc += cbyte
-        i += 1
-        if i != 0 and i % 16 == 0:
-            p.rint(line + ' ' + asc)
-            line = hex(b.tell()) + ': '
-            asc = ''
+    per_line = 16
+    s = binary_to_pretty_string(b.read(256), per_line=per_line, line_prefix='')
+    for line in s.splitlines():
+        p.rint(hex(pos + i) + ':  ' + line)
+        i += per_line
     b.seek(savepos)
 
 def file_header_decode(p, b):
@@ -567,10 +586,11 @@ def row_decode(p, b, pagehead, blockhead, disk_pos):
             else:
                 s = 'short val {} bytes'.format(l)
             x = b.read(l)
-        p.rint(f'{desc_str}{s}:')
-        p.rint(raw_bytes(x))
 
-        if x == '?' or s == '?':
+        if s != '?':
+            p.rint(f'{desc_str}{s}:')
+            p.rint(raw_bytes(x))
+        else:
             dumpraw(p, b, cellpos)
         p.end_cell()
 
@@ -591,7 +611,10 @@ def wtdecode_file_object(b, opts, nbytes):
         except:
             p.rint(f'ERROR decoding block at {d_and_h(startblock)}')
         p.rint('')
-        startblock = (b.tell() + 0x1ff) & ~(0x1FF)
+        pos = b.tell()
+        startblock = (pos + 0x1ff) & ~(0x1FF)
+        if startblock == pos:
+            startblock += 0x200
         pagecount += 1
     p.rint('')
     
