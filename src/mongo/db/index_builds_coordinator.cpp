@@ -60,6 +60,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/disk_space_util.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -501,6 +502,28 @@ IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* OperationC
     return get(OperationContext->getServiceContext());
 }
 
+Status IndexBuildsCoordinator::checkDiskSpaceSufficientToStartIndexBuild(OperationContext* opCtx) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const bool filesNotAllInSameDirectory =
+        storageEngine->isUsingDirectoryPerDb() || storageEngine->isUsingDirectoryForIndexes();
+    if (filesNotAllInSameDirectory) {
+        LOGV2(7333300,
+              "Index build: skipping available disk space check before starting index build as "
+              "storage engine stores data files in different directories");
+        return Status::OK();
+    }
+
+    const auto availableBytes = getAvailableDiskSpaceBytesInDbPath();
+    const int64_t requiredBytes = gIndexBuildMinAvailableDiskSpaceMB.load() * 1024 * 1024;
+    if (availableBytes <= requiredBytes) {
+        return Status(
+            ErrorCodes::OutOfDiskSpace,
+            fmt::format("available disk space of {} bytes is less than required minimum of {}",
+                        availableBytes,
+                        requiredBytes));
+    }
+    return Status::OK();
+}
 
 std::unique_ptr<DiskSpaceMonitor::Action>
 IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {

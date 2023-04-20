@@ -484,6 +484,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     // 1) We are in a replication mode that allows for index creation.
     // 2) Check sharding state.
     // 3) Check if we can create the index without handing control to the IndexBuildsCoordinator.
+    // 4) Check we are not in a multi-document transaction.
+    // 5) Check there is enough available disk space to start the index build.
     boost::optional<UUID> collectionUUID;
     {
         AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
@@ -538,6 +540,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 str::stream() << "Cannot create new indexes on existing collection "
                               << ns.toStringForErrorMsg() << " in a multi-document transaction.",
                 !opCtx->inMultiDocumentTransaction());
+
+        if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uassertStatusOK(
+                IndexBuildsCoordinator::checkDiskSpaceSufficientToStartIndexBuild(opCtx));
+        }
     }
 
     // Use AutoStatsTracker to update Top.

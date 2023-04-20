@@ -1160,6 +1160,7 @@ env.Library(
         'resumable_index_builds_idl',
         'server_base',
         'shard_role',
+        'storage/disk_space_util',
         'storage/encryption_hooks',
         'storage/storage_util',
         'storage/two_phase_index_build_knobs_idl',

@@ -452,6 +452,16 @@ env.Library(
 )
 
 env.Library(
+    target='disk_space_util',
+    source=[
+        'disk_space_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base', '$BUILD_DIR/mongo/util/fail_point', 'storage_options'
+    ],
+)
+
+env.Library(
     target='storage_repair_observer',
     source=[
         'storage_repair_observer.cpp',
@@ -618,10 +628,8 @@ env.Library(
         'disk_space_monitor.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        'storage_options',
+        '$BUILD_DIR/mongo/db/commands/server_status_core', '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context', 'disk_space_util', 'storage_options'
     ],
 )
 

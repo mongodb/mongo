@@ -115,6 +115,12 @@ public:
     static IndexBuildsCoordinator* get(OperationContext* operationContext);
 
     /**
+     * Returns Status::OK if there is enough available disk space to start an index build. Will
+     * return OutOfDiskSpace otherwise, with the context string providing the details.
+     */
+    static Status checkDiskSpaceSufficientToStartIndexBuild(OperationContext* opCtx);
+
+    /**
      * Updates CurOp's 'op' type to 'command', the 'nss' field, and the 'opDescription' field with
      * 'createIndexes' command and index specs. Also ensures the timer is started. If provided,
      * 'curOpDesc' is used as the base description upon which to perform the updates. Otherwise, the
