@@ -110,7 +110,7 @@ fdatasync(fd);
 close(fd);
 rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 
-...  // There is a second open of turtle here, is it important?
+...  // There is a second open of turtle here, is it important? We also set two thread names.
 
 fd = OPEN("./WiredTigerHS.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
 
@@ -150,6 +150,7 @@ dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
 close(dir);
 fdatasync(wt);
+... // Calls to open /proc/self/task/... in order to set names of internal threads.
 #endif /* __linux__ */
 
 OUTPUT("--------------open_session");
