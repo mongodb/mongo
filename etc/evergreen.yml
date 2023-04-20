@@ -2321,7 +2321,7 @@ buildvariants:
   # - name: test_api_version_compatibility # Not relevant for TSAN
   # - name: burn_in_tests_gen # No burn in tests needed
   - name: check_feature_flag_tags
-  # - name: .aggfuzzer !.feature_flag_guarded # Not passing
+  - name: .aggfuzzer !.feature_flag_guarded
   # - name: .aggregation !.feature_flag_guarded # Not passing
   - name: audit
   # - name: .auth  # Not passing
@@ -2345,7 +2345,7 @@ buildvariants:
   - name: disk_wiredtiger
   # - name: .encrypt # Not passing
   # - name: idl_tests # Not relevant for TSAN
-  # - name: initial_sync_fuzzer_gen # Not passing
+  - name: initial_sync_fuzzer_gen
   #   distros:
   #   - rhel80-medium
   - name: jsCore
@@ -2355,7 +2355,7 @@ buildvariants:
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
-  # - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer. # Not passing
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   # - name: libunwind_tests # Cant be used because tsan does not use libunwind
   # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: mqlrun
@@ -2385,9 +2385,8 @@ buildvariants:
   # - name: retryable_writes_jscore_stepdown_passthrough_gen # Not passing
   #   distros:
   #   - rhel80-medium
-  - name: read_only # TODO: replace with .read_only after read_only_sharded is fixed
-  # - name: .read_only # Not passing, see above
-  # - name: .rollbackfuzzer # Not passing
+  - name: .read_only
+  - name: .rollbackfuzzer
   - name: sasl
   - name: search
   - name: search_auth
@@ -2430,7 +2429,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_integration_and_test_parallel_stream_TG
-  - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
@@ -2444,9 +2442,7 @@ buildvariants:
     - rhel80-large
   - name: .config_fuzzer
   - name: .encrypt
-  - name: initial_sync_fuzzer_gen
   - name: .jscore .common !jsCore
-  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   # - name: libunwind_tests # Cant be used because tsan does not use libunwind
   # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: .multi_shard
@@ -2472,8 +2468,6 @@ buildvariants:
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
-  - name: .read_only
-  - name: .rollbackfuzzer
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
