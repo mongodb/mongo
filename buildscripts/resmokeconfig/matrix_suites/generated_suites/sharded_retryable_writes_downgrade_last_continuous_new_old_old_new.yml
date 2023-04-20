@@ -115,6 +115,7 @@ selector:
   - jstests/core/**/geo_s2sparse.js
   - jstests/core/**/mixed_version_replica_set.js
   - jstests/core/timeseries/timeseries_merge.js
+  - jstests/core/**/command_let_variables.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod
