@@ -17,12 +17,6 @@ const ns = dbName + "." + collName;
 let st =
     new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}, other: {enableBalancer: false}});
 
-// Increase timeout for range deletion of overlapping range on recipient.
-st.shard0.rs.getPrimary().adminCommand(
-    {setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 90000});
-st.shard1.rs.getPrimary().adminCommand(
-    {setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 90000});
-
 (() => {
     jsTestLog("Test simple shard key");
 
