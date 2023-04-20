@@ -144,14 +144,6 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
                                        optReceivedShardVersion,
                                        supportNonVersionedOperations);
 
-    if (!supportNonVersionedOperations) {
-        tassert(7032301,
-                "For sharded collections getOwnershipFilter cannot be relied on without a valid "
-                "shard version",
-                !ShardVersion::isPlacementVersionIgnored(*optReceivedShardVersion) ||
-                    !metadata->get().allowMigrations() || !metadata->get().isSharded());
-    }
-
     return {std::move(metadata)};
 }
 
