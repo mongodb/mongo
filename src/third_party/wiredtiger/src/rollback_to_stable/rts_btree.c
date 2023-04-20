@@ -577,11 +577,11 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
 
     /* Finally remove that update from history store. */
     if (valid_update_found) {
-        /* Avoid freeing the updates while still in use if hs_cursor->remove fails. */
-        upd = tombstone = NULL;
-
-        if (!dryrun)
+        if (!dryrun) {
+            /* Avoid freeing the updates while still in use if hs_cursor->remove fails. */
+            upd = tombstone = NULL;
             WT_ERR(hs_cursor->remove(hs_cursor));
+        }
         WT_RTS_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
         WT_RTS_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts);
     }
@@ -599,10 +599,12 @@ err:
     __wt_scr_free(session, &key_string);
     if (hs_cursor != NULL)
         WT_TRET(hs_cursor->close(hs_cursor));
-    if (dryrun) {
-        WT_ASSERT(session, !valid_update_found || upd == NULL);
+    if (dryrun)
+        /*
+         * Dry runs don't modify the database so any upd structure allocated by this function is not
+         * in use and must be cleaned up.
+         */
         __wt_free_update_list(session, &upd);
-    }
     return (ret);
 }
 
