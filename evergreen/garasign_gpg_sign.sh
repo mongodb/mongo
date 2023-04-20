@@ -3,12 +3,21 @@ set -o verbose
 
 cd src
 
-mv mongo-binaries.tgz mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-mv mongo-shell.tgz mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-mv mongo-cryptd.tgz mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz} || true
-mv mh.tgz mh-${push_name}-${push_arch}-${suffix}.${ext|tgz} || true
-mv mongo-debugsymbols.tgz mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} || true
-mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
+if [ -z "$ext" ]; then
+  ext="tgz"
+fi
+
+long_ext=${ext}
+if [ "$long_ext" == "tgz" ]; then
+  long_ext="tar.gz"
+fi
+
+mv mongo-binaries.tgz mongodb-${push_name}-${push_arch}-${suffix}.${ext}
+mv mongo-shell.tgz mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext}
+mv mongo-cryptd.tgz mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext} || true
+mv mh.tgz mh-${push_name}-${push_arch}-${suffix}.${ext} || true
+mv mongo-debugsymbols.tgz mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext} || true
+mv distsrc.${ext} mongodb-src-${src_suffix}.${long_ext} || true
 
 # generating checksums
 function gen_checksums() {
@@ -21,12 +30,12 @@ function gen_checksums() {
   fi
 }
 
-gen_checksums mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-gen_checksums mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-gen_checksums mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-gen_checksums mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-gen_checksums mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
-gen_checksums mongodb-src-${src_suffix}.${ext|tar.gz}
+gen_checksums mongodb-${push_name}-${push_arch}-${suffix}.${ext}
+gen_checksums mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext}
+gen_checksums mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext}
+gen_checksums mh-${push_name}-${push_arch}-${suffix}.${ext}
+gen_checksums mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext}
+gen_checksums mongodb-src-${src_suffix}.${long_ext}
 
 # signing linux artifacts with gpg
 cat << 'EOF' > gpg_signing_commands.sh
@@ -43,12 +52,12 @@ function sign(){
 EOF
 
 cat << EOF >> gpg_signing_commands.sh
-sign mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-sign mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-sign mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-sign mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-sign mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
-sign mongodb-src-${src_suffix}.${ext|tar.gz}
+sign mongodb-${push_name}-${push_arch}-${suffix}.${ext}
+sign mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext}
+sign mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext}
+sign mh-${push_name}-${push_arch}-${suffix}.${ext}
+sign mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext}
+sign mongodb-src-${src_suffix}.${long_ext}
 
 EOF
 

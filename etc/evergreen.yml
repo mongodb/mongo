@@ -7900,6 +7900,7 @@ tasks:
   - name: replica_sets_jscore_passthrough
   stepback: false
   commands:
+    - func: "git get project"
     - func: "fetch artifacts"
     - func: "fetch packages"
     - func: "fetch dist tarball"
@@ -7957,6 +7958,7 @@ tasks:
     - command: subprocess.exec
       params:
         binary: bash
+        add_expansions_to_env: true
         args:
         - "./src/evergreen/garasign_jsign_sign.sh"
 
@@ -7964,6 +7966,7 @@ tasks:
     - command: subprocess.exec
       params:
         binary: bash
+        add_expansions_to_env: true
         args:
         - "./src/evergreen/garasign_gpg_sign.sh"
 
