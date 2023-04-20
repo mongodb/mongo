@@ -19,7 +19,7 @@ function setParameter(adminDb, obj) {
 /**
  * Verify that getDiagnosticData is working correctly.
  */
-function verifyGetDiagnosticData(adminDb) {
+function verifyGetDiagnosticData(adminDb, logData = true) {
     // We need to retry a few times if run this test immediately after mongod is started as FTDC may
     // not have run yet.
     var foundGoodDocument = false;
@@ -42,8 +42,9 @@ function verifyGetDiagnosticData(adminDb) {
             assert(data.hasOwnProperty("end"), "does not have 'end' in '" + tojson(data) + "'");
 
             foundGoodDocument = true;
-
-            jsTestLog("Got good getDiagnosticData: " + tojson(result));
+            if (logData) {
+                jsTestLog("Got good getDiagnosticData: " + tojson(result));
+            }
         }
     }
 
