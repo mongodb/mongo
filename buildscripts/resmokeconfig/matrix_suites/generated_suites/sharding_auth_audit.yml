@@ -23,8 +23,6 @@ executor:
           keyFile: jstests/libs/authTestsKey
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
           roleGraphInvalidationIsFatal: true
-          setParameters:
-            receiveChunkWaitForRangeDeleterTimeoutMS: 90000
       nodb: ''
 matrix_suite: true
 selector:

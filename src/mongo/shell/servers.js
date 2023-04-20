@@ -1518,11 +1518,16 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
-            // TODO: Make this unconditional in 3.8.
-            if (programMajorMinorVersion > 340) {
-                if (!argArrayContainsSetParameterValue('orphanCleanupDelaySecs=')) {
-                    argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=1']);
-                }
+            // Reduce the default value for `orphanCleanupDelaySecs` to 1 sec to speed up jstests.
+            if (!argArrayContainsSetParameterValue('orphanCleanupDelaySecs=')) {
+                argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=1']);
+            }
+
+            // Increase the default value for `receiveChunkWaitForRangeDeleterTimeoutMS` to 90
+            // seconds to prevent failures due to occasional slow range deletions
+            if (!argArrayContainsSetParameterValue('receiveChunkWaitForRangeDeleterTimeoutMS=')) {
+                argArray.push(
+                    ...['--setParameter', 'receiveChunkWaitForRangeDeleterTimeoutMS=90000']);
             }
 
             if (programMajorMinorVersion >= 360) {
