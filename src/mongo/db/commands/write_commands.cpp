@@ -310,6 +310,12 @@ public:
                 }
             }
 
+            boost::optional<ScopedAdmissionPriorityForLock> priority;
+            if (request().getNamespace() == NamespaceString::kConfigSampledQueriesNamespace ||
+                request().getNamespace() == NamespaceString::kConfigSampledQueriesDiffNamespace) {
+                priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
+            }
+
             if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
                     const auto ns = data.getStringField("ns");
                     return ns == request().getNamespace().toString();
