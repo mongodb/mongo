@@ -83,6 +83,10 @@ struct ShardingStatistics {
     // node.
     AtomicWord<long long> countDocsClonedOnDonor{0};
 
+    // Cumulative, always-increasing counter of how many bytes have been cloned on the donor
+    // node.
+    AtomicWord<long long> countBytesClonedOnDonor{0};
+
     // Cumulative, always-increasing counter of how many documents have been deleted by the
     // rangeDeleter.
     AtomicWord<long long> countDocsDeletedOnDonor{0};
