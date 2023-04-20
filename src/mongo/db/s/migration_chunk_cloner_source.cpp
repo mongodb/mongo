@@ -723,6 +723,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(OperationContext* 
             lk.unlock();
 
             ShardingStatistics::get(opCtx).countDocsClonedOnDonor.addAndFetch(1);
+            ShardingStatistics::get(opCtx).countBytesClonedOnDonor.addAndFetch(obj.objsize());
         }
     } catch (DBException& exception) {
         exception.addContext("Executor error while scanning for documents belonging to chunk");
@@ -794,6 +795,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(OperationCont
 
         arrBuilder->append(doc->value());
         ShardingStatistics::get(opCtx).countDocsClonedOnDonor.addAndFetch(1);
+        ShardingStatistics::get(opCtx).countBytesClonedOnDonor.addAndFetch(doc->value().objsize());
     }
 }
 
