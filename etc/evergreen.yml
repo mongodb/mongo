@@ -9181,7 +9181,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    test_flags: --excludeWithAnyTags=resource_intensive
+    test_flags: --excludeWithAnyTags=resource_intensive,requires_increased_memlock_limits
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -9442,6 +9442,7 @@ buildvariants:
     packager_distro: rhel82
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -9713,6 +9714,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -9807,6 +9809,7 @@ buildvariants:
     multiversion_platform: rhel71
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -9940,6 +9943,7 @@ buildvariants:
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -10108,6 +10112,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: suse12-sp5-large
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -10197,6 +10202,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: suse15-build
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -10638,7 +10644,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -10683,7 +10689,7 @@ buildvariants:
     # also made to SConstruct.
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.

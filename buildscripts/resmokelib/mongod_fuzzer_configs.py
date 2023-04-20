@@ -51,6 +51,7 @@ def generate_independent_parameters(rng):
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
     ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(16, 256)
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(16, 256)
+    ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
 
     return ret
 
