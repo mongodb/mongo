@@ -111,11 +111,6 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
 
     auto metadata = _getMetadataWithVersionCheckAt(
         opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
-    tassert(7032301,
-            "For sharded collections getOwnershipFilter cannot be relied on without a valid "
-            "shard version",
-            !ChunkVersion::isIgnoredVersion(*optReceivedShardVersion) ||
-                !metadata->get().allowMigrations() || !metadata->get().isSharded());
 
     return {std::move(metadata)};
 }
