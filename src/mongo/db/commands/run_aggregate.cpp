@@ -460,9 +460,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         expCtx->changeStreamTokenVersion = 1;
     }
 
-    // Set the value of $$USER_ROLES for the aggregation.
-    expCtx->setUserRoles();
-
     return expCtx;
 }
 
@@ -1021,6 +1018,10 @@ Status runAggregate(OperationContext* opCtx,
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         curOp->beginQueryPlanningTimer();
         expCtx->stopExpressionCounters();
+
+        // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
+        // $$USER_ROLES for the aggregation.
+        expCtx->setUserRoles();
 
         if (!request.getAllowDiskUse().value_or(true)) {
             allowDiskUseFalseCounter.increment();

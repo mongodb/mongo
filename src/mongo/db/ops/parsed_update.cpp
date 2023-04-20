@@ -61,9 +61,6 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
         _expCtx->enabledCounters = false;
     }
     _expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-
-    // Allow update queries to refer to $$USER_ROLES.
-    _expCtx->setUserRoles();
 }
 
 Status ParsedUpdate::parseRequest() {
@@ -113,6 +110,11 @@ Status ParsedUpdate::parseRequest() {
     // it isn't required for query execution.
     parseUpdate();
     Status status = parseQuery();
+
+    // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
+    // $$USER_ROLES for the update.
+    _expCtx->setUserRoles();
+
     if (!status.isOK())
         return status;
     return Status::OK();

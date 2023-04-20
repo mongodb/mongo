@@ -2463,6 +2463,11 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
                 << " for more information.",
             queryFeatureAllowedUserRoles);
 
+        // If the variable we are parsing is a system variable, then indicate that we have seen it.
+        if (!Variables::isUserDefinedVariable(varId)) {
+            expCtx->setSystemVarReferencedInQuery(varId);
+        }
+
         return new ExpressionFieldPath(expCtx, fieldPath.toString(), varId);
     } else {
         return new ExpressionFieldPath(expCtx,
