@@ -529,6 +529,8 @@ error_codes:
 
     - {code: 399, name: MovePrimaryRecipientPastAbortableStage, categories: [InternalOnly]}
 
+    - {code: 400, name: CannotUpgrade}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

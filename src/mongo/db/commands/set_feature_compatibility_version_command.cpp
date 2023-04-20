@@ -332,39 +332,17 @@ public:
             // the FCV but encountered failover afterwards.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
-            // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-            if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-                feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
-                ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForCoordinatorsOfGivenTypeToComplete(
-                        opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
-            }
-            // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-            if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-                feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
-                    requestedVersion)) {
-                ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForCoordinatorsOfGivenTypeToComplete(
-                        opCtx, DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible);
-
-                ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForCoordinatorsOfGivenTypeToComplete(
-                        opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
-            }
-
-            // TODO SERVER-68373: Remove once 7.0 becomes last LTS
-            if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-                mongo::gFeatureFlagFLE2CompactForProtocolV2.isEnabledOnVersion(requestedVersion)) {
-                ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForCoordinatorsOfGivenTypeToComplete(
-                        opCtx,
-                        DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible);
-                ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForCoordinatorsOfGivenTypeToComplete(
-                        opCtx,
-                        DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible);
-            }
-
+            // _finalizeUpgrade is only for any tasks that must be done to fully complete the FCV
+            // upgrade AFTER the FCV document has already been updated to the UPGRADED FCV.
+            // We call it here because it's possible that during an FCV upgrade, the
+            // replset/shard server/config server undergoes failover AFTER the FCV document has
+            // already been updated to the UPGRADED FCV, but before the cluster has completed
+            // _finalizeUpgrade. In this case, since the cluster failed over, the user/client may
+            // retry sending the setFCV command to the cluster, but the cluster is already in the
+            // requestedVersion (i.e. requestedVersion == actualVersion). However, the cluster
+            // should retry/complete the tasks from _finalizeUpgrade before sending ok:1 back to the
+            // user/client. Therefore, these tasks **must** be idempotent/retryable.
+            _finalizeUpgrade(opCtx, requestedVersion);
             return true;
         }
 
@@ -456,7 +434,7 @@ public:
                 invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
                 // This helper function is only for any actions that should be done specifically on
-                // shard servers during phase 1 of the 2-phase setFCV protocol for sharded clusters.
+                // shard servers during phase 1 of the 3-phase setFCV protocol for sharded clusters.
                 // For example, before completing phase 1, we must wait for backward incompatible
                 // ShardingDDLCoordinators to finish.
                 // We do not expect any other feature-specific work to be done in the 'start' phase.
@@ -551,44 +529,15 @@ public:
                 false /* setIsCleaningServerMetadata */);
         }
 
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            requestedVersion > actualVersion &&
-            feature_flags::gGlobalIndexesShardingCatalog
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
-        }
 
-        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            requestedVersion > actualVersion &&
-            feature_flags::gDropCollectionHoldingCriticalSection
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible);
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
-        }
-
+        // _finalizeUpgrade is only for any tasks that must be done to fully complete the FCV
+        // upgrade AFTER the FCV document has already been updated to the UPGRADED FCV.
+        // This is because during _runUpgrade, the FCV is still in the transitional state (which
+        // behaves like the downgraded FCV), so certain tasks cannot be done yet until the FCV is
+        // fully upgraded.
+        // Everything in this function **must** be idempotent/retryable.
         if (requestedVersion > actualVersion) {
-            _maybeRemoveOldAuditConfig(opCtx, actualVersion, requestedVersion);
-        }
-
-        // TODO SERVER-68373: Remove once 7.0 becomes last LTS
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            requestedVersion > actualVersion &&
-            mongo::gFeatureFlagFLE2CompactForProtocolV2
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible);
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible);
+            _finalizeUpgrade(opCtx, requestedVersion);
         }
 
         LOGV2(6744302,
@@ -603,7 +552,7 @@ public:
 
 private:
     // This helper function is only for any actions that should be done specifically on
-    // shard servers during phase 1 of the 2-phase setFCV protocol for sharded clusters.
+    // shard servers during phase 1 of the 3-phase setFCV protocol for sharded clusters.
     // For example, before completing phase 1, we must wait for backward incompatible
     // ShardingDDLCoordinators to finish. This is important in order to ensure that no
     // shard that is currently a participant of such a backward-incompatible
@@ -710,11 +659,9 @@ private:
     }
 
     void _maybeRemoveOldAuditConfig(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion fromVersion,
-        const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gFeatureFlagAuditConfigClusterParameter
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, fromVersion) &&
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (feature_flags::gFeatureFlagAuditConfigClusterParameter.isEnabledOnVersion(
+                requestedVersion) &&
             audit::removeOldConfig) {
             LOGV2_DEBUG(7193000,
                         3,
@@ -724,13 +671,13 @@ private:
         }
     }
 
-    // This helper function is for updating metadata to make sure the new features in the
+    // This helper function is for updating server metadata to make sure the new features in the
     // upgraded version work for sharded and non-sharded clusters. It is required that the code
     // in this helper function is idempotent and could be done after _runDowngrade even if it
     // failed at any point in the middle of _userCollectionsUassertsForDowngrade or
     // _internalServerCleanupForDowngrade.
-    void _completeUpgrade(OperationContext* opCtx,
-                          const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    void _upgradeServerMetadata(OperationContext* opCtx,
+                                const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
@@ -1000,7 +947,8 @@ private:
 
     // _runUpgrade performs all the metadata-changing actions of an FCV upgrade. Any new feature
     // specific upgrade code should be placed in the _runUpgrade helper functions:
-    //  * _completeUpgrade: for updating metadata to make sure the new features in the upgraded
+    //  * _upgradeServerMetadata: for updating server metadata to make sure the new features in the
+    //  upgraded
     //    version work for sharded and non-sharded clusters
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
@@ -1026,12 +974,12 @@ private:
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
 
-        // This helper function is for updating metadata to make sure the new features in the
+        // This helper function is for updating server metadata to make sure the new features in the
         // upgraded version work for sharded and non-sharded clusters. It is required that the code
         // in this helper function is idempotent and could be done after _runDowngrade even if it
         // failed at any point in the middle of _userCollectionsUassertsForDowngrade or
         // _internalServerCleanupForDowngrade.
-        _completeUpgrade(opCtx, requestedVersion);
+        _upgradeServerMetadata(opCtx, requestedVersion);
 
         hangWhileUpgrading.pauseWhileSet(opCtx);
     }
@@ -1619,6 +1567,54 @@ private:
                 [&](const Collection* collection) {
                     return collection->isChangeStreamPreAndPostImagesEnabled();
                 });
+        }
+    }
+
+    // _finalizeUpgrade is only for any tasks that must be done to fully complete the FCV upgrade
+    // AFTER the FCV document has already been updated to the UPGRADED FCV.
+    // This is because during _runUpgrade, the FCV is still in the transitional state (which behaves
+    // like the downgraded FCV), so certain tasks cannot be done yet until the FCV is fully
+    // upgraded.
+    // Additionally, it's possible that during an FCV upgrade, the replset/shard server/config
+    // server undergoes failover AFTER the FCV document has already been updated to the UPGRADED
+    // FCV, but before the cluster has completed _finalizeUpgrade. In this case, since the cluster
+    // failed over, the user/client may retry sending the setFCV command to the cluster, but the
+    // cluster is already in the requestedVersion (i.e. requestedVersion == actualVersion). However,
+    // the cluster should retry/complete the tasks from _finalizeUpgrade before sending ok:1
+    // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
+    void _finalizeUpgrade(OperationContext* opCtx,
+                          const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
+        }
+
+        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
+                requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible);
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
+        }
+
+        _maybeRemoveOldAuditConfig(opCtx, requestedVersion);
+
+        // TODO SERVER-68373: Remove once 7.0 becomes last LTS
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            mongo::gFeatureFlagFLE2CompactForProtocolV2.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible);
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible);
         }
     }
 
