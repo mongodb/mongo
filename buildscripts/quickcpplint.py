@@ -25,6 +25,7 @@ def is_interesting_file(file_name: str) -> bool:
     return (file_name.startswith("jstests")
             or file_name.startswith("src") and not file_name.startswith("src/third_party/")
             and not file_name.startswith("src/mongo/gotools/")
+            and not file_name.startswith("src/streams/third_party")
             # TODO SERVER-49805: These files should be generated at compile time.
             and not file_name == "src/mongo/db/cst/parser_gen.cpp") and FILES_RE.search(file_name)
 

@@ -186,6 +186,11 @@ def main():
         # A few special cases of files to ignore
         if not file_doc["file"].startswith("src/mongo/"):
             continue
+
+        # Don't run clang_tidy on the streams/third_party code.
+        if file_doc["file"].startswith("src/mongo/db/modules/enterprise/src/streams/third_party"):
+            continue
+
         # TODO SERVER-49884 Remove this when we no longer check in generated Bison.
         if file_doc["file"].endswith("/parser_gen.cpp"):
             continue
