@@ -2385,6 +2385,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/ntservice',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        '$BUILD_DIR/mongo/util/pin_code_segments' if env.TargetOSIs('linux') else [],
         '$BUILD_DIR/mongo/util/testing_options',
         '$BUILD_DIR/mongo/util/version_impl',
         '$BUILD_DIR/mongo/watchdog/watchdog_mongod',

@@ -92,6 +92,8 @@ def generate_independent_parameters(rng):
         # The old retryable writes format is used by other variants. Weight towards turning on the
         # new retryable writes format on in this one.
         ret["storeFindAndModifyImagesInSideCollection"] = True
+    # TODO (SERVER-75632): Uncomment this to enable passthrough testing.
+    # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
 
     return ret
 

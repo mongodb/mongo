@@ -1159,6 +1159,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
     large_distro_name: suse12-sp5-large
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1300,6 +1301,7 @@ buildvariants:
     packager_distro: suse15
     repo_edition: org
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
     large_distro_name: suse15-build
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1550,6 +1552,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: ubuntu2204-large
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
