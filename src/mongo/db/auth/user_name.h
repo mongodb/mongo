@@ -81,6 +81,18 @@ public:
     BSONObj toBSON() const;
 
     /**
+     * Serialized length (in bytes) of object returned by toBSON().
+     */
+    std::size_t getBSONObjSize() const {
+        return 4UL +                          // BSONObj size
+            1UL + ("user"_sd).size() + 1UL +  // FieldName elem type, FieldName, NULL.
+            4UL + getUser().size() + 1UL +    // Length of name data, name data, NULL.
+            1UL + ("db"_sd).size() + 1UL +    // DB field elem type, "db", NULL.
+            4UL + getDB().size() + 1UL +      // DB value length, DB value, NULL.
+            1UL;                              // EOD marker.
+    }
+
+    /**
      * Gets the user part of a UserName.
      */
     StringData getUser() const {

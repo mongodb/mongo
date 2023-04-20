@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {
 using namespace fmt::literals;
@@ -203,8 +204,20 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
             _initialized = true;
         }
 
+        // While most metadata attached to a command is limited to less than a KB,
+        // Impersonation metadata may grow to an arbitrary size.
+        // Ask the active Client how much impersonation metadata we'll use for it,
+        // and assume the rest can fit in the 16KB already built into BSONObjMaxUserSize.
+        const auto estimatedMetadataSizeBytes =
+            rpc::estimateImpersonatedUserMetadataSize(pExpCtx->opCtx);
+        uassert(7637800,
+                "Unable to proceed with write while metadata size ({}KB) exceeds {}KB"_format(
+                    estimatedMetadataSizeBytes / 1024, BSONObjMaxUserSize / 1024),
+                estimatedMetadataSizeBytes <= BSONObjMaxUserSize);
+
+        const auto maxBatchSizeBytes = BSONObjMaxUserSize - estimatedMetadataSizeBytes;
         BatchedObjects batch;
-        int bufferedBytes = 0;
+        std::size_t bufferedBytes = 0;
 
         auto nextInput = pSource->getNext();
         for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
@@ -215,7 +228,7 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
 
             bufferedBytes += objSize;
             if (!batch.empty() &&
-                (bufferedBytes > BSONObjMaxUserSize ||
+                (bufferedBytes > maxBatchSizeBytes ||
                  batch.size() >= write_ops::kMaxWriteBatchSize)) {
                 spill(std::move(batch));
                 batch.clear();

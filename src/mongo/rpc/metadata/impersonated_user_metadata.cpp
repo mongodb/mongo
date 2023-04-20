@@ -95,5 +95,55 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
     metadata.serialize(&section);
 }
 
+std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx) {
+    if (!opCtx) {
+        return 0;
+    }
+
+    // Otherwise construct a metadata section from the list of authenticated users/roles
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    auto userNames = authSession->getImpersonatedUserNames();
+    auto roleNames = authSession->getImpersonatedRoleNames();
+    if (!userNames.more() && !roleNames.more()) {
+        userNames = authSession->getAuthenticatedUserNames();
+        roleNames = authSession->getAuthenticatedRoleNames();
+    }
+
+    // If there are no users/roles being impersonated just exit
+    if (!userNames.more() && !roleNames.more()) {
+        return 0;
+    }
+
+    std::size_t ret = 4 +                                   // BSONObj size
+        1 + kImpersonationMetadataSectionName.size() + 1 +  // "$audit" sub-object key
+        4;                                                  // $audit object length
+
+    // BSONArrayType + "impersonatedUsers" + NULL + BSONArray Length
+    ret += 1 + ImpersonatedUserMetadata::kUsersFieldName.size() + 1 + 4;
+    for (std::size_t i = 0; userNames.more(); userNames.next(), ++i) {
+        // BSONType::Object + strlen(indexId) + NULL byte
+        // to_string(i).size() will be log10(i) plus some rounding and fuzzing.
+        // Increment prior to taking the log so that we never take log10(0) which is NAN.
+        // This estimates one extra byte every time we reach (i % 10) == 9.
+        ret += 1 + static_cast<std::size_t>(1.1 + log10(i + 1)) + 1;
+        ret += userNames.get().getBSONObjSize();
+    }
+    // EOD terminator for impersonatedUsers
+    ++ret;
+
+    // BSONArrayType + "impersonatedRoles" + NULL + BSONArray Length
+    ret += 1 + ImpersonatedUserMetadata::kRolesFieldName.size() + 1 + 4;
+    for (std::size_t i = 0; roleNames.more(); roleNames.next(), ++i) {
+        // Same calculation as for UserNames above.
+        ret += 1 + static_cast<std::size_t>(1.1 + log10(i + 1)) + 1;
+        ret += roleNames.get().getBSONObjSize();
+    }
+
+    // EOD terminators for: impersonatedRoles, $audit, and metadata
+    ret += 1 + 1 + 1;
+
+    return ret;
+}
+
 }  // namespace rpc
 }  // namespace mongo
