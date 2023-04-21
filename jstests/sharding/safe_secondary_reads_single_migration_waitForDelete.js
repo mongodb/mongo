@@ -49,6 +49,8 @@ let testCases = {
     _configsvrBalancerStart: {skip: "primary only"},
     _configsvrBalancerStatus: {skip: "primary only"},
     _configsvrBalancerStop: {skip: "primary only"},
+    _configsvrCheckClusterMetadataConsistency: {skip: "internal command"},
+    _configsvrCheckMetadataConsistency: {skip: "internal command"},
     _configsvrClearJumboFlag: {skip: "primary only"},
     _configsvrCommitChunksMerge: {skip: "primary only"},
     _configsvrCommitChunkMigration: {skip: "primary only"},

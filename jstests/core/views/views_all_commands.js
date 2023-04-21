@@ -260,7 +260,10 @@ let viewsCommandTests = {
         command: {captrunc: "view", n: 2, inc: false},
         expectFailure: true,
     },
-    checkMetadataConsistency: {skip: isUnrelated},
+    checkMetadataConsistency: {
+        command: {checkMetadataConsistency: "view"},
+        expectFailure: false,
+    },
     checkShardingIndex: {skip: isUnrelated},
     cleanupOrphaned: {
         skip: "Tested in views/views_sharded.js",

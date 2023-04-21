@@ -317,7 +317,15 @@ let testCases = {
     balancerStop: {skip: "not on a user database"},
     buildInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
     bulkWrite: {skip: "not yet implemented"},
-    checkMetadataConsistency: {skip: "not yet implemented"},
+    checkMetadataConsistency: {
+        run: {
+            sendsDbVersion: true,
+            runsAgainstAdminDb: false,
+            command: function(dbName, collName) {
+                return {checkMetadataConsistency: 1};
+            }
+        }
+    },
     cleanupReshardCollection: {skip: "always targets the config server"},
     cleanupStructuredEncryptionData: {skip: "requires encrypted collections"},
     clearJumboFlag: {skip: "does not forward command to primary shard"},
