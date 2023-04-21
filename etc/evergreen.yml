@@ -2895,6 +2895,7 @@ buildvariants:
   - name: .lint
   - name: test_api_version_compatibility
   - name: validate_commit_message
+  - name: lint_large_files_check
   - name: check_feature_flag_tags
   - name: compile_venv_deps_check
   - name: resmoke_validation_tests

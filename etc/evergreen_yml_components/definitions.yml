@@ -7976,6 +7976,28 @@ tasks:
         JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
         JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
 
+- name: lint_large_files_check
+  tags: []
+  exec_timeout_secs: 600 # 10 minute timeout
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/run_python_script.sh"
+      - "buildscripts/large_file_check.py"
+      - "--exclude"
+      - "src/third_party/*"
+
 - name: check_for_todos
   tags: []
   exec_timeout_secs: 600 # 10 minute timeout
