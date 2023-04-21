@@ -25,7 +25,7 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 
-# This IDL file describes the BSON format for an APIParametersFromClient. 
+# This IDL file describes the BSON format for an APIParametersFromClient.
 # It also handles the serialization to / deserialization from its
 # BSON representation for that class.
 
@@ -35,25 +35,26 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
 
-structs: 
+structs:
 
-  APIParametersFromClient: 
+  APIParametersFromClient:
     description: "Parser for pulling out VersionedAPI parameters from commands"
     strict: false
+    unsafe_dangerous_disable_extra_field_duplicate_checks: true
     fields:
       apiVersion:
-        description: "The api version specified by the command" 
+        description: "The api version specified by the command"
         type: string
-        optional: true 
-      apiStrict: 
-        description: "With apiVersion: 'V' and apiStrict: true, the server rejects requests to 
+        optional: true
+      apiStrict:
+        description: "With apiVersion: 'V' and apiStrict: true, the server rejects requests to
         use behaviors not included in V"
-        type: bool 
-        optional: true 
-      apiDeprecationErrors: 
+        type: bool
+        optional: true
+      apiDeprecationErrors:
         description: "With apiVersion: 'V' and apiDeprecationErrors: true, the server rejects
         requests to use behaviors deprecated in V in the current MongoDB release"
-        type: bool 
+        type: bool
         optional: true
 
 server_parameters:

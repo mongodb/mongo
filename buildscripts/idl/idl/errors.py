@@ -130,6 +130,8 @@ ERROR_ID_MISSING_ACCESS_CHECK = "ID0090"
 ERROR_ID_STABILITY_UNKNOWN_VALUE = "ID0091"
 ERROR_ID_DUPLICATE_UNSTABLE_STABILITY = "ID0092"
 ERROR_ID_INVALID_ARRAY_VARIANT = "ID0093"
+ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0099"
+ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0100"
 
 
 class IDLError(Exception):
@@ -934,6 +936,18 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_DUPLICATE_UNSTABLE_STABILITY, (
             "Field specifies both 'unstable' and 'stability' options, should use 'stability: [stable|unstable|internal]' instead and remove the deprecated 'unstable' option."
         ))
+
+    def add_strict_and_disable_check_not_allowed(self, location):
+        self._add_error(
+            location, ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED,
+            "Cannot set strict = true and unsafe_dangerous_disable_extra_field_duplicate_checks = true on a struct. unsafe_dangerous_disable_extra_field_duplicate_checks is only permitted on strict = false"
+        )
+
+    def add_inheritance_and_disable_check_not_allowed(self, location):
+        self._add_error(
+            location, ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED,
+            "Fields cannot have unsafe_dangerous_disable_extra_field_duplicate_checks = true. unsafe_dangerous_disable_extra_field_duplicate_checks on non field structs"
+        )
 
 
 def _assert_unique_error_messages():

@@ -1982,6 +1982,24 @@ class TestParser(testcase.IDLTestcase):
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_EMPTY_ACCESS_CHECK)
 
+    # pylint: disable=invalid-name
+    def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(self):
+
+        # Test commands and unsafe_dangerous_disable_extra_field_duplicate_checks are disallowed
+        self.assert_parse_fail(
+            textwrap.dedent("""
+            commands:
+                dangerc:
+                    description: foo
+                    namespace: ignored
+                    command_name: dangerc
+                    api_version: ""
+                    strict: false
+                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
+                    fields:
+                        foo: string
+            """), idl.errors.ERROR_ID_UNKNOWN_NODE)
+
 
 if __name__ == '__main__':
 
