@@ -55,6 +55,7 @@ const auto kShardId3 = ShardId("shard3");
 const auto kShardId4 = ShardId("shard4");
 const auto kShardId5 = ShardId("shard5");
 const NamespaceString kNamespace("TestDB", "TestColl");
+const KeyPattern kShardKeyPattern(BSON("x" << 1));
 
 /**
  * Constructs a shard statistics vector and a consistent mapping of chunks to shards given the
@@ -77,8 +78,6 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
     ChunkVersion chunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
     const UUID uuid = UUID::gen();
 
-    const KeyPattern shardKeyPattern(BSON("x" << 1));
-
     for (const auto& shard : statsVector) {
         // Ensure that an entry is created
         chunkMap[shard.shardId];
@@ -86,8 +85,8 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
         ChunkType chunk;
 
         chunk.setCollectionUUID(uuid);
-        chunk.setMin(currentChunk == 0 ? shardKeyPattern.globalMin() : BSON("x" << currentChunk));
-        chunk.setMax(currentChunk == totalNumChunks - 1 ? shardKeyPattern.globalMax()
+        chunk.setMin(currentChunk == 0 ? kShardKeyPattern.globalMin() : BSON("x" << currentChunk));
+        chunk.setMax(currentChunk == totalNumChunks - 1 ? kShardKeyPattern.globalMax()
                                                         : BSON("x" << ++currentChunk));
         chunk.setShard(shard.shardId);
         chunk.setVersion(chunkVersion);
@@ -457,7 +456,7 @@ TEST(BalancerPolicy, DrainingFromShardWithFewData) {
     auto cluster =
         generateCluster({ShardStatistics(kShardId0,
                                          20 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         false /* draining */,
+                                         false /* not draining */,
                                          emptyZoneSet,
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t()),
@@ -482,14 +481,14 @@ TEST(BalancerPolicy, DrainingSingleChunkPerShard) {
     auto cluster =
         generateCluster({ShardStatistics(kShardId0,
                                          2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         true,
+                                         true /* draining */,
                                          emptyZoneSet,
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t()),
                          ShardStatistics(kShardId1, 0, false, emptyZoneSet, emptyShardVersion),
                          ShardStatistics(kShardId2,
                                          2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         true,
+                                         true /* draining */,
                                          emptyZoneSet,
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t()),
@@ -509,13 +508,13 @@ TEST(BalancerPolicy, DrainingSingleChunkPerShard) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[1].minKey);
 }
 
-TEST(BalancerPolicy, DrainingMultipleShardsFirstOneSelected) {
-    // shard0 and shard1 are both draining with very little data in them and chunks will go to
-    // shard2, even though it has a lot more data that the other two
+TEST(BalancerPolicy, DrainingMultipleShardsAtLeastOneSelected) {
+    // shard1 and shard2 are both draining with very little data in them and chunks will go to
+    // shard0, even though it has a lot more data that the other two
     auto cluster =
         generateCluster({ShardStatistics(kShardId0,
                                          50 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         false /* draining */,
+                                         false /* not draining */,
                                          emptyZoneSet,
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t()),
@@ -545,7 +544,7 @@ TEST(BalancerPolicy, DrainingMultipleShardsWontAcceptMigrations) {
     auto cluster = generateCluster(
         {ShardStatistics(kShardId0,
                          20 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                         false /* draining */,
+                         false /* not draining */,
                          emptyZoneSet,
                          emptyShardVersion,
                          ShardStatistics::use_bytes_t()),
@@ -574,7 +573,7 @@ TEST(BalancerPolicy, DrainingSingleAppropriateShardFoundDueToZone) {
                                          ShardStatistics::use_bytes_t()),
                          ShardStatistics(kShardId2,
                                          ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         true,
+                                         true /* draining */,
                                          {"LAX"},
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t())});
@@ -607,7 +606,7 @@ TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToZone) {
                                          ShardStatistics::use_bytes_t()),
                          ShardStatistics(kShardId2,
                                          ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         true,
+                                         true /* draining */,
                                          {"SEA"},
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t())});
@@ -623,14 +622,14 @@ TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToZone) {
 TEST(BalancerPolicy, NoBalancingDueToAllNodesDraining) {
     auto cluster =
         generateCluster({ShardStatistics(kShardId0,
-                                         2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         true,
+                                         5 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                                         true /* draining */,
                                          emptyZoneSet,
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t()),
                          ShardStatistics(kShardId2,
                                          ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         true,
+                                         true /* draining */,
                                          emptyZoneSet,
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t())});
@@ -651,7 +650,7 @@ TEST(BalancerPolicy, BalancerRespectsZonesWhenDraining) {
                                          ShardStatistics::use_bytes_t()),
                          ShardStatistics(kShardId1,
                                          5 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                                         true,
+                                         true /* draining */,
                                          {"a", "b"},
                                          emptyShardVersion,
                                          ShardStatistics::use_bytes_t()),
@@ -663,8 +662,10 @@ TEST(BalancerPolicy, BalancerRespectsZonesWhenDraining) {
                                          ShardStatistics::use_bytes_t())});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 7), "a")));
-    ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 8), kMaxBSONKey, "b")));
+    ASSERT_OK(
+        distribution.addRangeToZone(ZoneRange(kShardKeyPattern.globalMin(), BSON("x" << 7), "a")));
+    ASSERT_OK(
+        distribution.addRangeToZone(ZoneRange(BSON("x" << 8), kShardKeyPattern.globalMax(), "b")));
 
     const auto [migrations, reason] = balanceChunks(cluster.first, distribution, false, false);
     ASSERT_EQ(1U, migrations.size());
@@ -692,8 +693,118 @@ TEST(BalancerPolicy, BalancerZoneAlreadyBalanced) {
     });
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, kMaxBSONKey, "a")));
+    ASSERT_OK(distribution.addRangeToZone(
+        ZoneRange(kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax(), "a")));
     ASSERT(balanceChunks(cluster.first, distribution, false, false).first.empty());
+}
+
+TEST(BalancerPolicy, ScheduleMigrationForChunkViolatingZone) {
+    // Zone violation: shard1 owns a chunk from zone "a"
+    auto cluster = generateCluster({
+        ShardStatistics(kShardId0,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"a"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+        ShardStatistics(kShardId1,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"b"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+    });
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(distribution.addRangeToZone(
+        ZoneRange(kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax(), "a")));
+
+    const auto [migrations, reason] = balanceChunks(cluster.first, distribution, false, false);
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId1, migrations[0].from);
+    ASSERT_EQ(kShardId0, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[0].minKey);
+    ASSERT_EQ(MigrationReason::zoneViolation, reason);
+}
+
+TEST(BalancerPolicy, ScheduleParallelMigrationsForZoneViolations) {
+    // shard2 and shard3 own chunks from zone "a" that are violating the shards zone
+    auto cluster = generateCluster({
+        ShardStatistics(kShardId0,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"a"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+        ShardStatistics(kShardId1,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"a"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+        ShardStatistics(kShardId2,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"b"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+        ShardStatistics(kShardId3,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"b"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+
+    });
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(distribution.addRangeToZone(
+        ZoneRange(kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax(), "a")));
+
+    const auto [migrations, reason] = balanceChunks(cluster.first, distribution, false, false);
+    ASSERT_EQ(2U, migrations.size());
+    ASSERT_EQ(kShardId2, migrations[0].from);
+    ASSERT_EQ(kShardId0, migrations[0].to);
+
+    ASSERT_EQ(kShardId3, migrations[1].from);
+    ASSERT_EQ(kShardId1, migrations[1].to);
+
+    ASSERT_EQ(MigrationReason::zoneViolation, reason);
+}
+
+TEST(BalancerPolicy, DrainingHasPrecedenceOverZoneViolation) {
+    // shard1 owns a chunk from zone "a" that is violating the shards zone, however shard2 is in
+    // draining mode so it has preference over shard1
+    auto cluster = generateCluster({
+        ShardStatistics(kShardId0,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"a"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+        ShardStatistics(kShardId1,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        false,
+                        {"b"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+        ShardStatistics(kShardId2,
+                        2 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                        true /*draining*/,
+                        {"a"},
+                        emptyShardVersion,
+                        ShardStatistics::use_bytes_t()),
+    });
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(distribution.addRangeToZone(
+        ZoneRange(kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax(), "a")));
+
+    const auto [migrations, reason] = balanceChunks(cluster.first, distribution, false, false);
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId2, migrations[0].from);
+    ASSERT_EQ(kShardId0, migrations[0].to);
+    ASSERT_EQ(MigrationReason::drain, reason);
 }
 
 TEST(BalancerPolicy, BalancerHandlesNoShardsWithZone) {
@@ -712,8 +823,8 @@ TEST(BalancerPolicy, BalancerHandlesNoShardsWithZone) {
                                          ShardStatistics::use_bytes_t())});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    ASSERT_OK(
-        distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 7), "NonExistentZone")));
+    ASSERT_OK(distribution.addRangeToZone(
+        ZoneRange(kShardKeyPattern.globalMin(), BSON("x" << 7), "NonExistentZone")));
 
     ASSERT(balanceChunks(cluster.first, distribution, false, false).first.empty());
 }
@@ -726,7 +837,7 @@ TEST(DistributionStatus, AddZoneRangeOverlap) {
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 20), BSON("x" << 30), "b")));
 
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
-              d.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 2), "d")));
+              d.addRangeToZone(ZoneRange(kShardKeyPattern.globalMin(), BSON("x" << 2), "d")));
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
               d.addRangeToZone(ZoneRange(BSON("x" << -1), BSON("x" << 5), "d")));
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
@@ -734,11 +845,15 @@ TEST(DistributionStatus, AddZoneRangeOverlap) {
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
               d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "d")));
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << 5), BSON("x" << 12), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
               d.addRangeToZone(ZoneRange(BSON("x" << 5), BSON("x" << 25), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << 19), BSON("x" << 21), "d")));
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
               d.addRangeToZone(ZoneRange(BSON("x" << -1), BSON("x" << 32), "d")));
     ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
-              d.addRangeToZone(ZoneRange(BSON("x" << 25), kMaxBSONKey, "d")));
+              d.addRangeToZone(ZoneRange(BSON("x" << 25), kShardKeyPattern.globalMax(), "d")));
 }
 
 TEST(DistributionStatus, ChunkZonesSelectorWithRegularKeys) {
@@ -750,7 +865,7 @@ TEST(DistributionStatus, ChunkZonesSelectorWithRegularKeys) {
 
     {
         ChunkType chunk;
-        chunk.setMin(kMinBSONKey);
+        chunk.setMin(kShardKeyPattern.globalMin());
         chunk.setMax(BSON("x" << 1));
         ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
@@ -800,14 +915,14 @@ TEST(DistributionStatus, ChunkZonesSelectorWithRegularKeys) {
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 30));
-        chunk.setMax(kMaxBSONKey);
+        chunk.setMax(kShardKeyPattern.globalMax());
         ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 40));
-        chunk.setMax(kMaxBSONKey);
+        chunk.setMax(kShardKeyPattern.globalMax());
         ASSERT_EQUALS("", d.getZoneForChunk(chunk));
     }
 }
@@ -815,13 +930,13 @@ TEST(DistributionStatus, ChunkZonesSelectorWithRegularKeys) {
 TEST(DistributionStatus, ChunkZonesSelectorWithMinMaxKeys) {
     DistributionStatus d(kNamespace, ShardToChunksMap{});
 
-    ASSERT_OK(d.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << -100), "a")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(kShardKeyPattern.globalMin(), BSON("x" << -100), "a")));
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << -10), BSON("x" << 10), "b")));
-    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 100), kMaxBSONKey, "c")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 100), kShardKeyPattern.globalMax(), "c")));
 
     {
         ChunkType chunk;
-        chunk.setMin(kMinBSONKey);
+        chunk.setMin(kShardKeyPattern.globalMin());
         chunk.setMax(BSON("x" << -100));
         ASSERT_EQUALS("a", d.getZoneForChunk(chunk));
     }
@@ -864,7 +979,7 @@ TEST(DistributionStatus, ChunkZonesSelectorWithMinMaxKeys) {
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 200));
-        chunk.setMax(kMaxBSONKey);
+        chunk.setMax(kShardKeyPattern.globalMax());
         ASSERT_EQUALS("c", d.getZoneForChunk(chunk));
     }
 }

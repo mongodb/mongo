@@ -61,10 +61,19 @@ protected:
                                                                  ShardId shardId);
 
     /**
-     * Inserts a document into the config.databases collection to indicate that "dbName" is sharded
-     * with primary "primaryShard".
+     * Setup the config.shards collection to contain the given shards.
+     * Additionally set up dummy hosts for the targeted shards
      */
-    void setUpDatabase(const std::string& dbName, ShardId primaryShard);
+    void setupShards(const std::vector<ShardType>& shards) override {
+        ConfigServerTestFixture::setupShards(shards);
+
+        // Requests chunks to be relocated requires running commands on each shard to
+        // get shard statistics. Set up dummy hosts for the source shards.
+        for (const auto& shard : shards) {
+            shardTargeterMock(operationContext(), shard.getName())
+                ->setFindHostReturnValue(HostAndPort(shard.getHost()));
+        }
+    }
 
     /**
      * Inserts a document into the config.collections collection to indicate that "collName" is
@@ -119,14 +128,10 @@ protected:
     const HostAndPort kShardHost2 = HostAndPort("TestHost2", 12347);
     const HostAndPort kShardHost3 = HostAndPort("TestHost3", 12348);
 
-    const BSONObj kShard0 =
-        BSON(ShardType::name(kShardId0.toString()) << ShardType::host(kShardHost0.toString()));
-    const BSONObj kShard1 =
-        BSON(ShardType::name(kShardId1.toString()) << ShardType::host(kShardHost1.toString()));
-    const BSONObj kShard2 =
-        BSON(ShardType::name(kShardId2.toString()) << ShardType::host(kShardHost2.toString()));
-    const BSONObj kShard3 =
-        BSON(ShardType::name(kShardId3.toString()) << ShardType::host(kShardHost3.toString()));
+    const ShardType kShard0{kShardId0.toString(), kShardHost0.toString()};
+    const ShardType kShard1{kShardId1.toString(), kShardHost1.toString()};
+    const ShardType kShard2{kShardId2.toString(), kShardHost2.toString()};
+    const ShardType kShard3{kShardId3.toString(), kShardHost3.toString()};
 
     const std::string kPattern = "_id";
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));

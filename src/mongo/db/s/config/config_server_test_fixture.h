@@ -130,7 +130,7 @@ protected:
     /**
      * Setup the config.shards collection to contain the given shards.
      */
-    void setupShards(const std::vector<ShardType>& shards);
+    virtual void setupShards(const std::vector<ShardType>& shards);
 
     /**
      * Retrieves the shard document from the config server.
