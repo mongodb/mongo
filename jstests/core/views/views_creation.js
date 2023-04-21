@@ -111,12 +111,6 @@ assert.commandFailedWithCode(viewsDB.runCommand({
 }),
                              40600);
 
-// The remainder of this test will not work on server versions < 7.0 as the 'create' command
-// is not idempotent there.  TODO SERVER-74062: remove this.
-if (db.version().split('.')[0] < 7) {
-    return;
-}
-
 // Test that creating a view which already exists with identical options reports success.
 let repeatedCmd = {
     create: "existingViewTest",

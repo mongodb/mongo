@@ -233,14 +233,7 @@ commands.push({
         assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({create: collName}));
     },
     confirmFunc: function(res) {
-        // Branching is needed for multiversion tests as 'create' is only idempotent as of 7.0.
-        // TODO SERVER-74062: update this to stop branching on the server version and always
-        // assert the command worked ignoring write concern errors.
-        if (db.version().split('.')[0] >= 7) {
-            assert.commandWorkedIgnoringWriteConcernErrors(res);
-        } else {
-            assert.commandFailedWithCode(res, ErrorCodes.NamespaceExists);
-        }
+        assert.commandWorkedIgnoringWriteConcernErrors(res);
     }
 });
 

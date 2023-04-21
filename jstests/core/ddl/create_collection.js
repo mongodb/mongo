@@ -203,12 +203,6 @@ if (ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
     return;
 }
 
-// The remainder of this test will not work on server versions < 7.0 as the 'create' command
-// is not idempotent there. TODO SERVER-74062: remove this.
-if (db.version().split('.')[0] < 7) {
-    return;
-}
-
 assert.commandWorkedOrFailedWithCode(db.runCommand({drop: "create_collection"}),
                                      ErrorCodes.NamespaceNotFound);
 
