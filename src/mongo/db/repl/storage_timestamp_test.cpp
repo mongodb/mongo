@@ -3232,7 +3232,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
             Snapshotted<BSONObj>(_opCtx->recoveryUnit()->getSnapshotId(), oldObj),
             newObj,
             collection_internal::kUpdateNoIndexes,
-            nullptr,
+            nullptr /* indexesAffected */,
+            nullptr /* opDebug */,
             &args);
         wuow.commit();
     }
@@ -3292,7 +3293,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
                                                            source,
                                                            damages,
                                                            collection_internal::kUpdateNoIndexes,
-                                                           nullptr,
+                                                           nullptr /* indexesAffected */,
+                                                           nullptr /* opDebug */,
                                                            &args);
         wuow.commit();
         ASSERT_OK(statusWith.getStatus());

@@ -150,9 +150,6 @@ public:
         return _updateType;
     }
 
-    bool modsAffectIndices() const {
-        return _affectIndices;
-    }
     void refreshIndexKeys(const UpdateIndexData* indexedFields) {
         _indexedFields = indexedFields;
     }
@@ -243,10 +240,6 @@ private:
     bool _skipDotsDollarsCheck = false;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-
-    // Are any of the fields mentioned in the mods participating in any index? Is set anew
-    // at each call to update.
-    bool _affectIndices = false;
 
     // Do any of the mods require positional match details when calling 'prepare'?
     bool _positional = false;

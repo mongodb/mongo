@@ -241,8 +241,6 @@ Status UpdateDriver::update(OperationContext* opCtx,
                             FieldRefSetWithStorage* modifiedPaths) {
     // TODO: assert that update() is called at most once in a !_multi case.
 
-    _affectIndices = _updateType == UpdateType::kReplacement && _indexedFields != nullptr;
-
     _logDoc.reset();
 
     UpdateExecutor::ApplyParams applyParams(doc->root(), immutablePaths);
@@ -273,9 +271,6 @@ Status UpdateDriver::update(OperationContext* opCtx,
 
     invariant(_updateExecutor);
     auto applyResult = _updateExecutor->applyUpdate(applyParams);
-    if (applyResult.indexesAffected) {
-        _affectIndices = true;
-    }
     if (docWasModified) {
         *docWasModified = !applyResult.noop;
     }

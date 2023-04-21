@@ -132,7 +132,8 @@ public:
             Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
             newDoc,
             collection_internal::kUpdateAllIndexes,
-            nullptr,
+            nullptr /* indexesAffected */,
+            nullptr /* opDebug */,
             &args);
         wunit.commit();
     }

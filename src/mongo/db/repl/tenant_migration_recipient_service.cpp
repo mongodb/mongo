@@ -2377,6 +2377,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
                                                         originalSnapshot,
                                                         stateDoc,
                                                         collection_internal::kUpdateAllIndexes,
+                                                        nullptr /* indexesAffected */,
                                                         nullptr /* OpDebug* */,
                                                         &args);
 
