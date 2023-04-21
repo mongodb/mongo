@@ -322,4 +322,13 @@ void ClusterServerParameterRefresher::run() {
     }
 }
 
+void ClusterServerParameterRefresher::onShutdown(ServiceContext* serviceCtx) {
+    // Make sure that we finish the possibly running transaction and don't start any more.
+    auto& refresher = getClusterServerParameterRefresher(serviceCtx);
+    if (refresher && refresher->_job && refresher->_job->isValid()) {
+        refresher->_job->stop();
+    }
+    getClusterServerParameterRefresher(serviceCtx) = nullptr;
+}
+
 }  // namespace mongo

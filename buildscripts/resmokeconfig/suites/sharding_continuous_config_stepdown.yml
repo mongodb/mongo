@@ -241,10 +241,6 @@ selector:
   # set takes a while.
   - jstests/sharding/move_chunk_respects_maxtimems.js
 
-  # TODO (SERVER-76157): ClusterServerParameterRefresher can result in dangling internal
-  # transactions on the config server.
-  - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
-
   exclude_with_any_tags:
   - does_not_support_stepdowns
 

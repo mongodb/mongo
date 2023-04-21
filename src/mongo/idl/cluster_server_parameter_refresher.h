@@ -51,6 +51,12 @@ public:
     static void start(ServiceContext* serviceCtx, OperationContext* opCtx);
 
     /**
+     * Callback to be called when the mongos is shutting down. Will stop the currently running
+     * refresh, if one is running, and stop running periodically.
+     */
+    static void onShutdown(ServiceContext* serviceCtx);
+
+    /**
      * Refreshes all cluster server parameters from the config servers. Called periodically in the
      * run method, which executes in a background thread. Also called in-line during
      * getClusterParameter on mongos to ensure that cached values returned are up-to-date.

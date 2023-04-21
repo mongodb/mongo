@@ -297,6 +297,12 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             tl->shutdown();
         }
 
+        if (audit::shutdownSynchronizeJob) {
+            audit::shutdownSynchronizeJob();
+        }
+
+        ClusterServerParameterRefresher::onShutdown(serviceContext);
+
         try {
             // Abort transactions while we can still send remote commands.
             implicitlyAbortAllTransactions(opCtx);
