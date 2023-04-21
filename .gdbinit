@@ -9,3 +9,6 @@ source buildscripts/gdb/mongo_printers.py
 
 # Load the mongodb lock analysis
 source buildscripts/gdb/mongo_lock.py
+
+# Load third-party pretty printers
+source src/third_party/immer/dist/tools/gdb_pretty_printers/autoload.py
