@@ -56,16 +56,18 @@ BSONObj makeNewDocumentForWrite(
 
 /**
  * Performs modifications atomically for a user command on a time-series collection.
- * Replaces the bucket document for a partial bucket modification and removes the bucket for a full
- * bucket modification.
  *
- * Guarantees write atomicity per bucket document.
+ * Replaces the bucket document for a partial bucket modification and removes the bucket for a full
+ * bucket modification. Inserts new bucket documents if provided.
+ *
+ * All the modifications are written and replicated atomically.
  */
 Status performAtomicWrites(OperationContext* opCtx,
                            const CollectionPtr& coll,
                            const RecordId& recordId,
                            const stdx::variant<write_ops::UpdateCommandRequest,
                                                write_ops::DeleteCommandRequest>& modificationOp,
+                           const std::vector<write_ops::InsertCommandRequest>& insertOps,
                            bool fromMigrate,
                            StmtId stmtId);
 }  // namespace mongo::timeseries

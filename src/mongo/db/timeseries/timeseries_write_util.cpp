@@ -148,6 +148,7 @@ Status performAtomicWrites(OperationContext* opCtx,
                            const RecordId& recordId,
                            const stdx::variant<write_ops::UpdateCommandRequest,
                                                write_ops::DeleteCommandRequest>& modificationOp,
+                           const std::vector<write_ops::InsertCommandRequest>& insertOps,
                            bool fromMigrate,
                            StmtId stmtId) try {
     NamespaceString ns = coll->ns();
@@ -162,7 +163,11 @@ Status performAtomicWrites(OperationContext* opCtx,
 
     write_ops_exec::assertCanWrite_inlock(opCtx, ns);
 
-    WriteUnitOfWork wuow{opCtx};
+    // Groups all operations in one or several chained oplog entries to ensure the writes are
+    // replicated atomically.
+    // TODO(SERVER-76432): Handle the updateOne case for retryable writes.
+    auto groupOplogEntries = !opCtx->getTxnNumber() && !insertOps.empty();
+    WriteUnitOfWork wuow{opCtx, groupOplogEntries};
 
     stdx::visit(
         OverloadedVisitor{
@@ -210,6 +215,19 @@ Status performAtomicWrites(OperationContext* opCtx,
                     opCtx, coll, stmtId, recordId, &curOp->debug(), fromMigrate);
             }},
         modificationOp);
+
+    if (!insertOps.empty()) {
+        std::vector<InsertStatement> insertStatements;
+        for (auto& op : insertOps) {
+            invariant(op.getDocuments().size() == 1);
+            insertStatements.emplace_back(op.getDocuments().front());
+        }
+        auto status = collection_internal::insertDocuments(
+            opCtx, coll, insertStatements.begin(), insertStatements.end(), &curOp->debug());
+        if (!status.isOK()) {
+            return status;
+        }
+    }
 
     wuow.commit();
 
