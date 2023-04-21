@@ -5,7 +5,6 @@ mypy ~= 0.942
 pydocstyle == 6.1.1
 pylint == 2.7.2
 structlog ~= 19.2.0
-typing <= 3.7.4.3
 yamllint == 1.15.0
 yapf == 0.26.0
 evergreen-lint == 0.1.3
