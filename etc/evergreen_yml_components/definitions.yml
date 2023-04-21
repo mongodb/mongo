@@ -1819,11 +1819,25 @@ functions:
       display_name: Jepsen Test Results - ${execution}
       optional: true
 
+  "upload jepsen_log": &upload_jepsen_log
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/jepsen-mongodb/jepsen_${task_name}_${execution}.log
+      remote_file: ${project}/${build_variant}/${revision}/jepsen_${task_name}_${execution}.log
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Jepsen Test Log
+
   "save jepsen artifacts":
   - *tar_jepsen_logs
   - *archive_jepsen_logs
   - *tar_jepsen_results
   - *archive_jepsen_results
+  - *upload_jepsen_log
 
   "save blackduck artifacts":
   - command: archive.targz_pack
