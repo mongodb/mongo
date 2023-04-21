@@ -70,6 +70,13 @@ function CollectionValidator() {
                     print('Skipping collection validation for ' + coll.getFullName() +
                           ' since collection was not found');
                     continue;
+                } else if (res.codeName === "CommandNotSupportedOnView") {
+                    // Even though we pass a filter to getCollectionInfos() to only fetch
+                    // collections, nothing is preventing the collection from being dropped and
+                    // recreated as a view.
+                    print('Skipping collection validation for ' + coll.getFullName() +
+                          ' as it is a view');
+                    continue;
                 }
                 const host = db.getMongo().host;
                 print('Collection validation failed on host ' + host +
