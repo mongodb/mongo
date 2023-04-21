@@ -249,8 +249,7 @@
 #define WT_CLEAR(s) memset(&(s), 0, sizeof(s))
 
 /* Check if a string matches a prefix. */
-#define WT_PREFIX_MATCH(str, pfx) \
-    (((const char *)(str))[0] == ((const char *)(pfx))[0] && strncmp(str, pfx, strlen(pfx)) == 0)
+#define WT_PREFIX_MATCH(str, pfx) (strncmp(str, pfx, strlen(pfx)) == 0)
 
 /* Check if a string matches a suffix. */
 #define WT_SUFFIX_MATCH(str, sfx) \
