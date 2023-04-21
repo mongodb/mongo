@@ -14,7 +14,13 @@ RUN mkdir -p bin/ext/collators/revint
 COPY cmake_build/ext/collators/revint/libwiredtiger_revint_collator.so bin/ext/collators/revint
 RUN mkdir -p bin/ext/compressors/snappy
 COPY cmake_build/ext/compressors/snappy/libwiredtiger_snappy.so bin/ext/compressors/snappy
+RUN mkdir -p bin/ext/compressors/lz4
+COPY cmake_build/ext/compressors/lz4/libwiredtiger_lz4.so bin/ext/compressors/lz4
+RUN mkdir -p bin/ext/compressors/zlib
+COPY cmake_build/ext/compressors/zlib/libwiredtiger_zlib.so bin/ext/compressors/zlib
+RUN mkdir -p bin/ext/compressors/zstd
+COPY cmake_build/ext/compressors/zstd/libwiredtiger_zstd.so bin/ext/compressors/zstd
 COPY tools/antithesis/test.sh bin/
 COPY cmake_build/VERSION /data/
 RUN apt-get update
-RUN apt-get install -y libsnappy-dev
+RUN apt-get install -y libsnappy-dev gdb lz4 zstd
