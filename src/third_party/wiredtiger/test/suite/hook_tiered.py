@@ -300,7 +300,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
                 "test_stat_log01_readonly.test_stat_log01_readonly",
                 "test_stat_log02.test_stats_log_on_json_with_tables",
                 "test_txn02.test_ops",
-                "test_upgrade.test_upgrade",
 
                 # This group fail within Python for various, sometimes unknown, reasons.
                 "test_bug018.test_bug018",
