@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/migration_util.h"
@@ -276,14 +277,15 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
         shouldDelayBeforeDeletion ? Seconds(orphanCleanupDelaySecs.load()) : Seconds(0);
 
     if (overlapMetadata) {
-        LOGV2_OPTIONS(21989,
-                      {logv2::LogComponent::kShardingMigration},
-                      "Deletion of {namespace} range {range} will be scheduled after all possibly "
-                      "dependent queries finish",
-                      "Deletion of the collection's specified range will be scheduled after all "
-                      "possibly dependent queries finish",
-                      "namespace"_attr = _nss.ns(),
-                      "range"_attr = redact(range.toString()));
+        const auto openCursorsIds =
+            CursorManager::get(_serviceContext)->getCursorIdsForNamespace(_nss);
+        LOGV2_INFO_OPTIONS(
+            7179200,
+            {logv2::LogComponent::kShardingRangeDeleter},
+            "Range deletion will be scheduled after all possibly dependent queries finish",
+            "namespace"_attr = _nss,
+            "range"_attr = range.toString(),
+            "cursorsDirectlyReferringTheNamespace"_attr = openCursorsIds);
         ++overlapMetadata->numContingentRangeDeletionTasks;
         // Schedule the range for deletion once the overlapping metadata object is destroyed
         // (meaning no more queries can be using the range) and obtain a future which will be

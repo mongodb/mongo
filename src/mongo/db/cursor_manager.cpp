@@ -206,6 +206,24 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
     return toDisposeWithoutMutex.size();
 }
 
+std::vector<CursorId> CursorManager::getCursorIdsForNamespace(const NamespaceString& nss) {
+    std::vector<CursorId> cursorIds;
+
+    // Lock and inspect one partition at a time in order to avoid contention. It is acceptable for
+    // the output not to include info about cursors opened/closed while iterating.
+    for (size_t partitionId = 0; partitionId < kNumPartitions; ++partitionId) {
+        auto lockedPartition = _cursorMap->lockOnePartitionById(partitionId);
+        for (auto it = lockedPartition->begin(); it != lockedPartition->end(); ++it) {
+            auto* cursor = it->second;
+            if (cursor->nss() == nss) {
+                cursorIds.push_back(cursor->cursorid());
+            }
+        }
+    }
+
+    return cursorIds;
+}
+
 StatusWith<ClientCursorPin> CursorManager::pinCursor(
     OperationContext* opCtx,
     CursorId id,
