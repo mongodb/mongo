@@ -83,8 +83,8 @@ checkLog.containsJson(primary, 6825301, {
 assert.commandWorked(db.adminCommand({appendOplogNote: 1, data: {msg: "advance timestamp"}}));
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
-// Completing drop for ident.
-checkLog.containsJson(primary, 22237, {
+// "The ident was successfully dropped".
+checkLog.containsJson(primary, 6776600, {
     ident: function(ident) {
         return ident == xIndexUri;
     }
@@ -133,13 +133,13 @@ checkLog.containsJson(primary, 6825300, {
 assert.commandWorked(db.adminCommand({appendOplogNote: 1, data: {msg: "advance timestamp"}}));
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
-// Completing drop for ident.
-checkLog.containsJson(primary, 22237, {
+// "The ident was successfully dropped".
+checkLog.containsJson(primary, 6776600, {
     ident: function(ident) {
         return ident == collUri;
     }
 });
-checkLog.containsJson(primary, 22237, {
+checkLog.containsJson(primary, 6776600, {
     ident: function(ident) {
         return ident == idIndexUri;
     }

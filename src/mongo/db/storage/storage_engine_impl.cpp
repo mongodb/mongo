@@ -1230,7 +1230,22 @@ void StorageEngineImpl::checkpoint(OperationContext* opCtx) {
 void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {
     // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
     if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {
-        if (timestamp >= *earliestDropTimestamp) {
+
+        auto checkpoint = _engine->getCheckpointTimestamp();
+        auto oldest = _engine->getOldestTimestamp();
+
+        // We won't try to drop anything unless we know it is both safe to drop (older than the
+        // oldest timestamp) and present in a checkpoint for non-ephemeral storage engines.
+        // Otherwise, the drop will fail, and we'll keep attempting a drop for each new `timestamp`.
+        // Note that this is not required for correctness and is only done to avoid unnecessary work
+        // and spamming the logs when we actually have nothing to do. Additionally, these values may
+        // have both advanced since `timestamp` was calculated, but this is not expected to be
+        // common and does not affect correctness.
+        // For ephemeral storage engines, we can always drop immediately.
+        const bool safeToDrop = oldest >= *earliestDropTimestamp;
+        const bool canDropWithoutTransientErrors =
+            isEphemeral() || checkpoint >= *earliestDropTimestamp;
+        if (safeToDrop && canDropWithoutTransientErrors) {
             LOGV2(22260,
                   "Removing drop-pending idents with drop timestamps before timestamp",
                   "timestamp"_attr = timestamp);
