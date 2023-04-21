@@ -206,7 +206,6 @@ BSONObj makeObject2ForDropOrRename(uint64_t numRecords) {
 
 struct OpTimeBundle {
     repl::OpTime writeOpTime;
-    repl::OpTime prePostImageOpTime;
     Date_t wallClockTime;
 };
 
@@ -935,7 +934,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                                  args.updateArgs->updatedDoc,
                                  opTime.writeOpTime,
                                  shardingWriteRouter,
-                                 opTime.prePostImageOpTime,
                                  inMultiDocumentTransaction);
         }
     }
@@ -1091,7 +1089,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                                  documentKey.getShardKeyAndId(),
                                  opTime.writeOpTime,
                                  shardingWriteRouter,
-                                 opTime.prePostImageOpTime,
                                  inMultiDocumentTransaction);
         }
     }

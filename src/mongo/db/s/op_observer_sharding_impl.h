@@ -62,14 +62,12 @@ protected:
                               const BSONObj& updatedDoc,
                               const repl::OpTime& opTime,
                               const ShardingWriteRouter& shardingWriteRouter,
-                              const repl::OpTime& prePostImageOpTime,
                               bool inMultiDocumentTransaction) override;
     void shardObserveDeleteOp(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& documentKey,
                               const repl::OpTime& opTime,
                               const ShardingWriteRouter& shardingWriteRouter,
-                              const repl::OpTime& preImageOpTime,
                               bool inMultiDocumentTransaction) override;
     void shardObserveTransactionPrepareOrUnpreparedCommit(
         OperationContext* opCtx,

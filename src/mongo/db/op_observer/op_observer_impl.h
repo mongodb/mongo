@@ -266,14 +266,12 @@ private:
                                       const BSONObj& postImageDoc,
                                       const repl::OpTime& opTime,
                                       const ShardingWriteRouter& shardingWriteRouter,
-                                      const repl::OpTime& prePostImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveDeleteOp(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const BSONObj& documentKey,
                                       const repl::OpTime& opTime,
                                       const ShardingWriteRouter& shardingWriteRouter,
-                                      const repl::OpTime& preImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveTransactionPrepareOrUnpreparedCommit(
         OperationContext* opCtx,

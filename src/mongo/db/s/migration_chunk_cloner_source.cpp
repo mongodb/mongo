@@ -543,8 +543,7 @@ void MigrationChunkClonerSource::onInsertOp(OperationContext* opCtx,
 void MigrationChunkClonerSource::onUpdateOp(OperationContext* opCtx,
                                             boost::optional<BSONObj> preImageDoc,
                                             const BSONObj& postImageDoc,
-                                            const repl::OpTime& opTime,
-                                            const repl::OpTime& prePostImageOpTime) {
+                                            const repl::OpTime& opTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss(), MODE_IX));
 
     BSONElement idElement = postImageDoc["_id"];
@@ -564,7 +563,7 @@ void MigrationChunkClonerSource::onUpdateOp(OperationContext* opCtx,
         // the deletion of the preImage document so that the destination chunk does not receive an
         // outdated version of this document.
         if (preImageDoc && isDocInRange(*preImageDoc, getMin(), getMax(), _shardKeyPattern)) {
-            onDeleteOp(opCtx, *preImageDoc, opTime, prePostImageOpTime);
+            onDeleteOp(opCtx, *preImageDoc, opTime);
         }
         return;
     }
@@ -584,8 +583,7 @@ void MigrationChunkClonerSource::onUpdateOp(OperationContext* opCtx,
 
 void MigrationChunkClonerSource::onDeleteOp(OperationContext* opCtx,
                                             const BSONObj& deletedDocId,
-                                            const repl::OpTime& opTime,
-                                            const repl::OpTime&) {
+                                            const repl::OpTime& opTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss(), MODE_IX));
 
     BSONElement idElement = deletedDocId["_id"];

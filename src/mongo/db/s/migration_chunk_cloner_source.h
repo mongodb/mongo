@@ -192,9 +192,7 @@ public:
     void onUpdateOp(OperationContext* opCtx,
                     boost::optional<BSONObj> preImageDoc,
                     const BSONObj& postImageDoc,
-                    const repl::OpTime& opTime,
-                    const repl::OpTime& prePostImageOpTime);
-
+                    const repl::OpTime& opTime);
     /**
      * Notifies this cloner that a delede happened to the collection, which it owns. It is up to the
      * cloner's implementation to decide what to do with this information and it is valid for the
@@ -204,8 +202,7 @@ public:
      */
     void onDeleteOp(OperationContext* opCtx,
                     const BSONObj& deletedDocId,
-                    const repl::OpTime& opTime,
-                    const repl::OpTime& preImageOpTime);
+                    const repl::OpTime& opTime);
 
     /**
      * Returns the migration session id associated with this cloner, so stale sessions can be
