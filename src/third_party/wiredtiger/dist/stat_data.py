@@ -262,6 +262,7 @@ conn_stats = [
     CacheStat('cache_eviction_force_dirty_time', 'forced eviction - pages evicted that were dirty time (usecs)'),
     CacheStat('cache_eviction_force_fail', 'forced eviction - pages selected unable to be evicted count'),
     CacheStat('cache_eviction_force_fail_time', 'forced eviction - pages selected unable to be evicted time'),
+    CacheStat('cache_eviction_force_no_retry', 'forced eviction - do not retry count to evict pages selected to evict during reconciliation'),
     CacheStat('cache_eviction_force_hs', 'forced eviction - history store pages selected while session has history store cursor open'),
     CacheStat('cache_eviction_force_hs_fail', 'forced eviction - history store pages failed to evict while session has history store cursor open'),
     CacheStat('cache_eviction_force_hs_success', 'forced eviction - history store pages successfully evicted while session has history store cursor open'),

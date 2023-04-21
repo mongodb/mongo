@@ -400,9 +400,21 @@ read:
                     evict_skip = true;
                 else if (ret == EBUSY) {
                     WT_NOT_READ(ret, 0);
-                    WT_STAT_CONN_INCR(session, page_forcible_evict_blocked);
-                    stalled = true;
-                    break;
+                    /*
+                     * Don't back off if the session is configured not to do reconciliation, that
+                     * just wastes time for no benefit. Without this check a reconciliation of a
+                     * page that requires writing content to the history store can stall trying to
+                     * force-evict a history store page when there is no chance it will be evicted.
+                     */
+
+                    if (F_ISSET(session, WT_SESSION_NO_RECONCILE)) {
+                        WT_STAT_CONN_INCR(session, cache_eviction_force_no_retry);
+                        evict_skip = true;
+                    } else {
+                        WT_STAT_CONN_INCR(session, page_forcible_evict_blocked);
+                        stalled = true;
+                        break;
+                    }
                 }
                 WT_RET(ret);
 

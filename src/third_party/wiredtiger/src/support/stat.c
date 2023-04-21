@@ -1379,6 +1379,8 @@ static const char *const __stats_connection_desc[] = {
   "cache: files with active eviction walks",
   "cache: files with new eviction walks started",
   "cache: force re-tuning of eviction workers once in a while",
+  "cache: forced eviction - do not retry count to evict pages selected to evict during "
+  "reconciliation",
   "cache: forced eviction - history store pages failed to evict while session has history store "
   "cursor open",
   "cache: forced eviction - history store pages selected while session has history store cursor "
@@ -2032,6 +2034,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing cache_eviction_walks_active */
     stats->cache_eviction_walks_started = 0;
     stats->cache_eviction_force_retune = 0;
+    stats->cache_eviction_force_no_retry = 0;
     stats->cache_eviction_force_hs_fail = 0;
     stats->cache_eviction_force_hs = 0;
     stats->cache_eviction_force_hs_success = 0;
@@ -2654,6 +2657,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_walks_active += WT_STAT_READ(from, cache_eviction_walks_active);
     to->cache_eviction_walks_started += WT_STAT_READ(from, cache_eviction_walks_started);
     to->cache_eviction_force_retune += WT_STAT_READ(from, cache_eviction_force_retune);
+    to->cache_eviction_force_no_retry += WT_STAT_READ(from, cache_eviction_force_no_retry);
     to->cache_eviction_force_hs_fail += WT_STAT_READ(from, cache_eviction_force_hs_fail);
     to->cache_eviction_force_hs += WT_STAT_READ(from, cache_eviction_force_hs);
     to->cache_eviction_force_hs_success += WT_STAT_READ(from, cache_eviction_force_hs_success);
