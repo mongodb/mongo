@@ -9,8 +9,12 @@ from pathlib import Path
 import gdb
 import gdb.printing
 
+ROOT_PATH = str(Path(os.path.abspath(__file__)).parent.parent.parent)
+if ROOT_PATH not in sys.path:
+    sys.path.insert(0, ROOT_PATH)
+from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import ListIter as ImmerListIter  # pylint: disable=wrong-import-position
+
 if not gdb:
-    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
     from buildscripts.gdb.mongo import get_boost_optional
     from buildscripts.gdb.optimizer_printers import register_abt_printers
 
@@ -589,6 +593,61 @@ class AbslFlatHashMapPrinter(AbslHashMapPrinterBase):
             yield ('value', kvp['value'])
 
 
+class ImmutableMapIter(ImmerListIter):
+    def __init__(self, val):
+        super().__init__(val)
+        self.max = (1 << 64) - 1
+        self.pair = None
+        self.curr = (None, self.max, self.max)
+
+    def __next__(self):
+        if self.pair:
+            result = ('value', self.pair['second'])
+            self.pair = None
+            self.i += 1
+            return result
+        if self.i == self.size:
+            raise StopIteration
+        if self.i < self.curr[1] or self.i >= self.curr[2]:
+            self.curr = self.region()
+        self.pair = self.curr[0][self.i - self.curr[1]].cast(
+            gdb.lookup_type(self.v.type.template_argument(0).name))
+        result = ('key', self.pair['first'])
+        return result
+
+
+class ImmutableMapPrinter:
+    """Pretty-printer for mongo::immutable::map<>."""
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return '%s of size %d' % (self.val.type, int(self.val['_storage']['impl_']['size']))
+
+    def children(self):
+        return ImmutableMapIter(self.val['_storage'])
+
+    def display_hint(self):
+        return 'map'
+
+
+class ImmutableSetPrinter:
+    """Pretty-printer for mongo::immutable::set<>."""
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        return '%s of size %d' % (self.val.type, int(self.val['_storage']['impl_']['size']))
+
+    def children(self):
+        return ImmerListIter(self.val['_storage'])
+
+    def display_hint(self):
+        return 'array'
+
+
 def find_match_brackets(search, opening='<', closing='>'):
     """Return the index of the closing bracket that matches the first opening bracket.
 
@@ -914,6 +973,8 @@ def build_pretty_printer():
     pp.add('__wt_update', '__wt_update', False, WtUpdateToBsonPrinter)
     pp.add('CodeFragment', 'mongo::sbe::vm::CodeFragment', False, SbeCodeFragmentPrinter)
     pp.add('boost::optional', 'boost::optional', True, BoostOptionalPrinter)
+    pp.add('immutable::map', 'mongo::immutable::map', True, ImmutableMapPrinter)
+    pp.add('immutable::set', 'mongo::immutable::set', True, ImmutableSetPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
     register_abt_printers(pp)

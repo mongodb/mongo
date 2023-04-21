@@ -5,7 +5,7 @@ set -vxeuo pipefail
 
 IMMER_GIT_URL="https://github.com/mongodb-forks/immer.git"
 
-IMMER_GIT_REV=9dad616455aee3cf847ec349c6b5d98ca90b403b
+IMMER_GIT_REV=d98a68cd6c60e025547614ad0809f68fd816d740
 
 LIB_GIT_DIR=$(mktemp -d /tmp/import-immer.XXXXXX)
 trap "rm -rf $LIB_GIT_DIR" EXIT
@@ -27,7 +27,13 @@ rm -rf $LIB_GIT_DIR/example
 rm -rf $LIB_GIT_DIR/extra
 rm -rf $LIB_GIT_DIR/nix
 rm -rf $LIB_GIT_DIR/test
-rm -rf $LIB_GIT_DIR/tools
+rm -rf $LIB_GIT_DIR/tools/clojure
+rm -rf $LIB_GIT_DIR/tools/docker
+rm -rf $LIB_GIT_DIR/tools/include
+rm -rf $LIB_GIT_DIR/tools/scala
+rm -rf $LIB_GIT_DIR/tools/sinusoidal-sphinx-theme
+rm -rf $LIB_GIT_DIR/tools/reproduce-paper-results.bash
+rm -rf $LIB_GIT_DIR/tools/with-tee.bash
 rm -f $LIB_GIT_DIR/BUILD
 rm -f $LIB_GIT_DIR/CMakeLists.txt
 rm -f $LIB_GIT_DIR/Package.swift
