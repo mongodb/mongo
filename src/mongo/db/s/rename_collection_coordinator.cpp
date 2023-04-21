@@ -219,7 +219,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
                     if (!targetIsSharded) {
                         // (SERVER-67325) Acquire critical section on the target collection in order
-                        // to disallow concurrent `createCollection`
+                        // to disallow concurrent `createCollection`. In case the collection does
+                        // not exist, it will be later released by the rename participant. In case
+                        // the collection exists and is unsharded, the critical section can be
+                        // released right away as the participant will re-acquire it when needed.
                         criticalSection->acquireRecoverableCriticalSectionBlockWrites(
                             opCtx,
                             toNss,
@@ -230,38 +233,29 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             toNss,
                             criticalSectionReason,
                             ShardingCatalogClient::kLocalWriteConcern);
-                    }
 
-                    // Make sure the target namespace is not a view
-                    {
-                        Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
-                        const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, toNss.db());
-                        if (db) {
-                            uassert(ErrorCodes::CommandNotSupportedOnView,
-                                    str::stream() << "Can't rename to target collection `" << toNss
-                                                  << "` because it is a view.",
-                                    !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
+                        {
+                            // Make sure the target namespace is not a view
+                            Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
+                            const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, toNss.db());
+                            if (db) {
+                                uassert(ErrorCodes::CommandNotSupportedOnView,
+                                        str::stream() << "Can't rename to target collection `"
+                                                      << toNss << "` because it is a view.",
+                                        !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
+                            }
                         }
-                    }
 
-                    const bool targetExists = [&]() {
-                        if (targetIsSharded) {
-                            return true;
+                        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
+                                                                                       toNss)) {
+                            // Release the critical section because the unsharded target collection
+                            // already exists, hence no risk of concurrent `createCollection`
+                            criticalSection->releaseRecoverableCriticalSection(
+                                opCtx,
+                                toNss,
+                                criticalSectionReason,
+                                ShardingCatalogClient::kLocalWriteConcern);
                         }
-                        auto collectionCatalog = CollectionCatalog::get(opCtx);
-                        auto targetColl =
-                            collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
-                        return (bool)targetColl;  // true if exists and is unsharded
-                    }();
-
-                    if (targetExists) {
-                        // Release the critical section because the target collection
-                        // already exists, hence no risk of concurrent `createCollection`
-                        criticalSection->releaseRecoverableCriticalSection(
-                            opCtx,
-                            toNss,
-                            criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
                     }
 
                     sharding_ddl_util::checkRenamePreconditions(
@@ -276,7 +270,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx,
                         toNss,
                         criticalSectionReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
+                        ShardingCatalogClient::kLocalWriteConcern,
+                        false /* throwIfReasonDiffers */);
                     _completeOnError = true;
                     throw;
                 }
