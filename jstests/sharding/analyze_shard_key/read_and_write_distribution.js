@@ -481,6 +481,8 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
         docs.push({_id: i, x: i, y: i, ts: new Date()});
     }
     assert.commandWorked(sampledColl.insert(docs));
+    const sampledCollUuid =
+        QuerySamplingUtil.getCollectionUuid(fixture.conn.getDB(dbName), sampledCollName);
 
     // Verify that the analyzeShardKey command returns zeros for the read and write sample size
     // when there are no sampled queries.
@@ -491,7 +493,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     // Turn on query sampling and wait for sampling to become active.
     assert.commandWorked(
         fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", sampleRate}));
-    fixture.waitForActiveSamplingFn();
+    fixture.waitForActiveSamplingFn(sampledNs, sampledCollUuid);
 
     // Create and run test queries.
     const testCase = makeTestCase(
@@ -504,7 +506,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     // getting sampled.
     assert.commandWorked(
         fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
-    fixture.waitForInactiveSamplingFn();
+    fixture.waitForInactiveSamplingFn(sampledNs, sampledCollUuid);
 
     res = waitForSampledQueries(fixture.conn, sampledNs, shardKey, testCase);
     // Verify that the metrics are as expected.
@@ -585,10 +587,8 @@ const mongosSetParametersOpts = {
                     st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
             }
         },
-        waitForActiveSamplingFn: () => {
-            for (let i = 0; i < numMongoses; i++) {
-                QuerySamplingUtil.waitForActiveSampling(st["s" + String(i)]);
-            }
+        waitForActiveSamplingFn: (ns, collUuid) => {
+            QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
         },
         runCmdsFn: (dbName, cmdObjs) => {
             for (let i = 0; i < cmdObjs.length; i++) {
@@ -596,11 +596,8 @@ const mongosSetParametersOpts = {
                 assert.commandWorked(db.runCommand(cmdObjs[i]));
             }
         },
-        waitForInactiveSamplingFn: () => {
-            for (let i = 0; i < numMongoses; i++) {
-                QuerySamplingUtil.waitForInactiveSampling(st["s" + String(i)]);
-            }
-            QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
+        waitForInactiveSamplingFn: (ns, collUuid) => {
+            QuerySamplingUtil.waitForInactiveSamplingShardedCluster(st, ns, collUuid);
         }
     };
 
@@ -642,10 +639,8 @@ const mongosSetParametersOpts = {
         setUpCollectionFn: (dbName, collName, isShardedColl) => {
             // No setup is needed.
         },
-        waitForActiveSamplingFn: () => {
-            rst.nodes.forEach(node => {
-                QuerySamplingUtil.waitForActiveSampling(node);
-            });
+        waitForActiveSamplingFn: (ns, collUuid) => {
+            QuerySamplingUtil.waitForActiveSamplingReplicaSet(rst, ns, collUuid);
         },
         runCmdsFn: (dbName, cmdObjs) => {
             for (let i = 0; i < cmdObjs.length; i++) {
@@ -653,10 +648,8 @@ const mongosSetParametersOpts = {
                 assert.commandWorked(node.getDB(dbName).runCommand(cmdObjs[i]));
             }
         },
-        waitForInactiveSamplingFn: () => {
-            rst.nodes.forEach(node => {
-                QuerySamplingUtil.waitForInactiveSampling(node);
-            });
+        waitForInactiveSamplingFn: (ns, collUuid) => {
+            QuerySamplingUtil.waitForInactiveSamplingReplicaSet(rst, ns, collUuid);
         }
     };
 

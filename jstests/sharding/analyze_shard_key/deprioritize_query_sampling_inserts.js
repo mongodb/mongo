@@ -21,7 +21,7 @@ const mongosSetParameterOpts = {
     queryAnalysisSamplerConfigurationRefreshSecs,
 };
 
-function runTest(conn, primary) {
+function runTest(conn, primary, {st, rst}) {
     const dbName = "testDb";
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -33,9 +33,10 @@ function runTest(conn, primary) {
     const sampleDiffNs = "config." + sampleDiffCollName;
 
     assert.commandWorked(testColl.insert([{x: 1}]));
+    const collUuid = QuerySamplingUtil.getCollectionUuid(testDb, collName);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
-    QuerySamplingUtil.waitForActiveSampling(conn);
+    QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {st, rst});
 
     // Test insert to config.sampledQueries.
     const fp1 = configureFailPoint(primary, "hangInsertBeforeWrite", {ns: sampleNs});
@@ -80,7 +81,7 @@ function runTest(conn, primary) {
     });
 
     jsTest.log("Testing deprioritized insert in sharded cluster.");
-    runTest(st.s, st.rs0.getPrimary());
+    runTest(st.s, st.rs0.getPrimary(), {st});
 
     st.stop();
 }
@@ -90,7 +91,7 @@ function runTest(conn, primary) {
     rst.initiate();
 
     jsTest.log("Testing deprioritized insert in replica set.");
-    runTest(rst.getPrimary(), rst.getPrimary());
+    runTest(rst.getPrimary(), rst.getPrimary(), {rst});
 
     rst.stopSet();
 }

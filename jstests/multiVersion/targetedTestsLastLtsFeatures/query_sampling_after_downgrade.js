@@ -39,11 +39,10 @@ const testDb = st.s.getDB(dbName);
 const testColl = testDb.getCollection(collName);
 
 assert.commandWorked(testColl.insert([{x: 1}]));
+const collUuid = QuerySamplingUtil.getCollectionUuid(testDb, collName);
 
 assert.commandWorked(st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
-QuerySamplingUtil.waitForActiveSampling(st.s0);
-QuerySamplingUtil.waitForActiveSampling(st.s1);
-QuerySamplingUtil.waitForActiveSampling(shard0Primary);
+QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
 
 assert.commandWorked(shard0Primary.adminCommand(
     {configureFailPoint: "disableQueryAnalysisWriterFlusher", mode: "alwaysOn"}));

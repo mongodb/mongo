@@ -43,7 +43,9 @@ assert.commandWorked(mongosDB.createCollection(foreignCollName));
 
 assert.commandWorked(
     st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", sampleRate: 1000}));
-QuerySamplingUtil.waitForActiveSamplingOnAllShards(st);
+const foreignCollUUid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);
+QuerySamplingUtil.waitForActiveSamplingShardedCluster(
+    st, foreignNs, foreignCollUUid, {skipMongoses: true});
 
 // The foreign collection is unsharded so all documents are on the primary shard.
 const shardNames = [st.rs0.name];
