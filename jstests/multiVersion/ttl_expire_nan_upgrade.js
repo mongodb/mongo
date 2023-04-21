@@ -33,6 +33,7 @@ assert.commandWorked(secondary.adminCommand({fsync: 1}));
 
 // Restart the secondary with a 5.0+ binary. The node is expected to complete its startup procedure.
 secondary = rst.restart(secondary, {binVersion: 'latest'});
+rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
 rst.awaitReplication();
 const secondaryColl = secondary.getCollection(coll.getFullName());
 const secondaryIndexes = IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 't_1']);
