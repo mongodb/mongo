@@ -1533,41 +1533,48 @@ buildvariants:
       --runNoFeatureFlagTests
       --excludeWithAnyTags=incompatible_with_shard_merge,DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
 
-- <<: *linux-x86-multiversion-template
+# This variant exists becuase this is the only way to test future multiversion tags
+# version_expansions_gen will pretend we are upgrading to "bv_future_git_tag"
+# which is like simulating a branching task
+- &enterprise-rhel-80-64-bit-future-git-tag-multiversion-template
+  <<: *linux-x86-multiversion-template
   name: &enterprise-rhel-80-64-bit-future-git-tag-multiversion enterprise-rhel-80-64-bit-future-git-tag-multiversion
   display_name: "Enterprise RHEL 8.0 (future git tag multiversion)"
   expansions:
-    compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --ssl
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      MONGO_DISTMOD=rhel80
-      --link-model=dynamic
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    repo_edition: enterprise
+    <<: *linux_x86_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
-    num_scons_link_jobs_available: 0.99
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
-    large_distro_name: rhel80-medium
-    resmoke_jobs_factor: 0.25
+    resmoke_jobs_factor: 0.5
     bv_future_git_tag: r100.0.0-9999
     test_flags: >-
       --excludeWithAnyTags=future_git_tag_incompatible
-    compile_variant: *enterprise-rhel-80-64-bit-future-git-tag-multiversion
+  depends_on:
+  - name: version_expansions_gen
+    variant: &enterprise-rhel-80-64-bit-future-git-tag-multiversion-version-gen enterprise-rhel-80-64-bit-future-git-tag-multiversion-version-gen
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: archive_dist_test_debug
+    variant: *linux_x86_dynamic_compile_variant_name
+  tasks:
+  - name: .multiversion !.future_git_tag_incompatible
+  - name: .multiversion_future_git_tag
+  - name: generate_buildid_to_debug_symbols_mapping
+
+# This variant exists becuase this is the only way to correctly have
+# enterprise-rhel-80-64-bit-future-git-tag-multiversion depend the the "correct" version_expansions_gen task
+# Without this extra variant depending on version_expansions_gen will yeild the version_expansions_gen task in version_gen
+# Adding this variant removes that race condition
+- <<: *enterprise-rhel-80-64-bit-future-git-tag-multiversion-template
+  name: *enterprise-rhel-80-64-bit-future-git-tag-multiversion-version-gen
+  display_name: "Enterprise RHEL 8.0 (future git tag multiversion) (version gen)"
   depends_on: null
   tasks:
   - name: version_expansions_gen
     distros:
     - rhel80-small
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge
-  - name: .multiversion !.future_git_tag_incompatible
-  - name: .multiversion_future_git_tag
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
