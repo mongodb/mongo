@@ -85,6 +85,12 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"cache.evict_max", "maximum number of eviction workers", 0x0, 0, 5, 100,
     V_GLOBAL_CACHE_EVICT_MAX},
 
+  {"cache.eviction_dirty_target", "dirty content target for eviction", C_IGNORE, 0, 0, 100,
+    V_GLOBAL_CACHE_EVICTION_DIRTY_TARGET},
+
+  {"cache.eviction_dirty_trigger", "dirty content trigger for eviction", C_IGNORE, 0, 0, 100,
+    V_GLOBAL_CACHE_EVICTION_DIRTY_TRIGGER},
+
   {"cache.minimum", "minimum cache size (MB)", C_IGNORE, 0, 0, 100 * 1024, V_GLOBAL_CACHE_MINIMUM},
 
   {"checkpoint", "checkpoint type (on | off | wiredtiger)", C_IGNORE | C_STRING, 0, 0, 0,

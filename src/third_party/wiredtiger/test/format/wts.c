@@ -321,6 +321,12 @@ create_database(const char *home, WT_CONNECTION **connp)
       ",statistics=(%s)",
       GV(CACHE), progname, GVS(STATISTICS_MODE));
 
+    /* Eviction (dirty) configuration. */
+    if (GV(CACHE_EVICTION_DIRTY_TARGET) != 0)
+        CONFIG_APPEND(p, ",eviction_dirty_target=%" PRIu32, GV(CACHE_EVICTION_DIRTY_TARGET));
+    if (GV(CACHE_EVICTION_DIRTY_TRIGGER) != 0)
+        CONFIG_APPEND(p, ",eviction_dirty_trigger=%" PRIu32, GV(CACHE_EVICTION_DIRTY_TRIGGER));
+
     /* Statistics log configuration. */
     sources = GVS(STATISTICS_LOG_SOURCES);
     if (strcmp(sources, "off") != 0)
@@ -345,9 +351,6 @@ create_database(const char *home, WT_CONNECTION **connp)
     /* LSM configuration. */
     if (g.lsm_config)
         CONFIG_APPEND(p, ",lsm_manager=(worker_thread_max=%" PRIu32 "),", GV(LSM_WORKER_THREADS));
-
-    if (g.lsm_config || GV(CACHE) < 20)
-        CONFIG_APPEND(p, ",eviction_dirty_trigger=95");
 
     /* Eviction configuration. */
     if (GV(CACHE_EVICT_MAX) != 0)

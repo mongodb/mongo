@@ -684,12 +684,19 @@ config_cache(void)
 {
     uint64_t cache, workers;
 
+    /* Sum the number of workers. */
+    workers = GV(RUNS_THREADS);
+    if (GV(OPS_HS_CURSOR))
+        ++workers;
+    if (GV(OPS_RANDOM_CURSOR))
+        ++workers;
+
     /* Check if both min and max cache sizes have been specified and if they're consistent. */
     if (config_explicit(NULL, "cache")) {
         if (config_explicit(NULL, "cache.minimum") && GV(CACHE) < GV(CACHE_MINIMUM))
             testutil_die(EINVAL, "minimum cache set larger than cache (%" PRIu32 " > %" PRIu32 ")",
               GV(CACHE_MINIMUM), GV(CACHE));
-        return;
+        goto dirty_eviction_config;
     }
 
     GV(CACHE) = GV(CACHE_MINIMUM);
@@ -706,13 +713,6 @@ config_cache(void)
         if (GV(CACHE) < cache)
             GV(CACHE) = (uint32_t)cache;
     }
-
-    /* Sum the number of workers. */
-    workers = GV(RUNS_THREADS);
-    if (GV(OPS_HS_CURSOR))
-        ++workers;
-    if (GV(OPS_RANDOM_CURSOR))
-        ++workers;
 
     /*
      * Maximum internal/leaf page size sanity.
@@ -749,6 +749,21 @@ config_cache(void)
     /* Give any block cache 20% of the total cache size, over and above the cache. */
     if (GV(BLOCK_CACHE) != 0)
         GV(BLOCK_CACHE_SIZE) = (GV(CACHE) + 4) / 5;
+
+dirty_eviction_config:
+    /* Adjust the dirty eviction settings to reduce test driven cache stuck failures. */
+    if (g.lsm_config || GV(CACHE) < 20) {
+        WARN("Setting cache.eviction_dirty_trigger=95 due to %s",
+          g.lsm_config ? "LSM" : "micro cache");
+        config_single(NULL, "cache.eviction_dirty_trigger=95", false);
+    } else if (GV(CACHE) / workers <= 2 && !config_explicit(NULL, "cache.eviction_dirty_trigger")) {
+        WARN("Cache is minimally configured (%" PRIu32
+             "mb), setting cache.eviction_dirty_trigger=40 and "
+             "cache.eviction_dirty_target=10",
+          GV(CACHE));
+        config_single(NULL, "cache.eviction_dirty_trigger=40", false);
+        config_single(NULL, "cache.eviction_dirty_target=10", false);
+    }
 }
 
 /*
