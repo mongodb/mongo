@@ -55,11 +55,11 @@ void WindowFunctionPercentileBenchmarkFixture::removable_unbounded_percentile(
     benchmark::State& state, std::vector<double> ps) {
     // Generate the data.
     const vector<double> inputs = generateNormalData(dataSizeLarge);
-    auto expCtx = new ExpressionContextForTest();
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     // Run the test.
     for (auto keepRunning : state) {
-        auto w = WindowFunctionPercentile::create(expCtx, ps);
+        auto w = WindowFunctionPercentile::create(expCtx.get(), ps);
 
         // Calculate the percentile for a [0, unbounded] window for each input.
         for (size_t i = 0; i < dataSizeLarge; i++) {
@@ -90,11 +90,11 @@ void WindowFunctionPercentileBenchmarkFixture::removable_bounded_percentile(
     benchmark::State& state, std::vector<double> ps) {
     // Generate the data.
     const vector<double> inputs = generateNormalData(dataSizeLarge);
-    auto expCtx = new ExpressionContextForTest();
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     // Run the test.
     for (auto keepRunning : state) {
-        auto w = WindowFunctionPercentile::create(expCtx, ps);
+        auto w = WindowFunctionPercentile::create(expCtx.get(), ps);
 
         // Calculate the percentile for a ["current", 100] window for each input.
         for (size_t i = 0; i < dataSizeLarge; i++) {
