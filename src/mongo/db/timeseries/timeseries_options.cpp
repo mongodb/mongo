@@ -224,17 +224,22 @@ StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModificatio
 }
 
 BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray) {
+    // Generates the 'bucketMaxSpanSeconds' field if missing.
+    auto maxSpanSeconds =
+        options.getBucketMaxSpanSeconds().get_value_or(getMaxSpanSecondsFromGranularity(
+            options.getGranularity().get_value_or(BucketGranularityEnum::Seconds)));
+
     if (options.getMetaField()) {
         return wrapInArrayIf(
             asArray,
             BSON("$_internalUnpackBucket" << BSON(
                      "timeField" << options.getTimeField() << "metaField" << *options.getMetaField()
-                                 << "bucketMaxSpanSeconds" << *options.getBucketMaxSpanSeconds())));
+                                 << "bucketMaxSpanSeconds" << maxSpanSeconds)));
     }
     return wrapInArrayIf(asArray,
-                         BSON("$_internalUnpackBucket" << BSON(
-                                  "timeField" << options.getTimeField() << "bucketMaxSpanSeconds"
-                                              << *options.getBucketMaxSpanSeconds())));
+                         BSON("$_internalUnpackBucket"
+                              << BSON("timeField" << options.getTimeField()
+                                                  << "bucketMaxSpanSeconds" << maxSpanSeconds)));
 }
 
 bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2) {
