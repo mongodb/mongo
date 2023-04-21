@@ -49,16 +49,14 @@ TEST(DatabaseType, Empty) {
 TEST(DatabaseType, Basic) {
     UUID uuid = UUID::gen();
     Timestamp timestamp = Timestamp(1, 1);
-    const auto dbObj =
-        BSON(DatabaseType::kNameFieldName
-             << "mydb" << DatabaseType::kPrimaryFieldName << "shard"
-             << DatabaseType::kShardedFieldName << true << DatabaseType::kVersionFieldName
-             << BSON("uuid" << uuid << "lastMod" << 0 << "timestamp" << timestamp));
+    const auto dbObj = BSON(DatabaseType::kNameFieldName
+                            << "mydb" << DatabaseType::kPrimaryFieldName << "shard"
+                            << DatabaseType::kVersionFieldName
+                            << BSON("uuid" << uuid << "lastMod" << 0 << "timestamp" << timestamp));
 
     const auto db = DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
     ASSERT_EQUALS(db.getName(), "mydb");
     ASSERT_EQUALS(db.getPrimary(), "shard");
-    ASSERT_TRUE(db.getSharded());
     ASSERT_EQUALS(db.getVersion().getUuid(), uuid);
     ASSERT_EQUALS(db.getVersion().getLastMod(), 0);
 }

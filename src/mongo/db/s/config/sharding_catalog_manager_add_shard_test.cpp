@@ -543,7 +543,6 @@ protected:
             operationContext(), expectedDB.getName(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(expectedDB.getName(), foundDB.getName());
         ASSERT_EQUALS(expectedDB.getPrimary(), foundDB.getPrimary());
-        ASSERT_EQUALS(expectedDB.getSharded(), foundDB.getSharded());
     }
 
     /**

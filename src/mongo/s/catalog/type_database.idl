@@ -54,14 +54,6 @@ structs:
                 validator:
                     callback: "ShardId::validate"
                 optional: false
-            # The following field has been deprecated in 6.0 and should not be used
-            # TODO SERVER-63983 make this field optional
-            partitioned:
-                description: "Specify if it is allowed to create sharded collection on this database."
-                cpp_name: sharded
-                type: bool
-                default: false
-                optional: false
             version:
                 description: "Version of the database."
                 type: database_version

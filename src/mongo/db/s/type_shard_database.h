@@ -42,7 +42,6 @@ public:
     // Make getters and setters accessible.
     using ShardDatabaseTypeBase::getName;
     using ShardDatabaseTypeBase::getPrimary;
-    using ShardDatabaseTypeBase::getSharded;
     using ShardDatabaseTypeBase::getVersion;
 
     explicit ShardDatabaseType(const BSONObj& obj);

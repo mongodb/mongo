@@ -845,7 +845,6 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase
     DatabaseType dbt;
     dbt.setName(shardDatabase.getName());
     dbt.setPrimary(shardDatabase.getPrimary());
-    dbt.setSharded(shardDatabase.getSharded());
     dbt.setVersion(shardDatabase.getVersion());
 
     return dbt;
