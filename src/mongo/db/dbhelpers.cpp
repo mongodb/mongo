@@ -393,7 +393,8 @@ bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
                                         snapshottedDoc,
                                         result,
                                         collection_internal::kUpdateNoIndexes,
-                                        nullptr,
+                                        nullptr /* indexesAffected */,
+                                        nullptr /* opDebug */,
                                         &args);
 
     return true;

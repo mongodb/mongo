@@ -332,6 +332,7 @@ Status ViewsForDatabase::_upsertIntoCatalog(OperationContext* opCtx,
                                             oldView,
                                             viewObj,
                                             collection_internal::kUpdateAllIndexes,
+                                            nullptr /* indexesAffected */,
                                             &CurOp::get(opCtx)->debug(),
                                             &args);
     }

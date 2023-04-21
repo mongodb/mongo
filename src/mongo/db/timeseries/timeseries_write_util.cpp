@@ -197,6 +197,7 @@ Status performAtomicWrites(OperationContext* opCtx,
                                                     original,
                                                     updated,
                                                     diffOnIndexes,
+                                                    nullptr /* indexesAffected */,
                                                     &curOp->debug(),
                                                     &args);
             },

@@ -1841,8 +1841,15 @@ Status performAtomicTimeseriesWrites(
                     opCtx->recoveryUnit()->setTimestamp(args.oplogSlots[0].getTimestamp()));
         }
 
-        collection_internal::updateDocument(
-            opCtx, *coll, recordId, original, updated, diffOnIndexes, &curOp->debug(), &args);
+        collection_internal::updateDocument(opCtx,
+                                            *coll,
+                                            recordId,
+                                            original,
+                                            updated,
+                                            diffOnIndexes,
+                                            nullptr /*indexesAffected*/,
+                                            &curOp->debug(),
+                                            &args);
         if (slot) {
             if (participant) {
                 // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is

@@ -2332,6 +2332,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
                                                 preImageDoc,
                                                 stateDoc,
                                                 collection_internal::kUpdateAllIndexes,
+                                                nullptr /* indexesAffected */,
                                                 nullptr /* OpDebug* */,
                                                 &args);
         }

@@ -981,6 +981,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                                originalSnapshot,
                                updatedStateDocBson,
                                collection_internal::kUpdateNoIndexes,
+                               nullptr /* indexesAffected */,
                                nullptr /* OpDebug* */,
                                &args);
 

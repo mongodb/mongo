@@ -675,6 +675,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                                                            originalSnapshot,
                                                            updatedStateDocBson,
                                                            collection_internal::kUpdateNoIndexes,
+                                                           nullptr /* indexesAffected */,
                                                            nullptr /* OpDebug* */,
                                                            &args);
 

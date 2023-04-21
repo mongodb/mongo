@@ -99,11 +99,13 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
  * Updates the document @ oldLocation with newDoc.
  *
  * If the document fits in the old space, it is put there; if not, it is moved.
- * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on success.
- * 'opDiff' Optional argument. If set to kUpdateAllIndexes, all the indexes are updated. If it is
- * set to kUpdateNoIndexes, no indexes are updated. Otherwise, it is the precomputed difference
- * between 'oldDoc' and 'newDoc', used to determine which indexes need to be updated.
- * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
+ *
+ *'args.updatedDoc' is set to the updated version of the document with damages applied, on success
+ *'opDiff' is optional. If set to kUpdateAllIndexes, all the indexes are updated. If it is set to
+ *   kUpdateNoIndexes, no indexes are updated. Otherwise, it is the precomputed difference between
+ *   'oldDoc' and 'newDoc', used to determine which indexes need to be updated.
+ * 'indexesAffected' is optional. When not null, will be set to whether any indexes were updated
+ * 'opDebug' is argument. When not null, will be used to record operation statistics.
  */
 void updateDocument(OperationContext* opCtx,
                     const CollectionPtr& collection,
@@ -111,6 +113,7 @@ void updateDocument(OperationContext* opCtx,
                     const Snapshotted<BSONObj>& oldDoc,
                     const BSONObj& newDoc,
                     const BSONObj* opDiff,
+                    bool* indexesAffected,
                     OpDebug* opDebug,
                     CollectionUpdateArgs* args);
 
@@ -126,6 +129,7 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               const char* damageSource,
                                               const mutablebson::DamageVector& damages,
                                               const BSONObj* opDiff,
+                                              bool* indexesAffected,
                                               OpDebug* opDebug,
                                               CollectionUpdateArgs* args);
 

@@ -408,7 +408,8 @@ public:
                                                 oldDoc,
                                                 newDoc(oldDoc),
                                                 collection_internal::kUpdateNoIndexes,
-                                                nullptr,
+                                                nullptr /* indexesAffected */,
+                                                nullptr /* opDebug */,
                                                 &args);
             wuow.commit();
         }
@@ -433,7 +434,8 @@ public:
                                                     oldDoc,
                                                     newDoc(oldDoc),
                                                     collection_internal::kUpdateNoIndexes,
-                                                    nullptr,
+                                                    nullptr /* indexesAffected */,
+                                                    nullptr /* opDebug */,
                                                     &args);
                 wuow.commit();
             }

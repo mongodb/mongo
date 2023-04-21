@@ -477,7 +477,8 @@ void updateSessionEntry(OperationContext* opCtx,
                                         Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
                                         updateMod,
                                         collection_internal::kUpdateNoIndexes,
-                                        nullptr,
+                                        nullptr /* indexesAffected */,
+                                        nullptr /* opDebug */,
                                         &args);
 
     wuow.commit();
