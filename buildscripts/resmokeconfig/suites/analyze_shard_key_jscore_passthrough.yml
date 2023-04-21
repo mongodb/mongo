@@ -158,6 +158,8 @@ executor:
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 5
         analyzeShardKeyNumRanges: 10
+        analyzeShardKeySplitPointExpirationSecs: 10
+        ttlMonitorSleepSecs: 5
         logComponentVerbosity:
           verbosity: 0
           sharding: 2

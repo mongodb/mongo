@@ -80,7 +80,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gAnalyzeShardKeySplitPointExpirationSecs
         default:
-            expr: 15 * 60
+            expr: 5 * 60
         validator:
             gt: 0
 

@@ -204,6 +204,11 @@ function analyzeShardKey(ns, shardKey, indexKey) {
             tojsononeline(res)}`);
         return res;
     }
+    if (res.code == 7559401) {
+        print(`Failed to analyze the shard key because one of the shards fetched the split ` +
+              `point documents after the TTL deletions had started. ${tojsononeline(err)}`);
+        return res;
+    }
 
     assert.commandWorked(res);
     jsTest.log(`Finished analyzing the shard key: ${tojsononeline(res)}`);

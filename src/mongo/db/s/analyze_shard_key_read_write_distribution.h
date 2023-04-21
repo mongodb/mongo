@@ -254,7 +254,7 @@ template <typename T>
 std::vector<T> addNumByRange(const std::vector<T>& l, const std::vector<T>& r) {
     invariant(!l.empty());
     invariant(!r.empty());
-    tassert(
+    uassert(
         7559401,
         str::stream()
             << "Failed to combine the 'numByRange' metrics from two shards since one has length "
