@@ -190,8 +190,8 @@ StatusWithMatchExpression parseComparison(
     // (e.g. {a: {$gt: /b/}} is illegal).
     if (MatchExpression::EQ != cmp->matchType() && BSONType::RegEx == e.type()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "Can't have RegEx as arg to predicate over field '" << name
-                              << "'."};
+                str::stream() << "Can't have RegEx as arg to non-equality predicate over field '"
+                              << name << "'."};
     }
 
     cmp->setCollator(expCtx->getCollator());
