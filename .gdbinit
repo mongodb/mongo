@@ -13,3 +13,6 @@ source buildscripts/gdb/mongo_lock.py
 
 # Load methods for printing in-memory contents of WT tables.
 source buildscripts/gdb/wt_dump_table.py
+
+# Load third-party pretty printers
+source src/third_party/immer/dist/tools/gdb_pretty_printers/autoload.py
