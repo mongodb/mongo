@@ -5080,5 +5080,43 @@ TEST(IDLOwnershipTests, ParseSharingOwnershipTmpIDLStruct) {
     // accessing free'd memory which should error on ASAN and debug builds.
     ASSERT_BSONOBJ_EQ(bson["value"].Obj(), BSON("x" << 42));
 }
+
+
+TEST(IDLDangerousIgnoreChecks, ValidateDuplicateChecking) {
+    IDLParserContext ctxt("root");
+
+    // Positive: non-strict
+    {
+        auto testDoc = BSON("field1"
+                            << "abc"
+                            << "field0"
+                            << "def"
+                            << "extra" << 1);
+        Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc);
+    }
+
+    // Positive: duplicate extra
+    {
+        auto testDoc = BSON("extra" << 2 << "field1"
+                                    << "abc"
+                                    << "field0"
+                                    << "def"
+                                    << "extra" << 1);
+        Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc);
+    }
+
+    // Negative: duplicate required field
+    {
+        auto testDoc = BSON("field0"
+                            << "ghi"
+                            << "field1"
+                            << "abc"
+                            << "field0"
+                            << "def"
+                            << "extra" << 1);
+        ASSERT_THROWS(Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc),
+                      AssertionException);
+    }
+}
 }  // namespace
 }  // namespace mongo

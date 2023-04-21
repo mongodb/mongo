@@ -135,6 +135,8 @@ ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL = "ID0095"
 ERROR_ID_INVALID_TYPE_FOR_SHAPIFY = "ID0096"
 ERROR_ID_CANNOT_BE_LITERAL_AND_FIELDPATH = "ID0097"
 ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE = "ID0098"
+ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0099"
+ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0100"
 
 
 class IDLError(Exception):
@@ -978,6 +980,18 @@ class ParserContext(object):
     def add_field_cannot_have_query_shape_anonymize_false(self, location):
         self._add_error(location, ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE,
                         "'query_shape_anonymize' cannot be defined as false if it is set.")
+
+    def add_strict_and_disable_check_not_allowed(self, location):
+        self._add_error(
+            location, ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED,
+            "Cannot set strict = true and unsafe_dangerous_disable_extra_field_duplicate_checks = true on a struct. unsafe_dangerous_disable_extra_field_duplicate_checks is only permitted on strict = false"
+        )
+
+    def add_inheritance_and_disable_check_not_allowed(self, location):
+        self._add_error(
+            location, ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED,
+            "Fields cannot have unsafe_dangerous_disable_extra_field_duplicate_checks = true. unsafe_dangerous_disable_extra_field_duplicate_checks on non field structs"
+        )
 
 
 def _assert_unique_error_messages():

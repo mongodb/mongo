@@ -2850,6 +2850,79 @@ class TestBinder(testcase.IDLTestcase):
                             query_shape_literal: true
             """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
+    # pylint: disable=invalid-name
+    def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(self):
+        # type: () -> None
+        """Negative struct tests for unsafe_dangerous_disable_extra_field_duplicate_checks."""
+
+        # Setup some common types
+        test_preamble = self.common_types + \
+            textwrap.dedent("""
+            structs:
+                danger:
+                    description: foo
+                    strict: false
+                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
+                    fields:
+                        foo: string
+        """)
+
+        # Test strict and unsafe_dangerous_disable_extra_field_duplicate_checks are not allowed
+        self.assert_bind_fail(
+            test_preamble + indent_text(
+                1,
+                textwrap.dedent("""
+                danger1:
+                    description: foo
+                    strict: true
+                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
+                    fields:
+                        foo: string
+            """)), idl.errors.ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED)
+
+        # Test inheritance is prohibited through structs
+        self.assert_bind_fail(
+            test_preamble + indent_text(
+                1,
+                textwrap.dedent("""
+                danger2:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                        d1: danger
+            """)), idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED)
+
+        # Test inheritance is prohibited through commands
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+            commands:
+                dangerc:
+                    description: foo
+                    namespace: ignored
+                    command_name: dangerc
+                    strict: false
+                    api_version: ""
+                    fields:
+                        foo: string
+                        d1: danger
+            """), idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED)
+
+        # Test commands and unsafe_dangerous_disable_extra_field_duplicate_checks are disallowed
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+            commands:
+                dangerc:
+                    description: foo
+                    namespace: ignored
+                    command_name: dangerc
+                    api_version: ""
+                    strict: false
+                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
+                    fields:
+                        foo: string
+            """), idl.errors.ERROR_ID_COMMAND_AND_DISABLE_CHECK_NOT_ALLOWED)
+
 
 if __name__ == '__main__':
 

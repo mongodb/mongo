@@ -693,7 +693,7 @@ structs:
         strict: false
         fields:
             update: string
-    
+
     one_variant:
         description: UnitTest for a single variant which accepts int or string
         strict: false
@@ -983,6 +983,20 @@ structs:
         fields:
             unix: unixEpoch
             ecma: millisEpoch
+
+##################################################################################################
+#
+# Test unsafe_dangerous_disable_extra_field_duplicate_checks ignores extra fields
+#
+##################################################################################################
+
+    struct_with_ignore_extra_duplicates:
+        description: A struct expecting a unix epoch and a millis epoch.
+        unsafe_dangerous_disable_extra_field_duplicate_checks: true
+        strict: false
+        fields:
+            field0: string
+            field1: string
 
 ##################################################################################################
 #

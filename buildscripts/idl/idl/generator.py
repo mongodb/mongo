@@ -273,7 +273,7 @@ def _get_field_usage_checker(indented_writer, struct):
 
     # Only use the fast field usage checker if we never expect extra fields that we need to ignore
     # but still wish to do duplicate detection on.
-    if struct.strict:
+    if struct.strict or struct.unsafe_dangerous_disable_extra_field_duplicate_checks:
         return _FastFieldUsageChecker(indented_writer, struct.fields)
 
     return _SlowFieldUsageChecker(indented_writer, struct.fields)
@@ -1893,7 +1893,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         with self._block('else {', '}'):
                             with self._predicate(command_predicate):
                                 self._writer.write_line('ctxt.throwUnknownField(fieldName);')
-                    else:
+                    elif not struct.unsafe_dangerous_disable_extra_field_duplicate_checks:
                         with self._else(not first_field):
                             self._writer.write_line(
                                 'auto push_result = usedFieldSet.insert(fieldName);')

@@ -273,6 +273,12 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.non_const_getter = struct.non_const_getter
     ast_struct.is_command_reply = struct.is_command_reply
     ast_struct.query_shape_component = struct.query_shape_component
+    ast_struct.unsafe_dangerous_disable_extra_field_duplicate_checks = struct.unsafe_dangerous_disable_extra_field_duplicate_checks
+
+    # Check that unsafe_dangerous_disable_extra_field_duplicate_checks is used correctly
+    if ast_struct.unsafe_dangerous_disable_extra_field_duplicate_checks and ast_struct.strict is True:
+        ctxt.add_strict_and_disable_check_not_allowed(ast_struct)
+
     if struct.is_generic_cmd_list:
         if struct.is_generic_cmd_list == "arg":
             ast_struct.generic_list_type = ast.GenericListType.ARG
@@ -470,6 +476,10 @@ def _bind_struct_field(ctxt, ast_field, idl_type):
         array = cast(syntax.ArrayType, idl_type)
         assert isinstance(array.element_type, syntax.Struct)
         struct = cast(syntax.Struct, array.element_type)
+
+    # Check that unsafe_dangerous_disable_extra_field_duplicate_checks is used correctly
+    if struct.unsafe_dangerous_disable_extra_field_duplicate_checks:
+        ctxt.add_inheritance_and_disable_check_not_allowed(ast_field)
 
     ast_field.type = _bind_struct_type(struct)
     ast_field.type.is_array = isinstance(idl_type, syntax.ArrayType)

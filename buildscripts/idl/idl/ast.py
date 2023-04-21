@@ -145,6 +145,9 @@ class Struct(common.SourceLocation):
         self.generic_list_type = None  # type: Optional[GenericListType]
         # Determines whether or not this IDL struct can be a component of a query shape. See WRITING-13831.
         self.query_shape_component = False  # type: bool
+        # pylint: disable=invalid-name
+        self.unsafe_dangerous_disable_extra_field_duplicate_checks = None  # type: bool
+
         super(Struct, self).__init__(file_name, line, column)
 
 
