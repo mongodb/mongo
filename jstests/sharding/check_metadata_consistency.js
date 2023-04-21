@@ -241,6 +241,49 @@ function getNewDb() {
     assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
+(function testRoutingTableInconsistency() {
+    const db = getNewDb();
+    const kSourceCollName = "coll";
+    const ns = db[kSourceCollName].getFullName();
+
+    st.shardColl(db[kSourceCollName], {skey: 1});
+
+    // Insert a RoutingTableRangeOverlap inconsistency
+    const collUuid = st.config.collections.findOne({_id: ns}).uuid;
+    assert.commandWorked(st.config.chunks.updateOne({uuid: collUuid}, {$set: {max: {skey: 10}}}));
+
+    // Insert a ZonesRangeOverlap inconsistency
+    let entry = {
+        _id: {ns: ns, min: {"skey": -100}},
+        ns: ns,
+        min: {"skey": -100},
+        max: {"skey": 100},
+        tag: "a",
+    };
+    assert.commandWorked(st.config.tags.insert(entry));
+    entry = {
+        _id: {ns: ns, min: {"skey": 50}},
+        ns: ns,
+        min: {"skey": 50},
+        max: {"skey": 150},
+        tag: "a",
+    };
+    assert.commandWorked(st.config.tags.insert(entry));
+
+    // Database level mode command
+    let inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(2, inconsistencies.length, tojson(inconsistencies));
+    assert(inconsistencies.some(object => object.type === "RoutingTableRangeOverlap"),
+           tojson(inconsistencies));
+    assert(inconsistencies.some(object => object.type === "ZonesRangeOverlap"),
+           tojson(inconsistencies));
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db.dropDatabase();
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+})();
+
 (function testClusterLevelMode() {
     const db_MisplacedCollection1 = getNewDb();
     const db_MisplacedCollection2 = getNewDb();
