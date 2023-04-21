@@ -30,7 +30,7 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
             // number of times the fail point is entered between the time it returns
             // and the next time it gets called.
             sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-                conn.adminCommand({
+                return conn.adminCommand({
                     waitForFailPoint: failPointName,
                     timesEntered: this.timesEntered + timesEntered,
                     maxTimeMS: maxTimeMS
@@ -54,7 +54,7 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
         },
         off: function() {
             sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-                conn.adminCommand({configureFailPoint: failPointName, mode: "off"});
+                return conn.adminCommand({configureFailPoint: failPointName, mode: "off"});
             }, "Timed out disabling fail point " + failPointName);
         }
     };
@@ -74,7 +74,7 @@ configureFailPointForRS = function(conns, failPointName, data = {}, failPointMod
         off: function() {
             conns.forEach((conn) => {
                 sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-                    conn.adminCommand({configureFailPoint: failPointName, mode: "off"});
+                    return conn.adminCommand({configureFailPoint: failPointName, mode: "off"});
                 }, "Timed out disabling fail point " + failPointName);
             });
         }
