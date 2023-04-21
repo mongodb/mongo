@@ -459,6 +459,12 @@ var Cluster = function(options) {
         return cluster;
     };
 
+    this.getReplicaSets = function getReplicaSets() {
+        assert(initialized, 'cluster must be initialized first');
+        assert(this.isReplication() || this.isSharded());
+        return replSets;
+    };
+
     this.isBalancerEnabled = function isBalancerEnabled() {
         return this.isSharded() && options.sharded.enableBalancer;
     };

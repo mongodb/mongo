@@ -21,6 +21,7 @@
 load("jstests/concurrency/fsm_libs/extend_workload.js");
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // for isMongos
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/retryable_writes_util.js");
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
@@ -589,14 +590,22 @@ var $config = extendWorkload($config, function($config, $super) {
             // non-duplicate document using a random cursor. 4952606 is the error that the sampling
             // based split policy throws if it fails to find the specified number of split points.
             print(
-                `Failed to analyze the shard key due to duplicate keys returned by random cursor ${
-                    tojsononeline(err)}`);
+                `Failed to analyze the shard key due to duplicate keys returned by random ` +
+                `cursor. Skipping the next ${this.numAnalyzeShardKeySkipsAfterRandomCursorError} ` +
+                `analyzeShardKey states since the analyzeShardKey command is likely to fail with ` +
+                `this error again. ${tojsononeline(err)}`);
+            this.numAnalyzeShardKeySkips = this.numAnalyzeShardKeySkipsAfterRandomCursorError;
             return true;
         }
         if (this.expectedAggregateInterruptErrors.includes(err.code)) {
             print(
                 `Failed to analyze the shard key because internal aggregate commands got interrupted ${
                     tojsononeline(err)}`);
+            return true;
+        }
+        if (err.code == 7559401) {
+            print(`Failed to analyze the shard key because one of the shards fetched the split ` +
+                  `point documents after the TTL deletions had started. ${tojsononeline(err)}`);
             return true;
         }
         return false;
@@ -632,6 +641,94 @@ var $config = extendWorkload($config, function($config, $super) {
             truncatedRes.writeDistribution["numWritesByRange"] = "truncated";
         }
         return truncatedRes;
+    };
+
+    // To avoid leaving a lot of config.analyzeShardKeySplitPoints documents around which could
+    // make restart recovery take a long time, overwrite the values of the
+    // 'analyzeShardKeySplitPointExpirationSecs' and 'ttlMonitorSleepSecs' server parameters to make
+    // the clean up occur as the workload runs, and then restore the original values during
+    // teardown().
+    $config.data.splitPointExpirationSecs = 10;
+    $config.data.ttlMonitorSleepSecs = 5;
+    $config.data.originalSplitPointExpirationSecs = {};
+    $config.data.originalTTLMonitorSleepSecs = {};
+
+    $config.data.overrideSplitPointExpiration = function overrideSplitPointExpiration(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                analyzeShardKeySplitPointExpirationSecs: this.splitPointExpirationSecs,
+            }));
+            this.originalSplitPointExpirationSecs[db.getMongo().host] = res.was;
+        });
+    };
+
+    $config.data.overrideTTLMonitorSleepSecs = function overrideTTLMonitorSleepSecs(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, ttlMonitorSleepSecs: this.ttlMonitorSleepSecs}));
+            this.originalTTLMonitorSleepSecs[db.getMongo().host] = res.was;
+        });
+    };
+
+    $config.data.restoreSplitPointExpiration = function restoreSplitPointExpiration(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                analyzeShardKeySplitPointExpirationSecs:
+                    this.originalSplitPointExpirationSecs[db.getMongo().host],
+            }));
+        });
+    };
+
+    $config.data.restoreTTLMonitorSleepSecs = function restoreTTLMonitorSleepSecs(cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                ttlMonitorSleepSecs: this.originalTTLMonitorSleepSecs[db.getMongo().host],
+            }));
+        });
+    };
+
+    $config.data.getNumDocuments = function getNumDocuments(db, collName) {
+        const firstBatch =
+            assert
+                .commandWorked(
+                    db.runCommand({aggregate: collName, pipeline: [{$count: "count"}], cursor: {}}))
+                .cursor.firstBatch;
+        return firstBatch.length == 0 ? 0 : firstBatch[0].count;
+    };
+
+    // To avoid leaving unnecessary documents in config database after this workload finishes,
+    // remove all the sampled query documents and split point documents during teardown().
+    $config.data.removeSampledQueryAndSplitPointDocuments =
+        function removeSampledQueryAndSplitPointDocuments(cluster) {
+        cluster.getReplicaSets().forEach(rst => {
+            while (true) {
+                try {
+                    const configDb = rst.getPrimary().getDB("config");
+                    jsTest.log("Removing sampled query documents and split points documents");
+                    jsTest.log(tojsononeline({
+                        sampledQueries: this.getNumDocuments(configDb, "sampledQueries"),
+                        sampledQueriesDiff: this.getNumDocuments(configDb, "sampledQueriesDiff"),
+                        analyzeShardKeySplitPoints:
+                            this.getNumDocuments(configDb, "analyzeShardKeySplitPoints"),
+
+                    }));
+
+                    assert.commandWorked(configDb.sampledQueries.remove({}));
+                    assert.commandWorked(configDb.sampledQueriesDiff.remove({}));
+                    assert.commandWorked(configDb.analyzeShardKeySplitPoints.remove({}));
+                    return;
+                } catch (e) {
+                    if (RetryableWritesUtil.isRetryableCode(e.code)) {
+                        print("Retry documents removal after error: " + tojson(e));
+                        continue;
+                    }
+                    throw e;
+                }
+            }
+        });
     };
 
     ////
@@ -674,6 +771,9 @@ var $config = extendWorkload($config, function($config, $super) {
                                {comment: this.eligibleForSamplingComment});
         });
 
+        this.overrideSplitPointExpiration(cluster);
+        this.overrideTTLMonitorSleepSecs(cluster);
+
         // On a sharded cluster, running an aggregate command by default involves running getMore
         // commands since the cursor establisher in sharding is pessimistic about the router being
         // stale so it always makes a cursor with {batchSize: 0} on the shards and then run getMore
@@ -712,6 +812,10 @@ var $config = extendWorkload($config, function($config, $super) {
         print("Doing final validation of read and write distribution metrics " +
               tojson(this.truncateAnalyzeShardKeyResponseForLogging(metrics)));
         this.assertReadWriteDistributionMetrics(metrics, true /* isFinal */);
+
+        this.restoreSplitPointExpiration(cluster);
+        this.restoreTTLMonitorSleepSecs(cluster);
+        this.removeSampledQueryAndSplitPointDocuments(cluster);
     };
 
     $config.states.init = function init(db, collName) {
@@ -719,7 +823,18 @@ var $config = extendWorkload($config, function($config, $super) {
         this.metricsDocId = new UUID(this.metricsDocIdString);
     };
 
+    $config.data.numAnalyzeShardKeySkipsAfterRandomCursorError = 5;
+    // Set to a positive value when the analyzeShardKey command fails with an error that is likely
+    // to occur again upon the next try.
+    $config.data.numAnalyzeShardKeySkips = 0;
+
     $config.states.analyzeShardKey = function analyzeShardKey(db, collName) {
+        if (this.numAnalyzeShardKeySkips > 0) {
+            print("Skipping the analyzeShardKey state");
+            this.numAnalyzeShardKeySkips--;
+            return;
+        }
+
         print("Starting analyzeShardKey state");
         const ns = db.getName() + "." + collName;
         const res = db.adminCommand({analyzeShardKey: ns, key: this.shardKeyOptions.shardKey});
