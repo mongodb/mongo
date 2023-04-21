@@ -3302,6 +3302,148 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "checkClusterMetadataConsistency",
+          command: {checkMetadataConsistency: 1},
+          skipUnlessSharded: true,
+          setup: function(db) {
+              assert.commandWorked(db.getSiblingDB("test").createCollection("coll"));
+          },
+          teardown: function(db) {
+              assert.commandWorked(db.getSiblingDB("test").dropDatabase());
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1}
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {cluster: true}, actions: ["checkMetadataConsistency"]}]
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [
+                    {resource: {db: "", collection: ""}, actions: ["checkMetadataConsistency"]}
+                ],
+                expectAuthzFailure: true
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [{
+                    resource: {db: adminDbName, collection: ""},
+                    actions: ["checkMetadataConsistency"]
+                }],
+                expectAuthzFailure: true
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [{
+                    resource: {db: adminDbName, collection: "coll"},
+                    actions: ["checkMetadataConsistency"]
+                }],
+                expectAuthzFailure: true
+              },
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {cluster: true}, actions: ["allCollectionStats"]}],
+                expectAuthzFailure: true
+              }
+          ]
+        },
+        {
+          testname: "checkDatabaseMetadataConsistency",
+          command: {checkMetadataConsistency: 1},
+          skipUnlessSharded: true,
+          setup: function(db) {
+              assert.commandWorked(db.getSiblingDB("test").createCollection("coll"));
+          },
+          teardown: function(db) {
+              assert.commandWorked(db.getSiblingDB("test").dropDatabase());
+          },
+          testcases: [
+              {
+                runOnDb: "test",
+                roles: {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1}
+              },
+              {
+                runOnDb: "test",
+                privileges: [{resource: {cluster: true}, actions: ["checkMetadataConsistency"]}]
+              },
+              {
+                runOnDb: "test",
+                privileges: [
+                    {resource: {db: "", collection: ""}, actions: ["checkMetadataConsistency"]}
+                ]
+              },
+              {
+                runOnDb: "test",
+                privileges: [{
+                    resource: {db: "test", collection: ""},
+                    actions: ["checkMetadataConsistency"]
+                }]
+              },
+              {
+                runOnDb: "test",
+                privileges: [{
+                    resource: {db: "test", collection: "coll"},
+                    actions: ["checkMetadataConsistency"]
+                }],
+                expectAuthzFailure: true
+              },
+              {
+                runOnDb: "test",
+                privileges: [{resource: {cluster: true}, actions: ["allCollectionStats"]}],
+                expectAuthzFailure: true
+              }
+          ]
+        },
+        {
+          testname: "checkCollectionMetadataConsistency",
+          command: {checkMetadataConsistency: "coll"},
+          skipUnlessSharded: true,
+          setup: function(db) {
+              assert.commandWorked(db.getSiblingDB("test").createCollection("coll"));
+          },
+          teardown: function(db) {
+              assert.commandWorked(db.getSiblingDB("test").dropDatabase());
+          },
+          testcases: [
+              {
+                runOnDb: "test",
+                roles: {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1}
+              },
+              {
+                runOnDb: "test",
+                privileges: [{resource: {cluster: true}, actions: ["checkMetadataConsistency"]}]
+              },
+              {
+                runOnDb: "test",
+                privileges: [
+                    {resource: {db: "", collection: ""}, actions: ["checkMetadataConsistency"]}
+                ]
+              },
+              {
+                runOnDb: "test",
+                privileges: [{
+                    resource: {db: "test", collection: ""},
+                    actions: ["checkMetadataConsistency"]
+                }]
+              },
+              {
+                runOnDb: "test",
+                privileges: [{
+                    resource: {db: "test", collection: "coll"},
+                    actions: ["checkMetadataConsistency"]
+                }]
+              },
+              {
+                runOnDb: "test",
+                privileges: [{resource: {cluster: true}, actions: ["allCollectionStats"]}],
+                expectAuthzFailure: true
+              }
+          ]
+        },
+        {
           testname: "clusterCount",
           command: {clusterCount: "x"},
           skipSharded: true,
