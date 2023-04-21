@@ -69,7 +69,7 @@ sh.assertRetryableCommandWorkedOrFailedWithCodes = function(cmd, msg, expectedEr
     var res = undefined;
     assert.soon(function() {
         try {
-            res = cmd();
+            res = assert.commandWorked(cmd());
             return true;
         } catch (err) {
             if (err instanceof WriteError && ErrorCodes.isRetriableError(err.code)) {
@@ -271,7 +271,7 @@ sh.disableAutoMerge = function(coll) {
     }
 
     return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        dbase.getSiblingDB("config").collections.update(
+        return dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$set: {"enableAutoMerge": false}},
             {writeConcern: {w: 'majority', wtimeout: 60000}});
@@ -290,7 +290,7 @@ sh.enableAutoMerge = function(coll) {
     }
 
     return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        dbase.getSiblingDB("config").collections.update(
+        return dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$unset: {"enableAutoMerge": 1}},
             {writeConcern: {w: 'majority', wtimeout: 60000}});
@@ -369,7 +369,7 @@ sh.disableBalancing = function(coll) {
     }
 
     return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        dbase.getSiblingDB("config").collections.update(
+        return dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$set: {"noBalance": true}},
             {writeConcern: {w: 'majority', wtimeout: 60000}});
@@ -388,7 +388,7 @@ sh.enableBalancing = function(coll) {
     }
 
     return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        dbase.getSiblingDB("config").collections.update(
+        return dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$set: {"noBalance": false}},
             {writeConcern: {w: 'majority', wtimeout: 60000}});
