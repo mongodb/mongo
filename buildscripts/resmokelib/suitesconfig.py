@@ -129,7 +129,7 @@ def _make_suite_roots(files):
 
 def _get_suite_config(suite_name_or_path):
     """Attempt to read YAML configuration from 'suite_path' for the suite."""
-    return SuiteFinder.get_config_obj(suite_name_or_path)
+    return SuiteFinder.get_config_obj_no_verify(suite_name_or_path)
 
 
 def generate():
@@ -140,7 +140,7 @@ class SuiteConfigInterface:
     """Interface for suite configs."""
 
     @classmethod
-    def get_config_obj(cls, suite_name):
+    def get_config_obj_no_verify(cls, suite_name):
         """Get the config object given the suite name, which can be a path."""
         pass
 
@@ -162,7 +162,7 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
     _named_suites = {}
 
     @classmethod
-    def get_config_obj(cls, suite_name):
+    def get_config_obj_no_verify(cls, suite_name):
         """Get the suite config object in the given file."""
         if suite_name in cls.get_named_suites():
             # Check if is a named suite first for efficiency.
@@ -227,10 +227,10 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return os.path.join(_config.CONFIG_DIR, "matrix_suites")
 
     @classmethod
-    def get_config_obj(cls, suite_name):
+    def get_config_obj_and_verify(cls, suite_name):
         """Get the suite config object in the given file and verify it matches the generated file."""
 
-        config = cls._get_config_obj_no_verify(suite_name)
+        config = cls.get_config_obj_no_verify(suite_name)
 
         if not config:
             return None
@@ -259,7 +259,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return config
 
     @classmethod
-    def _get_config_obj_no_verify(cls, suite_name):
+    def get_config_obj_no_verify(cls, suite_name):
         """Get the suite config object in the given file."""
         suites_dir = cls.get_suites_dir()
         matrix_suite = cls.parse_mappings_file(suites_dir, suite_name)
@@ -279,7 +279,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         eval_names = suite.get("eval", None)
         description = suite.get("description")
 
-        base_suite = ExplicitSuiteConfig.get_config_obj(base_suite_name)
+        base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
 
         if base_suite is None:
             raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")
@@ -416,7 +416,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             if os.path.exists(path):
                 mapping_path = path
 
-        matrix_suite = cls._get_config_obj_no_verify(suite_name)
+        matrix_suite = cls.get_config_obj_no_verify(suite_name)
 
         if not matrix_suite or not mapping_path:
             print(f"Could not find mappings file for {suite_name}")
@@ -457,10 +457,10 @@ class SuiteFinder(object):
     """Utility/Factory class for getting polymorphic suite classes given a directory."""
 
     @staticmethod
-    def get_config_obj(suite_path):
+    def get_config_obj_no_verify(suite_path):
         """Get the suite config object in the given file."""
-        explicit_suite = ExplicitSuiteConfig.get_config_obj(suite_path)
-        matrix_suite = MatrixSuiteConfig.get_config_obj(suite_path)
+        explicit_suite = ExplicitSuiteConfig.get_config_obj_no_verify(suite_path)
+        matrix_suite = MatrixSuiteConfig.get_config_obj_no_verify(suite_path)
 
         if not (explicit_suite or matrix_suite):
             raise errors.SuiteNotFound("Unknown suite '%s'" % suite_path)

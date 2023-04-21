@@ -18,11 +18,12 @@ class ValidateGeneratedSuites(unittest.TestCase):
 
         for suite_name in suite_names:
             try:
-                suite = self.matrix_suite_config.get_config_obj(suite_name)
+                suite = self.matrix_suite_config.get_config_obj_and_verify(suite_name)
                 self.assertIsNotNone(
                     suite, msg=
                     f"{suite_name} was not found. This means either MatrixSuiteConfig.get_named_suites() "
-                    + "or MatrixSuiteConfig.get_config_obj() are not working as intended.")
+                    +
+                    "or MatrixSuiteConfig.get_config_obj_and_verify() are not working as intended.")
             except Exception as ex:
                 self.fail(repr(ex))
 
