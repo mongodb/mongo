@@ -107,6 +107,11 @@ the FCV document in `admin.system.version` with a new `targetVersion` field. Tra
     * Transitioning to one of the `kUpgradingFrom_X_To_Y`/`kDowngradingFrom_X_to_Y`/`kVersion_Y`(on
 upgrade) states [sets the `minWireVersion` to `WireVersion::LATEST_WIRE_VERSION`](https://github.com/10gen/mongo/blob/386b1c0c74aa24c306f0ef5bcbde892aec89c8f6/src/mongo/db/op_observer/fcv_op_observer.cpp#L69)
 and also [closes all incoming connections from internal clients with lower binary versions](https://github.com/10gen/mongo/blob/386b1c0c74aa24c306f0ef5bcbde892aec89c8f6/src/mongo/db/op_observer/fcv_op_observer.cpp#L76-L82).
+The reason we do this on `kDowngradingFrom_X_to_Y` is because we shouldn’t decrease the 
+minWireVersion until we have fully downgraded to the lower FCV in case we get any backwards 
+compatibility breakages, since during `kDowngradingFrom_X_to_Y` we may still be stopping/cleaning up
+any features from the upgraded FCV. In essence, a node with the upgraded FCV/binary should not be
+able to communicate with downgraded binary nodes until the FCV is completely downgraded to `kVersion_Y`. 
 
     * **This step is expected to be fast and always succeed** (except if the request parameters fail validation
     e.g. if the requested FCV is not a valid transition).

@@ -485,6 +485,13 @@ bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* o
 void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& wireSpec = WireSpec::instance();
     const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
+    // The reason we set the minWireVersion to LATEST_WIRE_VERSION when downgrading from latest as
+    // well as on upgrading to latest is because we shouldn’t decrease the minWireVersion until we
+    // have fully downgraded to the lower FCV in case we get any backwards compatibility breakages,
+    // since during `kDowngradingFrom_X_to_Y` we may still be stopping/cleaning up any features from
+    // the upgraded FCV. In essence, a node with the upgraded FCV/binary should not be able to
+    // communicate with downgraded binary nodes until the FCV is completely downgraded to
+    // `kVersion_Y`.
     if (currentFcv == GenericFCV::kLatest ||
         (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading() &&
          currentFcv != GenericFCV::kUpgradingFromLastLTSToLastContinuous)) {
