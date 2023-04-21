@@ -41,7 +41,11 @@ when desired.
 execute any work scheduled on the executor.
 * `ScopedTaskExecutor`: wraps a `TaskExecutor` and cancels any outstanding operations on
 destruction.
+* `PinnedConnectionTaskExecutor`: wraps a `TaskExecutor` and acts as a `ScopedTaskExecutor` that
+additionally runs all RPCs/remote operations scheduled through it over the same transport connection.
 * `TaskExecutorCursor`: manages a remote cursor that uses an asynchronous task executor to run all
-stages of the command cursor protocol (initial command, getMore, killCursors).
+stages of the command cursor protocol (initial command, getMore, killCursors). Offers a `pinConnections`
+option that utilizes a `PinnedConnectionTaskExecutor` to run all operations on the cursor over the
+same transport connection.
 * `TaskExecutorPool`: represents a pool of `TaskExecutors`. Work which requires a `TaskExecutor` can
 ask for an executor from the pool. This allows for work to be distributed across several executors.
