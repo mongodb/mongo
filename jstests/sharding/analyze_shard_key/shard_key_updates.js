@@ -113,7 +113,7 @@ function runTest({isShardedColl, execCtxType}) {
     const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
     assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
-    QuerySamplingUtil.waitForActiveSampling(st.s);
+    QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
     // Test with a mix of modifier, replacement and pipeline updates and findAndModify updates.
     let numUpdates = 0;
@@ -222,8 +222,7 @@ function runTest({isShardedColl, execCtxType}) {
     // preventing the internal aggregate commands run by the analyzeShardKey commands below from
     // getting sampled.
     assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
-    QuerySamplingUtil.waitForInactiveSampling(st.s);
-    QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
+    QuerySamplingUtil.waitForInactiveSamplingShardedCluster(st, ns, collectionUuid);
 
     let numTotal = numUpdates + numFindAndModifys;
     assert.soon(() => {
@@ -240,7 +239,7 @@ function runTest({isShardedColl, execCtxType}) {
     assert.eq(res0.writeDistribution.percentageOfShardKeyUpdates, 100, res0);
 
     assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
-    QuerySamplingUtil.waitForActiveSampling(st.s);
+    QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
     // Below are not shard key updates.
 
@@ -293,8 +292,7 @@ function runTest({isShardedColl, execCtxType}) {
     // preventing the internal aggregate commands run by the analyzeShardKey commands below from
     // getting sampled.
     assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
-    QuerySamplingUtil.waitForInactiveSampling(st.s);
-    QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
+    QuerySamplingUtil.waitForInactiveSamplingShardedCluster(st, ns, collectionUuid);
 
     numTotal = numUpdates + numFindAndModifys;
     assert.soon(() => {

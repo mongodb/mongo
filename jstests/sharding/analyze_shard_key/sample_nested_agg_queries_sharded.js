@@ -52,7 +52,9 @@ assert.commandWorked(
 
 assert.commandWorked(
     st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", sampleRate: 1000}));
-QuerySamplingUtil.waitForActiveSamplingOnAllShards(st);
+const foreignCollUUid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);
+QuerySamplingUtil.waitForActiveSamplingShardedCluster(
+    st, foreignNs, foreignCollUUid, {skipMongoses: true});
 
 for (let {name,
           makeOuterPipelineFunc,

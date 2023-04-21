@@ -13,13 +13,16 @@ load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 load("jstests/sharding/analyze_shard_key/libs/sampling_current_op_and_server_status_common.js");
 
 const sampleRate = 10000;
+
+const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
 
 const mongodSetParameterOpts = {
+    queryAnalysisSamplerConfigurationRefreshSecs,
     queryAnalysisWriterIntervalSecs,
 };
 const mongosSetParameterOpts = {
-    queryAnalysisSamplerConfigurationRefreshSecs: 1,
+    queryAnalysisSamplerConfigurationRefreshSecs,
 };
 
 function insertDocuments(collection, numDocs) {
@@ -30,23 +33,21 @@ function insertDocuments(collection, numDocs) {
     assert.commandWorked(bulk.execute());
 }
 
-function runTest(conn, st) {
-    const dbName = "test";
-    const collName0 = "coll0";
-    const collName1 = "coll1";
+function runTest(conn, {rst, st}) {
+    assert(rst || st);
+    assert(!rst || !st);
+
+    const dbName = "testDb";
+    const collName0 = "testColl0";
+    const collName1 = "testColl1";
     const ns0 = dbName + "." + collName0;
     const ns1 = dbName + "." + collName1;
     const numDocs = 100;
 
     const adminDb = conn.getDB("admin");
-    const configDb = conn.getDB("config");
     const testDb = conn.getDB(dbName);
     const collection0 = testDb.getCollection(collName0);
     const collection1 = testDb.getCollection(collName1);
-    insertDocuments(collection0, numDocs);
-    insertDocuments(collection1, numDocs);
-    const collUuid0 = QuerySamplingUtil.getCollectionUuid(testDb, collName0);
-    const collUuid1 = QuerySamplingUtil.getCollectionUuid(testDb, collName1);
 
     if (st) {
         // Shard collection1 and move one chunk to shard1.
@@ -60,9 +61,15 @@ function runTest(conn, st) {
             conn.adminCommand({moveChunk: ns1, find: {x: 0}, to: st.shard1.shardName}));
     }
 
+    insertDocuments(collection0, numDocs);
+    insertDocuments(collection1, numDocs);
+    const collUuid0 = QuerySamplingUtil.getCollectionUuid(testDb, collName0);
+    const collUuid1 = QuerySamplingUtil.getCollectionUuid(testDb, collName1);
+
     conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", sampleRate});
     conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", sampleRate});
-    QuerySamplingUtil.waitForActiveSampling(conn, true);
+    QuerySamplingUtil.waitForActiveSampling(ns0, collUuid0, {rst, st});
+    QuerySamplingUtil.waitForActiveSampling(ns1, collUuid1, {rst, st});
 
     // Create read samples on collection0.
     let expectedSamples = [];
@@ -169,7 +176,7 @@ function runTest(conn, st) {
         mongosOptions: {setParameter: mongosSetParameterOpts}
     });
 
-    runTest(st.s, st);
+    runTest(st.s, {st});
 
     st.stop();
 }
@@ -178,8 +185,9 @@ function runTest(conn, st) {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();
     rst.initiate();
+    const primary = rst.getPrimary();
 
-    runTest(rst.getPrimary());
+    runTest(primary, {rst});
 
     rst.stopSet();
 }

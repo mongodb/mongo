@@ -27,15 +27,76 @@ var QuerySamplingUtil = (function() {
     }
 
     /**
-     * Waits for the given node to have at least one active collection for query sampling. If
-     * 'waitForTokens' is true, additionally waits for the sampling bucket to contain at least one
-     * second of tokens.
+     * Returns the query sampling current op documents that match the given filter.
      */
-    function waitForActiveSampling(node, waitForTokens = true) {
+    function getQuerySamplingCurrentOp(conn, filter) {
+        return conn.getDB("admin")
+            .aggregate([
+                {$currentOp: {allUsers: true, localOps: true}},
+                {$match: Object.assign({desc: "query analyzer"}, filter)},
+            ])
+            .toArray();
+    }
+
+    /**
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be active on the given node.
+     */
+    function waitForActiveSamplingOnNode(node, ns, collUuid) {
+        jsTest.log("Start waiting for active sampling " + tojson({node, ns, collUuid}));
+        let numTries = 0;
         assert.soon(() => {
-            const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
-            assert(res.hasOwnProperty("queryAnalyzers"));
-            return res.queryAnalyzers.activeCollections >= 1;
+            numTries++;
+
+            const docs = getQuerySamplingCurrentOp(node, {ns, collUuid});
+            if (docs.length == 1) {
+                return true;
+            }
+            assert.eq(docs.length, 0, docs);
+
+            if (numTries % 100 == 0) {
+                jsTest.log("Still waiting for active sampling " +
+                           tojson({node, ns, collUuid, docs}));
+            }
+            return false;
+        });
+        jsTest.log("Finished waiting for active sampling " + tojson({node, ns, collUuid}));
+    }
+
+    /**
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be inactive on the given node.
+     */
+    function waitForInactiveSamplingOnNode(node, ns, collUuid) {
+        jsTest.log("Start waiting for inactive sampling " + tojson({node, ns, collUuid}));
+        let numTries = 0;
+        assert.soon(() => {
+            numTries++;
+
+            const docs = getQuerySamplingCurrentOp(node, {ns, collUuid});
+            if (docs.length == 0) {
+                return true;
+            }
+            assert.eq(docs.length, 1, docs);
+
+            if (numTries % 100 == 0) {
+                jsTest.log("Still waiting for inactive sampling " +
+                           tojson({node, ns, collUuid, docs}));
+            }
+            return false;
+        });
+        jsTest.log("Finished waiting for inactive sampling " + tojson({node, ns, collUuid}));
+    }
+
+    /**
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be active on all nodes in the given replica set. If 'waitForTokens' is true, additionally
+     * waits for the sampling bucket to contain at least one second of tokens.
+     */
+    function waitForActiveSamplingReplicaSet(rst, ns, collUuid, waitForTokens = true) {
+        rst.nodes.forEach(node => {
+            // Skip waiting for tokens now and just wait once at the end if needed.
+            waitForActiveSamplingOnNode(node, ns, collUuid, false /* waitForTokens */);
         });
         if (waitForTokens) {
             // Wait for the bucket to contain at least one second of tokens.
@@ -44,38 +105,72 @@ var QuerySamplingUtil = (function() {
     }
 
     /**
-     * Waits for the given node to have no active collections for query sampling.
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be inactive on all nodes in the given replica set.
      */
-    function waitForInactiveSampling(node) {
-        assert.soon(() => {
-            const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
-            return res.queryAnalyzers.activeCollections == 0;
+    function waitForInactiveSamplingReplicaSet(rst, ns, collUuid) {
+        rst.nodes.forEach(node => {
+            waitForInactiveSamplingOnNode(node, ns, collUuid);
         });
     }
 
     /**
-     * Waits for all shard nodes to have one active collection for query sampling.
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be active on all mongos and shardsvr mongod nodes in the given sharded cluster.
      */
-    function waitForActiveSamplingOnAllShards(st) {
-        st._rs.forEach(rs => {
-            rs.nodes.forEach(node => {
-                // Skip waiting for tokens now and just wait once at the end.
-                waitForActiveSampling(node, false /* waitForTokens */);
+    function waitForActiveSamplingShardedCluster(st, ns, collUuid, {skipMongoses} = {}) {
+        if (!skipMongoses) {
+            st.forEachMongos(mongos => {
+                waitForActiveSamplingOnNode(mongos, ns, collUuid);
             });
+        }
+        st._rs.forEach(rst => {
+            // Skip waiting for tokens now and just wait once at the end if needed.
+            waitForActiveSamplingReplicaSet(rst, ns, collUuid, false /* waitForTokens */);
         });
         // Wait for the bucket to contain at least one second of tokens.
         sleep(1000);
     }
 
     /**
-     * Waits for all shard nodes to have no active collection for query sampling.
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be inactive on all mongos and shardsvr mongod nodes in the given sharded cluster.
      */
-    function waitForInactiveSamplingOnAllShards(st) {
-        st._rs.forEach(rs => {
-            rs.nodes.forEach(node => {
-                waitForInactiveSampling(node);
-            });
+    function waitForInactiveSamplingShardedCluster(st, ns, collUuid) {
+        st.forEachMongos(mongos => {
+            waitForInactiveSamplingOnNode(mongos, ns, collUuid);
         });
+        st._rs.forEach(rst => {
+            waitForInactiveSamplingReplicaSet(rst, ns, collUuid);
+        });
+    }
+
+    /**
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be active on all nodes in the given replica set or sharded cluster.
+     */
+    function waitForActiveSampling(ns, collUuid, {rst, st}) {
+        assert(rst || st);
+        assert(!rst || !st);
+        if (st) {
+            waitForActiveSamplingShardedCluster(st, ns, collUuid);
+        } else {
+            waitForActiveSamplingReplicaSet(rst, ns, collUuid);
+        }
+    }
+
+    /**
+     * Waits for the query sampling for the collection with the namespace and collection uuid
+     * to be inactive on all nodes in the given replica set or sharded cluster.
+     */
+    function waitForInactiveSampling(ns, collUuid, {rst, st}) {
+        assert(rst || st);
+        assert(!rst || !st);
+        if (st) {
+            waitForInactiveSamplingShardedCluster(st, ns, collUuid);
+        } else {
+            waitForInactiveSamplingReplicaSet(rst, ns, collUuid);
+        }
     }
 
     /**
@@ -327,10 +422,12 @@ var QuerySamplingUtil = (function() {
         generateRandomString,
         generateRandomCollation,
         makeCmdObjIgnoreSessionInfo,
+        waitForActiveSamplingReplicaSet,
+        waitForInactiveSamplingReplicaSet,
+        waitForActiveSamplingShardedCluster,
+        waitForInactiveSamplingShardedCluster,
         waitForActiveSampling,
         waitForInactiveSampling,
-        waitForActiveSamplingOnAllShards,
-        waitForInactiveSamplingOnAllShards,
         assertSubObject,
         assertSoonSampledQueryDocuments,
         assertSoonSampledQueryDocumentsAcrossShards,

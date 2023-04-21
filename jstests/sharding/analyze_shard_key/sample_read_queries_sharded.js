@@ -10,14 +10,19 @@ load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
+const queryAnalysisWriterIntervalSecs = 1;
+const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const st = new ShardingTest({
     shards: 3,
     rs: {
         nodes: 2,
-        setParameter:
-            {queryAnalysisWriterIntervalSecs: 1, logComponentVerbosity: tojson({sharding: 2})}
+        setParameter: {
+            queryAnalysisSamplerConfigurationRefreshSecs,
+            queryAnalysisWriterIntervalSecs,
+            logComponentVerbosity: tojson({sharding: 2})
+        }
     },
-    mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs: 1}}
+    mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}}
 });
 
 const dbName = "testDb";
@@ -41,7 +46,7 @@ const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
 assert.commandWorked(
     st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1000}));
-QuerySamplingUtil.waitForActiveSampling(st.s);
+QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
 const expectedSampledQueryDocs = [];
 
