@@ -1550,16 +1550,9 @@ const operations = [
         },
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': true},
         profileAssert: (db, profileDoc) => {
-            // Debug builds may perform extra reads of the _mdb_catalog when updating index entries.
-            if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db) && isDebugBuild(db)) {
-                assert.gte(profileDoc.docBytesRead, 216);
-                assert.gte(profileDoc.docUnitsRead, 2);
-                assert.gte(profileDoc.cursorSeeks, 2);
-            } else {
-                assert.eq(profileDoc.docBytesRead, 207);
-                assert.eq(profileDoc.docUnitsRead, 2);
-                assert.eq(profileDoc.cursorSeeks, 2);
-            }
+            assert.eq(profileDoc.docBytesRead, 207);
+            assert.eq(profileDoc.docUnitsRead, 2);
+            assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.docBytesWritten, 233);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
@@ -1585,16 +1578,9 @@ const operations = [
         },
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': false},
         profileAssert: (db, profileDoc) => {
-            // Debug builds may perform extra reads of the _mdb_catalog when updating index entries.
-            if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db) && isDebugBuild(db)) {
-                assert.gte(profileDoc.docBytesRead, 216);
-                assert.gte(profileDoc.docUnitsRead, 2);
-                assert.gte(profileDoc.cursorSeeks, 2);
-            } else {
-                assert.eq(profileDoc.docBytesRead, 207);
-                assert.eq(profileDoc.docUnitsRead, 2);
-                assert.eq(profileDoc.cursorSeeks, 2);
-            }
+            assert.eq(profileDoc.docBytesRead, 207);
+            assert.eq(profileDoc.docUnitsRead, 2);
+            assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.docBytesWritten, 233);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
