@@ -137,6 +137,13 @@ public:
             inconsistenciesMerged.insert(inconsistenciesMerged.end(),
                                          std::make_move_iterator(chunksInconsistencies.begin()),
                                          std::make_move_iterator(chunksInconsistencies.end()));
+
+            auto zonesInconsistencies = metadata_consistency_util::checkZonesInconsistencies(
+                opCtx, coll, _getCollectionZones(opCtx, coll.getNss()));
+
+            inconsistenciesMerged.insert(inconsistenciesMerged.end(),
+                                         std::make_move_iterator(zonesInconsistencies.begin()),
+                                         std::make_move_iterator(zonesInconsistencies.end()));
         }
 
         std::vector<ChunkType> _getCollectionChunks(OperationContext* opCtx,
@@ -152,6 +159,12 @@ public:
                 coll.getEpoch(),
                 coll.getTimestamp(),
                 repl::ReadConcernLevel::kMajorityReadConcern));
+        }
+
+        std::vector<TagsType> _getCollectionZones(OperationContext* opCtx,
+                                                  const NamespaceString& nss) {
+            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+            return uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
         }
 
         NamespaceString ns() const override {

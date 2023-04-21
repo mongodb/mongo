@@ -34,6 +34,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 
@@ -97,6 +98,15 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
     OperationContext* opCtx,
     const CollectionType& collection,
     const std::vector<ChunkType>& chunks);
+
+/**
+ * Check different types of inconsistencies from a given set of zones owned by a collection.
+ *
+ * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
+ * there is no inconsistency, it is returned an empty vector.
+ */
+std::vector<MetadataInconsistencyItem> checkZonesInconsistencies(
+    OperationContext* opCtx, const CollectionType& collection, const std::vector<TagsType>& zones);
 
 }  // namespace metadata_consistency_util
 }  // namespace mongo

@@ -299,7 +299,6 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
     const auto& uuid = collection.getUuid();
     const auto& nss = collection.getNss();
     const auto shardKeyPattern = ShardKeyPattern{collection.getKeyPattern()};
-    const auto configShardId = ShardId::kConfigServerId;
 
     std::vector<MetadataInconsistencyItem> inconsistencies;
     auto previousChunk = chunks.begin();
@@ -356,6 +355,45 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
                 MetadataInconsistencyTypeEnum::kRoutingTableMissingMaxKey,
                 RoutingTableMissingMaxKeyDetails{nss, uuid, maxKeyObj, globalMax}));
         }
+    }
+
+    return inconsistencies;
+}
+
+std::vector<MetadataInconsistencyItem> checkZonesInconsistencies(
+    OperationContext* opCtx, const CollectionType& collection, const std::vector<TagsType>& zones) {
+    const auto& uuid = collection.getUuid();
+    const auto& nss = collection.getNss();
+    const auto shardKeyPattern = ShardKeyPattern{collection.getKeyPattern()};
+
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+    auto previousZone = zones.begin();
+    for (auto it = zones.begin(); it != zones.end(); it++) {
+        const auto& zone = *it;
+
+        // Skip the first iteration as we need to compare the current zone with the previous one.
+        if (it == zones.begin()) {
+            continue;
+        }
+
+        if (!shardKeyPattern.isShardKey(zone.getMinKey()) ||
+            !shardKeyPattern.isShardKey(zone.getMaxKey())) {
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kCorruptedZoneShardKey,
+                CorruptedZoneShardKeyDetails{nss, uuid, zone.toBSON(), shardKeyPattern.toBSON()}));
+        }
+
+        // As the zones are sorted by minKey, we can check if the previous zone maxKey is less than
+        // the current zone minKey.
+        const auto& minKey = zone.getMinKey();
+        auto cmp = previousZone->getMaxKey().woCompare(minKey);
+        if (cmp > 0) {
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kZonesRangeOverlap,
+                ZonesRangeOverlapDetails{nss, uuid, previousZone->toBSON(), zone.toBSON()}));
+        }
+
+        previousZone = it;
     }
 
     return inconsistencies;
