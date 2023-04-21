@@ -273,14 +273,13 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     //
     // Note that we need to hold a database intent lock before acquiring a notifier.
     boost::optional<AutoGetCollectionForReadMaybeLockFree> coll;
-    insert_listener::CappedInsertNotifierData cappedInsertNotifierData;
+    std::unique_ptr<insert_listener::Notifier> notifier;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
         if (!_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS)) {
             coll.emplace(_opCtx, _nss);
         }
 
-        cappedInsertNotifierData.notifier =
-            insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
+        notifier = insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
     }
 
     for (;;) {
@@ -325,7 +324,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
                 return PlanExecutor::ExecState::IS_EOF;
             }
 
-            insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), &cappedInsertNotifierData);
+            insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), notifier);
             // There may be more results, keep going.
             continue;
         } else if (_resumeRecordIdSlot) {

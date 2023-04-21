@@ -382,11 +382,10 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
     // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
     // insert notifier the entire time we are in the loop.  Holding a shared pointer to the
     // capped insert notifier is necessary for the notifierVersion to advance.
-    insert_listener::CappedInsertNotifierData cappedInsertNotifierData;
+    std::unique_ptr<insert_listener::Notifier> notifier;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
-        // We always construct the CappedInsertNotifier for awaitData cursors.
-        cappedInsertNotifierData.notifier =
-            insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
+        // We always construct the insert_listener::Notifier for awaitData cursors.
+        notifier = insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
     }
     for (;;) {
         // These are the conditions which can cause us to yield:
@@ -526,7 +525,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                 return PlanExecutor::IS_EOF;
             }
 
-            insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), &cappedInsertNotifierData);
+            insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), notifier);
 
             // There may be more results, keep going.
             continue;
