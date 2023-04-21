@@ -1,11 +1,18 @@
 """GDB Pretty-printers for MongoDB."""
 
+import os
 import re
 import struct
 import sys
 import uuid
+from pathlib import Path
 
 import gdb.printing
+
+ROOT_PATH = str(Path(os.path.abspath(__file__)).parent.parent.parent)
+if ROOT_PATH not in sys.path:
+    sys.path.insert(0, ROOT_PATH)
+from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import ListIter as ImmerListIter  # pylint: disable=wrong-import-position
 
 try:
     import bson
@@ -516,6 +523,75 @@ class AbslFlatHashMapPrinter(AbslHashMapPrinterBase):
             yield ('value', kvp['value'])
 
 
+class ImmutableMapIter(ImmerListIter):
+    """Iterator for mongo::immutable::map."""
+
+    def __init__(self, val):
+        """Initialize iterator for mongo::immutable::map."""
+        super().__init__(val)
+        self.max = (1 << 64) - 1
+        self.pair = None
+        self.curr = (None, self.max, self.max)
+
+    def __next__(self):
+        """Advance iterator for mongo::immutable::map and return current element."""
+        if self.pair:
+            result = ('value', self.pair['second'])
+            self.pair = None
+            self.i += 1
+            return result
+        if self.i == self.size:
+            raise StopIteration
+        if self.i < self.curr[1] or self.i >= self.curr[2]:
+            self.curr = self.region()
+        self.pair = self.curr[0][self.i - self.curr[1]].cast(
+            gdb.lookup_type(self.v.type.template_argument(0).name))
+        result = ('key', self.pair['first'])
+        return result
+
+
+class ImmutableMapPrinter:
+    """Pretty-printer for mongo::immutable::map."""
+
+    def __init__(self, val):
+        """Initialize pretty-printer for mongo::immutable::map."""
+        self.val = val
+
+    def to_string(self):
+        """Print top-level information about map."""
+        return '%s of size %d' % (self.val.type, int(self.val['_storage']['impl_']['size']))
+
+    def children(self):
+        """Initialize iterator to actual elements of map."""
+        return ImmutableMapIter(self.val['_storage'])
+
+    @staticmethod
+    def display_hint():
+        """Ensure map is displayed as map in gdb."""
+        return 'map'
+
+
+class ImmutableSetPrinter:
+    """Pretty-printer for mongo::immutable::set."""
+
+    def __init__(self, val):
+        """Initialize pretty-printer for mongo::immutable::set."""
+        self.val = val
+
+    def to_string(self):
+        """Print top-level information about set."""
+        return '%s of size %d' % (self.val.type, int(self.val['_storage']['impl_']['size']))
+
+    def children(self):
+        """Initialize iterator to actual elements of set."""
+        return ImmerListIter(self.val['_storage'])
+
+    @staticmethod
+    def display_hint():
+        """Ensure set is displayed as array in gdb."""
+        return 'array'
+
+
 def find_match_brackets(search, opening='<', closing='>'):
     """Return the index of the closing bracket that matches the first opening bracket.
 
@@ -614,6 +690,9 @@ def build_pretty_printer():
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
     pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
+    pp.add('immutable::map', 'mongo::immutable::map', True, ImmutableMapPrinter)
+    pp.add('immutable::set', 'mongo::immutable::set', True, ImmutableSetPrinter)
+
     return pp
 
 
