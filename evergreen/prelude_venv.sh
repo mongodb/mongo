@@ -22,6 +22,11 @@ function activate_venv {
 
   if [ "Windows_NT" = "$OS" ]; then
     export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
+  elif [ "$(uname)" = "Darwin" ]; then
+    #SERVER-75626 After activating the virtual environment under the mocos host. the PYTHONPATH setting
+    #is incorrect, and the site-packages directory of the virtual environment cannot be found in the sys.path.
+    python_version=$($python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    export PYTHONPATH="${workdir}/venv/lib/python${python_version}/site-packages:${PYTHONPATH}:${workdir}/src"
   else
     export PYTHONPATH="$PYTHONPATH:${workdir}/src"
   fi
