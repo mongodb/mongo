@@ -108,7 +108,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
     // casing. It is allowed to create the 'config' database (handled by the early return above),
     // but only with that exact casing.
     uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Cannot manually create database'" << dbName << "'",
+            str::stream() << "Cannot manually create database '" << dbName << "'",
             !dbName.equalCaseInsensitive(DatabaseName::kAdmin.db()) &&
                 !dbName.equalCaseInsensitive(DatabaseName::kLocal.db()) &&
                 !dbName.equalCaseInsensitive(DatabaseName::kConfig.db()));
