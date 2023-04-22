@@ -180,80 +180,27 @@ bool PartialSchemaRequirement::mayReturnNull(const ConstFoldFn& constFold) const
     return _boundProjectionName && checkMaybeHasNull(getIntervals(), constFold);
 };
 
-bool IndexPathLessComparator::operator()(const ABT& path1, const ABT& path2) const {
+bool IndexPath3WComparator::operator()(const ABT& path1, const ABT& path2) const {
     return compareExprAndPaths(path1, path2) < 0;
 }
 
-int PartialSchemaKeyComparator::Cmp3W::operator()(const PartialSchemaKey& k1,
-                                                  const PartialSchemaKey& k2) const {
+bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
+                                                const PartialSchemaKey& k2) const {
     if (const auto& p1 = k1._projectionName) {
         if (const auto& p2 = k2._projectionName) {
             const int projCmp = p1->compare(*p2);
             if (projCmp != 0) {
-                return projCmp;
+                return projCmp < 0;
             }
             // Fallthrough to comparison below.
         } else {
-            // p1 > p2 because nonempty > empty.
-            return 1;
+            return false;
         }
     } else if (k2._projectionName) {
-        // p1 < p2 because empty < nonempty
-        return -1;
-    }
-    // p1 == p2 so compare paths.
-    return compareExprAndPaths(k1._path, k2._path);
-}
-bool PartialSchemaKeyComparator::Less::operator()(const PartialSchemaKey& k1,
-                                                  const PartialSchemaKey& k2) const {
-    return PartialSchemaKeyComparator::Cmp3W{}(k1, k2) < 0;
-}
-
-int PartialSchemaRequirementComparator::Cmp3W::operator()(
-    const PartialSchemaRequirement& req1, const PartialSchemaRequirement& req2) const {
-
-    int intervalCmp = compareIntervalExpr(req1.getIntervals(), req2.getIntervals());
-    if (intervalCmp != 0) {
-        return intervalCmp;
-    }
-
-    // Intervals are equal: compare the output bindings.
-    auto b1 = req1.getBoundProjectionName();
-    auto b2 = req2.getBoundProjectionName();
-    if (b1 && b2) {
-        return b1->compare(*b2);
-    } else if (b1) {
-        // b1 > b2 because nonempty > empty.
-        return 1;
-    } else if (b2) {
-        // b1 < b2 because empty < nonempty.
-        return -1;
-    } else {
-        // empty == empty.
-        return 0;
-    }
-}
-
-bool PartialSchemaRequirementComparator::Less::operator()(
-    const PartialSchemaRequirement& req1, const PartialSchemaRequirement& req2) const {
-
-    int intervalCmp = compareIntervalExpr(req1.getIntervals(), req2.getIntervals());
-    if (intervalCmp < 0) {
-        return true;
-    } else if (intervalCmp > 0) {
         return false;
     }
 
-    // Intervals are equal: compare the output bindings.
-    auto b1 = req1.getBoundProjectionName();
-    auto b2 = req2.getBoundProjectionName();
-    if (b1 && b2) {
-        return b1->compare(*b2) < 0;
-    } else {
-        // If either or both optionals are empty, then the only way for
-        // 'b1 < b2' is '{} < {anything}'.
-        return !b1 && b2;
-    }
+    return compareExprAndPaths(k1._path, k2._path) < 0;
 }
 
 ResidualRequirement::ResidualRequirement(PartialSchemaKey key,

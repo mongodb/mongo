@@ -510,7 +510,7 @@ struct Collector {
                             const RIDUnionNode& node,
                             CollectedInfo leftChildResult,
                             CollectedInfo rightChildResult) {
-        // TODO SERVER-75587 should determine how the reference tracker for RIDUnionNode will work.
+        // TODO SERVER-69026 should determine how the reference tracker for RIDUnionNode will work.
         return handleRIDNodeReferences(
             node, std::move(leftChildResult), std::move(rightChildResult));
     }
