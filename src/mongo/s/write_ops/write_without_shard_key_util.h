@@ -52,7 +52,9 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          bool isUpdateOrDelete,
                          bool isUpsert,
                          const BSONObj& query,
-                         const BSONObj& collation);
+                         const BSONObj& collation,
+                         const boost::optional<BSONObj>& let,
+                         const boost::optional<LegacyRuntimeConstants>& legacyRuntimeConstants);
 
 /**
  * Runs and returns the result of running a write without a shard key using the two phase protocol.

@@ -423,12 +423,15 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
             }
 
             if (!isMultiWrite &&
-                write_without_shard_key::useTwoPhaseProtocol(opCtx,
-                                                             targeter.getNS(),
-                                                             true /* isUpdateOrDelete */,
-                                                             isUpsert,
-                                                             query,
-                                                             collation)) {
+                write_without_shard_key::useTwoPhaseProtocol(
+                    opCtx,
+                    targeter.getNS(),
+                    true /* isUpdateOrDelete */,
+                    isUpsert,
+                    query,
+                    collation,
+                    writeItem.getLet(),
+                    writeItem.getLegacyRuntimeConstants())) {
                 // Writes without shard key should be in their own batch.
                 if (!batchMap.empty()) {
                     writeOp.cancelWrites(nullptr);

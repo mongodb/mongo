@@ -39,6 +39,7 @@
 #include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
@@ -177,7 +178,9 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          bool isUpdateOrDelete,
                          bool isUpsert,
                          const BSONObj& query,
-                         const BSONObj& collation) {
+                         const BSONObj& collation,
+                         const boost::optional<BSONObj>& let,
+                         const boost::optional<LegacyRuntimeConstants>& legacyRuntimeConstants) {
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         return false;
@@ -213,14 +216,19 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     }
 
     BSONObj deleteQuery = query;
-    if (isTimeseries) {
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
-        deleteQuery = timeseries::getBucketLevelPredicateForRouting(
-            query, expCtx, tsFields->getTimeseriesOptions());
-    }
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               nss,
+                                                               collation,
+                                                               boost::none,  // explain
+                                                               let,
+                                                               legacyRuntimeConstants);
 
-    auto shardKey = uassertStatusOK(
-        extractShardKeyFromBasicQuery(opCtx, nss, cm.getShardKeyPattern(), deleteQuery));
+    auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
+        expCtx,
+        cm.getShardKeyPattern(),
+        !isTimeseries ? query
+                      : timeseries::getBucketLevelPredicateForRouting(
+                            query, expCtx, tsFields->getTimeseriesOptions())));
 
     // 'shardKey' will only be populated only if a full equality shard key is extracted.
     if (shardKey.isEmpty()) {
