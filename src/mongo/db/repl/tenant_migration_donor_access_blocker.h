@@ -127,6 +127,11 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  * to be rejected if it is possible that some writes have been accepted by the recipient (i.e. the
  * migration has committed).
  *
+ * Change stream getMore commands call assertCanGetMoreChangeStream. After a commit normal getMores
+ * are allowed to proceed and drain the cursors, but change stream cursors are infinite and can't be
+ * fully drained. We added this special check for change streams specifically to signal that they
+ * must be resumed on the recipient.
+ *
  * Index build user threads call checkIfCanBuildIndex. Index builds are blocked and rejected
  * similarly to regular writes except that they are blocked from the start of the migration (i.e.
  * before "blockTimestamp" is chosen).
@@ -197,6 +202,11 @@ public:
     // after registering the build.
     //
     Status checkIfCanBuildIndex() final;
+
+    /**
+     * Returns error status if "getMore" command of a change stream should fail.
+     */
+    Status checkIfCanGetMoreChangeStream() final;
 
     bool checkIfShouldBlockTTL() const final {
         // There is no TTL race at the donor side. See parent class for details.

@@ -105,7 +105,8 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
         (_commandName == "aggregate" || _commandName == "getMore") && _code && !_wcCode &&
         (ErrorCodes::isRetriableError(*_code) || ErrorCodes::isNetworkError(*_code) ||
          ErrorCodes::isNeedRetargettingError(*_code) || _code == ErrorCodes::RetryChangeStream ||
-         _code == ErrorCodes::FailedToSatisfyReadPreference);
+         _code == ErrorCodes::FailedToSatisfyReadPreference ||
+         _code == ErrorCodes::ResumeTenantChangeStream);
 
     // If the command or exception is not relevant, bail out early.
     if (!mayNeedResumableChangeStreamErrorLabel) {
@@ -120,7 +121,7 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
                                                      : CurOp::get(_opCtx)->originatingCommand());
 
     // Get the namespace string from CurOp. We will need it to build the LiteParsedPipeline.
-    const auto nss = NamespaceString{CurOp::get(_opCtx)->getNS()};
+    const auto& nss = CurOp::get(_opCtx)->getNSS();
 
     bool apiStrict = APIParameters::get(_opCtx).getAPIStrict().value_or(false);
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.

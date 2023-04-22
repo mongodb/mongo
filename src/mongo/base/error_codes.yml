@@ -522,14 +522,16 @@ error_codes:
     # This error code is not generated internally in mongod/s servers, but must be parsed and
     # reserve an error code. It can be returned by a remote search index management server.
     - {code: 396, name: IndexInformationTooLarge}
-    
+
     - {code: 397, name: MovePrimaryAborted}
-    
+
     - {code: 398, name: StreamTerminated, categories: [CloseConnectionError]}
 
     - {code: 399, name: MovePrimaryRecipientPastAbortableStage, categories: [InternalOnly]}
 
     - {code: 400, name: CannotUpgrade}
+
+    - {code: 401, name: ResumeTenantChangeStream}
 
     # Error codes 4000-8999 are reserved.
 
@@ -560,4 +562,3 @@ error_codes:
     - {code: 50768,name: NotARetryableWriteCommand}
     - {code: 50915,name: BackupCursorOpenConflictWithCheckpoint, categories: [RetriableError]}
     - {code: 56846,name: ConfigServerUnreachable}
-

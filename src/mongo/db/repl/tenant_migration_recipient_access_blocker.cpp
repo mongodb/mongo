@@ -158,6 +158,10 @@ Status TenantMigrationRecipientAccessBlocker::checkIfCanBuildIndex() {
     return Status::OK();
 }
 
+Status TenantMigrationRecipientAccessBlocker::checkIfCanGetMoreChangeStream() {
+    return Status::OK();
+}
+
 bool TenantMigrationRecipientAccessBlocker::checkIfShouldBlockTTL() const {
     stdx::lock_guard<Latch> lg(_mutex);
     return _ttlIsBlocked;

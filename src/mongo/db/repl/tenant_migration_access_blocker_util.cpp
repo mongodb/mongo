@@ -529,6 +529,17 @@ Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName)
     return Status::OK();
 }
 
+void assertCanGetMoreChangeStream(OperationContext* opCtx, const DatabaseName& dbName) {
+    // We only block change stream getMores on the donor.
+    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor);
+    if (mtab) {
+        auto status = mtab->checkIfCanGetMoreChangeStream();
+        mtab->recordTenantMigrationError(status);
+        uassertStatusOK(status);
+    }
+}
+
 bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbName) {
     if (dbName.db().empty()) {
         return false;
