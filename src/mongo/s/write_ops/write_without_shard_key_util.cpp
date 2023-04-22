@@ -215,8 +215,8 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     BSONObj deleteQuery = query;
     if (isTimeseries) {
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
-        deleteQuery =
-            timeseries::getBucketLevelPredicateForRouting(query, expCtx, tsFields->getMetaField());
+        deleteQuery = timeseries::getBucketLevelPredicateForRouting(
+            query, expCtx, tsFields->getTimeseriesOptions());
     }
 
     auto shardKey = uassertStatusOK(

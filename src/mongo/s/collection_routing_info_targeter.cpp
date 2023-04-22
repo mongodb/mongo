@@ -572,7 +572,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             // Note: The query returned would match a super set of the documents matched by the
             // original query.
             deleteQuery = timeseries::getBucketLevelPredicateForRouting(
-                deleteQuery, expCtx, tsFields->getMetaField());
+                deleteQuery, expCtx, tsFields->getTimeseriesOptions());
         }
 
         // Sharded collections have the following further requirements for targeting:

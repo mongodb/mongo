@@ -220,6 +220,13 @@ public:
         bool assumeNoMixedSchemaData,
         IneligiblePredicatePolicy policy);
 
+    /**
+     * Splits out a predicate on the meta field from a predicate on the bucket metric field.
+     */
+    static std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
+    splitOutMetaOnlyPredicate(std::unique_ptr<MatchExpression> expr,
+                              boost::optional<StringData> metaField);
+
     // Used as the return value of getPushdownPredicates().
     struct SplitPredicates {
         std::unique_ptr<MatchExpression> metaOnlyExpr;

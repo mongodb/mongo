@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   # To avoid multiversion tests
- *   requires_fcv_70,
+ *   requires_fcv_71,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
  * ]
@@ -33,6 +33,10 @@ const testDB = mongos.getDB(dbName);
 function generateTimeValue(index) {
     return ISODate(`${2000 + index}-01-01`);
 }
+
+// The split point between two shards. This value guarantees that generated time values do not fall
+// on this boundary.
+const splitTimePointBetweenTwoShards = ISODate("2001-06-30");
 
 function generateDocsForTestCase(collConfig) {
     const documents = TimeseriesTest.generateHosts(collConfig.nDocs);
@@ -72,7 +76,7 @@ const collectionConfigurations = {
     timeShardKey: {
         nDocs: 4,
         shardKey: {[timeField]: 1},
-        splitPoint: {[`control.min.${timeField}`]: generateTimeValue(2)},
+        splitPoint: {[`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
     },
 
     // Shard key on both meta and time field.
@@ -80,19 +84,19 @@ const collectionConfigurations = {
         nDocs: 4,
         metaGenerator: (id => id),
         shardKey: {[metaField]: 1, [timeField]: 1},
-        splitPoint: {meta: 2, [`control.min.${timeField}`]: generateTimeValue(2)},
+        splitPoint: {meta: 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
     },
     metaObjectTimeShardKey: {
         nDocs: 4,
         metaGenerator: (index => ({a: index})),
         shardKey: {[metaField]: 1, [timeField]: 1},
-        splitPoint: {meta: {a: 2}, [`control.min.${timeField}`]: generateTimeValue(2)},
+        splitPoint: {meta: {a: 2}, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
     },
     metaSubFieldTimeShardKey: {
         nDocs: 4,
         metaGenerator: (index => ({a: index})),
         shardKey: {[metaField + '.a']: 1, [timeField]: 1},
-        splitPoint: {'meta.a': 1, [`control.min.${timeField}`]: generateTimeValue(2)},
+        splitPoint: {'meta.a': 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
     },
 };
 
@@ -111,17 +115,15 @@ const requestConfigurations = {
         reachesPrimary: true,
         reachesOther: true,
     },
-    // Time field filter leads to broadcasted request.
-    // TODO SERVER-75160: Update this test case to a targeted request to shard0.
+    // This time field filter has the request targeted to the shard0.
     timeFilterOneShard: {
         deletePredicates:
             [{[timeField]: generateTimeValue(0), f: 0}, {[timeField]: generateTimeValue(1), f: 1}],
         remainingDocumentsIds: [2, 3],
         reachesPrimary: true,
-        reachesOther: true,
+        reachesOther: false,
     },
-    // Time field filter leads to broadcasted request.
-    // TODO SERVER-75160: Update the above comment to a targeted request.
+    // This time field filter has the request targeted to both shards.
     timeFilterTwoShards: {
         deletePredicates:
             [{[timeField]: generateTimeValue(1), f: 1}, {[timeField]: generateTimeValue(3), f: 3}],
@@ -130,8 +132,15 @@ const requestConfigurations = {
         reachesOther: true,
     },
     metaFilterOneShard: {
-        deletePredicates: [{[metaField]: 2, f: 2}, {[metaField]: 3, f: 3}],
-        remainingDocumentsIds: [0, 1],
+        deletePredicates: [{[metaField]: 2, f: 2}],
+        remainingDocumentsIds: [0, 1, 3],
+        reachesPrimary: false,
+        reachesOther: true,
+    },
+    // Meta + time filter has the request targeted to shard1.
+    metaTimeFilterOneShard: {
+        deletePredicates: [{[metaField]: 2, [timeField]: generateTimeValue(2), f: 2}],
+        remainingDocumentsIds: [0, 1, 3],
         reachesPrimary: false,
         reachesOther: true,
     },
@@ -147,6 +156,13 @@ const requestConfigurations = {
         reachesPrimary: false,
         reachesOther: true,
     },
+    // Meta object + time filter has the request targeted to shard1.
+    metaObjectTimeFilterOneShard: {
+        deletePredicates: [{[metaField]: {a: 2}, [timeField]: generateTimeValue(2), f: 2}],
+        remainingDocumentsIds: [0, 1, 3],
+        reachesPrimary: false,
+        reachesOther: true,
+    },
     metaObjectFilterTwoShards: {
         deletePredicates: [{[metaField]: {a: 1}, f: 1}, {[metaField]: {a: 2}, f: 2}],
         remainingDocumentsIds: [0, 3],
@@ -155,6 +171,13 @@ const requestConfigurations = {
     },
     metaSubFieldFilterOneShard: {
         deletePredicates: [{[metaField + '.a']: 2, f: 2}],
+        remainingDocumentsIds: [0, 1, 3],
+        reachesPrimary: false,
+        reachesOther: true,
+    },
+    // Meta sub field + time filter has the request targeted to shard1.
+    metaSubFieldTimeFilterOneShard: {
+        deletePredicates: [{[metaField + '.a']: 2, [timeField]: generateTimeValue(2), f: 2}],
         remainingDocumentsIds: [0, 1, 3],
         reachesPrimary: false,
         reachesOther: true,
@@ -358,23 +381,19 @@ runOneTestCase("timeShardKey", "timeFilterTwoShards");
 
 runOneTestCase("metaTimeShardKey", "emptyFilter");
 runOneTestCase("metaTimeShardKey", "nonShardKeyFilter");
-// TODO SERVER-75160: The shard key extractor can't extract the correct shard key when the shard
-// key is meta + time fields. After the fix, uncomment the following line.
-// runOneTestCase("metaTimeShardKey", "metaFilterOneShard");
+runOneTestCase("metaTimeShardKey", "metaTimeFilterOneShard");
 runOneTestCase("metaTimeShardKey", "metaFilterTwoShards");
 
 runOneTestCase("metaObjectTimeShardKey", "emptyFilter");
 runOneTestCase("metaObjectTimeShardKey", "nonShardKeyFilter");
-// TODO SERVER-75160: The shard key extractor can't extract the correct shard key when the shard
-// key is meta + time fields. After the fix, uncomment the following line.
-// runOneTestCase("metaObjectTimeShardKey", "metaObjectFilterOneShard");
+runOneTestCase("metaObjectTimeShardKey", "metaObjectTimeFilterOneShard");
 runOneTestCase("metaObjectTimeShardKey", "metaObjectFilterTwoShards");
 runOneTestCase("metaObjectTimeShardKey", "metaSubFieldFilterTwoShards");
 
 runOneTestCase("metaSubFieldTimeShardKey", "emptyFilter");
 runOneTestCase("metaSubFieldTimeShardKey", "nonShardKeyFilter");
+runOneTestCase("metaSubFieldTimeShardKey", "metaSubFieldTimeFilterOneShard");
 runOneTestCase("metaSubFieldTimeShardKey", "metaObjectFilterTwoShards");
-runOneTestCase("metaSubFieldTimeShardKey", "metaSubFieldFilterOneShard");
 runOneTestCase("metaSubFieldTimeShardKey", "metaSubFieldFilterTwoShards");
 
 st.stop();

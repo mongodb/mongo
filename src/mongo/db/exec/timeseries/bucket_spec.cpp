@@ -922,6 +922,22 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
     return std::make_pair(bucketMetricPred.get(), result.obj());
 }
 
+std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
+BucketSpec::splitOutMetaOnlyPredicate(std::unique_ptr<MatchExpression> expr,
+                                      boost::optional<StringData> metaField) {
+    if (!metaField) {
+        // If there's no metadata field, then none of the predicates are metadata-only
+        // predicates.
+        return std::make_pair(std::unique_ptr<MatchExpression>(nullptr), std::move(expr));
+    }
+
+    return expression::splitMatchExpressionBy(
+        std::move(expr),
+        {metaField->toString()},
+        {{metaField->toString(), timeseries::kBucketMetaFieldName.toString()}},
+        expression::isOnlyDependentOn);
+}
+
 BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
@@ -936,19 +952,7 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
         MatchExpressionParser::parse(predicate, expCtx, ExtensionsCallbackNoop(), allowedFeatures));
 
     auto metaField = haveComputedMetaField ? boost::none : tsOptions.getMetaField();
-    auto [metaOnlyPred, residualPred] = [&] {
-        if (!metaField) {
-            // If there's no metadata field, then none of the predicates are metadata-only
-            // predicates.
-            return std::make_pair(std::unique_ptr<MatchExpression>(nullptr), std::move(matchExpr));
-        }
-
-        return expression::splitMatchExpressionBy(
-            std::move(matchExpr),
-            {metaField->toString()},
-            {{metaField->toString(), timeseries::kBucketMetaFieldName.toString()}},
-            expression::isOnlyDependentOn);
-    }();
+    auto [metaOnlyPred, residualPred] = splitOutMetaOnlyPredicate(std::move(matchExpr), metaField);
 
     std::unique_ptr<MatchExpression> bucketMetricPred = residualPred
         ? createPredicatesOnBucketLevelField(
@@ -970,7 +974,9 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
               .loosePredicate
         : nullptr;
 
-    return {std::move(metaOnlyPred), std::move(bucketMetricPred), std::move(residualPred)};
+    return {.metaOnlyExpr = std::move(metaOnlyPred),
+            .bucketMetricExpr = std::move(bucketMetricPred),
+            .residualExpr = std::move(residualPred)};
 }
 
 BucketSpec::BucketSpec(const std::string& timeField,
