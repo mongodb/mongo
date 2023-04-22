@@ -74,6 +74,32 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '
                                  ErrorCodes.InvalidNamespace);
 }
 
+{
+    jsTestLog("Special collections can't be sharded");
+
+    let specialColls = [
+        'config.foo',             // all collections in config db except config.system.sessions
+        `${kDbName}.system.foo`,  // any custom system collection in any db
+    ];
+
+    // TODO BACKPORT-15485 always enable check on admin collections once the backport is completed
+    if (!jsTest.options().shardMixedBinVersions &&
+        !jsTest.options().useRandomBinVersionsWithinReplicaSet) {
+        specialColls.push('admin.foo');  // all collections in admin db can't be sharded
+    }
+
+    specialColls.forEach(collName => {
+        assert.commandFailedWithCode(
+            mongos.adminCommand({shardCollection: collName, key: {_id: 1}}),
+            ErrorCodes.IllegalOperation);
+    });
+
+    // For collections in the local database the router will attempt to create the db and it will
+    // fail with InvalidOptions
+    assert.commandFailedWithCode(mongos.adminCommand({shardCollection: 'local.foo', key: {_id: 1}}),
+                                 ErrorCodes.InvalidOptions);
+}
+
 jsTestLog('shardCollection may only be run against admin database.');
 assert.commandFailed(
     mongos.getDB('test').runCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));

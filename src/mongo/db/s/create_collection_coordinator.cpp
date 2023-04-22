@@ -773,12 +773,9 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
 void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx) {
     LOGV2_DEBUG(5277902, 2, "Create collection _checkCommandArguments", logAttrs(originalNss()));
 
-    if (originalNss().dbName() == DatabaseName::kConfig) {
-        // Only allowlisted collections in config may be sharded (unless we are in test mode)
-        uassert(ErrorCodes::IllegalOperation,
-                "only special collections in the config db may be sharded",
-                originalNss() == NamespaceString::kLogicalSessionsNamespace);
-    }
+    uassert(ErrorCodes::IllegalOperation,
+            "Special collection '" + originalNss().toStringForErrorMsg() + "' cannot be sharded",
+            !originalNss().isNamespaceAlwaysUnsharded());
 
     // Ensure that hashed and unique are not both set.
     uassert(ErrorCodes::InvalidOptions,
@@ -799,14 +796,6 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
                         !timeseries::getTimeseriesOptions(opCtx, nss(), false));
         }
     }
-
-    // Ensure the namespace is valid.
-    uassert(ErrorCodes::IllegalOperation,
-            "can't shard system namespaces",
-            !originalNss().isSystem() ||
-                originalNss() == NamespaceString::kLogicalSessionsNamespace ||
-                originalNss().isTemporaryReshardingCollection() ||
-                originalNss().isTimeseriesBucketsCollection());
 
     if (_request.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
