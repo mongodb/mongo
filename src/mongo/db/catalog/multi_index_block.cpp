@@ -125,8 +125,8 @@ auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
 }
 
 bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collection) {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
+    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         // Always suppress.
         return true;
     }

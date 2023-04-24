@@ -3,7 +3,7 @@
  * skipped records that still cause key generation errors.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

@@ -2,7 +2,6 @@
  * Ensures that a createIndexes command request fails when the available disk space is below the
  * indexBuildMinAvailableDiskSpaceMB threshold.
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
  *   requires_fcv_71,
  *   requires_replication,
  * ]

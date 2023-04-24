@@ -3,7 +3,7 @@
  * index build is canceled on all nodes.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

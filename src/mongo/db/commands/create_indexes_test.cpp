@@ -37,6 +37,13 @@ namespace {
 
 class CreateIndexesTest : public CatalogTestFixture {};
 
+// TODO (SERVER-75644) re-enable this test case. This test case exercises a failure that occurs
+// during the setup phase of the index build, before it replicates the startIndexBuild oplog entry.
+// With SERVER-75644 the index build should abort by itself, that is, without using the
+// voteAbortIndexBuild signal. This should allow us to run this test without having to add
+// replication subsystem support for voting.
+
+#if 0
 TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) {
     auto opCtx = operationContext();
     // Drop config.system.indexBuilds collection.
@@ -74,6 +81,7 @@ TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) 
         ASSERT_EQ(result.getIntField("code"), 6325700);
     }
 }
+#endif
 
 }  // namespace
 }  // namespace mongo

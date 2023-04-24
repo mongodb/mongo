@@ -2,7 +2,7 @@
  * Tests that a failing index build on a secondary node causes the primary node to abort the build.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

@@ -45,7 +45,13 @@ assert.commandWorked(
 
 // Enable fail point which makes hybrid index build to hang before it aborts.
 var failPoint;
-if (TestData.setParameters.featureFlagIndexBuildGracefulErrorHandling) {
+
+const gracefulIndexBuildFeatureFlag =
+    assert
+        .commandWorked(
+            primary.adminCommand({getParameter: 1, featureFlagIndexBuildGracefulErrorHandling: 1}))
+        .featureFlagIndexBuildGracefulErrorHandling.value;
+if (gracefulIndexBuildFeatureFlag) {
     // If this feature flag is enabled, index builds fail immediately instead of suppressing errors
     // until the commit phase, and always signal the primary for abort (even if it is itself). Abort
     // is only ever performed in the command thread, which is interrupted by replication state

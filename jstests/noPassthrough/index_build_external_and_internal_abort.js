@@ -3,7 +3,7 @@
  * internal index build abort (e.g. build failed due to invalid keys).
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

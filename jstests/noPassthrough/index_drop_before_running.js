@@ -2,7 +2,7 @@
  * Test aborting an index build after setup but before transitioning to in-progress.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

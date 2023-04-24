@@ -2,7 +2,7 @@
  * Tests the 'voteAbortIndexBuild' internal command.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

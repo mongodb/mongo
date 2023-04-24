@@ -221,4 +221,5 @@ feature_flags:
     featureFlagIndexBuildGracefulErrorHandling:
         description: "Enable index build error handling improvements"
         cpp_varname: feature_flags::gIndexBuildGracefulErrorHandling
-        default: false
+        default: true
+        version: 7.1

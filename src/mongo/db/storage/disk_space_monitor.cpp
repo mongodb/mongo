@@ -47,11 +47,6 @@ static const auto _decoration = ServiceContext::declareDecoration<DiskSpaceMonit
 }  // namespace
 
 void DiskSpaceMonitor::start(ServiceContext* svcCtx) {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
-        return;
-    }
-
     auto storageEngine = svcCtx->getStorageEngine();
     const bool filesNotAllInSameDirectory =
         storageEngine->isUsingDirectoryPerDb() || storageEngine->isUsingDirectoryForIndexes();

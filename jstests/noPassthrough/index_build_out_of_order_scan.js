@@ -2,7 +2,7 @@
  * Ensures that index builds encountering a DataCorruptionDetected error log and increment a metric.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

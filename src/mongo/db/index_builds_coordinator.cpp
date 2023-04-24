@@ -537,6 +537,14 @@ IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
         }
 
         void act(OperationContext* opCtx, int64_t availableBytes) noexcept final {
+            if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                LOGV2(6826200,
+                      "Index build: disk space monitor detected we're low on storage space but "
+                      "'featureFlagIndexBuildGracefulErrorHandling' is disabled. Ignoring it");
+                return;
+            }
+
             if (_coord->noIndexBuildInProgress()) {
                 // Avoid excessive logging when no index builds are in progress. Nothing prevents an
                 // index build from starting after this check.  Subsequent calls will see any
@@ -2623,8 +2631,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     // vote, because we want the voting itself to be killable. Continue and try to abort as primary
     // or crash.
     if (!opCtx->isKillPending() &&
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
+        feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         if (ErrorCodes::NotWritablePrimary == status && !replState->isAbortCleanUpRequired()) {
             // Clean up if the error happens due to stepdown before 'startIndexBuild' oplog entry is
             // replicated. Other nodes will not be aware of this index build, so trying to signal
@@ -2643,8 +2651,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
             // The index builder thread will need to reach out to the current primary to abort on
             // its own. This can happen if an error is thrown, it is interrupted by a user killop,
             // or is killed internally by something like the DiskSpaceMonitor.
-            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-            if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
+            if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
                 // If we were interrupted by a caller internally who set a status, use that
                 // status instead of the generic interruption error status.
                 auto abortStatus =
@@ -2786,8 +2794,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // feature flag is enabled, two-phase builds can handle unexpected errors by requesting an abort
     // to the primary node. Single-phase builds can also abort immediately, as the primary or
     // standalone is the only node aware of the build.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
+    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         // Index builds only check index constraints when committing. If an error occurs at that
         // point, then the build is cleaned up while still holding the appropriate locks. The only
         // errors that we cannot anticipate are user interrupts and shutdown errors.

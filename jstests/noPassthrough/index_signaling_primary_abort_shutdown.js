@@ -3,7 +3,7 @@
  * properly interrupted, without blocking shutdown, and restarted after shutdown.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */

@@ -95,6 +95,11 @@ void IndexBuildState::setState(State state,
                   str::stream() << "current state :" << toString(_state)
                                 << ", new state: " << toString(state));
     }
+    LOGV2_DEBUG(6826201,
+                1,
+                "Index build: transitioning state",
+                "current"_attr = toString(_state),
+                "new"_attr = toString(state));
     _state = state;
     if (timestamp)
         _timestamp = timestamp;
@@ -106,9 +111,8 @@ void IndexBuildState::setState(State state,
 
 bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentState,
                                               IndexBuildState::State newState) const {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    const auto graceful =
-        feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe();
+    const auto graceful = feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+        serverGlobalParams.featureCompatibility);
     switch (currentState) {
         case IndexBuildState::State::kSetup:
             return
@@ -670,6 +674,17 @@ void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->isReplEnabled() && protocol == IndexBuildProtocol::kTwoPhase) {
+        if (replCoord->getMemberState() == repl::MemberState::RS_STARTUP2 &&
+            !serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+            // We're likely at the initial stages of a new logical initial sync attempt, and we
+            // haven't yet replicated the FCV from the sync source. Skip the index build state
+            // transition checks because they rely on the FCV.
+            LOGV2_DEBUG(6826202,
+                        2,
+                        "Index build: skipping index build state transition checks because the FCV "
+                        "isn't known yet");
+            return true;
+        }
         return false;
     }
     return true;

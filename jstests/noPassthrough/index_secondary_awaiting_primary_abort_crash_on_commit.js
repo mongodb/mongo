@@ -3,7 +3,7 @@
  * oplog entry to be replicated. If a commit entry is received instead, the secondary should crash.
  *
  * @tags: [
- *   featureFlagIndexBuildGracefulErrorHandling,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */
