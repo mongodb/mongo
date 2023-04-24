@@ -1,0 +1,316 @@
+# Build variants for testing the classic engine.
+
+variables:
+- &linux_x86_dynamic_compile_variant_dependency
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+
+- &linux_x86_generic_expansions
+  multiversion_platform: rhel80
+  multiversion_edition: enterprise
+  repo_edition: enterprise
+  large_distro_name: rhel80-medium
+  num_scons_link_jobs_available: 0.99
+  compile_variant: *linux_x86_dynamic_compile_variant_name
+
+- &enterprise-rhel-80-64-bit-dynamic-expansions
+    <<: *linux_x86_generic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    large_distro_name: rhel80-medium
+    burn_in_tag_buildvariants: >-
+      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
+
+# If you add anything to san_options, make sure the appropriate changes are
+# also made to SConstruct.
+# and also to the san_options in compile_static_analysis.yml
+- aubsan_options: &aubsan_options
+  >-
+    UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+    ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+
+buildvariants:
+- &enterprise-rhel-80-64-bit-dynamic-classic-engine
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: enterprise-rhel-80-64-bit-dynamic-classic-engine
+  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
+  cron: "0 0 * * 0"  # once a week (Sunday midnight UTC)
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  stepback: false
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    test_flags: >-
+      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+    large_distro_name: rhel80-medium
+    burn_in_tag_buildvariants: >-
+      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: linux-x86-dynamic-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
+  tasks:
+  - name: .aggfuzzer !.sbe_only
+  - name: .aggregation !.sbe_only
+  - name: .auth
+  - name: .causally_consistent !.sharding
+  - name: .change_stream_fuzzer
+  - name: .change_streams
+  - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode
+  - name: .concurrency .large !.ubsan !.no_txns !.compute_mode
+    distros:
+    - rhel80-medium
+  - name: .encrypt
+  - name: .jscore .common !jsCore !.sbe_only
+  - name: .jstestfuzz !.flow_control
+  - name: .misc_js
+  - name: .multi_shard
+  - name: .query_fuzzer
+  - name: .random_multiversion_ds
+  - name: .read_only
+  - name: .read_write_concern !.large
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel80-xlarge
+  - name: .rollbackfuzzer
+  - name: .sharding .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .serverless
+    distros:
+    - rhel80-xlarge
+  - name: .updatefuzzer
+  - name: aggregation_repeat_queries
+  - name: audit
+  - name: burn_in_tags_gen
+  - name: burn_in_tests_gen
+  - name: check_feature_flag_tags
+  - name: check_for_todos
+  - name: disk_wiredtiger
+  - name: initial_sync_fuzzer_gen
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: lint_fuzzer_sanity_patch
+  - name: mqlrun
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: .multiversion_sanity_check
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_pinned_connections_auth
+  - name: search_ssl
+  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: test_api_version_compatibility
+  - name: unittest_shell_hang_analyzer_gen
+
+- name: &rhel80-debug-asan-classic-engine rhel80-debug-asan-classic-engine
+  display_name: "* ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
+  cron: "0 0 * * 2"  # once a week (Tuesday midnight UTC)
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-build
+  stepback: false
+  expansions:
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+    lang_environment: LANG=C
+    san_options: *aubsan_options
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=address
+      --ssl
+      --ocsp-stapling=off
+      --enable-free-mon=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+    compile_variant: *rhel80-debug-asan-classic-engine
+    test_flags: >-
+      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
+    hang_analyzer_dump_core: false
+    scons_cache_scope: shared
+    exec_timeout_secs: 14400 # 3 hour timeout
+    separate_debug: off
+    large_distro_name: rhel80-build
+  tasks:
+  - name: compile_test_benchmark_and_package_serial_TG
+  - name: .aggregation !.sbe_only
+  - name: .auth
+  - name: audit
+  - name: .benchmarks
+  - name: .causally_consistent !.wo_snapshot
+  - name: .change_streams
+  - name: .misc_js
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode
+  - name: .encrypt
+  - name: free_monitoring
+  - name: external_auth
+  - name: external_auth_aws
+  - name: external_auth_oidc
+  - name: initial_sync_fuzzer_gen
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
+  - name: .jscore .common !.sbe_only
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .logical_session_cache
+  - name: .multi_shard .common
+  - name: .query_fuzzer
+  - name: .read_write_concern
+  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: .replica_sets !.multi_oplog
+  - name: .replica_sets .encrypt
+  - name: .resharding_fuzzer
+  - name: .retry
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: .updatefuzzer
+  - name: sasl
+  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot
+  - name: .sharding .common !.csrs !.jstestfuzz
+  - name: .watchdog
+  - name: .stitch
+  - name: .serverless
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .updatefuzzer
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
+  display_name: "* UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
+  cron: "0 0 * * 4"  # once a week (Thursday midnight UTC)
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-build
+  stepback: false
+  expansions:
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+    lang_environment: LANG=C
+    san_options: *aubsan_options
+    compile_variant: *rhel80-debug-ubsan-classic-engine
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+      --dbg=on
+      --opt=on
+      --sanitize=undefined
+      --ssl
+      --ocsp-stapling=off
+      --enable-free-mon=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+    test_flags: >-
+      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
+    scons_cache_scope: shared
+    separate_debug: off
+    large_distro_name: rhel80-build
+  tasks:
+  - name: compile_test_benchmark_and_package_serial_TG
+  - name: .aggregation !.sbe_only
+  - name: .auth
+  - name: audit
+  - name: .benchmarks
+  - name: .causally_consistent !.wo_snapshot
+  - name: .change_streams
+  - name: .misc_js
+  - name: .concurrency !.no_txns !.repl !.kill_terminate !.compute_mode
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: free_monitoring
+  - name: initial_sync_fuzzer_gen
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
+  - name: .jscore .common !.sbe_only
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .logical_session_cache .one_sec
+  - name: .multi_shard .common
+  - name: .read_write_concern
+  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: .replica_sets !.multi_oplog
+  - name: .replica_sets .encrypt
+  - name: .resharding_fuzzer
+  - name: .retry
+  - name: .rollbackfuzzer
+  - name: .read_only
+  - name: sasl
+  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot
+  - name: .sharding .common !.csrs !.jstestfuzz
+  - name: .stitch
+  - name: .updatefuzzer
+  - name: .serverless
+  - name: watchdog_wiredtiger
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
+  - name: generate_buildid_to_debug_symbols_mapping
