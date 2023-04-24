@@ -454,4 +454,17 @@ TEST_F(ValueSerializeForKeyString, BsonCodeWScope) {
 
     runTest({{cwsTag1, cwsVal1}, {cwsTag2, cwsVal2}, {cwsTag3, cwsVal3}});
 }
+
+// Test that roundtripping through KeyString works for a wide row. KeyStrings used in indexes are
+// typically constrained in the number of components they can have, since we limit compound indexes
+// to at most 32 components. But roundtripping rows wider than 32 still needs to work.
+//
+// This test was originally designed to reproduce SERVER-76321.
+TEST_F(ValueSerializeForKeyString, RoundtripWideRow) {
+    std::vector<std::pair<sbe::value::TypeTags, sbe::value::Value>> row;
+    for (int32_t i = 0; i < 40; ++i) {
+        row.emplace_back(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int32_t>(i));
+    }
+    runTest(row);
+}
 }  // namespace mongo::sbe
