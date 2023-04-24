@@ -1304,7 +1304,7 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
     invariant(supportsLockFreeRead(opCtx) &&
               (!opCtx->recoveryUnit()->isActive() || _isLockFreeReadSubOperation));
 
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, DatabaseName{nsOrUUID.db()});
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.dbName());
 
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (_isLockFreeReadSubOperation) {

@@ -843,7 +843,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     auto indexes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nssOrUUID.db().toString(),
+                                              nssOrUUID.dbName().toString(),
                                               cmd,
                                               Milliseconds(-1)));
 
@@ -889,7 +889,7 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
     auto infosRes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nssOrUUID.db().toString(),
+                                              nssOrUUID.dbName().toString(),
                                               cmd,
                                               Milliseconds(-1)));
 

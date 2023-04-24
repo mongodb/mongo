@@ -196,7 +196,7 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
 
     // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
     return AutoGetDb(opCtx,
-                     nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
+                     nsOrUUID.dbName(),
                      isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
                      deadline,
                      std::move(dbLockOptions));
@@ -328,14 +328,13 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
         auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
-        auto secondaryDbName = secondaryNssOrUUID.dbName() ? secondaryNssOrUUID.dbName()
-                                                           : secondaryNssOrUUID.nss()->dbName();
+        auto secondaryDbName = secondaryNssOrUUID.dbName();
         verifyDbAndCollection(opCtx,
                               MODE_IS,
                               secondaryNssOrUUID,
                               secondaryResolvedNss,
                               secondaryColl,
-                              databaseHolder->getDb(opCtx, *secondaryDbName),
+                              databaseHolder->getDb(opCtx, secondaryDbName),
                               verifyWriteEligible);
     }
 

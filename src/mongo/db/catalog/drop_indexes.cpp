@@ -83,7 +83,7 @@ Status checkReplState(OperationContext* opCtx,
     if (writesAreReplicatedAndNotPrimary) {
         return Status(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while dropping indexes on database "
-                                    << dbAndUUID.dbName()->toStringForErrorMsg()
+                                    << dbAndUUID.dbName().toStringForErrorMsg()
                                     << " with collection " << dbAndUUID.uuid());
     }
 
@@ -92,9 +92,10 @@ Status checkReplState(OperationContext* opCtx,
     const auto& nss = collection->ns();
     if (isPrimary && nss.isDropPendingNamespace()) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Cannot drop indexes on drop-pending namespace " << nss
-                                    << " in database " << dbAndUUID.dbName()->toStringForErrorMsg()
-                                    << " with uuid " << dbAndUUID.uuid());
+                      str::stream() << "Cannot drop indexes on drop-pending namespace "
+                                    << nss.toStringForErrorMsg() << " in database "
+                                    << dbAndUUID.dbName().toStringForErrorMsg() << " with uuid "
+                                    << dbAndUUID.uuid());
     }
 
     return Status::OK();
@@ -473,9 +474,10 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
 
         if (!*collection) {
             uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Collection '" << nss << "' with UUID " << dbAndUUID.uuid()
-                                    << " in database " << dbAndUUID.dbName()->toStringForErrorMsg()
-                                    << " does not exist.");
+                      str::stream()
+                          << "Collection '" << nss.toStringForErrorMsg() << "' with UUID "
+                          << dbAndUUID.uuid() << " in database "
+                          << dbAndUUID.dbName().toStringForErrorMsg() << " does not exist.");
         }
 
         // The collection could have been renamed when we dropped locks.

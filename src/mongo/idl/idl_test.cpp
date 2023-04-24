@@ -2776,7 +2776,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName().value(), DatabaseName(tenantId, "db"));
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName(), DatabaseName(tenantId, "db"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
