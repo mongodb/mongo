@@ -38,14 +38,53 @@ namespace mongo {
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
                                            const SerializationContext& context) {
-    if (gMultitenancySupport) {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-            return ns.toString();
-        }
-        return ns.toStringWithTenantId();
+    if (!gMultitenancySupport)
+        return ns.toString();
+
+    // TODO SERVER-74284: uncomment to redirect command-sepcific serialization requests
+    // if (context.getSource() == SerializationContext::Source::Command &&
+    //     context.getCallerType() == SerializationContext::CallerType::Reply)
+    //     return serializeForCommands(ns, context);
+
+    // if we're not serializing a Command Reply, use the default serializing rules
+    return serializeForStorage(ns, context);
+}
+
+std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
+                                                     const SerializationContext& context) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        return ns.toString();
     }
-    return ns.toString();
+    return ns.toStringWithTenantId();
+}
+
+std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
+                                                      const SerializationContext& context) {
+    // tenantId came from either a $tenant field or security token
+    if (context.receivedNonPrefixedTenantId()) {
+        switch (context.getPrefix()) {
+            case SerializationContext::Prefix::ExcludePrefix:
+                // fallthrough
+            case SerializationContext::Prefix::Default:
+                return ns.toString();
+            case SerializationContext::Prefix::IncludePrefix:
+                return ns.toStringWithTenantId();
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    switch (context.getPrefix()) {
+        case SerializationContext::Prefix::ExcludePrefix:
+            return ns.toString();
+        case SerializationContext::Prefix::Default:
+            // fallthrough
+        case SerializationContext::Prefix::IncludePrefix:
+            return ns.toStringWithTenantId();
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
@@ -57,11 +96,23 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
 
     if (!gMultitenancySupport) {
         massert(6972102,
-                str::stream() << "TenantId must not be set, but it is " << tenantId->toString(),
+                str::stream() << "TenantId must not be set, but it is: " << tenantId->toString(),
                 tenantId == boost::none);
         return NamespaceString(boost::none, ns);
     }
 
+    // TODO SERVER-74284: uncomment to redirect command-sepcific deserialization requests
+    // if (context.getSource() == SerializationContext::Source::Command &&
+    //     context.getCallerType() == SerializationContext::CallerType::Request)
+    //     return deserializeForCommands(std::move(tenantId), ns, context);
+
+    // if we're not deserializing a Command Request, use the default deserializing rules
+    return deserializeForStorage(std::move(tenantId), ns, context);
+}
+
+NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
+                                                           StringData ns,
+                                                           const SerializationContext& context) {
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         StringData dbName = ns.substr(0, ns.find('.'));
@@ -85,6 +136,49 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
                 str::stream() << "TenantId must match the db prefix tenantId: "
                               << tenantId->toString() << " prefix " << nss.tenantId()->toString(),
                 tenantId == nss.tenantId());
+    }
+
+    return nss;
+}
+
+NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<TenantId> tenantId,
+                                                            StringData ns,
+                                                            const SerializationContext& context) {
+    // we only get here if we are processing a Command Request.  We disregard the feature flag in
+    // this case, essentially letting the request dictate the state of the feature.
+
+    if (tenantId != boost::none) {
+        switch (context.getPrefix()) {
+            case SerializationContext::Prefix::ExcludePrefix:
+                // fallthrough
+            case SerializationContext::Prefix::Default:
+                return NamespaceString(std::move(tenantId), ns);
+            case SerializationContext::Prefix::IncludePrefix: {
+                auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+                massert(8423385,
+                        str::stream() << "TenantId from $tenant or security token present as '"
+                                      << tenantId->toString()
+                                      << "' with expectPrefix field set but without a prefix set",
+                        nss.tenantId());
+                massert(
+                    8423381,
+                    str::stream()
+                        << "TenantId from $tenant or security token must match prefixed tenantId: "
+                        << tenantId->toString() << " prefix " << nss.tenantId()->toString(),
+                    tenantId.value() == nss.tenantId());
+                return nss;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    if ((nss.dbName() != DatabaseName::kAdmin) && (nss.dbName() != DatabaseName::kLocal) &&
+        (nss.dbName() != DatabaseName::kConfig)) {
+        massert(8423387,
+                str::stream() << "TenantId must be set on nss " << ns,
+                nss.tenantId() != boost::none);
     }
 
     return nss;

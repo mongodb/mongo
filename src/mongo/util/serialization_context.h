@@ -32,8 +32,6 @@
 
 #include "mongo/util/static_immortal.h"
 
-#include "mongo/util/static_immortal.h"
-
 namespace mongo {
 
 /**
@@ -61,7 +59,7 @@ struct SerializationContext {
      * where it is being called.  Use default if serialization and deserialization should only
      * depened on the state of the feature flags.
      */
-    enum class Source { Default, Command, Storage } _source;
+    enum class Source { Default, Command, Storage };
 
     /**
      * The CallerType enum is currently only applicable to source = Command, and is used in
@@ -70,20 +68,28 @@ struct SerializationContext {
      * for example handle serialization for a request differently than serialization for a reply.
      */
 
-    enum class CallerType { None, Request, Reply } _callerType;
+    enum class CallerType { None, Request, Reply };
 
     /**
      * Prefix is used to track whether or not upstream is sending us and thus expecting a prefixed
      * tenant ID in the reply.  This field in the request can either be true, false, or not present,
      * the latter represented by the default state.
      */
-    enum class Prefix { Default, IncludePrefix, ExcludePrefix } _prefixState;
+    enum class Prefix { Default, IncludePrefix, ExcludePrefix };
 
     SerializationContext(Source source = Source::Default,
                          CallerType callerType = CallerType::None,
-                         Prefix prefixState = Prefix::Default)
-        : _source(source), _callerType(callerType), _prefixState(prefixState) {}
+                         Prefix prefixState = Prefix::Default,
+                         bool nonPrefixedTenantId = false)
+        : _source(source),
+          _callerType(callerType),
+          _prefixState(prefixState),
+          _nonPrefixedTenantId(nonPrefixedTenantId) {}
 
+    /**
+     * Gets a copy of a commonly used immutable value for use in constructing a mutable
+     * SerializationContext object
+     */
     static const SerializationContext& stateCommandReply() {
         static StaticImmortal<SerializationContext> stateCommandReply{Source::Command,
                                                                       CallerType::Reply};
@@ -96,9 +102,46 @@ struct SerializationContext {
         return *stateCommandRequest;
     }
 
+    /**
+     * Setters for flags that may not be known during construction time, used by producers
+     */
+    void setTenantIdSource(bool nonPrefixedTenantId) {
+        _nonPrefixedTenantId = nonPrefixedTenantId;
+    }
+
     void setPrefixState(bool prefixState) {
         _prefixState = prefixState ? Prefix::IncludePrefix : Prefix::ExcludePrefix;
     }
+
+    /**
+     * Getters for the flags, used by the consumers
+     */
+    const Source& getSource() const {
+        return _source;
+    }
+    const Prefix& getPrefix() const {
+        return _prefixState;
+    }
+    const CallerType& getCallerType() const {
+        return _callerType;
+    }
+    bool receivedNonPrefixedTenantId() const {
+        return _nonPrefixedTenantId;
+    }
+
+private:
+    Source _source;
+    CallerType _callerType;
+    Prefix _prefixState;
+
+    /**
+     * This flag is set/produced at command parsing before the deserializer is called, and consumed
+     * by the serializer.  It indicates whether the tenantId was sourced from the $tenant field or
+     * security token (ie. true), or if it was sourced from parsing the db string prefix (ie.
+     * false).  This is important as the serializer uses this flag to determine whether the reponse
+     * should contain a prefixed tenantId when serializing for commands.
+     */
+    bool _nonPrefixedTenantId;
 };
 
 }  // namespace mongo

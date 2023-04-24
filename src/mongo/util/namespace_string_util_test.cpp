@@ -148,4 +148,279 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequir
     ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar"));
 }
 
+// We will focus on specific configurations of the SerializationContext ie. Command Request and
+// Command Reply as this is a defaulted parameter where tests that don't specify this parameter
+// already test the default codepath.
+
+TEST(NamespaceStringUtilTest, SerializeMissingExpectPrefix_CommandReply) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    TenantId tenantId(OID::gen());
+    const std::string nsString = "foo.bar";
+    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
+
+    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandReply());
+    ctxt_noTenantId.setTenantIdSource(false);
+    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
+    ctxt_withTenantId.setTenantIdSource(true);
+
+    // TODO SERVER-74284: call the serialize/deserialize entry points in this test instead
+
+    {  // No prefix, no tenantId.
+        // request --> { ns: database.coll }
+        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId), nsString);
+    }
+
+    {  // Has prefix, no tenantId.
+        // request --> { ns: tenantId_database.coll }
+        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsPrefixString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId), nsPrefixString);
+    }
+
+    {  // No prefix, has tenantId.
+        // request --> { ns: database.coll, $tenant: tenantId }
+        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_withTenantId), nsString);
+    }
+
+    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: tenantId_database.coll, $tenant: tenantId }
+        // in this test, we're getting the toString() for ns, but we also have a tenantId. This
+        // means if we called ns.toStringWithTenantId(), we would see two tenantId prefixes
+        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsPrefixString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_withTenantId),
+                  nsPrefixString);
+    }
+}
+
+TEST(NamespaceStringUtilTest, SerializeExpectPrefixFalse_CommandReply) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    TenantId tenantId(OID::gen());
+    const std::string nsString = "foo.bar";
+    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
+
+    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandReply());
+    ctxt_noTenantId.setTenantIdSource(false);
+    ctxt_noTenantId.setPrefixState(false);
+    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
+    ctxt_withTenantId.setTenantIdSource(true);
+    ctxt_withTenantId.setPrefixState(false);
+
+    // TODO SERVER-74284: call the serialize/deserialize entry points in this test instead
+
+    {  // No prefix, no tenantId.
+        // request --> { ns: database.coll, expectPrefix: false }
+        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId), nsString);
+    }
+
+    {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: tenantId_database.coll, expectPrefix: false }
+        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsPrefixString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId), nsPrefixString);
+    }
+
+    {  // No prefix, has tenantId.
+        // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: false }
+        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_withTenantId), nsString);
+    }
+
+    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: false }
+        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsPrefixString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_withTenantId),
+                  nsPrefixString);
+    }
+}
+
+// Serializing with SerializationContext, with an expectPrefix set to true
+TEST(NamespaceStringUtilTest, SerializeExpectPrefixTrue_CommandReply) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    TenantId tenantId(OID::gen());
+    const std::string nsString = "foo.bar";
+    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
+
+    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandReply());
+    ctxt_noTenantId.setTenantIdSource(false);
+    ctxt_noTenantId.setPrefixState(true);
+    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
+    ctxt_withTenantId.setTenantIdSource(true);
+    ctxt_withTenantId.setPrefixState(true);
+
+    // TODO SERVER-74284: call the serialize/deserialize entry points in this test instead
+
+    {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: database.coll, expectPrefix: true }
+        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId), nsString);
+    }
+
+    {  // Has prefix, no tenantId.
+        // request --> { ns: tenantId_database.coll, expectPrefix: true }
+        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsPrefixString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId), nsPrefixString);
+    }
+
+    {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: true }
+        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId), nsPrefixString);
+    }
+
+    {  // Has prefix, has tenantId.
+        // request -->  { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: true }
+        const std::string nsDoublePrefixString = str::stream()
+            << tenantId.toString() << "_" << tenantId.toString() << "_" << nsString;
+        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsPrefixString);
+        ASSERT_EQ(NamespaceStringUtil::serializeForCommands(nss, ctxt_noTenantId),
+                  nsDoublePrefixString);
+    }
+}
+
+TEST(NamespaceStringUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    TenantId tenantId(OID::gen());
+    const std::string nsString = "foo.bar";
+    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
+
+    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
+    ctxt_noTenantId.setTenantIdSource(false);
+    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
+    ctxt_withTenantId.setTenantIdSource(true);
+
+    // TODO SERVER-74284: call the serialize/deserialize entry points in this test instead
+
+    {  // No prefix, no tenantId.   *** we shouldn't see this from Atlas Proxy in MT mode
+        // request --> { ns: database.coll }
+        ASSERT_THROWS_CODE(
+            NamespaceStringUtil::deserializeForCommands(boost::none, nsString, ctxt_noTenantId),
+            AssertionException,
+            8423387);
+    }
+
+    {  // Has prefix, no tenantId.
+        // request --> { ns: tenantId_database.coll }
+        auto nss = NamespaceStringUtil::deserializeForCommands(
+            boost::none, nsPrefixString, ctxt_noTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsString);
+    }
+
+    {  // No prefix, has tenantId.
+        // request --> { ns: database.coll, $tenant: tenantId }
+        auto nss =
+            NamespaceStringUtil::deserializeForCommands(tenantId, nsString, ctxt_withTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsString);
+    }
+
+    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: tenantId_database.coll, $tenant: tenantId }
+        auto nss = NamespaceStringUtil::deserializeForCommands(
+            tenantId, nsPrefixString, ctxt_withTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsPrefixString);
+    }
+}
+
+TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    TenantId tenantId(OID::gen());
+    const std::string nsString = "foo.bar";
+    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
+
+    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
+    ctxt_noTenantId.setTenantIdSource(false);
+    ctxt_noTenantId.setPrefixState(false);
+    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
+    ctxt_withTenantId.setTenantIdSource(true);
+    ctxt_withTenantId.setPrefixState(false);
+
+    // TODO SERVER-74284: call the serialize/deserialize entry points in this test instead
+
+    {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
+        // request --> { ns: database.coll, expectPrefix: false }
+        ASSERT_THROWS_CODE(
+            NamespaceStringUtil::deserializeForCommands(boost::none, nsString, ctxt_noTenantId),
+            AssertionException,
+            8423387);
+    }
+
+    {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: tenantId_database.coll, expectPrefix: false }
+        auto nss = NamespaceStringUtil::deserializeForCommands(
+            boost::none, nsPrefixString, ctxt_noTenantId);
+        // This is an anomaly, when no tenantId is supplied, we actually ignore expectPrefix, so we
+        // can't expect nss.toString == nsPrefixString as we will still attempt to parse the prefix
+        // as usual.
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsString);
+    }
+
+    {  // No prefix, has tenantId.
+        // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: false }
+        auto nss =
+            NamespaceStringUtil::deserializeForCommands(tenantId, nsString, ctxt_withTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsString);
+    }
+
+    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: false }
+        auto nss = NamespaceStringUtil::deserializeForCommands(
+            tenantId, nsPrefixString, ctxt_withTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsPrefixString);
+    }
+}
+
+TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    TenantId tenantId(OID::gen());
+    const std::string nsString = "foo.bar";
+    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
+
+    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
+    ctxt_noTenantId.setTenantIdSource(false);
+    ctxt_noTenantId.setPrefixState(true);
+    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
+    ctxt_withTenantId.setTenantIdSource(true);
+    ctxt_withTenantId.setPrefixState(true);
+
+    // TODO SERVER-74284: call the serialize/deserialize entry points in this test instead
+
+    {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
+        // request --> { ns: database.coll, expectPrefix: true }
+        ASSERT_THROWS_CODE(
+            NamespaceStringUtil::deserializeForCommands(boost::none, nsString, ctxt_noTenantId),
+            AssertionException,
+            8423387);
+    }
+
+    {  // Has prefix, no tenantId.
+        // request --> { ns: tenantId_database.coll, expectPrefix: true }
+        auto nss = NamespaceStringUtil::deserializeForCommands(
+            boost::none, nsPrefixString, ctxt_noTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsString);
+    }
+
+    {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: true }
+        ASSERT_THROWS_CODE(
+            NamespaceStringUtil::deserializeForCommands(tenantId, nsString, ctxt_withTenantId),
+            AssertionException,
+            8423385);
+    }
+
+    {  // Has prefix, has tenantId.
+        // request -->  { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: true }
+        auto nss = NamespaceStringUtil::deserializeForCommands(
+            tenantId, nsPrefixString, ctxt_withTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString(), nsString);
+    }
+}
+
 }  // namespace mongo

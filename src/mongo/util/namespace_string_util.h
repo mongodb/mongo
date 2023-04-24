@@ -48,11 +48,23 @@ public:
      * is included in the serialization.
      * eg. serialize(NamespaceString(tenantID, "foo.bar")) -> "tenantID_foo.bar"
      *
+     * If multitenancySupport is enabled and we are serializing a command reply, the
+     * featureFlagRequireTenantID has no bearing on whether we prefix or not, and is dependent on
+     * the value of the expectPrefix field in the request at the time of deserialization, and
+     * whether or not the tenantId was provided as a prefix.
+     *
      * If multitenancySupport is disabled, the tenantID is not set in the NamespaceString Object.
      * eg. serialize(NamespaceString(boost::none, "foo.bar")) -> "foo.bar"
      */
     static std::string serialize(const NamespaceString& ns,
                                  const SerializationContext& context = SerializationContext());
+
+    // TODO SERVER-74284: Privatize the worker functions
+    static std::string serializeForStorage(
+        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+
+    static std::string serializeForCommands(
+        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
 
     /**
      * Deserializes StringData ns to a NamespaceString object.
@@ -69,11 +81,27 @@ public:
      * eg. deserialize(boost::none, "preTenantID_foo.bar") -> NamespaceString(preTenantId,
      * "foo.bar")
      *
+     * If multitenancySupport is enabled and we are deserializing a command request, we will extract
+     * it from the prefix if a tenantId is not provided, otherwise we rely on the value of the
+     * expectPrefix field in the request to determine whether or not we should expect to parse a
+     * prefix.
+     *
      * If multitenancySupport is disabled then the invariant requires tenantID to not be initialized
      * and NamespaceString is constructor without the tenantID.
      * eg. deserialize(boost::none, "foo.bar") -> NamespaceString(boost::none, "foo.bar")
      */
     static NamespaceString deserialize(
+        boost::optional<TenantId> tenantId,
+        StringData ns,
+        const SerializationContext& context = SerializationContext());
+
+    // TODO SERVER-74284: Privatize the worker functions
+    static NamespaceString deserializeForStorage(
+        boost::optional<TenantId> tenantId,
+        StringData ns,
+        const SerializationContext& context = SerializationContext());
+
+    static NamespaceString deserializeForCommands(
         boost::optional<TenantId> tenantId,
         StringData ns,
         const SerializationContext& context = SerializationContext());

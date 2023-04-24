@@ -2545,8 +2545,16 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
                        .append(BasicConcatenateWithDbCommand::kCommandName, "coll1")
                        .append("field1", 3)
                        .append("field2", "five")
+                       .append("expectPrefix", true)
                        .append("$db", prefixedDb)
                        .obj();
+
+    auto targetDoc = BSONObjBuilder{}
+                         .append(BasicConcatenateWithDbCommand::kCommandName, "coll1")
+                         .append("field1", 3)
+                         .append("field2", "five")
+                         .append("$db", prefixedDb)
+                         .obj();
 
     auto testStruct =
         BasicConcatenateWithDbCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
@@ -2557,7 +2565,7 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
     assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
+    ASSERT_BSONOBJ_EQ(targetDoc, serializeCmd(testStruct));
 }
 
 TEST(IDLCommand, TestConcatentateWithDb_TestConstructor) {
@@ -2695,8 +2703,16 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
                        .append(BasicConcatenateWithDbOrUUIDCommand::kCommandName, "coll1")
                        .append("field1", 3)
                        .append("field2", "five")
+                       .append("expectPrefix", true)
                        .append("$db", prefixedDb)
                        .obj();
+
+    auto targetDoc = BSONObjBuilder{}
+                         .append(BasicConcatenateWithDbOrUUIDCommand::kCommandName, "coll1")
+                         .append("field1", 3)
+                         .append("field2", "five")
+                         .append("$db", prefixedDb)
+                         .obj();
 
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
@@ -2707,7 +2723,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
+    ASSERT_BSONOBJ_EQ(targetDoc, serializeCmd(testStruct));
 }
 
 // Positive: demonstrate a command with concatenate with db or uuid - test UUID
@@ -2770,6 +2786,15 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
             .appendElements(BSON(BasicConcatenateWithDbOrUUIDCommand::kCommandName << uuid))
             .append("field1", 3)
             .append("field2", "five")
+            .append("expectPrefix", true)
+            .append("$db", prefixedDb)
+            .obj();
+
+    auto targetDoc =
+        BSONObjBuilder{}
+            .appendElements(BSON(BasicConcatenateWithDbOrUUIDCommand::kCommandName << uuid))
+            .append("field1", 3)
+            .append("field2", "five")
             .append("$db", prefixedDb)
             .obj();
 
@@ -2782,7 +2807,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
+    ASSERT_BSONOBJ_EQ(targetDoc, serializeCmd(testStruct));
 }
 
 TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestConstructor) {
@@ -4327,10 +4352,10 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
                                                                        featureFlag);
             IDLParserContext ctxt("root");
 
-            const char* ns1 = "db.coll1";
-            const char* ns2 = "a.b";
-            const char* ns3 = "c.d";
-            auto nsInfoStructBSON = [&](const char* ns) {
+            const std::string ns1 = "db.coll1";
+            const std::string ns2 = "a.b";
+            const std::string ns3 = "c.d";
+            auto nsInfoStructBSON = [&](StringData ns) {
                 BSONObjBuilder builder;
                 builder.append("ns", ns);
                 return builder.obj();
@@ -4359,33 +4384,33 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
             auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
 
             auto serializationContextCommand = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextCommand._source,
+            ASSERT_EQUALS(serializationContextCommand.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextCommand._callerType,
+            ASSERT_EQUALS(serializationContextCommand.getCallerType(),
                           SerializationContext::CallerType::Request);
 
             auto bypassStruct = testStruct.getField1();
             auto serializationContextBypass = bypassStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::Request);
 
 
             auto nsInfoStruct = bypassStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::Request);
 
 
             auto nsInfoArray = bypassStruct.getField2();
             for (const auto& nsInfo : nsInfoArray) {
                 auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getSource(),
                               SerializationContext::Source::Command);
-                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getCallerType(),
                               SerializationContext::CallerType::Request);
             }
         }
@@ -4403,10 +4428,10 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
                 multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
             IDLParserContext ctxt("root", false, tenantId);
 
-            const char* ns1 = "db.coll1";
-            const char* ns2 = "a.b";
-            const char* ns3 = "c.d";
-            auto nsInfoStructBSON = [&](const char* ns) {
+            const std::string ns1 = "db.coll1";
+            const std::string ns2 = "a.b";
+            const std::string ns3 = "c.d";
+            auto nsInfoStructBSON = [&](StringData ns) {
                 BSONObjBuilder builder;
                 builder.append("ns", ns);
                 return builder.obj();
@@ -4424,24 +4449,24 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
             auto testStruct = BypassStruct::parse(ctxt, testDoc);
 
             auto serializationContextBypass = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Default);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::None);
 
             auto nsInfoStruct = testStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Default);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::None);
 
             auto nsInfoArray = testStruct.getField2();
             for (const auto& nsInfo : nsInfoArray) {
                 auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getSource(),
                               SerializationContext::Source::Default);
-                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getCallerType(),
                               SerializationContext::CallerType::None);
             }
         }
@@ -4459,10 +4484,10 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
                 multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
             IDLParserContext ctxt("root", false, tenantId);
 
-            const char* ns1 = "db.coll1";
-            const char* ns2 = "a.b";
-            const char* ns3 = "c.d";
-            auto nsInfoStructBSON = [&](const char* ns) {
+            const std::string ns1 = "db.coll1";
+            const std::string ns2 = "a.b";
+            const std::string ns3 = "c.d";
+            auto nsInfoStructBSON = [&](StringData ns) {
                 BSONObjBuilder builder;
                 builder.append("ns", ns);
                 return builder.obj();
@@ -4480,24 +4505,24 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
             auto testStruct = BypassReplyStruct::parse(ctxt, testDoc);
 
             auto serializationContextBypass = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::Reply);
 
             auto nsInfoStruct = testStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::Reply);
 
             auto nsInfoArray = testStruct.getField2();
             for (const auto& nsInfo : nsInfoArray) {
                 auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getSource(),
                               SerializationContext::Source::Command);
-                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getCallerType(),
                               SerializationContext::CallerType::Reply);
             }
         }
@@ -4515,23 +4540,23 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_EmptyConstruct) {
             auto testStruct = CommandWithBypassAndNamespaceStruct();
 
             auto serializationContextCommand = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextCommand._source,
+            ASSERT_EQUALS(serializationContextCommand.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextCommand._callerType,
+            ASSERT_EQUALS(serializationContextCommand.getCallerType(),
                           SerializationContext::CallerType::Request);
 
             auto bypassStruct = testStruct.getField1();
             auto serializationContextBypass = bypassStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::Request);
 
             auto nsInfoStruct = bypassStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::Request);
 
             // the vector container is empty, which means that the SerializationContext obj's will
@@ -4554,16 +4579,16 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_EmptyConstruct) {
             auto testStruct = BypassStruct();
 
             auto serializationContextBypass = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Default);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::None);
 
             auto nsInfoStruct = testStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Default);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::None);
 
             // the vector container is empty, which means that the SerializationContext obj's will
@@ -4586,16 +4611,16 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_EmptyConstruct)
             auto testStruct = BypassReplyStruct();
 
             auto serializationContextBypass = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::Reply);
 
             auto nsInfoStruct = testStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::Reply);
 
             // the vector container is empty, which means that the SerializationContext obj's will
@@ -4617,7 +4642,7 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgsNo
             boost::optional<TenantId> tenantId =
                 multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
 
-            const char* ns1 = "db.coll1";
+            const std::string ns1 = "db.coll1";
 
             NamespaceInfoStruct nsArg(
                 NamespaceString::createNamespaceString_forTest(tenantId, ns1));
@@ -4629,34 +4654,34 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgsNo
             auto testStruct = CommandWithBypassAndNamespaceStruct(bypassArg);
 
             auto serializationContextCommand = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextCommand._source,
+            ASSERT_EQUALS(serializationContextCommand.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextCommand._callerType,
+            ASSERT_EQUALS(serializationContextCommand.getCallerType(),
                           SerializationContext::CallerType::Request);
 
             // bypassArg was NOT passed in any SerializationContext flags so its flags are the
             // default
             auto bypassStruct = testStruct.getField1();
             auto serializationContextBypass = bypassStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Default);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::None);
 
             // nsArg was NOT passed in any SerializationContext flags so its flags are the default
             auto nsInfoStruct = bypassStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Default);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::None);
 
             auto nsInfoArray = bypassStruct.getField2();
             for (const auto& nsInfo : nsInfoArray) {
                 auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getSource(),
                               SerializationContext::Source::Default);
-                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getCallerType(),
                               SerializationContext::CallerType::None);
             }
         }
@@ -4673,7 +4698,7 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgs) 
             boost::optional<TenantId> tenantId =
                 multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
 
-            const char* ns1 = "db.coll1";
+            const std::string ns1 = "db.coll1";
 
             NamespaceInfoStruct nsArg(NamespaceString::createNamespaceString_forTest(tenantId, ns1),
                                       SerializationContext::stateCommandRequest());
@@ -4683,35 +4708,35 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgs) 
             auto testStruct = CommandWithBypassAndNamespaceStruct(bypassArg);
 
             auto serializationContextCommand = testStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextCommand._source,
+            ASSERT_EQUALS(serializationContextCommand.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextCommand._callerType,
+            ASSERT_EQUALS(serializationContextCommand.getCallerType(),
                           SerializationContext::CallerType::Request);
 
             // bypassArg was NOT passed in any SerializationContext flags so its flags are the
             // default
             auto bypassStruct = testStruct.getField1();
             auto serializationContextBypass = bypassStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextBypass._source,
+            ASSERT_EQUALS(serializationContextBypass.getSource(),
                           SerializationContext::Source::Default);
-            ASSERT_EQUALS(serializationContextBypass._callerType,
+            ASSERT_EQUALS(serializationContextBypass.getCallerType(),
                           SerializationContext::CallerType::None);
 
             // ...but we can still get the correct SerializationContext state if the state is
             // manually passed into nested structs
             auto nsInfoStruct = bypassStruct.getField1();
             auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfo._source,
+            ASSERT_EQUALS(serializationContextNsInfo.getSource(),
                           SerializationContext::Source::Command);
-            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+            ASSERT_EQUALS(serializationContextNsInfo.getCallerType(),
                           SerializationContext::CallerType::Request);
 
             auto nsInfoArray = bypassStruct.getField2();
             for (const auto& nsInfo : nsInfoArray) {
                 auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getSource(),
                               SerializationContext::Source::Command);
-                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                ASSERT_EQUALS(serializationContextNsInfoArr.getCallerType(),
                               SerializationContext::CallerType::Request);
             }
         }
@@ -4724,10 +4749,10 @@ TEST(IDLTypeCommand, TestCommandParseExpectPrefix_MissingExpectPrefix) {
 
     IDLParserContext ctxt("root");
 
-    const char* ns1 = "db.coll1";
-    const char* ns2 = "a.b";
-    const char* ns3 = "c.d";
-    auto nsInfoStructBSON = [&](const char* ns) {
+    const std::string ns1 = "db.coll1";
+    const std::string ns2 = "a.b";
+    const std::string ns3 = "c.d";
+    auto nsInfoStructBSON = [&](StringData ns) {
         BSONObjBuilder builder;
         builder.append("ns", ns);
         return builder.obj();
@@ -4752,20 +4777,20 @@ TEST(IDLTypeCommand, TestCommandParseExpectPrefix_MissingExpectPrefix) {
     auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
 
     auto serializationContextCommand = testStruct.getSerializationContext();
-    ASSERT_EQUALS(serializationContextCommand._prefixState, SerializationContext::Prefix::Default);
+    ASSERT_EQUALS(serializationContextCommand.getPrefix(), SerializationContext::Prefix::Default);
 
     auto bypassStruct = testStruct.getField1();
     auto serializationContextBypass = bypassStruct.getSerializationContext();
-    ASSERT_EQUALS(serializationContextBypass._prefixState, SerializationContext::Prefix::Default);
+    ASSERT_EQUALS(serializationContextBypass.getPrefix(), SerializationContext::Prefix::Default);
 
     auto nsInfoStruct = bypassStruct.getField1();
     auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-    ASSERT_EQUALS(serializationContextNsInfo._prefixState, SerializationContext::Prefix::Default);
+    ASSERT_EQUALS(serializationContextNsInfo.getPrefix(), SerializationContext::Prefix::Default);
 
     auto nsInfoArray = bypassStruct.getField2();
     for (const auto& nsInfo : nsInfoArray) {
         auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-        ASSERT_EQUALS(serializationContextNsInfoArr._prefixState,
+        ASSERT_EQUALS(serializationContextNsInfoArr.getPrefix(),
                       SerializationContext::Prefix::Default);
     }
 }
@@ -4777,10 +4802,15 @@ TEST(IDLTypeCommand, TestCommandParseExpectPrefix) {
     for (bool expectPrefix : {false, true}) {
         IDLParserContext ctxt("root");
 
-        const char* ns1 = "db.coll1";
-        const char* ns2 = "a.b";
-        const char* ns3 = "c.d";
-        auto nsInfoStructBSON = [&](const char* ns) {
+        const auto tenantId = TenantId(OID::gen());
+        std::string prefix = "";
+        if (expectPrefix)
+            prefix = str::stream() << tenantId.toString() << "_";
+
+        const std::string ns1 = prefix + "db.coll1";
+        const std::string ns2 = prefix + "a.b";
+        const std::string ns3 = prefix + "c.d";
+        auto nsInfoStructBSON = [&](StringData ns) {
             BSONObjBuilder builder;
             builder.append("ns", ns);
             return builder.obj();
@@ -4796,36 +4826,37 @@ TEST(IDLTypeCommand, TestCommandParseExpectPrefix) {
                            .append("CommandWithBypassAndNamespaceMember", 1)
                            .append("field1", bypassStructBSON())
                            .append("expectPrefix", expectPrefix)
-                           .append("$db", "admin")
+                           .append("$db", prefix + "admin")
                            .obj();
 
+        std::cout << "expectPrefix: " << (expectPrefix ? "true" : "false") << std::endl;
         OpMsgRequest request;
-        const auto tenantId = TenantId(OID::gen());
         request = makeOMRWithTenant(testDoc, tenantId);
 
+        std::cout << "request.body: " << request.body << std::endl;
         auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
 
         auto serializationContextCommand = testStruct.getSerializationContext();
-        ASSERT_EQUALS(serializationContextCommand._prefixState,
+        ASSERT_EQUALS(serializationContextCommand.getPrefix(),
                       expectPrefix ? SerializationContext::Prefix::IncludePrefix
                                    : SerializationContext::Prefix::ExcludePrefix);
 
         auto bypassStruct = testStruct.getField1();
         auto serializationContextBypass = bypassStruct.getSerializationContext();
-        ASSERT_EQUALS(serializationContextBypass._prefixState,
+        ASSERT_EQUALS(serializationContextBypass.getPrefix(),
                       expectPrefix ? SerializationContext::Prefix::IncludePrefix
                                    : SerializationContext::Prefix::ExcludePrefix);
 
         auto nsInfoStruct = bypassStruct.getField1();
         auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-        ASSERT_EQUALS(serializationContextNsInfo._prefixState,
+        ASSERT_EQUALS(serializationContextNsInfo.getPrefix(),
                       expectPrefix ? SerializationContext::Prefix::IncludePrefix
                                    : SerializationContext::Prefix::ExcludePrefix);
 
         auto nsInfoArray = bypassStruct.getField2();
         for (const auto& nsInfo : nsInfoArray) {
             auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfoArr._prefixState,
+            ASSERT_EQUALS(serializationContextNsInfoArr.getPrefix(),
                           expectPrefix ? SerializationContext::Prefix::IncludePrefix
                                        : SerializationContext::Prefix::ExcludePrefix);
         }
@@ -4840,10 +4871,10 @@ TEST(IDLTypeCommand, TestCommandParseDuplicateExpectPrefix) {
                                                                    featureFlag);
         IDLParserContext ctxt("root");
 
-        const char* ns1 = "db.coll1";
-        const char* ns2 = "a.b";
-        const char* ns3 = "c.d";
-        auto nsInfoStructBSON = [&](const char* ns) {
+        const std::string ns1 = "db.coll1";
+        const std::string ns2 = "a.b";
+        const std::string ns3 = "c.d";
+        auto nsInfoStructBSON = [&](StringData ns) {
             BSONObjBuilder builder;
             builder.append("ns", ns);
             return builder.obj();

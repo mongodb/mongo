@@ -1805,13 +1805,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line(
                 'setSerializationContext(SerializationContext::stateCommandRequest());')
 
+            # Update the serialization context whether or not we received a tenantId object
+            if tenant == 'request.getValidatedTenantId()':
+                self._writer.write_line(
+                    '_serializationContext.setTenantIdSource(request.getValidatedTenantId() != boost::none);'
+                )
+
             # some fields are consumed in the BSON iteration loop and need to be parsed before
             # entering the main loop
             for field in struct.fields:  # iterate over the original list
                 if field.preparse:
                     struct_fields.remove(field)
                     preparse_fields.append(field)
-
         else:
             # set the local serializer flags according to the constexpr set by is_command_reply
             self._writer.write_empty_line()
