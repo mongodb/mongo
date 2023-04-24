@@ -55,8 +55,6 @@ CBT
 CCCCCCCCCCCCCCCCCC
 CELLs
 CET
-CFLAGS
-CHECKKEY
 CHUNKCACHE
 CKPT
 CLOEXEC
@@ -77,7 +75,6 @@ Checksums
 CityHash
 CloseHandle
 CmP
-CmPTh
 Comparator
 Config
 Coverity
@@ -858,8 +855,6 @@ isprint
 isrc
 isspace
 iter
-iteratively
-iters
 jemalloc
 jjj
 js
@@ -1047,7 +1042,6 @@ pT
 packv
 pageref
 pagesize
-pagestat
 param
 pareto
 parserp
