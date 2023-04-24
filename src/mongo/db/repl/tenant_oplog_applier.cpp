@@ -1038,6 +1038,7 @@ std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVector
                     isTransactionWithCommand = true;
                 }
             }
+
             if (op.ignore) {
                 continue;
             }

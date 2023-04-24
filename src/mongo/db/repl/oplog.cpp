@@ -186,6 +186,27 @@ StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool i
     return ""_sd;
 }
 
+bool isTenantChangeStreamEnabled(OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    const auto& settings = ReplicationCoordinator::get(opCtx)->getSettings();
+    if (!settings.isServerless()) {
+        return false;
+    }
+
+    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+        return false;
+    }
+
+    if (!tenantId) {
+        return false;
+    }
+
+    if (!change_stream_serverless_helpers::isChangeStreamEnabled(opCtx, tenantId.get())) {
+        return false;
+    }
+
+    return true;
+}
+
 Status insertDocumentsForOplog(OperationContext* opCtx,
                                const CollectionPtr& oplogCollection,
                                std::vector<Record>* records,
@@ -507,11 +528,16 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         return {};
     }
     // If this oplog entry is from a tenant migration, include the tenant migration
-    // UUID.
-    const auto& recipientInfo = tenantMigrationInfo(opCtx);
-    if (recipientInfo) {
+    // UUID and optional donor timeline metadata.
+    if (const auto& recipientInfo = tenantMigrationInfo(opCtx)) {
         oplogEntry->setFromTenantMigration(recipientInfo->uuid);
+        if (isTenantChangeStreamEnabled(opCtx, oplogEntry->getTid()) &&
+            recipientInfo->donorOplogEntryData) {
+            oplogEntry->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
+            oplogEntry->setDonorApplyOpsIndex(recipientInfo->donorOplogEntryData->applyOpsIndex);
+        }
     }
+
 
     // TODO SERVER-51301 to remove this block.
     if (oplogEntry->getOpType() == repl::OpTypeEnum::kNoop) {
@@ -592,10 +618,15 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
               oplogEntryTemplate->toReplOperation().toBSON().toString());
 
     // If this oplog entry is from a tenant migration, include the tenant migration
-    // UUID.
-    const auto& recipientInfo = tenantMigrationInfo(opCtx);
-    if (recipientInfo) {
+    // UUID and optional donor timeline metadata.
+    if (const auto& recipientInfo = tenantMigrationInfo(opCtx)) {
         oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
+        if (isTenantChangeStreamEnabled(opCtx, oplogEntryTemplate->getTid()) &&
+            recipientInfo->donorOplogEntryData) {
+            oplogEntryTemplate->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
+            oplogEntryTemplate->setDonorApplyOpsIndex(
+                recipientInfo->donorOplogEntryData->applyOpsIndex);
+        }
     }
 
     const size_t count = end - begin;
@@ -1342,14 +1373,30 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
-// operation to collection 'collection' with "applyOpsIndex" 0.
+// operation to collection 'collection'. If we are writing the pre-image during oplog application
+// on a secondary for a serverless tenant migration, we will use the timestamp and applyOpsIndex
+// from the donor timeline. If we are applying this entry on a primary during tenant oplog
+// application, we skip writing of the pre-image. The op observer will handle inserting the
+// correct pre-image on the primary in this case.
 void writeChangeStreamPreImage(OperationContext* opCtx,
                                const CollectionPtr& collection,
                                const mongo::repl::OplogEntry& oplogEntry,
                                const BSONObj& preImage) {
-    ChangeStreamPreImageId preImageId{collection->uuid(),
-                                      oplogEntry.getTimestampForPreImage(),
-                                      static_cast<int64_t>(oplogEntry.getApplyOpsIndex())};
+    Timestamp timestamp;
+    int64_t applyOpsIndex;
+    // If donorOpTime is set on the oplog entry, this is a write that is being applied on a
+    // secondary during the oplog catchup phase of a tenant migration. Otherwise, we are either
+    // applying a steady state write operation on a secondary or applying a write on the primary
+    // during tenant migration oplog catchup.
+    if (const auto& donorOpTime = oplogEntry.getDonorOpTime()) {
+        timestamp = donorOpTime->getTimestamp();
+        applyOpsIndex = oplogEntry.getDonorApplyOpsIndex().get_value_or(0);
+    } else {
+        timestamp = oplogEntry.getTimestampForPreImage();
+        applyOpsIndex = oplogEntry.getApplyOpsIndex();
+    }
+
+    ChangeStreamPreImageId preImageId{collection->uuid(), timestamp, applyOpsIndex};
     ChangeStreamPreImage preImageDocument{
         std::move(preImageId), oplogEntry.getWallClockTimeForPreImage(), preImage};
 
@@ -1577,6 +1624,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
             !op.getFromMigrate().get_value_or(false) &&
             !requestNss.isTemporaryReshardingCollection();
     };
+
+
+    // We are applying this entry on the primary during tenant oplog application. Decorate the opCtx
+    // with donor timeline metadata so that it will be available in the op observer and available
+    // for use here when oplog entries are logged.
+    if (auto& recipientInfo = tenantMigrationInfo(opCtx)) {
+        recipientInfo->donorOplogEntryData =
+            DonorOplogEntryData(op.getOpTime(), op.getApplyOpsIndex());
+    }
 
     switch (opType) {
         case OpTypeEnum::kInsert: {

@@ -120,6 +120,19 @@ repl::OpTime logOperation(OperationContext* opCtx,
     return opTime;
 }
 
+void writeChangeStreamPreImageEntry(
+    OperationContext* opCtx,
+    // Skip the pre-image insert if we are in the middle of a tenant migration. Pre-image inserts
+    // for writes during the oplog catchup phase are handled in the oplog application code.
+    boost::optional<TenantId> tenantId,
+    const ChangeStreamPreImage& preImage) {
+    if (repl::tenantMigrationInfo(opCtx)) {
+        return;
+    }
+
+    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, tenantId, preImage);
+}
+
 /**
  * Generic function that logs an operation.
  * Intended to reduce branching at call-sites by accepting the least common denominator
@@ -917,8 +930,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             ChangeStreamPreImageId id(args.coll->uuid(), opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc);
 
-            ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
-                opCtx, args.coll->ns().tenantId(), preImage);
+            writeChangeStreamPreImageEntry(opCtx, args.coll->ns().tenantId(), preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -1044,6 +1056,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                 oplogEntry.setOpTime(args.oplogSlots.back());
             }
         }
+
         opTime = replLogDelete(
             opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, _oplogWriter.get());
         if (opAccumulator) {
@@ -1077,8 +1090,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
 
-            ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
-                opCtx, nss.tenantId(), preImage);
+            writeChangeStreamPreImageEntry(opCtx, nss.tenantId(), preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -1546,7 +1558,7 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
             invariant(operation.getUuid());
             invariant(!operation.getPreImage().isEmpty());
 
-            ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
+            writeChangeStreamPreImageEntry(
                 opCtx,
                 operation.getTid(),
                 ChangeStreamPreImage{

@@ -37,11 +37,19 @@
 namespace mongo {
 namespace repl {
 
+struct DonorOplogEntryData {
+    DonorOplogEntryData(const OpTime& donorOpTime, const int64_t applyOpsIndex)
+        : donorOpTime(donorOpTime), applyOpsIndex(applyOpsIndex) {}
+    OpTime donorOpTime;
+    int64_t applyOpsIndex;
+};
+
 struct TenantMigrationInfo {
     TenantMigrationInfo(const UUID& in_uuid) : uuid(in_uuid) {}
+
     UUID uuid;
+    boost::optional<DonorOplogEntryData> donorOplogEntryData;
 };
 extern const OperationContext::Decoration<boost::optional<TenantMigrationInfo>> tenantMigrationInfo;
-
 }  // namespace repl
 }  // namespace mongo

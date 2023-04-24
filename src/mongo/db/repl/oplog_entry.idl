@@ -165,6 +165,19 @@ structs:
                 optional: true
                 description: "Contains the UUID of a tenant migration for an operation caused by
                               one."
+            donorOpTime:
+                type: optime
+                optional: true
+                description: "Used for Serverless shard merge during the oplog catchup phase. The
+                              original opTime of the write on the donor timeline. Will only be set
+                              for writes written during the oplog catchup phase."
+            donorApplyOpsIndex:
+                type: safeInt64
+                optional: true
+                description: "Used for Serverless shard merge during the oplog catchup phase. If the
+                              write was part of a transaction or applyOps entry, this will be the
+                              index of the original applyOps entry. Will be set to 0 for any
+                              non-applyOps writes."
             _id:
                 cpp_name: _id
                 type: Value
