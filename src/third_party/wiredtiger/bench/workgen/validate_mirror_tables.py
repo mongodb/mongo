@@ -64,7 +64,12 @@ def get_mirrors(db_dir, db_files):
             continue
         db_files_remaining.remove(filename)
         mirror_filename = get_mirror_file(db_dir, f'table:{filename}')
-        if mirror_filename is not None:
+
+        # At this point, there is no guarantee that the database contains all the base/mirror pairs.
+        # It is possible to have a base and no associated mirror and vice-versa. This may happen
+        # when a drop is occurring when a snapshot of the database is taken and fed into this
+        # script.
+        if mirror_filename is not None and mirror_filename in db_files_remaining:
             db_files_remaining.remove(mirror_filename)
             mirrors.append([f'{db_dir}/table:{filename}',
                             f'{db_dir}/table:{mirror_filename}'])
