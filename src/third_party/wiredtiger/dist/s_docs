@@ -106,7 +106,7 @@ spellchk()
         -e 's/__verify_dsk_/__verify_disk_/g' \
         -e 's/__wt_dsk_/__wt_disk_/g' \
         -e 's/__wt_verify_dsk/__wt_verify_disk/g' \
-       *.dox | tee yogbert | \
+       *.dox | \
     aspell --encoding=iso-8859-1 --lang=en_US --personal=./spell.ok list) |
     sort -u > $t
     test -s $t && {
@@ -204,6 +204,12 @@ EOF
             done
         done
         )
+    fi
+
+    # Clean up the doxygen.log if it is empty.
+    doxy_logfile=../src/docs/doxygen.log
+    if [ ! -s "${doxy_logfile}" ] ; then
+        rm -f "${doxy_logfile}"
     fi
 }
 

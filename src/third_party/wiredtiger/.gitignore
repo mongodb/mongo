@@ -4,3 +4,6 @@ build/
 dist/clang-format
 /docs/
 test-compatibility-run/
+
+# Python artifacts
+**/*.pyc
