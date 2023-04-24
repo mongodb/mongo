@@ -330,7 +330,8 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
-                                         const OplogUpdateEntryArgs& args) {
+                                         const OplogUpdateEntryArgs& args,
+                                         OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
@@ -388,7 +389,8 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
 void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
                                          const CollectionPtr& coll,
                                          StmtId stmtId,
-                                         const OplogDeleteEntryArgs& args) {
+                                         const OplogDeleteEntryArgs& args,
+                                         OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace || !splitCleanupDetails(opCtx) ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;

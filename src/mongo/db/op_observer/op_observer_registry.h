@@ -179,10 +179,13 @@ public:
             o->onDeleteGlobalIndexKey(opCtx, globalIndexNss, globalIndexUuid, key, docKey);
     }
 
-    void onUpdate(OperationContext* const opCtx, const OplogUpdateEntryArgs& args) override {
+    void onUpdate(OperationContext* const opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
+        OpStateAccumulator opStateAccumulator;
         for (auto& o : _observers)
-            o->onUpdate(opCtx, args);
+            o->onUpdate(opCtx, args, &opStateAccumulator);
     }
 
     void aboutToDelete(OperationContext* const opCtx,
@@ -196,10 +199,12 @@ public:
     void onDelete(OperationContext* const opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) override {
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
+        OpStateAccumulator opStateAccumulator;
         for (auto& o : _observers)
-            o->onDelete(opCtx, coll, stmtId, args);
+            o->onDelete(opCtx, coll, stmtId, args, &opStateAccumulator);
     }
 
     void onInternalOpMessage(OperationContext* const opCtx,

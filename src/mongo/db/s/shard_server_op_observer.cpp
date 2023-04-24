@@ -270,7 +270,9 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
     }
 }
 
-void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
+                                     const OplogUpdateEntryArgs& args,
+                                     OpStateAccumulator* opAccumulator) {
     const auto& updateDoc = args.updateArgs->update;
     // Most of these handlers do not need to run when the update is a full document replacement.
     // An empty updateDoc implies a no-op update and is not a valid oplog entry.
@@ -572,7 +574,8 @@ void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationCont
 void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const CollectionPtr& coll,
                                      StmtId stmtId,
-                                     const OplogDeleteEntryArgs& args) {
+                                     const OplogDeleteEntryArgs& args,
+                                     OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     auto& documentId = documentIdDecoration(opCtx);
     invariant(!documentId.isEmpty());

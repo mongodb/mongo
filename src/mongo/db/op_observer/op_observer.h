@@ -47,6 +47,20 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
+struct OpTimeBundle {
+    repl::OpTime writeOpTime;
+    Date_t wallClockTime;
+};
+
+/**
+ * The generic container for onUpdate/onDelete state-passing between OpObservers. Despite the
+ * naming, some OpObserver's don't strictly observe. This struct is written by OpObserverImpl and
+ * useful for later observers to inspect state they need.
+ */
+struct OpStateAccumulator {
+    OpTimeBundle opTime;
+};
+
 enum class RetryableFindAndModifyLocation {
     // The operation is not retryable, or not a "findAndModify" command. Do not record a
     // pre-image.
@@ -204,7 +218,9 @@ public:
                                         const BSONObj& key,
                                         const BSONObj& docKey) = 0;
 
-    virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
+    virtual void onUpdate(OperationContext* opCtx,
+                          const OplogUpdateEntryArgs& args,
+                          OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     virtual void aboutToDelete(OperationContext* opCtx,
                                const CollectionPtr& coll,
@@ -222,7 +238,8 @@ public:
     virtual void onDelete(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           StmtId stmtId,
-                          const OplogDeleteEntryArgs& args) = 0;
+                          const OplogDeleteEntryArgs& args,
+                          OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     /**
      * Logs a no-op with "msgObj" in the o field into oplog.

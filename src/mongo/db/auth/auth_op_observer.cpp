@@ -63,7 +63,9 @@ void AuthOpObserver::onInserts(OperationContext* opCtx,
     }
 }
 
-void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void AuthOpObserver::onUpdate(OperationContext* opCtx,
+                              const OplogUpdateEntryArgs& args,
+                              OpStateAccumulator* opAccumulator) {
     if (args.updateArgs->update.isEmpty()) {
         return;
     }
@@ -87,7 +89,8 @@ void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
 void AuthOpObserver::onDelete(OperationContext* opCtx,
                               const CollectionPtr& coll,
                               StmtId stmtId,
-                              const OplogDeleteEntryArgs& args) {
+                              const OplogDeleteEntryArgs& args,
+                              OpStateAccumulator* opAccumulator) {
     auto& documentId = documentIdDecoration(opCtx);
     invariant(!documentId.isEmpty());
     AuthorizationManager::get(opCtx->getServiceContext())

@@ -193,7 +193,8 @@ void TenantMigrationRecipientOpObserver::onInserts(
 }
 
 void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
-                                                  const OplogUpdateEntryArgs& args) {
+                                                  const OplogUpdateEntryArgs& args,
+                                                  OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
@@ -285,7 +286,8 @@ void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
 void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                                                   const CollectionPtr& coll,
                                                   StmtId stmtId,
-                                                  const OplogDeleteEntryArgs& args) {
+                                                  const OplogDeleteEntryArgs& args,
+                                                  OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto tmi = tenantMigrationInfo(opCtx);

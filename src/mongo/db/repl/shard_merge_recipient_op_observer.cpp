@@ -366,7 +366,8 @@ void ShardMergeRecipientOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ShardMergeRecipientOpObserver::onUpdate(OperationContext* opCtx,
-                                             const OplogUpdateEntryArgs& args) {
+                                             const OplogUpdateEntryArgs& args,
+                                             OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
@@ -433,7 +434,8 @@ void ShardMergeRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
 void ShardMergeRecipientOpObserver::onDelete(OperationContext* opCtx,
                                              const CollectionPtr& coll,
                                              StmtId stmtId,
-                                             const OplogDeleteEntryArgs& args) {
+                                             const OplogDeleteEntryArgs& args,
+                                             OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;

@@ -165,7 +165,9 @@ public:
         invariant(++begin == end);  // No support for inserting more than one state document yet.
     }
 
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override {
         if (args.coll->ns() != _stateDocumentNss) {
             return;
         }
@@ -179,7 +181,8 @@ public:
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) override {
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override {
         if (coll->ns() != _stateDocumentNss) {
             return;
         }

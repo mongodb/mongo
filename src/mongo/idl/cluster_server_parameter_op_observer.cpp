@@ -74,7 +74,8 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
-                                                const OplogUpdateEntryArgs& args) {
+                                                const OplogUpdateEntryArgs& args,
+                                                OpStateAccumulator* opAccumulator) {
     auto updatedDoc = args.updateArgs->updatedDoc;
     if (!isConfigNamespace(args.coll->ns()) || args.updateArgs->update.isEmpty()) {
         return;
@@ -117,7 +118,8 @@ void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
 void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
                                                 const CollectionPtr& coll,
                                                 StmtId stmtId,
-                                                const OplogDeleteEntryArgs& args) {
+                                                const OplogDeleteEntryArgs& args,
+                                                OpStateAccumulator* opAccumulator) {
     const auto& docName = aboutToDeleteDoc(opCtx);
     if (!docName.empty()) {
         opCtx->recoveryUnit()->onCommit([docName, tenantId = tenantIdToDelete(opCtx)](

@@ -279,7 +279,8 @@ void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
-                                              const OplogUpdateEntryArgs& args) {
+                                              const OplogUpdateEntryArgs& args,
+                                              OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto donorStateDoc =
@@ -330,7 +331,8 @@ void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
 void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
                                               const CollectionPtr& coll,
                                               StmtId stmtId,
-                                              const OplogDeleteEntryArgs& args) {
+                                              const OplogDeleteEntryArgs& args,
+                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto tmi = tenantMigrationInfo(opCtx);

@@ -128,7 +128,9 @@ public:
                                 const BSONObj& key,
                                 const BSONObj& docKey) final {}
 
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override;
 
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
@@ -137,7 +139,8 @@ public:
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) override;
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override;
 
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,

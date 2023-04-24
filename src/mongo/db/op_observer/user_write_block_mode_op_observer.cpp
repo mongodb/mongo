@@ -91,7 +91,8 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
-                                            const OplogUpdateEntryArgs& args) {
+                                            const OplogUpdateEntryArgs& args,
+                                            OpStateAccumulator* opAccumulator) {
     const auto& nss = args.coll->ns();
 
     if (args.updateArgs->source != OperationSource::kFromMigrate) {
@@ -141,7 +142,8 @@ void UserWriteBlockModeOpObserver::aboutToDelete(OperationContext* opCtx,
 void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
                                             const CollectionPtr& coll,
                                             StmtId stmtId,
-                                            const OplogDeleteEntryArgs& args) {
+                                            const OplogDeleteEntryArgs& args,
+                                            OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     if (!args.fromMigrate) {
         _checkWriteAllowed(opCtx, nss);

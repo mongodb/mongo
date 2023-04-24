@@ -104,7 +104,8 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
-                                             const OplogUpdateEntryArgs& args) {
+                                             const OplogUpdateEntryArgs& args,
+                                             OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         const bool pendingFieldIsRemoved = [&] {
             return update_oplog_entry::isFieldRemovedByUpdate(
@@ -137,7 +138,8 @@ void RangeDeleterServiceOpObserver::aboutToDelete(OperationContext* opCtx,
 void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
                                              const CollectionPtr& coll,
                                              StmtId stmtId,
-                                             const OplogDeleteEntryArgs& args) {
+                                             const OplogDeleteEntryArgs& args,
+                                             OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         const auto& deletedDoc = deletedDocumentDecoration(opCtx);
 

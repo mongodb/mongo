@@ -100,7 +100,9 @@ void FreeMonOpObserver::onInserts(OperationContext* opCtx,
     }
 }
 
-void FreeMonOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void FreeMonOpObserver::onUpdate(OperationContext* opCtx,
+                                 const OplogUpdateEntryArgs& args,
+                                 OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() != NamespaceString::kServerConfigurationNamespace) {
         return;
     }
@@ -133,7 +135,8 @@ void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
 void FreeMonOpObserver::onDelete(OperationContext* opCtx,
                                  const CollectionPtr& coll,
                                  StmtId stmtId,
-                                 const OplogDeleteEntryArgs& args) {
+                                 const OplogDeleteEntryArgs& args,
+                                 OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kServerConfigurationNamespace) {
         return;
     }

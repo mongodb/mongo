@@ -174,7 +174,9 @@ void FcvOpObserver::onInserts(OperationContext* opCtx,
     }
 }
 
-void FcvOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void FcvOpObserver::onUpdate(OperationContext* opCtx,
+                             const OplogUpdateEntryArgs& args,
+                             OpStateAccumulator* opAccumulator) {
     if (args.updateArgs->update.isEmpty()) {
         return;
     }
@@ -186,7 +188,8 @@ void FcvOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs
 void FcvOpObserver::onDelete(OperationContext* opCtx,
                              const CollectionPtr& coll,
                              StmtId stmtId,
-                             const OplogDeleteEntryArgs& args) {
+                             const OplogDeleteEntryArgs& args,
+                             OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     // documentKeyDecoration is set in OpObserverImpl::aboutToDelete. So the FcvOpObserver
     // relies on the OpObserverImpl also being in the opObserverRegistry.

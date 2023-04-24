@@ -204,11 +204,6 @@ BSONObj makeObject2ForDropOrRename(uint64_t numRecords) {
     return obj;
 }
 
-struct OpTimeBundle {
-    repl::OpTime writeOpTime;
-    Date_t wallClockTime;
-};
-
 /**
  * Write oplog entry(ies) for the update operation.
  */
@@ -760,7 +755,9 @@ void OpObserverImpl::onDeleteGlobalIndexKey(OperationContext* opCtx,
         opCtx, &oplogEntry, _oplogWriter.get(), isRequiredInMultiDocumentTransaction);
 }
 
-void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void OpObserverImpl::onUpdate(OperationContext* opCtx,
+                              const OplogUpdateEntryArgs& args,
+                              OpStateAccumulator* opAccumulator) {
     failCollectionUpdates.executeIf(
         [&](const BSONObj&) {
             uasserted(40654,
@@ -877,6 +874,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         }
 
         opTime = replLogUpdate(opCtx, args, &oplogEntry, _oplogWriter.get());
+        if (opAccumulator) {
+            opAccumulator->opTime.writeOpTime = opTime.writeOpTime;
+            opAccumulator->opTime.wallClockTime = opTime.wallClockTime;
+        }
 
         if (oplogEntry.getNeedsRetryImage()) {
             // If the oplog entry has `needsRetryImage`, copy the image into image collection.
@@ -970,7 +971,8 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
 void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const CollectionPtr& coll,
                               StmtId stmtId,
-                              const OplogDeleteEntryArgs& args) {
+                              const OplogDeleteEntryArgs& args,
+                              OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     const auto uuid = coll->uuid();
     auto optDocKey = repl::documentKeyDecoration(opCtx);
@@ -1044,6 +1046,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         }
         opTime = replLogDelete(
             opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, _oplogWriter.get());
+        if (opAccumulator) {
+            opAccumulator->opTime.writeOpTime = opTime.writeOpTime;
+            opAccumulator->opTime.wallClockTime = opTime.wallClockTime;
+        }
 
         if (oplogEntry.getNeedsRetryImage()) {
             auto imageDoc = *(args.deletedDoc);

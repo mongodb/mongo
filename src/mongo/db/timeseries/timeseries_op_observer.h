@@ -52,7 +52,9 @@ public:
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate) final;
 
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
 
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,

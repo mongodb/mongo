@@ -77,7 +77,9 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
     }
 }
 
-void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx,
+                                       const OplogUpdateEntryArgs& args,
+                                       OpStateAccumulator* opAccumulator) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (args.coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             const auto parsedDoc = QueryAnalyzerDocument::parse(
@@ -124,7 +126,8 @@ void QueryAnalysisOpObserver::aboutToDelete(OperationContext* opCtx,
 void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
                                        const CollectionPtr& coll,
                                        StmtId stmtId,
-                                       const OplogDeleteEntryArgs& args) {
+                                       const OplogDeleteEntryArgs& args,
+                                       OpStateAccumulator* opAccumulator) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             auto& doc = docToDeleteDecoration(opCtx);

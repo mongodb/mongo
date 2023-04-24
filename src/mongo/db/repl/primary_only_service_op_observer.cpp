@@ -60,7 +60,8 @@ void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
 void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
                                             const CollectionPtr& coll,
                                             StmtId stmtId,
-                                            const OplogDeleteEntryArgs& args) {
+                                            const OplogDeleteEntryArgs& args,
+                                            OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     auto& documentId = documentIdDecoration(opCtx);
     invariant(!documentId.isEmpty());

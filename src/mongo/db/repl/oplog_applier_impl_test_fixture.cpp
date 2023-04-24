@@ -75,7 +75,8 @@ void OplogApplierImplOpObserver::onInserts(OperationContext* opCtx,
 void OplogApplierImplOpObserver::onDelete(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           StmtId stmtId,
-                                          const OplogDeleteEntryArgs& args) {
+                                          const OplogDeleteEntryArgs& args,
+                                          OpStateAccumulator* opAccumulator) {
     if (!onDeleteFn) {
         return;
     }
@@ -83,7 +84,8 @@ void OplogApplierImplOpObserver::onDelete(OperationContext* opCtx,
 }
 
 void OplogApplierImplOpObserver::onUpdate(OperationContext* opCtx,
-                                          const OplogUpdateEntryArgs& args) {
+                                          const OplogUpdateEntryArgs& args,
+                                          OpStateAccumulator* opAccumulator) {
     if (!onUpdateFn) {
         return;
     }

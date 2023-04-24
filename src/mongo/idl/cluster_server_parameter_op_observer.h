@@ -63,14 +63,17 @@ public:
                                 const UUID& globalIndexUuid,
                                 const BSONObj& key,
                                 const BSONObj& docKey) final {}
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc) final;
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) final;
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,

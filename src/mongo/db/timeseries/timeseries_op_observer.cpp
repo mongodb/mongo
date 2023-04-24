@@ -76,7 +76,9 @@ void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
     }
 }
 
-void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
+                                    const OplogUpdateEntryArgs& args,
+                                    OpStateAccumulator* opAccumulator) {
     const auto& nss = args.coll->ns();
 
     if (!nss.isTimeseriesBucketsCollection()) {

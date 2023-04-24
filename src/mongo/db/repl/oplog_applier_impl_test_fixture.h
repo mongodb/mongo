@@ -87,12 +87,15 @@ public:
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) override;
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override;
 
     /**
      * This function is called whenever OplogApplierImpl updates a document in a collection.
      */
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override;
 
     /**
      * Called when OplogApplierImpl creates a collection.
