@@ -15,7 +15,7 @@ const testConnection =
 const testDb = testConnection.getDB('local');
 const collectionSize = 10;
 const clusteredCollName = "clustered_index_sorted_scan_coll";
-const clusterField = "clusterKey";
+const clusterField = "_id";
 
 let nonClusteredCollName = clusteredCollName + "_nc";
 
@@ -26,7 +26,6 @@ let clusteredColl = testDb[clusteredCollName];
 
 // Generate a non-clustered collection for comparison
 assert.commandWorked(testDb.createCollection(nonClusteredCollName));
-assert.commandWorked(testDb[nonClusteredCollName].createIndex({[clusterField]: 1}, {unique: true}));
 let nonClusteredColl = testDb[nonClusteredCollName];
 
 // Put something in the collections so the planner has something to chew on.
@@ -72,12 +71,16 @@ function runTest(isClustered, hasFilter, hasHint, direction) {
     assert(!planHasStage(testDb, plan, "SORT"), "Unexpected sort in " + formatParamsAndPlan(plan));
 }
 
-function testCollations(direction) {
+function testCollations(collectionCollation, queryCollation, direction) {
+    const collationsMatch = collectionCollation == queryCollation;
+
     let strCollName = clusteredCollName + "_str";
 
     // Generate a clustered collection for the remainder of the testing
-    assert.commandWorked(testDb.createCollection(
-        strCollName, {clusteredIndex: {key: {[clusterField]: 1}, unique: true}}));
+    assert.commandWorked(testDb.createCollection(strCollName, {
+        clusteredIndex: {key: {[clusterField]: 1}, unique: true},
+        collation: collectionCollation
+    }));
 
     let tsColl = testDb[strCollName];
 
@@ -86,22 +89,120 @@ function testCollations(direction) {
         assert.commandWorked(tsColl.insert({[clusterField]: i.toString(), a: Math.random()}));
     }
 
-    // Run query with Faroese collation, just to choose something unlikely.
-    // Because the collations don't match, we can't use the clustered index
-    // to provide a sort
-    let plan = tsColl.find()
-                   .sort({[clusterField]: direction})
-                   .collation({locale: "fo", caseLevel: true})
-                   .explain();
-    assert(planHasStage(testDb, plan, "SORT"), "Expected sort in " + tojson(plan));
+    function runExplain(filter) {
+        return tsColl.find(filter)
+            .sort({[clusterField]: direction})
+            .collation(queryCollation)
+            .explain();
+    }
 
-    // However, if we can exclude strings, we don't need an explicit sort even
-    // if the collations don't match
-    plan = tsColl.find({[clusterField]: {$gt: -1}})
-               .sort({[clusterField]: direction})
-               .collation({locale: "fo", caseLevel: true})
-               .explain();
+    //
+    // Some queries need an explicit sort only when the query/collection collations do not match.
+    //
+    function assertPlanOnlyHasSortIfCollationsDontMatch(plan) {
+        if (collationsMatch) {
+            assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+        } else {
+            assert(planHasStage(testDb, plan, "SORT"), "Expected sort in " + tojson(plan));
+        }
+    }
+
+    // Empty match.
+    let plan = runExplain({});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Comparison against a field other than the cluster field.
+    plan = runExplain({a: {$lt: 2}});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Query which contains an unsupported match expression.
+    plan = runExplain({$or: [{[clusterField]: {$lt: 2}}, {[clusterField]: {$gt: 5}}]});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Conjunction with one child which is an unsupported match expression and another which is a
+    // comparison against a field other than the cluster field.
+    plan = runExplain(
+        {$and: [{$or: [{[clusterField]: {$lt: 2}}, {[clusterField]: {$gt: 5}}]}, {a: {$gt: -1}}]});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Match which compares the cluster field to a string.
+    plan = runExplain({[clusterField]: {$gt: "1"}});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Match which compares the cluster field to an object containing a string.
+    plan = runExplain({[clusterField]: {$eq: {a: "str"}}});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Match which compares the cluster field to an array containing a string.
+    plan = runExplain({[clusterField]: {$eq: [1, 2, "str"]}});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // $in query where one of the elements is a string.
+    plan = runExplain({[clusterField]: {$in: [1, "2", 3]}});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Conjunction with one child which compares the cluster field to a string and another which
+    // is a comparison against a field other than the cluster field.
+    plan = runExplain({$and: [{[clusterField]: "str"}, {a: 5}]});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    // Conjunction with one $in child which compares the cluster field to a string and another
+    // which is a comparison against a field other than the cluster field.
+    plan = runExplain({$and: [{[clusterField]: {$in: [1, "2", 3]}}, {a: 5}]});
+    assertPlanOnlyHasSortIfCollationsDontMatch(plan);
+
+    //
+    // Some queries can omit the explicit sort regardless of collations. This is the case when
+    // we can exclude string values of the cluster key in the output.
+    //
+
+    // Simple comparison on cluster key which omits strings.
+    plan = runExplain({[clusterField]: {$gt: -1}});
     assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+    plan = runExplain({[clusterField]: {$eq: {a: 5}}});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+    plan = runExplain({[clusterField]: {$eq: [1, 2, 3]}});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
+    // Conjunction with multiple comparisons on cluster key which omits strings.
+    plan = runExplain({$and: [{[clusterField]: {$gt: -1}}, {[clusterField]: {$lt: 10}}]});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
+    // $in query against cluster key which omits strings.
+    plan = runExplain({[clusterField]: {$in: [1, 2, 3]}});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
+    // Conjunction of $in query against cluster key and another comparison on a field other than
+    // the cluster key. The first conjunct omits strings.
+    plan = runExplain({$and: [{[clusterField]: {$in: [1, 2, 3]}}, {a: 5}]});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
+    // Conjunction with one comparison against the cluster key and one against another field. The
+    // second conjunct omits strings.
+    plan = runExplain({$and: [{a: {$lt: 2}}, {[clusterField]: {$gt: -1}}]});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
+    // Conjunction with one child which is an unsupported match expression and another which is
+    // a comparison against the cluster field. The second conjunct omits strings.
+    plan = runExplain({
+        $and: [
+            {$or: [{[clusterField]: {$lt: 2}}, {[clusterField]: {$gt: 5}}]},
+            {[clusterField]: {$gt: -1}}
+        ]
+    });
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
+    // Conjunction which contains a comparison of the cluster field to a string and a comparison
+    // of the cluster field to a number. The second conjunct omits strings.
+    plan = runExplain({$and: [{[clusterField]: {$lt: "1"}}, {[clusterField]: {$gt: 2}}]});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
+    // Conjunction which contains a $in comparison of the cluster field to a string and a $in
+    // comparison of the cluster field to a number. The second conjunct omits strings.
+    plan = runExplain(
+        {$and: [{[clusterField]: {$in: [1, "2", 3]}}, {[clusterField]: {$in: [1, 3, 4]}}]});
+    assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
+
     tsColl.drop();
 }
 
@@ -146,7 +247,7 @@ function testPlanCache(direction) {
     assert.commandWorked(clusteredColl.createIndex({a: 1}, {name: indexName}));
 
     const filter = {a: {$gt: -1}};
-    const projection = {_id: 0, [clusterField]: 1};
+    const projection = {[clusterField]: 1};
     const sort = {[clusterField]: direction};
 
     // Because of the _a index above, we should have two alternatves -- filter via the
@@ -190,8 +291,31 @@ for (let isClustered = 0; isClustered <= 1; isClustered++) {
     }
 }
 
-testCollations(/* direction = */ 1);
-testCollations(/* direction = */ -1);
+//
+// Show that the direction of the sort does not affect the plans we are able to provide. Also show
+// the collation conditions under which we can avoid explicit sorts in the final plan.
+//
+
+const defaultCollation = {
+    locale: "simple",
+};
+const faroeseCollation = {
+    locale: "fo",
+    caseLevel: true
+};
+
+testCollations(
+    defaultCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ 1);
+testCollations(
+    defaultCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ -1);
+testCollations(
+    faroeseCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ 1);
+testCollations(
+    faroeseCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ -1);
+testCollations(
+    defaultCollation /* for collection */, defaultCollation /* for query */, /* direction = */ 1);
+testCollations(
+    defaultCollation /* for collection */, defaultCollation /* for query */, /* direction = */ -1);
 
 testMinMax();
 

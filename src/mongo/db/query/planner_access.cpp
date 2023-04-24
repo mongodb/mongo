@@ -299,31 +299,50 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
 
 /**
  * Helper function to add an RID range to collection scans.
- * If the query solution tree contains a collection scan node with a suitable comparison
- * predicate on '_id', we add a minRecord and maxRecord on the collection node.
+ * If the query solution tree contains a collection scan node with a suitable comparison predicate
+ * on '_id', we add a minRecord and maxRecord on the collection node.
+ *
+ * Returns true if the MatchExpression is a comparison against the cluster key which either:
+ * 1) is guaranteed to exclude values of the cluster key which are affected by collation or
+ * 2) may return values of the cluster key which are affected by collation, but the query and
+ *    collection collations match.
+ * Otherwise, returns false.
+ *
+ * For example, assuming the cluster key is "_id":
+ * Given {a: {$eq: 2}}, we return false, because the comparison is not against the cluster key.
+ * Given {_id: {$gte: 5}}, we return true, because this comparison against the cluster key excludes
+ *    keys which are affected by collations.
+ * Given {_id: {$eq: "str"}}, we return true only if the query and collection collations match.
+ *
  */
-void handleRIDRangeScan(const MatchExpression* conjunct,
-                        CollectionScanNode* collScan,
-                        const QueryPlannerParams& params,
-                        const CollatorInterface* collator) {
+[[nodiscard]] bool handleRIDRangeScan(const MatchExpression* conjunct,
+                                      CollectionScanNode* collScan,
+                                      const QueryPlannerParams& params,
+                                      const CollatorInterface* collator) {
     invariant(params.clusteredInfo);
 
     if (conjunct == nullptr) {
-        return;
+        return false;
     }
 
     auto* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
     if (andMatchPtr != nullptr) {
+        bool atLeastOneConjunctCompatibleCollation = false;
         for (size_t index = 0; index < andMatchPtr->numChildren(); index++) {
-            handleRIDRangeScan(andMatchPtr->getChild(index), collScan, params, collator);
+            if (handleRIDRangeScan(andMatchPtr->getChild(index), collScan, params, collator)) {
+                atLeastOneConjunctCompatibleCollation = true;
+            }
         }
-        return;
+
+        // If one of the conjuncts excludes values of the cluster key which are affected by
+        // collation, then the entire $and will also exclude those values.
+        return atLeastOneConjunctCompatibleCollation;
     }
 
     if (conjunct->path() !=
         clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec())) {
         // No match on the cluster key.
-        return;
+        return false;
     }
 
     // TODO SERVER-62707: Allow $in with regex to use a clustered index.
@@ -353,7 +372,6 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
                 setHighestRecord(maxBound, bMax.obj());
             }
         }
-        collScan->hasCompatibleCollation = allEltsCollationCompatible;
 
         // Finally, tighten the collscan bounds with the min/max bounds for the $in.
         if (minBound) {
@@ -362,12 +380,12 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
         if (maxBound) {
             setLowestRecord(collScan->maxRecord, *maxBound);
         }
-        return;
+        return allEltsCollationCompatible;
     }
 
     auto match = dynamic_cast<const ComparisonMatchExpression*>(conjunct);
     if (match == nullptr) {
-        return;  // Not a comparison match expression.
+        return false;  // Not a comparison match expression.
     }
 
     const auto& element = match->getData();
@@ -383,13 +401,11 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
 
     bool compatible = compatibleCollator(params, collator, element);
     if (!compatible) {
-        return;  // Collator affects probe and it's not compatible with collection's collator.
+        return false;  // Collator affects probe and it's not compatible with collection's collator.
     }
 
     // Even if the collations don't match at this point, it's fine,
     // because the bounds exclude values that use it
-    collScan->hasCompatibleCollation = true;
-
     const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
     if (dynamic_cast<const EqualityMatchExpression*>(match)) {
         setHighestRecord(collScan->minRecord, collated);
@@ -401,6 +417,8 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
                dynamic_cast<const GTEMatchExpression*>(match)) {
         setHighestRecord(collScan->minRecord, collated);
     }
+
+    return true;
 }
 
 /**
@@ -518,13 +536,18 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     auto queryCollator = query.getCollator();
     auto collCollator = params.clusteredCollectionCollator;
-    csn->hasCompatibleCollation =
-        !queryCollator || (collCollator && *queryCollator == *collCollator);
+    csn->hasCompatibleCollation = CollatorInterface::collatorsMatch(queryCollator, collCollator);
 
     if (params.clusteredInfo && !csn->resumeAfterRecordId) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
-        // via minRecord and maxRecord if applicable.
-        handleRIDRangeScan(csn->filter.get(), csn.get(), params, queryCollator);
+        // via minRecord and maxRecord if applicable. During this process, we will check if the
+        // query is guaranteed to exclude values of the cluster key which are affected by collation.
+        // If so, then even if the query and collection collations differ, the collation difference
+        // won't affect the query results. In that case, we can say hasCompatibleCollation is true.
+        bool compatibleCollation =
+            handleRIDRangeScan(csn->filter.get(), csn.get(), params, queryCollator);
+        csn->hasCompatibleCollation |= compatibleCollation;
+
         handleRIDRangeMinMax(query, csn.get(), params, queryCollator);
     }
 
