@@ -1789,14 +1789,13 @@ buildvariants:
       canaries: none
       atlas_setup: M60-repl
       use_custom_build: true
-      infrastructure_provisioning: workload_client
+      infrastructure_provisioning: workload_client_arm.2023-04
       infrastructure_provisioning_release: 2022-11
       workload_setup: 2022-11
       platform: linux
       project_dir: *project_dir
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      client_compile_variant: ""  # Explicitly set this. Otherwise it will use the server version
     run_on:
       - "rhel70-perf-atlas-large"
     depends_on:
