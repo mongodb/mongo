@@ -192,6 +192,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
         batchStats.totalOps += opCount;
         batchStats.totalBytes += opBytes;
         batchStats.prepareOps += entry.shouldPrepare();
+        batchStats.commitOrAbortOps += entry.isPreparedCommit() || entry.isPreparedAbort();
         ops.push_back(std::move(entry));
         _consume(opCtx, _oplogBuffer);
 
@@ -223,7 +224,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
  *
  * 1) When in secondary steady state oplog application mode, a prepareTransaction entry can be
  *    batched with other entries, while a prepared commitTransaction or abortTransaction entry
- *    is always processed individually in its own batch.
+ *    can only be batched with other prepared commitTransaction or abortTransaction entries.
  * 2) An applyOps entry from batched writes or unprepared transactions will be expanded to CRUD
  *    operation and thus can be safely batched with other CRUD operations in most cases, unless
  *    it refers to the end of a large transaction (> 16MB) or a transaction that contains DDL
@@ -231,10 +232,17 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
  */
 OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry& entry,
                                                                 const BatchStats& batchStats) {
+    // Used by non-commit and non-abort entries to cut the batch if it already contains any
+    // commit or abort entries.
+    auto continueOrStartNewBatch = [&] {
+        return batchStats.commitOrAbortOps > 0 ? OplogBatcher::BatchAction::kStartNewBatch
+                                               : OplogBatcher::BatchAction::kContinueBatch;
+    };
+
     if (!entry.isCommand()) {
         return entry.getNss().mustBeAppliedInOwnOplogBatch()
             ? OplogBatcher::BatchAction::kProcessIndividually
-            : OplogBatcher::BatchAction::kContinueBatch;
+            : continueOrStartNewBatch();
     }
 
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
@@ -245,10 +253,11 @@ OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry
             // so we break the batch when it contains enough prepare ops.
             return batchStats.prepareOps >= kMaxPrepareOpsPerBatch
                 ? OplogBatcher::BatchAction::kStartNewBatch
-                : OplogBatcher::BatchAction::kContinueBatch;
+                : continueOrStartNewBatch();
         }
         if (entry.isPreparedCommitOrAbort()) {
-            return OplogBatcher::BatchAction::kProcessIndividually;
+            return batchStats.commitOrAbortOps == 0 ? OplogBatcher::BatchAction::kStartNewBatch
+                                                    : OplogBatcher::BatchAction::kContinueBatch;
         }
     }
 
@@ -257,7 +266,7 @@ OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry
         entry.isEndOfLargeTransaction();
 
     return processIndividually ? OplogBatcher::BatchAction::kProcessIndividually
-                               : OplogBatcher::BatchAction::kContinueBatch;
+                               : continueOrStartNewBatch();
 }
 
 /**

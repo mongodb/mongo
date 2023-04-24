@@ -205,15 +205,11 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsPreparedApplyOpsOrPreparedComm
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
 
-    // Prepared commit needs to be processed individually.
+    // Prepared commit or abort must start a new batch with commits or aborts only.
     batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
-    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[2], batch[0]);
-
-    // Prepared abort needs to be processed individually.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
-    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
-    ASSERT_EQUALS(srcOps[3], batch[0]);
+    ASSERT_EQUALS(srcOps[3], batch[1]);
 
     // Prepares can be batched together.
     batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
@@ -240,17 +236,17 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithPreparedApplyOpsOrP
     ASSERT_EQUALS(srcOps[1], batch[1]);
     ASSERT_EQUALS(srcOps[2], batch[2]);
 
-    // Prepared commit needs to be processed individually.
+    // Prepared commit must start a new batch.
     batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[3], batch[0]);
 
-    // Due to the next prepared abort, this insert is in a batch of 1.
+    // CRUD op cannot be in the same batch with the previous prepared commit.
     batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[4], batch[0]);
 
-    // Prepared abort needs to be processed individually.
+    // Prepared abort must start a new batch.
     batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[5], batch[0]);

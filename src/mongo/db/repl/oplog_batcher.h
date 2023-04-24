@@ -197,6 +197,7 @@ private:
         std::size_t totalOps = 0;
         std::size_t totalBytes = 0;
         std::size_t prepareOps = 0;
+        std::size_t commitOrAbortOps = 0;
     };
 
     /**
