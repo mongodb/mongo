@@ -90,9 +90,8 @@ bool NamespaceString::isCollectionlessAggregateNS() const {
 
 bool NamespaceString::isLegalClientSystemNS(
     const ServerGlobalParams::FeatureCompatibility& currentFCV) const {
-    auto dbname = dbName().db();
 
-    if (dbname == DatabaseName::kAdmin.db()) {
+    if (isAdminDB()) {
         if (coll() == "system.roles")
             return true;
         if (coll() == kServerConfigurationNamespace.coll())
@@ -101,7 +100,7 @@ bool NamespaceString::isLegalClientSystemNS(
             return true;
         if (coll() == "system.backup_users")
             return true;
-    } else if (dbname == DatabaseName::kConfig.db()) {
+    } else if (isConfigDB()) {
         if (coll() == "system.sessions")
             return true;
         if (coll() == kIndexBuildEntryNamespace.coll())
@@ -112,7 +111,7 @@ bool NamespaceString::isLegalClientSystemNS(
             return true;
         if (coll() == kConfigsvrCoordinatorsNamespace.coll())
             return true;
-    } else if (dbname == DatabaseName::kLocal.db()) {
+    } else if (isLocalDB()) {
         if (coll() == kSystemReplSetNamespace.coll())
             return true;
         if (coll() == kLocalHealthLogNamespace.coll())
@@ -355,11 +354,11 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
 
 bool NamespaceString::isNamespaceAlwaysUnsharded() const {
     // Local and admin never have sharded collections
-    if (db() == DatabaseName::kLocal.db() || db() == DatabaseName::kAdmin.db())
+    if (isLocalDB() || isAdminDB())
         return true;
 
     // Config can only have the system.sessions as sharded
-    if (db() == DatabaseName::kConfig.db())
+    if (isConfigDB())
         return *this != NamespaceString::kLogicalSessionsNamespace;
 
     if (isSystem()) {
@@ -393,11 +392,11 @@ bool NamespaceString::isTimeseriesBucketsCollection() const {
 }
 
 bool NamespaceString::isChangeStreamPreImagesCollection() const {
-    return _dbName.db() == DatabaseName::kConfig.db() && coll() == kPreImagesCollectionName;
+    return isConfigDB() && coll() == kPreImagesCollectionName;
 }
 
 bool NamespaceString::isChangeCollection() const {
-    return _dbName.db() == DatabaseName::kConfig.db() && coll() == kChangeCollectionName;
+    return isConfigDB() && coll() == kChangeCollectionName;
 }
 
 bool NamespaceString::isConfigImagesCollection() const {
@@ -443,7 +442,7 @@ bool NamespaceString::isImplicitlyReplicated() const {
 }
 
 bool NamespaceString::isReplicated() const {
-    if (isLocal()) {
+    if (isLocalDB()) {
         return false;
     }
 

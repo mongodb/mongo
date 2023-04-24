@@ -105,8 +105,6 @@ public:
 
         void doCheckAuthorization(OperationContext*) const final {}
 
-        static constexpr auto kAdminDB = "admin"_sd;
-        static constexpr auto kLocalDB = "local"_sd;
         void typedRun(OperationContext* opCtx) {
             auto& logoutState = getLogoutCommandState(opCtx->getServiceContext());
             auto hasBeenInvoked = logoutState.markAsInvoked();
@@ -121,14 +119,14 @@ public:
 
             as->logoutDatabase(
                 opCtx->getClient(), dbname.toStringWithTenantId(), "Logging out on user request");
-            if (getTestCommandsEnabled() && (dbname.db() == kAdminDB)) {
+            if (getTestCommandsEnabled() && (dbname.db() == DatabaseName::kAdmin.db())) {
                 // Allows logging out as the internal user against the admin database, however
                 // this actually logs out of the local database as well. This is to
                 // support the auth passthrough test framework on mongos (since you can't use the
                 // local database on a mongos, so you can't logout as the internal user
                 // without this).
                 as->logoutDatabase(opCtx->getClient(),
-                                   kLocalDB,
+                                   DatabaseName::kLocal.db(),
                                    "Logging out from local database for test purposes");
             }
         }

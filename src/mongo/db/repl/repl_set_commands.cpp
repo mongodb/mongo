@@ -733,7 +733,7 @@ bool replHasDatabases(OperationContext* opCtx) {
     if (dbNames.size() >= 2)
         return true;
     if (dbNames.size() == 1) {
-        if (dbNames[0].db() != "local")
+        if (dbNames[0].db() != DatabaseName::kLocal.db())
             return true;
 
         // we have a local database.  return true if oplog isn't empty

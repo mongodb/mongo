@@ -173,7 +173,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
             : boost::none;
         DatabaseName dbName = DatabaseNameUtil::deserialize(tenantId, dbBSON["name"].str());
 
-        if (dbName.db() == "local") {
+        if (dbName.db() == DatabaseName::kLocal.db()) {
             LOGV2_DEBUG(21056,
                         1,
                         "Excluding database from the 'listDatabases' response: {db}",

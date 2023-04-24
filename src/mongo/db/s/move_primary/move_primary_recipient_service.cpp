@@ -898,7 +898,7 @@ repl::OpTime MovePrimaryRecipientService::MovePrimaryRecipient::_getStartApplyin
 
     auto rawResp = _movePrimaryRecipientExternalState->sendCommandToShards(
         opCtx,
-        "local"_sd,
+        DatabaseName::kLocal.db(),
         findCmd.toBSON({}),
         {ShardId(_metadata.getFromShardName().toString())},
         **executor);

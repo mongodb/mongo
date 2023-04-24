@@ -1594,7 +1594,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
     // these namespaces, a local cursor should always be used.
     // TODO SERVER-59957: use NamespaceString::isPerShardNamespace instead.
     auto shouldAlwaysAttachLocalCursorForNamespace = [](const NamespaceString& ns) {
-        return (ns.isLocal() || ns.isConfigDotCacheDotChunks() ||
+        return (ns.isLocalDB() || ns.isConfigDotCacheDotChunks() ||
                 ns.isReshardingLocalOplogBufferCollection() ||
                 ns == NamespaceString::kConfigImagesNamespace ||
                 ns.isChangeStreamPreImagesCollection());

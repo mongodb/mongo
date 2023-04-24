@@ -617,7 +617,7 @@ static int buildResourceSearchList(const ResourcePattern& target,
             // ResourcePattern::forAnyNormalResource. 'local' and 'config' are
             // used to store special system collections, which user level
             // administrators should not be able to manipulate.
-            if (target.ns().db() != "local" && target.ns().db() != "config") {
+            if (!target.ns().isLocalDB() && !target.ns().isConfigDB()) {
                 resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
             }
             resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
@@ -636,7 +636,7 @@ static int buildResourceSearchList(const ResourcePattern& target,
         // All collections can be matched by a collection resource for their name
         resourceSearchList[size++] = ResourcePattern::forCollectionName(target.ns().coll());
     } else if (target.isDatabasePattern()) {
-        if (target.ns().db() != "local" && target.ns().db() != "config") {
+        if (!target.ns().isLocalDB() && !target.ns().isConfigDB()) {
             resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
         }
     }
@@ -851,7 +851,7 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
 
     // If the user is authorized for anyNormalResource, then they implicitly have access
     // to most databases.
-    if (db != "local" && db != "config" &&
+    if (db != DatabaseName::kLocal.db() && db != DatabaseName::kConfig.db() &&
         user->hasActionsForResource(ResourcePattern::forAnyNormalResource())) {
         return true;
     }

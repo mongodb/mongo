@@ -969,7 +969,7 @@ bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
     invariant(nss.size() > 0);
 
     // Of the replica set configurations:
-    if (!nss.isLocal()) {
+    if (!nss.isLocalDB()) {
         // All replicated collections are not logged.
         return false;
     }

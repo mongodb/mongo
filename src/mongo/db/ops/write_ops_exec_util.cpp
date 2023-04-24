@@ -56,7 +56,7 @@ LastOpFixer::~LastOpFixer() {
 
 void LastOpFixer::startingOp(const NamespaceString& ns) {
     // Operations on the local DB aren't replicated, so they don't need to bump the lastOp.
-    _needToFixLastOp = !ns.isLocal();
+    _needToFixLastOp = !ns.isLocalDB();
     _opTimeAtLastOpStart = replClientInfo().getLastOp();
 }
 

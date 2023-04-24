@@ -631,8 +631,8 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(
     // The collection will be named local.orphan.xxxxx.
     std::string identNs = ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
-    NamespaceString nss(NamespaceString(NamespaceString::kOrphanCollectionDb,
-                                        NamespaceString::kOrphanCollectionPrefix + identNs));
+    NamespaceString nss{DatabaseName::kLocal.db(),
+                        NamespaceString::kOrphanCollectionPrefix + identNs};
 
     BSONObj obj;
     {

@@ -131,8 +131,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-const char kLocalDbName[] = "local";
-
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 
 // The count of items in the buffer

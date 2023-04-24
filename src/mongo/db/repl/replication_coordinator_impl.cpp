@@ -188,7 +188,6 @@ using NextAction = Fetcher::NextAction;
 
 namespace {
 
-const char kLocalDB[] = "local";
 
 void lockAndCall(stdx::unique_lock<Latch>* lk, const std::function<void()>& fn) {
     if (!lk->owns_lock()) {
@@ -3020,7 +3019,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationCont
     if (_readWriteAbility->canAcceptNonLocalWrites_UNSAFE() || alwaysAllowNonLocalWrites(opCtx)) {
         return true;
     }
-    if (dbName == kLocalDB) {
+    if (dbName == DatabaseName::kLocal.db()) {
         return true;
     }
     return false;
@@ -3048,7 +3047,7 @@ bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& ns
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
-    if (!isReplEnabled() || nsOrUUID.db() == kLocalDB) {
+    if (!isReplEnabled() || nsOrUUID.db() == DatabaseName::kLocal.db()) {
         // Writes on stand-alone nodes or "local" database are always permitted.
         return true;
     }
@@ -3132,7 +3131,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
     // Non-oplog local reads from the user are not allowed during initial sync when the initial
     // sync method disallows it.  "isFromUserConnection" means DBDirectClient reads are not blocked;
     // "isInternalClient" means reads from other cluster members are not blocked.
-    if (!isPrimaryOrSecondary && getReplicationMode() == modeReplSet && ns.db() == kLocalDB &&
+    if (!isPrimaryOrSecondary && getReplicationMode() == modeReplSet && ns.isLocalDB() &&
         client->isFromUserConnection()) {
         stdx::lock_guard<Latch> lock(_mutex);
         auto isInternalClient = !client->session() ||

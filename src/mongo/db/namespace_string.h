@@ -165,7 +165,6 @@ public:
 
     // Prefix for orphan collections
     static constexpr StringData kOrphanCollectionPrefix = "orphan."_sd;
-    static constexpr StringData kOrphanCollectionDb = "local"_sd;
 
     // Prefix for collections that store the local resharding oplog buffer.
     static constexpr StringData kReshardingLocalOplogBufferPrefix =
@@ -468,13 +467,13 @@ public:
     //
 
     bool isHealthlog() const {
-        return isLocal() && coll() == "system.healthlog";
+        return isLocalDB() && coll() == "system.healthlog";
     }
     bool isSystem() const {
         return coll().startsWith("system.");
     }
     bool isNormalCollection() const {
-        return !isSystem() && !(isLocal() && coll().startsWith("replset."));
+        return !isSystem() && !(isLocalDB() && coll().startsWith("replset."));
     }
     bool isGlobalIndex() const {
         return coll().startsWith(kGlobalIndexCollectionPrefix);
@@ -482,7 +481,7 @@ public:
     bool isAdminDB() const {
         return db() == DatabaseName::kAdmin.db();
     }
-    bool isLocal() const {
+    bool isLocalDB() const {
         return db() == DatabaseName::kLocal.db();
     }
     bool isSystemDotProfile() const {
@@ -499,7 +498,7 @@ public:
         return coll() == kSystemDotJavascriptCollectionName;
     }
     bool isServerConfigurationCollection() const {
-        return (db() == DatabaseName::kAdmin.db()) && (coll() == "system.version");
+        return isAdminDB() && (coll() == "system.version");
     }
     bool isPrivilegeCollection() const {
         if (!isAdminDB()) {
@@ -517,17 +516,11 @@ public:
         return oplog(_ns);
     }
     bool isOnInternalDb() const {
-        if (db() == DatabaseName::kAdmin.db())
-            return true;
-        if (db() == DatabaseName::kLocal.db())
-            return true;
-        if (db() == DatabaseName::kConfig.db())
-            return true;
-        return false;
+        return isAdminDB() || isLocalDB() || isConfigDB();
     }
 
     bool isOrphanCollection() const {
-        return db() == kOrphanCollectionDb && coll().startsWith(kOrphanCollectionPrefix);
+        return isLocalDB() && coll().startsWith(kOrphanCollectionPrefix);
     }
 
     /**

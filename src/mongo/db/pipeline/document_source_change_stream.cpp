@@ -367,7 +367,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     // 'admin' database iff 'allChangesForCluster' is true. A stream may run against the 'config'
     // database iff 'allowToRunOnConfigDB' is true.
     const bool isNotBannedInternalDB =
-        !expCtx->ns.isLocal() && (!expCtx->ns.isConfigDB() || spec.getAllowToRunOnConfigDB());
+        !expCtx->ns.isLocalDB() && (!expCtx->ns.isConfigDB() || spec.getAllowToRunOnConfigDB());
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "$changeStream may not be opened on the internal "
                           << expCtx->ns.dbName().toStringForErrorMsg() << " database",

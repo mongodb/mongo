@@ -312,7 +312,7 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
         return false;
 
     // 3. If the index build is on the local database, do not timestamp.
-    if (nss.isLocal())
+    if (nss.isLocalDB())
         return false;
 
     // 4. All other cases, we generate a timestamp by writing a no-op oplog entry.  This is
