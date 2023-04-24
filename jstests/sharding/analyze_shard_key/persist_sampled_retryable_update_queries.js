@@ -9,9 +9,6 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
-// Set this to allow sample ids to be set by an external client.
-TestData.enableTestCommands = true;
-
 // Make the periodic job for writing sampled queries have a period of 1 second to speed up the test.
 const queryAnalysisWriterIntervalSecs = 1;
 
