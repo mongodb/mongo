@@ -94,7 +94,8 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
+        const NamespaceString nss(
+            parseNs(DatabaseNameUtil::deserialize(boost::none, dbname), cmdObj));
 
         std::vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {

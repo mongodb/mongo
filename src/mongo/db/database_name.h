@@ -112,41 +112,24 @@ public:
      * Constructs an empty DatabaseName.
      */
     DatabaseName() = default;
+
     /**
-     * Constructs a DatabaseName from the given tenantId and database name.
-     * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
-     * the dbName is a valid db name.
+     * This function constructs a DatabaseName without checking for presence of TenantId. It
+     * must only be used by auth systems which are not yet tenant aware.
+     *
+     * TODO SERVER-76294 Remove this function. Any remaining call sites must be changed to use a
+     * function on DatabaseNameUtil.
      */
-    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
-        uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in a db name: " + dbString,
-                dbString.find('.') == std::string::npos);
-        uassert(ErrorCodes::InvalidNamespace,
-                "database names cannot have embedded null characters",
-                dbString.find('\0') == std::string::npos);
-        uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("db name must be at most {} characters, found: {}",
-                            kMaxDatabaseNameLength,
-                            dbString.size()),
-                dbString.size() <= kMaxDatabaseNameLength);
-
-        uint8_t details = dbString.size() & kDatabaseNameOffsetEndMask;
-        size_t dbStartIndex = kDataOffset;
-        if (tenantId) {
-            dbStartIndex += OID::kOIDSize;
-            details |= kTenantIdMask;
-        }
-
-        _data.resize(dbStartIndex + dbString.size());
-        *reinterpret_cast<uint8_t*>(_data.data()) = details;
-        if (tenantId) {
-            std::memcpy(_data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
-        }
-        if (!dbString.empty()) {
-            std::memcpy(_data.data() + dbStartIndex, dbString.rawData(), dbString.size());
-        }
+    static DatabaseName createDatabaseNameForAuth(const boost::optional<TenantId>& tenantId,
+                                                  StringData dbString) {
+        return DatabaseName(tenantId, dbString);
     }
 
+    /**
+     * This function constructs a DatabaseName without checking for presence of TenantId.
+     *
+     * MUST only be used for tests.
+     */
     static DatabaseName createDatabaseName_forTest(boost::optional<TenantId> tenantId,
                                                    StringData dbString) {
         return DatabaseName(tenantId, dbString);
@@ -266,6 +249,43 @@ public:
 
 private:
     friend class NamespaceString;
+    friend class NamespaceStringOrUUID;
+    friend class DatabaseNameUtil;
+
+    /**
+     * Constructs a DatabaseName from the given tenantId and database name.
+     * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
+     * the dbName is a valid db name.
+     */
+    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
+        uassert(ErrorCodes::InvalidNamespace,
+                "'.' is an invalid character in a db name: " + dbString,
+                dbString.find('.') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                "database names cannot have embedded null characters",
+                dbString.find('\0') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("db name must be at most {} characters, found: {}",
+                            kMaxDatabaseNameLength,
+                            dbString.size()),
+                dbString.size() <= kMaxDatabaseNameLength);
+
+        uint8_t details = dbString.size() & kDatabaseNameOffsetEndMask;
+        size_t dbStartIndex = kDataOffset;
+        if (tenantId) {
+            dbStartIndex += OID::kOIDSize;
+            details |= kTenantIdMask;
+        }
+
+        _data.resize(dbStartIndex + dbString.size());
+        *reinterpret_cast<uint8_t*>(_data.data()) = details;
+        if (tenantId) {
+            std::memcpy(_data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
+        }
+        if (!dbString.empty()) {
+            std::memcpy(_data.data() + dbStartIndex, dbString.rawData(), dbString.size());
+        }
+    }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);
     static constexpr uint8_t kTenantIdMask = 0x80;

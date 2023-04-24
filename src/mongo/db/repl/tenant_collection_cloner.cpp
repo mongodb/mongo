@@ -244,8 +244,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(_operationTime);
-    getClient()->runCommand(
-        DatabaseName(boost::none, "admin"), cmd, readResult, QueryOption_SecondaryOk);
+    getClient()->runCommand(DatabaseName::kAdmin, cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "TenantCollectionCloner failed to get listIndexes result majority-committed");

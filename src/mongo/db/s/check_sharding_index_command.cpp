@@ -81,7 +81,8 @@ public:
                    const BSONObj& jsobj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs({boost::none, dbname}, jsobj));
+        const NamespaceString nss(
+            parseNs(DatabaseNameUtil::deserialize(boost::none, dbname), jsobj));
 
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
         if (keyPattern.isEmpty()) {

@@ -88,16 +88,16 @@ protected:
 
         _catalogClient = std::make_unique<StaticCatalogClient>(recipientShardedColls);
 
-        auto cloner =
-            std::make_unique<MovePrimaryDatabaseCloner>(DatabaseName(boost::none, _dbName),
-                                                        donorShardedColls,
-                                                        ts,
-                                                        sharedData ? sharedData : getSharedData(),
-                                                        _source,
-                                                        _mockClient.get(),
-                                                        &_storageInterface,
-                                                        _dbWorkThreadPool.get(),
-                                                        _catalogClient.get());
+        auto cloner = std::make_unique<MovePrimaryDatabaseCloner>(
+            DatabaseName::createDatabaseName_forTest(boost::none, _dbName),
+            donorShardedColls,
+            ts,
+            sharedData ? sharedData : getSharedData(),
+            _source,
+            _mockClient.get(),
+            &_storageInterface,
+            _dbWorkThreadPool.get(),
+            _catalogClient.get());
         return cloner;
     }
 
@@ -125,9 +125,9 @@ protected:
     }
 
     BSONObj createListExistingCollectionsOnDonorResponse(const std::vector<BSONObj>& collections) {
-        auto ns =
-            NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "admin"))
-                .toString();
+        auto ns = NamespaceString::makeCollectionlessAggregateNSS(
+                      DatabaseName::createDatabaseName_forTest(boost::none, "admin"))
+                      .toString();
         BSONObjBuilder bob;
         {
             BSONObjBuilder cursorBob(bob.subobjStart("cursor"));

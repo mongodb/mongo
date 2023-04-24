@@ -321,7 +321,9 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
 }
 
 std::string CommandHelpers::parseNsFromCommand(StringData dbname, const BSONObj& cmdObj) {
-    return parseNsFromCommand({boost::none, dbname}, cmdObj).ns().toString();
+    return parseNsFromCommand(DatabaseNameUtil::deserialize(boost::none, dbname), cmdObj)
+        .ns()
+        .toString();
 }
 
 NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,

@@ -164,25 +164,25 @@ TEST(DatabaseNameUtilTest, SerializeMissingExpectPrefix_CommandReply) {
 
     {  // No prefix, no tenantId.
         // request --> { ns: database.coll }
-        auto dbName = DatabaseName(boost::none, dbnString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnString);
     }
 
     {  // Has prefix, no tenantId.
         // request --> { ns: tenantId_database.coll }
-        auto dbName = DatabaseName(boost::none, dbnPrefixString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnPrefixString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
     }
 
     {  // No prefix, has tenantId.
         // request --> { ns: database.coll, $tenant: tenantId }
-        auto dbName = DatabaseName(tenantId, dbnString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId), dbnString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, $tenant: tenantId }
-        auto dbName = DatabaseName(tenantId, dbnPrefixString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnPrefixString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId),
                   dbnPrefixString);
     }
@@ -205,25 +205,25 @@ TEST(DatabaseNameUtilTest, SerializeExpectPrefixFalse_CommandReply) {
 
     {  // No prefix, no tenantId.
         // request --> { ns: database.coll, expectPrefix: false }
-        auto dbName = DatabaseName(boost::none, dbnString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnString);
     }
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, expectPrefix: false }
-        auto dbName = DatabaseName(boost::none, dbnPrefixString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnPrefixString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
     }
 
     {  // No prefix, has tenantId.
         // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: false }
-        auto dbName = DatabaseName(tenantId, dbnString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId), dbnString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: false }
-        auto dbName = DatabaseName(tenantId, dbnPrefixString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnPrefixString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId),
                   dbnPrefixString);
     }
@@ -247,19 +247,19 @@ TEST(DatabaseNameUtilTest, SerializeExpectPrefixTrue_CommandReply) {
 
     {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: database.coll, expectPrefix: true }
-        auto dbName = DatabaseName(boost::none, dbnString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnString);
     }
 
     {  // Has prefix, no tenantId.
         // request --> { ns: tenantId_database.coll, expectPrefix: true }
-        auto dbName = DatabaseName(boost::none, dbnPrefixString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnPrefixString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
     }
 
     {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: true }
-        auto dbName = DatabaseName(tenantId, dbnString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
     }
 
@@ -267,7 +267,7 @@ TEST(DatabaseNameUtilTest, SerializeExpectPrefixTrue_CommandReply) {
         // request -->  { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: true }
         const std::string nsDoublePrefixString = str::stream()
             << tenantId.toString() << "_" << tenantId.toString() << "_" << dbnString;
-        auto dbName = DatabaseName(tenantId, dbnPrefixString);
+        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnPrefixString);
         ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId),
                   nsDoublePrefixString);
     }

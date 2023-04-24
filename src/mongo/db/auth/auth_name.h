@@ -111,7 +111,7 @@ public:
     }
 
     DatabaseName getDatabaseName() const {
-        return DatabaseName(_tenant, _db);
+        return DatabaseName::createDatabaseNameForAuth(_tenant, _db);
     }
 
     /**

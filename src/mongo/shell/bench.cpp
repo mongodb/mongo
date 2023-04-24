@@ -179,7 +179,7 @@ void abortTransaction(DBClientBase* conn,
     BSONObj abortTransactionCmd = BSON("abortTransaction" << 1);
     BSONObj abortCommandResult;
     const bool successful = runCommandWithSession(conn,
-                                                  DatabaseName(boost::none, "admin"),
+                                                  DatabaseName::kAdmin,
                                                   abortTransactionCmd,
                                                   kMultiStatementTransactionOption,
                                                   lsid,
@@ -926,8 +926,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
         BSONObj result;
         uassert(40640,
                 str::stream() << "Unable to create session due to error " << result,
-                conn->runCommand(
-                    DatabaseName(boost::none, "admin"), BSON("startSession" << 1), result));
+                conn->runCommand(DatabaseName::kAdmin, BSON("startSession" << 1), result));
 
         lsid.emplace(LogicalSessionIdToClient::parse(IDLParserContext("lsid"), result["id"].Obj()));
     }
@@ -1093,12 +1092,13 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             BSONObj result;
             {
                 BenchRunEventTrace _bret(&state->stats->commandCounter);
-                ok = runCommandWithSession(conn,
-                                           DatabaseName(this->tenantId, this->ns),
-                                           fixQuery(this->command, *state->bsonTemplateEvaluator),
-                                           this->options,
-                                           lsid,
-                                           &result);
+                ok = runCommandWithSession(
+                    conn,
+                    DatabaseName::createDatabaseName_forTest(this->tenantId, this->ns),
+                    fixQuery(this->command, *state->bsonTemplateEvaluator),
+                    this->options,
+                    lsid,
+                    &result);
             }
             if (!ok) {
                 ++state->stats->errCount;
@@ -1115,12 +1115,13 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     uassert(ErrorCodes::CommandFailed,
                             str::stream()
                                 << "getMore command failed; reply was: " << getMoreCommandResult,
-                            runCommandWithSession(conn,
-                                                  DatabaseName(this->tenantId, this->ns),
-                                                  getMoreRequest.toBSON({}),
-                                                  kNoOptions,
-                                                  lsid,
-                                                  &getMoreCommandResult));
+                            runCommandWithSession(
+                                conn,
+                                DatabaseName::createDatabaseName_forTest(this->tenantId, this->ns),
+                                getMoreRequest.toBSON({}),
+                                kNoOptions,
+                                lsid,
+                                &getMoreCommandResult));
                     cursorResponse =
                         uassertStatusOK(CursorResponse::parseFromBSON(getMoreCommandResult));
                     count += cursorResponse.getBatch().size();
@@ -1258,7 +1259,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                 }
                 runCommandWithSession(conn,
-                                      DatabaseName(this->tenantId, nsToDatabaseSubstring(this->ns)),
+                                      DatabaseName::createDatabaseName_forTest(
+                                          this->tenantId, nsToDatabaseSubstring(this->ns)),
                                       builder.done(),
                                       kNoOptions,
                                       lsid,
@@ -1296,7 +1298,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                 }
                 runCommandWithSession(conn,
-                                      DatabaseName(this->tenantId, nsToDatabaseSubstring(this->ns)),
+                                      DatabaseName::createDatabaseName_forTest(
+                                          this->tenantId, nsToDatabaseSubstring(this->ns)),
                                       builder.done(),
                                       kNoOptions,
                                       lsid,
@@ -1326,7 +1329,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                 }
                 runCommandWithSession(conn,
-                                      DatabaseName(this->tenantId, nsToDatabaseSubstring(this->ns)),
+                                      DatabaseName::createDatabaseName_forTest(
+                                          this->tenantId, nsToDatabaseSubstring(this->ns)),
                                       builder.done(),
                                       kNoOptions,
                                       lsid,

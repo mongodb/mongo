@@ -129,7 +129,7 @@ void endSession(SessionHolder* holder) {
                                                    << holder->txnNumber << "autocommit" << false);
 
         [[maybe_unused]] auto ignored =
-            holder->client->runCommand(DatabaseName(boost::none, "admin"), abortObj, out);
+            holder->client->runCommand(DatabaseName::kAdmin, abortObj, out);
     }
 
     EndSessions es;
@@ -137,7 +137,7 @@ void endSession(SessionHolder* holder) {
     es.setEndSessions({holder->lsid});
 
     [[maybe_unused]] auto ignored =
-        holder->client->runCommand(DatabaseName(boost::none, "admin"), es.toBSON(), out);
+        holder->client->runCommand(DatabaseName::kAdmin, es.toBSON(), out);
 
     holder->client.reset();
 }

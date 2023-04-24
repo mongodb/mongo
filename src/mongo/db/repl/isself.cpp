@@ -293,7 +293,7 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
             }
         }
         BSONObj out;
-        bool ok = conn.runCommand(DatabaseName(boost::none, "admin"), BSON("_isSelf" << 1), out);
+        bool ok = conn.runCommand(DatabaseName::kAdmin, BSON("_isSelf" << 1), out);
         bool me = ok && out["id"].type() == jstOID && instanceId == out["id"].OID();
 
         return me;

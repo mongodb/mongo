@@ -240,8 +240,9 @@ EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionR
     auto& request = params.request;
     auto commandName = request.getCommandName().toString();
     const DatabaseName dbName = request.body.hasField("$tenant")
-        ? DatabaseName(TenantId(request.body["$tenant"].OID()), request.getDatabase())
-        : DatabaseName(boost::none, request.getDatabase());
+        ? DatabaseNameUtil::deserialize(TenantId(request.body["$tenant"].OID()),
+                                        request.getDatabase())
+        : DatabaseName::createDatabaseName_forTest(boost::none, request.getDatabase());
 
     if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==
         std::end(kEncryptedCommands)) {

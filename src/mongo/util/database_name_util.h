@@ -104,6 +104,9 @@ public:
         boost::optional<TenantId> tenantId,
         StringData db,
         const SerializationContext& context = SerializationContext());
+
+private:
+    static DatabaseName parseDbNameFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 };
 
 }  // namespace mongo

@@ -76,8 +76,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
 
     if (conn->type() == ConnectionString::ConnectionType::kStandalone) {
         BSONObj isMasterResponse;
-        if (!conn->runCommand(
-                DatabaseName(boost::none, "admin"), BSON("ismaster" << 1), isMasterResponse)) {
+        if (!conn->runCommand(DatabaseName::kAdmin, BSON("ismaster" << 1), isMasterResponse)) {
             uassertStatusOK(getStatusFromCommandResult(isMasterResponse));
         }
 

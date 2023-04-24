@@ -750,7 +750,7 @@ void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri
         command = BSON("whatsmyuri" << 1);
     }
 
-    if (client.runCommand({boost::none, "admin"}, command, info)) {
+    if (client.runCommand(DatabaseName::kAdmin, command, info)) {
         stdx::lock_guard<Latch> lk(_mutex);
         _connectionUris[uri.toString()].insert(info["you"].str());
     }
@@ -771,7 +771,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
         const std::set<std::string>& uris = connection.second;
 
         BSONObj currentOpRes;
-        conn->runCommand({boost::none, "admin"}, BSON("currentOp" << 1), currentOpRes);
+        conn->runCommand(DatabaseName::kAdmin, BSON("currentOp" << 1), currentOpRes);
         if (!currentOpRes["inprog"].isABSONObj()) {
             // We don't have permissions (or the call didn't succeed) - go to the next connection.
             continue;
@@ -808,7 +808,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
                 if (!withPrompt || prompter.confirm()) {
                     BSONObj info;
                     conn->runCommand(
-                        {boost::none, "admin"}, BSON("killOp" << 1 << "op" << op["opid"]), info);
+                        DatabaseName::kAdmin, BSON("killOp" << 1 << "op" << op["opid"]), info);
                 } else {
                     return;
                 }

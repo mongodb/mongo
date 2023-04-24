@@ -595,6 +595,7 @@ TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
 }
 
 TEST_F(CollectionCatalogTest, GetAllTenants) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     TenantId tid1 = TenantId(OID::gen());
     TenantId tid2 = TenantId(OID::gen());
     std::vector<NamespaceString> nsss = {

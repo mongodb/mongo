@@ -166,14 +166,15 @@ TEST(DatabaseNameTest, EmptyDbString) {
     ASSERT_EQ(empty.toString(), "");
     ASSERT_EQ(empty.toStringWithTenantId(), "");
 
-    DatabaseName emptyFromStringData{StringData()};
+    DatabaseName emptyFromStringData =
+        DatabaseName::createDatabaseName_forTest(boost::none, StringData());
     ASSERT_EQ(emptyFromStringData.db(), "");
     ASSERT_FALSE(emptyFromStringData.tenantId());
     ASSERT_EQ(emptyFromStringData.toString(), "");
     ASSERT_EQ(emptyFromStringData.toStringWithTenantId(), "");
 
     TenantId tenantId(OID::gen());
-    DatabaseName emptyWithTenantId{tenantId, ""};
+    DatabaseName emptyWithTenantId = DatabaseName::createDatabaseName_forTest(tenantId, "");
     ASSERT_EQ(emptyWithTenantId.db(), "");
     ASSERT(emptyWithTenantId.tenantId());
     ASSERT_EQ(emptyWithTenantId.toString(), "");

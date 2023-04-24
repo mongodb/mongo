@@ -117,7 +117,7 @@ public:
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        auto nss = NamespaceString(parseNs({boost::none, dbname}, cmdObj));
+        auto nss = parseNs(DatabaseNameUtil::deserialize(boost::none, dbname), cmdObj);
 
         auto cloneRequest = uassertStatusOK(StartChunkCloneRequest::createFromCommand(nss, cmdObj));
 

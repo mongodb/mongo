@@ -107,7 +107,8 @@ public:
         Impl::checkCanRunHere(opCtx);
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
+        const NamespaceString nss(
+            parseNs(DatabaseNameUtil::deserialize(boost::none, dbname), cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
                               << "'",

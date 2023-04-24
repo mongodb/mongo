@@ -92,7 +92,7 @@ public:
 
         const auto movePrimaryRequest =
             ShardMovePrimary::parse(IDLParserContext("_shardsvrMovePrimary"), cmdObj);
-        const auto dbName = parseNs({boost::none, ""}, cmdObj).dbName();
+        const auto dbName = parseNs(DatabaseName(), cmdObj).dbName();
 
         const NamespaceString dbNss(dbName);
         const auto toShardArg = movePrimaryRequest.getTo();

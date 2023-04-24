@@ -64,7 +64,8 @@ struct ClusterPipelineCommandS {
         bool apiStrict) {
         return aggregation_request_helper::parseFromBSON(
             opCtx,
-            DatabaseName(opMsgRequest.getValidatedTenantId(), opMsgRequest.getDatabase()),
+            DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
+                                          opMsgRequest.getDatabase()),
             opMsgRequest.body,
             explainVerbosity,
             apiStrict);

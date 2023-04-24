@@ -566,7 +566,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'cannot_convert_index_to_unique_info',
         'clustered_collection_options',
         'collection_crud',
@@ -649,6 +648,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 

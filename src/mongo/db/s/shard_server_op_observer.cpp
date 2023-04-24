@@ -363,7 +363,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             // block.
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
 
-            DatabaseName dbName(boost::none, db);
+            DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, db);
             AutoGetDb autoDb(opCtx, dbName, MODE_X);
             auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
@@ -599,7 +599,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
 
-        DatabaseName dbName(boost::none, deletedDatabase);
+        DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, deletedDatabase);
         AutoGetDb autoDb(opCtx, dbName, MODE_X);
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
         scopedDss->clearDbInfo(opCtx);

@@ -138,7 +138,7 @@ public:
         : _opCtx(opCtx), _dbName(std::move(dbName)), _reason(std::move(reason)) {
         // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
         // directly
-        DatabaseName databaseName(boost::none, _dbName);
+        DatabaseName databaseName = DatabaseNameUtil::deserialize(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
@@ -151,7 +151,7 @@ public:
         UninterruptibleLockGuard guard(_opCtx->lockState());  // NOLINT.
         // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
         // directly
-        DatabaseName databaseName(boost::none, _dbName);
+        DatabaseName databaseName = DatabaseNameUtil::deserialize(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
@@ -279,7 +279,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
 }
 
 void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
-    DatabaseName dbName(boost::none, _dbName);
+    DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     scopedDss->clearDbInfo(opCtx);

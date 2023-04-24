@@ -89,7 +89,8 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
 }
 
 
-DatabaseName parseDbNameFromStringExpectTenantIdInMultitenancyMode(StringData dbName) {
+DatabaseName DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(
+    StringData dbName) {
     if (!gMultitenancySupport) {
         return DatabaseName(boost::none, dbName);
     }
@@ -115,7 +116,7 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
                                            StringData db,
                                            const SerializationContext& context) {
     if (db.empty()) {
-        return DatabaseName();
+        return DatabaseName(tenantId, "");
     }
 
     if (!gMultitenancySupport) {
@@ -144,7 +145,7 @@ DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> t
         return DatabaseName(std::move(tenantId), db);
     }
 
-    auto dbName = parseDbNameFromStringExpectTenantIdInMultitenancyMode(db);
+    auto dbName = DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(db);
     // TenantId could be prefixed, or passed in separately (or both) and namespace is always
     // constructed with the tenantId separately.
     if (tenantId != boost::none) {

@@ -105,7 +105,8 @@ public:
         Invocation(const ClusterFindCmdBase* definition, const OpMsgRequest& request)
             : CommandInvocation(definition),
               _request(request),
-              _dbName(request.getValidatedTenantId(), request.getDatabase()) {}
+              _dbName(DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
+                                                    request.getDatabase())) {}
 
     private:
         bool supportsWriteConcern() const override {

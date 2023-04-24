@@ -417,7 +417,8 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
                                  const OpMsgRequest& request,
                                  ExplainOptions::Verbosity verbosity,
                                  rpc::ReplyBuilderInterface* result) const {
-    const DatabaseName dbName(request.getValidatedTenantId(), request.getDatabase());
+    const DatabaseName dbName =
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
     const BSONObj& cmdObj = [&]() {
         // Check whether the query portion needs to be rewritten for FLE.
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(

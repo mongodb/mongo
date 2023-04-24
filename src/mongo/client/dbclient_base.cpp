@@ -448,7 +448,7 @@ bool DBClientBase::auth(const string& dbname,
 }
 
 void DBClientBase::logout(const string& dbname, BSONObj& info) {
-    runCommand(DatabaseName(boost::none, dbname), BSON("logout" << 1), info);
+    runCommand(DatabaseNameUtil::deserialize(boost::none, dbname), BSON("logout" << 1), info);
 }
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
@@ -461,7 +461,7 @@ bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObj o;
     if (info == nullptr)
         info = &o;
-    bool ok = runCommand(DatabaseName(boost::none, "admin"), bob.obj(), *info);
+    bool ok = runCommand(DatabaseName::kAdmin, bob.obj(), *info);
     isPrimary =
         info->getField(_apiParameters.getVersion() ? "isWritablePrimary" : "ismaster").trueValue();
     return ok;
@@ -553,7 +553,7 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
     BSONObj cmd = bob.done();
 
     BSONObj res;
-    if (runCommand(DatabaseName(boost::none, "admin"), cmd, res, QueryOption_SecondaryOk)) {
+    if (runCommand(DatabaseName::kAdmin, cmd, res, QueryOption_SecondaryOk)) {
         BSONObj dbs = res["databases"].Obj();
         BSONObjIterator it(dbs);
         while (it.more()) {

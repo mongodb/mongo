@@ -1722,8 +1722,7 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(*operationTime);
-    _client.get()->runCommand(
-        DatabaseName(boost::none, "admin"), cmd, readResult, QueryOption_SecondaryOk);
+    _client.get()->runCommand(DatabaseName::kAdmin, cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "Failed to wait for retryable writes pre-fetch result majority committed");

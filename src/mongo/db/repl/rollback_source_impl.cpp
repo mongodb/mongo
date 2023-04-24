@@ -61,8 +61,7 @@ const HostAndPort& RollbackSourceImpl::getSource() const {
 
 int RollbackSourceImpl::getRollbackId() const {
     bo info;
-    _getConnection()->runCommand(
-        DatabaseName(boost::none, "admin"), BSON("replSetGetRBID" << 1), info);
+    _getConnection()->runCommand(DatabaseName::kAdmin, BSON("replSetGetRBID" << 1), info);
     return info["rbid"].numberInt();
 }
 

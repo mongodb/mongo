@@ -99,8 +99,7 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(_operationTime);
-    getClient()->runCommand(
-        DatabaseName(boost::none, "admin"), cmd, readResult, QueryOption_SecondaryOk);
+    getClient()->runCommand(DatabaseName::kAdmin, cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "TenantAllDatabaseCloner failed to get listDatabases result majority-committed");
@@ -163,7 +162,8 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesSta
         clonedDatabases.emplace_back(dbName);
 
         BSONObj res;
-        client.runCommand(DatabaseName(boost::none, dbName), BSON("dbStats" << 1), res);
+        client.runCommand(
+            DatabaseNameUtil::deserialize(boost::none, dbName), BSON("dbStats" << 1), res);
         if (auto status = getStatusFromCommandResult(res); !status.isOK()) {
             LOGV2_WARNING(5522900,
                           "Skipping recording of data size metrics for database due to failure "
@@ -233,7 +233,8 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::initializeStatsStage() {
     long long approxTotalDataSizeLeftOnRemote = 0;
     for (const auto& dbName : _databases) {
         BSONObj res;
-        getClient()->runCommand(DatabaseName(boost::none, dbName), BSON("dbStats" << 1), res);
+        getClient()->runCommand(
+            DatabaseNameUtil::deserialize(boost::none, dbName), BSON("dbStats" << 1), res);
         if (auto status = getStatusFromCommandResult(res); !status.isOK()) {
             LOGV2_WARNING(5426600,
                           "Skipping recording of data size metrics for database due to failure "
