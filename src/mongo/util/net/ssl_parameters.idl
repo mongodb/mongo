@@ -102,7 +102,7 @@ server_parameters:
         when fetching OCSP Responses for peer certificate
     set_at: startup
     cpp_vartype: int
-    default: 5
+    default: 4
     cpp_varname: "gTLSOCSPVerifyTimeoutSecs"
     validator:
       gte: 1
