@@ -426,8 +426,6 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
         // It is possible that this is called before FCV is properly set up. Setting up the store if
         // the flag is enabled but FCV is incorrect is safe, and guards against the FCV being
         // changed to a supported version later.
-        // TODO SERVER-73907. Move this to run after FCV is initialized. It could be we'd have to
-        // re-run this function if FCV changes later during the life of the process.
         if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
             // to not create a telemetry store in ConstructorActionRegisterer at start up with the
@@ -466,6 +464,7 @@ bool isTelemetryEnabled(const ServiceContext* serviceCtx) {
     // During initialization FCV may not yet be setup but queries could be run. We can't
     // check whether telemetry should be enabled without FCV, so default to not recording
     // those queries.
+    // TODO SERVER-75935 Remove FCV Check.
     return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility) &&
         telemetryStoreDecoration(serviceCtx)->getMaxSize() > 0;
