@@ -834,6 +834,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
