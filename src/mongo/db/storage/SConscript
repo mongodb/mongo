@@ -206,6 +206,17 @@ env.Library(
 )
 
 env.Library(
+    target='concurrency_adjustment_parameters',
+    source=[
+        'execution_control/concurrency_adjustment_validator.cpp',
+        'execution_control/concurrency_adjustment_parameters.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
     target='storage_engine_parameters',
     source=[
         'execution_control/throughput_probing.cpp',
@@ -219,6 +230,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/processinfo',
+        'concurrency_adjustment_parameters',
         'storage_engine_feature_flags',
     ],
 )
@@ -231,6 +243,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/periodic_runner',
+        'concurrency_adjustment_parameters',
         'storage_engine_parameters',
     ],
 )
