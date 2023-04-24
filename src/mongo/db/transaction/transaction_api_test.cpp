@@ -388,14 +388,12 @@ protected:
         _executor->startup();
         _inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
-        _sleepInlineExecutor = _inlineExecutor->getSleepableExecutor(_executor);
-
         auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
-            opCtx(), _inlineExecutor, _sleepInlineExecutor, nullptr);
+            opCtx(), _inlineExecutor, _inlineExecutor->getSleepableExecutor(_executor), nullptr);
         _mockClient = mockClient.get();
         _txnWithRetries =
             std::make_unique<txn_api::SyncTransactionWithRetries>(opCtx(),
-                                                                  _sleepInlineExecutor,
+                                                                  _executor,
                                                                   nullptr /* resourceYielder */,
                                                                   _inlineExecutor,
                                                                   std::move(mockClient));
@@ -435,14 +433,15 @@ protected:
         return *_txnWithRetries;
     }
 
-    void resetTxnWithRetries(
-        std::unique_ptr<MockResourceYielder> resourceYielder = nullptr,
-        std::shared_ptr<executor::InlineExecutor::SleepableExecutor> executor = nullptr) {
-        auto executorToUse = _sleepInlineExecutor;
-
+    void resetTxnWithRetries(std::unique_ptr<MockResourceYielder> resourceYielder = nullptr,
+                             std::shared_ptr<executor::TaskExecutor> executor = nullptr) {
+        auto executorToUse = executor ? executor : _executor;
 
         auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
-            opCtx(), _inlineExecutor, executorToUse, nullptr);
+            opCtx(),
+            _inlineExecutor,
+            _inlineExecutor->getSleepableExecutor(executorToUse),
+            nullptr);
         _mockClient = mockClient.get();
         if (resourceYielder) {
             _resourceYielder = resourceYielder.get();
@@ -468,7 +467,7 @@ protected:
         waitForAllEarlierTasksToComplete();
         _txnWithRetries = nullptr;
         _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
-            opCtx(), _sleepInlineExecutor, nullptr, _inlineExecutor, std::move(txnClient));
+            opCtx(), _executor, nullptr, _inlineExecutor, std::move(txnClient));
     }
 
     void expectSentAbort(TxnNumber txnNumber, BSONObj writeConcern) {
@@ -486,7 +485,6 @@ private:
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 
     std::shared_ptr<executor::InlineExecutor> _inlineExecutor;
-    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _sleepInlineExecutor;
     txn_api::details::MockTransactionClient* _mockClient{nullptr};
     MockResourceYielder* _resourceYielder{nullptr};
     std::unique_ptr<txn_api::SyncTransactionWithRetries> _txnWithRetries;
@@ -1377,48 +1375,34 @@ TEST_F(TxnAPITest, HandlesExceptionWhileUnyielding) {
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
 }
 
-// TODO SERVER-75553 - with inline executors, this test runs in the wrong order
-#if 0
-TEST_F(TxnAPITest, UnyieldsAfterCancellation) {
+TEST_F(TxnAPITest, TransactionErrorTakesPrecedenceOverUnyieldError) {
     resetTxnWithRetries(std::make_unique<MockResourceYielder>());
-
-    unittest::Barrier txnApiStarted(2);
-    unittest::Barrier opCtxKilled(2);
-
-    auto killerThread = stdx::thread([&txnApiStarted, &opCtxKilled, opCtx = opCtx()] {
-        txnApiStarted.countDownAndWait();
-        opCtx->markKilled();
-        opCtxKilled.countDownAndWait();
-    });
 
     auto swResult = txnWithRetries().runNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
-            auto insertRes = txnClient
-                                 .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
-                                             BSON("insert"
-                                                  << "foo"
-                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                 .get();
+            auto insertRes =
+                txnClient
+                    .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                                BSON("insert"
+                                     << "foo"
+                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                    .get();
 
-            resourceYielder()->throwInUnyield(ErrorCodes::InternalError);
+            resourceYielder()->throwInUnyield(ErrorCodes::Interrupted);
 
-            txnApiStarted.countDownAndWait();
-            opCtxKilled.countDownAndWait();
+            uasserted(ErrorCodes::InternalError, "Mock error");
 
             return SemiFuture<void>::makeReady();
         });
 
-    // The transaction should fail with an Interrupted error from killing the opCtx using the
-    // API instead of the ResourceYielder error from within the API callback.
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // The transaction should fail with the error the transaction failed with instead of the
+    // ResourceYielder error.
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
     // Yield before starting and corresponding unyield.
     ASSERT_EQ(resourceYielder()->timesYielded(), 1);
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
-
-    killerThread.join();
 }
-#endif
 
 TEST_F(TxnAPITest, ClientSession_UsesNonRetryableInternalSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
@@ -2343,8 +2327,6 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionWCError) 
     runTest(true, Status(ErrorCodes::HostUnreachable, "mock retriable error"));
 }
 
-// TODO SERVER-75553 - test needs to be aborted and assumes multiple-threads
-#if 0
 TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortIfCancelled) {
     // Start the transaction with an insert.
     mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -2394,8 +2376,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
         std::make_unique<ThreadPool>(std::move(options)),
         executor::makeNetworkInterface("TxnAPITestNetwork"));
     executor->startup();
-    auto exec1 = executor::InlineExecutor().getSleepableExecutor(executor);
-    resetTxnWithRetries(nullptr /* resourceYielder */, exec1);
+    resetTxnWithRetries(nullptr /* resourceYielder */, executor);
 
     // Start the transaction with an insert.
     mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -2454,9 +2435,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
         std::make_unique<ThreadPool>(std::move(options)),
         executor::makeNetworkInterface("TxnAPITestNetwork"));
     executor->startup();
-    auto exec1 = executor::InlineExecutor().getSleepableExecutor(executor);
-
-    resetTxnWithRetries(nullptr /* resourceYielder */, exec1);
+    resetTxnWithRetries(nullptr /* resourceYielder */, executor);
 
     // Start the transaction with an insert.
     mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -2514,7 +2493,6 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
     executor->shutdown();
     executor->join();
 }
-#endif
 
 }  // namespace
 }  // namespace mongo

@@ -1508,9 +1508,8 @@ void ShardingCatalogManager::_addShardInTransaction(
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
     txn.run(opCtx, transactionChain);
 
     hangBeforeNotifyingaddShardCommitted.pauseWhileSet();
@@ -1571,11 +1570,10 @@ void ShardingCatalogManager::_removeShardInTransaction(OperationContext* opCtx,
             .semi();
     };
 
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
 
     txn.run(opCtx, removeShardFn);
 }

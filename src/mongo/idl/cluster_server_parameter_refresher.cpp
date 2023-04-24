@@ -149,9 +149,7 @@ getFCVAndClusterParametersFromConfigServer() {
 
     auto executor = Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx.get(), sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx.get(), executor, nullptr, inlineExecutor);
     txn.run(opCtx.get(), doFetch);
     return {*fcv, *allDocs};
 }

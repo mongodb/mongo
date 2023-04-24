@@ -178,13 +178,16 @@ public:
      *
      * Optionally accepts a custom TransactionClient and will default to a client that runs commands
      * against the local service entry point.
+     *
+     * Will run all tasks synchronously on the caller's thread via the InlineExecutor. Will sleep
+     * between retries and schedule any necessary cleanup (e.g. abortTransaction commands) using the
+     * sleepAndCleanupExecutor.
      */
-    SyncTransactionWithRetries(
-        OperationContext* opCtx,
-        std::shared_ptr<executor::InlineExecutor::SleepableExecutor> sleepableExecutor,
-        std::unique_ptr<ResourceYielder> resourceYielder,
-        std::shared_ptr<executor::InlineExecutor> executor,
-        std::unique_ptr<TransactionClient> txnClient = nullptr);
+    SyncTransactionWithRetries(OperationContext* opCtx,
+                               std::shared_ptr<executor::TaskExecutor> sleepAndCleanupExecutor,
+                               std::unique_ptr<ResourceYielder> resourceYielder,
+                               std::shared_ptr<executor::InlineExecutor> executor,
+                               std::unique_ptr<TransactionClient> txnClient = nullptr);
     /**
      * Returns a bundle with the commit command status and write concern error, if any. Any error
      * prior to receiving a response from commit (e.g. an interruption or a user assertion in the
@@ -215,6 +218,7 @@ private:
     std::unique_ptr<ResourceYielder> _resourceYielder;
     std::shared_ptr<executor::InlineExecutor> _inlineExecutor;
     std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _sleepExec;
+    std::shared_ptr<executor::TaskExecutor> _cleanupExecutor;
     std::shared_ptr<details::TransactionWithRetries> _txn;
 };
 
@@ -607,10 +611,15 @@ public:
     }
 
     /**
-     * If the transaction needs to be cleaned up, i.e. aborted, this will schedule the necessary
-     * work. Callers can wait for cleanup by waiting on the returned future.
+     * Returns if the transaction needs to be cleaned up, i.e. aborted.
      */
-    SemiFuture<void> cleanUpIfNecessary();
+    bool needsCleanup();
+
+    /**
+     * Schedules the necessary work to clean up the transacton, assuming it needs cleanup. Callers
+     * can wait for cleanup by waiting on the returned future.
+     */
+    SemiFuture<void> cleanUp();
 
 private:
     // Helper methods for running a transaction.

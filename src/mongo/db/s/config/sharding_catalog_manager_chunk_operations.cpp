@@ -458,9 +458,8 @@ void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
     txn.run(opCtx, updateChunksFn);
 }
 
@@ -676,9 +675,8 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
 
     // TODO: SERVER-72431 Make split chunk commit idempotent, with that we won't need anymore the
     // transaction precondition and we will be able to remove the try/catch on the transaction run
@@ -904,9 +902,8 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
     txn.run(opCtx, updateChunksFn);
 }
 
@@ -2261,11 +2258,10 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
         };
         auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
         txn_api::SyncTransactionWithRetries txn(
             opCtx,
-            sleepInlineExecutor,
+            executor,
             TransactionParticipantResourceYielder::make("setAllowMigrationsAndBumpOneChunk"),
             inlineExecutor);
 
@@ -2490,9 +2486,8 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
 
     txn.run(opCtx, transactionChain);
 }

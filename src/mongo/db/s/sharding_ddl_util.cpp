@@ -896,7 +896,6 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     }();
 
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
     // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
     // routed to the CSRS.
@@ -909,6 +908,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
             return nullptr;
         }
 
+        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
         return std::make_unique<txn_api::details::SEPTransactionClient>(
             newOpCtx,
             inlineExecutor,
@@ -925,7 +925,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     newOpCtx->setWriteConcern(writeConcern);
 
     txn_api::SyncTransactionWithRetries txn(newOpCtx,
-                                            sleepInlineExecutor,
+                                            executor,
                                             nullptr /*resourceYielder*/,
                                             inlineExecutor,
                                             std::move(customTxnClient));

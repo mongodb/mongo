@@ -557,11 +557,10 @@ void setInitializationTimeOnPlacementHistory(
     ScopeGuard resetWriteConcerGuard([opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
 
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, sleepInlineExecutor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
     txn.run(opCtx, transactionChain);
 
     LOGV2(7068807,
@@ -1113,11 +1112,10 @@ void ShardingCatalogManager::withTransactionAPI(OperationContext* opCtx,
                                                 const NamespaceString& namespaceForInitialFind,
                                                 txn_api::Callback callback) {
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     auto txn = txn_api::SyncTransactionWithRetries(
-        opCtx, sleepInlineExecutor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
     txn.run(opCtx,
             [innerCallback = std::move(callback),
              namespaceForInitialFind](const txn_api::TransactionClient& txnClient,

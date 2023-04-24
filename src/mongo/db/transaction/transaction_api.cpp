@@ -86,13 +86,14 @@ void runFutureInline(executor::InlineExecutor* inlineExecutor, Notification<void
 
 SyncTransactionWithRetries::SyncTransactionWithRetries(
     OperationContext* opCtx,
-    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> sleepableExecutor,
+    std::shared_ptr<executor::TaskExecutor> sleepAndCleanupExecutor,
     std::unique_ptr<ResourceYielder> resourceYielder,
     std::shared_ptr<executor::InlineExecutor> inlineExecutor,
     std::unique_ptr<TransactionClient> txnClient)
     : _resourceYielder(std::move(resourceYielder)),
       _inlineExecutor(inlineExecutor),
-      _sleepExec(sleepableExecutor),
+      _sleepExec(inlineExecutor->getSleepableExecutor(sleepAndCleanupExecutor)),
+      _cleanupExecutor(sleepAndCleanupExecutor),
       _txn(std::make_shared<details::TransactionWithRetries>(
           opCtx,
           _sleepExec,
@@ -101,9 +102,8 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
                     : std::make_unique<details::SEPTransactionClient>(
                           opCtx,
                           inlineExecutor,
-                          sleepableExecutor,
+                          _sleepExec,
                           std::make_unique<details::DefaultSEPTransactionClientBehaviors>()))) {
-
     // Callers should always provide a yielder when using the API with a session checked out,
     // otherwise commands run by the API won't be able to check out that session.
     invariant(!OperationContextSession::get(opCtx) || _resourceYielder);
@@ -123,7 +123,6 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
                          .tapAll([&](auto&&) { mayReturn.set(); })
                          .semi();
 
-
     runFutureInline(_inlineExecutor.get(), mayReturn);
 
     auto txnResult = txnFuture.getNoThrow(opCtx);
@@ -131,28 +130,29 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     // Cancel the source to guarantee the transaction will terminate if our opCtx was interrupted.
     _source.cancel();
 
-    // Wait for transaction to complete before returning so variables referenced by its callback are
-    // guaranteed to be in scope even if the API caller's opCtx was interrupted.
-    txnFuture.wait();
-
     // Post transaction processing, which must also happen inline.
     OperationTimeTracker::get(opCtx)->updateOperationTime(_txn->getOperationTime());
     repl::ReplClientInfo::forClient(opCtx->getClient())
         .setLastProxyWriteTimestampForward(_txn->getOperationTime().asTimestamp());
 
-    // Run cleanup tasks after the caller has finished waiting so the caller can't be blocked.
-    // Attempt to wait for cleanup so it appears synchronous for most callers, but allow
-    // interruptions so we return immediately if the opCtx has been cancelled.
-    //
-    // Also schedule after getting the transaction's operation time so the best effort abort can't
-    // unnecessarily advance it.
-    Notification<void> mayReturnFromCleanup;
-    auto cleanUpFuture = _txn->cleanUpIfNecessary().unsafeToInlineFuture().tapAll(
-        [&](auto&&) { mayReturnFromCleanup.set(); });
-
-    runFutureInline(_inlineExecutor.get(), mayReturnFromCleanup);
-
-    cleanUpFuture.getNoThrow(opCtx).ignore();
+    if (_txn->needsCleanup()) {
+        // Schedule cleanup on an out of line executor so it runs even if the transaction was
+        // cancelled. Attempt to wait for cleanup so it appears synchronous for most callers, but
+        // allow interruptions so we return immediately if the opCtx has been cancelled.
+        //
+        // Also schedule after getting the transaction's operation time so the best effort abort
+        // can't unnecessarily advance it.
+        ExecutorFuture<void>(_cleanupExecutor)
+            .then([txn = _txn, inlineExecutor = _inlineExecutor]() mutable {
+                Notification<void> mayReturnFromCleanup;
+                auto cleanUpFuture = txn->cleanUp().unsafeToInlineFuture().tapAll(
+                    [&](auto&&) { mayReturnFromCleanup.set(); });
+                runFutureInline(inlineExecutor.get(), mayReturnFromCleanup);
+                return cleanUpFuture;
+            })
+            .getNoThrow(opCtx)
+            .ignore();
+    }
 
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
 
@@ -509,7 +509,6 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
 
 BatchedCommandResponse SEPTransactionClient::runCRUDOpSync(const BatchedCommandRequest& cmd,
                                                            std::vector<StmtId> stmtIds) const {
-
     Notification<void> mayReturn;
 
     auto result =
@@ -832,10 +831,12 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
     return ErrorHandlingStep::kAbortAndDoNotRetry;
 }
 
-SemiFuture<void> TransactionWithRetries::cleanUpIfNecessary() {
-    if (!_internalTxn->needsCleanup()) {
-        return SemiFuture<void>(Status::OK());
-    }
+bool TransactionWithRetries::needsCleanup() {
+    return _internalTxn->needsCleanup();
+}
+
+SemiFuture<void> TransactionWithRetries::cleanUp() {
+    tassert(7567600, "Unnecessarily cleaning up transaction", _internalTxn->needsCleanup());
 
     return _bestEffortAbort()
         // Safe to inline because the continuation only holds state.

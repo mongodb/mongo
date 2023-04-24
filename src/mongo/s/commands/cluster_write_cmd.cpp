@@ -163,10 +163,9 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
     auto txn = txn_api::SyncTransactionWithRetries(
-        opCtx, sleepInlineExecutor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -243,12 +242,8 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     auto sharedBlock = std::make_shared<SharedBlock>(changeInfo, request->getNS());
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
-    auto txn =
-        txn_api::SyncTransactionWithRetries(opCtx,
-                                            sleepInlineExecutor,
-                                            TransactionRouterResourceYielder::makeForLocalHandoff(),
-                                            inlineExecutor);
+    auto txn = txn_api::SyncTransactionWithRetries(
+        opCtx, executor, TransactionRouterResourceYielder::makeForLocalHandoff(), inlineExecutor);
 
     try {
         txn.run(opCtx,

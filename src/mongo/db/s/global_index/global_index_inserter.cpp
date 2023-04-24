@@ -103,9 +103,7 @@ void GlobalIndexInserter::processDoc(OperationContext* opCtx,
         };
 
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(_executor);
-
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, _executor, nullptr, inlineExecutor);
     txn.run(opCtx, insertToGlobalIndexFn);
 }
 

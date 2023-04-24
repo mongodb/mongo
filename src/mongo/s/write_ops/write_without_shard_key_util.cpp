@@ -270,13 +270,9 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    auto txn =
-        txn_api::SyncTransactionWithRetries(opCtx,
-                                            sleepInlineExecutor,
-                                            TransactionRouterResourceYielder::makeForLocalHandoff(),
-                                            inlineExecutor);
+    auto txn = txn_api::SyncTransactionWithRetries(
+        opCtx, executor, TransactionRouterResourceYielder::makeForLocalHandoff(), inlineExecutor);
 
     auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj);
     auto swResult = txn.runNoThrow(
