@@ -157,3 +157,26 @@ buildvariants:
     - name: compatibility-test-for-newer-releases
     - name: compatibility-test-for-patch-releases
     - name: import-compatibility-test
+
+- name: infrequent-checks
+  display_name: "~ Infrequent checks"
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
+    CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
+    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    cmake_generator: Ninja
+    make_command: ninja
+  tasks:
+    - name: memory-model-test
+      batchtime: 40320 # 28 days
+    - name: s-outdated-fixmes
+      batchtime: 10080 # 7 days
+    - name: s-string
+      batchtime: 129600 # 90 days
