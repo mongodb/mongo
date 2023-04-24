@@ -193,7 +193,7 @@ class ShardedClusterFixture(interface.Fixture):
                         time.sleep(0.1)
 
     # TODO SERVER-76343 remove the join_migrations parameter and the if clause depending on it.
-    def stop_balancer(self, timeout_ms=60000, join_migrations=True):
+    def stop_balancer(self, timeout_ms=300000, join_migrations=True):
         """Stop the balancer."""
         client = interface.build_client(self, self.auth_options)
         client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
@@ -203,7 +203,7 @@ class ShardedClusterFixture(interface.Fixture):
                 shard_client.admin.command({"_shardsvrJoinMigrations": 1})
         self.logger.info("Stopped the balancer")
 
-    def start_balancer(self, timeout_ms=60000):
+    def start_balancer(self, timeout_ms=300000):
         """Start the balancer."""
         client = interface.build_client(self, self.auth_options)
         client.admin.command({"balancerStart": 1}, maxTimeMS=timeout_ms)
