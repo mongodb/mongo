@@ -37,6 +37,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -126,7 +127,8 @@ boost::optional<UUID> getOrGenerateSampleId(OperationContext* opCtx,
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot specify 'sampleRate' since it is an internal field",
-                !request.getSampleId() || (isInternalClient || getTestCommandsEnabled()));
+                !request.getSampleId() || isInternalClient ||
+                    TestingProctor::instance().isEnabled());
         return request.getSampleId();
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {

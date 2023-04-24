@@ -10,9 +10,6 @@
 load("jstests/libs/config_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
-// Set this to allow sample ids to be set by an external client.
-TestData.enableTestCommands = true;
-
 const supportedTestCases = [
     {collectionExists: true, markForSampling: true, expectSampling: true},
     {collectionExists: true, markForSampling: false, expectSampling: false},

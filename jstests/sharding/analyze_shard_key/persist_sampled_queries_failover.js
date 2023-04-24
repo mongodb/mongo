@@ -10,9 +10,6 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
-// Set this to allow sample ids to be set by an external client.
-TestData.enableTestCommands = true;
-
 function testStepDown(rst) {
     const dbName = "testDb";
     const collName = "testCollStepDown";
