@@ -3,7 +3,7 @@
  * config.image_collection entries for a transaction session if the logical session that it
  * corresponds to has expired and been removed from the config.system.sessions collection.
  *
- * @tags: [requires_fcv_70, uses_transactions]
+ * @tags: [requires_fcv_60, uses_transactions]
  */
 
 (function() {

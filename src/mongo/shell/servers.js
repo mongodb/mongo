@@ -893,6 +893,8 @@ MongoRunner.mongosOptions = function(opts) {
 
     _removeSetParameterIfBeforeVersion(
         opts, "mongosShutdownTimeoutMillisForSignaledShutdown", "4.5.0", true);
+    _removeSetParameterIfBeforeVersion(
+        opts, "failpoint.skipClusterParameterRefresh", "7.1.0", true);
 
     return opts;
 };

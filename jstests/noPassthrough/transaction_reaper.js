@@ -1,5 +1,4 @@
 // @tags: [
-//   requires_fcv_70,
 //   requires_replication,
 //   requires_sharding,
 // ]

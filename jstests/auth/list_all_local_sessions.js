@@ -1,5 +1,5 @@
 // Auth tests for the $listLocalSessions {allUsers:true} aggregation stage.
-// @tags: [requires_fcv_70, requires_sharding]
+// @tags: [requires_sharding]
 
 (function() {
 'use strict';

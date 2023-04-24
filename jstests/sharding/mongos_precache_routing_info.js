@@ -1,5 +1,3 @@
-// @tags: [requires_fcv_70]
-
 (function() {
 'use strict';
 

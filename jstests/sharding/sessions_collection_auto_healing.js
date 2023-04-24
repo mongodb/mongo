@@ -1,7 +1,6 @@
 /**
  * Requires no shards.
  * @tags: [
- *   requires_fcv_70,
  *   config_shard_incompatible,
  *   requires_fcv_70,
  * ]

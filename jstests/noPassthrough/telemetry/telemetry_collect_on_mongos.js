@@ -1,6 +1,6 @@
 /**
  * Test that mongos is collecting telemetry metrics.
- * @tags: [requires_fcv_70, featureFlagTelemetry]
+ * @tags: [featureFlagTelemetry]
  */
 
 load('jstests/libs/telemetry_utils.js');

@@ -1,7 +1,6 @@
 // Tests multi-statement transactions metrics in the serverStatus output from mongos in various
 // basic cases.
 // @tags: [
-//   requires_fcv_70,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
