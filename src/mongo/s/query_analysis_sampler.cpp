@@ -331,11 +331,6 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
                                                          configuration.getSampleRate()});
         } else {
             auto rateLimiter = it->second;
-            if (it->second.getNss() != configuration.getNs()) {
-                // Nss changed due to collection rename.
-                // TODO SERVER-73990: Test collection renaming during query sampling
-                it->second.setNss(configuration.getNs());
-            }
             rateLimiter.refreshRate(configuration.getSampleRate());
             sampleRateLimiters.emplace(configuration.getNs(), std::move(rateLimiter));
         }

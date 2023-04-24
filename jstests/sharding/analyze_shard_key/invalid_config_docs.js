@@ -10,12 +10,13 @@
 
 function runAnalyzerDocTest(conn) {
     const configColl = conn.getCollection("config.queryAnalyzers");
-    assert.commandFailedWithCode(configColl.insert({_id: UUID(), unknownField: 0}),
-                                 40414 /* IDL required field error */);
-
     const dbName = "testDb";
     const collName = "testColl";
     const ns = dbName + "." + collName;
+
+    assert.commandFailedWithCode(configColl.insert({_id: ns, unknownField: 0}),
+                                 40414 /* IDL required field error */);
+
     assert.commandWorked(conn.getDB(dbName).createCollection(collName));
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1}));

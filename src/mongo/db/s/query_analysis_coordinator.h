@@ -53,7 +53,7 @@ namespace analyze_shard_key {
 class QueryAnalysisCoordinator : public ReplicaSetAwareService<QueryAnalysisCoordinator> {
 public:
     using CollectionQueryAnalyzerConfigurationMap =
-        stdx::unordered_map<UUID, CollectionQueryAnalyzerConfiguration, UUID::Hash>;
+        stdx::unordered_map<NamespaceString, CollectionQueryAnalyzerConfiguration>;
     /**
      * Stores the last ping time and the last exponential moving average number of queries executed
      * per second for a sampler.

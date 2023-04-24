@@ -44,8 +44,8 @@ function testBasic(createConnFn, rst, samplerNames) {
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", sampleRate: sampleRate1}));
     const configColl = conn.getCollection("config.queryAnalyzers");
-    const startTime0 = configColl.findOne({ns: ns0}).startTime;
-    const startTime1 = configColl.findOne({ns: ns1}).startTime;
+    const startTime0 = configColl.findOne({_id: ns0}).startTime;
+    const startTime1 = configColl.findOne({_id: ns1}).startTime;
 
     // Query distribution after: [1, unknown, unknown]. Verify that refreshing returns
     // sampleRate / numSamplers.
@@ -200,7 +200,7 @@ function testFailover(createConnFn, rst, samplerNames) {
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
     const configColl = conn.getCollection("config.queryAnalyzers");
-    const startTime = configColl.findOne({ns: ns}).startTime;
+    const startTime = configColl.findOne({_id: ns}).startTime;
 
     assert.commandWorked(
         primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
@@ -242,7 +242,7 @@ function testRestart(createConnFn, rst, samplerNames) {
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
     const configColl = conn.getCollection("config.queryAnalyzers");
-    const startTime = configColl.findOne({ns: ns}).startTime;
+    const startTime = configColl.findOne({_id: ns}).startTime;
 
     rst.stopSet(null /* signal */, true /*forRestart */);
     rst.startSet({restart: true});
