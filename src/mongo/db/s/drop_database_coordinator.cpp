@@ -103,6 +103,25 @@ private:
     const BSONObj _reason;
 };
 
+bool isDbAlreadyDropped(OperationContext* opCtx,
+                        const boost::optional<mongo::DatabaseVersion>& dbVersion,
+                        const StringData& dbName) {
+    if (dbVersion) {
+        try {
+            auto const catalogClient = Grid::get(opCtx)->catalogClient();
+            const auto db = catalogClient->getDatabase(
+                opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+            if (dbVersion->getUuid() != db.getVersion().getUuid()) {
+                // The database was dropped and re-created with a different UUID
+                return true;
+            }
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // The database was already dropped
+            return true;
+        }
+    }
+    return false;
+}
 
 }  // namespace
 
@@ -254,18 +273,18 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
 
                 // ensure we do not delete collections of a different DB
-                if (!_firstExecution && _doc.getDatabaseVersion()) {
-                    try {
-                        const auto db = catalogClient->getDatabase(
-                            opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
-                        if (_doc.getDatabaseVersion()->getUuid() != db.getVersion().getUuid()) {
-                            VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-                            return;  // skip to FlushDatabaseCacheUpdates
-                        }
-                    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                        VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-                        return;  // skip to FlushDatabaseCacheUpdates
-                    }
+                if (!_firstExecution &&
+                    isDbAlreadyDropped(opCtx, _doc.getDatabaseVersion(), _dbName)) {
+                    // Clear the database sharding state so that all subsequent write operations
+                    // with the old database version will fail due to StaleDbVersion.
+                    // Note: because we are using an scoped critical section it could happen that
+                    // the dbversion being deleted is recovered once we return. It is a rare
+                    // occurence, but it might lead to a situation where the now former primary
+                    // will believe to still be primary.
+                    _clearDatabaseInfoOnPrimary(opCtx);
+                    _clearDatabaseInfoOnSecondaries(opCtx);
+                    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+                    return;  // skip to FlushDatabaseCacheUpdates
                 }
 
                 if (_doc.getCollInfo()) {
