@@ -44,6 +44,7 @@ class barrier {
 public:
     /* Mutexes have a deleted copy constructor so we need to as well. */
     barrier(barrier const &) = delete;
+    barrier &operator=(barrier const &) = delete;
     ~barrier() = default;
     explicit barrier(std::size_t thread_count);
     void wait();
@@ -56,6 +57,6 @@ private:
     std::size_t _generation;
 
     /* Timeout for the synchronization wait. */
-    const int _sync_timeout = 600;
+    const std::chrono::seconds _sync_timeout{600};
 };
 } // namespace test_harness

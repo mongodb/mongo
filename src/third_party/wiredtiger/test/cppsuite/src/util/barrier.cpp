@@ -39,14 +39,12 @@ void
 barrier::wait()
 {
     std::unique_lock<std::mutex> lock{_mutex};
-    auto lock_gen = _generation;
     if (!--_count) {
         _generation++;
         _count = _threshold;
         _cond.notify_all();
     } else {
-        if (!_cond.wait_for(lock, std::chrono::seconds(_sync_timeout),
-              [this, lock_gen] { return lock_gen != _generation; }))
+        if (_cond.wait_for(lock, _sync_timeout) == std::cv_status::timeout)
             logger::log_msg(LOG_WARN, "Barrier timed out!");
     }
 }
