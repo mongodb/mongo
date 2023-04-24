@@ -570,7 +570,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js !.non_win_dbg
-  - name: .concurrency
+  - name: .concurrency !.ubsan
     distros:
     - windows-vsCurrent-large
   - name: .config_fuzzer !.large
