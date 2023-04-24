@@ -1798,7 +1798,7 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "UUID: " << nsOrUUID.toStringForErrorMsg()
                           << " specified in provided db name: "
-                          << nsOrUUID.dbName()->toStringForErrorMsg()
+                          << nsOrUUID.dbName().toStringForErrorMsg()
                           << " resolved to a collection in a different database, resolved nss: "
                           << (*resolvedNss).toStringForErrorMsg(),
             resolvedNss->dbName() == nsOrUUID.dbName());

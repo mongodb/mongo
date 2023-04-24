@@ -86,7 +86,7 @@ OptionsAndIndexes getCollectionOptionsAndIndexes(OperationContext* opCtx,
     BSONObjBuilder optionsBob;
 
     auto all =
-        localClient.getCollectionInfos(*nssOrUUID.dbName(), BSON("info.uuid" << *nssOrUUID.uuid()));
+        localClient.getCollectionInfos(nssOrUUID.dbName(), BSON("info.uuid" << *nssOrUUID.uuid()));
 
     // There must be a collection at this time.
     invariant(!all.empty());

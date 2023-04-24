@@ -3047,7 +3047,7 @@ bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& ns
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
-    if (!isReplEnabled() || nsOrUUID.db() == DatabaseName::kLocal.db()) {
+    if (!isReplEnabled() || nsOrUUID.dbName().db() == DatabaseName::kLocal.db()) {
         // Writes on stand-alone nodes or "local" database are always permitted.
         return true;
     }
@@ -3064,7 +3064,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                                            const NamespaceStringOrUUID& nsOrUUID) {
-    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.db());
+    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.dbName().db());
 
     if (!canWriteToDB && !isSystemDotProfile(opCtx, nsOrUUID)) {
         return false;

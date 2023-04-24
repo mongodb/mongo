@@ -1716,9 +1716,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 initializes_db_name = True
         elif [arg for arg in constructor.args if arg.name == 'nssOrUUID']:
             if [field for field in struct.fields if field.serialize_op_msg_request_only]:
-                initializers.append(
-                    '_dbName(nssOrUUID.uuid() ? nssOrUUID.dbName().value() : nssOrUUID.nss()->dbName())'
-                )
+                initializers.append('_dbName(nssOrUUID.dbName())')
                 initializes_db_name = True
 
         # Serialize has fields third

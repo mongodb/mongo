@@ -893,10 +893,6 @@ public:
         return _dbname ? _dbname->db().toString() : "";
     }
 
-    const boost::optional<DatabaseName>& dbName() const {
-        return _dbname;
-    }
-
     void preferNssForSerialization() {
         _preferNssForSerialization = true;
     }
@@ -904,8 +900,8 @@ public:
     /**
      * Returns database name derived from either '_nss' or '_dbname'.
      */
-    StringData db() const {
-        return _nss ? _nss->db() : StringData(_dbname->db());
+    const DatabaseName& dbName() const {
+        return _nss ? _nss->dbName() : *_dbname;
     }
 
     /**

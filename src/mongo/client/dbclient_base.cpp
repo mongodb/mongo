@@ -283,11 +283,11 @@ long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
                               int limit,
                               int skip,
                               boost::optional<BSONObj> readConcernObj) {
-    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName() : (*nsOrUuid.nss()).dbName());
+    auto dbName = nsOrUuid.dbName();
 
     BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj);
     BSONObj res;
-    if (!runCommand(*dbName, cmd, res, options)) {
+    if (!runCommand(dbName, cmd, res, options)) {
         auto status = getStatusFromCommandResult(res);
         uassertStatusOK(status.withContext("count fails:"));
     }
@@ -778,10 +778,10 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
                                                 const BSONObj& cmd,
                                                 int options) {
     list<BSONObj> specs;
-    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName() : (*nsOrUuid.nss()).dbName());
+    auto dbName = nsOrUuid.dbName();
 
     BSONObj res;
-    if (runCommand(*dbName, cmd, res, options)) {
+    if (runCommand(dbName, cmd, res, options)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObjIterator i(cursorObj["firstBatch"].Obj());
         while (i.more()) {
@@ -795,7 +795,7 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
         const long long id = cursorObj["id"].Long();
         if (id != 0) {
             const auto cursorNs =
-                NamespaceStringUtil::deserialize(dbName->tenantId(), cursorObj["ns"].String());
+                NamespaceStringUtil::deserialize(dbName.tenantId(), cursorObj["ns"].String());
             if (nsOrUuid.nss()) {
                 invariant((*nsOrUuid.nss()) == cursorNs);
             }

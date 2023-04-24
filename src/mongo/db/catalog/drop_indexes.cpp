@@ -85,7 +85,7 @@ Status checkReplState(OperationContext* opCtx,
     if (writesAreReplicatedAndNotPrimary) {
         return Status(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while dropping indexes on database "
-                                    << dbAndUUID.dbName()->toStringForErrorMsg()
+                                    << dbAndUUID.dbName().toStringForErrorMsg()
                                     << " with collection " << dbAndUUID.uuid());
     }
 
@@ -96,7 +96,7 @@ Status checkReplState(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Cannot drop indexes on drop-pending namespace "
                                     << nss.toStringForErrorMsg() << " in database "
-                                    << dbAndUUID.dbName()->toStringForErrorMsg() << " with uuid "
+                                    << dbAndUUID.dbName().toStringForErrorMsg() << " with uuid "
                                     << dbAndUUID.uuid());
     }
 
@@ -479,7 +479,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                       str::stream()
                           << "Collection '" << nss.toStringForErrorMsg() << "' with UUID "
                           << dbAndUUID.uuid() << " in database "
-                          << dbAndUUID.dbName()->toStringForErrorMsg() << " does not exist.");
+                          << dbAndUUID.dbName().toStringForErrorMsg() << " does not exist.");
         }
 
         // The collection could have been renamed when we dropped locks.
