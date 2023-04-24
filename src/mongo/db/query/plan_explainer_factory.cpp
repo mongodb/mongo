@@ -81,10 +81,10 @@ std::unique_ptr<PlanExplainer> make(
     bool isMultiPlan,
     bool isFromPlanCache,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfoSBE) {
-    // TODO SERVER-64882: Consider invariant(debugInfoSBE) as we may not need to create a
-    // DebugInfoSBE from QuerySolution after the feature flag is removed. We currently need it
-    // because debugInfoSBE can be null if the plan was recovered from the classic plan cache.
-    if (!debugInfoSBE) {
+    // If the plan was recovered from the plan cache, we should already have 'debugInfoSBE'.
+    if (isFromPlanCache) {
+        invariant(debugInfoSBE);
+    } else {
         debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
             plan_cache_util::buildDebugInfo(solution));
     }

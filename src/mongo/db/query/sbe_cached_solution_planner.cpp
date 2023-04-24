@@ -99,6 +99,7 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                         std::move(roots[0].second),
                                                         maxReadsBeforeReplan);
 
+    tassert(6488200, "'debugInfo' should be initialized", candidate.data.stageData.debugInfo);
     auto explainer = plan_explainer_factory::make(
         candidate.root.get(),
         &candidate.data.stageData,
@@ -107,9 +108,7 @@ CandidatePlans CachedSolutionPlanner::plan(
         {},    /* rejectedCandidates */
         false, /* isMultiPlan */
         true,  /* isFromPlanCache */
-        candidate.data.stageData.debugInfo ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(
-                                                 *candidate.data.stageData.debugInfo)
-                                           : nullptr);
+        std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.stageData.debugInfo));
 
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
