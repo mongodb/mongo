@@ -44,8 +44,6 @@ enums:
         description: "Type of the sharding DDL Operation."
         type: string
         values:
-            # TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-            kMovePrimaryNoResilient: "movePrimaryNoResilient"
             kMovePrimary: "movePrimary"
             kDropDatabase: "dropDatabase_V2"
             # TODO SERVER-73627: Remove once 7.0 becomes last LTS.

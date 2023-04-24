@@ -5,7 +5,6 @@
 'use strict';
 
 load('jstests/libs/fail_point_util.js');
-load("jstests/libs/feature_flag_util.js");
 
 let st = new ShardingTest({
     mongos: 2,
@@ -288,12 +287,6 @@ st.forEachConnection(shard => {
 
 let cloningDataFPName = "hangBeforeCloningData";
 
-// TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-if (!FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary().getDB('admin'),
-                                         "ResilientMovePrimary")) {
-    cloningDataFPName = "hangInCloneStage";
-}
-
 createCollections();
 let fromShard = st.getPrimaryShard(dbName);
 let toShard = st.getOther(fromShard);
@@ -314,16 +307,6 @@ createCollections();
 fromShard = st.getPrimaryShard(dbName);
 toShard = st.getOther(fromShard);
 testMovePrimaryDDL(cloningDataFPName, fromShard, toShard, st.s.getDB("admin"), false, true);
-
-// TODO (SERVER-71309): Remove once 7.0 becomes last LTS. With the new DDL coordinator, the
-// recipient blocks any CRUD operations until movePrimary is complete.
-if (!FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "ResilientMovePrimary")) {
-    createCollections();
-    fromShard = st.getPrimaryShard(dbName);
-    toShard = st.getOther(fromShard);
-    testMovePrimary(
-        "hangInCleanStaleDataStage", fromShard, toShard, st.s.getDB(dbName), false, false);
-}
 
 overrideDDLLockTimeoutFPs.forEach(fp => fp.off());
 

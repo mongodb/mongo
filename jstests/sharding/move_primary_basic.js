@@ -110,10 +110,8 @@ jsTest.log('Test that only unsharded collections are moved');
     }
 }
 
-// TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-if (FeatureFlagUtil.isPresentAndEnabled(config.admin, 'ResilientMovePrimary')) {
-    jsTest.log('Test that orphaned documents on recipient causes the operation to fail');
-
+jsTest.log('Test that orphaned documents on recipient causes the operation to fail');
+{
     // Insert an orphaned document on shard1.
     assert.commandWorked(shard1.getCollection(coll1NS).insertOne({name: 'Emma'}));
 

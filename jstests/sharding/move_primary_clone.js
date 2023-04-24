@@ -1,8 +1,6 @@
 (function() {
 'use strict';
 
-load('jstests/libs/feature_flag_util.js');
-
 function sortByName(a, b) {
     if (a.name < b.name)
         return -1;
@@ -197,16 +195,9 @@ function movePrimaryWithFailpoint(sharded) {
         assert.commandFailedWithCode(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}),
                                      ErrorCodes.InvalidOptions);
     } else {
-        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-        if (!FeatureFlagUtil.isPresentAndEnabled(db, 'ResilientMovePrimary')) {
-            // If the collections are unsharded, we should fail when any collections being copied
-            // exist on the target shard.
-            assert.commandFailed(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
-        } else {
-            // The failure of the previous attempt caused the dirty data on the recipient to be
-            // dropped, so the data cloning shouldn't find any impediments.
-            assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
-        }
+        // The failure of the previous attempt caused the dirty data on the recipient to be dropped,
+        // so the data cloning shouldn't find any impediments.
+        assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
     }
 }
 

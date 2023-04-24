@@ -31,11 +31,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/move_primary_coordinator.h"
-#include "mongo/db/s/move_primary_coordinator_no_resilient.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -120,26 +118,6 @@ public:
 
         const auto coordinatorFuture = [&] {
             FixedFCVRegion fcvRegion(opCtx);
-
-            // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-            if (!feature_flags::gResilientMovePrimary.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                const auto coordinatorDoc = [&] {
-                    MovePrimaryCoordinatorDocument doc;
-                    doc.setShardingDDLCoordinatorMetadata(
-                        {{dbNss, DDLCoordinatorTypeEnum::kMovePrimaryNoResilient}});
-                    doc.setToShardId(toShardArg.toString());
-                    return doc.toBSON();
-                }();
-
-                const auto coordinator = [&] {
-                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                    return checked_pointer_cast<MovePrimaryCoordinatorNoResilient>(
-                        service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
-                }();
-
-                return coordinator->getCompletionFuture();
-            }
 
             auto shardRegistry = Grid::get(opCtx)->shardRegistry();
             // Ensure that the shard information is up-to-date as possible to catch the case where

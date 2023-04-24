@@ -568,15 +568,6 @@ private:
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
         const auto isDowngrading = originalVersion > requestedVersion;
         const auto isUpgrading = originalVersion < requestedVersion;
-        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-        if (isDowngrading &&
-            feature_flags::gResilientMovePrimary.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kMovePrimary);
-        }
-
         // TODO SERVER-68008: Remove collMod draining mechanism after 7.0 becomes last LTS.
         if (isDowngrading &&
             feature_flags::gCollModCoordinatorV3.isDisabledOnTargetFCVButEnabledOnOriginalFCV(

@@ -65,10 +65,6 @@ var $config = (function() {
                 ]);
         },
         movePrimary: function(db, collName, connCache) {
-            if (this.skipMovePrimary) {
-                return;
-            }
-
             db = getRandomDb(db);
             const shardId = getRandomShard(connCache);
 
@@ -116,9 +112,6 @@ var $config = (function() {
     };
 
     let setup = function(db, collName, cluster) {
-        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS. Prevent non-resilient movePrimary
-        // operations from being executed in multiversion suites.
-        this.skipMovePrimary = !FeatureFlagUtil.isEnabled(db.getMongo(), 'ResilientMovePrimary');
         this.skipMetadataChecks =
             // TODO SERVER-70396: remove this flag
             !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency');

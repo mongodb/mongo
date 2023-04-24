@@ -75,13 +75,6 @@ feature_flags:
     cpp_varname: feature_flags::gStopUsingConfigVersion
     default: true
     version: 6.2
-  # TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
-  featureFlagResilientMovePrimary:
-    description: "Enable the resilient coordinator for the movePrimary command in order to improve
-                 the tolerance in case of a failure on donor and recipient nodes"
-    cpp_varname: feature_flags::gResilientMovePrimary
-    default: true
-    version: 7.0
   featureFlagAutoMerger:
     description: "Feature flag for enabling auto-merging of contiguous chunks belonging to the same shard"
     cpp_varname: feature_flags::gAutoMerger
