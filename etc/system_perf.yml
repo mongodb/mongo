@@ -1759,7 +1759,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica.2022-10
-      infrastructure_provisioning: M60-like-replica.2022-10
+      infrastructure_provisioning: M60-like-replica.2023-04
       infrastructure_provisioning_release: 2022-11
       workload_setup: 2022-11
       platform: linux
