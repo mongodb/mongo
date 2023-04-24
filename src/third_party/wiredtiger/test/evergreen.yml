@@ -5413,15 +5413,6 @@ buildvariants:
     - name: ".stress-test-no-barrier-nonstandalone"
     - name: format-abort-recovery-stress-test-nonstandalone
 
-- name: large-scale-tests
-  display_name: "Large scale tests"
-  batchtime: 480 # 3 times a day
-  run_on:
-  - ubuntu2004-test
-  tasks:
-    - name: many-collection-test
-      distros: ubuntu2004-wt-large
-
 - name: cppsuite-stress-tests-ubuntu
   display_name: "Cppsuite Stress Tests Ubuntu 20.04"
   batchtime: 720 # twice a day
