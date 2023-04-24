@@ -145,10 +145,11 @@ function testMongosError() {
     const retryableInsertThread = new Thread((mongosHost, dbName, collName) => {
         const mongos = new Mongo(mongosHost);
         const session = mongos.startSession();
+        session.startTransaction();
         return session.getDatabase(dbName).runCommand({
             insert: collName,
             documents: [{a: 0, b: "retryable"}],
-            txnNumber: NumberLong(0),
+            txnNumber: NumberLong(session.getTxnNumber_forTesting()),
         });
     }, st.s.host, dbName, collName);
     retryableInsertThread.start();
