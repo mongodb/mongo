@@ -191,8 +191,11 @@ public:
     virtual size_t numValues() const = 0;
 
 protected:
+    // We expect most rows to end up containing this many values or fewer.
+    static constexpr int kInlinedVectorSize = 16;
+
     std::pair<TypeTags, Value> getValue(size_t index, int bufferLen) {
-        invariant(index < _numValues);
+        invariant(index < _tagList.size());
         auto tag = _tagList[index];
         auto val = _valList[index];
 
@@ -224,9 +227,8 @@ protected:
     }
 
     void appendValue(TypeTags tag, Value val) noexcept {
-        _tagList[_numValues] = tag;
-        _valList[_numValues] = val;
-        ++_numValues;
+        _tagList.push_back(tag);
+        _valList.push_back(val);
     }
 
     void appendValue(std::pair<TypeTags, Value> in) noexcept {
@@ -241,14 +243,12 @@ protected:
     // storing a pointer, we store an _offset_ into the under-construction buffer. Translation from
     // offset to pointer occurs as part of the 'readValues()' function.
     void appendValueBufferOffset(TypeTags tag) {
-        _tagList[_numValues] = tag;
-        _valList[_numValues] = value::bitcastFrom<int32_t>(_valueBufferBuilder->len());
-        ++_numValues;
+        _tagList.push_back(tag);
+        _valList.push_back(value::bitcastFrom<int32_t>(_valueBufferBuilder->len()));
     }
 
-    std::array<TypeTags, Ordering::kMaxCompoundIndexKeys> _tagList;
-    std::array<Value, Ordering::kMaxCompoundIndexKeys> _valList;
-    size_t _numValues = 0;
+    absl::InlinedVector<TypeTags, kInlinedVectorSize> _tagList;
+    absl::InlinedVector<Value, kInlinedVectorSize> _valList;
 
     BufBuilder* _valueBufferBuilder;
 };
@@ -270,11 +270,12 @@ public:
         // buffer, this value will remain in that buffer, even though we've removed it from the
         // list. It will still get deallocated along with everything else when that buffer gets
         // cleared or deleted, though, so there is no leak.
-        --_numValues;
+        _tagList.pop_back();
+        _valList.pop_back();
     }
 
     size_t numValues() const override {
-        return _numValues;
+        return _tagList.size();
     }
 
     /**
@@ -284,7 +285,7 @@ public:
      */
     void readValues(std::vector<OwnedValueAccessor>* accessors) {
         auto bufferLen = _valueBufferBuilder->len();
-        for (size_t i = 0; i < _numValues; ++i) {
+        for (size_t i = 0; i < _tagList.size(); ++i) {
             auto [tag, val] = getValue(i, bufferLen);
             invariant(i < accessors->size());
             (*accessors)[i].reset(false, tag, val);
@@ -304,7 +305,7 @@ public:
     size_t numValues() const override {
         size_t nVals = 0;
         size_t bufIdx = 0;
-        while (bufIdx < _numValues) {
+        while (bufIdx < _tagList.size()) {
             auto tag = _tagList[bufIdx];
             auto val = _valList[bufIdx];
             if (tag == TypeTags::Boolean && !bitcastTo<bool>(val)) {
