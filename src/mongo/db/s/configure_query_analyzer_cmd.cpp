@@ -191,8 +191,8 @@ public:
                 // If the mode is 'off', do not perform the update since that would overwrite the
                 // existing stop time.
                 request.setQuery(BSON(
-                    doc::kCollectionUuidFieldName
-                    << collUuid << doc::kModeFieldName
+                    doc::kNsFieldName
+                    << nss.toString() << doc::kModeFieldName
                     << BSON("$ne" << QueryAnalyzerMode_serializer(QueryAnalyzerModeEnum::kOff))));
 
                 std::vector<BSONObj> updates;
@@ -203,22 +203,27 @@ public:
                 request.setUpdate(write_ops::UpdateModification(updates));
             } else {
                 request.setUpsert(true);
-                request.setQuery(BSON(doc::kCollectionUuidFieldName << collUuid));
+                request.setQuery(BSON(doc::kNsFieldName << nss.toString()));
 
                 std::vector<BSONObj> updates;
                 BSONObjBuilder setBuilder;
                 setBuilder.appendElements(BSON(doc::kCollectionUuidFieldName
                                                << collUuid << doc::kNsFieldName << nss.toString()));
                 setBuilder.appendElements(newConfig.toBSON());
-                // If the mode remains the same, keep the original start time. Otherwise, set a new
-                // start time.
+                // If the mode or collection UUID is different, set a new start time. Otherwise,
+                // keep the original start time.
                 setBuilder.append(
                     doc::kStartTimeFieldName,
-                    BSON("$cond" << BSON("if" << BSON("$ne" << BSON_ARRAY(
-                                                          ("$" + doc::kModeFieldName)
-                                                          << QueryAnalyzerMode_serializer(mode)))
-                                              << "then" << currentTime << "else"
-                                              << ("$" + doc::kStartTimeFieldName))));
+                    BSON("$cond" << BSON(
+                             "if" << BSON("$or" << BSON_ARRAY(
+                                              BSON("$ne" << BSON_ARRAY(
+                                                       ("$" + doc::kModeFieldName)
+                                                       << QueryAnalyzerMode_serializer(mode)))
+                                              << BSON("$ne" << BSON_ARRAY(
+                                                          ("$" + doc::kCollectionUuidFieldName)
+                                                          << collUuid))))
+                                  << "then" << currentTime << "else"
+                                  << ("$" + doc::kStartTimeFieldName))));
                 updates.push_back(BSON("$set" << setBuilder.obj()));
                 updates.push_back(BSON("$unset" << doc::kStopTimeFieldName));
                 request.setUpdate(write_ops::UpdateModification(updates));
@@ -230,10 +235,12 @@ public:
 
             Response response;
             response.setNewConfiguration(newConfig);
-            if (auto preImageDoc = writeResult.getValue()) {
-                auto oldConfig = QueryAnalyzerConfiguration::parse(
-                    IDLParserContext("configureQueryAnalyzer"), *preImageDoc);
-                response.setOldConfiguration(oldConfig);
+            if (writeResult.getValue()) {
+                auto preImageDoc =
+                    doc::parse(IDLParserContext("configureQueryAnalyzer"), *writeResult.getValue());
+                if (preImageDoc.getCollectionUuid() == collUuid) {
+                    response.setOldConfiguration(preImageDoc.getConfiguration());
+                }
             } else {
                 uassert(ErrorCodes::IllegalOperation,
                         "Attempted to disable query sampling but query sampling was not active",

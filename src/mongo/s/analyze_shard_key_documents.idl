@@ -41,12 +41,13 @@ structs:
     strict: false
     fields:
       _id:
+        type: namespacestring
+        description: "The namespace of the collection."
+        cpp_name: ns
+      collUuid:
         type: uuid
         description: "The UUID of the collection."
         cpp_name: collectionUuid
-      ns:
-        type: namespacestring
-        description: "The namespace of the collection."
       startTime:
         type: date
         description: "The time at which query sampling began."

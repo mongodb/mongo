@@ -84,23 +84,20 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
          serverGlobalParams.clusterRole.has(ClusterRole::None));
 
-    const double sampleRate0 = 0.0;
-    const double sampleRate1Before = 0.0000000001;
-    const double sampleRate1After = 222.2;
-
     // The mock size for each sampled read or write query, in bytes.
     const int64_t sampledQueryDocSizeBytes = 10;
 
     auto opCtx = operationContext();
     QueryAnalysisSampleTracker& tracker = QueryAnalysisSampleTracker::get(opCtx);
 
-    // Add first configuration and refresh.
+    // Add the configuration for collection0 and refresh.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV1;
-    auto startTime0 = now();
-    configurationsV1.emplace_back(nss0, collUuid0, sampleRate0, startTime0);
+    const double sampleRate0Before = 0.0;
+    const auto startTime0Before = now();
+    configurationsV1.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
     tracker.refreshConfigurations(configurationsV1);
 
-    // Verify currentOp, one configuration.
+    // Verify currentOp, one active collection.
     std::vector<BSONObj> ops;
     tracker.reportForCurrentOp(&ops);
     ASSERT_EQ(1, ops.size());
@@ -111,9 +108,9 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
     }
-    ASSERT_EQ(parsedOp.getStartTime(), startTime0);
+    ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
     if (supportsPersisting) {
@@ -121,7 +118,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
     }
 
-    // Verify server status, one configuration.
+    // Verify server status, one active collection.
     BSONObj serverStatus;
     serverStatus = tracker.reportForServerStatus();
     auto parsedServerStatus = QueryAnalysisServerStatus::parse(
@@ -136,14 +133,15 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 0L);
     }
 
-    // Add second configuration and refresh.
+    // Add the configuration for collection1 and refresh.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV2;
-    configurationsV2.emplace_back(nss0, collUuid0, sampleRate0, startTime0);
-    auto startTime1Before = now();
+    configurationsV2.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
+    const double sampleRate1Before = 0.0000000001;
+    const auto startTime1Before = now();
     configurationsV2.emplace_back(nss1, collUuid1, sampleRate1Before, startTime1Before);
     tracker.refreshConfigurations(configurationsV2);
 
-    // Verify currentOp, two configurations.
+    // Verify currentOp, two active collections.
     ops.clear();
     tracker.reportForCurrentOp(&ops);
     ASSERT_EQ(2, ops.size());
@@ -154,9 +152,9 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
     }
-    ASSERT_EQ(parsedOp.getStartTime(), startTime0);
+    ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
     if (supportsPersisting) {
@@ -179,7 +177,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
     }
 
-    // Verify server status, two configurations.
+    // Verify server status, two active collections.
     serverStatus = tracker.reportForServerStatus();
     parsedServerStatus = QueryAnalysisServerStatus::parse(
         IDLParserContext("QueryAnalysisSampleTrackerTest.RefreshConfigIncrementAndReport_TEST"),
@@ -193,10 +191,10 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 0L);
     }
 
-    // Modify second configuration and refresh.
+    // Update the sample rate for collection1 and refresh.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV3;
-    configurationsV3.emplace_back(nss0, collUuid0, sampleRate0, startTime0);
-    configurationsV3.emplace_back(nss1, collUuid1, sampleRate1After, startTime1Before);
+    configurationsV3.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
+    configurationsV3.emplace_back(nss1, collUuid1, sampleRate1Before, startTime1Before);
     tracker.refreshConfigurations(configurationsV3);
 
     // Increment read and write counters.
@@ -214,7 +212,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         tracker.incrementWrites(opCtx, nss1, collUuid1);
     }
 
-    // Verify currentOp, two configurations, updated sample rate.
+    // Verify currentOp, two active collections.
     ops.clear();
     tracker.reportForCurrentOp(&ops);
     ASSERT_EQ(2, ops.size());
@@ -224,9 +222,9 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
     }
-    ASSERT_EQ(parsedOp.getStartTime(), startTime0);
+    ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
     if (supportsPersisting) {
@@ -239,7 +237,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss1);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1After);
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime1Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 2);
@@ -249,7 +247,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
     }
 
-    // Verify server status, two configurations.
+    // Verify server status, two active collections.
     serverStatus = tracker.reportForServerStatus();
     parsedServerStatus = QueryAnalysisServerStatus::parse(
         IDLParserContext("QueryAnalysisSampleTrackerTest.RefreshConfigIncrementAndReport_TEST"),
@@ -263,12 +261,12 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
     }
 
-    // Second configuration becomes inactive.
+    // Remove the configuration for collection1.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV4;
-    configurationsV4.emplace_back(nss0, collUuid0, sampleRate0, startTime0);
+    configurationsV4.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
     tracker.refreshConfigurations(configurationsV4);
 
-    // Verify currentOp, one remaining configuration.
+    // Verify currentOp, one active configuration.
     ops.clear();
     tracker.reportForCurrentOp(&ops);
     ASSERT_EQ(1, ops.size());
@@ -278,9 +276,9 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
     }
-    ASSERT_EQ(parsedOp.getStartTime(), startTime0);
+    ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
     if (supportsPersisting) {
@@ -288,7 +286,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
     }
 
-    // Verify server status, one remaining configuration.
+    // Verify server status, one active configuration.
     serverStatus = tracker.reportForServerStatus();
     parsedServerStatus = QueryAnalysisServerStatus::parse(
         IDLParserContext("QueryAnalysisSampleTrackerTest.RefreshConfigIncrementAndReport_TEST"),
@@ -302,14 +300,15 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
     }
 
-    // Second configuration becomes active again
+    // Add new configuration for collection1 (same collection uuid).
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV5;
-    configurationsV5.emplace_back(nss0, collUuid0, sampleRate0, startTime0);
-    auto startTime1After = now();
+    configurationsV5.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
+    const double sampleRate1After = 222.2;
+    const auto startTime1After = now();
     configurationsV5.emplace_back(nss1, collUuid1, sampleRate1After, startTime1After);
     tracker.refreshConfigurations(configurationsV5);
 
-    // Verify currentOp, two configurations, updated sample rate.
+    // Verify currentOp, two active collections.
     ops.clear();
     tracker.reportForCurrentOp(&ops);
     ASSERT_EQ(2, ops.size());
@@ -320,9 +319,9 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
     }
-    ASSERT_EQ(parsedOp.getStartTime(), startTime0);
+    ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
     if (supportsPersisting) {
@@ -346,12 +345,56 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
     }
 
-    // Verify server status, two configurations.
+    // Verify server status, two active collections.
     serverStatus = tracker.reportForServerStatus();
     parsedServerStatus = QueryAnalysisServerStatus::parse(
         IDLParserContext("QueryAnalysisSampleTrackerTest.RefreshConfigIncrementAndReport_TEST"),
         serverStatus);
     ASSERT_EQ(parsedServerStatus.getActiveCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);
+    if (supportsPersisting) {
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 3 * sampledQueryDocSizeBytes);
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
+    }
+
+    // Remove the configuration for collection1, and make the configuration for collection0 have
+    // a different collection uuid.
+    std::vector<CollectionQueryAnalyzerConfiguration> configurationsV6;
+    const auto collUuid0After = UUID::gen();
+    const auto sampleRate0After = 1.5;
+    const auto startTime0After = now();
+    configurationsV6.emplace_back(nss0, collUuid0After, sampleRate0After, startTime0After);
+    tracker.refreshConfigurations(configurationsV6);
+
+    // Verify currentOp, one active collection. The counters should have been reset.
+    ops.clear();
+    tracker.reportForCurrentOp(&ops);
+    ASSERT_EQ(1, ops.size());
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleTrackerTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[0]);
+    ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
+    ASSERT_EQ(parsedOp.getNs(), nss0);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid0After);
+    if (supportsSampling) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0After);
+    }
+    ASSERT_EQ(parsedOp.getStartTime(), startTime0After);
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
+    if (supportsPersisting) {
+        ASSERT_EQ(*parsedOp.getSampledReadsBytes(), 0);
+        ASSERT_EQ(*parsedOp.getSampledWritesBytes(), 0);
+    }
+
+    // Verify server status, one active collection.
+    serverStatus = tracker.reportForServerStatus();
+    parsedServerStatus = QueryAnalysisServerStatus::parse(
+        IDLParserContext("QueryAnalysisSampleTrackerTest.RefreshConfigIncrementAndReport_TEST"),
+        serverStatus);
+    ASSERT_EQ(parsedServerStatus.getActiveCollections(), 1);
     ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
     ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
     ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);

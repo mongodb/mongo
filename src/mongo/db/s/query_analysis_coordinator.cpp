@@ -74,34 +74,33 @@ void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument
     stdx::lock_guard<Latch> lk(_mutex);
 
     LOGV2(7372308, "Detected new query analyzer configuration", "configuration"_attr = doc);
-
     if (doc.getMode() == QueryAnalyzerModeEnum::kOff) {
         // Do not create an entry for it if the mode is "off".
         return;
     }
-
     auto configuration = CollectionQueryAnalyzerConfiguration{
         doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
-
-    _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
+    _configurations.emplace(doc.getNs(), std::move(configuration));
 }
 
 void QueryAnalysisCoordinator::onConfigurationUpdate(const QueryAnalyzerDocument& doc) {
     stdx::lock_guard<Latch> lk(_mutex);
 
     LOGV2(7372309, "Detected a query analyzer configuration update", "configuration"_attr = doc);
-
     if (doc.getMode() == QueryAnalyzerModeEnum::kOff) {
         // Remove the entry for it if the mode has been set to "off".
-        _configurations.erase(doc.getCollectionUuid());
+        _configurations.erase(doc.getNs());
     } else {
-        auto it = _configurations.find(doc.getCollectionUuid());
+        auto it = _configurations.find(doc.getNs());
         if (it == _configurations.end()) {
             auto configuration = CollectionQueryAnalyzerConfiguration{
                 doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
-            _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
+            _configurations.emplace(doc.getNs(), std::move(configuration));
         } else {
             it->second.setSampleRate(*doc.getSampleRate());
+            it->second.setStartTime(doc.getStartTime());
+            // The collection could have been dropped and recreated.
+            it->second.setCollectionUuid(doc.getCollectionUuid());
         }
     }
 }
@@ -110,8 +109,7 @@ void QueryAnalysisCoordinator::onConfigurationDelete(const QueryAnalyzerDocument
     stdx::lock_guard<Latch> lk(_mutex);
 
     LOGV2(7372310, "Detected a query analyzer configuration delete", "configuration"_attr = doc);
-
-    _configurations.erase(doc.getCollectionUuid());
+    _configurations.erase(doc.getNs());
 }
 
 Date_t QueryAnalysisCoordinator::_getMinLastPingTime() {
@@ -185,8 +183,7 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
             invariant(doc.getMode() != QueryAnalyzerModeEnum::kOff);
             auto configuration = CollectionQueryAnalyzerConfiguration{
                 doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
-            auto [_, inserted] =
-                _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
+            auto [_, inserted] = _configurations.emplace(doc.getNs(), std::move(configuration));
             invariant(inserted);
         }
     }

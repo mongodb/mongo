@@ -92,7 +92,7 @@ protected:
     void assertContainsConfiguration(
         const QueryAnalysisCoordinator::CollectionQueryAnalyzerConfigurationMap& configurations,
         QueryAnalyzerDocument analyzerDoc) {
-        auto it = configurations.find(analyzerDoc.getCollectionUuid());
+        auto it = configurations.find(analyzerDoc.getNs());
         ASSERT(it != configurations.end());
         auto& configuration = it->second;
         ASSERT_EQ(configuration.getNs(), analyzerDoc.getNs());
@@ -211,7 +211,7 @@ TEST_F(QueryAnalysisCoordinatorTest, CreateConfigurationsOnInsert) {
     assertContainsConfiguration(configurations, analyzerDoc1);
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsOnSampleRateUpdate) {
+TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsSameCollectionUUid) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     // There are no configurations initially.
@@ -219,7 +219,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsOnSampleRateUpdate) {
     ASSERT(configurations.empty());
 
     auto analyzerDocPreUpdate =
-        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 0.5);
+        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 0.5, now());
     uassertStatusOK(insertToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDocPreUpdate.toBSON()));
@@ -228,13 +228,16 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsOnSampleRateUpdate) {
     ASSERT_EQ(configurations.size(), 1U);
     assertContainsConfiguration(configurations, analyzerDocPreUpdate);
 
+    advanceTime(Seconds(1));
+
     auto analyzerDocPostUpdate =
-        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 1.5);
-    uassertStatusOK(updateToConfigCollection(operationContext(),
-                                             NamespaceString::kConfigQueryAnalyzersNamespace,
-                                             BSON("_id" << collUuid0),
-                                             analyzerDocPostUpdate.toBSON(),
-                                             false /* upsert */));
+        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 1.5, now());
+    uassertStatusOK(
+        updateToConfigCollection(operationContext(),
+                                 NamespaceString::kConfigQueryAnalyzersNamespace,
+                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
+                                 analyzerDocPostUpdate.toBSON(),
+                                 false /* upsert */));
 
     // The update should cause the configuration to have the new sample rate.
     configurations = coordinator->getConfigurationsForTest();
@@ -242,7 +245,42 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsOnSampleRateUpdate) {
     assertContainsConfiguration(configurations, analyzerDocPostUpdate);
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, UpdateOrRemoveConfigurationsOnModeUpdate) {
+TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationDifferentCollectionUUid) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no configurations initially.
+    auto configurations = coordinator->getConfigurationsForTest();
+    ASSERT(configurations.empty());
+
+    auto analyzerDocPreUpdate =
+        makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 0.5, now());
+    uassertStatusOK(insertToConfigCollection(operationContext(),
+                                             NamespaceString::kConfigQueryAnalyzersNamespace,
+                                             analyzerDocPreUpdate.toBSON()));
+
+    configurations = coordinator->getConfigurationsForTest();
+    ASSERT_EQ(configurations.size(), 1U);
+    assertContainsConfiguration(configurations, analyzerDocPreUpdate);
+
+    advanceTime(Seconds(1));
+
+    auto analyzerDocPostUpdate = makeConfigQueryAnalyzersDocument(
+        nss0, UUID::gen(), QueryAnalyzerModeEnum::kFull, 1.5, now());
+    uassertStatusOK(
+        updateToConfigCollection(operationContext(),
+                                 NamespaceString::kConfigQueryAnalyzersNamespace,
+                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
+                                 analyzerDocPostUpdate.toBSON(),
+                                 false /* upsert */));
+
+    // The update should cause the configuration to have the new collection uuid, sample rate and
+    // start time.
+    configurations = coordinator->getConfigurationsForTest();
+    ASSERT_EQ(configurations.size(), 1U);
+    assertContainsConfiguration(configurations, analyzerDocPostUpdate);
+}
+
+TEST_F(QueryAnalysisCoordinatorTest, RemoveOrCreateConfigurationsOnModeUpdate) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     // There are no configurations initially.
@@ -261,11 +299,12 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateOrRemoveConfigurationsOnModeUpdate) {
 
     auto analyzerDocPostUpdate0 =
         makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kOff);
-    uassertStatusOK(updateToConfigCollection(operationContext(),
-                                             NamespaceString::kConfigQueryAnalyzersNamespace,
-                                             BSON("_id" << collUuid0),
-                                             analyzerDocPostUpdate0.toBSON(),
-                                             false /* upsert */));
+    uassertStatusOK(
+        updateToConfigCollection(operationContext(),
+                                 NamespaceString::kConfigQueryAnalyzersNamespace,
+                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
+                                 analyzerDocPostUpdate0.toBSON(),
+                                 false /* upsert */));
 
     // The update to mode "off" should cause the configuration to get removed.
     configurations = coordinator->getConfigurationsForTest();
@@ -273,11 +312,12 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateOrRemoveConfigurationsOnModeUpdate) {
 
     auto analyzerDocPostUpdate1 =
         makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 15);
-    uassertStatusOK(updateToConfigCollection(operationContext(),
-                                             NamespaceString::kConfigQueryAnalyzersNamespace,
-                                             BSON("_id" << collUuid0),
-                                             analyzerDocPostUpdate1.toBSON(),
-                                             false /* upsert */));
+    uassertStatusOK(
+        updateToConfigCollection(operationContext(),
+                                 NamespaceString::kConfigQueryAnalyzersNamespace,
+                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
+                                 analyzerDocPostUpdate1.toBSON(),
+                                 false /* upsert */));
 
     // The update to mode "on" should cause the configuration to get recreated.
     configurations = coordinator->getConfigurationsForTest();

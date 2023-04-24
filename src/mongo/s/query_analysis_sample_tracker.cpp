@@ -59,6 +59,8 @@ void QueryAnalysisSampleTracker::refreshConfigurations(
         auto it = _trackers.find(configuration.getNs());
         if (it == _trackers.end() ||
             it->second->getCollUuid() != configuration.getCollectionUuid()) {
+            // There is no existing CollectionSampleTracker for the collection with this specific
+            // collection uuid so create one for it.
             newTrackers.emplace(std::make_pair(
                 configuration.getNs(),
                 std::make_shared<CollectionSampleTracker>(configuration.getNs(),
