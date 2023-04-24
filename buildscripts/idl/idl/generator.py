@@ -1675,7 +1675,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # initialized first; don't move in the event a boost::none is supplied
                 initializer_vars.insert(0, '_%s(%s)' % (arg.name, initializer_var))
             elif arg.name in ["nss", "nssOrUUID"]:
-                # TODO(SERVER-75669): Remove this denylist, prevent use-after-move by defining fields in the correct order.
+                # TODO (SERVER-74238): Remove this denylist, prevent use-after-move by defining fields in the correct order.
                 initializer_vars.append('_%s(%s)' % (arg.name, arg.name))
             else:
                 initializer_vars.append('_%s(std::move(%s))' % (arg.name, arg.name))
