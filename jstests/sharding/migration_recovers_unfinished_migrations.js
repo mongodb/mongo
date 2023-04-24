@@ -14,6 +14,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/chunk_manipulation_util.js');
+load('jstests/replsets/rslib.js');
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh their sharding metadata. That
@@ -63,6 +64,13 @@ let hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint =
     configureFailPoint(rs0Secondary, "hangInEnsureChunkVersionIsGreaterThanInterruptible");
 
 st.rs0.stepUp(rs0Secondary);
+
+// Wait for the config server to see the new primary.
+// TODO SERVER-74177 Remove this once retry on NotWritablePrimary is implemented.
+st.forEachConfigServer((conn) => {
+    awaitRSClientHosts(conn, st.rs0.getPrimary(), {ok: true, ismaster: true});
+});
+
 joinMoveChunk1();
 migrationCommitNetworkErrorFailpoint.off();
 skipShardFilteringMetadataRefreshFailpoint.off();
