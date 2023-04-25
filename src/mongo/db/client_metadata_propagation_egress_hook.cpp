@@ -50,7 +50,8 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
             metadata->writeToMetadata(metadataBob);
         }
 
-        if (gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility)) {
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility)) {
             WriteBlockBypass::get(opCtx).writeAsMetadata(metadataBob);
         }
 

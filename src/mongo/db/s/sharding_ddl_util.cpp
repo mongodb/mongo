@@ -286,7 +286,8 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     // the command
     BSONObjBuilder bob(command);
     rpc::writeAuthDataToImpersonatedUserMetadata(opCtx, &bob);
-    if (gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility)) {
         WriteBlockBypass::get(opCtx).writeAsMetadata(&bob);
     }
     auto authenticatedCommand = bob.obj();
