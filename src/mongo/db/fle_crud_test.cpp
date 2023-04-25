@@ -763,6 +763,13 @@ protected:
         FleCrudTest::tearDown();
     }
 
+    std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(BSONObj obj, uint64_t cm = 0) {
+        auto s = getTestESCDataToken(obj);
+        auto d = getTestEDCDataToken(obj);
+        auto nssEsc = NamespaceString("test.enxcol_.coll.esc");
+        return mongo::fle::getCountInfoSets(_queryImpl.get(), nssEsc, s, d, cm);
+    }
+
     std::vector<PrfBlock> readTags(BSONObj obj, uint64_t cm = 0) {
         auto s = getTestESCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
@@ -1577,6 +1584,41 @@ TEST_F(FleTagsTest, ContentionFactor) {
     // Insert doc2 once with a contention factor of 2 and once with a contention factor of 3.
     doSingleInsertWithContention(7, doc2, 4, 2, efc);
     doSingleInsertWithContention(8, doc2, 4, 3, efc);
+
+    {
+        // Test the counts of the results from individual contention factors, ensuring that
+        // the data stored on disk and the getTags algorithm is working correctly.
+        //
+        // This relies on the order preserving nature of the query.
+
+        auto countInfoSetDoc1 = getCountInfoSets(doc1, 4);
+        {
+            ASSERT_EQ(1, countInfoSetDoc1.size());
+
+            auto countInfoSet = countInfoSetDoc1[0];
+
+            ASSERT_EQ(5, countInfoSet.size());
+
+            ASSERT_EQ(2, countInfoSet[0].count);
+            ASSERT_EQ(0, countInfoSet[1].count);
+            ASSERT_EQ(0, countInfoSet[2].count);
+            ASSERT_EQ(1, countInfoSet[3].count);
+        }
+
+        auto countInfoSetDoc2 = getCountInfoSets(doc2, 4);
+        {
+            ASSERT_EQ(1, countInfoSetDoc2.size());
+
+            auto countInfoSet = countInfoSetDoc2[0];
+
+            ASSERT_EQ(5, countInfoSet.size());
+
+            ASSERT_EQ(0, countInfoSet[0].count);
+            ASSERT_EQ(0, countInfoSet[1].count);
+            ASSERT_EQ(1, countInfoSet[2].count);
+            ASSERT_EQ(1, countInfoSet[3].count);
+        }
+    }
 
     ASSERT_EQ(3, readTags(doc1, 4).size());
     ASSERT_EQ(2, readTags(doc2, 4).size());
