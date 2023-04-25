@@ -1266,6 +1266,7 @@ buildvariants:
   - &compile-amazon2
     name: compile-amazon2
     display_name: Compile
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions: &compile-expansions
       platform: linux
@@ -1288,6 +1289,7 @@ buildvariants:
   - &compile-amazon-linux2-arm64
     name: compile-amazon-linux2-arm64
     display_name: Compile for Amazon Linux 2 arm64
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       <<: *compile-expansions
@@ -1334,6 +1336,7 @@ buildvariants:
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       <<: *compile-expansions
@@ -2070,6 +2073,7 @@ buildvariants:
 
   - name: atlas-like-replica.2022-10
     display_name: M60-like-replica.2022-10 3-Node ReplSet
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica.2022-10
@@ -2096,6 +2100,7 @@ buildvariants:
 
   - name: atlas-M60-real
     display_name: M60-Atlas ReplSet AWS
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup: atlas
@@ -2132,6 +2137,7 @@ buildvariants:
 
   - name: atlas-M60-real-azure
     display_name: M60-Atlas ReplSet Azure
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup: atlas
@@ -2167,6 +2173,7 @@ buildvariants:
 
   - name: linux-standalone.2022-11
     display_name: Linux Standalone 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2206,6 +2213,7 @@ buildvariants:
 
   - name: linux-1-node-replSet.2022-11
     display_name: Linux 1-Node ReplSet 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2252,6 +2260,7 @@ buildvariants:
 
   - name: linux-standalone-audit.2022-11
     display_name: Linux Standalone Audit 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2276,6 +2285,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-fle.2022-11
     display_name: Linux 1-Node ReplSet FLE 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2300,6 +2310,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-cbc.2022-11
     display_name: Linux 1-Node ReplSet ESE CBC 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2324,6 +2335,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-gcm.2022-11
     display_name: Linux 1-Node ReplSet ESE GCM 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2348,6 +2360,7 @@ buildvariants:
 
   - name: linux-1-node-15gbwtcache.2022-11
     display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2372,6 +2385,7 @@ buildvariants:
 
   - name: linux-3-node-1dayhistory-15gbwtcache.2022-11
     display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2396,6 +2410,7 @@ buildvariants:
 
   - name: linux-3-shard.2022-11
     display_name: Linux 3-Shard Cluster 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2431,6 +2446,7 @@ buildvariants:
 
   - name: linux-shard-lite-audit.2022-11
     display_name: Linux Shard Lite Cluster Audit 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2451,6 +2467,7 @@ buildvariants:
 
   - name: linux-shard-lite.2022-11
     display_name: Linux Shard Lite Cluster 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2494,6 +2511,7 @@ buildvariants:
 
   - name: linux-shard-lite-intel.2022-11
     display_name: Linux Shard Lite Cluster Intel 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2520,6 +2538,7 @@ buildvariants:
 
   - name: linux-shard-lite-read-concern-available.2022-11
     display_name: Linux Shard Lite ReadConcern Available 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2543,6 +2562,7 @@ buildvariants:
 
   - name: linux-shard-single.2022-11
     display_name: Linux Shard Single 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2564,6 +2584,7 @@ buildvariants:
 
   - name: linux-3-node-replSet.2022-11
     display_name: Linux 3-Node ReplSet 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2617,6 +2638,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-intel.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2644,6 +2666,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-notls.2022-11
     display_name: Linux 3-Node ReplSet (No TLS) 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup: replica-tls-disabled
@@ -2668,6 +2691,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-maintenance-events.2022-11
     display_name: Linux 3-Node ReplSet (Maintenance Events) 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2699,6 +2723,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-initialsync.2022-11
     display_name: Linux 3-Node ReplSet Initial Sync  2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2722,6 +2747,7 @@ buildvariants:
 
   - name: linux-replSet-initialsync-logkeeper.2022-11
     display_name: Linux ReplSet Initial Sync LogKeeper 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2747,6 +2773,7 @@ buildvariants:
 
   - name: linux-replSet-audit.2022-11
     display_name: Linux 3-Node ReplSet Audit 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2769,6 +2796,7 @@ buildvariants:
 
   - name: linux-replSet-auth-delay.2022-11
     display_name: Linux 3-Node ReplSet (Auth Delay) 2022-11
+    cron: "0 4 21 * *" # 21st day of every month at 04:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
