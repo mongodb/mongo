@@ -2900,6 +2900,8 @@ buildvariants:
   - name: compile_venv_deps_check
   - name: resmoke_validation_tests
   - name: version_gen_validation
+    distros:
+    - ubuntu2004-medium
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
