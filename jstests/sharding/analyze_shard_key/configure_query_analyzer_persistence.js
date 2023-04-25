@@ -81,7 +81,7 @@ function testPersistingConfiguration(conn) {
 
     // Run a configureQueryAnalyzer command to enable query sampling.
     const mode1 = "full";
-    const sampleRate1 = 100;
+    const sampleRate1 = 50;
     const res1 = assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: mode1, sampleRate: sampleRate1}));
     const doc1 = assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode1, sampleRate1);

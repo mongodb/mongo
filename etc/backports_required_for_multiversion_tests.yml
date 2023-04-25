@@ -370,6 +370,8 @@ last-continuous:
     ticket: SERVER-73482
   - test_file: jstests/core/command_let_variables.js
     ticket: SERVER-75356
+  - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_basic.js
+    ticket: SERVER-76311
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
   suites: null
@@ -825,6 +827,8 @@ last-lts:
     ticket: SERVER-76310
   - test_file: jstests/sharding/catalog_shard_mongos_ops_on_config_and_admin.js
     ticket: SERVER-76310
+  - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_basic.js
+    ticket: SERVER-76311
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
   suites: null

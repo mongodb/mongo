@@ -1,7 +1,7 @@
 /**
  * Tests that inserts related to query sampling are deprioritized.
  *
- * @tags: [requires_fcv_71]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {
@@ -85,6 +85,7 @@ function runTest(conn, primary, {st, rst}) {
 
     st.stop();
 }
+
 {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();

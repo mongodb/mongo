@@ -6,6 +6,9 @@
 (function() {
 "use strict";
 
+// Set this to opt into the sampleRate check.
+TestData.testingDiagnosticsEnabled = false;
+
 const dbNameBase = "testDb";
 
 function testNonExistingCollection(testCases, tenantId) {
@@ -55,18 +58,17 @@ function testExistingCollection(writeConn, testCases) {
         assert.commandWorked(basicRes);
         assert.commandWorked(
             testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1}));
-        assert.commandWorked(testCase.conn.adminCommand(
-            {configureQueryAnalyzer: ns, mode: "full", sampleRate: 1000}));
+        assert.commandWorked(
+            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 50}));
 
         // Cannot set 'sampleRate' to 0.
         assert.commandFailedWithCode(
             testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 0}),
             ErrorCodes.InvalidOptions);
 
-        // Cannot set 'sampleRate' to larger than 1'000'000.
+        // Cannot set 'sampleRate' to larger than 50.
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand(
-                {configureQueryAnalyzer: ns, mode: "full", sampleRate: 1000001}),
+            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 51}),
             ErrorCodes.InvalidOptions);
 
         // Cannot specify 'sampleRate' when 'mode' is "off".

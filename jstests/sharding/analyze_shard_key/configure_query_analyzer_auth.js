@@ -27,7 +27,7 @@ function testConfigureQueryAnalyzer(conn) {
     assert(adminDb.logout());
 
     const mode = "full";
-    const sampleRate = 100;
+    const sampleRate = 1;
 
     // Set up a user without any role or privilege.
     assert(adminDb.auth("super", "super"));
