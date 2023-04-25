@@ -139,9 +139,7 @@ void PlacementHistoryCleaner::onStepUpComplete(OperationContext* opCtx, long lon
     PeriodicRunner::PeriodicJob placementHistoryCleanerJob(
         "PlacementHistoryCleanUpJob",
         [](Client* client) { runOnce(client, kminPlacementHistoryEntries); },
-        kJobExecutionPeriod,
-        // TODO(SERVER-74658): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        kJobExecutionPeriod);
 
     _anchor = periodicRunner->makeJob(std::move(placementHistoryCleanerJob));
     _anchor.start();

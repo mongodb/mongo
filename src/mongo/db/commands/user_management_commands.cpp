@@ -731,13 +731,6 @@ public:
 
         // Subclient used by transaction operations.
         _client = opCtx->getServiceContext()->makeClient(forCommand.toString());
-
-        // TODO(SERVER-74660): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(*_client.get());
-            _client.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         auto as = AuthorizationSession::get(_client.get());
         if (as) {
             as->grantInternalAuthorization(_client.get());

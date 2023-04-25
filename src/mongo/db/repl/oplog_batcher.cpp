@@ -298,13 +298,6 @@ void OplogBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
 void OplogBatcher::_run(StorageInterface* storageInterface) {
     Client::initThread("ReplBatcher");
 
-    {
-        // The OplogBatcher's thread has its own shutdown sequence triggered by the OplogApplier,
-        // so we don't want it to be killed in other ways.
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
     BatchLimits batchLimits;
 
     while (true) {

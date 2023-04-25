@@ -119,12 +119,6 @@ void ShardingUptimeReporter::startPeriodicThread() {
     _thread = stdx::thread([created] {
         Client::initThread("Uptime-reporter");
 
-        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(cc());
-            cc().setSystemOperationUnkillableByStepdown(lk);
-        }
-
         const std::string hostName(getHostNameCached());
         const std::string instanceId(constructInstanceIdString(hostName));
         const Timer upTimeTimer;

@@ -212,14 +212,8 @@ void GlobalIndexCloningService::CloningStateMachine::_init(
         _metadata.getNss(), indexSpec.getName(), _metadata.getIndexCollectionUUID(), **executor);
 
     auto client = _serviceContext->makeClient("globalIndexClonerServiceInit");
-
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*client.get());
-        client.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     AlternativeClientRegion clientRegion(client);
+
     auto opCtx = _serviceContext->makeOperationContext(Client::getCurrent());
 
     auto routingInfo =

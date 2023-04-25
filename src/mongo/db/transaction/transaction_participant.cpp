@@ -572,13 +572,6 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
     // the server, and it both blocks this thread from querying config.transactions and waits for
     // this thread to terminate.
     auto client = getGlobalServiceContext()->makeClient("OldestActiveTxnTimestamp");
-
-    // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*client.get());
-        client.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     AlternativeClientRegion acr(client);
 
     try {
@@ -2020,14 +2013,8 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
 
         auto splitClientOwned = userOpCtx->getServiceContext()->makeClient("tempSplitClient");
         auto splitOpCtx = splitClientOwned->makeOperationContext();
-
-        // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(*splitClientOwned.get());
-            splitClientOwned.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         AlternativeClientRegion acr(splitClientOwned);
+
         std::unique_ptr<MongoDSessionCatalog::Session> checkedOutSession;
 
         repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
@@ -2249,14 +2236,8 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
 
         auto splitClientOwned = opCtx->getServiceContext()->makeClient("tempSplitClient");
         auto splitOpCtx = splitClientOwned->makeOperationContext();
-
-        // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(*splitClientOwned.get());
-            splitClientOwned.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         AlternativeClientRegion acr(splitClientOwned);
+
         std::unique_ptr<MongoDSessionCatalog::Session> checkedOutSession;
 
         repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());

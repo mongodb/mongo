@@ -80,12 +80,6 @@ void JournalFlusher::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
     LOGV2_DEBUG(4584701, 1, "starting {name} thread", "name"_attr = name());
 
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     // The thread must not run and access the service context to create an opCtx while unit test
     // infrastructure is still being set up and expects sole access to the service context (there is
     // no conurrency control on the service context during this phase).

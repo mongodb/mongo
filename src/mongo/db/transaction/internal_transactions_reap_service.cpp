@@ -114,6 +114,10 @@ void InternalTransactionsReapService::onShutdown() {
 
 void InternalTransactionsReapService::_reapInternalTransactions(ServiceContext* service) try {
     ThreadClient tc("reap-internal-transactions", service);
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc->setSystemOperationKillableByStepdown(lk);
+    }
     auto uniqueOpCtx = tc->makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

@@ -107,16 +107,6 @@ void WaitForMajorityServiceImplBase::startup(ServiceContext* ctx) {
         ClientStrand::make(ctx->makeClient(kWaitClientName + _getReadOrWrite()));
     _waitForMajorityCancellationClient =
         ClientStrand::make(ctx->makeClient(kCancelClientName + _getReadOrWrite()));
-    // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*_waitForMajorityClient->getClientPointer());
-        _waitForMajorityClient->getClientPointer()->setSystemOperationUnkillableByStepdown(lk);
-    }
-    {
-        stdx::lock_guard<Client> lk(*_waitForMajorityCancellationClient->getClientPointer());
-        _waitForMajorityCancellationClient->getClientPointer()
-            ->setSystemOperationUnkillableByStepdown(lk);
-    }
     _backgroundWorkComplete = _periodicallyWaitForMajority();
     _pool->startup();
     _state = State::kRunning;

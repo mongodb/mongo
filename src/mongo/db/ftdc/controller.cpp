@@ -196,12 +196,6 @@ void FTDCController::doLoop() noexcept {
     Client::initThread(kFTDCThreadName);
     Client* client = &cc();
 
-    // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     // Update config
     {
         stdx::lock_guard<Latch> lock(_mutex);

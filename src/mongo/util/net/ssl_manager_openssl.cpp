@@ -2285,9 +2285,7 @@ void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
         getGlobalServiceContext()->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob(
             "OCSP Fetch and Staple",
             [this, sm = _manager->shared_from_this()](Client* client) { doPeriodicJob(); },
-            getPeriodForStapleJob(swDurationInitial),
-            // TODO(SERVER-74660): Please revisit if this periodic job could be made killable.
-            false /*isKillableByStepdown*/));
+            getPeriodForStapleJob(swDurationInitial)));
 
     _ocspStaplingAnchor.start();
 }

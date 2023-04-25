@@ -145,9 +145,7 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
     PeriodicRunner::PeriodicJob job(
         "UserCacheInvalidator",
         [serviceCtx](Client* client) { getUserCacheInvalidator(serviceCtx)->run(); },
-        loadInterval(),
-        // TODO(SERVER-74660): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        loadInterval());
 
     invalidator->_job =
         std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));

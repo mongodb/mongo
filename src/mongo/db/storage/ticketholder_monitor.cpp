@@ -38,11 +38,7 @@ TicketHolderMonitor::TicketHolderMonitor(ServiceContext* svcCtx,
     : _readTicketHolder(readTicketHolder),
       _writeTicketHolder(writeTicketHolder),
       _job(svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
-          "TicketHolderMonitor",
-          [this](Client* client) { _run(client); },
-          interval,
-          // TODO(SERVER-74657): Please revisit if this periodic job could be made killable.
-          false /*isKillableByStepdown*/})) {}
+          "TicketHolderMonitor", [this](Client* client) { _run(client); }, interval})) {}
 
 void TicketHolderMonitor::start() {
     _job.start();

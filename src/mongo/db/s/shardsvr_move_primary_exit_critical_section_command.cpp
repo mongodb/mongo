@@ -69,6 +69,10 @@ public:
                 // solution is to use an alternative client as well as a new operation context.
                 auto newClient =
                     getGlobalServiceContext()->makeClient("ShardsvrMovePrimaryExitCriticalSection");
+                {
+                    stdx::lock_guard<Client> lk(*newClient);
+                    newClient->setSystemOperationKillableByStepdown(lk);
+                }
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(
                     cc().makeOperationContext(),

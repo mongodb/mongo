@@ -70,19 +70,13 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison>
     _stats.setLastTransactionReaperJobTimestamp(_service->now());
 
     if (!disableLogicalSessionCacheRefresh) {
-        _service->scheduleJob(
-            {"LogicalSessionCacheRefresh",
-             [this](Client* client) { _periodicRefresh(client); },
-             Milliseconds(logicalSessionRefreshMillis),
-             // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
-             false /*isKillableByStepdown*/});
+        _service->scheduleJob({"LogicalSessionCacheRefresh",
+                               [this](Client* client) { _periodicRefresh(client); },
+                               Milliseconds(logicalSessionRefreshMillis)});
 
-        _service->scheduleJob(
-            {"LogicalSessionCacheReap",
-             [this](Client* client) { _periodicReap(client); },
-             Milliseconds(logicalSessionRefreshMillis),
-             // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
-             false /*isKillableByStepdown*/});
+        _service->scheduleJob({"LogicalSessionCacheReap",
+                               [this](Client* client) { _periodicReap(client); },
+                               Milliseconds(logicalSessionRefreshMillis)});
     }
 }
 

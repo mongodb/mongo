@@ -109,6 +109,10 @@ public:
                             // executor thread after setting the shared state as ready.
                             auto scopedMigrationLocal(std::move(scopedMigration));
                             ThreadClient tc("MoveChunk", serviceContext);
+                            {
+                                stdx::lock_guard<Client> lk(*tc.get());
+                                tc->setSystemOperationKillableByStepdown(lk);
+                            }
                             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
                             auto executorOpCtx = uniqueOpCtx.get();
                             Status status = {ErrorCodes::InternalError, "Uninitialized value"};

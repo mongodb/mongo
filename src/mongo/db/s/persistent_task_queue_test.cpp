@@ -288,6 +288,11 @@ TEST_F(PersistentTaskQueueTest, TestKilledOperationContextWhileWaitingOnCV) {
 
     auto result = stdx::async(stdx::launch::async, [this, &q, &barrier] {
         ThreadClient tc("TestKilledOperationContextWhileWaitingOnCV", getServiceContext());
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc->setSystemOperationKillableByStepdown(lk);
+        }
+
         auto opCtx = tc->makeOperationContext();
 
         barrier.countDownAndWait();

@@ -1351,9 +1351,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 throw;
             }
         },
-        Seconds(1),
-        // TODO(SERVER-74657): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        Seconds(1));
 
     _job = _periodicRunner->makeJob(std::move(job));
     _job.start();

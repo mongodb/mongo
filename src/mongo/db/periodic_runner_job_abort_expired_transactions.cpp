@@ -115,9 +115,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
                 LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
             }
         },
-        getPeriod(gTransactionLifetimeLimitSeconds.load()),
-        // TODO(SERVER-74656): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        getPeriod(gTransactionLifetimeLimitSeconds.load()));
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 

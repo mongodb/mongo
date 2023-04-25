@@ -194,12 +194,6 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
                                                         WiredTigerRecordStore* oplogRecordStore) {
     Client::initThread("OplogVisibilityThread");
 
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
     // This thread updates the oplog read timestamp, the timestamp used to read from the oplog with
     // forward cursors. The timestamp is used to hide oplog entries that might be committed but have
     // uncommitted entries behind them. This prevents cursors from seeing 'holes' in the oplog and

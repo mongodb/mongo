@@ -122,9 +122,7 @@ void QueryAnalysisSampler::onStartup() {
     PeriodicRunner::PeriodicJob queryStatsRefresherJob(
         "QueryAnalysisQueryStatsRefresher",
         [this](Client* client) { _refreshQueryStats(); },
-        Seconds(1),
-        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        Seconds(1));
     _periodicQueryStatsRefresher = periodicRunner->makeJob(std::move(queryStatsRefresherJob));
     _periodicQueryStatsRefresher.start();
 
@@ -141,9 +139,7 @@ void QueryAnalysisSampler::onStartup() {
                       "error"_attr = redact(ex));
             }
         },
-        Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs),
-        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs));
     _periodicConfigurationsRefresher =
         periodicRunner->makeJob(std::move(configurationsRefresherJob));
     _periodicConfigurationsRefresher.start();

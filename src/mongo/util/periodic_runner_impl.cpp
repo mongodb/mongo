@@ -75,12 +75,6 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
         ON_BLOCK_EXIT([this] { _stopPromise.emplaceValue(); });
 
         ThreadClient client(_job.name, _serviceContext, nullptr);
-
-        if (!_job.isKillableByStepdown) {
-            stdx::lock_guard<Client> lk(*client.get());
-            client.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         {
             // This ensures client object is not destructed so long as others can access it.
             ON_BLOCK_EXIT([this] {

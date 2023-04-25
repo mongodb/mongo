@@ -193,13 +193,6 @@ private:
                 MozJSImplScope scope(static_cast<MozJSScriptEngine*>(getGlobalScriptEngine()),
                                      boost::none /* Don't override global jsHeapLimitMB */);
                 Client::initThread("js");
-
-                // TODO(SERVER-74662): Please revisit if this thread could be made killable.
-                {
-                    stdx::lock_guard<Client> lk(cc());
-                    cc().setSystemOperationUnkillableByStepdown(lk);
-                }
-
                 scope.setParentStack(thisv->_sharedData->_stack);
                 thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {

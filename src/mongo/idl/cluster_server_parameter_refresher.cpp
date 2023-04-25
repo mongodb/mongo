@@ -64,11 +64,6 @@ getFCVAndClusterParametersFromConfigServer() {
     // Use an alternative client region, because we call refreshParameters both from the internal
     // refresher process and from getClusterParameter.
     auto altClient = getGlobalServiceContext()->makeClient("clusterParameterRefreshTransaction");
-    // TODO(SERVER-74660): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*altClient.get());
-        altClient.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
     AlternativeClientRegion clientRegion(altClient);
     auto opCtx = cc().makeOperationContext();
     auto as = AuthorizationSession::get(cc());
@@ -305,9 +300,7 @@ void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, Operatio
     PeriodicRunner::PeriodicJob job(
         "ClusterServerParameterRefresher",
         [serviceCtx](Client* client) { getClusterServerParameterRefresher(serviceCtx)->run(); },
-        loadInterval(),
-        // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        loadInterval());
 
     refresher->_job = std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 

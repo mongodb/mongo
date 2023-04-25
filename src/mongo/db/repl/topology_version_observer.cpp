@@ -178,12 +178,6 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
     invariant(_serviceContext);
     ThreadClient tc(kTopologyVersionObserverName, _serviceContext);
 
-    // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     auto getTopologyVersion = [&]() -> boost::optional<TopologyVersion> {
         // Only the observer thread updates `_cache`, thus there is no need to hold the lock before
         // accessing `_cache` here.

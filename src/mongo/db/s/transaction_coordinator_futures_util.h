@@ -101,12 +101,6 @@ public:
 
                         ThreadClient tc("TransactionCoordinator", _serviceContext);
 
-                        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-                        {
-                            stdx::lock_guard<Client> lk(*tc.get());
-                            tc.get()->setSystemOperationUnkillableByStepdown(lk);
-                        }
-
                         auto uniqueOpCtxIter = [&] {
                             stdx::lock_guard lk(_mutex);
                             return _activeOpContexts.emplace(_activeOpContexts.begin(),

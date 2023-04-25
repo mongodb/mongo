@@ -69,6 +69,10 @@ public:
                 // cause the failure of the second operation.
                 auto newClient = getGlobalServiceContext()->makeClient(
                     "ShardsvrMovePrimaryEnterCriticalSection");
+                {
+                    stdx::lock_guard<Client> lk(*newClient);
+                    newClient->setSystemOperationKillableByStepdown(lk);
+                }
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(
                     cc().makeOperationContext(),

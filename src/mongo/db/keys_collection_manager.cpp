@@ -240,6 +240,12 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                                                                std::string threadName,
                                                                Milliseconds refreshInterval) {
     ThreadClient tc(threadName, service);
+
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc.get()->setSystemOperationKillableByStepdown(lk);
+    }
+
     ON_BLOCK_EXIT([this]() mutable { _hasSeenKeys.store(false); });
 
     unsigned errorCount = 0;

@@ -104,12 +104,6 @@ void BlockedOp::start(ServiceContext* serviceContext) {
     _latchState.thread = stdx::thread([this, serviceContext]() mutable {
         ThreadClient tc("DiagnosticCaptureTestLatch", serviceContext);
 
-        // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         LOGV2(23123, "Entered currentOpSpawnsThreadWaitingForLatch thread");
 
         stdx::lock_guard testLock(_latchState.mutex);
@@ -119,13 +113,6 @@ void BlockedOp::start(ServiceContext* serviceContext) {
 
     _interruptibleState.thread = stdx::thread([this, serviceContext]() mutable {
         ThreadClient tc("DiagnosticCaptureTestInterruptible", serviceContext);
-
-        // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         auto opCtx = tc->makeOperationContext();
 
         LOGV2(23125, "Entered currentOpSpawnsThreadWaitingForLatch thread for interruptibles");

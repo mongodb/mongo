@@ -89,12 +89,6 @@ void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
             ThreadClient tc("BalancerStatsRegistry::asynchronousInitialization",
                             getGlobalServiceContext());
 
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
             {
                 stdx::lock_guard lk{_stateMutex};
                 if (const auto currentState = _state.load(); currentState != State::kPrimaryIdle) {

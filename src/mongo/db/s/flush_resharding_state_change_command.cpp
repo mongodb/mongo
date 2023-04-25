@@ -114,6 +114,11 @@ public:
             ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor())
                 .then([svcCtx = opCtx->getServiceContext(), nss = ns()] {
                     ThreadClient tc("FlushReshardingStateChange", svcCtx);
+                    {
+                        stdx::lock_guard<Client> lk(*tc.get());
+                        tc->setSystemOperationKillableByStepdown(lk);
+                    }
+
                     auto opCtx = tc->makeOperationContext();
                     onCollectionPlacementVersionMismatch(
                         opCtx.get(), nss, boost::none /* chunkVersionReceived */);

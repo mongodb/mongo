@@ -90,6 +90,10 @@ public:
         ThreadClient tc(name(), getGlobalServiceContext());
 
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationKillableByStepdown(lk);
+        }
 
         while (true) {
             LOGV2_DEBUG(6278517, 3, "Thread awake");

@@ -110,13 +110,6 @@ void killSessionTokens(OperationContext* opCtx,
             invariant(status);
 
             ThreadClient tc("Kill-Sessions", service);
-
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
             auto uniqueOpCtx = tc->makeOperationContext();
             const auto opCtx = uniqueOpCtx.get();
             const auto catalog = SessionCatalog::get(opCtx);
@@ -521,12 +514,6 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     {
         // Create a new opCtx because we need an empty locker to refresh the locks.
         auto newClient = opCtx->getServiceContext()->makeClient("restore-prepared-txn");
-
-        {
-            stdx::lock_guard<Client> lk(*newClient.get());
-            newClient.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         AlternativeClientRegion acr(newClient);
         for (const auto& sessionInfo : sessionsToReacquireLocks) {
             auto newOpCtx = cc().makeOperationContext();

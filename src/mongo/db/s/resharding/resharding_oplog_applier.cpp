@@ -197,12 +197,6 @@ SemiFuture<void> ReshardingOplogApplier::run(
                 auto client =
                     cc().getServiceContext()->makeClient("ReshardingOplogApplierCleanupClient");
 
-                // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-                {
-                    stdx::lock_guard<Client> lk(*client.get());
-                    client.get()->setSystemOperationUnkillableByStepdown(lk);
-                }
-
                 AlternativeClientRegion acr(client);
                 auto opCtx = cc().makeOperationContext();
 

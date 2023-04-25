@@ -224,12 +224,6 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     auto opCtx = cc().makeOperationContext();
     opCtx->setEnforceConstraints(false);
 
-    // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
     // DocumentValidationSettings::kDisableInternalValidation is currently inert.
     // But, it's logically ok to disable internal validation as this function gets called
     // only during initial sync.

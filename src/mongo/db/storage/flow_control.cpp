@@ -150,9 +150,7 @@ FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* 
          [this](Client* client) {
              FlowControlTicketholder::get(client->getServiceContext())->refreshTo(getNumTickets());
          },
-         Seconds(1),
-         // TODO(SERVER-74657): Please revisit if this periodic job could be made killable.
-         false /*isKillableByStepdown*/});
+         Seconds(1)});
     _jobAnchor.start();
 }
 
