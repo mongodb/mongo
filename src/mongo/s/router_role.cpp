@@ -135,10 +135,10 @@ void CollectionRouter::_onException(RouteContext* context, Status s) {
         catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
             si->getNss(), si->getVersionWanted(), si->getShardId());
     } else if (s == ErrorCodes::StaleEpoch) {
-        auto si = s.extraInfo<StaleEpochInfo>();
-        tassert(6375905, "StaleEpoch must have extra info", si);
-        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-            si->getNss(), si->getVersionWanted(), ShardId());
+        if (auto si = s.extraInfo<StaleEpochInfo>()) {
+            catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                si->getNss(), si->getVersionWanted(), ShardId());
+        }
     } else {
         uassertStatusOK(s);
     }
