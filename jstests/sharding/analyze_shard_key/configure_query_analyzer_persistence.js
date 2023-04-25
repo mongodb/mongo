@@ -1,7 +1,7 @@
 /**
  * Tests that the configureQueryAnalyzer command persists the configuration in a document
  * in config.queryAnalyzers and that the document is deleted when the associated collection
- * is dropped.
+ * is dropped or renamed.
  *
  * @tags: [requires_fcv_70]
  */
@@ -198,12 +198,60 @@ function testConfigurationDeletionDropDatabase(conn, {isShardedColl, rst, st}) {
     assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode, sampleRate);
 
     assert.commandWorked(conn.getDB(dbName).dropDatabase());
-    if (st && isShardedColl) {
+    if (st) {
         assertNoQueryAnalyzerConfigDoc(conn, ns);
     } else {
         // TODO (SERVER-76443): Make sure that dropDatabase on replica set delete the
         // config.queryAnalyzers docs for all collections in the database being dropped.
         assertQueryAnalyzerConfigDoc(conn, ns, collUuid, mode, sampleRate);
+    }
+}
+
+function testConfigurationDeletionRenameCollection(conn, {sameDatabase, isShardedColl, rst, st}) {
+    const {dbName, collName} = setUpCollection(conn, {isShardedColl, rst, st});
+
+    const srcDbName = dbName;
+    const srcCollName = collName;
+    const srcNs = srcDbName + "." + srcCollName;
+    const srcDb = conn.getDB(srcDbName);
+    const srcCollUuid = QuerySamplingUtil.getCollectionUuid(srcDb, srcCollName);
+
+    const dstDbName = sameDatabase ? srcDbName : (srcDbName + "New");
+    const dstCollName = sameDatabase ? (srcCollName + "New") : srcCollName;
+    const dstNs = dstDbName + "." + dstCollName;
+    const dstDb = conn.getDB(dstDbName);
+    assert.commandWorked(dstDb.createCollection(dstCollName));
+    if (!sameDatabase && st) {
+        // On a sharded cluster, the src and dst collections must be on same shard.
+        st.ensurePrimaryShard(dstDbName, st.getPrimaryShardIdForDatabase(srcDbName));
+    }
+    const dstCollUuid = QuerySamplingUtil.getCollectionUuid(dstDb, dstCollName);
+
+    jsTest.log(`Testing configuration deletion upon renameCollection ${
+        tojson({sameDatabase, srcDbName, srcCollName, dstDbName, dstCollName, isShardedColl})}`);
+
+    const mode = "full";
+    const sampleRate = 0.5;
+
+    const srcRes =
+        assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: srcNs, mode, sampleRate}));
+    assertConfigQueryAnalyzerResponse(srcRes, {mode, sampleRate});
+    assertQueryAnalyzerConfigDoc(conn, srcNs, srcCollUuid, mode, sampleRate);
+
+    const dstRes =
+        assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: dstNs, mode, sampleRate}));
+    assertConfigQueryAnalyzerResponse(dstRes, {mode, sampleRate});
+    assertQueryAnalyzerConfigDoc(conn, dstNs, dstCollUuid, mode, sampleRate);
+
+    assert.commandWorked(conn.adminCommand({renameCollection: srcNs, to: dstNs, dropTarget: true}));
+    if (st) {
+        assertNoQueryAnalyzerConfigDoc(conn, srcNs);
+        assertNoQueryAnalyzerConfigDoc(conn, dstNs);
+    } else {
+        // TODO (SERVER-76443): Make sure that renameCollection on replica set delete the
+        // config.queryAnalyzers doc for the collection being renamed.
+        assertQueryAnalyzerConfigDoc(conn, srcNs, srcCollUuid, mode, sampleRate);
+        assertQueryAnalyzerConfigDoc(conn, dstNs, dstCollUuid, mode, sampleRate);
     }
 }
 
@@ -214,7 +262,12 @@ function testConfigurationDeletionDropDatabase(conn, {isShardedColl, rst, st}) {
     for (let isShardedColl of [true, false]) {
         testConfigurationDeletionDropCollection(st.s, {st, isShardedColl});
         testConfigurationDeletionDropDatabase(st.s, {st, isShardedColl});
+        testConfigurationDeletionRenameCollection(st.s, {st, sameDatabase: true, isShardedColl});
     }
+    // During renameCollection, the source database is only allowed to be different from the
+    // destination database when the collection being renamed is unsharded.
+    testConfigurationDeletionRenameCollection(st.s,
+                                              {st, sameDatabase: false, isShardedColl: false});
 
     st.stop();
 }
@@ -228,6 +281,8 @@ function testConfigurationDeletionDropDatabase(conn, {isShardedColl, rst, st}) {
     testPersistingConfiguration(primary);
     testConfigurationDeletionDropCollection(primary, {rst});
     testConfigurationDeletionDropDatabase(primary, {rst});
+    testConfigurationDeletionRenameCollection(primary, {rst, sameDatabase: false});
+    testConfigurationDeletionRenameCollection(primary, {rst, sameDatabase: true});
 
     rst.stopSet();
 }

@@ -47,6 +47,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/client/shard_registry.h"
@@ -54,6 +55,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/util/pcre_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -268,9 +270,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx, nss, {primaryShardId}, **executor, getCurrentSession(), false /* fromMigrate */);
 
-    // Remove collection's query analyzer configuration document, if it exists.
-    sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss, coll.getUuid());
-
     if (!_isPre70Compatible()) {
         _updateSession(opCtx);
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
@@ -397,6 +396,14 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     sharding_ddl_util::removeTagsMetadataFromConfig(
                         opCtx, nss, getCurrentSession());
                 }
+
+                // Remove the query sampling configuration documents for all collections in this
+                // database, if they exist.
+                const std::string regex = "^" + pcre_util::quoteMeta(_dbName) + "\\..*";
+                sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
+                    opCtx,
+                    BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
+                         << BSON("$regex" << regex)));
 
                 const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                 {

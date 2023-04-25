@@ -112,11 +112,9 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
                                                          const WriteConcernOptions& writeConcern);
 
 /**
- * Delete the config query analyzer document for the given collection, if it exists.
+ * Delete the query analyzer documents that match the given filter.
  */
-void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const boost::optional<UUID>& uuid);
+void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONObj& filter);
 
 /**
  * Rename sharded collection metadata as part of a renameCollection operation.

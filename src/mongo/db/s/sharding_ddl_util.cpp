@@ -434,28 +434,15 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
         str::stream() << "Error removing tags for collection " << nss.toStringForErrorMsg());
 }
 
-void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const boost::optional<UUID>& uuid) {
+void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONObj& filter) {
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     write_ops::DeleteCommandRequest deleteCmd(NamespaceString::kConfigQueryAnalyzersNamespace);
-    if (uuid) {
-        deleteCmd.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(
-                BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName << *uuid));
-            entry.setMulti(false);
-            return entry;
-        }()});
-    } else {
-        deleteCmd.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(
-                BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName << nss.toString()));
-            entry.setMulti(true);
-            return entry;
-        }()});
-    }
+    deleteCmd.setDeletes({[&] {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(filter);
+        entry.setMulti(true);
+        return entry;
+    }()});
 
     const auto deleteResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -464,10 +451,10 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
         CommandHelpers::appendMajorityWriteConcern(deleteCmd.toBSON({})),
         Shard::RetryPolicy::kIdempotent);
 
-    uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(std::move(deleteResult)),
-                               str::stream()
-                                   << "Error removing query analyzer configurations for collection "
-                                   << nss.toStringForErrorMsg());
+    uassertStatusOKWithContext(
+        Shard::CommandResponse::getEffectiveStatus(std::move(deleteResult)),
+        str::stream() << "Failed to remove query analyzer documents that match the filter"
+                      << filter);
 }
 
 void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,

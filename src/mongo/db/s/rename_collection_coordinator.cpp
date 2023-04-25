@@ -48,6 +48,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -397,6 +398,14 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
+
+                // Remove the query sampling configuration documents for the source and destination
+                // collections, if they exist.
+                sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
+                    opCtx,
+                    BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
+                         << BSON("$in"
+                                 << BSON_ARRAY(nss().toString() << _request.getTo().toString()))));
 
                 // For an unsharded collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.

@@ -42,6 +42,7 @@
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -277,6 +278,10 @@ void DropCollectionCoordinator::_commitDropCollection(
 
     LOGV2_DEBUG(5390504, 2, "Dropping collection", logAttrs(nss()), "sharded"_attr = collIsSharded);
 
+    // Remove the query sampling configuration document for this collection, if it exists.
+    sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
+        opCtx, BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName << nss().toString()));
+
     _updateSession(opCtx);
     if (collIsSharded) {
         invariant(_doc.getCollInfo());
@@ -320,11 +325,6 @@ void DropCollectionCoordinator::_commitDropCollection(
     // unsharded with a higher optime than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx, nss(), {primaryShardId}, **executor, getCurrentSession(), false /*fromMigrate*/);
-
-    // Remove potential query analyzer document only after purging the collection from
-    // the catalog. This ensures no leftover documents referencing an old incarnation of
-    // a collection.
-    sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss(), boost::none);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));
