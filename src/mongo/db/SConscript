@@ -1864,6 +1864,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         'catalog/catalog_impl',
         'commands/mongod',
         'index_builds_coordinator_mongod',

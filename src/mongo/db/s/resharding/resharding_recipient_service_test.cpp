@@ -210,15 +210,14 @@ class ReshardingRecipientServiceTest : public repl::PrimaryOnlyServiceMongoDTest
 public:
     using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
 
+    ReshardingRecipientServiceTest() : repl::PrimaryOnlyServiceMongoDTest{true} {}
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<ReshardingRecipientServiceForTest>(serviceContext);
     }
 
     void setUp() override {
         repl::PrimaryOnlyServiceMongoDTest::setUp();
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        clockSource->advance(Seconds(1));
-        getServiceContext()->setFastClockSource(std::move(clockSource));
         auto serviceContext = getServiceContext();
         auto storageMock = std::make_unique<repl::StorageInterfaceMock>();
         repl::DropPendingCollectionReaper::set(

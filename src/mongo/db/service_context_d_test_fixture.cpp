@@ -50,6 +50,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
@@ -60,7 +61,9 @@ ServiceContextMongoDTest::ServiceContextMongoDTest()
 ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine)
     : ServiceContextMongoDTest(engine, RepairAction::kNoRepair) {}
 
-ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAction repair)
+ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine,
+                                                   RepairAction repair,
+                                                   bool useMockClock)
     : _tempDir("service_context_d_test_fixture") {
 
     _stashedStorageParams.engine = std::exchange(storageGlobalParams.engine, std::move(engine));
@@ -80,6 +83,15 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     }
 
     auto const serviceContext = getServiceContext();
+    if (useMockClock) {
+        auto fastClock = std::make_unique<ClockSourceMock>();
+        fastClock->advance(Seconds(1));
+        serviceContext->setFastClockSource(std::move(fastClock));
+
+        auto preciseClock = std::make_unique<ClockSourceMock>();
+        preciseClock->advance(Seconds(1));
+        serviceContext->setPreciseClockSource(std::move(preciseClock));
+    }
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
     // Set up the periodic runner to allow background job execution for tests that require it.

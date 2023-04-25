@@ -46,6 +46,7 @@ class PrimaryOnlyServiceRegistry;
 
 class PrimaryOnlyServiceMongoDTest : public ServiceContextMongoDTest {
 public:
+    PrimaryOnlyServiceMongoDTest(bool useMockClock = false);
     virtual std::unique_ptr<repl::PrimaryOnlyService> makeService(
         ServiceContext* serviceContext) = 0;
 

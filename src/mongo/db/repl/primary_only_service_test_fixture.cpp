@@ -42,6 +42,9 @@
 namespace mongo {
 namespace repl {
 
+PrimaryOnlyServiceMongoDTest::PrimaryOnlyServiceMongoDTest(bool useMockClock)
+    : ServiceContextMongoDTest{"ephemeralForTest", RepairAction::kNoRepair, useMockClock} {}
+
 void PrimaryOnlyServiceMongoDTest::setUp() {
     ServiceContextMongoDTest::setUp();
 

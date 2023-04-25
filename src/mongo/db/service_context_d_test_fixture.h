@@ -47,7 +47,7 @@ protected:
      * Build a ServiceContextMongoDTest, using the named storage engine.
      */
     explicit ServiceContextMongoDTest(std::string engine);
-    ServiceContextMongoDTest(std::string engine, RepairAction repair);
+    ServiceContextMongoDTest(std::string engine, RepairAction repair, bool useMockClock = false);
     virtual ~ServiceContextMongoDTest();
 
     void tearDown() override;
