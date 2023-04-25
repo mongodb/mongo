@@ -737,17 +737,9 @@ if (!isStepdownSuite) {
     assert.soon(() => oldPrimaryEpoch !==
                     st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
                         .metadata.shardVersionEpoch.toString());
-    // TODO (SERVER-74477): Always assume that all shards will refresh during rename.
-    if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB(kDbName),
-                                            "AllowMigrationsRefreshToAll")) {
-        assert.soon(() => oldSecondaryEpoch !==
-                        st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
-                            .metadata.shardVersionEpoch.toString());
-    } else {
-        assert.soon(() => oldSecondaryEpoch ===
-                        st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
-                            .metadata.shardVersionEpoch.toString());
-    }
+    assert.soon(() => oldSecondaryEpoch !==
+                    st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                        .metadata.shardVersionEpoch.toString());
 }
 
 // TODO SERVER-72515: remove once 7.0 becomes last-lts.
