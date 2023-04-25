@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine_change_context.h"
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
@@ -156,10 +157,19 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     // This should be set once during startup.
     if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
         auto readTransactions = gConcurrentReadTransactions.load();
-        static constexpr auto DEFAULT_TICKETS_VALUE = 128;
-        readTransactions = readTransactions == 0 ? DEFAULT_TICKETS_VALUE : readTransactions;
         auto writeTransactions = gConcurrentWriteTransactions.load();
+        static constexpr auto DEFAULT_TICKETS_VALUE = 128;
+        bool userSetConcurrency = false;
+
+        userSetConcurrency = readTransactions != 0 || writeTransactions != 0;
+        readTransactions = readTransactions == 0 ? DEFAULT_TICKETS_VALUE : readTransactions;
         writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
+
+        if (userSetConcurrency) {
+            // If the user manually set concurrency limits, then disable execution control
+            // implicitly.
+            gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
+        }
 
         auto svcCtx = opCtx->getServiceContext();
         if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations

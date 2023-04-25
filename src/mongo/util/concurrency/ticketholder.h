@@ -53,8 +53,8 @@ class TicketHolder {
     friend class Ticket;
 
 public:
-    TicketHolder(int32_t numTickets, ServiceContext* svcCtx)
-        : _outof(numTickets), _serviceContext(svcCtx){};
+    TicketHolder(int32_t numTickets, ServiceContext* svcCtx);
+
     virtual ~TicketHolder(){};
 
     /**
@@ -191,6 +191,7 @@ private:
     AtomicWord<int32_t> _outof;
     AtomicWord<int32_t> _peakUsed;
     AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount;
+    bool _usingDynamicConcurrencyAdjustment;
 
 protected:
     /**
