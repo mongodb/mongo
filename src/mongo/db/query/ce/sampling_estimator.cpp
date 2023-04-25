@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/query/ce/sel_tree_utils.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
@@ -79,8 +80,7 @@ public:
         PhysPlanBuilder result{childResult};
 
         // Retain only output bindings without applying filters.
-        // TODO SERVER-74540: Handle top-level disjunction.
-        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+        PSRExpr::visitAnyShape(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
             const auto& [key, req] = e;
             if (const auto& boundProjName = req.getBoundProjectionName()) {
                 lowerPartialSchemaRequirement(
@@ -165,16 +165,10 @@ public:
         ABT extracted = planExtractor.extract(n);
 
         // Estimate individual requirements separately by potentially re-using cached results.
-        // Here we assume that each requirement is independent.
         // TODO: consider estimating together the entire set of requirements (but caching!)
-        // TODO SERVER-74540: Handle top-level disjunction.
-        CEType result = childResult;
-        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+        EstimatePartialSchemaEntrySelFn estimateFn = [&](SelectivityTreeBuilder& selTreeBuilder,
+                                                         const PartialSchemaEntry& e) {
             const auto& [key, req] = e;
-            if (req.getIsPerfOnly()) {
-                // Ignore perf-only requirements.
-                return;
-            }
 
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 PhysPlanBuilder lowered{extracted};
@@ -188,12 +182,16 @@ public:
                     boost::none /*residualCE*/,
                     lowered);
                 uassert(6624243, "Expected a filter node", lowered._node.is<FilterNode>());
-                result = estimateFilterCE(
-                    metadata, memo, logicalProps, n, std::move(lowered._node), result);
+                const CEType filterCE = estimateFilterCE(
+                    metadata, memo, logicalProps, n, std::move(lowered._node), childResult);
+                const SelectivityType sel =
+                    childResult > 0.0 ? (filterCE / childResult) : SelectivityType{0.0};
+                selTreeBuilder.atom(sel);
             }
-        });
+        };
 
-        return result;
+        PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult);
+        return estimator.estimateCE(node.getReqMap().getRoot());
     }
 
     /**

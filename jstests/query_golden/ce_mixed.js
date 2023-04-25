@@ -1,5 +1,5 @@
 /**
- * A test for conjunctive predicates using a semi-realistic collection/queries.
+ * A test for conjunctive and disjunctive predicates using a semi-realistic collection/queries.
  * @tags: [
  *   requires_cqf,
  * ]
@@ -122,6 +122,24 @@ runHistogramsTest(function() {
     testPredicate({likesPizza: false, name: {$lte: "Bob Bennet"}});
     testPredicate({favPizzaToppings: "mushrooms", name: {$lte: "Bob Bennet"}});
 
+    // Test disjunctions of predicates all using histograms.
+    testPredicate({$or: [{likesPizza: true}, {date: {$lt: new ISODate("1955-01-01T00:00:00")}}]});
+    testPredicate({
+        $or: [{favPizzaToppings: "mushrooms"}, {name: {$lte: "Bob Bennet", $gte: "Alice Smith"}}]
+    });
+    testPredicate({
+        $or: [
+            {$and: [{likesPizza: false}, {name: {$lte: "Bob Bennet"}}]},
+            {$and: [{likesPizza: true}, {name: {$gte: "Tom Watson"}}]}
+        ]
+    });
+    testPredicate({
+        $or: [
+            {$and: [{likesPizza: false}, {name: {$lte: "Bob Bennet"}}]},
+            {date: {$lte: "1960-01-01T00:00:00"}}
+        ]
+    });
+
     // Test conjunctions of predicates such that some use histograms and others use heuristics.
     testPredicate({lastPizzaShopVisited: "Zizzi", likesPizza: true});
     testPredicate({lastPizzaShopVisited: "Zizzi", likesPizza: false});
@@ -138,6 +156,44 @@ runHistogramsTest(function() {
         date: {$gt: new ISODate("1950-01-01T00:00:00")},
         favPizzaToppings: "mushrooms",
         likesPizza: true
+    });
+
+    // Test disjunctions of predicates such that some use histograms and others use heuristics.
+    testPredicate({$or: [{lastPizzaShopVisited: "Zizzi"}, {likesPizza: true}]});
+    testPredicate({
+        $or: [
+            {lastPizzaShopVisited: "Zizzi"},
+            {
+                date: {
+                    $gt: new ISODate("1950-01-01T00:00:00"),
+                    $lt: new ISODate("1960-01-01T00:00:00")
+                }
+            }
+        ]
+    });
+    testPredicate({
+        $or: [
+            {$and: [{lastPizzaShopVisited: "Zizzi"}, {name: {$lte: "John Watson"}}]},
+            {$and: [{favPizzaToppings: "mushrooms"}, {likesPizza: true}]}
+        ]
+    });
+    testPredicate({
+        $or: [
+            {$and: [{lastPizzaShopVisited: "Zizzi"}, {name: {$lte: "John Watson"}}]},
+            {$and: [{lastPizzaShopVisited: "Zizzi"}, {name: {$gte: "Kate Knight"}}]}
+        ]
+    });
+    testPredicate({
+        $or: [
+            {$and: [{lastPizzaShopVisited: "Zizzi"}, {name: {$lte: "John Watson"}}]},
+            {favPizzaToppings: "mushrooms"}
+        ]
+    });
+    testPredicate({
+        $or: [
+            {$and: [{favPizzaToppings: "mushrooms"}, {name: {$lte: "John Watson"}}]},
+            {lastPizzaShopVisited: "Zizzi"}
+        ]
     });
 });
 })();

@@ -66,6 +66,10 @@ template <bool isConjunction,
                                                          std::less<SelectivityType>,
                                                          std::greater<SelectivityType>>>
 SelectivityType expBackoffInternal(std::vector<SelectivityType> sels) {
+    if (sels.size() == 1) {
+        return sels[0];
+    }
+
     const size_t actualMaxBackoffElements = std::min(sels.size(), kMaxBackoffElements);
     std::partial_sort(
         sels.begin(), sels.begin() + actualMaxBackoffElements, sels.end(), Comparator());

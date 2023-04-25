@@ -30,7 +30,7 @@
 #include "mongo/db/query/ce/heuristic_estimator.h"
 
 #include "mongo/db/query/ce/heuristic_predicate_estimation.h"
-
+#include "mongo/db/query/ce/sel_tree_utils.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 
@@ -221,44 +221,22 @@ public:
             return {0.0};
         }
 
-        SelectivityType topLevelSel{1.0};
-        std::vector<SelectivityType> topLevelSelectivities;
+        EstimateIntervalSelFn estimateIntervalFn = [&](SelectivityTreeBuilder& selTreeBuilder,
+                                                       const IntervalRequirement& interval) {
+            selTreeBuilder.atom(heuristicIntervalSel(interval, childResult));
+        };
 
-        // TODO SERVER-74540: Handle top-level disjunction.
-        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+        EstimatePartialSchemaEntrySelFn estimateFn = [&](SelectivityTreeBuilder& selTreeBuilder,
+                                                         const PartialSchemaEntry& e) {
             const auto& [key, req] = e;
-            if (req.getIsPerfOnly()) {
-                // Ignore perf-only requirements.
-                return;
-            }
+            IntervalSelectivityTreeBuilder intEstimator{selTreeBuilder, estimateIntervalFn};
+            intEstimator.build(req.getIntervals());
+        };
 
-            SelectivityType disjSel{1.0};
-            std::vector<SelectivityType> disjSelectivities;
-            // Intervals are in DNF.
-            const auto intervalDNF = req.getIntervals();
-            const auto disjuncts = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
-            for (const auto& disjunct : disjuncts) {
-                const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
-                SelectivityType conjSel{1.0};
-                std::vector<SelectivityType> conjSelectivities;
-                for (const auto& conjunct : conjuncts) {
-                    const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
-                    const SelectivityType sel = heuristicIntervalSel(interval, childResult);
-                    conjSelectivities.push_back(sel);
-                }
-                conjSel = conjExponentialBackoff(std::move(conjSelectivities));
-                disjSelectivities.push_back(conjSel);
-            }
-            disjSel = disjExponentialBackoff(std::move(disjSelectivities));
-            topLevelSelectivities.push_back(disjSel);
-        });
+        PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult);
+        const CEType estimate = estimator.estimateCE(node.getReqMap().getRoot());
 
-        if (topLevelSelectivities.empty()) {
-            return childResult;
-        }
-        // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
-        topLevelSel = conjExponentialBackoff(std::move(topLevelSelectivities));
-        CEType card = std::max(topLevelSel * childResult, kMinCard);
+        const CEType card = std::max(estimate, kMinCard);
         uassert(6716602, "Invalid cardinality.", validCardinality(card));
         return card;
     }

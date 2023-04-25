@@ -18,7 +18,7 @@ for (let i = 0; i < nMatches; i++) {
 documents.push({a: 4, b: 3, c: 2});
 documents.push({a: 5, b: 5, c: 2});
 
-for (let i = 1; i < nMatches + 500; i++) {
+for (let i = 1; i < nMatches + 1000; i++) {
     documents.push({a: i + nMatches, b: i + nMatches, c: i + nMatches});
 }
 

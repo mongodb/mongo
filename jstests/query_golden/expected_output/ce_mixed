@@ -2832,7 +2832,7 @@
 [jsTest] ----
 
 Histogram estimate: 150.
-Heuristic estimate: 17.320508075688778.
+Heuristic estimate: 17.32050807568877.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 150,
@@ -2847,13 +2847,13 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.320508075688778,
+	"logicalCE" : 17.32050807568877,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 17.320508075688778,
+		"logicalCE" : 17.32050807568877,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"interval" : "[ true, true ]"
 		},
 		"rightChild" : {
@@ -2872,7 +2872,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 150.
-Heuristic estimate: 17.320508075688778.
+Heuristic estimate: 17.32050807568877.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 150,
@@ -2887,13 +2887,13 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.320508075688778,
+	"logicalCE" : 17.32050807568877,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 17.320508075688778,
+		"logicalCE" : 17.32050807568877,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"interval" : "[ false, false ]"
 		},
 		"rightChild" : {
@@ -2912,7 +2912,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 299.
-Heuristic estimate: 59.999999999999986.
+Heuristic estimate: 60.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 299,
@@ -2927,13 +2927,13 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 59.999999999999986,
+	"logicalCE" : 60,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 59.999999999999986,
+		"logicalCE" : 60,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 59.999999999999986,
+			"logicalCE" : 60,
 			"interval" : "( ISODate(\"1950-01-01T00:00:00Z\"), ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\") ]"
 		},
 		"rightChild" : {
@@ -2952,7 +2952,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 179.33675564681724.
-Heuristic estimate: 59.999999999999986.
+Heuristic estimate: 60.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 179.33675564681724,
@@ -2967,13 +2967,13 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 59.999999999999986,
+	"logicalCE" : 60,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 59.999999999999986,
+		"logicalCE" : 60,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 59.999999999999986,
+			"logicalCE" : 60,
 			"interval" : "[ ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\"), ISODate(\"1979-12-06T00:00:00Z\") )"
 		},
 		"rightChild" : {
@@ -2992,7 +2992,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 61.99999971987415.
-Heuristic estimate: 99.00000000000003.
+Heuristic estimate: 99.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 61.99999971987415,
@@ -3016,13 +3016,13 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 99.00000000000003,
+	"logicalCE" : 99,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 99.00000000000003,
+		"logicalCE" : 99,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 99.00000000000003
+			"logicalCE" : 99
 		}
 	}
 }
@@ -3032,7 +3032,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 120.
-Heuristic estimate: 17.320508075688778.
+Heuristic estimate: 17.32050807568877.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 120,
@@ -3047,13 +3047,13 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.320508075688778,
+	"logicalCE" : 17.32050807568877,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 17.320508075688778,
+		"logicalCE" : 17.32050807568877,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 17.320508075688778
+			"logicalCE" : 17.32050807568877
 		}
 	}
 }
@@ -3062,29 +3062,29 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi" } returned 62 documents.
 [jsTest] ----
 
-Histogram and heuristic estimates were equal: 17.320508075688778.
+Histogram and heuristic estimates were equal: 17.32050807568877.
 
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.320508075688778,
+	"logicalCE" : 17.32050807568877,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 17.320508075688778,
+		"logicalCE" : 17.32050807568877,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 17.320508075688778
+			"logicalCE" : 17.32050807568877
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.320508075688778,
+	"logicalCE" : 17.32050807568877,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 17.320508075688778,
+		"logicalCE" : 17.32050807568877,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 17.320508075688778
+			"logicalCE" : 17.32050807568877
 		}
 	}
 }
@@ -3093,29 +3093,29 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos" } returned 113 documents.
 [jsTest] ----
 
-Histogram and heuristic estimates were equal: 17.320508075688778.
+Histogram and heuristic estimates were equal: 17.32050807568877.
 
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.320508075688778,
+	"logicalCE" : 17.32050807568877,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 17.320508075688778,
+		"logicalCE" : 17.32050807568877,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 17.320508075688778
+			"logicalCE" : 17.32050807568877
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.320508075688778,
+	"logicalCE" : 17.32050807568877,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 17.320508075688778,
+		"logicalCE" : 17.32050807568877,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 17.320508075688778
+			"logicalCE" : 17.32050807568877
 		}
 	}
 }
@@ -3125,7 +3125,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 115.65144475323812.
-Heuristic estimate: 7.745966692414835.
+Heuristic estimate: 7.745966692414833.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 115.65144475323812,
@@ -3144,24 +3144,24 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 7.745966692414835,
+	"logicalCE" : 7.745966692414833,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 7.745966692414835,
+		"logicalCE" : 7.745966692414833,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"interval" : "[ true, true ]"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 59.999999999999986,
+			"logicalCE" : 60,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 59.999999999999986,
+				"logicalCE" : 60,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 59.999999999999986
+					"logicalCE" : 60
 				}
 			}
 		}
@@ -3173,7 +3173,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 43.84062023548705.
-Heuristic estimate: 9.949874371066203.
+Heuristic estimate: 9.949874371066198.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 43.84062023548705,
@@ -3201,24 +3201,24 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 9.949874371066203,
+	"logicalCE" : 9.949874371066198,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 9.949874371066203,
+		"logicalCE" : 9.949874371066198,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"interval" : "[ false, false ]"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 99.00000000000003,
+			"logicalCE" : 99,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 99.00000000000003,
+				"logicalCE" : 99,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 99.00000000000003
+					"logicalCE" : 99
 				}
 			}
 		}
@@ -3230,7 +3230,7 @@ Heuristic explain:  {
 [jsTest] ----
 
 Histogram estimate: 39.21224280892076.
-Heuristic estimate: 9.949874371066203.
+Heuristic estimate: 9.949874371066198.
 Histogram explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 39.21224280892076,
@@ -3258,17 +3258,141 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 9.949874371066203,
+	"logicalCE" : 9.949874371066198,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 9.949874371066203,
+		"logicalCE" : 9.949874371066198,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 9.949874371066203,
+			"logicalCE" : 9.949874371066198,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 9.949874371066203
+				"logicalCE" : 9.949874371066198
 			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "likesPizza" : true }, { "date" : { "$lt" : ISODate("1955-01-01T00:00:00Z") } } ] } returned 168 documents.
+[jsTest] ----
+
+Histogram estimate: 157.54345865842552.
+Heuristic estimate: 67.03119854910238.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 157.54345865842552,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 157.54345865842552,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 157.54345865842552
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 67.03119854910238,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 67.03119854910238,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 67.03119854910238
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "favPizzaToppings" : "mushrooms" }, { "name" : { "$lte" : "Bob Bennet", "$gte" : "Alice Smith" } } ] } returned 130 documents.
+[jsTest] ----
+
+Histogram estimate: 138.3336768827409.
+Heuristic estimate: 67.03119854910238.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 138.3336768827409,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 138.3336768827409,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 138.3336768827409
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 67.03119854910238,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 67.03119854910238,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 67.03119854910238
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "$and" : [ { "likesPizza" : false }, { "name" : { "$lte" : "Bob Bennet" } } ] }, { "$and" : [ { "likesPizza" : true }, { "name" : { "$gte" : "Tom Watson" } } ] } ] } returned 34 documents.
+[jsTest] ----
+
+Histogram estimate: 53.66673009508964.
+Heuristic estimate: 14.800368851048507.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 53.66673009508964,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 53.66673009508964,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 53.66673009508964
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 14.800368851048507,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 14.800368851048507,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 14.800368851048507
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "$and" : [ { "likesPizza" : false }, { "name" : { "$lte" : "Bob Bennet" } } ] }, { "date" : { "$lte" : "1960-01-01T00:00:00" } } ] } returned 17 documents.
+[jsTest] ----
+
+Histogram estimate: 43.84062023548707.
+Heuristic estimate: 102.36131345698406.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 43.84062023548707,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 43.84062023548707,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 43.84062023548707
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 102.36131345698406,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 102.36131345698406,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 102.36131345698406
 		}
 	}
 }
@@ -3277,44 +3401,44 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "likesPizza" : true } returned 62 documents.
 [jsTest] ----
 
-Histogram estimate: 12.247448713915896.
-Heuristic estimate: 4.1617914502878195.
+Histogram estimate: 12.247448713915889.
+Heuristic estimate: 4.161791450287816.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 12.247448713915896,
+	"logicalCE" : 12.247448713915889,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 12.247448713915896,
+		"logicalCE" : 12.247448713915889,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 12.247448713915896,
+			"logicalCE" : 12.247448713915889,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 12.247448713915896
+				"logicalCE" : 12.247448713915889
 			}
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 4.1617914502878195,
+	"logicalCE" : 4.161791450287816,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 4.1617914502878195,
+		"logicalCE" : 4.161791450287816,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"interval" : "[ true, true ]"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 17.320508075688778,
+				"logicalCE" : 17.32050807568877,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 17.320508075688778
+					"logicalCE" : 17.32050807568877
 				}
 			}
 		}
@@ -3325,44 +3449,44 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "likesPizza" : false } returned 0 documents.
 [jsTest] ----
 
-Histogram estimate: 12.247448713915896.
-Heuristic estimate: 4.1617914502878195.
+Histogram estimate: 12.247448713915889.
+Heuristic estimate: 4.161791450287816.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 12.247448713915896,
+	"logicalCE" : 12.247448713915889,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 12.247448713915896,
+		"logicalCE" : 12.247448713915889,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 12.247448713915896,
+			"logicalCE" : 12.247448713915889,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 12.247448713915896
+				"logicalCE" : 12.247448713915889
 			}
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 4.1617914502878195,
+	"logicalCE" : 4.161791450287816,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 4.1617914502878195,
+		"logicalCE" : 4.161791450287816,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"interval" : "[ false, false ]"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 17.320508075688778,
+				"logicalCE" : 17.32050807568877,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 17.320508075688778
+					"logicalCE" : 17.32050807568877
 				}
 			}
 		}
@@ -3373,44 +3497,44 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") } } returned 62 documents.
 [jsTest] ----
 
-Histogram estimate: 17.29161646579059.
-Heuristic estimate: 7.745966692414835.
+Histogram estimate: 17.29161646579058.
+Heuristic estimate: 7.745966692414833.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 17.29161646579059,
+	"logicalCE" : 17.29161646579058,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 17.29161646579059,
+		"logicalCE" : 17.29161646579058,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 17.29161646579059,
+			"logicalCE" : 17.29161646579058,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 17.29161646579059
+				"logicalCE" : 17.29161646579058
 			}
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 7.745966692414835,
+	"logicalCE" : 7.745966692414833,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 7.745966692414835,
+		"logicalCE" : 7.745966692414833,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 59.999999999999986,
+			"logicalCE" : 60,
 			"interval" : "( ISODate(\"1950-01-01T00:00:00Z\"), ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\") ]"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 17.320508075688778,
+				"logicalCE" : 17.32050807568877,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 17.320508075688778
+					"logicalCE" : 17.32050807568877
 				}
 			}
 		}
@@ -3421,44 +3545,44 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 37 documents.
 [jsTest] ----
 
-Histogram estimate: 13.391667396064515.
-Heuristic estimate: 7.745966692414835.
+Histogram estimate: 13.39166739606451.
+Heuristic estimate: 7.745966692414833.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 13.391667396064515,
+	"logicalCE" : 13.39166739606451,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 13.391667396064515,
+		"logicalCE" : 13.39166739606451,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 13.391667396064515,
+			"logicalCE" : 13.39166739606451,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 13.391667396064515
+				"logicalCE" : 13.39166739606451
 			}
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 7.745966692414835,
+	"logicalCE" : 7.745966692414833,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 7.745966692414835,
+		"logicalCE" : 7.745966692414833,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 59.999999999999986,
+			"logicalCE" : 60,
 			"interval" : "[ ISODate(\"0NaN-NaN-NaNTNaN:NaN:NaNZ\"), ISODate(\"1979-12-06T00:00:00Z\") )"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 17.320508075688778,
+				"logicalCE" : 17.32050807568877,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 17.320508075688778
+					"logicalCE" : 17.32050807568877
 				}
 			}
 		}
@@ -3469,44 +3593,44 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z"),  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 37 documents.
 [jsTest] ----
 
-Histogram estimate: 13.354278552090237.
-Heuristic estimate: 7.745966692414835.
+Histogram estimate: 13.354278552090232.
+Heuristic estimate: 7.745966692414833.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 13.354278552090237,
+	"logicalCE" : 13.354278552090232,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 13.354278552090237,
+		"logicalCE" : 13.354278552090232,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 13.354278552090237,
+			"logicalCE" : 13.354278552090232,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 13.354278552090237
+				"logicalCE" : 13.354278552090232
 			}
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 7.745966692414835,
+	"logicalCE" : 7.745966692414833,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 7.745966692414835,
+		"logicalCE" : 7.745966692414833,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 59.999999999999986,
+			"logicalCE" : 60,
 			"interval" : "( ISODate(\"1950-01-01T00:00:00Z\"), ISODate(\"1979-12-06T00:00:00Z\") )"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 17.320508075688778,
+				"logicalCE" : 17.32050807568877,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 17.320508075688778
+					"logicalCE" : 17.32050807568877
 				}
 			}
 		}
@@ -3517,14 +3641,14 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "name" : {  "$lte" : "Bob Bennet" } } returned 13 documents.
 [jsTest] ----
 
-Histogram estimate: 7.8740078562238045.
-Heuristic estimate: 9.949874371066203.
+Histogram estimate: 7.8740078562238.
+Heuristic estimate: 9.949874371066198.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 7.8740078562238045,
+	"logicalCE" : 7.8740078562238,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 7.8740078562238045,
+		"logicalCE" : 7.8740078562238,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
 			"logicalCE" : 61.99999971987415,
@@ -3532,13 +3656,13 @@ Histogram explain:  {
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"child" : {
 				"nodeType" : "LimitSkip",
-				"logicalCE" : 17.320508075688778,
+				"logicalCE" : 17.32050807568877,
 				"child" : {
 					"nodeType" : "Seek",
-					"logicalCE" : 17.320508075688778
+					"logicalCE" : 17.32050807568877
 				}
 			}
 		}
@@ -3546,16 +3670,16 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 9.949874371066203,
+	"logicalCE" : 9.949874371066198,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 9.949874371066203,
+		"logicalCE" : 9.949874371066198,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 9.949874371066203,
+			"logicalCE" : 9.949874371066198,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 9.949874371066203
+				"logicalCE" : 9.949874371066198
 			}
 		}
 	}
@@ -3565,36 +3689,36 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "favPizzaToppings" : "mushrooms" } returned 20 documents.
 [jsTest] ----
 
-Histogram estimate: 10.954451150103326.
-Heuristic estimate: 4.1617914502878195.
+Histogram estimate: 10.95445115010332.
+Heuristic estimate: 4.161791450287816.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 10.954451150103326,
+	"logicalCE" : 10.95445115010332,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 10.954451150103326,
+		"logicalCE" : 10.95445115010332,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 10.954451150103326,
+			"logicalCE" : 10.95445115010332,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 10.954451150103326
+				"logicalCE" : 10.95445115010332
 			}
 		}
 	}
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 4.1617914502878195,
+	"logicalCE" : 4.161791450287816,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 4.1617914502878195,
+		"logicalCE" : 4.161791450287816,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 4.1617914502878195,
+			"logicalCE" : 4.161791450287816,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 4.1617914502878195
+				"logicalCE" : 4.161791450287816
 			}
 		}
 	}
@@ -3604,26 +3728,26 @@ Heuristic explain:  {
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") },  "favPizzaToppings" : "mushrooms",  "likesPizza" : true } returned 20 documents.
 [jsTest] ----
 
-Histogram estimate: 9.207714944743804.
-Heuristic estimate: 1.6682798577318325.
+Histogram estimate: 9.207714944743799.
+Heuristic estimate: 1.6682798577318312.
 Histogram explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 9.207714944743804,
+	"logicalCE" : 9.207714944743799,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 9.207714944743804,
+		"logicalCE" : 9.207714944743799,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 9.207714944743804,
+			"logicalCE" : 9.207714944743799,
 			"child" : {
 				"nodeType" : "Filter",
-				"logicalCE" : 9.207714944743804,
+				"logicalCE" : 9.207714944743799,
 				"child" : {
 					"nodeType" : "Filter",
-					"logicalCE" : 9.207714944743804,
+					"logicalCE" : 9.207714944743799,
 					"child" : {
 						"nodeType" : "PhysicalScan",
-						"logicalCE" : 9.207714944743804
+						"logicalCE" : 9.207714944743799
 					}
 				}
 			}
@@ -3632,34 +3756,220 @@ Histogram explain:  {
 }
 Heuristic explain:  {
 	"nodeType" : "Root",
-	"logicalCE" : 1.6682798577318325,
+	"logicalCE" : 1.6682798577318312,
 	"child" : {
 		"nodeType" : "NestedLoopJoin",
-		"logicalCE" : 1.6682798577318325,
+		"logicalCE" : 1.6682798577318312,
 		"leftChild" : {
 			"nodeType" : "IndexScan",
-			"logicalCE" : 17.320508075688778,
+			"logicalCE" : 17.32050807568877,
 			"interval" : "[ true, true ]"
 		},
 		"rightChild" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 2.783157683713742,
+			"logicalCE" : 2.7831576837137395,
 			"child" : {
 				"nodeType" : "Filter",
-				"logicalCE" : 2.783157683713742,
+				"logicalCE" : 2.7831576837137395,
 				"child" : {
 					"nodeType" : "Filter",
-					"logicalCE" : 2.783157683713742,
+					"logicalCE" : 2.7831576837137395,
 					"child" : {
 						"nodeType" : "LimitSkip",
-						"logicalCE" : 2.783157683713742,
+						"logicalCE" : 2.7831576837137395,
 						"child" : {
 							"nodeType" : "Seek",
-							"logicalCE" : 2.783157683713742
+							"logicalCE" : 2.7831576837137395
 						}
 					}
 				}
 			}
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "likesPizza" : true } ] } returned 150 documents.
+[jsTest] ----
+
+Histogram estimate: 154.39449909318898.
+Heuristic estimate: 25.602073215185506.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 154.39449909318898,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 154.39449909318898,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 154.39449909318898
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 25.602073215185506,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 25.602073215185506,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 25.602073215185506
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "date" : { "$gt" : ISODate("1950-01-01T00:00:00Z"), "$lt" : ISODate("1960-01-01T00:00:00Z") } } ] } returned 109 documents.
+[jsTest] ----
+
+Histogram estimate: 65.96349869353018.
+Heuristic estimate: 67.03119854910238.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 65.96349869353018,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 65.96349869353018,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 65.96349869353018
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 67.03119854910238,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 67.03119854910238,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 67.03119854910238
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$lte" : "John Watson" } } ] }, { "$and" : [ { "favPizzaToppings" : "mushrooms" }, { "likesPizza" : true } ] } ] } returned 126 documents.
+[jsTest] ----
+
+Histogram estimate: 89.72910201968833.
+Heuristic estimate: 11.968780936383162.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 89.72910201968833,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 89.72910201968833,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 89.72910201968833
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 11.968780936383162,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 11.968780936383162,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 11.968780936383162
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$lte" : "John Watson" } } ] }, { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$gte" : "Kate Knight" } } ] } ] } returned 56 documents.
+[jsTest] ----
+
+Histogram estimate: 18.45591859401975.
+Heuristic estimate: 14.800368851048507.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 18.45591859401975,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 18.45591859401975,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 18.45591859401975
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 14.800368851048507,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 14.800368851048507,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 14.800368851048507
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$lte" : "John Watson" } } ] }, { "favPizzaToppings" : "mushrooms" } ] } returned 126 documents.
+[jsTest] ----
+
+Histogram estimate: 124.07968100899764.
+Heuristic estimate: 22.04774379816937.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 124.07968100899764,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 124.07968100899764,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 124.07968100899764
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 22.04774379816937,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 22.04774379816937,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 22.04774379816937
+		}
+	}
+}
+
+[jsTest] ----
+[jsTest] Query: {  "$or" : [ { "$and" : [ { "favPizzaToppings" : "mushrooms" }, { "name" : { "$lte" : "John Watson" } } ] }, { "lastPizzaShopVisited" : "Zizzi" } ] } returned 101 documents.
+[jsTest] ----
+
+Histogram estimate: 99.20855534651972.
+Heuristic estimate: 22.04774379816937.
+Histogram explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 99.20855534651972,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 99.20855534651972,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 99.20855534651972
+		}
+	}
+}
+Heuristic explain:  {
+	"nodeType" : "Root",
+	"logicalCE" : 22.04774379816937,
+	"child" : {
+		"nodeType" : "Filter",
+		"logicalCE" : 22.04774379816937,
+		"child" : {
+			"nodeType" : "PhysicalScan",
+			"logicalCE" : 22.04774379816937
 		}
 	}
 }

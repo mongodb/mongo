@@ -688,11 +688,18 @@ TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_OR1path) {
 
 TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_OR2paths) {
     std::string query = "{$or: [{a0: {$gt:44}}, {b0: {$lt: 9}}]}";
-    HeuristicCETester ht(collName, kOnlySubPhaseSet);
-    // Disjunctions on different paths are not SARGable.
-    ASSERT_MATCH_CE_CARD(ht, query, 8.19, 9.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 69.0525, 99.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 551.1, 1000.0);
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 7.52115, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 58.6188, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 451.581, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_OR3paths) {
+    std::string query = "{$or: [{a0: {$gt:44}}, {b0: {$lt: 9}}, {c0: {$eq: 5}}]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 7.66374, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 59.6741, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 455.969, 1000.0);
 }
 
 TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathSimple) {
@@ -709,7 +716,7 @@ TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathSimple) {
 
 
 TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
-    HeuristicCETester ht(collName, kOnlySubPhaseSet);
+    HeuristicCETester ht(collName);
     // Each disjunct has different number of conjuncts,
     // so that its selectivity is different. We need 5 disjuncts to test exponential backoff which
     // cuts off at the first 4. The conjuncts are in selectivity order.
@@ -745,11 +752,22 @@ TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF2paths) {
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}]},"
         "{$and: [{b0: {$gt:40}}, {b0: {$lt: 44}}]}"
         "]}";
-    HeuristicCETester ht(collName, kOnlySubPhaseSet);
-    // Disjunctions on different paths are not SARGable.
-    ASSERT_MATCH_CE_CARD(ht, query, 6.6591, 9.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 36.0354, 99.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 205.941, 1000.0);
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 6.59965, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 41.2515, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 270.42, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF4paths) {
+    std::string query =
+        "{$or: ["
+        "{$and: [{a0: {$gt: 9}}, {b0: {$lt: 12}}]},"
+        "{$and: [{c0: {$gt:40}}, {d0: {$lt: 44}}]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 6.59965, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 41.2515, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 270.42, 1000.0);
 }
 
 TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF1path) {
@@ -775,6 +793,103 @@ TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF2paths) {
     ASSERT_MATCH_CE_CARD(ht, query, 30.8127, 99.0);
     ASSERT_MATCH_CE_CARD(ht, query, 192.613, 1000.0);
 }
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF4paths) {
+    std::string query =
+        "{$and : ["
+        "{$or : [ {a0 : {$gt : 11}}, {a1 : {$lt : 44}} ]},"
+        "{$or : [ {b0 : {$gt : 77}}, {b1 : {$lt : 51}} ]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 6.2853, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 34.7087, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 203.926, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_AsymmetricDisj) {
+    std::string query =
+        "{$or: ["
+        "{a: {$lt: 3}},"
+        "{$and: [{b: {$gt:5}}, {c: {$lt: 10}}]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 7.26203, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 53.5047, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 396.84, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_AsymmetricConj) {
+    std::string query =
+        "{$and: ["
+        "{a: {$lt: 3}},"
+        "{$or: [{b: {$gt:5}}, {c: {$lt: 10}}]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 5.2648, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 26.3785, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 149.022, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_SymmetricDisjNested) {
+    std::string query =
+        "{$or: ["
+        "{$and: [{$or: [{a: {$gt:5}}, {b: {$lt: 10}}]}, {$or: [{c: {$gt:5}}, {d: {$lt: 10}}]}]},"
+        "{$and: [{$or: [{e: {$gt:5}}, {f: {$lt: 10}}]}, {$or: [{g: {$gt:5}}, {h: {$lt: 10}}]}]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 8.73405, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 72.8961, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 515.182, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_SymmetricConjNested) {
+    std::string query =
+        "{$and: ["
+        "{$or: [{$and: [{a: {$gt:5}}, {b: {$lt: 10}}]}, {$and: [{c: {$gt:5}}, {d: {$lt: 10}}]}]},"
+        "{$or: [{$and: [{e: {$gt:5}}, {f: {$lt: 10}}]}, {$and: [{g: {$gt:5}}, {h: {$lt: 10}}]}]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 4.83949, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 17.1888, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 73.1271, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_AsymmetricDisjNested) {
+    std::string query =
+        "{$or: ["
+        "{a: {$gt: 4}},"
+        "{$and: ["
+        "{b: {$lt : 3}},"
+        "{$or: ["
+        "{c: {$gt: 2}},"
+        "{$and: [{d: {$lt: 1}}, {e: {$gt: 0}}]}"
+        "]}"
+        "]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 7.90083, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 58.3051, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 419.095, 1000.0);
+}
+
+TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_AsymmetricConjNested) {
+    std::string query =
+        "{$and: ["
+        "{a: {$gt: 4}},"
+        "{$or: ["
+        "{b: {$lt : 3}},"
+        "{$and: ["
+        "{c: {$gt: 2}},"
+        "{$or: [{d: {$lt: 1}}, {e: {$gt: 0}}]}"
+        "]}"
+        "]}"
+        "]}";
+    HeuristicCETester ht(collName);
+    ASSERT_MATCH_CE_CARD(ht, query, 5.61393, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 27.7382, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 149.11, 1000.0);
+}
+
 
 TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionExplorationPhases) {
     HeuristicCETester ht(collName);
@@ -811,6 +926,13 @@ TEST_F(CEHeuristicTest, CENotEquality) {
     ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
     ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
 
+    neNeCE = {9999};
+    neEqCE = {9901};
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f1: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f1: {$eq: 'abc'}}]}", neEqCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
+
     // Update cardinality to 25.
     collCard = {25};
     opt.setCollCard(collCard);
@@ -835,6 +957,13 @@ TEST_F(CEHeuristicTest, CENotEquality) {
     ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
     ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
 
+    neNeCE = {24};
+    neEqCE = {21};
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f1: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f1: {$eq: 'abc'}}]}", neEqCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
+
     // Update cardinality to 9.
     collCard = {9};
     opt.setCollCard(collCard);
@@ -858,6 +987,13 @@ TEST_F(CEHeuristicTest, CENotEquality) {
     ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f1: {$eq: 'abc'}}]}", neEqCE);
     ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
     ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
+
+    neNeCE = {8};
+    neEqCE = {7};
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f1: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f1: {$eq: 'abc'}}]}", neEqCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$or: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
 }
 
 TEST_F(CEHeuristicTest, CENotOpenRange) {

@@ -34,6 +34,7 @@
 #include "mongo/db/query/ce/bound_utils.h"
 #include "mongo/db/query/ce/heuristic_predicate_estimation.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/sel_tree_utils.h"
 
 #include "mongo/db/query/cqf_command_utils.h"
 
@@ -217,7 +218,6 @@ std::string serializePath(const ABT& path) {
     auto str = algebra::transport<false>(path, pdt);
     return str;
 }
-
 }  // namespace
 
 IntervalEstimation analyzeIntervalEstimationMode(const stats::ArrayHistogram* histogram,
@@ -278,22 +278,6 @@ public:
         return {_stats->getCardinality()};
     }
 
-    /**
-     * This struct is used to track an intermediate representation of the intervals in the
-     * requirements map. In particular, grouping intervals along each path in the map allows us to
-     * determine which paths should be estimated as $elemMatches without relying on a particular
-     * order of entries in the requirements map.
-     */
-    struct SargableConjunct {
-        bool includeScalar;
-        const stats::ArrayHistogram* histogram;
-        std::vector<std::reference_wrapper<const IntervalReqExpr::Node>> intervals;
-
-        bool isPathArr() const {
-            return histogram && !includeScalar && intervals.empty();
-        }
-    };
-
     CEType transport(const ABT& n,
                      const SargableNode& node,
                      const Metadata& metadata,
@@ -307,103 +291,18 @@ public:
             return {0.0};
         }
 
-        // Initial first pass through the requirements map to extract information about each path.
-        // TODO SERVER-74540: Handle top-level disjunction.
-        std::map<std::string, SargableConjunct> conjunctRequirements;
-        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
-            const auto& [key, req] = e;
-            if (req.getIsPerfOnly()) {
-                // Ignore perf-only requirements.
-                return;
-            }
+        SelectivityTreeBuilder selTreeBuilder;
+        selTreeBuilder.pushDisj();
+        PSRExpr::visitDisjuncts(node.getReqMap().getRoot(),
+                                [&](const PSRExpr::Node& n, const size_t) {
+                                    estimateConjunct(n, selTreeBuilder, childResult);
+                                });
 
-            const auto serializedPath = serializePath(key._path.ref());
-            const auto& interval = req.getIntervals();
-            const bool isPathArrInterval =
-                (_arrayOnlyInterval == interval) && !pathEndsInTraverse(key._path.ref());
-
-            // Check if we have already seen this path.
-            if (auto conjunctIt = conjunctRequirements.find({serializedPath});
-                conjunctIt != conjunctRequirements.end()) {
-                auto& conjunctReq = conjunctIt->second;
-                if (isPathArrInterval) {
-                    // We should estimate this path's intervals using $elemMatch semantics.
-                    // Don't push back the interval for estimation; instead, we use it to change how
-                    // we estimate other intervals along this path.
-                    conjunctReq.includeScalar = false;
-                } else {
-                    // We will need to estimate this interval.
-                    conjunctReq.intervals.push_back(interval);
-                }
-                return;
-            }
-
-            // Get histogram from statistics if it exists, or null if not.
-            const auto* histogram = _stats->getHistogram(serializedPath);
-
-            // Add this path to the map. If this is not a 'PathArr' interval, add it to the vector
-            // of intervals we will be estimating.
-            SargableConjunct sc{!isPathArrInterval, histogram, {}};
-            if (sc.includeScalar) {
-                sc.intervals.push_back(interval);
-            }
-            conjunctRequirements.emplace(serializedPath, std::move(sc));
-        });
-
-        std::vector<SelectivityType> topLevelSelectivities;
-        for (const auto& [serializedPath, conjunctReq] : conjunctRequirements) {
-            if (conjunctReq.isPathArr()) {
-                // If there is a single 'PathArr' interval for this field, we should estimate this
-                // as the selectivity of array values.
-                topLevelSelectivities.push_back(getArraySelectivity(*conjunctReq.histogram));
-            }
-
-            // Intervals are in DNF.
-            for (const IntervalReqExpr::Node& intervalDNF : conjunctReq.intervals) {
-                std::vector<SelectivityType> disjSelectivities;
-
-                const auto disjuncts = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
-                for (const auto& disjunct : disjuncts) {
-                    const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
-
-                    std::vector<SelectivityType> conjSelectivities;
-                    for (const auto& conjunct : conjuncts) {
-                        const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
-                        const auto selectivity = estimateInterval(conjunctReq.histogram,
-                                                                  interval,
-                                                                  conjunctReq.includeScalar,
-                                                                  childResult);
-                        OPTIMIZER_DEBUG_LOG(7151301,
-                                            5,
-                                            "Estimated path and interval as:",
-                                            "path"_attr = serializedPath,
-                                            "interval"_attr =
-                                                ExplainGenerator::explainInterval(interval),
-                                            "selectivity"_attr = selectivity._value);
-                        conjSelectivities.push_back(selectivity);
-                    }
-
-                    const auto backoff = conjExponentialBackoff(std::move(conjSelectivities));
-                    disjSelectivities.push_back(backoff);
-                }
-
-                const auto backoff = disjExponentialBackoff(std::move(disjSelectivities));
-                OPTIMIZER_DEBUG_LOG(7151303,
-                                    5,
-                                    "Estimating disjunction on path using histograms",
-                                    "path"_attr = serializedPath,
-                                    "intervalDNF"_attr =
-                                        ExplainGenerator::explainIntervalExpr(intervalDNF),
-                                    "selectivity"_attr = backoff._value);
-                topLevelSelectivities.push_back(backoff);
-            }
+        if (auto selTree = selTreeBuilder.finish()) {
+            const SelectivityType topLevelSel = estimateSelectivityTree(*selTree);
+            childResult *= topLevelSel;
         }
 
-        // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
-        if (!topLevelSelectivities.empty()) {
-            const auto backoff = conjExponentialBackoff(std::move(topLevelSelectivities));
-            childResult *= backoff;
-        }
         OPTIMIZER_DEBUG_LOG(7151304,
                             5,
                             "Final estimate for SargableNode using histograms.",
@@ -440,6 +339,106 @@ public:
     }
 
 private:
+    /**
+     * This struct is used to track an intermediate representation of the intervals in the
+     * requirements map. In particular, grouping intervals along each path in the map allows us to
+     * determine which paths should be estimated as $elemMatches without relying on a particular
+     * order of entries in the requirements map.
+     */
+    struct SargableConjunct {
+        bool includeScalar;
+        const stats::ArrayHistogram* histogram;
+        std::vector<std::reference_wrapper<const IntervalReqExpr::Node>> intervals;
+
+        bool isPathArr() const {
+            return histogram && !includeScalar && intervals.empty();
+        }
+    };
+
+    /**
+     * Estimate the selectivities of a PartialSchemaRequirements conjunction. It is assumed that the
+     * conjuncts are all PartialSchemaEntries. The entire conjunction must be estimated at the same
+     * time because some paths may have multiple requirements which should be considered together.
+     */
+    void estimateConjunct(const PSRExpr::Node& conj,
+                          SelectivityTreeBuilder& selTreeBuilder,
+                          const CEType& childResult) {
+        // Initial first pass through the requirements map to extract information about each path.
+        std::map<std::string, SargableConjunct> conjunctRequirements;
+        PSRExpr::visitConjuncts(conj, [&](const PSRExpr::Node& atom, const size_t) {
+            PSRExpr::visitAtom(atom, [&](const PartialSchemaEntry& e) {
+                const auto& [key, req] = e;
+                if (req.getIsPerfOnly()) {
+                    // Ignore perf-only requirements.
+                    return;
+                }
+
+                const auto serializedPath = serializePath(key._path.ref());
+                const auto& interval = req.getIntervals();
+                const bool isPathArrInterval =
+                    (_arrayOnlyInterval == interval) && !pathEndsInTraverse(key._path.ref());
+
+                // Check if we have already seen this path.
+                if (auto conjunctIt = conjunctRequirements.find({serializedPath});
+                    conjunctIt != conjunctRequirements.end()) {
+                    auto& conjunctReq = conjunctIt->second;
+                    if (isPathArrInterval) {
+                        // We should estimate this path's intervals using $elemMatch semantics.
+                        // Don't push back the interval for estimation; instead, we use it to change
+                        // how we estimate other intervals along this path.
+                        conjunctReq.includeScalar = false;
+                    } else {
+                        // We will need to estimate this interval.
+                        conjunctReq.intervals.push_back(interval);
+                    }
+                    return;
+                }
+
+                // Get histogram from statistics if it exists, or null if not.
+                const auto* histogram = _stats->getHistogram(serializedPath);
+
+                // Add this path to the map. If this is not a 'PathArr' interval, add it to the
+                // vector of intervals we will be estimating.
+                SargableConjunct sc{!isPathArrInterval, histogram, {}};
+                if (sc.includeScalar) {
+                    sc.intervals.push_back(interval);
+                }
+                conjunctRequirements.emplace(serializedPath, std::move(sc));
+            });
+        });
+
+        selTreeBuilder.pushConj();
+        for (const auto& conjunctRequirement : conjunctRequirements) {
+            const auto& serializedPath = conjunctRequirement.first;
+            const auto& conjunctReq = conjunctRequirement.second;
+
+            if (conjunctReq.isPathArr()) {
+                // If there is a single 'PathArr' interval for this field, we should estimate this
+                // as the selectivity of array values.
+                selTreeBuilder.atom(getArraySelectivity(*conjunctReq.histogram));
+            }
+
+            EstimateIntervalSelFn estimateIntervalFn = [&](SelectivityTreeBuilder& b,
+                                                           const IntervalRequirement& interval) {
+                const auto selectivity = estimateInterval(
+                    conjunctReq.histogram, interval, conjunctReq.includeScalar, childResult);
+                selTreeBuilder.atom(selectivity);
+                OPTIMIZER_DEBUG_LOG(7151301,
+                                    5,
+                                    "Estimated path and interval as:",
+                                    "path"_attr = serializedPath,
+                                    "interval"_attr = ExplainGenerator::explainInterval(interval),
+                                    "selectivity"_attr = selectivity._value);
+            };
+            IntervalSelectivityTreeBuilder intervalSelBuilder{selTreeBuilder, estimateIntervalFn};
+
+            for (const IntervalReqExpr::Node& intervalDNF : conjunctReq.intervals) {
+                intervalSelBuilder.build(intervalDNF);
+            }
+        }
+        selTreeBuilder.pop();
+    }
+
     std::shared_ptr<stats::CollectionStatistics> _stats;
     std::unique_ptr<cascades::CardinalityEstimator> _fallbackCE;
 

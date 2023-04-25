@@ -30,6 +30,7 @@
 #include "mongo/db/query/ce/hinted_estimator.h"
 
 #include "mongo/db/query/ce/heuristic_estimator.h"
+#include "mongo/db/query/ce/sel_tree_utils.h"
 
 namespace mongo::optimizer::ce {
 class HintedTransport {
@@ -39,20 +40,19 @@ public:
                      CEType childResult,
                      CEType /*bindsResult*/,
                      CEType /*refsResult*/) {
-        CEType result = childResult;
-        // TODO SERVER-74540: Handle top-level disjunction.
-        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+        EstimatePartialSchemaEntrySelFn entrySelFn = [&](SelectivityTreeBuilder& selTreeBuilder,
+                                                         const PartialSchemaEntry& e) {
             const auto& [key, req] = e;
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 auto it = _hints.find(key);
                 if (it != _hints.cend()) {
-                    // Assume independence.
-                    result *= it->second;
+                    selTreeBuilder.atom(it->second);
                 }
             }
-        });
+        };
 
-        return result;
+        PartialSchemaRequirementsCardinalityEstimator estimator(entrySelFn, childResult);
+        return estimator.estimateCE(node.getReqMap().getRoot());
     }
 
     template <typename T, typename... Ts>

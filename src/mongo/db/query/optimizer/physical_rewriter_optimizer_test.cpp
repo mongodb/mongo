@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
@@ -1102,7 +1103,7 @@ TEST(PhysRewriter, FilterIndexing4) {
     const BSONObj explain = ExplainGenerator::explainMemoBSONObj(phaseManager.getMemo());
     for (const auto& pathAndCE : pathAndCEs) {
         BSONElement el = dotted_path_support::extractElementAtPath(explain, pathAndCE.first);
-        ASSERT_EQ(el.Double(), pathAndCE.second);
+        ASSERT_CE_APPROX_EQUAL(el.Double(), pathAndCE.second, ce::kMaxCEError);
     }
 
     ASSERT_EXPLAIN_V2_AUTO(
@@ -2267,7 +2268,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
     // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
     auto costModel = getTestCostModel();
     costModel.setEvalStartupCost(1e-6);
-    costModel.setGroupByIncrementalCost(1e-4);
+    costModel.setGroupByIncrementalCost(9e-5);
 
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,

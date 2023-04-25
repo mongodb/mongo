@@ -8,6 +8,7 @@ env.Library(
     target="ce_utils",
     source=[
         'bound_utils.cpp',
+        'sel_tree_utils.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/abt_utils',
@@ -45,6 +46,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
         'ce_heuristic_estimation',
+        'ce_utils',
     ],
 )
 
@@ -55,6 +57,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+        'ce_utils',
         'query_ce_heuristic',
     ],
 )
@@ -70,6 +73,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
         'ce_heuristic_estimation',
+        'ce_utils',
     ],
 )
 
@@ -81,6 +85,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        'ce_utils',
     ],
 )
 

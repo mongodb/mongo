@@ -295,6 +295,114 @@ TEST_F(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
     // heuristics if no predicates have a histogram.
     ASSERT_MATCH_CE(t, "{a: {$eq: 2}, c: {$eq: 1}}", 2.23607);
     ASSERT_MATCH_CE(t, "{c: {$eq: 2}, d: {$eq: 22}}", 1.73205);
+
+    // Test disjunction where together the predicates include the entire range.
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$gt: 2}}, {a: {$lte: 2}}]}", 9.0);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$gte: 2}}, {a: {$lte: 2}}]}", 9.0);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$gt: 2}}, {a: {$lte: 3}}]}", 9.0);
+
+    // Test disjunction with overlapping, redundant ranges.
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$gte: 2}}, {a: {$gte: 3}}]}", 6.0);
+
+    // Test disjunction with disjoint ranges. We again expect exponential backoff here.
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$lte: 1}}, {a: {$gte: 3}}]}", 3.34315);
+
+    // Test disjunctions over multiple fields for which we have histograms.  We again expect
+    // exponential backoff here.
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 2}}, {b: {$eq: 22}}]}", 5.73401);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 2}}, {b: {$eq: 25}}]}", 5.0);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 11}}, {b: {$eq: 25}}]}", 0.0);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$gt: 11}}, {a: {$lte: 100}}, {b: {$eq: 22}}]}", 9.0);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$lt: 3}}, {a: {$gte: 1}}, {b: {$gt: 30}}]}", 9.0);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$lte: 1}}, {a: {$gte: 3}}, {b: {$gt: 30}}]}", 6.62159);
+
+    // Test conjunctions over multiple fields for which we may not have histograms. This is
+    // expected to fall back as described above.
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 2}}, {c: {$eq: 1}}]}", 5.73401);
+    ASSERT_MATCH_CE(t, "{$or: [{c: {$eq: 2}}, {d: {$eq: 22}}]}", 4.1010);
+}
+
+TEST_F(CEHistogramTest, AssertSmallHistogramEstimatesAsymmetricAndNestedPredicates) {
+    constexpr CEType kCollCard{26.0};
+    CEHistogramTester t(collName, kCollCard);
+
+    // Basic histogram, which we will use for all fields: a scalar histogram with values in the
+    // range [1,11], most of which are in the middle bucket.
+    auto hist = getArrayHistogramFromData({
+        {Value(1), 2 /* frequency */},
+        {Value(2), 2 /* frequency */},
+        {Value(3), 4 /* frequency */, 10 /* range frequency */, 5 /* ndv */},
+        {Value(8), 2 /* frequency */, 5 /* range frequency */, 3 /* ndv */},
+        {Value(11), 1 /* frequency */},
+    });
+    t.addHistogram("a", hist);
+    t.addHistogram("b", hist);
+    t.addHistogram("c", hist);
+    t.addHistogram("d", hist);
+    t.addHistogram("e", hist);
+    t.addHistogram("f", hist);
+    t.addHistogram("g", hist);
+    t.addHistogram("h", hist);
+
+    // Asymmetric disjunction.
+    std::string query =
+        "{$or: ["
+        "{a: {$lt: 3}},"
+        "{$and: [{b: {$gt:5}}, {c: {$lt: 9}}]}"
+        "]}";
+    ASSERT_MATCH_CE(t, query, 15.4447);
+
+    // Asymmetric conjunction.
+    query =
+        "{$and: ["
+        "{a: {$lt: 3}},"
+        "{$or: [{b: {$gt:5}}, {c: {$lt: 9}}]}"
+        "]}";
+    ASSERT_MATCH_CE(t, query, 13.5277);
+
+    // Symmetric disjunction nested (3 levels).
+    query =
+        "{$or: ["
+        "{$and: [{$or: [{a: {$gt:5}}, {b: {$lt: 9}}]}, {$or: [{c: {$gt:5}}, {d: {$lt: 9}}]}]},"
+        "{$and: [{$or: [{e: {$gt:5}}, {f: {$lt: 9}}]}, {$or: [{g: {$gt:5}}, {h: {$lt: 9}}]}]}"
+        "]}";
+    ASSERT_MATCH_CE(t, query, 19.1444);
+
+    // Symmetric conjunction nested (3 levels).
+    query =
+        "{$and: ["
+        "{$or: [{$and: [{a: {$gt:5}}, {b: {$lt: 9}}]}, {$and: [{c: {$gt:5}}, {d: {$lt: 9}}]}]},"
+        "{$or: [{$and: [{e: {$gt:5}}, {f: {$lt: 9}}]}, {$and: [{g: {$gt:5}}, {h: {$lt: 9}}]}]}"
+        "]}";
+    ASSERT_MATCH_CE(t, query, 2.65302);
+
+    // Asymmetric disjunction nested (4 levels).
+    query =
+        "{$or: ["
+        "{a: {$gt: 6}},"
+        "{$and: ["
+        "{b: {$lt : 5}},"
+        "{$or: ["
+        "{c: {$gt: 4}},"
+        "{$and: [{d: {$lt: 3}}, {e: {$gt: 2}}]}"
+        "]}"
+        "]}"
+        "]}";
+    ASSERT_MATCH_CE(t, query, 15.3124);
+
+    // Asymmetric conjunction nested (4 levels).
+    query =
+        "{$and: ["
+        "{a: {$gt: 6}},"
+        "{$or: ["
+        "{b: {$lt : 5}},"
+        "{$and: ["
+        "{c: {$gt: 4}},"
+        "{$or: [{d: {$lt: 3}}, {e: {$gt: 2}}]}"
+        "]}"
+        "]}"
+        "]}";
+    ASSERT_MATCH_CE(t, query, 4.4555);
 }
 
 TEST_F(CEHistogramTest, SanityTestEmptyHistogram) {
@@ -306,6 +414,7 @@ TEST_F(CEHistogramTest, SanityTestEmptyHistogram) {
     ASSERT_MATCH_CE(t, "{empty: {$lt: 1.0}, empty: {$gt: 0.0}}", 0.0);
     ASSERT_MATCH_CE(t, "{empty: {$eq: 1.0}, other: {$eq: \"anything\"}}", 0.0);
     ASSERT_MATCH_CE(t, "{other: {$eq: \"anything\"}, empty: {$eq: 1.0}}", 0.0);
+    ASSERT_MATCH_CE(t, "{$or: [{empty: {$lt: 1.0}}, {empty: {$gt: 0.0}}]}", 0.0);
 }
 
 TEST_F(CEHistogramTest, TestOneBucketOneIntHistogram) {
@@ -690,10 +799,18 @@ TEST_F(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
     ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, array: {$elemMatch: {$eq: 5}}}", 2.236);
     ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 0.0);
 
+    ASSERT_MATCH_CE(t, "{$or: [{scalar: {$eq: 5}}, {array: {$eq: 5}}]}", 37.0145);
+    ASSERT_MATCH_CE(t, "{$or: [{scalar: {$eq: 5}}, {array: {$elemMatch: {$eq: 5}}}]}", 37.0145);
+    ASSERT_MATCH_CE(t, "{$or: [{scalar: {$elemMatch: {$eq: 5}}}, {array: {$eq: 5}}]}", 35.0);
+
     // Composite predicate on 'mixed' and 'array' fields.
     ASSERT_MATCH_CE(t, "{mixed: {$eq: 5}, array: {$eq: 5}}", 8.721);
     ASSERT_MATCH_CE(t, "{mixed: {$eq: 5}, array: {$elemMatch: {$eq: 5}}}", 8.721);
     ASSERT_MATCH_CE(t, "{mixed: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 7.603);
+
+    ASSERT_MATCH_CE(t, "{$or: [{mixed: {$eq: 5}}, {array: {$eq: 5}}]}", 43.0303);
+    ASSERT_MATCH_CE(t, "{$or: [{mixed: {$eq: 5}}, {array: {$elemMatch: {$eq: 5}}}]}", 43.0303);
+    ASSERT_MATCH_CE(t, "{$or: [{mixed: {$elemMatch: {$eq: 5}}}, {array: {$eq: 5}}]}", 41.9737);
 
     // Composite predicate on 'scalar' and 'mixed' fields.
     ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}, mixed: {$eq: 5}}", 1.669);
@@ -713,6 +830,32 @@ TEST_F(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
     ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}, scalar: {$eq: 5}}", 0.0);
     ASSERT_MATCH_CE(t, "{mixed: {$elemMatch: {$eq: 5}}, mixed: {$eq: 5}}", 17.0);
     ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$eq: 5}}, array: {$eq: 5}}", 35.0);
+
+    // Test case where the same path has both a $match and $elemMatch, but where the top-level
+    // query is a disjunction.
+    ASSERT_MATCH_CE(t, "{mixed: {$eq: 5}}", 19.5);
+    ASSERT_MATCH_CE(t, "{scalar: {$eq: 5}}", 5.0);
+    ASSERT_MATCH_CE(t, "{$or: [{scalar: {$elemMatch: {$eq: 5}}}, {scalar: {$eq: 5}}]}", 5.0);
+    ASSERT_MATCH_CE(t,
+                    "{$or: ["
+                    "{$and: [{scalar: {$elemMatch: {$eq: 5}}}, {scalar: {$eq: 5}}]},"
+                    "{mixed: {$eq: 5}}]}",
+                    19.5);
+    ASSERT_MATCH_CE(t,
+                    "{$or: ["
+                    "{$and: [{mixed: {$elemMatch: {$eq: 5}}}, {mixed: {$eq: 5}}]},"
+                    "{scalar: {$eq: 5}}]}",
+                    19.2735);
+    ASSERT_MATCH_CE(t,
+                    "{$or: ["
+                    "{$and: [{array: {$elemMatch: {$eq: 5}}}, {array: {$eq: 5}}]},"
+                    "{scalar: {$eq: 5}}]}",
+                    37.0145);
+    ASSERT_MATCH_CE(t,
+                    "{$or: ["
+                    "{$and: [{scalar: {$elemMatch: {$eq: 5}}}, {scalar: {$eq: 5}}]},"
+                    "{scalar: {$eq: 5}}]}",
+                    5.0);
 
     // Test case with multiple predicates and ranges.
     ASSERT_MATCH_CE(t, "{array: {$elemMatch: {$lt: 5}}, mixed: {$lt: 5}}", 67.1508);
@@ -743,6 +886,8 @@ TEST_F(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
                    makeIndexDefinition("scalar", CollationOp::Ascending, /* isMultiKey */ false)}});
     ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$eq: 5}}}", 0.0);
     ASSERT_MATCH_CE(t, "{scalar: {$elemMatch: {$gt: 1, $lt: 10}}}", 0.0);
+    ASSERT_MATCH_CE(
+        t, "{$or: [{scalar: {$elemMatch: {$gt: 1, $lt: 10}}}, {mixed: {$eq: 5}}]}", 19.5);
 
     // Test how we estimate singular PathArr sargable predicate.
     ASSERT_MATCH_CE_NODE(t, "{array: {$elemMatch: {}}}", 175.0, isSargable);
@@ -1322,7 +1467,7 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
     ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "b", "{$ne: 'charB'}");
 
     // Test conjunctions where both fields have histograms. Note that when both ops are $ne, we
-    // never use histogram estimation because the optimizer only generates filetr nodes (no sargable
+    // never use histogram estimation because the optimizer only generates filter nodes (no sargable
     // nodes).
     CEType neNeCE{11.5873};
     CEType neEqCE{0.585786};
@@ -1339,9 +1484,26 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
     eqEqCE = {0.945742};
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
     ASSERT_MATCH_CE(t, "{$and: [{a: {$eq: 7}}, {noHist: {$eq: 'charB'}}]}", eqEqCE);
+
+    // Same as above, but testing disjunction. In this case, if either op is $ne, we never use
+    // histogram estimation because the optimizer only generates filter nodes.
+    neNeCE = {19};
+    neEqCE = {16.5279};
+    eqEqCE = {2.92370};
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$ne: 7}}, {b: {$ne: 'charB'}}]}", neNeCE);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$ne: 7}}, {b: {$eq: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 7}}, {b: {$ne: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 7}}, {b: {$eq: 'charB'}}]}", eqEqCE);
+
+    // Where only one fields has a histogram.
+    eqEqCE = {5.26899};
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$ne: 7}}, {noHist: {$ne: 'charB'}}]}", neNeCE);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 7}}, {noHist: {$ne: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$or: [{a: {$eq: 7}}, {noHist: {$eq: 'charB'}}]}", eqEqCE);
 }
 
-TEST_F(CEHistogramTest, TestHistogramConjTypeCount) {
+TEST_F(CEHistogramTest, TestHistogramConjAndDisjTypeCount) {
     constexpr double kCollCard = 40.0;
     CEHistogramTester t("test", {kCollCard});
     {
@@ -1382,6 +1544,12 @@ TEST_F(CEHistogramTest, TestHistogramConjTypeCount) {
     ASSERT_MATCH_CE(t, "{$and: [{i: {$lt: 8}}, {tc: {$eq: true}}]}", 4.0);
     // CE = 8/40*sqrt(20/40)*40
     ASSERT_MATCH_CE(t, "{$and: [{i: {$lt: 8}}, {tc: {$eq: false}}]}", 5.65685);
+
+    // Same tests, but with a disjunction of predicates.
+    // CE = (1 - (1 - 10/40) * sqrt(1 - 8/40)) * 40
+    ASSERT_MATCH_CE(t, "{$or: [{i: {$lt: 8}}, {tc: {$eq: true}}]}", 13.16718);
+    // CE = (1 - (1 - 20/40) * sqrt(1 - 8.40)) * 40
+    ASSERT_MATCH_CE(t, "{$or: [{i: {$lt: 8}}, {tc: {$eq: false}}]}", 22.11146);
 }
 
 TEST(CEHistogramTest, RoundUpNegativeEstimate) {
