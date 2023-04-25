@@ -18,5 +18,3 @@ executor:
       global_vars:
         TestData:
           useFle2Protocol: true
-          setParametersMongocryptd:
-            featureFlagFLE2Range: true

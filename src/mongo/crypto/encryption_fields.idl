@@ -56,11 +56,6 @@ enums:
             RangePreview: "rangePreview"
 
 feature_flags:
-    featureFlagFLE2Range:
-        description: "Enable support for range indexes in Queryable Encryption"
-        version: 6.2
-        cpp_varname: gFeatureFlagFLE2Range
-        default: true
     featureFlagFLE2CompactForProtocolV2:
         description: "Enable support for version 2 of Queryable Encryption wire protocol"
         version: 7.0

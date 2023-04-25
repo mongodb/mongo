@@ -1154,24 +1154,6 @@ private:
                         });
                 }
             }
-
-            // Block downgrade for collections with encrypted fields
-            // TODO SERVER-67760: Remove once FCV 7.0 becomes last-lts.
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_X, [&](const Collection* collection) {
-                        auto& efc = collection->getCollectionOptions().encryptedFieldConfig;
-
-                        uassert(ErrorCodes::CannotDowngrade,
-                                str::stream() << "Cannot downgrade the cluster as collection "
-                                              << collection->ns().toStringForErrorMsg()
-                                              << " has 'encryptedFields' with range indexes",
-                                !(efc.has_value() &&
-                                  hasQueryType(efc.get(), QueryTypeEnum::RangePreview)));
-                        return true;
-                    });
-            }
         }
     }
 
