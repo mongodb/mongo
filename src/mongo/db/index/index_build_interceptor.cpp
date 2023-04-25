@@ -324,7 +324,7 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx, const Yieldable* yie
 
     auto locker = opCtx->lockState();
     Locker::LockSnapshot snapshot;
-    invariant(locker->saveLockStateAndUnlock(&snapshot));
+    locker->saveLockStateAndUnlock(&snapshot);
 
 
     // Track the number of yields in CurOp.

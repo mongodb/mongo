@@ -40,9 +40,8 @@ PlanYieldPolicyImpl::PlanYieldPolicyImpl(
     PlanYieldPolicy::YieldPolicy policy,
     stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
-    : PlanYieldPolicy(exec->getOpCtx()->lockState()->isGlobalLockedRecursively()
-                          ? PlanYieldPolicy::YieldPolicy::NO_YIELD
-                          : policy,
+    : PlanYieldPolicy(exec->getOpCtx(),
+                      policy,
                       exec->getOpCtx()->getServiceContext()->getFastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},

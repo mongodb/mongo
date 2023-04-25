@@ -194,11 +194,11 @@ public:
     virtual boost::optional<LockerInfo> getLockerInfo(
         boost::optional<SingleThreadedLockStats> lockStatsBase) const final;
 
-    virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
+    virtual void saveLockStateAndUnlock(LockSnapshot* stateOut);
 
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore);
 
-    bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override;
+    void releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override;
     void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
                                        const LockSnapshot& stateToRestore) override;
 
@@ -429,6 +429,7 @@ public:
     virtual bool isRSTLLocked() const;
 
     bool isGlobalLockedRecursively() override;
+    bool canSaveLockState() override;
 
     virtual bool hasLockPending() const {
         return getWaitingResource().isValid();

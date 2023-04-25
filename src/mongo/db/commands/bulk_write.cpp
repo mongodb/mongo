@@ -597,8 +597,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         }
         updateRequest.setMulti(op->getMulti());
 
-        updateRequest.setYieldPolicy(inTransaction ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                                   : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
         // We only execute one update op at a time.
         updateRequest.setStmtIds({stmtId});
@@ -736,9 +735,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         deleteRequest.setReturnDeleted(op->getReturn());
         deleteRequest.setIsExplain(false);
 
-        deleteRequest.setYieldPolicy(opCtx->inMultiDocumentTransaction()
-                                         ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                         : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        deleteRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
         deleteRequest.setStmtId(stmtId);
 

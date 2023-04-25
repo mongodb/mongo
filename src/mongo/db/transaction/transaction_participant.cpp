@@ -1215,8 +1215,8 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     // On secondaries, we yield the locks for transactions.
     if (stashStyle == StashStyle::kSecondary) {
         _lockSnapshot = std::make_unique<Locker::LockSnapshot>();
-        // Transactions have at least a global IX lock. Invariant that we have something to release.
-        invariant(_locker->releaseWriteUnitOfWorkAndUnlock(_lockSnapshot.get()));
+        // Transactions have at least a global IX lock.
+        _locker->releaseWriteUnitOfWorkAndUnlock(_lockSnapshot.get());
     }
 
     // This thread must still respect the transaction lock timeout, since it can prevent the

@@ -709,9 +709,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
                                                   std::move(ws),
                                                   std::move(root),
                                                   &coll,
-                                                  opCtx->inMultiDocumentTransaction()
-                                                      ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                                      : PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   QueryPlannerParams::RETURN_OWNED_DATA);
     if (!execStatus.isOK()) {
         return execStatus.getStatus();

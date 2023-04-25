@@ -794,8 +794,7 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 
     // Release any locks before waiting on the condition variable. It is illegal to access any
     // methods or members of this record store after this line because it could be deleted.
-    bool releasedAnyLocks = locker->saveLockStateAndUnlock(&snapshot);
-    invariant(releasedAnyLocks);
+    locker->saveLockStateAndUnlock(&snapshot);
 
     // The top-level locks were freed, so also release any potential low-level (storage engine)
     // locks that might be held.

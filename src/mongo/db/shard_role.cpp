@@ -662,10 +662,7 @@ boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperat
 
     invariant(!transactionResources->lockSnapshot);
     Locker::LockSnapshot lockSnapshot;
-    if (!opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot)) {
-        // Nothing was yielded. TransactionResources on opCtx left intact.
-        return boost::none;
-    }
+    opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot);
 
     transactionResources->lockSnapshot.emplace(std::move(lockSnapshot));
     transactionResources->yielded = true;

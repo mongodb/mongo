@@ -258,6 +258,7 @@ public:
 protected:
     std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
         return std::make_unique<PlanYieldPolicySBE>(
+            operationContext(),
             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
             operationContext()->getServiceContext()->getFastClockSource(),
             0,

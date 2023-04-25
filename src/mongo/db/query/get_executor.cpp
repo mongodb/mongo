@@ -1315,12 +1315,12 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     return nullptr;
 }
 
-std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
-    OperationContext* opCtx,
-    PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
-    const Yieldable* yieldable,
-    NamespaceString nss) {
-    return std::make_unique<PlanYieldPolicySBE>(requestedYieldPolicy,
+std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(OperationContext* opCtx,
+                                                       PlanYieldPolicy::YieldPolicy policy,
+                                                       const Yieldable* yieldable,
+                                                       NamespaceString nss) {
+    return std::make_unique<PlanYieldPolicySBE>(opCtx,
+                                                policy,
                                                 opCtx->getServiceContext()->getFastClockSource(),
                                                 internalQueryExecYieldIterations.load(),
                                                 Milliseconds{internalQueryExecYieldPeriodMS.load()},
@@ -1642,9 +1642,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     bool permitYield,
     QueryPlannerParams plannerParams) {
 
-    auto yieldPolicy = (permitYield && !opCtx->inMultiDocumentTransaction())
-        ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
-        : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
+    auto yieldPolicy = permitYield ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
+                                   : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
 
     if (OperationShardingState::isComingFromRouter(opCtx)) {
         plannerParams.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -2394,9 +2393,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     }
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    const auto yieldPolicy = opCtx->inMultiDocumentTransaction()
-        ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-        : PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
+    const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
     const auto skip = request.getSkip().value_or(0);
     const auto limit = request.getLimit().value_or(0);
@@ -2906,9 +2903,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
 
     auto expCtx = parsedDistinct->getQuery()->getExpCtx();
     OperationContext* opCtx = expCtx->opCtx;
-    const auto yieldPolicy = opCtx->inMultiDocumentTransaction()
-        ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-        : PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
+    const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
     // Assert that not eligible for bonsai
     uassert(ErrorCodes::InternalErrorNotSupported,

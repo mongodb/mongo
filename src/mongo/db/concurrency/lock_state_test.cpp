@@ -246,18 +246,16 @@ TEST_F(LockerImplTest, ReadTransaction) {
 TEST_F(LockerImplTest, saveAndRestoreGlobal) {
     auto opCtx = makeOperationContext();
 
-    Locker::LockSnapshot lockInfo;
-
     LockerImpl locker(opCtx->getServiceContext());
 
     // No lock requests made, no locks held.
-    locker.saveLockStateAndUnlock(&lockInfo);
-    ASSERT_EQUALS(0U, lockInfo.locks.size());
+    ASSERT_FALSE(locker.canSaveLockState());
 
     // Lock the global lock, but just once.
     locker.lockGlobal(opCtx.get(), MODE_IX);
 
     // We've locked the global lock.  This should be reflected in the lockInfo.
+    Locker::LockSnapshot lockInfo;
     locker.saveLockStateAndUnlock(&lockInfo);
     ASSERT(!locker.isLocked());
     ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
@@ -315,20 +313,17 @@ TEST_F(LockerImplTest, saveAndRestoreRSTL) {
 TEST_F(LockerImplTest, saveAndRestoreGlobalAcquiredTwice) {
     auto opCtx = makeOperationContext();
 
-    Locker::LockSnapshot lockInfo;
-
     LockerImpl locker(opCtx->getServiceContext());
 
     // No lock requests made, no locks held.
-    locker.saveLockStateAndUnlock(&lockInfo);
-    ASSERT_EQUALS(0U, lockInfo.locks.size());
+    ASSERT_FALSE(locker.canSaveLockState());
 
     // Lock the global lock.
     locker.lockGlobal(opCtx.get(), MODE_IX);
     locker.lockGlobal(opCtx.get(), MODE_IX);
 
     // This shouldn't actually unlock as we're in a nested scope.
-    ASSERT(!locker.saveLockStateAndUnlock(&lockInfo));
+    ASSERT_FALSE(locker.canSaveLockState());
 
     ASSERT(locker.isLocked());
 
@@ -396,7 +391,7 @@ TEST_F(LockerImplTest, releaseWriteUnitOfWork) {
     ASSERT_FALSE(locker.unlock(resIdDatabase));
     ASSERT_FALSE(locker.unlockGlobal());
 
-    ASSERT(locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo));
+    locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo);
 
     // Things shouldn't be locked anymore.
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
@@ -429,7 +424,7 @@ TEST_F(LockerImplTest, restoreWriteUnitOfWork) {
     ASSERT_FALSE(locker.unlock(resIdDatabase));
     ASSERT_FALSE(locker.unlockGlobal());
 
-    ASSERT(locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo));
+    locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo);
 
     // Things shouldn't be locked anymore.
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
@@ -600,7 +595,7 @@ TEST_F(LockerImplTest, releaseAndRestoreReadOnlyWriteUnitOfWork) {
     ASSERT_EQ(3u, locker.numResourcesToUnlockAtEndUnitOfWorkForTest());
 
     // Things shouldn't be locked anymore.
-    ASSERT_TRUE(locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo));
+    locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo);
 
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
@@ -631,15 +626,10 @@ TEST_F(LockerImplTest, releaseAndRestoreEmptyWriteUnitOfWork) {
     locker.beginWriteUnitOfWork();
 
     // Nothing to yield.
-    ASSERT_FALSE(locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo));
-    ASSERT_FALSE(locker.isLocked());
-
-    // Restore lock state.
-    locker.restoreWriteUnitOfWorkAndLock(nullptr, lockInfo);
+    ASSERT_FALSE(locker.canSaveLockState());
     ASSERT_FALSE(locker.isLocked());
 
     locker.endWriteUnitOfWork();
-    ASSERT_FALSE(locker.isLocked());
 }
 
 TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
@@ -701,7 +691,7 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
     ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->recursiveCount, 1U);
     ASSERT_EQ(locker.getRequestsForTest().find(resIdCollection).objAddr()->unlockPending, 1U);
 
-    ASSERT(locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo));
+    locker.releaseWriteUnitOfWorkAndUnlock(&lockInfo);
 
     // Things shouldn't be locked anymore.
     ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
@@ -1378,6 +1368,25 @@ DEATH_TEST_F(LockerImplTest,
     ASSERT(locker.isLockHeldForMode(resId, MODE_S));
 
     // 'locker' destructor should invariant because locks are still held.
+}
+
+DEATH_TEST_F(LockerImplTest, SaveAndRestoreGlobalRecursivelyIsFatal, "7033800") {
+    auto opCtx = makeOperationContext();
+
+    Locker::LockSnapshot lockInfo;
+
+    LockerImpl locker(opCtx->getServiceContext());
+
+    // No lock requests made, no locks held.
+    locker.saveLockStateAndUnlock(&lockInfo);
+    ASSERT_EQUALS(0U, lockInfo.locks.size());
+
+    // Lock the global lock.
+    locker.lockGlobal(opCtx.get(), MODE_IX);
+    locker.lockGlobal(opCtx.get(), MODE_IX);
+
+    // Should invariant
+    locker.saveLockStateAndUnlock(&lockInfo);
 }
 
 }  // namespace mongo

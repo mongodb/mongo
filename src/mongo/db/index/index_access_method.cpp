@@ -771,26 +771,23 @@ void IndexAccessMethod::BulkBuilder::yield(OperationContext* opCtx,
 
     auto locker = opCtx->lockState();
     Locker::LockSnapshot snapshot;
-    if (locker->saveLockStateAndUnlock(&snapshot)) {
+    locker->saveLockStateAndUnlock(&snapshot);
 
-        // Track the number of yields in CurOp.
-        CurOp::get(opCtx)->yielded();
+    // Track the number of yields in CurOp.
+    CurOp::get(opCtx)->yielded();
 
-        auto failPointHang = [opCtx, &ns](FailPoint* fp) {
-            fp->executeIf(
-                [fp](auto&&) {
-                    LOGV2(5180600, "Hanging index build during bulk load yield");
-                    fp->pauseWhileSet();
-                },
-                [opCtx, &ns](auto&& config) {
-                    return config.getStringField("namespace") == ns.ns();
-                });
-        };
-        failPointHang(&hangDuringIndexBuildBulkLoadYield);
-        failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
+    auto failPointHang = [opCtx, &ns](FailPoint* fp) {
+        fp->executeIf(
+            [fp](auto&&) {
+                LOGV2(5180600, "Hanging index build during bulk load yield");
+                fp->pauseWhileSet();
+            },
+            [opCtx, &ns](auto&& config) { return config.getStringField("namespace") == ns.ns(); });
+    };
+    failPointHang(&hangDuringIndexBuildBulkLoadYield);
+    failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
 
-        locker->restoreLockState(opCtx, snapshot);
-    }
+    locker->restoreLockState(opCtx, snapshot);
     yieldable->restore();
 }
 

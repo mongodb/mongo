@@ -529,7 +529,7 @@ void LockerImpl::restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) 
     _wuowNestingLevel = stateToRestore.wuowNestingLevel;
 }
 
-bool LockerImpl::releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) {
+void LockerImpl::releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) {
     // Only the global WUOW can be released, since we never need to release and restore
     // nested WUOW's. Thus we don't have to remember the nesting level.
     invariant(_wuowNestingLevel == 1);
@@ -545,7 +545,7 @@ bool LockerImpl::releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) {
     }
     _numResourcesToUnlockAtEndUnitOfWork = 0;
 
-    return saveLockStateAndUnlock(stateOut);
+    saveLockStateAndUnlock(stateOut);
 }
 
 void LockerImpl::restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
@@ -789,41 +789,27 @@ boost::optional<Locker::LockerInfo> LockerImpl::getLockerInfo(
     return std::move(lockerInfo);
 }
 
-bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
+void LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
     // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
     invariant(!inAWriteUnitOfWork());
-    invariant(!(_modeForTicket == MODE_S || _modeForTicket == MODE_X),
-              "Yielding a strong global MODE_X/MODE_S lock is forbidden");
+
+    // Callers must guarantee that they can actually yield.
+    if (MONGO_unlikely(!canSaveLockState())) {
+        dump();
+        LOGV2_FATAL(7033800,
+                    "Attempted to yield locks but we are either not holding locks, holding a "
+                    "strong MODE_S/MODE_X lock, or holding one recursively");
+    }
+
     // Clear out whatever is in stateOut.
     stateOut->locks.clear();
     stateOut->globalMode = MODE_NONE;
 
     // First, we look at the global lock.  There is special handling for this so we store it
     // separately from the more pedestrian locks.
-    LockRequestsMap::Iterator globalRequest = _requests.find(resourceIdGlobal);
-    if (!globalRequest) {
-        // If there's no global lock there isn't really anything to do. Check that.
-        for (auto it = _requests.begin(); !it.finished(); it.next()) {
-            invariant(it.key().getType() == RESOURCE_MUTEX);
-        }
-        return false;
-    }
+    auto globalRequest = _requests.find(resourceIdGlobal);
+    invariant(globalRequest);
 
-    // If the global lock or RSTL has been acquired more than once, we're probably somewhere in a
-    // DBDirectClient call.  It's not safe to release and reacquire locks -- the context using
-    // the DBDirectClient is probably not prepared for lock release.
-    LockRequestsMap::Iterator rstlRequest =
-        _requests.find(resourceIdReplicationStateTransitionLock);
-    if (globalRequest->recursiveCount > 1 || (rstlRequest && rstlRequest->recursiveCount > 1)) {
-        return false;
-    }
-
-    // If the RSTL is exclusive, then this operation should not yield.
-    if (rstlRequest && rstlRequest->mode != MODE_IX) {
-        return false;
-    }
-
-    // The global lock must have been acquired just once
     stateOut->globalMode = globalRequest->mode;
     invariant(unlock(resourceIdGlobal));
 
@@ -836,29 +822,21 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
-                  RESOURCE_TENANT == resType ||
-                  (resId == resourceIdParallelBatchWriterMode && isSharedLockMode(it->mode)) ||
+                  resId == resourceIdParallelBatchWriterMode || RESOURCE_TENANT == resType ||
                   resId == resourceIdFeatureCompatibilityVersion ||
-                  (resId == resourceIdReplicationStateTransitionLock && it->mode == MODE_IX));
+                  resId == resourceIdReplicationStateTransitionLock);
 
         // And, stuff the info into the out parameter.
         OneLock info;
         info.resourceId = resId;
         info.mode = it->mode;
-        invariant(
-            !(info.mode == MODE_S || info.mode == MODE_X),
-            str::stream() << "Yielding a strong MODE_X/MODE_S lock is forbidden. ResourceId was "
-                          << resId.toString());
         stateOut->locks.push_back(info);
-
         invariant(unlock(resId));
     }
     invariant(!isLocked());
 
     // Sort locks by ResourceId. They'll later be acquired in this canonical locking order.
     std::sort(stateOut->locks.begin(), stateOut->locks.end());
-
-    return true;
 }
 
 void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSnapshot& state) {
@@ -1175,6 +1153,47 @@ bool LockerImpl::_unlockImpl(LockRequestsMap::Iterator* it) {
 bool LockerImpl::isGlobalLockedRecursively() {
     auto globalLockRequest = _requests.find(resourceIdGlobal);
     return !globalLockRequest.finished() && globalLockRequest->recursiveCount > 1;
+}
+
+bool LockerImpl::canSaveLockState() {
+    // We cannot yield strong global locks.
+    if (_modeForTicket == MODE_S || _modeForTicket == MODE_X) {
+        return false;
+    }
+
+    // If we don't have a global lock, we do not yield.
+    if (_modeForTicket == MODE_NONE) {
+        auto globalRequest = _requests.find(resourceIdGlobal);
+        invariant(!globalRequest);
+
+        // If there's no global lock there isn't really anything to do. Check that.
+        for (auto it = _requests.begin(); !it.finished(); it.next()) {
+            invariant(it.key().getType() == RESOURCE_MUTEX);
+        }
+        return false;
+    }
+
+    for (auto it = _requests.begin(); !it.finished(); it.next()) {
+        const ResourceId resId = it.key();
+        const ResourceType resType = resId.getType();
+        if (resType == RESOURCE_MUTEX)
+            continue;
+
+        // If any lock has been acquired more than once, we're probably somewhere in a
+        // DBDirectClient call.  It's not safe to release and reacquire locks -- the context using
+        // the DBDirectClient is probably not prepared for lock release. This logic applies to all
+        // locks in the hierarchy.
+        if (it->recursiveCount > 1) {
+            return false;
+        }
+
+        // We cannot yield any other lock in a strong lock mode.
+        if (it->mode == MODE_S || it->mode == MODE_X) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void LockerImpl::_setWaitingResource(ResourceId resId) {
