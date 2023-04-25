@@ -85,6 +85,7 @@ function runTest(conn, primary, {st, rst}) {
 
     st.stop();
 }
+
 {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();

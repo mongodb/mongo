@@ -1,6 +1,5 @@
 /**
- * Test to validate the privileges required by the analyzeShardKey and configureQueryAnalyzer
- * commands and _refreshQueryAnalyzerConfiguration internal command.
+ * Test to validate the privileges required by the analyzeShardKey command.
  *
  * @tags: [requires_fcv_70]
  */

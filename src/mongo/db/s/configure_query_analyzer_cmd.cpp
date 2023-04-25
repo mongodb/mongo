@@ -44,6 +44,7 @@
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -53,7 +54,7 @@ namespace analyze_shard_key {
 
 namespace {
 
-constexpr int kMaxSampleRate = 1'000'000;
+constexpr int kMaxSampleRate = 50;
 
 /**
  * RAII type for the DDL lock. On a sharded cluster, the lock is the DDLLockManager collection lock.
@@ -138,8 +139,9 @@ public:
                         str::stream() << "'sampleRate' must be greater than 0",
                         *sampleRate > 0);
                 uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "'sampleRate' must be less than " << kMaxSampleRate,
-                        *sampleRate < kMaxSampleRate);
+                        str::stream()
+                            << "'sampleRate' must be less than or equal to " << kMaxSampleRate,
+                        (*sampleRate <= kMaxSampleRate) || TestingProctor::instance().isEnabled());
             }
 
             // Take the DDL lock to serialize this command with DDL commands.

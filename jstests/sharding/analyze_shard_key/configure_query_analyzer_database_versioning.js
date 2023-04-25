@@ -26,7 +26,7 @@ assert.commandWorked(mongos0Coll.insert([{x: -1}, {x: 1}]));
 const configureCmdObj = {
     configureQueryAnalyzer: ns,
     mode: "full",
-    sampleRate: 100
+    sampleRate: 1
 };
 
 // Run the configureQueryAnalyzer command.

@@ -1,7 +1,7 @@
 /**
  * Test to validate the privileges required by the listSampledQuery aggregation stage.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {
@@ -14,10 +14,6 @@ function runTest(conn) {
     const dbName = "testDb";
     const collName0 = "testColl0";
     const collName1 = "testColl1";
-    const ns0 = dbName + "." + collName0;
-    const ns1 = dbName + "." + collName1;
-
-    const sampleRate = 10000;
 
     const adminDb = conn.getDB("admin");
     assert.commandWorked(

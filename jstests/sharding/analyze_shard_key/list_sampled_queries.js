@@ -196,7 +196,7 @@ function runTest(conn, {rst, st}) {
 // replica sets.
 if (!TestData.auth) {
     const rst = new ReplSetTest({
-        name: jsTest.name() + "_umltitenant",
+        name: jsTest.name() + "_multitenant",
         nodes: 2,
         nodeOptions: {setParameter: {multitenancySupport: true}}
     });
