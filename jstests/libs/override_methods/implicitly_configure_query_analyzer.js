@@ -47,8 +47,10 @@ function configureQueryAnalyzer({db, collName}) {
     }
     if (!result.ok) {
         if (result.code === ErrorCodes.CommandNotFound ||
-            result.code === ErrorCodes.NamespaceNotFound) {
+            result.code === ErrorCodes.NamespaceNotFound ||
+            result.code === ErrorCodes.CommandNotSupportedOnView) {
             print(`Failed to configure query analyzer: ${tojsononeline({ns, result})}`);
+            return;
         }
         assert.commandWorked(result);
     }

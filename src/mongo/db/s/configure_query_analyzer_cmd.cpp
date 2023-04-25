@@ -32,17 +32,18 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -54,79 +55,48 @@ namespace {
 
 constexpr int kMaxSampleRate = 1'000'000;
 
-/*
- * The helper for 'validateCollectionOptions'. Performs the same validation as
- * 'validateCollectionOptionsLocally' but does that based on the listCollections response from the
- * primary shard for the database.
+/**
+ * RAII type for the DDL lock. On a sharded cluster, the lock is the DDLLockManager collection lock.
+ * On a replica set, the lock is the collection IX lock.
  */
-StatusWith<UUID> validateCollectionOptionsOnPrimaryShard(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    ListCollections listCollections;
-    listCollections.setDbName(nss.dbName());
-    listCollections.setFilter(BSON("name" << nss.coll()));
-    auto listCollectionsCmdObj =
-        CommandHelpers::filterCommandRequestForPassthrough(listCollections.toBSON({}));
+class ScopedDDLLock {
+    ScopedDDLLock(const ScopedDDLLock&) = delete;
+    ScopedDDLLock& operator=(const ScopedDDLLock&) = delete;
 
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return shardVersionRetry(
-        opCtx,
-        catalogCache,
-        nss,
-        "validateCollectionOptionsOnPrimaryShard"_sd,
-        [&]() -> StatusWith<UUID> {
-            auto dbInfo = uassertStatusOK(catalogCache->getDatabaseWithRefresh(opCtx, nss.db()));
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
-                opCtx,
-                nss.db(),
-                dbInfo,
-                listCollectionsCmdObj,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                Shard::RetryPolicy::kIdempotent);
-            auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+public:
+    static constexpr StringData lockReason{"configureQueryAnalyzer"_sd};
 
-            auto cursorResponse =
-                uassertStatusOK(CursorResponse::parseFromBSON(remoteResponse.data));
-            auto firstBatch = cursorResponse.getBatch();
+    ScopedDDLLock(OperationContext* opCtx, const NamespaceString& nss) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            ShardingDDLCoordinatorService::getService(opCtx)->waitForRecoveryCompletion(opCtx);
+            auto ddlLockManager = DDLLockManager::get(opCtx);
+            auto dbDDLLock = ddlLockManager->lock(
+                opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
 
-            if (firstBatch.empty()) {
-                return Status{ErrorCodes::NamespaceNotFound,
-                              str::stream() << "The namespace does not exist"};
-            }
-            uassert(6915300,
-                    str::stream() << "The namespace corresponds to multiple collections",
-                    firstBatch.size() == 1);
+            // Check under the db lock if this is still the primary shard for the database.
+            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
 
-            auto listCollRepItem = ListCollectionsReplyItem::parse(
-                IDLParserContext("ListCollectionsReplyItem"), firstBatch[0]);
-
-            if (listCollRepItem.getType() == "view") {
-                return Status{ErrorCodes::CommandNotSupportedOnView,
-                              "The namespace corresponds to a view"};
-            }
-            if (auto obj = listCollRepItem.getOptions()) {
-                auto options = uassertStatusOK(CollectionOptions::parse(*obj));
-                if (options.encryptedFieldConfig.has_value()) {
-                    return Status{ErrorCodes::IllegalOperation,
-                                  str::stream()
-                                      << "The collection has queryable encryption enabled"};
-                }
-            }
-
-            auto info = listCollRepItem.getInfo();
-            uassert(6915301,
-                    str::stream() << "The listCollections reply for '" << nss.toStringForErrorMsg()
-                                  << "' does not have the 'info' field",
-                    info);
-            return *info->getUuid();
-        });
-}
-
-StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        return validateCollectionOptionsLocally(opCtx, nss);
+            _collDDLLock.emplace(ddlLockManager->lock(
+                opCtx, nss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout));
+        } else {
+            _autoColl.emplace(opCtx, nss, MODE_IX);
+        }
     }
-    return validateCollectionOptionsOnPrimaryShard(opCtx, nss);
+
+private:
+    boost::optional<DDLLockManager::ScopedLock> _collDDLLock;
+    boost::optional<AutoGetCollection> _autoColl;
+};
+
+/**
+ * Waits for the system last opTime to be majority committed.
+ */
+void waitUntilMajorityLastOpTime(OperationContext* opCtx) {
+    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    WaitForMajorityService::get(opCtx->getServiceContext())
+        .waitUntilMajority(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                           CancellationToken::uncancelable())
+        .get();
 }
 
 class ConfigureQueryAnalyzerCmd : public TypedCommand<ConfigureQueryAnalyzerCmd> {
@@ -146,8 +116,8 @@ public:
                     "configQueryAnalyzer command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a shardsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasShardRole());
+                    "configQueryAnalyzer command is not supported on a configsvr mongod",
+                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             const auto& nss = ns();
             const auto mode = request().getMode();
@@ -171,6 +141,14 @@ public:
                         str::stream() << "'sampleRate' must be less than " << kMaxSampleRate,
                         *sampleRate < kMaxSampleRate);
             }
+
+            // Take the DDL lock to serialize this command with DDL commands.
+            boost::optional<ScopedDDLLock> ddlLock;
+            ddlLock.emplace(opCtx, nss);
+
+            // Wait for the metadata for this collection in the CollectionCatalog to be majority
+            // committed before validating its options and persisting the configuration.
+            waitUntilMajorityLastOpTime(opCtx);
             auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
             LOGV2(6915001,
@@ -228,10 +206,35 @@ public:
                 updates.push_back(BSON("$unset" << doc::kStopTimeFieldName));
                 request.setUpdate(write_ops::UpdateModification(updates));
             }
-            request.setWriteConcern(WriteConcerns::kMajorityWriteConcernNoTimeout.toBSON());
 
-            DBDirectClient client(opCtx);
-            auto writeResult = client.findAndModify(request);
+            auto writeResult = [&] {
+                if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+                    request.setWriteConcern(WriteConcerns::kMajorityWriteConcernNoTimeout.toBSON());
+
+                    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+                    auto swResponse = configShard->runCommandWithFixedRetryAttempts(
+                        opCtx,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        DatabaseName::kConfig.toString(),
+                        request.toBSON({}),
+                        Shard::RetryPolicy::kIdempotent);
+                    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
+                    return write_ops::FindAndModifyCommandReply::parse(
+                        IDLParserContext("configureQueryAnalyzer"), swResponse.getValue().response);
+                }
+
+                DBDirectClient client(opCtx);
+                // It is illegal to wait for replication while holding a lock so instead wait below
+                // after releasing the lock.
+                request.setWriteConcern(BSONObj());
+                return client.findAndModify(request);
+            }();
+
+            ddlLock.reset();
+            if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+                // Wait for the write above to be majority committed.
+                waitUntilMajorityLastOpTime(opCtx);
+            }
 
             Response response;
             response.setNewConfiguration(newConfig);

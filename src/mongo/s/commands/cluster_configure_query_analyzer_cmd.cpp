@@ -34,6 +34,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
 
@@ -44,6 +45,19 @@ namespace mongo {
 namespace analyze_shard_key {
 
 namespace {
+
+/**
+ * Returns a new command object with shard version and database version appended to it based on
+ * the given routing info.
+ */
+BSONObj makeVersionedCmdObj(const CollectionRoutingInfo& cri,
+                            const BSONObj& unversionedCmdObj,
+                            ShardId shardId) {
+    auto versionedCmdObj = appendShardVersion(unversionedCmdObj,
+                                              cri.cm.isSharded() ? cri.getShardVersion(shardId)
+                                                                 : ShardVersion::UNSHARDED());
+    return appendDbVersionIfPresent(versionedCmdObj, cri.cm.dbVersion());
+}
 
 class ConfigureQueryAnalyzerCmd : public TypedCommand<ConfigureQueryAnalyzerCmd> {
 public:
@@ -58,13 +72,21 @@ public:
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
 
-            const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            const auto cri = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            const auto primaryShardId = cri.cm.dbPrimary();
 
-            auto swResponse = configShard->runCommandWithFixedRetryAttempts(
+            auto shard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+            auto versionedCmdObj = makeVersionedCmdObj(
+                cri,
+                CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({})),
+                primaryShardId);
+            auto swResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin.toString(),
-                request().toBSON({}),
+                versionedCmdObj,
                 Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
 

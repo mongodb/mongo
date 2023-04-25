@@ -6,6 +6,8 @@ selector:
   - jstests/sharding/**/*.js
   exclude_files:
   - jstests/sharding/**/libs/**/*.js
+  # TODO: Re-enable after SERVER-76296 is backported.
+  - jstests/sharding/analyze_shard_key/**/*.js
 #  # This tag file can be created using ./buildscripts/resmoke.py generate-multiversion-exclude-tags
 #  # or downloaded from the evergreen task.
 #  tag_file: multiversion_exclude_tags.yml

@@ -15,17 +15,14 @@ function testNonExistingCollection(testCases, tenantId) {
 
     testCases.forEach(testCase => {
         jsTest.log(`Running configureQueryAnalyzer command against an non-existing collection: ${
-            tojson(testCase)}`);
+            tojson({testCase, ns})}`);
         const cmdObj = {configureQueryAnalyzer: ns, mode: "full", sampleRate: 1};
         if (tenantId) {
             cmdObj.$tenant = tenantId;
         }
         const res = testCase.conn.adminCommand(cmdObj);
-        // If the command is not supported, it should fail even before the collection validation
-        // step. That is, it should fail with an IllegalOperation error instead of a
-        // NamespaceNotFound error.
         const expectedErrorCode =
-            testCase.isSupported ? ErrorCodes.NamespaceNotFound : testCase.expectedErrorCode;
+            testCase.expectedErrorCode ? testCase.expectedErrorCode : ErrorCodes.NamespaceNotFound;
         assert.commandFailedWithCode(res, expectedErrorCode);
     });
 }
@@ -38,6 +35,11 @@ function testExistingCollection(writeConn, testCases) {
     assert.commandWorked(db.createCollection(collName));
 
     testCases.forEach(testCase => {
+        if (testCase.conn.isConfigsvr) {
+            // The collection created below will not exist on the config server.
+            return;
+        }
+
         jsTest.log(
             `Running configureQueryAnalyzer command against an existing collection:
         ${tojson(testCase)}`);
@@ -45,7 +47,7 @@ function testExistingCollection(writeConn, testCases) {
         // Can set 'sampleRate' to > 0.
         const basicRes =
             testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 0.1});
-        if (!testCase.isSupported) {
+        if (testCase.expectedErrorCode) {
             assert.commandFailedWithCode(basicRes, testCase.expectedErrorCode);
             // There is no need to test the remaining cases.
             return;
@@ -98,25 +100,34 @@ function testExistingCollection(writeConn, testCases) {
     const shard0Secondaries = st.rs0.getSecondaries();
     const configPrimary = st.configRS.getPrimary();
     const configSecondaries = st.configRS.getSecondaries();
+    st.configRS.nodes.forEach(node => {
+        node.isConfigsvr = true;
+    });
 
     const testCases = [];
-    // The configureQueryAnalyzer command is only supported on mongos and configsvr primary mongod.
-    testCases.push({conn: st.s, isSupported: true});
-    testCases.push({conn: configPrimary, isSupported: true});
-    configSecondaries.forEach(node => {
-        testCases.push(
-            {conn: node, isSupported: false, expectedErrorCode: ErrorCodes.NotWritablePrimary});
+    // The configureQueryAnalyzer command is only supported on mongos and shardsvr primary mongod.
+    testCases.push({conn: st.s});
+    testCases.push({
+        conn: shard0Primary,
+        // It is illegal to send a configureQueryAnalyzer command to a shardsvr mongod without
+        // attaching the database version.
+        expectedErrorCode: ErrorCodes.IllegalOperation
     });
-    // If there's a config shard, shard0 will be the config server and can accept
-    // configureQueryAnalyzer.
-    testCases.push(
-        Object.assign({conn: shard0Primary},
-                      TestData.configShard
-                          ? {isSupported: true}
-                          : {isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation}));
     shard0Secondaries.forEach(node => {
-        testCases.push(
-            {conn: node, isSupported: false, expectedErrorCode: ErrorCodes.NotWritablePrimary});
+        testCases.push({
+            conn: node,
+            // configureQueryAnalyzer is a primary-only command.
+            expectedErrorCode: ErrorCodes.NotWritablePrimary
+        });
+    });
+    // The analyzeShardKey command is not supported on dedicated configsvr mongods.
+    testCases.push({conn: configPrimary, expectedErrorCode: ErrorCodes.IllegalOperation});
+    configSecondaries.forEach(node => {
+        testCases.push({
+            conn: node,
+            // configureQueryAnalyzer is a primary-only command.
+            expectedErrorCode: ErrorCodes.NotWritablePrimary
+        });
     });
 
     testNonExistingCollection(testCases);
@@ -134,10 +145,13 @@ function testExistingCollection(writeConn, testCases) {
 
     const testCases = [];
     // The configureQueryAnalyzer command is only supported on primary mongod.
-    testCases.push(Object.assign({conn: primary, isSupported: true}));
+    testCases.push(Object.assign({conn: primary}));
     secondaries.forEach(node => {
-        testCases.push(
-            {conn: node, isSupported: false, expectedErrorCode: ErrorCodes.NotWritablePrimary});
+        testCases.push({
+            conn: node,
+            // configureQueryAnalyzer is a primary-only command.
+            expectedErrorCode: ErrorCodes.NotWritablePrimary
+        });
     });
 
     testNonExistingCollection(testCases);

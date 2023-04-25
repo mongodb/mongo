@@ -53,8 +53,7 @@ Status validateNamespace(const NamespaceString& nss) {
     return Status::OK();
 }
 
-StatusWith<UUID> validateCollectionOptionsLocally(OperationContext* opCtx,
-                                                  const NamespaceString& nss) {
+StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
     if (CollectionCatalog::get(opCtx)->lookupView(opCtx, nss)) {
         return Status{ErrorCodes::CommandNotSupportedOnView, "The namespace corresponds to a view"};
     }

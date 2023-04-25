@@ -330,7 +330,7 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
 
     _finished = true;
 
-    auto collUuid = uassertStatusOK(validateCollectionOptionsLocally(pExpCtx->opCtx, pExpCtx->ns));
+    auto collUuid = uassertStatusOK(validateCollectionOptions(pExpCtx->opCtx, pExpCtx->ns));
     auto targeter = makeCollectionRoutingInfoTargeter(pExpCtx->opCtx,
                                                       pExpCtx->ns,
                                                       _spec.getKey(),
