@@ -190,13 +190,13 @@ private:
      * Requests the recipient to enter the critical section on the database, causing the database
      * metadata refreshes to block.
      */
-    void enterCriticalSectionOnRecipient(OperationContext* opCtx) const;
+    void enterCriticalSectionOnRecipient(OperationContext* opCtx);
 
     /**
      * Requests the recipient to exit the critical section on the database, causing the database
      * metadata refreshes to unblock.
      */
-    void exitCriticalSectionOnRecipient(OperationContext* opCtx) const;
+    void exitCriticalSectionOnRecipient(OperationContext* opCtx);
 
     void cleanupOnlineCloner(OperationContext* opCtx, const CancellationToken& token);
     void cleanupOnAbortWithoutOnlineCloner(OperationContext* opCtx,
