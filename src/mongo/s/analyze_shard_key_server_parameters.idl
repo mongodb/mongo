@@ -30,6 +30,8 @@
 
 global:
     cpp_namespace: "mongo::analyze_shard_key"
+    cpp_includes:
+        - "mongo/db/ops/write_ops.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -147,9 +149,12 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gQueryAnalysisWriterMaxBatchSize
-        default: 100000
+        default:
+            expr: write_ops::kMaxWriteBatchSize
         validator:
             gt: 0
+            lte:
+                expr: write_ops::kMaxWriteBatchSize
     queryAnalysisWriterMinThreadPoolSize:
         description: The minimum number of threads in the writer's thread pool.
         set_at: startup

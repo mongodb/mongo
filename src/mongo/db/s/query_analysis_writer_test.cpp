@@ -973,7 +973,7 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
     }
 }
 
-TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBSONObjSize) {
+TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatchesFewQueries_MaxBSONObjSize) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagAnalyzeShardKey", true);
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
@@ -982,6 +982,31 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBSONObjSize) {
     for (auto i = 0; i < numQueries; i++) {
         auto sampleId = UUID::gen();
         auto filter = BSON(std::string(BSONObjMaxUserSize / 2, 'a') << 1);
+        auto collation = makeNonEmptyCollation();
+        writer.addAggregateQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
+            .get();
+        expectedSampledCmds.push_back({sampleId, filter, collation});
+    }
+    ASSERT_EQ(writer.getQueriesCountForTest(), numQueries);
+    writer.flushQueriesForTest(operationContext());
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getSampledQueryDocumentsCount(nss0), numQueries);
+    for (const auto& [sampleId, filter, collation] : expectedSampledCmds) {
+        assertSampledReadQueryDocument(
+            sampleId, nss0, SampledCommandNameEnum::kAggregate, filter, collation);
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatchesManyQueries_MaxBSONObjSize) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAnalyzeShardKey", true);
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+
+    auto numQueries = 75'000;
+    std::vector<std::tuple<UUID, BSONObj, BSONObj>> expectedSampledCmds;
+    for (auto i = 0; i < numQueries; i++) {
+        auto sampleId = UUID::gen();
+        auto filter = makeNonEmptyFilter();
         auto collation = makeNonEmptyCollation();
         writer.addAggregateQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
             .get();

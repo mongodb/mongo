@@ -41,9 +41,15 @@ namespace analyze_shard_key {
 // The maximum number of decimal places for the metrics returned by the analyzeShardKey command.
 const int kMaxNumDecimalPlaces = 10;
 
-// The size limit for the documents to an insert in a single batch. Leave some padding for other
+// The size limit for the documents to insert in a single command. The 2MB padding is to account
+// for the size of the fields other than the "documents" field, and the fact that BSON stores an
+// array as {'0': <object>, '1': <object>, ...}. The math is as follows. The limit for the number
+// of documents that can be included in a single insert command is 100'000. So the size of the
+// largest field name is 5 bytes (since the max index is 99999). There is 1 byte doc for the field
+// name's null terminator and 1 byte per document for the type. So the upper bound for the overhead
+// for the "documents" field is 700kB. The remaining > 1MB should be more than enough for the other
 // fields in the insert command.
-constexpr int kMaxBSONObjSizePerInsertBatch = BSONObjMaxUserSize - 100 * 1024;
+constexpr int kMaxBSONObjSizePerInsertBatch = BSONObjMaxUserSize - 2 * 1024 * 1024;
 
 //
 // The helpers used for validation within the analyzeShardKey or configureQueryAnalyzer command.
