@@ -1046,9 +1046,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         request.setLetParameters(std::move(letParams));
     }
     request.setStmtIds(stmtIds);
-    request.setYieldPolicy(opCtx->inMultiDocumentTransaction()
-                               ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                               : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     request.setSource(source);
 
     size_t numAttempts = 0;
@@ -1253,9 +1251,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     request.setQuery(op.getQ());
     request.setCollation(write_ops::collationOf(op));
     request.setMulti(op.getMulti());
-    request.setYieldPolicy(opCtx->inMultiDocumentTransaction()
-                               ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                               : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     request.setStmtId(stmtId);
     request.setHint(op.getHint());
 

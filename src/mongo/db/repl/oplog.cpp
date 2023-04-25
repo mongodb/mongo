@@ -2090,12 +2090,17 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "aborting index build and retrying",
                                 logAttrs(ns));
                 } else {
+                    opCtx->recoveryUnit()->abandonSnapshot();
+
                     auto lockState = opCtx->lockState();
                     Locker::LockSnapshot lockSnapshot;
-                    auto locksReleased = lockState->saveLockStateAndUnlock(&lockSnapshot);
+                    bool canSaveState = lockState->canSaveLockState();
+                    if (canSaveState) {
+                        lockState->saveLockStateAndUnlock(&lockSnapshot);
+                    }
 
                     ScopeGuard guard{[&] {
-                        if (locksReleased) {
+                        if (canSaveState) {
                             invariant(!lockState->isLocked());
                             lockState->restoreLockState(lockSnapshot);
                         }
@@ -2111,7 +2116,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
                         opCtx, swUUID.get());
 
-                    opCtx->recoveryUnit()->abandonSnapshot();
                     opCtx->checkForInterrupt();
 
                     LOGV2_DEBUG(

@@ -66,7 +66,12 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots, const BSONArray
 }
 
 void PlanStageTestFixture::prepareTree(CompileCtx* ctx, PlanStage* root) {
-    Lock::GlobalLock globalLock{opCtx(), MODE_IS};
+    // We want to avoid recursive locking since this results in yield plans that don't yield when
+    // they should.
+    boost::optional<Lock::GlobalLock> globalLock;
+    if (!opCtx()->lockState()->isLocked()) {
+        globalLock.emplace(opCtx(), MODE_IS);
+    }
     root->attachToOperationContext(opCtx());
     root->prepare(*ctx);
     root->open(false);

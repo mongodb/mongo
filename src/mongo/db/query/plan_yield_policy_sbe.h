@@ -36,15 +36,21 @@ namespace mongo {
 
 class PlanYieldPolicySBE final : public PlanYieldPolicy {
 public:
-    PlanYieldPolicySBE(YieldPolicy policy,
+    PlanYieldPolicySBE(OperationContext* opCtx,
+                       YieldPolicy policy,
                        ClockSource* clockSource,
                        int yieldFrequency,
                        Milliseconds yieldPeriod,
                        const Yieldable* yieldable,
                        std::unique_ptr<YieldPolicyCallbacks> callbacks,
                        bool useExperimentalCommitTxnBehavior)
-        : PlanYieldPolicy(
-              policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)),
+        : PlanYieldPolicy(opCtx,
+                          policy,
+                          clockSource,
+                          yieldFrequency,
+                          yieldPeriod,
+                          yieldable,
+                          std::move(callbacks)),
           _useExperimentalCommitTxnBehavior(useExperimentalCommitTxnBehavior) {
         uassert(4822879,
                 "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",

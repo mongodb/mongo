@@ -257,7 +257,8 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     }
 
     auto yieldPolicy =
-        std::make_unique<PlanYieldPolicySBE>(PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        std::make_unique<PlanYieldPolicySBE>(opCtx,
+                                             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                              opCtx->getServiceContext()->getFastClockSource(),
                                              internalQueryExecYieldIterations.load(),
                                              Milliseconds{internalQueryExecYieldPeriodMS.load()},
