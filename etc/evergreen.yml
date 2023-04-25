@@ -573,8 +573,8 @@ buildvariants:
   - name: .concurrency !.ubsan
     distros:
     - windows-vsCurrent-large
-  - name: .config_fuzzer !.large
-  - name: .config_fuzzer .large
+  - name: .config_fuzzer !.large !.linux_only
+  - name: .config_fuzzer .large !.linux_only
     distros:
     - windows-vsCurrent-large
   - name: disk_wiredtiger

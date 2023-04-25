@@ -5106,7 +5106,7 @@ tasks:
 
 - <<: *task_template
   name: config_fuzzer_simulate_crash_concurrency_replication_gen
-  tags: ["config_fuzzer", "large"]
+  tags: ["config_fuzzer", "large", "linux_only"]
   commands:
   - func: "generate resmoke tasks"
     vars:
