@@ -60,6 +60,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/shard_role.h"
 
 namespace mongo {
 
@@ -153,13 +154,15 @@ public:
         // TODO A write lock is currently taken here to accommodate stages that perform writes
         //      (e.g. DeleteStage).  This should be changed to use a read lock for read-only
         //      execution trees.
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
         // Make sure the collection is valid.
-        const auto& collection = autoColl.getCollection();
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Couldn't find collection " << nss.toStringForErrorMsg(),
-                collection);
+                collection.exists());
 
         // Pull out the plan
         BSONElement planElt = argObj["plan"];
@@ -178,7 +181,7 @@ public:
 
         // Add a fetch at the top for the user so we can get obj back for sure.
         unique_ptr<PlanStage> rootFetch = std::make_unique<FetchStage>(
-            expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection);
+            expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection.getCollectionPtr());
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(expCtx,
@@ -203,11 +206,12 @@ public:
     }
 
     PlanStage* parseQuery(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const CollectionPtr& collection,
+                          const ScopedCollectionAcquisition& collection,
                           BSONObj obj,
                           WorkingSet* workingSet,
                           const NamespaceString& nss,
                           std::vector<std::unique_ptr<MatchExpression>>* exprs) {
+        const auto& collectionPtr = collection.getCollectionPtr();
         OperationContext* opCtx = expCtx->opCtx;
 
         BSONElement firstElt = obj.firstElement();
@@ -234,7 +238,7 @@ public:
                 auto statusWithMatcher =
                     MatchExpressionParser::parse(argObj,
                                                  expCtx,
-                                                 ExtensionsCallbackReal(opCtx, &collection->ns()),
+                                                 ExtensionsCallbackReal(opCtx, &collection.nss()),
                                                  MatchExpressionParser::kAllowAllSpecialFeatures);
                 if (!statusWithMatcher.isOK()) {
                     return nullptr;
@@ -262,7 +266,7 @@ public:
                 // This'll throw if it's not an obj but that's OK.
                 BSONObj keyPatternObj = keyPatternElement.Obj();
                 std::vector<const IndexDescriptor*> indexes;
-                collection->getIndexCatalog()->findIndexesByKeyPattern(
+                collectionPtr->getIndexCatalog()->findIndexesByKeyPattern(
                     opCtx, keyPatternObj, IndexCatalog::InclusionPolicy::kReady, &indexes);
                 uassert(16890,
                         str::stream() << "Can't find index: " << keyPatternObj,
@@ -279,20 +283,20 @@ public:
                         str::stream() << "Index 'name' must be a string in: " << nodeArgs,
                         nodeArgs["name"].type() == BSONType::String);
                 StringData name = nodeArgs["name"].valueStringData();
-                desc = collection->getIndexCatalog()->findIndexByName(opCtx, name);
+                desc = collectionPtr->getIndexCatalog()->findIndexByName(opCtx, name);
                 uassert(40223, str::stream() << "Can't find index: " << name.toString(), desc);
             }
 
-            IndexScanParams params(opCtx, collection, desc);
+            IndexScanParams params(opCtx, collectionPtr, desc);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSONObj::stripFieldNames(nodeArgs["startKey"].Obj());
             params.bounds.endKey = BSONObj::stripFieldNames(nodeArgs["endKey"].Obj());
             params.bounds.boundInclusion = IndexBounds::makeBoundInclusionFromBoundBools(
                 nodeArgs["startKeyInclusive"].Bool(), nodeArgs["endKeyInclusive"].Bool());
             params.direction = nodeArgs["direction"].numberInt();
-            params.shouldDedup = desc->getEntry()->isMultikey(opCtx, collection);
+            params.shouldDedup = desc->getEntry()->isMultikey(opCtx, collectionPtr);
 
-            return new IndexScan(expCtx.get(), collection, params, workingSet, matcher);
+            return new IndexScan(expCtx.get(), collectionPtr, params, workingSet, matcher);
         } else if ("andHash" == nodeName) {
             uassert(
                 16921, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
@@ -370,7 +374,7 @@ public:
                     "Can't parse sub-node of FETCH: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
             return new FetchStage(
-                expCtx.get(), workingSet, std::move(subNode), matcher, collection);
+                expCtx.get(), workingSet, std::move(subNode), matcher, collectionPtr);
         } else if ("limit" == nodeName) {
             uassert(16937,
                     "Limit stage doesn't have a filter (put it on the child)",
@@ -411,7 +415,7 @@ public:
                 params.direction = CollectionScanParams::BACKWARD;
             }
 
-            return new CollectionScan(expCtx.get(), collection, params, workingSet, matcher);
+            return new CollectionScan(expCtx.get(), collectionPtr, params, workingSet, matcher);
         } else if ("mergeSort" == nodeName) {
             uassert(
                 16971, "Nodes argument must be provided to sort", nodeArgs["nodes"].isABSONObj());

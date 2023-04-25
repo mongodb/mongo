@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -63,7 +64,7 @@ const auto getPreImagesCollectionManager =
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getDeleteExpiredPreImagesExecutor(
     OperationContext* opCtx,
-    const CollectionPtr& preImageColl,
+    const ScopedCollectionAcquisition& preImageColl,
     const MatchExpression* filterPtr,
     Timestamp maxRecordIdTimestamp,
     UUID currentCollectionUUID) {
@@ -80,7 +81,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getDeleteExpiredPreImagesEx
 
     return InternalPlanner::deleteWithCollectionScan(
         opCtx,
-        &preImageColl,
+        preImageColl,
         std::move(params),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         InternalPlanner::Direction::FORWARD,
@@ -346,7 +347,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
 
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredChangeStreamPreImagesCommon(
     OperationContext* opCtx,
-    const CollectionPtr& preImageColl,
+    const ScopedCollectionAcquisition& preImageColl,
     const MatchExpression* filterPtr,
     Timestamp maxRecordIdTimestamp) {
     size_t numberOfRemovals = 0;
@@ -356,8 +357,9 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredChangeStreamPreImag
     // collection being examined.
     Date_t firstDocWallTime{};
 
-    while ((currentCollectionUUID = findNextCollectionUUID(
-                opCtx, &preImageColl, currentCollectionUUID, firstDocWallTime))) {
+    while (
+        (currentCollectionUUID = findNextCollectionUUID(
+             opCtx, &preImageColl.getCollectionPtr(), currentCollectionUUID, firstDocWallTime))) {
         writeConflictRetry(
             opCtx,
             "ChangeStreamExpiredPreImagesRemover",
@@ -383,11 +385,16 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredChangeStreamPreImag
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredChangeStreamPreImages(
     OperationContext* opCtx, Date_t currentTimeForTimeBasedExpiration) {
     // Acquire intent-exclusive lock on the change collection.
-    AutoGetCollection preImageColl(
-        opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), MODE_IX);
+    const auto preImageColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(boost::none),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Early exit if the collection doesn't exist or running on a secondary.
-    if (!preImageColl ||
+    if (!preImageColl.exists() ||
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
             opCtx, DatabaseName::kConfig.toString())) {
         return 0;
@@ -411,14 +418,14 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredChangeStreamPreImag
         // RecordId for this collection. Whether the pre-image has to be deleted will be determined
         // by the 'filter' parameter.
         return _deleteExpiredChangeStreamPreImagesCommon(
-            opCtx, *preImageColl, &filter, Timestamp::max() /* maxRecordIdTimestamp */);
+            opCtx, preImageColl, &filter, Timestamp::max() /* maxRecordIdTimestamp */);
     }
 
     // 'preImageExpirationTime' is not set, so the last expired pre-image timestamp is less than
     // 'currentEarliestOplogEntryTs'.
     return _deleteExpiredChangeStreamPreImagesCommon(
         opCtx,
-        *preImageColl,
+        preImageColl,
         nullptr /* filterPtr */,
         Timestamp(currentEarliestOplogEntryTs.asULL() - 1) /* maxRecordIdTimestamp */);
 }
@@ -427,13 +434,18 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredChangeStreamPreImag
     OperationContext* opCtx, const TenantId& tenantId, Date_t currentTimeForTimeBasedExpiration) {
 
     // Acquire intent-exclusive lock on the change collection.
-    AutoGetCollection preImageColl(opCtx,
-                                   NamespaceString::makePreImageCollectionNSS(
-                                       change_stream_serverless_helpers::resolveTenantId(tenantId)),
-                                   MODE_IX);
+    const auto preImageColl =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest(
+                              NamespaceString::makePreImageCollectionNSS(
+                                  change_stream_serverless_helpers::resolveTenantId(tenantId)),
+                              PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                              repl::ReadConcernArgs::get(opCtx),
+                              AcquisitionPrerequisites::kWrite),
+                          MODE_IX);
 
     // Early exit if the collection doesn't exist or running on a secondary.
-    if (!preImageColl ||
+    if (!preImageColl.exists() ||
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
             opCtx, DatabaseName::kConfig.toString())) {
         return 0;
@@ -447,7 +459,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredChangeStreamPreImag
     // Set the 'maxRecordIdTimestamp' parameter (upper scan boundary) to maximum possible. Whether
     // the pre-image has to be deleted will be determined by the 'filter' parameter.
     return _deleteExpiredChangeStreamPreImagesCommon(
-        opCtx, *preImageColl, &filter, Timestamp::max() /* maxRecordIdTimestamp */);
+        opCtx, preImageColl, &filter, Timestamp::max() /* maxRecordIdTimestamp */);
 }
 
 }  // namespace mongo

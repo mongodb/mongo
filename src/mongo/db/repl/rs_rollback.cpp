@@ -70,6 +70,7 @@
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -1623,7 +1624,12 @@ void syncFixUp(OperationContext* opCtx,
                 const NamespaceString docNss(doc.ns);
                 Lock::DBLock docDbLock(opCtx, docNss.dbName(), MODE_X);
                 OldClientContext ctx(opCtx, docNss);
-                CollectionWriter collection(opCtx, uuid);
+                auto collection = acquireCollection(opCtx,
+                                                    {NamespaceStringOrUUID(docNss.dbName(), uuid),
+                                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                                     repl::ReadConcernArgs::get(opCtx),
+                                                     AcquisitionPrerequisites::kWrite},
+                                                    MODE_X);
 
                 // Adds the doc to our rollback file if the collection was not dropped while
                 // rolling back createCollection operations. Does not log an error when
@@ -1631,9 +1637,10 @@ void syncFixUp(OperationContext* opCtx,
                 // the collection was dropped as part of rolling back a createCollection
                 // command and the document no longer exists.
 
-                if (collection && removeSaver) {
+                if (collection.exists() && removeSaver) {
                     BSONObj obj;
-                    bool found = Helpers::findOne(opCtx, collection.get(), pattern, obj);
+                    bool found =
+                        Helpers::findOne(opCtx, collection.getCollectionPtr(), pattern, obj);
                     if (found) {
                         auto status = removeSaver->goingToDelete(obj);
                         if (!status.isOK()) {
@@ -1672,8 +1679,8 @@ void syncFixUp(OperationContext* opCtx,
                     // here.
                     deletes++;
 
-                    if (collection) {
-                        if (collection->isCapped()) {
+                    if (collection.exists()) {
+                        if (collection.getCollectionPtr()->isCapped()) {
                             // Can't delete from a capped collection - so we truncate instead.
                             // if this item must go, so must all successors.
 
@@ -1684,7 +1691,8 @@ void syncFixUp(OperationContext* opCtx,
 
                                 const auto clock = opCtx->getServiceContext()->getFastClockSource();
                                 const auto findOneStart = clock->now();
-                                RecordId loc = Helpers::findOne(opCtx, collection.get(), pattern);
+                                RecordId loc =
+                                    Helpers::findOne(opCtx, collection.getCollectionPtr(), pattern);
                                 if (clock->now() - findOneStart > Milliseconds(200))
                                     LOGV2_WARNING(
                                         21726,
@@ -1698,19 +1706,24 @@ void syncFixUp(OperationContext* opCtx,
                                         writeConflictRetry(
                                             opCtx,
                                             "cappedTruncateAfter",
-                                            collection->ns().ns(),
+                                            collection.nss().ns(),
                                             [&] {
                                                 collection_internal::cappedTruncateAfter(
-                                                    opCtx, collection.get(), loc, true);
+                                                    opCtx,
+                                                    collection.getCollectionPtr(),
+                                                    loc,
+                                                    true);
                                             });
                                     } catch (const DBException& e) {
                                         if (e.code() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
+                                            CollectionWriter collectionWriter(opCtx, &collection);
                                             writeConflictRetry(
-                                                opCtx, "truncate", collection->ns().ns(), [&] {
+                                                opCtx, "truncate", collection.nss().ns(), [&] {
                                                     WriteUnitOfWork wunit(opCtx);
                                                     uassertStatusOK(
-                                                        collection.getWritableCollection(opCtx)
+                                                        collectionWriter
+                                                            .getWritableCollection(opCtx)
                                                             ->truncate(opCtx));
                                                     wunit.commit();
                                                 });
@@ -1737,8 +1750,7 @@ void syncFixUp(OperationContext* opCtx,
                             }
                         } else {
                             deleteObjects(opCtx,
-                                          collection.get(),
-                                          *nss,
+                                          collection,
                                           pattern,
                                           true,   // justOne
                                           true);  // god

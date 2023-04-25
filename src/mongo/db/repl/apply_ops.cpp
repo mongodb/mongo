@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -149,9 +150,14 @@ Status _applyOps(OperationContext* opCtx,
                         }
                     }
 
-                    AutoGetCollection autoColl(
-                        opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
-                    if (!autoColl.getCollection()) {
+                    const auto collection = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest(nss,
+                                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                                     repl::ReadConcernArgs::get(opCtx),
+                                                     AcquisitionPrerequisites::kWrite),
+                        fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+                    if (!collection.exists()) {
                         // For idempotency reasons, return success on delete operations.
                         if (*opType == 'd') {
                             return Status::OK();
@@ -172,6 +178,7 @@ Status _applyOps(OperationContext* opCtx,
                     const bool isDataConsistent = true;
                     return repl::applyOperation_inlock(opCtx,
                                                        ctx.db(),
+                                                       collection,
                                                        ApplierOperation{&entry},
                                                        alwaysUpsert,
                                                        oplogApplicationMode,

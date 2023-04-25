@@ -93,6 +93,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -621,8 +622,15 @@ Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
     writeConflictRetry(
         opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
-            AutoGetCollection coll(opCtx, NamespaceString::kSystemReplSetNamespace, MODE_X);
-            Helpers::emptyCollection(opCtx, NamespaceString::kSystemReplSetNamespace);
+            const auto coll =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString(NamespaceString::kSystemReplSetNamespace),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
+            Helpers::emptyCollection(opCtx, coll);
             Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
             wuow.commit();
         });

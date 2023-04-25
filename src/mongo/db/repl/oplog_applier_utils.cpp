@@ -44,6 +44,7 @@
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/fail_point.h"
 
@@ -409,7 +410,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
             writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_CRUD", nss.ns(), [&] {
                 // Need to throw instead of returning a status for it to be properly ignored.
                 try {
-                    boost::optional<AutoGetCollection> autoColl;
+                    boost::optional<ScopedCollectionAcquisition> coll;
                     Database* db = nullptr;
 
                     // If the collection UUID does not resolve, acquire the collection using the
@@ -420,25 +421,39 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                     // needs to be done everywhere this situation is possible. We should try
                     // to consolidate this into applyOperation_inlock.
                     try {
-                        autoColl.emplace(opCtx,
-                                         getNsOrUUID(nss, *op),
-                                         fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
-                        db = autoColl->getDb();
+                        coll.emplace(
+                            acquireCollection(opCtx,
+                                              {getNsOrUUID(nss, *op),
+                                               AcquisitionPrerequisites::kPretendUnsharded,
+                                               repl::ReadConcernArgs::get(opCtx),
+                                               AcquisitionPrerequisites::kWrite},
+                                              fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
+
+                        AutoGetDb autoDb(opCtx, coll->nss().dbName(), MODE_IX);
+                        db = autoDb.getDb();
                     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
                         if (!isDataConsistent) {
-                            autoColl.emplace(
-                                opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
-                            db = autoColl->ensureDbExists(opCtx);
+                            coll.emplace(acquireCollection(
+                                opCtx,
+                                {nss,
+                                 AcquisitionPrerequisites::kPretendUnsharded,
+                                 repl::ReadConcernArgs::get(opCtx),
+                                 AcquisitionPrerequisites::kWrite},
+                                fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
+
+                            AutoGetDb autoDb(opCtx, coll->nss().dbName(), MODE_IX);
+                            db = autoDb.ensureDbExists(opCtx);
                         } else {
                             throw ex;
                         }
                     }
 
+                    invariant(coll);
                     uassert(ErrorCodes::NamespaceNotFound,
                             str::stream() << "missing database ("
                                           << nss.dbName().toStringForErrorMsg() << ")",
                             db);
-                    OldClientContext ctx(opCtx, autoColl->getNss(), db);
+                    OldClientContext ctx(opCtx, coll->nss(), db);
 
                     // We convert updates to upserts in secondary mode when the
                     // oplogApplicationEnforcesSteadyStateConstraints parameter is false, to avoid
@@ -452,6 +467,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                         oplogApplicationMode == OplogApplication::Mode::kSecondary;
                     Status status = applyOperation_inlock(opCtx,
                                                           db,
+                                                          *coll,
                                                           entryOrGroupedInserts,
                                                           shouldAlwaysUpsert,
                                                           oplogApplicationMode,

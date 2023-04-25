@@ -70,6 +70,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock.h"
@@ -1683,11 +1684,17 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
             totalDocs++;
-            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            const auto collection = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(_nss,
+                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite),
+                MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.toStringForErrorMsg()
                                   << " was dropped in the middle of the migration",
-                    autoColl.getCollection());
+                    collection.exists());
 
             BSONObj id = i.next().Obj();
 
@@ -1708,8 +1715,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
             writeConflictRetry(opCtx, "transferModsDeletes", _nss.ns(), [&] {
                 deleteObjects(opCtx,
-                              autoColl.getCollection(),
-                              _nss,
+                              collection,
                               id,
                               true /* justOne */,
                               false /* god */,

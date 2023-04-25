@@ -311,7 +311,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
+    const ScopedCollectionAcquisition& coll,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     DeleteStageParams::DocumentCounter&& documentCounter = nullptr);
@@ -338,7 +338,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
+    VariantCollectionPtrOrAcquisition collection,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     UpdateStageParams::DocumentCounter&& documentCounter = nullptr);

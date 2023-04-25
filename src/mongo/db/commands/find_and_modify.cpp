@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_yield_restore.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -364,23 +365,27 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         // Explain calls of the findAndModify command are read-only, but we take write
         // locks so that the timing information is more accurate.
-        AutoGetCollection collection(opCtx, nss, MODE_IX);
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+                              MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
-                collection.getDb());
+                DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
-        ParsedDelete parsedDelete(opCtx, &deleteRequest, collection.getCollection());
+        ParsedDelete parsedDelete(opCtx, &deleteRequest, collection.getCollectionPtr());
         uassertStatusOK(parsedDelete.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
             ->checkShardVersionOrThrow(opCtx);
 
-        const auto exec = uassertStatusOK(
-            getExecutorDelete(opDebug, &collection.getCollection(), &parsedDelete, verbosity));
+        const auto exec =
+            uassertStatusOK(getExecutorDelete(opDebug, collection, &parsedDelete, verbosity));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
-            exec.get(), collection.getCollection(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
+            exec.get(), collection.getCollectionPtr(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
     } else {
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nss);

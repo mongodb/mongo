@@ -132,7 +132,7 @@ BatchedDeleteStage::BatchedDeleteStage(
     std::unique_ptr<DeleteStageParams> params,
     std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
     WorkingSet* ws,
-    const CollectionPtr& collection,
+    const ScopedCollectionAcquisition& collection,
     PlanStage* child)
     : DeleteStage::DeleteStage(
           kStageType.rawData(), expCtx, std::move(params), ws, collection, child),

@@ -93,6 +93,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -1474,6 +1475,7 @@ void logOplogConstraintViolation(OperationContext* opCtx,
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
+                             const ScopedCollectionAcquisition& collectionAcquisition,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
@@ -1506,10 +1508,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
     }
 
     NamespaceString requestNss;
-    CollectionPtr collection;
     if (auto uuid = op.getUuid()) {
         auto catalog = CollectionCatalog::get(opCtx);
-        collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid.value()));
+        const auto collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid.value()));
         // Invalidate the image collection if collectionUUID does not resolve and this op returns
         // a preimage or postimage. We only expect this to happen when in kInitialSync mode but
         // this can sometimes occur in kRecovering mode during rollback-via-refetch. In either case
@@ -1538,15 +1539,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
                               << uuid.value() << "): " << redact(opOrGroupedInserts.toBSON()),
                 collection);
         requestNss = collection->ns();
+        dassert(requestNss == collectionAcquisition.nss());
         dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX));
     } else {
         requestNss = op.getNss();
         invariant(requestNss.coll().size());
         dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX),
                 requestNss.toStringForErrorMsg());
-        collection = CollectionPtr(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, requestNss));
     }
+
+    const CollectionPtr& collection = collectionAcquisition.getCollectionPtr();
 
     assertInitialSyncCanContinueDuringShardMerge(opCtx, requestNss, op);
 
@@ -2105,7 +2107,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     request.setReturnDeleted(true);
                 }
 
-                DeleteResult result = deleteObject(opCtx, collection, request);
+                DeleteResult result = deleteObject(opCtx, collectionAcquisition, request);
                 if (op.getNeedsRetryImage()) {
                     // Even if `result.nDeleted` is 0, we want to perform a write to the
                     // imageCollection to advance the txnNumber/ts and invalidate the image. This
@@ -2224,7 +2226,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 global_index::deleteKey(
                     opCtx,
-                    collection,
+                    collectionAcquisition,
                     op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
                     op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
 

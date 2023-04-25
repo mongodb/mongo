@@ -30,6 +30,10 @@
 #include "mongo/db/transaction_resources.h"
 
 namespace mongo {
+
+const PlacementConcern AcquisitionPrerequisites::kPretendUnsharded =
+    PlacementConcern{boost::none, boost::none};
+
 namespace shard_role_details {
 
 TransactionResources::TransactionResources(repl::ReadConcernArgs readConcern)

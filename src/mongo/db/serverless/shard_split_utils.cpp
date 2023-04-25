@@ -35,6 +35,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log_debug.h"
 
 namespace mongo {
@@ -200,16 +201,21 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
 
 StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitId) {
     const auto nss = NamespaceString::kShardSplitDonorsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(nss),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
-    if (!collection) {
+    if (!collection.exists()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
     auto query = BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId);
     return writeConflictRetry(opCtx, "ShardSplitDonorDeleteStateDoc", nss.ns(), [&]() -> bool {
-        auto nDeleted =
-            deleteObjects(opCtx, collection.getCollection(), nss, query, true /* justOne */);
+        auto nDeleted = deleteObjects(opCtx, collection, query, true /* justOne */);
         return nDeleted > 0;
     });
 }

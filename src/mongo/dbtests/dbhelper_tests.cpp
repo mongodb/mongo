@@ -41,6 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -193,18 +194,21 @@ private:
             WriteUnitOfWork wuow1(opCtx1);
 
             WriteUnitOfWork wuow2(opCtx2);
-            auto collection2 =
-                CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
-            ASSERT(collection2);
+            const auto collection2 =
+                acquireCollection(opCtx2,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx2, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            ASSERT(collection2.exists());
             auto lastApplied = repl::ReplicationCoordinator::get(opCtx2->getServiceContext())
                                    ->getMyLastAppliedOpTime()
                                    .getTimestamp();
             ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(lastApplied + 1));
             BSONObj res;
-            ASSERT_TRUE(
-                Helpers::findByIdAndNoopUpdate(opCtx2, CollectionPtr(collection2), idQuery, res));
+            ASSERT_TRUE(Helpers::findByIdAndNoopUpdate(
+                opCtx2, collection2.getCollectionPtr(), idQuery, res));
 
-            ASSERT_THROWS(Helpers::emptyCollection(opCtx1, nss), WriteConflictException);
+            ASSERT_THROWS(Helpers::emptyCollection(opCtx1, collection2), WriteConflictException);
 
             wuow2.commit();
         }
@@ -233,11 +237,18 @@ private:
                                                     const BSONObj& idQuery) {
         {
             WriteUnitOfWork wuow1(opCtx1);
-            auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
-                                   ->getMyLastAppliedOpTime()
-                                   .getTimestamp();
-            ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
-            Helpers::emptyCollection(opCtx1, nss);
+            {
+                const auto coll =
+                    acquireCollection(opCtx1,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx1, nss, AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
+                auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
+                                       ->getMyLastAppliedOpTime()
+                                       .getTimestamp();
+                ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
+                Helpers::emptyCollection(opCtx1, coll);
+            }
 
             {
                 WriteUnitOfWork wuow2(opCtx2);

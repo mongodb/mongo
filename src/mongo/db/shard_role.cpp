@@ -360,6 +360,22 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
                                         operationType);
 }
 
+CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
+    OperationContext* opCtx,
+    NamespaceStringOrUUID nssOrUUID,
+    AcquisitionPrerequisites::OperationType operationType) {
+    auto& oss = OperationShardingState::get(opCtx);
+    auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+
+    // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
+    PlacementConcern placementConcern = nssOrUUID.nss()
+        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()),
+                           oss.getShardVersion(*nssOrUUID.nss())}
+        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()), {}};
+
+    return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
+}
+
 const UUID& ScopedCollectionAcquisition::uuid() const {
     invariant(exists(),
               str::stream() << "Collection " << nss().toStringForErrorMsg()

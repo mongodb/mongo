@@ -49,6 +49,11 @@ struct PlacementConcern {
 };
 
 struct AcquisitionPrerequisites {
+    // Pretends that the collection is unsharded. Acquisitions with this PlacementConcern will have
+    // always have UNSHARDED description and filter, even if they are sharded. Only for use in
+    // internal code paths that require it. Possible data loss if used incorrectly!
+    static const PlacementConcern kPretendUnsharded;
+
     enum PlacementConcernPlaceholder {
         /**
          * Special PlacementConcern which mimics direct connection to a shard, causing the

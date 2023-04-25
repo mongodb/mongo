@@ -169,6 +169,11 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
         NamespaceString nss,
         AcquisitionPrerequisites::OperationType operationType,
         boost::optional<UUID> expectedUUID = boost::none);
+
+    static CollectionAcquisitionRequest fromOpCtx(
+        OperationContext* opCtx,
+        NamespaceStringOrUUID nssOrUUID,
+        AcquisitionPrerequisites::OperationType operationType);
 };
 
 class ScopedCollectionAcquisition {

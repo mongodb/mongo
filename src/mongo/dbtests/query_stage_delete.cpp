@@ -39,6 +39,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
@@ -122,14 +123,16 @@ private:
 class QueryStageDeleteUpcomingObjectWasDeleted : public QueryStageDeleteBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        const auto coll = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
+        ASSERT(coll.exists());
 
         // Get the RecordIds that would be returned by an in-order scan.
         std::vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+        getRecordIds(coll.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Configure the scan.
         CollectionScanParams collScanParams;
@@ -146,7 +149,8 @@ public:
             std::move(deleteStageParams),
             &ws,
             coll,
-            new CollectionScan(_expCtx.get(), coll, collScanParams, &ws, nullptr));
+            new CollectionScan(
+                _expCtx.get(), coll.getCollectionPtr(), collScanParams, &ws, nullptr));
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
 
@@ -160,10 +164,11 @@ public:
 
         // Remove recordIds[targetDocIndex];
         static_cast<PlanStage*>(&deleteStage)->saveState();
-        BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
+        BSONObj targetDoc =
+            coll.getCollectionPtr()->docFor(&_opCtx, recordIds[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
-        static_cast<PlanStage*>(&deleteStage)->restoreState(&coll);
+        static_cast<PlanStage*>(&deleteStage)->restoreState(&coll.getCollectionPtr());
 
         // Remove the rest.
         while (!deleteStage.isEOF()) {
@@ -184,9 +189,12 @@ class QueryStageDeleteReturnOldDoc : public QueryStageDeleteBase {
 public:
     void run() {
         // Various variables we'll need.
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
+        const auto coll = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+
+        ASSERT(coll.exists());
         const int targetDocIndex = 0;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = std::make_unique<WorkingSet>();
@@ -194,7 +202,7 @@ public:
 
         // Get the RecordIds that would be returned by an in-order scan.
         std::vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+        getRecordIds(coll.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.

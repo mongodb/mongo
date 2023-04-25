@@ -42,6 +42,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -243,6 +244,8 @@ protected:
                 uassertStatusOK(applyCommand_inlock(
                     &_opCtx, ApplierOperation{&entry}, getOplogApplicationMode()));
             } else {
+                const auto coll = acquireCollection(
+                    &_opCtx, {nss(), {}, {}, AcquisitionPrerequisites::kWrite}, MODE_IX);
                 WriteUnitOfWork wunit(&_opCtx);
                 auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
                                        ->getMyLastAppliedOpTime()
@@ -252,6 +255,7 @@ protected:
                 const bool dataIsConsistent = true;
                 uassertStatusOK(applyOperation_inlock(&_opCtx,
                                                       ctx.db(),
+                                                      coll,
                                                       ApplierOperation{&entry},
                                                       false,
                                                       getOplogApplicationMode(),

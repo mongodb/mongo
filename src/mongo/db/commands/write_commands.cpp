@@ -761,13 +761,16 @@ public:
 
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
-            AutoGetCollection collection(opCtx, deleteRequest.getNsString(), MODE_IX);
-
+            const auto collection = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
+                MODE_IX);
             if (isRequestToTimeseries) {
                 uassert(ErrorCodes::NamespaceNotFound,
                         "Could not find time-series buckets collection for write explain",
-                        *collection);
-                auto timeseriesOptions = collection->getTimeseriesOptions();
+                        collection.exists());
+                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
                 uassert(ErrorCodes::InvalidOptions,
                         "Time-series buckets collection is missing time-series options",
                         timeseriesOptions);
@@ -780,17 +783,15 @@ public:
             }
 
             ParsedDelete parsedDelete(
-                opCtx, &deleteRequest, collection.getCollection(), isRequestToTimeseries);
+                opCtx, &deleteRequest, collection.getCollectionPtr(), isRequestToTimeseries);
             uassertStatusOK(parsedDelete.parseRequest());
 
             // Explain the plan tree.
-            auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),
-                                                          &collection.getCollection(),
-                                                          &parsedDelete,
-                                                          verbosity));
+            auto exec = uassertStatusOK(getExecutorDelete(
+                &CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(exec.get(),
-                                   collection.getCollection(),
+                                   collection.getCollectionPtr(),
                                    verbosity,
                                    BSONObj(),
                                    _commandObj,

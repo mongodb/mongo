@@ -39,10 +39,9 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/shard_role.h"
 
 namespace mongo {
-
-class ScopedCollectionAcquisition;
 
 /**
  * Query execution helper. Runs the argument function 'f'. If 'f' throws an exception other than
@@ -91,17 +90,16 @@ public:
      * order to avoid depending directly on this concrete implementation of the PlanExecutor
      * interface.
      */
-    PlanExecutorImpl(
-        OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        std::unique_ptr<QuerySolution> qs,
-        std::unique_ptr<CanonicalQuery> cq,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
-        bool returnOwnedBson,
-        NamespaceString nss,
-        PlanYieldPolicy::YieldPolicy yieldPolicy);
+    PlanExecutorImpl(OperationContext* opCtx,
+                     std::unique_ptr<WorkingSet> ws,
+                     std::unique_ptr<PlanStage> rt,
+                     std::unique_ptr<QuerySolution> qs,
+                     std::unique_ptr<CanonicalQuery> cq,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     VariantCollectionPtrOrAcquisition collection,
+                     bool returnOwnedBson,
+                     NamespaceString nss,
+                     PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     virtual ~PlanExecutorImpl();
     CanonicalQuery* getCanonicalQuery() const final;

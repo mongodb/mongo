@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/background.h"
 
@@ -170,10 +171,11 @@ private:
      * |   applyIndex: 0   | |   applyIndex: 0   | |   applyIndex: 0   | |   applyIndex: 1   |
      * +-------------------+ +-------------------+ +-------------------+ +-------------------+
      */
-    size_t _deleteExpiredChangeStreamPreImagesCommon(OperationContext* opCtx,
-                                                     const CollectionPtr& preImageColl,
-                                                     const MatchExpression* filterPtr,
-                                                     Timestamp maxRecordIdTimestamp);
+    size_t _deleteExpiredChangeStreamPreImagesCommon(
+        OperationContext* opCtx,
+        const ScopedCollectionAcquisition& preImageColl,
+        const MatchExpression* filterPtr,
+        Timestamp maxRecordIdTimestamp);
 
     /**
      * Removes expired pre-images in a single tenant enviornment.

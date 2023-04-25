@@ -56,6 +56,7 @@
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -1121,9 +1122,16 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
     const auto& nss = NamespaceString::kRecipientReshardingOperationsNamespace;
     writeConflictRetry(
         opCtx.get(), "RecipientStateMachine::_removeRecipientDocument", nss.toString(), [&] {
-            AutoGetCollection coll(opCtx.get(), nss, MODE_IX);
+            const auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString(nss),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
-            if (!coll) {
+            if (!coll.exists()) {
                 return;
             }
 
@@ -1135,8 +1143,7 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
             });
 
             deleteObjects(opCtx.get(),
-                          *coll,
-                          nss,
+                          coll,
                           BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
                                << _metadata.getReshardingUUID()),
                           true /* justOne */);

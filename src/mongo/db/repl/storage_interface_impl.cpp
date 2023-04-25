@@ -74,6 +74,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/control/storage_control.h"
@@ -675,13 +676,17 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             using Result = StatusWith<std::vector<BSONObj>>;
 
             auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-            AutoGetCollection autoColl(opCtx, nsOrUUID, collectionAccessMode);
-            auto collectionResult = getCollection(
-                autoColl, nsOrUUID, str::stream() << "Unable to proceed with " << opStr << ".");
-            if (!collectionResult.isOK()) {
-                return Result(collectionResult.getStatus());
+            const auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, nsOrUUID, AcquisitionPrerequisites::kWrite),
+                                  collectionAccessMode);
+            if (!collection.exists()) {
+                return Status{ErrorCodes::NamespaceNotFound,
+                              str::stream()
+                                  << "Collection [" << nsOrUUID.toString() << "] not found. "
+                                  << "Unable to proceed with " << opStr << "."};
             }
-            const auto& collection = *collectionResult.getValue();
 
             auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
             auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
@@ -700,16 +705,19 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 }
                 // Use collection scan.
                 planExecutor = isFind
-                    ? InternalPlanner::collectionScan(
-                          opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, direction)
+                    ? InternalPlanner::collectionScan(opCtx,
+                                                      &collection.getCollectionPtr(),
+                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                      direction)
                     : InternalPlanner::deleteWithCollectionScan(
                           opCtx,
-                          &collection,
+                          collection,
                           makeDeleteStageParamsForDeleteDocuments(),
                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                           direction);
-            } else if (*indexName == kIdIndexName && collection->isClustered() &&
-                       collection->getClusteredInfo()
+            } else if (*indexName == kIdIndexName && collection.getCollectionPtr()->isClustered() &&
+                       collection.getCollectionPtr()
+                               ->getClusteredInfo()
                                ->getIndexSpec()
                                .getKey()
                                .firstElement()
@@ -752,7 +760,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
 
                 planExecutor = isFind
                     ? InternalPlanner::collectionScan(opCtx,
-                                                      &collection,
+                                                      &collection.getCollectionPtr(),
                                                       PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                       direction,
                                                       boost::none /* resumeAfterId */,
@@ -761,7 +769,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                                       collScanBoundInclusion)
                     : InternalPlanner::deleteWithCollectionScan(
                           opCtx,
-                          &collection,
+                          collection,
                           makeDeleteStageParamsForDeleteDocuments(),
                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                           direction,
@@ -770,7 +778,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                           collScanBoundInclusion);
             } else {
                 // Use index scan.
-                auto indexCatalog = collection->getIndexCatalog();
+                auto indexCatalog = collection.getCollectionPtr()->getIndexCatalog();
                 invariant(indexCatalog);
                 const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
                     opCtx, *indexName, IndexCatalog::InclusionPolicy::kReady);
@@ -801,7 +809,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 }
                 planExecutor = isFind
                     ? InternalPlanner::indexScan(opCtx,
-                                                 &collection,
+                                                 &collection.getCollectionPtr(),
                                                  indexDescriptor,
                                                  bounds.first,
                                                  bounds.second,
@@ -811,7 +819,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                                  InternalPlanner::IXSCAN_FETCH)
                     : InternalPlanner::deleteWithIndexScan(
                           opCtx,
-                          &collection,
+                          collection,
                           makeDeleteStageParamsForDeleteDocuments(),
                           indexDescriptor,
                           bounds.first,
@@ -1135,28 +1143,28 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
     request.setGod(true);
 
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::deleteByFilter", nss.ns(), [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto collectionResult =
-            getCollection(autoColl,
-                          nss,
-                          str::stream() << "Unable to delete documents in "
-                                        << nss.toStringForErrorMsg() << " using filter " << filter);
-        if (!collectionResult.isOK()) {
-            return collectionResult.getStatus();
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        if (!collection.exists()) {
+            return Status{ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Collection [" << nss.toString() << "] not found. "
+                                        << "Unable to delete documents in "
+                                        << nss.toStringForErrorMsg() << " using filter " << filter};
         }
-        const auto& collection = *collectionResult.getValue();
 
         // ParsedDelete needs to be inside the write conflict retry loop because it may create a
         // CanonicalQuery whose ownership will be transferred to the plan executor in
         // getExecutorDelete().
-        ParsedDelete parsedDelete(opCtx, &request, collection);
+        ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
         auto parsedDeleteStatus = parsedDelete.parseRequest();
         if (!parsedDeleteStatus.isOK()) {
             return parsedDeleteStatus;
         }
 
         auto planExecutorResult = mongo::getExecutorDelete(
-            nullptr, &collection, &parsedDelete, boost::none /* verbosity */);
+            nullptr, collection, &parsedDelete, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }

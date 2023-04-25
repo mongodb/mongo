@@ -41,9 +41,30 @@
 
 namespace mongo {
 
+class CollectionPtr;
 class BSONObj;
 class PlanStage;
 class RecordId;
+class ScopedCollectionAcquisition;
+
+// TODO: SERVER-76397 Remove this once we use ScopedCollectionAcquisition everywhere.
+class VariantCollectionPtrOrAcquisition {
+public:
+    VariantCollectionPtrOrAcquisition(const CollectionPtr* collectionPtr)
+        : _collectionPtrOrAcquisition(collectionPtr) {}
+    VariantCollectionPtrOrAcquisition(const ScopedCollectionAcquisition* collection)
+        : _collectionPtrOrAcquisition(collection) {}
+
+    const stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>& get() {
+        return _collectionPtrOrAcquisition;
+    };
+
+    const CollectionPtr& getCollectionPtr() const;
+
+private:
+    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>
+        _collectionPtrOrAcquisition;
+};
 
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop

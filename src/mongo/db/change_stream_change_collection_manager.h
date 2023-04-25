@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 
 namespace mongo {
 
@@ -199,16 +200,17 @@ public:
      */
     static boost::optional<ChangeCollectionPurgingJobMetadata>
     getChangeCollectionPurgingJobMetadata(OperationContext* opCtx,
-                                          const CollectionPtr* changeCollection);
+                                          const ScopedCollectionAcquisition& changeCollection);
 
     /** Removes documents from a change collection whose wall time is less than the
      * 'expirationTime'. Returns the number of documents deleted. The 'maxRecordIdBound' is the
      * maximum record id bound that will not be included in the collection scan.
      */
-    static size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
-                                                          const CollectionPtr* changeCollection,
-                                                          RecordIdBound maxRecordIdBound,
-                                                          Date_t expirationTime);
+    static size_t removeExpiredChangeCollectionsDocuments(
+        OperationContext* opCtx,
+        const ScopedCollectionAcquisition& changeCollection,
+        RecordIdBound maxRecordIdBound,
+        Date_t expirationTime);
 
 private:
     // Change collections purging job stats.

@@ -45,6 +45,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -75,7 +76,7 @@ bool shouldRestartDeleteIfNoLongerMatches(const DeleteStageParams* params) {
 DeleteStage::DeleteStage(ExpressionContext* expCtx,
                          std::unique_ptr<DeleteStageParams> params,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         const ScopedCollectionAcquisition& collection,
                          PlanStage* child)
     : DeleteStage(kStageType.rawData(), expCtx, std::move(params), ws, collection, child) {}
 
@@ -83,12 +84,12 @@ DeleteStage::DeleteStage(const char* stageType,
                          ExpressionContext* expCtx,
                          std::unique_ptr<DeleteStageParams> params,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         const ScopedCollectionAcquisition& collection,
                          PlanStage* child)
-    : RequiresMutableCollectionStage(stageType, expCtx, collection),
+    : RequiresMutableCollectionStage(stageType, expCtx, collection.getCollectionPtr()),
       _params(std::move(params)),
       _ws(ws),
-      _preWriteFilter(opCtx(), collection->ns()),
+      _preWriteFilter(opCtx(), collection.nss()),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID) {
     _children.emplace_back(child);

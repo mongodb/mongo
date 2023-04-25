@@ -37,6 +37,7 @@ namespace mongo {
 
 class Database;
 class OperationContext;
+class ScopedCollectionAcquisition;
 
 /**
  * Deletes objects from 'collection' that match the query predicate given by 'pattern'. If 'justOne'
@@ -44,8 +45,7 @@ class OperationContext;
  * not yield. If 'god' is true, deletes are allowed on system namespaces.
  */
 long long deleteObjects(OperationContext* opCtx,
-                        const CollectionPtr& collection,
-                        const NamespaceString& ns,
+                        const ScopedCollectionAcquisition& collection,
                         BSONObj pattern,
                         bool justOne,
                         bool god = false,
@@ -57,7 +57,7 @@ struct DeleteResult {
 };
 
 DeleteResult deleteObject(OperationContext* opCtx,
-                          const CollectionPtr& collection,
+                          const ScopedCollectionAcquisition& collection,
                           const DeleteRequest& request);
 
 }  // namespace mongo

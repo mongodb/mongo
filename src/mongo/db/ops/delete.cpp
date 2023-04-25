@@ -35,40 +35,40 @@
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/shard_role.h"
 
 namespace mongo {
 
 long long deleteObjects(OperationContext* opCtx,
-                        const CollectionPtr& collection,
-                        const NamespaceString& ns,
+                        const ScopedCollectionAcquisition& collection,
                         BSONObj pattern,
                         bool justOne,
                         bool god,
                         bool fromMigrate) {
     auto request = DeleteRequest{};
-    request.setNsString(ns);
+    request.setNsString(collection.nss());
     request.setQuery(pattern);
     request.setMulti(!justOne);
     request.setGod(god);
     request.setFromMigrate(fromMigrate);
 
-    ParsedDelete parsedDelete(opCtx, &request, collection);
+    ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), &collection, &parsedDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
 
     return exec->executeDelete();
 }
 
 DeleteResult deleteObject(OperationContext* opCtx,
-                          const CollectionPtr& collection,
+                          const ScopedCollectionAcquisition& collection,
                           const DeleteRequest& request) {
-    ParsedDelete parsedDelete(opCtx, &request, collection);
+    ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), &collection, &parsedDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
 
     if (!request.getReturnDeleted()) {
         return {exec->executeDelete(), boost::none};

@@ -42,6 +42,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/str.h"
 
@@ -116,9 +117,15 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
 StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* opCtx,
                                                             StringData tenantId) {
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(nss),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
-    if (!collection) {
+    if (!collection.exists()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
@@ -128,8 +135,7 @@ StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* op
                       << BSON("$exists" << 1));
     return writeConflictRetry(
         opCtx, "deleteTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> bool {
-            auto nDeleted =
-                deleteObjects(opCtx, collection.getCollection(), nss, query, true /* justOne */);
+            auto nDeleted = deleteObjects(opCtx, collection, query, true /* justOne */);
             return nDeleted > 0;
         });
 }

@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/duration.h"
@@ -92,12 +93,18 @@ void removeExpiredDocuments(Client* client) {
                 change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);
 
             // Acquire intent-exclusive lock on the change collection.
-            AutoGetChangeCollection changeCollection{
-                opCtx.get(), AutoGetChangeCollection::AccessMode::kWrite, tenantId};
+            const auto changeCollection =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::makeChangeCollectionNSS(tenantId),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
             // Early exit if collection does not exist or if running on a secondary (requires
             // opCtx->lockState()->isRSTLLocked()).
-            if (!changeCollection ||
+            if (!changeCollection.exists() ||
                 !repl::ReplicationCoordinator::get(opCtx.get())
                      ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig.toString())) {
                 continue;
@@ -108,7 +115,7 @@ void removeExpiredDocuments(Client* client) {
             // to remove.
             auto purgingJobMetadata =
                 ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-                    opCtx.get(), &*changeCollection);
+                    opCtx.get(), changeCollection);
             if (!purgingJobMetadata) {
                 continue;
             }
@@ -116,7 +123,7 @@ void removeExpiredDocuments(Client* client) {
             removedCount +=
                 ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
                     opCtx.get(),
-                    &*changeCollection,
+                    changeCollection,
                     purgingJobMetadata->maxRecordIdBound,
                     currentWallTime - Seconds(expiredAfterSeconds));
             changeCollectionManager.getPurgingJobStats().scannedCollections.fetchAndAddRelaxed(1);

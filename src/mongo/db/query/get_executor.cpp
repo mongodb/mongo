@@ -1725,18 +1725,12 @@ StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSO
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> coll,
+    const ScopedCollectionAcquisition& coll,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     DeleteStageParams::DocumentCounter&& documentCounter) {
-    const auto& collectionPtr =
-        *stdx::visit(OverloadedVisitor{
-                         [](const CollectionPtr* collectionPtr) { return collectionPtr; },
-                         [](const ScopedCollectionAcquisition* collectionAcquisition) {
-                             return &collectionAcquisition->getCollectionPtr();
-                         },
-                     },
-                     coll);
+    const auto& collectionPtr = coll.getCollectionPtr();
+
     auto expCtx = parsedDelete->expCtx();
     OperationContext* opCtx = expCtx->opCtx;
     const DeleteRequest* request = parsedDelete->getRequest();
@@ -1799,7 +1793,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
                                            std::make_unique<EOFStage>(expCtx.get()),
-                                           &CollectionPtr::null,
+                                           &coll,
                                            policy,
                                            false, /* whether we must return owned data */
                                            nss);
@@ -1840,12 +1834,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                     std::make_unique<DeleteStage>(expCtx.get(),
                                                   std::move(deleteStageParams),
                                                   ws.get(),
-                                                  collectionPtr,
+                                                  coll,
                                                   idHackStage.release());
                 return plan_executor_factory::make(expCtx,
                                                    std::move(ws),
                                                    std::move(root),
-                                                   coll,
+                                                   &coll,
                                                    policy,
                                                    false /* whether owned BSON must be returned */);
             }
@@ -1928,11 +1922,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                                     std::move(deleteStageParams),
                                                     std::make_unique<BatchedDeleteStageParams>(),
                                                     ws.get(),
-                                                    collectionPtr,
+                                                    coll,
                                                     root.release());
     } else {
         root = std::make_unique<DeleteStage>(
-            expCtxRaw, std::move(deleteStageParams), ws.get(), collectionPtr, root.release());
+            expCtxRaw, std::move(deleteStageParams), ws.get(), coll, root.release());
     }
 
     if (projection) {
@@ -1945,7 +1939,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),
-                                       coll,
+                                       &coll,
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString(),
@@ -1958,18 +1952,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> coll,
+    VariantCollectionPtrOrAcquisition coll,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     UpdateStageParams::DocumentCounter&& documentCounter) {
-    const auto& collectionPtr =
-        *stdx::visit(OverloadedVisitor{
-                         [](const CollectionPtr* collectionPtr) { return collectionPtr; },
-                         [](const ScopedCollectionAcquisition* collectionAcquisition) {
-                             return &collectionAcquisition->getCollectionPtr();
-                         },
-                     },
-                     coll);
+    const auto& collectionPtr = coll.getCollectionPtr();
 
     auto expCtx = parsedUpdate->expCtx();
     OperationContext* opCtx = expCtx->opCtx;

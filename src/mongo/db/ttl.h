@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/shard_role.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/background.h"
 
@@ -137,7 +138,7 @@ private:
      */
     bool _deleteExpiredWithIndex(OperationContext* opCtx,
                                  TTLCollectionCache* ttlCollectionCache,
-                                 const CollectionPtr& collection,
+                                 const ScopedCollectionAcquisition& collection,
                                  std::string indexName);
 
     /*
@@ -153,7 +154,7 @@ private:
      */
     bool _deleteExpiredWithCollscan(OperationContext* opCtx,
                                     TTLCollectionCache* ttlCollectionCache,
-                                    const CollectionPtr& collection);
+                                    const ScopedCollectionAcquisition& collection);
 
     // Protects the state below.
     mutable Mutex _stateMutex = MONGO_MAKE_LATCH("TTLMonitorStateMutex");

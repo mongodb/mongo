@@ -118,17 +118,16 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(
 }
 }  // namespace
 
-PlanExecutorImpl::PlanExecutorImpl(
-    OperationContext* opCtx,
-    unique_ptr<WorkingSet> ws,
-    unique_ptr<PlanStage> rt,
-    unique_ptr<QuerySolution> qs,
-    unique_ptr<CanonicalQuery> cq,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
-    bool returnOwnedBson,
-    NamespaceString nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy)
+PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
+                                   unique_ptr<WorkingSet> ws,
+                                   unique_ptr<PlanStage> rt,
+                                   unique_ptr<QuerySolution> qs,
+                                   unique_ptr<CanonicalQuery> cq,
+                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   VariantCollectionPtrOrAcquisition collection,
+                                   bool returnOwnedBson,
+                                   NamespaceString nss,
+                                   PlanYieldPolicy::YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
@@ -141,12 +140,7 @@ PlanExecutorImpl::PlanExecutorImpl(
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
-    const CollectionPtr* collectionPtr =
-        stdx::visit(OverloadedVisitor{[](const CollectionPtr* coll) { return coll; },
-                                      [](const ScopedCollectionAcquisition* coll) {
-                                          return &coll->getCollectionPtr();
-                                      }},
-                    collection);
+    const CollectionPtr* collectionPtr = &collection.getCollectionPtr();
     invariant(collectionPtr);
     const bool collectionExists = static_cast<bool>(*collectionPtr);
 
@@ -175,7 +169,7 @@ PlanExecutorImpl::PlanExecutorImpl(
                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
                                       PlanYieldPolicy::YieldThroughAcquisitions{});
                               }},
-            collection);
+            collection.get());
 
     _yieldPolicy = makeYieldPolicy(
         this, collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::NO_YIELD, yieldable);

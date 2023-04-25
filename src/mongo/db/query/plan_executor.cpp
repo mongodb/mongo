@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/shard_role.h"
 
 #include "mongo/util/fail_point.h"
 
@@ -57,6 +58,16 @@ void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
         uasserted(ErrorCodes::Error(4382101),
                   "PlanExecutor hit planExecutorAlwaysFails fail point");
     }
+}
+
+const CollectionPtr& VariantCollectionPtrOrAcquisition::getCollectionPtr() const {
+    return *stdx::visit(OverloadedVisitor{
+                            [](const CollectionPtr* collectionPtr) { return collectionPtr; },
+                            [](const ScopedCollectionAcquisition* collectionAcquisition) {
+                                return &collectionAcquisition->getCollectionPtr();
+                            },
+                        },
+                        _collectionPtrOrAcquisition);
 }
 
 }  // namespace mongo

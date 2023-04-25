@@ -838,7 +838,7 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
     }
 
     const auto exec = uassertStatusOK(
-        getExecutorDelete(opDebug, &collection, &parsedDelete, boost::none /* verbosity */));
+        getExecutorDelete(opDebug, collection, &parsedDelete, boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1566,7 +1566,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
     auto exec = uassertStatusOK(getExecutorDelete(&curOp.debug(),
-                                                  &collection,
+                                                  collection,
                                                   &parsedDelete,
                                                   boost::none /* verbosity */,
                                                   std::move(documentCounter)));

@@ -33,6 +33,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/uuid.h"
 
+namespace mongo {
+class ScopedCollectionAcquisition;
+}
+
 namespace mongo::global_index {
 
 // The container (collection) fields of an index key. The document key is stored as a BSON object.
@@ -94,7 +98,7 @@ void deleteKey(OperationContext* opCtx,
  * the above, this variant requires the call to be wrapped inside a writeConflictRetry.
  */
 void deleteKey(OperationContext* opCtx,
-               const CollectionPtr& container,
+               const ScopedCollectionAcquisition& container,
                const BSONObj& key,
                const BSONObj& docKey);
 

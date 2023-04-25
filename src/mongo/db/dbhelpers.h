@@ -40,6 +40,7 @@ class CollectionPtr;
 class Database;
 class OperationContext;
 class FindCommandRequest;
+class ScopedCollectionAcquisition;
 
 /**
  * db helpers are helper functions and classes that let us easily manipulate the local
@@ -176,7 +177,7 @@ struct Helpers {
      * You do not need to set the database before calling.
      * Does not oplog the operation.
      */
-    static void emptyCollection(OperationContext* opCtx, const NamespaceString& nss);
+    static void emptyCollection(OperationContext* opCtx, const ScopedCollectionAcquisition& coll);
 
     /*
      * Finds the doc and then runs a no-op update by running an update using the doc just read. Used

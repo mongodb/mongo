@@ -55,6 +55,7 @@
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -1022,9 +1023,15 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 
     const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
     writeConflictRetry(opCtx.get(), "DonorStateMachine::_removeDonorDocument", nss.toString(), [&] {
-        AutoGetCollection coll(opCtx.get(), nss, MODE_X);
+        const auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString(nss),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_X);
 
-        if (!coll) {
+        if (!coll.exists()) {
             return;
         }
 
@@ -1037,8 +1044,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
             });
 
         deleteObjects(opCtx.get(),
-                      *coll,
-                      nss,
+                      coll,
                       BSON(ReshardingDonorDocument::kReshardingUUIDFieldName
                            << _metadata.getReshardingUUID()),
                       true /* justOne */);

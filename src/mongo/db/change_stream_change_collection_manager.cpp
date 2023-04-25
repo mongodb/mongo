@@ -48,6 +48,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -449,14 +450,14 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
 
 boost::optional<ChangeCollectionPurgingJobMetadata>
 ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-    OperationContext* opCtx, const CollectionPtr* changeCollection) {
+    OperationContext* opCtx, const ScopedCollectionAcquisition& changeCollection) {
     auto findWallTimeAndRecordIdForFirstDocument = [&](InternalPlanner::Direction direction)
         -> boost::optional<std::pair<long long, RecordId>> {
         BSONObj currChangeDoc;
         RecordId currRecordId;
 
         auto scanExecutor = InternalPlanner::collectionScan(
-            opCtx, changeCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, direction);
+            opCtx, &changeCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, direction);
         switch (scanExecutor->getNext(&currChangeDoc, &currRecordId)) {
             case PlanExecutor::IS_EOF:
                 return boost::none;
@@ -479,7 +480,7 @@ ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
 
 size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
     OperationContext* opCtx,
-    const CollectionPtr* changeCollection,
+    const ScopedCollectionAcquisition& changeCollection,
     RecordIdBound maxRecordIdBound,
     Date_t expirationTime) {
     auto params = std::make_unique<DeleteStageParams>();
@@ -489,7 +490,7 @@ size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocume
     LTEMatchExpression filter{"wall"_sd, Value(expirationTime)};
     auto deleteExecutor = InternalPlanner::deleteWithCollectionScan(
         opCtx,
-        &(*changeCollection),
+        changeCollection,
         std::move(params),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         InternalPlanner::Direction::FORWARD,

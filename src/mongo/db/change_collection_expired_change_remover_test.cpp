@@ -47,6 +47,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -131,16 +132,21 @@ protected:
                                                    Date_t expirationTime) {
         // Acquire intent-exclusive lock on the change collection. Early exit if the collection
         // doesn't exist.
-        const auto changeCollection =
-            AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
+        const auto changeCollection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::makeChangeCollectionNSS(tenantId),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
         // Get the 'maxRecordIdBound' and perform the removal of the expired documents.
         const auto maxRecordIdBound =
             ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-                opCtx, &*changeCollection)
+                opCtx, changeCollection)
                 ->maxRecordIdBound;
         return ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
-            opCtx, &*changeCollection, maxRecordIdBound, expirationTime);
+            opCtx, changeCollection, maxRecordIdBound, expirationTime);
     }
 
     const TenantId _tenantId;
@@ -244,18 +250,23 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, VerifyLastExpiredDocument) {
         clockSource()->advance(Milliseconds(1));
     }
 
-    auto changeCollection =
-        AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kRead, _tenantId};
+    const auto changeCollection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::makeChangeCollectionNSS(_tenantId),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
 
     auto maxExpiredRecordId =
-        ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-            opCtx, &*changeCollection)
+        ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(opCtx,
+                                                                                   changeCollection)
             ->maxRecordIdBound;
 
     // Get the document found at 'maxExpiredRecordId' and test it against 'lastExpiredDocument'.
     auto scanExecutor =
         InternalPlanner::collectionScan(opCtx,
-                                        &(*changeCollection),
+                                        &changeCollection,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         InternalPlanner::Direction::FORWARD,
                                         boost::none,

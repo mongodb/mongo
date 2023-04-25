@@ -42,6 +42,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
@@ -123,10 +124,21 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             // Presently, it is not allowed to run a prepared transaction with a command
             // inside. TODO(SERVER-46105)
             invariant(!op.isCommand());
-            AutoGetCollection coll(opCtx, op.getNss(), MODE_IX);
+            const auto coll = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(op.getNss(),
+                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite),
+                MODE_IX);
+            const auto db = [opCtx, &coll]() {
+                AutoGetDb autoDb(opCtx, coll.nss().dbName(), MODE_IX);
+                return autoDb.getDb();
+            }();
             const bool isDataConsistent = true;
             auto status = repl::applyOperation_inlock(opCtx,
-                                                      coll.getDb(),
+                                                      db,
+                                                      coll,
                                                       ApplierOperation{&op},
                                                       false /*alwaysUpsert*/,
                                                       oplogApplicationMode,

@@ -52,6 +52,7 @@ class Database;
 class NamespaceString;
 class OperationContext;
 class OperationSessionInfo;
+class ScopedCollectionAcquisition;
 class Session;
 
 using OplogSlot = repl::OpTime;
@@ -224,6 +225,7 @@ void logOplogConstraintViolation(OperationContext* opCtx,
  */
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
+                             const ScopedCollectionAcquisition& collectionAcquisition,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,

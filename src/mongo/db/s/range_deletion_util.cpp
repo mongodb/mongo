@@ -33,7 +33,6 @@
 #include <boost/optional.hpp>
 #include <utility>
 
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbhelpers.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
@@ -81,18 +81,18 @@ MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
  * the range failed.
  */
 StatusWith<int> deleteNextBatch(OperationContext* opCtx,
-                                const CollectionPtr& collection,
+                                const ScopedCollectionAcquisition& collection,
                                 BSONObj const& keyPattern,
                                 ChunkRange const& range,
                                 int numDocsToRemovePerBatch) {
-    invariant(collection);
+    invariant(collection.exists());
 
-    auto const nss = collection->ns();
+    auto const nss = collection.nss();
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
-    const auto shardKeyIdx =
-        findShardKeyPrefixedIndex(opCtx, collection, keyPattern, /*requireSingleKey=*/false);
+    const auto shardKeyIdx = findShardKeyPrefixedIndex(
+        opCtx, collection.getCollectionPtr(), keyPattern, /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
         LOGV2_ERROR(
             23765, "Unable to find shard key index", "keyPattern"_attr = keyPattern, logAttrs(nss));
@@ -137,7 +137,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
 
     auto exec =
         InternalPlanner::deleteWithShardKeyIndexScan(opCtx,
-                                                     &collection,
+                                                     collection,
                                                      std::move(deleteStageParams),
                                                      *shardKeyIdx,
                                                      min,
@@ -346,25 +346,28 @@ Status deleteRangeInBatches(OperationContext* opCtx,
             int numDeleted;
             const auto nss = [&]() {
                 try {
-                    AutoGetCollection collection(
-                        opCtx, NamespaceStringOrUUID{dbName.toString(), collectionUuid}, MODE_IX);
+                    const auto nssOrUuid = NamespaceStringOrUUID{dbName.toString(), collectionUuid};
+                    const auto collection =
+                        acquireCollection(opCtx,
+                                          {nssOrUuid,
+                                           AcquisitionPrerequisites::kPretendUnsharded,
+                                           repl::ReadConcernArgs::get(opCtx),
+                                           AcquisitionPrerequisites::kWrite},
+                                          MODE_IX);
 
                     LOGV2_DEBUG(6777800,
                                 1,
                                 "Starting batch deletion",
-                                logAttrs(collection.getNss()),
+                                logAttrs(collection.nss()),
                                 "collectionUUID"_attr = collectionUuid,
                                 "range"_attr = redact(range.toString()),
                                 "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
                                 "delayBetweenBatches"_attr = delayBetweenBatches);
 
-                    numDeleted = uassertStatusOK(deleteNextBatch(opCtx,
-                                                                 collection.getCollection(),
-                                                                 keyPattern,
-                                                                 range,
-                                                                 numDocsToRemovePerBatch));
+                    numDeleted = uassertStatusOK(deleteNextBatch(
+                        opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
 
-                    return collection.getNss();
+                    return collection.nss();
                 } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                     // Throw specific error code that stops range deletions in case of errors
                     uasserted(

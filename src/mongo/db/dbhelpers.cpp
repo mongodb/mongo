@@ -351,14 +351,10 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     return kpBuilder.obj();
 }
 
-void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    OldClientContext context(opCtx, nss);
+void Helpers::emptyCollection(OperationContext* opCtx, const ScopedCollectionAcquisition& coll) {
+    OldClientContext context(opCtx, coll.nss());
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    CollectionPtr collection = CollectionPtr(
-        context.db() ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)
-                     : nullptr);
-
-    deleteObjects(opCtx, collection, nss, BSONObj(), false);
+    deleteObjects(opCtx, coll, BSONObj(), false);
 }
 
 bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
