@@ -38,4 +38,15 @@ repl::OpTime MovePrimarySharedData::getLastVisibleOpTime(WithLock) {
     return _lastVisibleOpTime;
 }
 
+std::string MovePrimarySharedData::resumePhaseToString(ResumePhase phase) {
+    switch (phase) {
+        case ResumePhase::kNone:
+            return "None";
+        case ResumePhase::kDataSync:
+            return "DataSync";
+        case ResumePhase::kOplogCatchup:
+            return "OplogCatchup";
+    }
+    MONGO_UNREACHABLE;
+}
 }  // namespace mongo

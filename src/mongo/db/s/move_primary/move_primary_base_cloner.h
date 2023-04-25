@@ -37,6 +37,25 @@ namespace mongo {
 
 class MovePrimaryBaseCloner : public repl::BaseCloner {
 public:
+    struct CollectionParams {
+        static CollectionParams parseCollectionParamsFromBSON(const BSONObj& entry);
+        CollectionParams();
+
+        CollectionParams(const NamespaceString& nss,
+                         const UUID id,
+                         const BSONObj& collBSONObj,
+                         bool isSharded = false)
+            : ns(nss), uuid(std::move(id)), collectionInfo(collBSONObj), shardedColl(isSharded) {}
+
+        CollectionParams(const NamespaceString& nss, const UUID& id, bool isSharded = false)
+            : CollectionParams(nss, id, BSONObj(), isSharded) {}
+
+        NamespaceString ns;
+        UUID uuid;
+        BSONObj collectionInfo;
+        bool shardedColl = false;
+    };
+
     MovePrimaryBaseCloner(StringData clonerName,
                           MovePrimarySharedData* sharedData,
                           const HostAndPort& source,
@@ -56,5 +75,10 @@ private:
      */
     virtual logv2::LogComponent getLogComponent() final;
 };
+
+inline bool operator<(const MovePrimaryBaseCloner::CollectionParams& left,
+                      const MovePrimaryBaseCloner::CollectionParams& right) {
+    return left.uuid < right.uuid;
+}
 
 }  // namespace mongo

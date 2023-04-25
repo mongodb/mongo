@@ -30,9 +30,13 @@
 #include "mongo/db/s/move_primary/move_primary_cloner_test_fixture.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/platform/basic.h"
 
 namespace mongo {
@@ -40,6 +44,9 @@ namespace mongo {
 void MovePrimaryClonerTestFixture::setUp() {
     ClonerTestFixture::setUp();
     serviceContext = getServiceContext();
+    auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
     _sharedData = std::make_unique<MovePrimarySharedData>(&_clock, _migrationId);
 
@@ -54,4 +61,11 @@ MovePrimarySharedData* MovePrimaryClonerTestFixture::getSharedData() {
     return checked_cast<MovePrimarySharedData*>(_sharedData.get());
 }
 
+Status MovePrimaryClonerTestFixture::createCollection(const NamespaceString& nss,
+                                                      const CollectionOptions& options) {
+    auto opCtx = cc().getOperationContext();
+    repl::createOplog(opCtx);
+    auto storage = repl::StorageInterface::get(serviceContext);
+    return storage->createCollection(opCtx, nss, options);
+}
 }  // namespace mongo

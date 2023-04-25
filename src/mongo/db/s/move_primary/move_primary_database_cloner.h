@@ -35,6 +35,7 @@
 #include "mongo/db/s/move_primary/move_primary_base_cloner.h"
 #include "mongo/db/s/move_primary/move_primary_collection_cloner.h"
 #include "mongo/db/s/move_primary/move_primary_shared_data.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 
@@ -52,14 +53,20 @@ public:
         long long approxTotalBytesCopied{0};
     };
 
-    MovePrimaryDatabaseCloner(const std::string& dbName,
+    MovePrimaryDatabaseCloner(const DatabaseName& dbName,
+                              const stdx::unordered_set<NamespaceString>& shardedColls,
+                              const Timestamp& startCloningOpTime,
                               MovePrimarySharedData* sharedData,
                               const HostAndPort& source,
                               DBClientConnection* client,
                               repl::StorageInterface* storageInterface,
-                              ThreadPool* dbPool);
+                              ThreadPool* dbPool,
+                              ShardingCatalogClient* catalogClient = nullptr);
 
     virtual ~MovePrimaryDatabaseCloner() = default;
+
+    std::string toString() const;
+
 
 protected:
     ClonerStages getStages() final;
@@ -83,13 +90,13 @@ private:
     /**
      * Stage function that retrieves collection information from the donor.
      */
-    AfterStageBehavior listCollectionsStage();
+    AfterStageBehavior listExistingCollectionsOnDonorStage();
 
     /**
      * Stage function that retrieves collection information locally for collections that are already
-     * cloned.
+     * present on the recipient or cloned as part of a previous Move Primary operation.
      */
-    AfterStageBehavior listExistingCollectionsStage();
+    AfterStageBehavior listExistingCollectionsOnRecipientStage();
 
     /**
      * The preStage sets the start time in _stats.
@@ -102,6 +109,20 @@ private:
      */
     void postStage() final;
 
+    void calculateListCatalogEntriesForDonor();
+
+    void calculateListCatalogEntriesForRecipient();
+
+    size_t getDonorCollectionSize_ForTest() const {
+        return _donorCollections.size();
+    }
+    size_t getRecipientCollectionSize_ForTest() const {
+        return _recipientCollections.size();
+    }
+    size_t getCollectionsToCloneSize_ForTest() const {
+        return _collectionsToClone.size();
+    }
+
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
@@ -111,12 +132,16 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
     // (MX) Write access with mutex from main flow of control, read access with mutex from other
     //      threads, read access allowed from main flow without mutex.
-    const std::string _dbName;  // (R)
-
-    MovePrimaryDatabaseClonerStage _listCollectionsStage;          // (R)
-    MovePrimaryDatabaseClonerStage _listExistingCollectionsStage;  // (R)
-
-    Stats _stats;  // (MX)
+    const DatabaseName _dbName;                                               // (R)
+    const stdx::unordered_set<NamespaceString> _shardedColls;                 // (R)
+    const Timestamp _startCloningOpTime;                                      // (R)
+    std::vector<CollectionParams> _donorCollections;                          // (X)
+    std::vector<CollectionParams> _recipientCollections;                      // (X)
+    std::list<CollectionParams> _collectionsToClone;                          // (X)
+    MovePrimaryDatabaseClonerStage _listExistingCollectionsOnDonorStage;      // (R)
+    MovePrimaryDatabaseClonerStage _listExistingCollectionsOnRecipientStage;  // (R)
+    Stats _stats;                                                             // (MX)
+    ServiceContext::UniqueOperationContext _opCtxHolder;                      // (X)
+    ShardingCatalogClient* _catalogClient;                                    // (X)
 };
-
 }  // namespace mongo

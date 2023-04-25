@@ -41,6 +41,7 @@ protected:
     void tearDown() override;
     ServiceContext* serviceContext{nullptr};
     MovePrimarySharedData* getSharedData();
+    Status createCollection(const NamespaceString& nss, const CollectionOptions& options);
     const Timestamp _operationTime = Timestamp(12345, 67);
     const UUID _migrationId = UUID::gen();
 };

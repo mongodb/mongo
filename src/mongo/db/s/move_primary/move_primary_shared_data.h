@@ -57,6 +57,8 @@ public:
         return _resumePhase;
     }
 
+    std::string resumePhaseToString(ResumePhase phase);
+
 private:
     // Must hold mutex (in base class) to access this.
     // Represents last visible majority committed donor opTime.

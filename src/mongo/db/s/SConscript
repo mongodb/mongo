@@ -23,23 +23,20 @@ env.Library(
         'move_primary/move_primary_database_cloner.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/aggregation',
         '$BUILD_DIR/mongo/db/repl/base_cloner',
         '$BUILD_DIR/mongo/db/repl/cloner_utils',
         '$BUILD_DIR/mongo/db/repl/task_runner',
         'move_primary_shared_data',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/base', '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
-        '$BUILD_DIR/mongo/db/shard_role_api',
-        '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/progress_meter',
+        '$BUILD_DIR/mongo/db/dbdirectclient', '$BUILD_DIR/mongo/db/ops/write_ops_exec',
+        '$BUILD_DIR/mongo/db/repl/oplog', '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
+        '$BUILD_DIR/mongo/db/shard_role'
     ],
 )
 
@@ -51,12 +48,15 @@ env.Library(
     LIBDEPS=[
         # Required for service context test fixture
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/repl/cloner_test_fixtures',
         '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'move_primary_shared_data',

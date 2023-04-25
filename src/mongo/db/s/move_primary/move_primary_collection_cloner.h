@@ -43,6 +43,9 @@ namespace mongo {
 class MovePrimaryCollectionCloner : public MovePrimaryBaseCloner {
 public:
     struct Stats {
+        static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
+        static constexpr StringData kDocumentsCopiedFieldName = "documentsCopied"_sd;
+
         std::string ns;
         Date_t start;
         Date_t end;
@@ -54,15 +57,22 @@ public:
         long long avgObjSize{0};
         long long approxTotalDataSize{0};
         long long approxTotalBytesCopied{0};
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
     };
 
-    MovePrimaryCollectionCloner(MovePrimarySharedData* sharedData,
+    MovePrimaryCollectionCloner(const CollectionParams& collectionParams,
+                                MovePrimarySharedData* sharedData,
                                 const HostAndPort& source,
                                 DBClientConnection* client,
                                 repl::StorageInterface* storageInterface,
                                 ThreadPool* dbPool);
 
     virtual ~MovePrimaryCollectionCloner() = default;
+
+    Stats getStats() const;
 
 protected:
     ClonerStages getStages() final;
@@ -133,6 +143,7 @@ private:
     // (S)  Self-synchronizing; access according to class's own rules.
     // (M)  Reads and writes guarded by _mutex (defined in base class).
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
+    const CollectionParams _collectionParams;                              // (R)
     MovePrimaryCollectionClonerStage _countStage;                          // (R)
     MovePrimaryCollectionClonerStage _checkIfDonorCollectionIsEmptyStage;  // (R)
     MovePrimaryCollectionClonerStage _listIndexesStage;                    // (R)

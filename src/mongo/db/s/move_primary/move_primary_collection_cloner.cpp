@@ -50,13 +50,15 @@
 
 namespace mongo {
 
-MovePrimaryCollectionCloner::MovePrimaryCollectionCloner(MovePrimarySharedData* sharedData,
+MovePrimaryCollectionCloner::MovePrimaryCollectionCloner(const CollectionParams& collectionParams,
+                                                         MovePrimarySharedData* sharedData,
                                                          const HostAndPort& source,
                                                          DBClientConnection* client,
                                                          repl::StorageInterface* storageInterface,
                                                          ThreadPool* dbPool)
     : MovePrimaryBaseCloner(
           "MovePrimaryCollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+      _collectionParams(collectionParams),
       _countStage("count", this, &MovePrimaryCollectionCloner::countStage),
       _checkIfDonorCollectionIsEmptyStage(
           "checkIfDonorCollectionIsEmpty",
@@ -104,5 +106,4 @@ repl::BaseCloner::AfterStageBehavior MovePrimaryCollectionCloner::createCollecti
 repl::BaseCloner::AfterStageBehavior MovePrimaryCollectionCloner::queryStage() {
     return kContinueNormally;
 }
-
 }  // namespace mongo

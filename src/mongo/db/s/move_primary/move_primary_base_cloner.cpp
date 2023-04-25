@@ -48,4 +48,11 @@ logv2::LogComponent MovePrimaryBaseCloner::getLogComponent() {
     return logv2::LogComponent::kMovePrimary;
 }
 
+MovePrimaryBaseCloner::CollectionParams
+MovePrimaryBaseCloner::CollectionParams::parseCollectionParamsFromBSON(const BSONObj& entry) {
+    auto collNs = NamespaceString(entry.getField("ns").valueStringData().toString());
+    auto collUUID = uassertStatusOK(UUID::parse(entry["md"]["options"]["uuid"]));
+    auto collInfo = entry["md"].Obj().getOwned();
+    return CollectionParams{collNs, collUUID, collInfo};
+}
 }  // namespace mongo

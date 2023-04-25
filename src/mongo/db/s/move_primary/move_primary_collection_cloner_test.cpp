@@ -60,7 +60,9 @@ protected:
 
     std::unique_ptr<MovePrimaryCollectionCloner> makeCollectionCloner(
         MovePrimarySharedData* sharedData = nullptr) {
-        return std::make_unique<MovePrimaryCollectionCloner>(sharedData ? sharedData
+        MovePrimaryBaseCloner::CollectionParams collectionParams{_nss, UUID::gen()};
+        return std::make_unique<MovePrimaryCollectionCloner>(collectionParams,
+                                                             sharedData ? sharedData
                                                                         : getSharedData(),
                                                              _source,
                                                              _mockClient.get(),
