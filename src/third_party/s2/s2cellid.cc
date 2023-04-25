@@ -560,9 +560,3 @@ string S2CellId::slowToString() const {
 ostream& operator<<(ostream& os, S2CellId const& id) {
   return os << id.ToString();
 }
-
-#ifdef OS_WINDOWS
-template<> size_t stdext::hash_value<S2CellId>(const S2CellId &id) {
-    return static_cast<size_t>(id.id() >> 32) + static_cast<size_t>(id.id());
-}
-#endif
