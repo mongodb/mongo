@@ -1449,6 +1449,10 @@ prepare_verify:
               head_upd->type == WT_UPDATE_STANDARD && F_ISSET(head_upd, WT_UPDATE_RESTORED_FROM_HS))
                 WT_ASSERT_ALWAYS(session, head_upd->next == NULL,
                   "Rolling back a prepared transaction resulted in an invalid update chain");
+
+            /* We have traversed all the non-obsolete updates. */
+            if (WT_UPDATE_DATA_VALUE(head_upd) && __wt_txn_upd_visible_all(session, head_upd))
+                break;
         }
     }
 
