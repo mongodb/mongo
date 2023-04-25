@@ -7248,7 +7248,7 @@ tasks:
       - "./src/evergreen/packages_publish.sh"
 
 - name: push
-  run_on: rhel80-small
+  run_on: rhel8.7-small
   tags: ["publish"]
   patchable: false
   depends_on:
