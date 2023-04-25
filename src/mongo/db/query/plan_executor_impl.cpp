@@ -104,11 +104,11 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutorImpl* exec,
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT: {
             return std::make_unique<AlwaysTimeOutYieldPolicy>(
-                exec->getOpCtx()->getServiceContext()->getFastClockSource());
+                exec->getOpCtx(), exec->getOpCtx()->getServiceContext()->getFastClockSource());
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED: {
             return std::make_unique<AlwaysPlanKilledYieldPolicy>(
-                exec->getOpCtx()->getServiceContext()->getFastClockSource());
+                exec->getOpCtx(), exec->getOpCtx()->getServiceContext()->getFastClockSource());
         }
         default:
             MONGO_UNREACHABLE;

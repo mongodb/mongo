@@ -172,14 +172,24 @@ public:
     }
 
     /**
+     * Returns the policy that this operation should use, accounting for any special circumstances,
+     * and otherwise the desired policy. Should always be used when constructing a PlanYieldPolicy.
+     */
+    static YieldPolicy getPolicyOverrideForOperation(OperationContext* opCtx, YieldPolicy desired);
+
+    /**
      * Constructs a PlanYieldPolicy of the given 'policy' type. This class uses an ElapsedTracker
      * to keep track of elapsed time, which is initialized from the parameters 'cs',
      * 'yieldIterations' and 'yieldPeriod'.
      *
      * If provided, the given 'yieldable' is released and restored by the 'PlanYieldPolicy' (in
-     * addition to releasing/restoring locks and the storage engine snapshot).
+     * addition to releasing/restoring locks and the storage engine snapshot). The provided 'policy'
+     * will be overridden depending on the nature of this operation. For example, multi-document
+     * transactions will always downgrade to INTERRUPT_ONLY, and operations with recursively held
+     * locks will downgrade to NO_YIELD.
      */
-    PlanYieldPolicy(YieldPolicy policy,
+    PlanYieldPolicy(OperationContext* opCtx,
+                    YieldPolicy policy,
                     ClockSource* cs,
                     int yieldIterations,
                     Milliseconds yieldPeriod,

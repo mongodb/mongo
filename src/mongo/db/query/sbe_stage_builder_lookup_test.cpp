@@ -150,8 +150,11 @@ public:
                       << std::endl;
         }
 
-        AutoGetCollection localColl(operationContext(), _nss, LockMode::MODE_IS);
-        AutoGetCollection foreignColl(operationContext(), _foreignNss, LockMode::MODE_IS);
+        AutoGetCollection localColl(
+            operationContext(),
+            _nss,
+            LockMode::MODE_IS,
+            AutoGetCollection::Options{}.secondaryNssOrUUIDs({_foreignNss}));
 
         MultipleCollectionAccessor colls(operationContext(),
                                          &localColl.getCollection(),

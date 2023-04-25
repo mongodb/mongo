@@ -168,7 +168,7 @@ public:
         return boost::none;
     }
 
-    bool saveLockStateAndUnlock(LockSnapshot* stateOut) override {
+    void saveLockStateAndUnlock(LockSnapshot* stateOut) override {
         MONGO_UNREACHABLE;
     }
 
@@ -176,7 +176,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override {
+    void releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override {
         MONGO_UNREACHABLE;
     }
 
@@ -248,6 +248,10 @@ public:
     }
 
     bool isGlobalLockedRecursively() override {
+        return false;
+    }
+
+    bool canSaveLockState() override {
         return false;
     }
 };

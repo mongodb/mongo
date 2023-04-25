@@ -39,8 +39,10 @@ namespace mongo {
  */
 class MockYieldPolicy : public PlanYieldPolicy {
 public:
-    MockYieldPolicy(ClockSource* clockSource, PlanYieldPolicy::YieldPolicy policy)
-        : PlanYieldPolicy(policy, clockSource, 0, Milliseconds{0}, nullptr, nullptr) {}
+    MockYieldPolicy(OperationContext* opCtx,
+                    ClockSource* clockSource,
+                    PlanYieldPolicy::YieldPolicy policy)
+        : PlanYieldPolicy(opCtx, policy, clockSource, 0, Milliseconds{0}, nullptr, nullptr) {}
 
 private:
     void saveState(OperationContext* opCtx) override final {
@@ -58,8 +60,8 @@ private:
  */
 class AlwaysTimeOutYieldPolicy final : public MockYieldPolicy {
 public:
-    AlwaysTimeOutYieldPolicy(ClockSource* cs)
-        : MockYieldPolicy(cs, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT) {}
+    AlwaysTimeOutYieldPolicy(OperationContext* opCtx, ClockSource* cs)
+        : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT) {}
 
     bool shouldYieldOrInterrupt(OperationContext*) override {
         return true;
@@ -76,8 +78,8 @@ public:
  */
 class AlwaysPlanKilledYieldPolicy final : public MockYieldPolicy {
 public:
-    AlwaysPlanKilledYieldPolicy(ClockSource* cs)
-        : MockYieldPolicy(cs, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED) {}
+    AlwaysPlanKilledYieldPolicy(OperationContext* opCtx, ClockSource* cs)
+        : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED) {}
 
     bool shouldYieldOrInterrupt(OperationContext*) override {
         return true;
@@ -94,8 +96,8 @@ public:
  */
 class NoopYieldPolicy final : public MockYieldPolicy {
 public:
-    NoopYieldPolicy(ClockSource* clockSource)
-        : MockYieldPolicy(clockSource, PlanYieldPolicy::YieldPolicy::NO_YIELD) {}
+    NoopYieldPolicy(OperationContext* opCtx, ClockSource* clockSource)
+        : MockYieldPolicy(opCtx, clockSource, PlanYieldPolicy::YieldPolicy::NO_YIELD) {}
 
     bool shouldYieldOrInterrupt(OperationContext*) override {
         return false;

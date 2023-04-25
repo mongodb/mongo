@@ -381,23 +381,29 @@ public:
     };
 
     /**
+     * Determines if this operation can safely release its locks for yielding. This must precede a
+     * call to saveLockStateAndUnlock() at the risk of failing any invariants.
+     *
+     * Returns false when no locks are held.
+     */
+    virtual bool canSaveLockState() = 0;
+
+    /**
      * Retrieves all locks held by this transaction, other than RESOURCE_MUTEX locks, and what mode
      * they're held in.
-     * Stores these locks in 'stateOut', destroying any previous state.  Unlocks all locks
-     * held by this transaction.  This functionality is used for yielding, which is
-     * voluntary/cooperative lock release and reacquisition in order to allow for interleaving
-     * of otherwise conflicting long-running operations.
+     *
+     * Unlocks all locks held by this transaction, and stores them in 'stateOut'. This functionality
+     * is used for yielding, which is voluntary/cooperative lock release and reacquisition in order
+     * to allow for interleaving of otherwise conflicting long-running operations. The LockSnapshot
+     * can then be passed to restoreLockState() after yielding to reacquire all released locks.
      *
      * This functionality is also used for releasing locks on databases and collections
      * when cursors are dormant and waiting for a getMore request.
      *
-     * Returns true if locks are released.  It is expected that restoreLockerImpl will be called
-     * in the future.
-     *
-     * Returns false if locks are not released.  restoreLockState(...) does not need to be
-     * called in this case.
+     * Callers are expected to check if locks are yieldable first by calling canSaveLockState(),
+     * otherwise this function will invariant.
      */
-    virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut) = 0;
+    virtual void saveLockStateAndUnlock(LockSnapshot* stateOut) = 0;
 
     /**
      * Re-locks all locks whose state was stored in 'stateToRestore'.
@@ -410,7 +416,7 @@ public:
      * WUOW has been released. restoreWriteUnitOfWorkAndLock reacquires the locks and resumes the
      * two-phase locking behavior of WUOW.
      */
-    virtual bool releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) = 0;
+    virtual void releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) = 0;
     virtual void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
                                                const LockSnapshot& stateToRestore) = 0;
 

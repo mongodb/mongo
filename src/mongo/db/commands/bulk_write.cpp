@@ -416,8 +416,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         }
         updateRequest.setMulti(op->getMulti());
 
-        updateRequest.setYieldPolicy(inTransaction ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                                   : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
         if (req.getStmtIds()) {
             updateRequest.setStmtIds(*req.getStmtIds());
@@ -525,9 +524,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         deleteRequest.setReturnDeleted(op->getReturn());
         deleteRequest.setIsExplain(false);
 
-        deleteRequest.setYieldPolicy(opCtx->inMultiDocumentTransaction()
-                                         ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                         : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        deleteRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
         if (opCtx->getTxnNumber() && req.getStmtId()) {
             deleteRequest.setStmtId(*req.getStmtId());
