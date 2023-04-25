@@ -267,7 +267,6 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                                    return true;
                                }
 
-                               // TODO SERVER-69592 Account for interior executor shutdown
                                invariant(commandStatus.code() ==
                                              ErrorCodes::RemoteCommandExecutionError,
                                          commandStatus.toString());
