@@ -131,6 +131,9 @@ const st = new ShardingTest({
     }
 });
 
+// Force samples to get persisted even though query sampling is not enabled.
+QuerySamplingUtil.skipActiveSamplingCheckWhenPersistingSamples(st);
+
 testRetryExecutedWrite(st.rs0);
 testRetryUnExecutedWrite(st.rs0);
 

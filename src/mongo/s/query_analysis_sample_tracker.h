@@ -145,6 +145,12 @@ public:
      */
     BSONObj reportForServerStatus() const;
 
+    /**
+     * Returns true if query sampling is active for the collection with the given namespace and
+     * collection UUID.
+     */
+    bool isSamplingActive(const NamespaceString& nss, const UUID& collUuid);
+
 private:
     std::shared_ptr<CollectionSampleTracker> _getOrCreateCollectionSampleTracker(
         WithLock,
