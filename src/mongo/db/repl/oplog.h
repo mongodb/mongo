@@ -147,6 +147,30 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
  */
 OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry);
 
+/**
+ * Low level oplog function used by logOp() and similar functions to append
+ * storage engine records to the oplog collection.
+ *
+ * This function has to be called within the scope of a WriteUnitOfWork with
+ * a valid CollectionPtr reference to the oplog.
+ *
+ * @param records a vector of oplog records to be written. Records hold references
+ * to unowned BSONObj data.
+ * @param timestamps a vector of respective Timestamp objects for each oplog record.
+ * @param oplogCollection collection to be written to.
+ * @param finalOpTime the OpTime of the last oplog record.
+ * @param wallTime the wall clock time of the last oplog record.
+ * @param isAbortIndexBuild for tenant migration use only.
+ */
+void logOplogRecords(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     std::vector<Record>* records,
+                     const std::vector<Timestamp>& timestamps,
+                     const CollectionPtr& oplogCollection,
+                     OpTime finalOpTime,
+                     Date_t wallTime,
+                     bool isAbortIndexBuild);
+
 // Flush out the cached pointer to the oplog.
 void clearLocalOplogPtr(ServiceContext* service);
 

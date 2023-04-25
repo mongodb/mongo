@@ -424,21 +424,14 @@ void writeToImageCollection(OperationContext* opCtx,
 */
 
 
-/*
- * records - a vector of oplog records to be written.
- * timestamps - a vector of respective Timestamp objects for each oplog record.
- * oplogCollection - collection to be written to.
- * finalOpTime - the OpTime of the last oplog record.
- * wallTime - the wall clock time of the last oplog record.
- */
-void _logOpsInner(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  std::vector<Record>* records,
-                  const std::vector<Timestamp>& timestamps,
-                  const CollectionPtr& oplogCollection,
-                  OpTime finalOpTime,
-                  Date_t wallTime,
-                  bool isAbortIndexBuild) {
+void logOplogRecords(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     std::vector<Record>* records,
+                     const std::vector<Timestamp>& timestamps,
+                     const CollectionPtr& oplogCollection,
+                     OpTime finalOpTime,
+                     Date_t wallTime,
+                     bool isAbortIndexBuild) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
@@ -580,14 +573,14 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     std::vector<Timestamp> timestamps{slot.getTimestamp()};
     const auto isAbortIndexBuild = oplogEntry->getOpType() == OpTypeEnum::kCommand &&
         parseCommandType(oplogEntry->getObject()) == OplogEntry::CommandType::kAbortIndexBuild;
-    _logOpsInner(opCtx,
-                 oplogEntry->getNss(),
-                 &records,
-                 timestamps,
-                 CollectionPtr(oplog),
-                 slot,
-                 wallClockTime,
-                 isAbortIndexBuild);
+    logOplogRecords(opCtx,
+                    oplogEntry->getNss(),
+                    &records,
+                    timestamps,
+                    CollectionPtr(oplog),
+                    slot,
+                    wallClockTime,
+                    isAbortIndexBuild);
     wuow.commit();
     return slot;
 }
@@ -696,17 +689,15 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     invariant(!opTimes.empty());
     auto lastOpTime = opTimes.back();
     invariant(!lastOpTime.isNull());
-    const Collection* oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntryTemplate->getWallClockTime();
-    const bool isAbortIndexBuild = false;
-    _logOpsInner(opCtx,
-                 nss,
-                 &records,
-                 timestamps,
-                 CollectionPtr(oplog),
-                 lastOpTime,
-                 wallClockTime,
-                 isAbortIndexBuild);
+    logOplogRecords(opCtx,
+                    nss,
+                    &records,
+                    timestamps,
+                    oplogWrite.getCollection(),
+                    lastOpTime,
+                    wallClockTime,
+                    /*isAbortIndexBuild=*/false);
     wuow.commit();
     return opTimes;
 }
