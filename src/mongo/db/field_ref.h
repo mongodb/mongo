@@ -158,6 +158,12 @@ public:
     bool isNumericPathComponentStrict(FieldIndex i) const;
 
     /**
+     * Similar to isNumericPathComponentStrict, but returns true for 0-prefixed indices, such as
+     * "00" and "01".
+     */
+    bool isNumericPathComponentLenient(FieldIndex i) const;
+
+    /**
      * Returns true if this FieldRef has any numeric path components.
      */
     bool hasNumericPathComponents() const;
