@@ -226,6 +226,18 @@ Status ReplIndexBuildState::tryStart(OperationContext* opCtx) {
     return interruptCheck;
 }
 
+void ReplIndexBuildState::setVotedForCommitReadiness(OperationContext* opCtx) {
+    stdx::lock_guard lk(_mutex);
+    invariant(!_votedForCommitReadiness);
+    opCtx->checkForInterrupt();
+    _votedForCommitReadiness = true;
+}
+
+bool ReplIndexBuildState::canVoteForAbort() const {
+    stdx::lock_guard lk(_mutex);
+    return !_votedForCommitReadiness;
+}
+
 void ReplIndexBuildState::commit(OperationContext* opCtx) {
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
     opCtx->recoveryUnit()->onCommit(
@@ -517,9 +529,14 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
     stdx::lock_guard lk(_mutex);
     if (_indexBuildState.isSettingUp() || _indexBuildState.isAborted() ||
         _indexBuildState.isCommitted() || _indexBuildState.isAwaitingPrimaryAbort() ||
-        _indexBuildState.isApplyingCommitOplogEntry()) {
+        _indexBuildState.isApplyingCommitOplogEntry() || _votedForCommitReadiness) {
         // If the build is setting up, it is not yet abortable. If the index build has already
         // passed a point of no return, interrupting will not be productive.
+        LOGV2(7617000,
+              "Index build: cannot force abort",
+              "buildUUID"_attr = buildUUID,
+              "state"_attr = _indexBuildState,
+              "votedForCommit"_attr = _votedForCommitReadiness);
         return false;
     }
 

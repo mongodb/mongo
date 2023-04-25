@@ -1,6 +1,5 @@
 /**
- * Ensures that index builds can safely be aborted, for instance by the DiskSpaceMonitor, while a
- * voteCommitIndexBuild is in progress.
+ * Ensures that index builds cannot be aborted after voting for commit.
  *
  * @tags: [
  *   requires_fcv_71,
@@ -45,7 +44,7 @@ const secondaryColl = secondaryDB.getCollection(collName);
 // effectively pausing the index build on the secondary too as it will wait for the primary to
 // commit or abort.
 IndexBuildTest.pauseIndexBuilds(primary);
-const hangVoteCommit = configureFailPoint(primary, 'hangBeforeVoteCommitIndexBuild');
+const hangBeforeVoteCommit = configureFailPoint(primary, 'hangBeforeVoteCommitIndexBuild');
 
 const tookActionCountBefore = secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction;
 
@@ -55,7 +54,7 @@ const createIdx = IndexBuildTest.startIndexBuild(
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), 'a_1');
 
 // Wait until secondary is voting for commit.
-hangVoteCommit.wait();
+hangBeforeVoteCommit.wait();
 
 // Default indexBuildMinAvailableDiskSpaceMB is 500 MB.
 // Simulate a remaining disk space of 450MB on the secondary node.
@@ -68,20 +67,20 @@ assert.soon(() => {
 });
 IndexBuildTest.resumeIndexBuilds(primary);
 
-jsTestLog("Waiting for the index build to be killed");
-// "Index build: joined after abort".
-checkLog.containsJson(secondary, 20655);
+jsTestLog("Waiting for the index build kill attempt to fail");
+// "Index build: cannot force abort".
+checkLog.containsJson(secondary, 7617000);
+hangBeforeVoteCommit.off();
 
 jsTestLog("Waiting for threads to join");
 createIdx();
 simulateDiskSpaceFp.off();
 
 assert.eq(0, primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
-assert.eq(1, secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
+assert.eq(0, secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
 
-rst.awaitReplication();
-IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexesSoon(primaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ['_id_', 'a_1']);
 
 rst.stopSet();
 })();

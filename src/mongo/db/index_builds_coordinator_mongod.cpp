@@ -798,6 +798,14 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
           logAttrs(replState->dbName),
           "collectionUUID"_attr = replState->collectionUUID);
 
+    // Indicate that the index build in this node has already tried to vote for commit readiness.
+    // We do not try to determine whether the vote has actually succeeded or not, as it is
+    // challenging due to the asynchronous request and potential concurrent interrupts. After this
+    // point, the node cannot vote to abort this index build, and if it needs to abort the index
+    // build it must try to do so independently. Meaning, as a primary it will succeed, but as a
+    // secondary it will fassert.
+    replState->setVotedForCommitReadiness(opCtx);
+
     const auto generateCmd = [](const UUID& uuid, const std::string& address) {
         return BSON("voteCommitIndexBuild" << uuid << "hostAndPort" << address << "writeConcern"
                                            << BSON("w"

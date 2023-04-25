@@ -2656,9 +2656,13 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
         opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
             // The index builder thread will need to reach out to the current primary to abort on
             // its own. This can happen if an error is thrown, it is interrupted by a user killop,
-            // or is killed internally by something like the DiskSpaceMonitor.
+            // or is killed internally by something like the DiskSpaceMonitor. Voting for abort is
+            // only allowed if the node did not previously attempt to vote for commit.
+
+            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
             if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility) &&
+                replState->canVoteForAbort()) {
                 // If we were interrupted by a caller internally who set a status, use that
                 // status instead of the generic interruption error status.
                 auto abortStatus =
@@ -2679,9 +2683,10 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(
                     abortCtx->lockState());
 
-                // Take RSTL (implicitly by DBLock) to observe and prevent replication state
-                // from changing.
-                Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
+                // Take RSTL to observe and prevent replication state from changing. This is done
+                // with the release/reacquire strategy to avoid deadlock with prepared txns.
+                auto [dbLock, collLock, rstl] = std::move(
+                    _acquireExclusiveLockWithRSTLRetry(abortCtx, replState.get()).getValue());
 
                 const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
                 auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
@@ -2703,7 +2708,6 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                     }
                 }
 
-                CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
                 AutoGetCollection indexBuildEntryColl(
                     abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
                 _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
