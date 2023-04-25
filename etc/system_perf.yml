@@ -3165,6 +3165,14 @@ buildvariants:
     - name: compound_wildcard_index_write_commands
     - name: compound_wildcard_index_read_commands
 
+# Variant: Microbenchmarks with Telemetry
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-arm-telemetry.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory.2023-01 (Telemetry)
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-telemetry
+
   - &linux-microbenchmarks-repl-arm
     name: linux-microbenchmarks-repl-arm.2023-01
     display_name: MicroBenchmarks Arm 1-Node ReplSet inMemory.2023-01
