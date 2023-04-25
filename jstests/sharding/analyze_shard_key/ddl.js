@@ -9,7 +9,9 @@
 
 load("jstests/libs/config_shard_util.js");
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/parallelTester.js");  // For Thread.
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
 
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
@@ -57,7 +59,7 @@ const configureQueryAnalyzerTestCases = [
     {operationType: "makeEmpty", expectedErrCodes: [ErrorCodes.IllegalOperation]}
 ];
 
-function setUpTestMode(conn, dbName, collName, operationType) {
+function setUpTestCase(conn, dbName, collName, operationType) {
     const testDB = conn.getDB(dbName);
     const testColl = testDB.getCollection(collName);
     switch (operationType) {
@@ -90,7 +92,9 @@ function runAnalyzeShardKeyTest(conn, testCase, fpConn, fpName) {
     assert.commandWorked(conn.getCollection(ns).insert(docs));
 
     const runCmdFunc = (host, ns) => {
+        load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
         const conn = new Mongo(host);
+        sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
         return conn.adminCommand({analyzeShardKey: ns, key: {_id: 1}});
     };
 
@@ -100,32 +104,52 @@ function runAnalyzeShardKeyTest(conn, testCase, fpConn, fpName) {
         fp = configureFailPoint(fpConn, fpName);
     }
     runCmdThread.start();
-    sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
-    setUpTestMode(conn, dbName, collName, testCase.operationType);
+    setUpTestCase(conn, dbName, collName, testCase.operationType);
     if (fp) {
         fp.off();
     }
     assert.commandWorkedOrFailedWithCode(runCmdThread.returnData(), testCase.expectedErrCodes);
 }
 
-function runConfigureQueryAnalyzerTest(conn, testCase) {
+function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
     const validationTest = ValidationTest(conn);
 
     const dbName = validationTest.dbName;
     const collName = validationTest.collName;
     const ns = dbName + "." + collName;
+
     jsTest.log(`Testing configureQueryAnalyzer command ${tojson({testCase, dbName, collName})}`);
 
     const runCmdFunc = (host, ns, mode, sampleRate) => {
+        load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
         const conn = new Mongo(host);
+        sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
         return conn.adminCommand({configureQueryAnalyzer: ns, mode, sampleRate});
     };
 
     let runCmdThread = new Thread(runCmdFunc, conn.host, ns, "full" /* mode */, 1 /* sampleRate */);
     runCmdThread.start();
-    sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
-    setUpTestMode(conn, dbName, collName, testCase.operationType);
-    assert.commandWorkedOrFailedWithCode(runCmdThread.returnData(), testCase.expectedErrCodes);
+    setUpTestCase(conn, dbName, collName, testCase.operationType);
+    const res =
+        assert.commandWorkedOrFailedWithCode(runCmdThread.returnData(), testCase.expectedErrCodes);
+
+    if (testCase.operationType == "recreate") {
+        const configDoc = conn.getCollection("config.queryAnalyzers").findOne({_id: ns});
+        if (configDoc) {
+            // The configureQueryAnalyzer command is serialized with DDL commands. In addition, on a
+            // sharded cluster, dropping a collection causes its config.queryAnalyzers document to
+            // get deleted. So if there is config.queryAnalyzers document for this collection after
+            // it is dropped and recreated, the configureQueryAnalyzer command must have run after
+            // the collection has been recreated so it must have the new collection uuid.
+            assert(res.ok, res);
+            const collUuid = QuerySamplingUtil.getCollectionUuid(conn.getDB(dbName), collName);
+            if (bsonWoCompare(configDoc.collUuid, collUuid) != 0) {
+                // (SERVER-76443): Make sure that dropCollection on replica set delete the
+                // config.queryAnalyzers doc for the collection being dropped.
+                assert(rst);
+            }
+        }
+    }
 
     // Verify that running the configureQueryAnalyzer command after the DDL operation does not
     // lead to a crash.
@@ -178,7 +202,7 @@ function runConfigureQueryAnalyzerTest(conn, testCase) {
         }
     }
     for (let testCase of configureQueryAnalyzerTestCases) {
-        runConfigureQueryAnalyzerTest(primary, testCase);
+        runConfigureQueryAnalyzerTest(primary, testCase, {rst});
     }
 
     rst.stopSet();

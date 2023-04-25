@@ -61,8 +61,7 @@ Status validateNamespace(const NamespaceString& nss);
  * that occurs during the validation. If the validation passed, returns an OK status and the
  * collection UUID for the collection when the validation occurred.
  */
-StatusWith<UUID> validateCollectionOptionsLocally(OperationContext* opCtx,
-                                                  const NamespaceString& nss);
+StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss);
 
 /*
  * If the shard key is invalid, returns a BadValue error. Otherwise, returns an OK status. This

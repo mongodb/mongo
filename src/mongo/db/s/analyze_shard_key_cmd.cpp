@@ -80,7 +80,7 @@ public:
             const auto& nss = ns();
             const auto& key = request().getKey();
             uassertStatusOK(validateNamespace(nss));
-            const auto collUuid = uassertStatusOK(validateCollectionOptionsLocally(opCtx, nss));
+            const auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
             LOGV2(6875001, "Start analyzing shard key", logAttrs(nss), "shardKey"_attr = key);
 
