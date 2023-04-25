@@ -1318,8 +1318,9 @@ buildvariants:
   - name: fle2_sharding_high_cardinality
   - name: fle2_sharding
   - name: jstestfuzz_sharded_causal_consistency_gen
-  - name: jstestfuzz_sharded_session_gen
+  - name: jstestfuzz_sharded_continuous_stepdown_gen
   - name: jstestfuzz_sharded_gen
+  - name: jstestfuzz_sharded_session_gen
   - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
   - name: sharding_auth_gen
@@ -1331,11 +1332,12 @@ buildvariants:
   # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
   - name: .sharding .common !.csrs !.multiversion
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  # - name: .concurrency .sharded !.large
-  # - name: .concurrency .sharded .large
-    # distros:
-    # - rhel80-medium
-  # - name: .multi_shard
+  - name: .concurrency .sharded !.large
+  - name: .concurrency .sharded .large
+    distros:
+    - rhel80-medium
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
