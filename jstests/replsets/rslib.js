@@ -26,6 +26,7 @@ var disconnectSecondaries;
 var reconnectSecondaries;
 var createRstArgs;
 var createRst;
+var waitAllNodesHaveConfig;
 
 (function() {
 "use strict";
@@ -882,5 +883,17 @@ createRst = function(rstArgs, retryOnRetryableErrors) {
             throw e;
         }
     }
+};
+
+/**
+ * Wait until all the nodes in a replica set have the same config as the input config.
+ */
+waitAllNodesHaveConfig = function(replSet, config) {
+    replSet.nodes.forEach(function(node) {
+        assert.soon(function() {
+            const nodeConfig = replSet.getReplSetConfigFromNode(node.nodeId);
+            return isSameConfigContent(config, nodeConfig);
+        });
+    });
 };
 }());

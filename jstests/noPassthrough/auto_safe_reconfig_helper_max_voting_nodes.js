@@ -11,15 +11,6 @@
 
 load("jstests/replsets/rslib.js");
 
-function waitAllNodesHaveConfig(replTest, config) {
-    replTest.nodes.forEach(function(node) {
-        assert.soon(function() {
-            const nodeConfig = replTest.getReplSetConfigFromNode(node.nodeId);
-            return isSameConfigContent(config, nodeConfig);
-        });
-    });
-}
-
 // Make secondaries unelectable. Add 7 voting nodes, which is the maximum allowed.
 const replTest = new ReplSetTest({
     nodes: [

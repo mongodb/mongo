@@ -185,5 +185,8 @@ assertSameConfigContent(replTest.getReplSetConfigFromNode(), config);
 
 // Restore the original config before shutting down.
 reconfig(replTest, origConfig);
+// There is a chance that some nodes haven't finished reconfig, if we directly call stopSet, those
+// nodes may fail to answer certain commands and fail the test.
+waitAllNodesHaveConfig(replTest, config);
 replTest.stopSet();
 })();
