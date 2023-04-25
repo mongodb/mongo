@@ -28,7 +28,7 @@
 
 # Compare WT data files in two different home directories.
 
-import os, sys
+import sys
 from wt_tools_common import wiredtiger_open
 from wiredtiger import WT_NOTFOUND, wiredtiger_strerror
 
@@ -214,7 +214,7 @@ def compare_cursors(cc1, cc2, version):
             ver_ecode = compare_version_cursors(vcc1, vcc2)
             vcur1.close()
             vcur2.close()
-            if ver_code != 0:
+            if ver_ecode != 0:
                 ecode = 1
         verbose('{}: next'.format(cc1.name))
 
