@@ -34,6 +34,11 @@
 #include "mongo/db/op_observer/op_observer.h"
 
 namespace mongo::repl {
+
+// Common fail points for logOp() and logInsertOps().
+extern FailPoint addDestinedRecipient;
+extern FailPoint sleepBetweenInsertOpTimeGenerationAndLogOp;
+
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,
                           boost::optional<IndexCollModInfo> indexInfo);

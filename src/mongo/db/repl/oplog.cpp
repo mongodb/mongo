@@ -129,9 +129,6 @@ namespace {
 
 using namespace fmt::literals;
 
-MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
-MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
-
 // Failpoint to block after a write and its oplog entry have been written to the storage engine and
 // are visible, but before we have advanced 'lastApplied' for the write.
 MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);

@@ -32,11 +32,15 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo::repl {
 
 const OperationContext::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
     OperationContext::declareDecoration<boost::optional<DocumentKey>>();
+
+MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
+MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
 /**
  * Given a raw collMod command object and associated collection metadata, create and return the
