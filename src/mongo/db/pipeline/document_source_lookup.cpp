@@ -1124,7 +1124,19 @@ DepsTracker::State DocumentSourceLookUp::getDependencies(DepsTracker* deps) cons
     }
 
     if (hasLocalFieldForeignFieldJoin()) {
-        deps->fields.insert(_localField->fullPath());
+        const FieldRef ref(_localField->fullPath());
+        // We need everything up until the first numeric component. Otherwise, a projection could
+        // treat the numeric component as a field name rather than an index into an array.
+        size_t firstNumericIx;
+        for (firstNumericIx = 0; firstNumericIx < ref.numParts(); firstNumericIx++) {
+            // We are lenient with the component, because classic $lookup treats 0-prefixed numeric
+            // fields like "00" as both an index and a field name. Allowing it in a dependency would
+            // restrict the usage to only a field name.
+            if (ref.isNumericPathComponentLenient(firstNumericIx)) {
+                break;
+            }
+        }
+        deps->fields.insert(ref.dottedSubstring(0, firstNumericIx).toString());
     }
 
     // Purposely ignore '_matchSrc' and '_unwindSrc', since those should only be absorbed if we know

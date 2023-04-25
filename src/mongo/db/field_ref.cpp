@@ -258,6 +258,10 @@ bool FieldRef::isNumericPathComponentStrict(FieldIndex i) const {
     return FieldRef::isNumericPathComponentStrict(getPart(i));
 }
 
+bool FieldRef::isNumericPathComponentLenient(FieldIndex i) const {
+    return FieldRef::isNumericPathComponentLenient(getPart(i));
+}
+
 bool FieldRef::hasNumericPathComponents() const {
     for (size_t i = 0; i < numParts(); ++i) {
         if (isNumericPathComponentStrict(i))
