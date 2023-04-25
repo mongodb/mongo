@@ -106,7 +106,8 @@ class ContinuousInitialSync(interface.Hook):
             for shard_fixture in fixture.shards:
                 self._add_fixture(shard_fixture)
 
-            self._add_fixture(fixture.configsvr)
+            if fixture.config_shard is None:
+                self._add_fixture(fixture.configsvr)
 
             for mongos_fixture in fixture.mongos:
                 self._mongos_fixtures.append(mongos_fixture)

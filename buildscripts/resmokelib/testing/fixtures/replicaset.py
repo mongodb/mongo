@@ -47,7 +47,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                  replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
                  use_replica_set_connection_string=None, linear_chain=False,
                  default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
-                 replicaset_logging_prefix=None, replset_name=None):
+                 replicaset_logging_prefix=None, replset_name=None, config_shard=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -110,6 +110,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             self.replset_name = self.mongod_options.setdefault("replSet", "rs")
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
+        self.config_shard = config_shard
 
     def setup(self):
         """Set up the replica set."""

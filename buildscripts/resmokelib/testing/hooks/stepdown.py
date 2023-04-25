@@ -128,8 +128,9 @@ class ContinuousStepdown(interface.Hook):
         elif isinstance(fixture, shardedcluster.ShardedClusterFixture):
             if self._shard_stepdown:
                 for shard_fixture in fixture.shards:
-                    self._add_fixture(shard_fixture)
-            if self._config_stepdown:
+                    if shard_fixture.config_shard is None or self._config_stepdown:
+                        self._add_fixture(shard_fixture)
+            if self._config_stepdown and fixture.config_shard is None:
                 self._add_fixture(fixture.configsvr)
             for mongos_fixture in fixture.mongos:
                 self._mongos_fixtures.append(mongos_fixture)
