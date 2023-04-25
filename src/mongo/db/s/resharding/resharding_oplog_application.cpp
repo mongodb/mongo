@@ -68,10 +68,6 @@ void runWithTransaction(OperationContext* opCtx,
                         unique_function<void(OperationContext*)> func) {
     AlternativeSessionRegion asr(opCtx);
     auto* const client = asr.opCtx()->getClient();
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationKillableByStepdown(lk);
-    }
     asr.opCtx()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     AuthorizationSession::get(client)->grantInternalAuthorization(client);

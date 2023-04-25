@@ -66,7 +66,9 @@ Status GRPCTransportLayer::start() try {
         [pool = _channelPool](Client*) {
             pool->dropIdleChannels(GRPCTransportLayer::kDefaultChannelTimeout);
         },
-        kDefaultChannelTimeout);
+        kDefaultChannelTimeout,
+        // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
+        false /*isKillableByStepdown*/);
     invariant(!_idleChannelPruner);
     _idleChannelPruner.emplace(_svcCtx->getPeriodicRunner()->makeJob(std::move(prunerJob)));
     _idleChannelPruner->start();

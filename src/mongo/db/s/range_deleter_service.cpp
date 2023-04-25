@@ -133,11 +133,6 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_completedRangeDeletion(
 void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
     Client::initThread(kRangeDeletionThreadName);
     {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationKillableByStepdown(lk);
-    }
-
-    {
         stdx::lock_guard<Latch> lock(_mutex);
         if (_state != kRunning) {
             return;

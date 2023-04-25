@@ -220,12 +220,6 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 
         try {
             auto newClient = opCtx->getServiceContext()->makeClient(newClientName);
-
-            {
-                stdx::lock_guard<Client> lk(*newClient.get());
-                newClient->setSystemOperationKillableByStepdown(lk);
-            }
-
             auto newOpCtx = newClient->makeOperationContext();
             AlternativeClientRegion altClient(newClient);
 
@@ -450,10 +444,6 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                                   const RangeDeletionTask& deletionTask) {
     return AsyncTry([=]() mutable {
                ThreadClient tc(kRangeDeletionThreadName, serviceContext);
-               {
-                   stdx::lock_guard<Client> lk(*tc.get());
-                   tc->setSystemOperationKillableByStepdown(lk);
-               }
                auto uniqueOpCtx = tc->makeOperationContext();
                auto opCtx = uniqueOpCtx.get();
                opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -524,10 +514,6 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
     return ExecutorFuture<void>(executor)
         .then([=] {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillableByStepdown(lk);
-            }
 
             uassert(
                 ErrorCodes::ResumableRangeDeleterDisabled,
@@ -540,10 +526,6 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                        return cleanUpRange(serviceContext, executor, deletionTask)
                            .onError<ErrorCodes::KeyPatternShorterThanBound>([=](Status status) {
                                ThreadClient tc(kRangeDeletionThreadName, serviceContext);
-                               {
-                                   stdx::lock_guard<Client> lk(*tc.get());
-                                   tc->setSystemOperationKillableByStepdown(lk);
-                               }
                                auto uniqueOpCtx = tc->makeOperationContext();
                                uniqueOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
@@ -565,10 +547,6 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
         })
         .onError([=](const Status status) {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillableByStepdown(lk);
-            }
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
@@ -608,10 +586,6 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
     ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext))
         .then([serviceContext] {
             ThreadClient tc("ResubmitRangeDeletions", serviceContext);
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillableByStepdown(lk);
-            }
 
             auto opCtx = tc->makeOperationContext();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -644,10 +618,6 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
         })
         .then([serviceContext] {
             ThreadClient tc("ResubmitRangeDeletions", serviceContext);
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillableByStepdown(lk);
-            }
 
             auto opCtx = tc->makeOperationContext();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -1179,10 +1149,6 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
 
     return ExecutorFuture<void>(executor).then([=] {
         ThreadClient tc("releaseRecipientCritSec", serviceContext);
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc->setSystemOperationKillableByStepdown(lk);
-        }
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
@@ -1320,10 +1286,6 @@ void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
     ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, nss] {
             ThreadClient tc{"MigrationRecovery", svcCtx};
-            {
-                stdx::lock_guard<Client> lk{*tc.get()};
-                tc->setSystemOperationKillableByStepdown(lk);
-            }
             auto uniqueOpCtx{tc->makeOperationContext()};
             auto opCtx{uniqueOpCtx.get()};
 

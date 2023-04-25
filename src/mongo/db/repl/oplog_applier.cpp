@@ -171,9 +171,9 @@ std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount,
         auto client = Client::getCurrent();
         AuthorizationSession::get(*client)->grantInternalAuthorization(client);
 
-        if (isKillableByStepdown) {
+        if (!isKillableByStepdown) {
             stdx::lock_guard<Client> lk(*client);
-            client->setSystemOperationKillableByStepdown(lk);
+            client->setSystemOperationUnkillableByStepdown(lk);
         }
     };
     auto pool = std::make_unique<ThreadPool>(options);

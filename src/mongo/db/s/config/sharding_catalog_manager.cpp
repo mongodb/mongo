@@ -148,10 +148,6 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
     // commit should not have a lock timeout.
     auto newClient = getGlobalServiceContext()->makeClient("ShardingCatalogManager");
-    {
-        stdx::lock_guard<Client> lk(*newClient);
-        newClient->setSystemOperationKillableByStepdown(lk);
-    }
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -957,6 +953,11 @@ Status ShardingCatalogManager::_notifyClusterOnNewDatabases(
         // Setup an AlternativeClientRegion and a non-interruptible Operation Context to ensure that
         // the notification may be also sent out while the node is stepping down.
         auto altClient = opCtx->getServiceContext()->makeClient("_notifyClusterOnNewDatabases");
+        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        {
+            mongo::stdx::lock_guard<mongo::Client> lk(*altClient.get());
+            altClient.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
         AlternativeClientRegion acr(altClient);
         auto altOpCtxHolder = cc().makeOperationContext();
         auto altOpCtx = altOpCtxHolder.get();
@@ -1152,10 +1153,6 @@ void ShardingCatalogManager::withTransaction(
 
     AlternativeSessionRegion asr(opCtx);
     auto* const client = asr.opCtx()->getClient();
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationKillableByStepdown(lk);
-    }
     asr.opCtx()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     AuthorizationSession::get(client)->grantInternalAuthorization(client);
     TxnNumber txnNumber = 0;
@@ -1289,6 +1286,11 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
     // internal client credentials).
     {
         auto altClient = opCtx->getServiceContext()->makeClient("initializePlacementHistory");
+        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*altClient.get());
+            altClient.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
         AuthorizationSession::get(altClient.get())->grantInternalAuthorization(altClient.get());
         AlternativeClientRegion acr(altClient);
         auto executor =

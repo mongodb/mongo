@@ -77,12 +77,6 @@ void GlobalIndexInserter::processDoc(OperationContext* opCtx,
                           const auto& skipIdDocResults) {
                     auto client = service->makeClient("globalIndexInserter");
                     auto opCtx = service->makeOperationContext(client.get());
-
-                    {
-                        stdx::lock_guard<Client> lk(*client);
-                        client->setSystemOperationKillableByStepdown(lk);
-                    }
-
                     globalIndexInserterPauseAfterReadingSkipCollection.pauseWhileSet(opCtx.get());
 
                     if (!skipIdDocResults.empty()) {

@@ -113,6 +113,11 @@ void OplogCapMaintainerThread::run() {
     LOGV2_DEBUG(5295000, 1, "Oplog cap maintainer thread started", "threadName"_attr = _name);
     ThreadClient tc(_name, getGlobalServiceContext());
 
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     while (!globalInShutdownDeprecated()) {
         if (MONGO_unlikely(hangOplogCapMaintainerThread.shouldFail())) {
             LOGV2(5095500, "Hanging the oplog cap maintainer thread due to fail point");

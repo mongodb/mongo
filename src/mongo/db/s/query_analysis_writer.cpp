@@ -290,7 +290,9 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             auto opCtx = client->makeOperationContext();
             _flushQueries(opCtx.get());
         },
-        Seconds(gQueryAnalysisWriterIntervalSecs));
+        Seconds(gQueryAnalysisWriterIntervalSecs),
+        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
+        false /*isKillableByStepdown*/);
     _periodicQueryWriter = periodicRunner->makeJob(std::move(queryWriterJob));
     _periodicQueryWriter.start();
 
@@ -303,7 +305,9 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             auto opCtx = client->makeOperationContext();
             _flushDiffs(opCtx.get());
         },
-        Seconds(gQueryAnalysisWriterIntervalSecs));
+        Seconds(gQueryAnalysisWriterIntervalSecs),
+        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
+        false /*isKillableByStepdown*/);
     _periodicDiffWriter = periodicRunner->makeJob(std::move(diffWriterJob));
     _periodicDiffWriter.start();
 
@@ -314,6 +318,10 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
     threadPoolOptions.poolName = "QueryAnalysisWriterThreadPool";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
+
+        // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationUnkillableByStepdown(lk);
     };
     _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),

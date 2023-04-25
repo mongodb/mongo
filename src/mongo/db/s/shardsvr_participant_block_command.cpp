@@ -128,10 +128,6 @@ public:
             if (txnParticipant) {
                 auto newClient =
                     getGlobalServiceContext()->makeClient("ShardSvrParticipantBlockCmdClient");
-                {
-                    stdx::lock_guard<Client> lk(*newClient);
-                    newClient->setSystemOperationKillableByStepdown(lk);
-                }
                 AlternativeClientRegion acr(newClient);
                 auto cancelableOperationContext = CancelableOperationContext(
                     cc().makeOperationContext(),

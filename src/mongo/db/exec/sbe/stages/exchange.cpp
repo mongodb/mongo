@@ -46,6 +46,12 @@ MONGO_INITIALIZER(s_globalThreadPool)(InitializerContext* context) {
     options.maxThreads = 128;
     options.onCreateThread = [](const std::string& name) {
         Client::initThread(name);
+
+        // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(cc());
+            cc().setSystemOperationUnkillableByStepdown(lk);
+        }
     };
     s_globalThreadPool = std::make_unique<ThreadPool>(options);
     s_globalThreadPool->startup();

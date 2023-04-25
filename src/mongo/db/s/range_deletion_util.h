@@ -130,10 +130,6 @@ auto withTemporaryOperationContext(Callable&& callable,
                                    const UUID& collectionUUID,
                                    bool writeToRangeDeletionNamespace = false) {
     ThreadClient tc(kRangeDeletionThreadName, getGlobalServiceContext());
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc->setSystemOperationKillableByStepdown(lk);
-    }
     auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
 

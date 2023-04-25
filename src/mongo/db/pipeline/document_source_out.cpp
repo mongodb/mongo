@@ -71,6 +71,13 @@ DocumentSourceOut::~DocumentSourceOut() {
         if (_tempNs.size() || (_timeseries && !_timeseriesViewCreated)) {
             auto cleanupClient =
                 pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
+
+            // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+            {
+                stdx::lock_guard<Client> lk(*cleanupClient.get());
+                cleanupClient.get()->setSystemOperationUnkillableByStepdown(lk);
+            }
+
             AlternativeClientRegion acr(cleanupClient);
             // Create a new operation context so that any interrupts on the current operation will
             // not affect the dropCollection operation below.

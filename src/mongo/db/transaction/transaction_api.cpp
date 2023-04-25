@@ -417,9 +417,6 @@ void primeInternalClient(Client* client) {
     if (as) {
         as->grantInternalAuthorization(client);
     }
-
-    stdx::lock_guard<Client> lk(*client);
-    client->setSystemOperationKillableByStepdown(lk);
 }
 
 Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(

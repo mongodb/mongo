@@ -192,6 +192,13 @@ void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
 void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
     // Create a new opCtx because we need an empty locker to refresh the locks.
     auto newClient = opCtx->getServiceContext()->makeClient("prepared-txns-yield-locks");
+
+    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*newClient.get());
+        newClient.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
 

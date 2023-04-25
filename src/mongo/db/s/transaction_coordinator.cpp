@@ -84,6 +84,13 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(
                     failpoint.pauseWhileSet();
                 } else {
                     ThreadClient tc(failPointName, service);
+
+                    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+                    {
+                        stdx::lock_guard<Client> lk(*tc.get());
+                        tc.get()->setSystemOperationUnkillableByStepdown(lk);
+                    }
+
                     auto opCtx = tc->makeOperationContext();
                     failpoint.pauseWhileSet(opCtx.get());
                 }

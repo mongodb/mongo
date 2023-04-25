@@ -51,6 +51,12 @@ SessionKiller::SessionKiller(ServiceContext* sc, KillFunc killer)
 
         ThreadClient tc("SessionKiller", sc);
 
+        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
+
         stdx::unique_lock<Latch> lk(_mutex);
 
         // While we're not in shutdown

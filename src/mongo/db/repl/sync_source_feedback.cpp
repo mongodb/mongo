@@ -159,6 +159,12 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
                              ReplicationCoordinator* replCoord) {
     Client::initThread("SyncSourceFeedback");
 
+    // TODO(SERVER-74656): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationUnkillableByStepdown(lk);
+    }
+
     HostAndPort syncTarget;
 
     // keepAliveInterval indicates how frequently to forward progress in the absence of updates.
