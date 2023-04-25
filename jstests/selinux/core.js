@@ -4,20 +4,6 @@
 load('jstests/selinux/lib/selinux_base_test.js');
 
 class TestDefinition extends SelinuxBaseTest {
-    get config() {
-        return {
-            "systemLog":
-                {"destination": "file", "logAppend": true, "path": "/var/log/mongodb/mongod.log"},
-            "storage": {"dbPath": "/var/lib/mongo"},
-            "processManagement": {
-                "fork": true,
-                "pidFilePath": "/var/run/mongodb/mongod.pid",
-                "timeZoneInfo": "/usr/share/zoneinfo"
-            },
-            "net": {"port": 27017, "bindIp": "127.0.0.1"}
-        };
-    }
-
     run() {
         // On RHEL7 there is no python3, but check_has_tag.py will also work with python2
         const python = (0 == runNonMongoProgram("which", "python3")) ? "python3" : "python2";

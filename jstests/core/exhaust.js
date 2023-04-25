@@ -3,6 +3,7 @@
 //   # This test uses exhaust which does not use runCommand (required by the inject_tenant_prefix.js
 //   # override).
 //   tenant_migration_incompatible,
+//   no_selinux
 // ]
 
 (function() {

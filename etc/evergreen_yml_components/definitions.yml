@@ -6839,7 +6839,6 @@ tasks:
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
 
-
 - name: selinux_rhel8_org
   tags: []
   depends_on:
@@ -6874,6 +6873,8 @@ tasks:
   - func: "run selinux tests"
     vars:
       distro: rhel80-selinux
+      test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
 - name: selinux_rhel9_org
   tags: []
   depends_on:
