@@ -29,8 +29,11 @@
 
 #include "mongo/s/query_analysis_sample_tracker.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/is_mongos.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -163,6 +166,18 @@ BSONObj QueryAnalysisSampleTracker::reportForServerStatus() const {
         res.setTotalSampledWritesBytes(_totalSampledWritesBytes);
     }
     return res.toBSON();
+}
+
+bool QueryAnalysisSampleTracker::isSamplingActive(const NamespaceString& nss,
+                                                  const UUID& collUuid) {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto it = _trackers.find(nss);
+    if (it == _trackers.end()) {
+        return false;
+    }
+    auto& tracker = it->second;
+    return tracker->getCollUuid() == collUuid;
 }
 
 }  // namespace analyze_shard_key

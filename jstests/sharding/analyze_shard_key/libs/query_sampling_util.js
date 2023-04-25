@@ -2,6 +2,7 @@
  * Utilities for testing query sampling.
  */
 var QuerySamplingUtil = (function() {
+    load("jstests/libs/fail_point_util.js");
     load("jstests/libs/uuid_util.js");
     load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
@@ -171,6 +172,20 @@ var QuerySamplingUtil = (function() {
         } else {
             waitForInactiveSamplingReplicaSet(rst, ns, collUuid);
         }
+    }
+
+    /**
+     * Forces samples to get persisted whether or not query sampling is active.
+     */
+    function skipActiveSamplingCheckWhenPersistingSamples(st) {
+        st._rs.forEach(rst => {
+            rst.nodes.forEach(node => {
+                configureFailPoint(node, "queryAnalysisWriterSkipActiveSamplingCheck");
+            });
+        });
+        st.configRS.nodes.forEach(node => {
+            configureFailPoint(node, "queryAnalysisWriterSkipActiveSamplingCheck");
+        });
     }
 
     /**
@@ -428,6 +443,7 @@ var QuerySamplingUtil = (function() {
         waitForInactiveSamplingShardedCluster,
         waitForActiveSampling,
         waitForInactiveSampling,
+        skipActiveSamplingCheckWhenPersistingSamples,
         assertSubObject,
         assertSoonSampledQueryDocuments,
         assertSoonSampledQueryDocumentsAcrossShards,

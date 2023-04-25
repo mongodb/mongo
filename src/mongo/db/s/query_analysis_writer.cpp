@@ -68,8 +68,7 @@ static ReplicaSetAwareServiceRegistry::Registerer<QueryAnalysisWriter>
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisWriter);
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisWriterFlusher);
-MONGO_FAIL_POINT_DEFINE(hangQueryAnalysisWriterBeforeWritingLocally);
-MONGO_FAIL_POINT_DEFINE(hangQueryAnalysisWriterBeforeWritingRemotely);
+MONGO_FAIL_POINT_DEFINE(queryAnalysisWriterSkipActiveSamplingCheck);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -214,6 +213,22 @@ SampledCommandRequest makeSampledFindAndModifyCommandRequest(
     return {sampleId,
             sampledCmd.getNamespace(),
             sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db().toString()))};
+}
+
+/*
+ * Returns true if a sample for the collection with the given namespace and collection uuid should
+ * be persisted. If the collection does not exist (i.e. the collection uuid is none), returns false.
+ * If the collection has been recreated or renamed (i.e. the given collection uuid does not match
+ * the one in the sampling configuration), returns false. Otherwise, returns true.
+ */
+bool shouldPersistSample(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const boost::optional<UUID>& collUuid) {
+    if (!collUuid) {
+        return false;
+    }
+    return MONGO_unlikely(queryAnalysisWriterSkipActiveSamplingCheck.shouldFail()) ||
+        QueryAnalysisSampleTracker::get(opCtx).isSamplingActive(nss, *collUuid);
 }
 
 }  // namespace
@@ -577,8 +592,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
 
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledReadCmd.nss);
-            if (!collUuid) {
-                LOGV2_WARNING(7047301, "Found a sampled read query for non-existing collection");
+            if (!shouldPersistSample(opCtx, sampledReadCmd.nss, collUuid)) {
                 return;
             }
 
@@ -623,9 +637,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
 
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledUpdateCmd.nss);
-            if (!collUuid) {
-                LOGV2_WARNING(7075300,
-                              "Found a sampled update query for a non-existing collection");
+            if (!shouldPersistSample(opCtx, sampledUpdateCmd.nss, collUuid)) {
                 return;
             }
 
@@ -679,9 +691,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
 
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledDeleteCmd.nss);
-            if (!collUuid) {
-                LOGV2_WARNING(7075302,
-                              "Found a sampled delete query for a non-existing collection");
+            if (!shouldPersistSample(opCtx, sampledDeleteCmd.nss, collUuid)) {
                 return;
             }
 
@@ -736,9 +746,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
 
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledFindAndModifyCmd.nss);
-            if (!collUuid) {
-                LOGV2_WARNING(7075304,
-                              "Found a sampled findAndModify query for a non-existing collection");
+            if (!shouldPersistSample(opCtx, sampledFindAndModifyCmd.nss, collUuid)) {
                 return;
             }
 
@@ -798,6 +806,14 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
             auto opCtx = opCtxHolder.get();
 
             if (!diff || diff->isEmpty()) {
+                return;
+            }
+
+            if (collUuid != CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss)) {
+                return;
+            }
+
+            if (!shouldPersistSample(opCtx, nss, collUuid)) {
                 return;
             }
 

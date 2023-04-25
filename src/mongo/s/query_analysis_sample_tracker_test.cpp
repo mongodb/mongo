@@ -438,6 +438,17 @@ TEST_F(QueryAnalysisSampleTrackerTest, RefreshConfigIncrementAndReportReplSetMon
     testRefreshConfigIncrementAndReport();
 }
 
+TEST_F(QueryAnalysisSampleTrackerTest, IsSamplingActive) {
+    auto& tracker = QueryAnalysisSampleTracker::get(operationContext());
+
+    ASSERT_FALSE(tracker.isSamplingActive(nss0, collUuid0));
+    auto configuration0 =
+        CollectionQueryAnalyzerConfiguration(nss0, collUuid0, 100 /* sampleRate */, now());
+    tracker.refreshConfigurations({configuration0});
+    ASSERT(tracker.isSamplingActive(nss0, collUuid0));
+    ASSERT_FALSE(tracker.isSamplingActive(nss0, UUID::gen()));
+}
+
 }  // namespace
 }  // namespace analyze_shard_key
 }  // namespace mongo
