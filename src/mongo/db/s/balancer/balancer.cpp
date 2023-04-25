@@ -47,6 +47,7 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
@@ -71,13 +72,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(overrideBalanceRoundInterval);
 
-const Seconds kBalanceRoundDefaultInterval(10);
-
-// Sleep between balancer rounds in the case where the last round found some chunks which needed to
-// be balanced. This value should be set sufficiently low so that imbalanced clusters will quickly
-// reach balanced state, but setting it too low may cause CRUD operations to start failing due to
-// not being able to establish a stable shard version.
-const Seconds kShortBalanceRoundInterval(1);
+const Milliseconds kBalanceRoundDefaultInterval(10000);  // 10 sec
 
 /**
  * Balancer status response
@@ -494,8 +489,9 @@ void Balancer::_mainThread() {
                 LOGV2_DEBUG(21863, 1, "End balancing round");
             }
 
-            Milliseconds balancerInterval =
-                _balancedLastTime ? kShortBalanceRoundInterval : kBalanceRoundDefaultInterval;
+            Milliseconds balancerInterval = _balancedLastTime
+                ? Milliseconds(balancerMigrationsThrottlingMs.load())
+                : kBalanceRoundDefaultInterval;
 
             overrideBalanceRoundInterval.execute([&](const BSONObj& data) {
                 balancerInterval = Milliseconds(data["intervalMs"].numberInt());
