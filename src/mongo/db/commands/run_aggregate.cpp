@@ -580,6 +580,83 @@ void performValidationChecks(const OperationContext* opCtx,
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
 }
 
+Status runAggregateOnView(OperationContext* opCtx,
+                          const NamespaceString& origNss,
+                          const AggregateCommandRequest& request,
+                          boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse,
+                          const ViewDefinition* view,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const PrivilegeVector& privileges,
+                          CurOp* curOp,
+                          rpc::ReplyBuilderInterface* result,
+                          const std::function<void(void)>& resetContextFn) {
+
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
+                          << " is not supported against a view",
+            !request.getCollectionUUID());
+
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            "mapReduce on a view is not supported",
+            !request.getIsMapReduceCommand());
+
+    auto nss = request.getNamespace();
+
+    // Check that the default collation of 'view' is compatible with the operation's
+    // collation. The check is skipped if the request did not specify a collation.
+    if (!request.getCollation().get_value_or(BSONObj()).isEmpty()) {
+        invariant(collatorToUse);  // Should already be resolved at this point.
+        if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collatorToUse->get())) {
+            return {ErrorCodes::OptionNotSupportedOnView,
+                    "Cannot override a view's default collation"};
+        }
+    }
+
+    auto resolvedView = uassertStatusOK(
+        DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db())->resolveView(opCtx, nss));
+
+    // With the view & collation resolved, we can relinquish locks.
+    resetContextFn();
+
+    // Set this operation's shard version for the underlying collection to unsharded.
+    // This is prerequisite for future shard versioning checks.
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        resolvedView.getNamespace(), ChunkVersion::UNSHARDED(), boost::none);
+
+    bool collectionIsSharded = [opCtx, &resolvedView]() {
+        AutoGetCollection autoColl(opCtx,
+                                   resolvedView.getNamespace(),
+                                   MODE_IS,
+                                   AutoGetCollectionViewMode::kViewsPermitted);
+        return CollectionShardingState::get(opCtx, resolvedView.getNamespace())
+            ->getCollectionDescription(opCtx)
+            .isSharded();
+    }();
+
+    uassert(std::move(resolvedView),
+            "Resolved views on sharded collections must be executed by mongos",
+            !collectionIsSharded);
+
+    uassert(std::move(resolvedView),
+            "Explain of a resolved view must be executed by mongos",
+            !ShardingState::get(opCtx)->enabled() || !request.getExplain());
+
+    // Parse the resolved view into a new aggregation request.
+    auto newRequest = resolvedView.asExpandedViewAggregation(request);
+    auto newCmd = aggregation_request_helper::serializeToCommandObj(newRequest);
+
+    auto status = runAggregate(opCtx, origNss, newRequest, newCmd, privileges, result);
+
+    {
+        // Set the namespace of the curop back to the view namespace so ctx records
+        // stats on this view namespace on destruction.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        curOp->setNS_inlock(nss.ns());
+    }
+
+    return status;
+}
+
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -622,6 +699,7 @@ Status runAggregate(OperationContext* opCtx,
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
+    auto resetContext = [&]() -> void { ctx.reset(); };
     {
         // If we are in a transaction, check whether the parsed pipeline supports
         // being in a transaction.
@@ -710,74 +788,22 @@ Status runAggregate(OperationContext* opCtx,
         // recursively calling runAggregate(), which will re-acquire locks on the underlying
         // collection.  (The lock must be released because recursively acquiring locks on the
         // database will prohibit yielding.)
-        if (ctx && ctx->getView() && !liteParsedPipeline.startsWithCollStats()) {
-            invariant(nss != NamespaceString::kRsOplogNamespace);
-            invariant(!nss.isCollectionlessAggregateNS());
-            uassert(ErrorCodes::OptionNotSupportedOnView,
-                    str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
-                                  << " is not supported against a view",
-                    !request.getCollectionUUID());
-
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    "mapReduce on a view is not supported",
-                    !request.getIsMapReduceCommand());
-
-            // Check that the default collation of 'view' is compatible with the operation's
-            // collation. The check is skipped if the request did not specify a collation.
-            if (!request.getCollation().get_value_or(BSONObj()).isEmpty()) {
-                invariant(collatorToUse);  // Should already be resolved at this point.
-                if (!CollatorInterface::collatorsMatch(ctx->getView()->defaultCollator(),
-                                                       collatorToUse->get())) {
-                    return {ErrorCodes::OptionNotSupportedOnView,
-                            "Cannot override a view's default collation"};
-                }
-            }
-
-
-            auto resolvedView = uassertStatusOK(DatabaseHolder::get(opCtx)
-                                                    ->getViewCatalog(opCtx, nss.db())
-                                                    ->resolveView(opCtx, nss));
-
-            // With the view & collation resolved, we can relinquish locks.
-            ctx.reset();
-
-            // Set this operation's shard version for the underlying collection to unsharded.
-            // This is prerequisite for future shard versioning checks.
-            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                resolvedView.getNamespace(), ChunkVersion::UNSHARDED(), boost::none);
-
-            bool collectionIsSharded = [opCtx, &resolvedView]() {
-                AutoGetCollection autoColl(opCtx,
-                                           resolvedView.getNamespace(),
-                                           MODE_IS,
-                                           AutoGetCollectionViewMode::kViewsPermitted);
-                return CollectionShardingState::get(opCtx, resolvedView.getNamespace())
-                    ->getCollectionDescription(opCtx)
-                    .isSharded();
-            }();
-
-            uassert(std::move(resolvedView),
-                    "Resolved views on sharded collections must be executed by mongos",
-                    !collectionIsSharded);
-
-            uassert(std::move(resolvedView),
-                    "Explain of a resolved view must be executed by mongos",
-                    !ShardingState::get(opCtx)->enabled() || !request.getExplain());
-
-            // Parse the resolved view into a new aggregation request.
-            auto newRequest = resolvedView.asExpandedViewAggregation(request);
-            auto newCmd = aggregation_request_helper::serializeToCommandObj(newRequest);
-
-            auto status = runAggregate(opCtx, origNss, newRequest, newCmd, privileges, result);
-
-            {
-                // Set the namespace of the curop back to the view namespace so ctx records
-                // stats on this view namespace on destruction.
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                curOp->setNS_inlock(nss.ns());
-            }
-
-            return status;
+        // We do not need to expand the view pipeline when there is a $collStats stage, as
+        // $collStats is supported on a view namespace. For a time-series collection, however, the
+        // view is abstracted out for the users, so we needed to resolve the namespace to get the
+        // underlying bucket collection.
+        if (ctx && ctx->getView() &&
+            (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
+            return runAggregateOnView(opCtx,
+                                      origNss,
+                                      request,
+                                      std::move(collatorToUse),
+                                      ctx->getView(),
+                                      expCtx,
+                                      privileges,
+                                      curOp,
+                                      result,
+                                      resetContext);
         }
 
         if (request.getCollectionUUID()) {

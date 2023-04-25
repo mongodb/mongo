@@ -92,8 +92,12 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
     builder.appendDate("localTime", jsTime());
 
     if (auto latencyStatsSpec = _collStatsSpec.getLatencyStats()) {
+        // getRequestOnTimeseriesView is set to true if collstats is called on the view.
+        auto resolvedNss = _collStatsSpec.getRequestOnTimeseriesView()
+            ? pExpCtx->ns.getTimeseriesViewNamespace()
+            : pExpCtx->ns;
         pExpCtx->mongoProcessInterface->appendLatencyStats(
-            pExpCtx->opCtx, pExpCtx->ns, latencyStatsSpec->getHistograms(), &builder);
+            pExpCtx->opCtx, resolvedNss, latencyStatsSpec->getHistograms(), &builder);
     }
 
     if (auto storageStats = _collStatsSpec.getStorageStats()) {

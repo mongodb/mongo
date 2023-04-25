@@ -39,7 +39,7 @@ structs:
   LatencyStatsSpec:
     description: Represents the 'latencyStats' argument to the $collStats stage.
     strict: true
-    fields: 
+    fields:
       histograms:
         description: Adds latency histogram information to the embedded documents in latencyStats if true.
         type: optionalBool
@@ -67,3 +67,8 @@ structs:
         validator:
             callback: validateObjectIsEmpty
         optional: true
+      $_requestOnTimeseriesView:
+        description: When set to true, $collStats stage requests statistics from the view namespace.
+          When set to false, $collStats stage requests statistics from the underlying collection.
+        cpp_name: requestOnTimeseriesView
+        type: optionalBool
