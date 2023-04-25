@@ -53,7 +53,6 @@
 #include "mongo/util/alarm.h"
 #include "mongo/util/alarm_runner_background_thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/bufreader.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/net/hostandport.h"
@@ -160,38 +159,18 @@ size_t WriteMemoryCallback(void* ptr, size_t size, size_t nmemb, void* data) {
  */
 size_t ReadMemoryCallback(char* buffer, size_t size, size_t nitems, void* instream) {
 
-    auto* bufReader = reinterpret_cast<BufReader*>(instream);
+    auto* cdrc = reinterpret_cast<ConstDataRangeCursor*>(instream);
 
     size_t ret = 0;
 
-    if (bufReader->remaining() > 0) {
-        size_t readSize =
-            std::min(size * nitems, static_cast<unsigned long>(bufReader->remaining()));
-        auto buf = bufReader->readBytes(readSize);
-        memcpy(buffer, buf.rawData(), readSize);
+    if (cdrc->length() > 0) {
+        size_t readSize = std::min(size * nitems, cdrc->length());
+        memcpy(buffer, cdrc->data(), readSize);
+        invariant(cdrc->advanceNoThrow(readSize).isOK());
         ret = readSize;
     }
 
     return ret;
-}
-
-/**
- * Seek into for data to the remote side
- */
-size_t SeekMemoryCallback(void* clientp, curl_off_t offset, int origin) {
-
-    // Curl will call this in readrewind but only to reset the stream to the beginning
-    // In other protocols (like FTP, SSH) or HTTP resumption they may ask for partial buffers which
-    // we do not support.
-    if (offset != 0 || origin != SEEK_SET) {
-        return CURL_SEEKFUNC_CANTSEEK;
-    }
-
-    auto* bufReader = reinterpret_cast<BufReader*>(clientp);
-
-    bufReader->rewindToStart();
-
-    return CURL_SEEKFUNC_OK;
 }
 
 struct CurlEasyCleanup {
@@ -662,7 +641,7 @@ private:
 
         curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, longSeconds(_connectTimeout));
 
-        BufReader bufReader(cdr.data(), cdr.length());
+        ConstDataRangeCursor cdrc(cdr);
         switch (method) {
             case HttpMethod::kGET:
                 uassert(ErrorCodes::BadValue,
@@ -677,22 +656,16 @@ private:
                 curl_easy_setopt(handle, CURLOPT_POST, 1);
 
                 curl_easy_setopt(handle, CURLOPT_READFUNCTION, ReadMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_READDATA, &bufReader);
-                curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, (long)bufReader.remaining());
-
-                curl_easy_setopt(handle, CURLOPT_SEEKFUNCTION, SeekMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_SEEKDATA, &bufReader);
+                curl_easy_setopt(handle, CURLOPT_READDATA, &cdrc);
+                curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
                 break;
             case HttpMethod::kPUT:
                 curl_easy_setopt(handle, CURLOPT_POST, 0);
                 curl_easy_setopt(handle, CURLOPT_PUT, 1);
 
                 curl_easy_setopt(handle, CURLOPT_READFUNCTION, ReadMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_READDATA, &bufReader);
-                curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, (long)bufReader.remaining());
-
-                curl_easy_setopt(handle, CURLOPT_SEEKFUNCTION, SeekMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_SEEKDATA, &bufReader);
+                curl_easy_setopt(handle, CURLOPT_READDATA, &cdrc);
+                curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, (long)cdrc.length());
                 break;
             default:
                 MONGO_UNREACHABLE;

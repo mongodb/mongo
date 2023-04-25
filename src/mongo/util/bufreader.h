@@ -106,11 +106,6 @@ public:
         invariant(_pos >= _start);
     }
 
-    /** back up to beginging of buffer */
-    void rewindToStart() {
-        _pos = _start;
-    }
-
     /** return current position pointer, and advance by len */
     const void* skip(unsigned len) {
         ConstDataRangeCursor cdrc(_pos, _end);
