@@ -41,4 +41,4 @@ class ResmokeProxyService:
         :param suite_name: Name of suite to read.
         :return: Configuration of specified suite.
         """
-        return self._suite_config.SuiteFinder.get_config_obj(suite_name)
+        return self._suite_config.SuiteFinder.get_config_obj_no_verify(suite_name)

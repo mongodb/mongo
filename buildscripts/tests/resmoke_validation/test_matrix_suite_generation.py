@@ -25,12 +25,12 @@ class TestSuiteGeneration(unittest.TestCase):
                 InvalidMatrixSuiteError, msg=
                 f"{tested_suite} suite should have failed because the generated suite does not exist."
         ):
-            self.matrix_suite_config.get_config_obj(tested_suite)
+            self.matrix_suite_config.get_config_obj_and_verify(tested_suite)
 
         self.matrix_suite_config.generate_matrix_suite_file(tested_suite)
 
         try:
-            suite = self.matrix_suite_config.get_config_obj(tested_suite)
+            suite = self.matrix_suite_config.get_config_obj_and_verify(tested_suite)
             self.assertIsNotNone(suite, msg=f"{suite} was not found.")
         except Exception as ex:
             self.fail(repr(ex))
@@ -45,13 +45,13 @@ class TestSuiteGeneration(unittest.TestCase):
         with self.assertRaises(
                 InvalidMatrixSuiteError, msg=
                 f"{tested_suite} suite should have failed because the generated suite was edited."):
-            self.matrix_suite_config.get_config_obj(tested_suite)
+            self.matrix_suite_config.get_config_obj_and_verify(tested_suite)
 
         # restore original file back
         self.matrix_suite_config.generate_matrix_suite_file(tested_suite)
 
         try:
-            suite = self.matrix_suite_config.get_config_obj(tested_suite)
+            suite = self.matrix_suite_config.get_config_obj_and_verify(tested_suite)
             self.assertIsNotNone(suite, msg=f"{suite} was not found.")
         except Exception as ex:
             self.fail(repr(ex))

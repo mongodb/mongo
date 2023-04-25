@@ -2,6 +2,7 @@
 import collections
 import copy
 import os
+import pathlib
 from threading import Lock
 from typing import Dict, List
 
@@ -128,7 +129,7 @@ def _make_suite_roots(files):
 
 def _get_suite_config(suite_name_or_path):
     """Attempt to read YAML configuration from 'suite_path' for the suite."""
-    return SuiteFinder.get_config_obj(suite_name_or_path)
+    return SuiteFinder.get_config_obj_no_verify(suite_name_or_path)
 
 
 def generate():
@@ -139,7 +140,7 @@ class SuiteConfigInterface:
     """Interface for suite configs."""
 
     @classmethod
-    def get_config_obj(cls, suite_name):
+    def get_config_obj_no_verify(cls, suite_name):
         """Get the config object given the suite name, which can be a path."""
         pass
 
@@ -161,7 +162,7 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
     _named_suites = {}
 
     @classmethod
-    def get_config_obj(cls, suite_name):
+    def get_config_obj_no_verify(cls, suite_name):
         """Get the suite config object in the given file."""
         if suite_name in cls.get_named_suites():
             # Check if is a named suite first for efficiency.
@@ -226,36 +227,39 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return os.path.join(_config.CONFIG_DIR, "matrix_suites")
 
     @classmethod
-    def get_config_obj(cls, suite_name):
+    def get_config_obj_and_verify(cls, suite_name):
         """Get the suite config object in the given file and verify it matches the generated file."""
 
-        config = cls._get_config_obj_no_verify(suite_name)
+        config = cls.get_config_obj_no_verify(suite_name)
 
         if not config:
             return None
 
-        # TODO: SERVER-75688 add validation back
-        # generated_path = cls.get_generated_suite_path(suite_name)
-        # if not os.path.exists(generated_path):
-        #     raise errors.InvalidMatrixSuiteError(
-        #         f"No generated suite file was found for {suite_name}" +
-        #         "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
-        #     )
+        generated_path = cls.get_generated_suite_path(suite_name)
+        if not os.path.exists(generated_path):
+            raise errors.InvalidMatrixSuiteError(
+                f"No generated suite file was found for {suite_name}" +
+                "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+            )
 
-        # new_text = cls.generate_matrix_suite_text(suite_name)
-        # with open(generated_path, "r") as file:
-        #     old_text = file.read()
-        #     if new_text != old_text:
-        #         raise errors.InvalidMatrixSuiteError(
-        #             f"The generated file found on disk did not match the mapping file for {suite_name}. "
-        #             +
-        #             "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
-        #         )
+        new_text = cls.generate_matrix_suite_text(suite_name)
+        with open(generated_path, "r") as file:
+            old_text = file.read()
+            if new_text != old_text:
+                loggers.ROOT_EXECUTOR_LOGGER.error("Generated file on disk:")
+                loggers.ROOT_EXECUTOR_LOGGER.error(old_text)
+                loggers.ROOT_EXECUTOR_LOGGER.error("Generated text from mapping file:")
+                loggers.ROOT_EXECUTOR_LOGGER.error(new_text)
+                raise errors.InvalidMatrixSuiteError(
+                    f"The generated file found on disk did not match the mapping file for {suite_name}. "
+                    +
+                    "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+                )
 
         return config
 
     @classmethod
-    def _get_config_obj_no_verify(cls, suite_name):
+    def get_config_obj_no_verify(cls, suite_name):
         """Get the suite config object in the given file."""
         suites_dir = cls.get_suites_dir()
         matrix_suite = cls.parse_mappings_file(suites_dir, suite_name)
@@ -275,7 +279,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         eval_names = suite.get("eval", None)
         description = suite.get("description")
 
-        base_suite = ExplicitSuiteConfig.get_config_obj(base_suite_name)
+        base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
 
         if base_suite is None:
             raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")
@@ -412,12 +416,14 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             if os.path.exists(path):
                 mapping_path = path
 
-        matrix_suite = cls._get_config_obj_no_verify(suite_name)
+        matrix_suite = cls.get_config_obj_no_verify(suite_name)
 
         if not matrix_suite or not mapping_path:
             print(f"Could not find mappings file for {suite_name}")
             return None
 
+        # This path needs to output the same text on both windows and linux/mac
+        mapping_path = pathlib.PurePath(mapping_path)
         yml = yaml.safe_dump(matrix_suite)
         comments = [
             "##########################################################",
@@ -425,7 +431,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             "# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE",
             "# AND REGENERATE THE MATRIX SUITES.",
             "#",
-            f"# matrix suite mapping file: {mapping_path}",
+            f"# matrix suite mapping file: {mapping_path.as_posix()}",
             "# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites",
             "##########################################################",
         ]
@@ -451,10 +457,10 @@ class SuiteFinder(object):
     """Utility/Factory class for getting polymorphic suite classes given a directory."""
 
     @staticmethod
-    def get_config_obj(suite_path):
+    def get_config_obj_no_verify(suite_path):
         """Get the suite config object in the given file."""
-        explicit_suite = ExplicitSuiteConfig.get_config_obj(suite_path)
-        matrix_suite = MatrixSuiteConfig.get_config_obj(suite_path)
+        explicit_suite = ExplicitSuiteConfig.get_config_obj_no_verify(suite_path)
+        matrix_suite = MatrixSuiteConfig.get_config_obj_no_verify(suite_path)
 
         if not (explicit_suite or matrix_suite):
             raise errors.SuiteNotFound("Unknown suite '%s'" % suite_path)

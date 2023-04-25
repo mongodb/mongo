@@ -81,6 +81,7 @@ buildvariants:
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: .lint
+    - name: resmoke_validation_tests
     - name: clang_tidy_TG
       distros:
       - rhel80-xxlarge
