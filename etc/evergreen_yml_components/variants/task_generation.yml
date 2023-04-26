@@ -11,5 +11,9 @@ buildvariants:
   - rhel80-medium
   tasks:
   - name: version_gen
+    distros:
+    - ubuntu2004-medium
   - name: version_burn_in_gen
+    distros:
+    - ubuntu2004-medium
   - name: version_expansions_gen
