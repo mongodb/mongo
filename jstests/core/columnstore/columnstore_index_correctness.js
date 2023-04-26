@@ -181,102 +181,102 @@ const coll = db.columnstore_index_correctness;
 // Multiple tests in this file use the same dataset. Intentionally not using _id as the unique
 // identifier, to avoid getting IDHACK plans when we query by it.
 const docs = [
-    {_num: 0},
-    {_num: 1, a: null},
-    {_num: 2, a: "scalar"},
-    {_num: 3, a: {}},
-    {_num: 4, a: {x: 1, b: "scalar"}},
-    {_num: 5, a: {b: {}}},
-    {_num: 6, a: {x: 1, b: {}}},
-    {_num: 7, a: {x: 1, b: {x: 1}}},
-    {_num: 8, a: {b: {c: "scalar"}}},
-    {_num: 9, a: {b: {c: null}}},
-    {_num: 10, a: {b: {c: [[1, 2], [{}], 2]}}},
-    {_num: 11, a: {x: 1, b: {x: 1, c: ["scalar"]}}},
-    {_num: 12, a: {x: 1, b: {c: {x: 1}}}},
-    {_num: 13, a: {b: []}},
-    {_num: 14, a: {b: [null]}},
-    {_num: 15, a: {b: ["scalar"]}},
-    {_num: 16, a: {b: [[]]}},
-    {_num: 17, a: {b: [1, {}, 2]}},
-    {_num: 18, a: {b: [[1, 2], [{}], 2]}},
-    {_num: 19, a: {x: 1, b: [[1, 2], [{}], 2]}},
-    {_num: 20, a: {b: [{c: "scalar"}]}},
-    {_num: 21, a: {b: [{c: "scalar"}, {c: "scalar2"}]}},
-    {_num: 22, a: {b: [{c: [[1, 2], [{}], 2]}]}},
-    {_num: 23, a: {b: [1, {c: "scalar"}, 2]}},
-    {_num: 24, a: {b: [1, {c: [[1, 2], [{}], 2]}, 2]}},
-    {_num: 25, a: {x: 1, b: [1, {c: [[1, 2], [{}], 2]}, 2]}},
-    {_num: 26, a: {b: [[1, 2], [{c: "scalar"}], 2]}},
-    {_num: 27, a: {b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}},
-    {_num: 28, a: {x: 1, b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}},
-    {_num: 29, a: []},
-    {_num: 30, a: [null]},
-    {_num: 31, a: ["scalar"]},
-    {_num: 32, a: [[]]},
-    {_num: 33, a: [{}]},
-    {_num: 34, a: [1, {}, 2]},
-    {_num: 35, a: [[1, 2], [{}], 2]},
-    {_num: 36, a: [{b: "scalar"}]},
-    {_num: 37, a: [{b: null}]},
-    {_num: 38, a: [1, {b: "scalar"}, 2]},
-    {_num: 39, a: [1, {b: []}, 2]},
-    {_num: 40, a: [1, {b: [null]}, 2]},
-    {_num: 41, a: [1, {b: ["scalar"]}, 2]},
-    {_num: 42, a: [1, {b: [[]]}, 2]},
-    {_num: 43, a: [{b: []}]},
-    {_num: 44, a: [{b: ["scalar"]}]},
-    {_num: 45, a: [{b: [[]]}]},
-    {_num: 46, a: [{b: {}}]},
-    {_num: 47, a: [{b: {c: "scalar"}}]},
-    {_num: 48, a: [{b: {c: [[1, 2], [{}], 2]}}]},
-    {_num: 49, a: [{b: {x: 1}}]},
-    {_num: 50, a: [{b: {x: 1, c: "scalar"}}]},
-    {_num: 51, a: [{b: [{c: "scalar"}]}]},
-    {_num: 52, a: [{b: [{c: ["scalar"]}]}]},
-    {_num: 53, a: [{b: [1, {c: ["scalar"]}, 2]}]},
-    {_num: 54, a: [{b: [{}]}]},
-    {_num: 55, a: [{b: [[1, 2], [{}], 2]}]},
-    {_num: 56, a: [{b: [[1, 2], [{c: "scalar"}], 2]}]},
-    {_num: 57, a: [{b: [[1, 2], [{c: ["scalar"]}], 2]}]},
-    {_num: 58, a: [1, {b: {}}, 2]},
-    {_num: 59, a: [1, {b: {c: "scalar"}}, 2]},
-    {_num: 60, a: [1, {b: {c: {x: 1}}}, 2]},
-    {_num: 61, a: [1, {b: {c: [1, {}, 2]}}, 2]},
-    {_num: 62, a: [1, {b: {x: 1}}, 2]},
-    {_num: 63, a: [1, {b: {x: 1, c: "scalar"}}, 2]},
-    {_num: 64, a: [1, {b: {x: 1, c: [[]]}}, 2]},
-    {_num: 65, a: [1, {b: {x: 1, c: [1, {}, 2]}}, 2]},
-    {_num: 66, a: [1, {b: [{}]}, 2]},
-    {_num: 67, a: [1, {b: [{c: "scalar"}]}, 2]},
-    {_num: 68, a: [1, {b: [{c: {x: 1}}]}, 2]},
-    {_num: 69, a: [1, {b: [{c: [1, {}, 2]}]}, 2]},
-    {_num: 70, a: [1, {b: [1, {}, 2]}, 2]},
-    {_num: 71, a: [1, {b: [1, {c: null}, 2]}, 2]},
-    {_num: 72, a: [1, {b: [1, {c: "scalar"}, 2]}, 2]},
-    {_num: 73, a: [1, {b: [1, {c: [1, {}, 2]}, 2]}, 2]},
-    {_num: 74, a: [1, {b: [[1, 2], [{}], 2]}, 2]},
-    {_num: 75, a: [1, {b: [[1, 2], [{c: "scalar"}], 2]}, 2]},
-    {_num: 76, a: [1, {b: [[1, 2], [{c: [1, {}, 2]}], 2]}, 2]},
-    {_num: 77, a: [[1, 2], [{b: "scalar"}], 2]},
-    {_num: 78, a: [[1, 2], [{b: {x: 1, c: "scalar"}}], 2]},
-    {_num: 79, a: [[1, 2], [{b: {x: 1, c: [1, {}, 2]}}], 2]},
-    {_num: 80, a: [[1, 2], [{b: []}], 2]},
-    {_num: 81, a: [[1, 2], [{b: [1, {c: "scalar"}, 2]}], 2]},
-    {_num: 82, a: [[1, 2], [{b: [[1, 2], [{c: "scalar"}], 2]}], 2]},
-    {_num: 83, a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
-    {_num: 84, a: [{b: [{c: 1}, {}]}]},
-    {_num: 85, a: [{b: [{c: 1}, {d: 1}]}]},
-    {_num: 86, a: [{b: {c: 1}}, {b: {}}]},
-    {_num: 87, a: [{b: {c: 1}}, {b: {d: 1}}]},
-    {_num: 88, a: [{b: {c: 1}}, {}]},
-    {_num: 89, a: [{b: {c: 1}}, {b: null}]},
-    {_num: 90, a: [{b: {c: 1}}, {b: []}]},
-    {_num: 91, a: [{b: []}, {b: []}]},
-    {_num: 92, a: {b: [{c: [1, 2]}]}},
-    {_num: 93, a: {b: {c: [1, 2]}}},
-    {_num: 94, a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
-    {_num: 95, a: [{m: 1, n: 2}, {m: 2, o: 1}]},
+    {num: 0},
+    {num: 1, a: null},
+    {num: 2, a: "scalar"},
+    {num: 3, a: {}},
+    {num: 4, a: {x: 1, b: "scalar"}},
+    {num: 5, a: {b: {}}},
+    {num: 6, a: {x: 1, b: {}}},
+    {num: 7, a: {x: 1, b: {x: 1}}},
+    {num: 8, a: {b: {c: "scalar"}}},
+    {num: 9, a: {b: {c: null}}},
+    {num: 10, a: {b: {c: [[1, 2], [{}], 2]}}},
+    {num: 11, a: {x: 1, b: {x: 1, c: ["scalar"]}}},
+    {num: 12, a: {x: 1, b: {c: {x: 1}}}},
+    {num: 13, a: {b: []}},
+    {num: 14, a: {b: [null]}},
+    {num: 15, a: {b: ["scalar"]}},
+    {num: 16, a: {b: [[]]}},
+    {num: 17, a: {b: [1, {}, 2]}},
+    {num: 18, a: {b: [[1, 2], [{}], 2]}},
+    {num: 19, a: {x: 1, b: [[1, 2], [{}], 2]}},
+    {num: 20, a: {b: [{c: "scalar"}]}},
+    {num: 21, a: {b: [{c: "scalar"}, {c: "scalar2"}]}},
+    {num: 22, a: {b: [{c: [[1, 2], [{}], 2]}]}},
+    {num: 23, a: {b: [1, {c: "scalar"}, 2]}},
+    {num: 24, a: {b: [1, {c: [[1, 2], [{}], 2]}, 2]}},
+    {num: 25, a: {x: 1, b: [1, {c: [[1, 2], [{}], 2]}, 2]}},
+    {num: 26, a: {b: [[1, 2], [{c: "scalar"}], 2]}},
+    {num: 27, a: {b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}},
+    {num: 28, a: {x: 1, b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}},
+    {num: 29, a: []},
+    {num: 30, a: [null]},
+    {num: 31, a: ["scalar"]},
+    {num: 32, a: [[]]},
+    {num: 33, a: [{}]},
+    {num: 34, a: [1, {}, 2]},
+    {num: 35, a: [[1, 2], [{}], 2]},
+    {num: 36, a: [{b: "scalar"}]},
+    {num: 37, a: [{b: null}]},
+    {num: 38, a: [1, {b: "scalar"}, 2]},
+    {num: 39, a: [1, {b: []}, 2]},
+    {num: 40, a: [1, {b: [null]}, 2]},
+    {num: 41, a: [1, {b: ["scalar"]}, 2]},
+    {num: 42, a: [1, {b: [[]]}, 2]},
+    {num: 43, a: [{b: []}]},
+    {num: 44, a: [{b: ["scalar"]}]},
+    {num: 45, a: [{b: [[]]}]},
+    {num: 46, a: [{b: {}}]},
+    {num: 47, a: [{b: {c: "scalar"}}]},
+    {num: 48, a: [{b: {c: [[1, 2], [{}], 2]}}]},
+    {num: 49, a: [{b: {x: 1}}]},
+    {num: 50, a: [{b: {x: 1, c: "scalar"}}]},
+    {num: 51, a: [{b: [{c: "scalar"}]}]},
+    {num: 52, a: [{b: [{c: ["scalar"]}]}]},
+    {num: 53, a: [{b: [1, {c: ["scalar"]}, 2]}]},
+    {num: 54, a: [{b: [{}]}]},
+    {num: 55, a: [{b: [[1, 2], [{}], 2]}]},
+    {num: 56, a: [{b: [[1, 2], [{c: "scalar"}], 2]}]},
+    {num: 57, a: [{b: [[1, 2], [{c: ["scalar"]}], 2]}]},
+    {num: 58, a: [1, {b: {}}, 2]},
+    {num: 59, a: [1, {b: {c: "scalar"}}, 2]},
+    {num: 60, a: [1, {b: {c: {x: 1}}}, 2]},
+    {num: 61, a: [1, {b: {c: [1, {}, 2]}}, 2]},
+    {num: 62, a: [1, {b: {x: 1}}, 2]},
+    {num: 63, a: [1, {b: {x: 1, c: "scalar"}}, 2]},
+    {num: 64, a: [1, {b: {x: 1, c: [[]]}}, 2]},
+    {num: 65, a: [1, {b: {x: 1, c: [1, {}, 2]}}, 2]},
+    {num: 66, a: [1, {b: [{}]}, 2]},
+    {num: 67, a: [1, {b: [{c: "scalar"}]}, 2]},
+    {num: 68, a: [1, {b: [{c: {x: 1}}]}, 2]},
+    {num: 69, a: [1, {b: [{c: [1, {}, 2]}]}, 2]},
+    {num: 70, a: [1, {b: [1, {}, 2]}, 2]},
+    {num: 71, a: [1, {b: [1, {c: null}, 2]}, 2]},
+    {num: 72, a: [1, {b: [1, {c: "scalar"}, 2]}, 2]},
+    {num: 73, a: [1, {b: [1, {c: [1, {}, 2]}, 2]}, 2]},
+    {num: 74, a: [1, {b: [[1, 2], [{}], 2]}, 2]},
+    {num: 75, a: [1, {b: [[1, 2], [{c: "scalar"}], 2]}, 2]},
+    {num: 76, a: [1, {b: [[1, 2], [{c: [1, {}, 2]}], 2]}, 2]},
+    {num: 77, a: [[1, 2], [{b: "scalar"}], 2]},
+    {num: 78, a: [[1, 2], [{b: {x: 1, c: "scalar"}}], 2]},
+    {num: 79, a: [[1, 2], [{b: {x: 1, c: [1, {}, 2]}}], 2]},
+    {num: 80, a: [[1, 2], [{b: []}], 2]},
+    {num: 81, a: [[1, 2], [{b: [1, {c: "scalar"}, 2]}], 2]},
+    {num: 82, a: [[1, 2], [{b: [[1, 2], [{c: "scalar"}], 2]}], 2]},
+    {num: 83, a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
+    {num: 84, a: [{b: [{c: 1}, {}]}]},
+    {num: 85, a: [{b: [{c: 1}, {d: 1}]}]},
+    {num: 86, a: [{b: {c: 1}}, {b: {}}]},
+    {num: 87, a: [{b: {c: 1}}, {b: {d: 1}}]},
+    {num: 88, a: [{b: {c: 1}}, {}]},
+    {num: 89, a: [{b: {c: 1}}, {b: null}]},
+    {num: 90, a: [{b: {c: 1}}, {b: []}]},
+    {num: 91, a: [{b: []}, {b: []}]},
+    {num: 92, a: {b: [{c: [1, 2]}]}},
+    {num: 93, a: {b: {c: [1, 2]}}},
+    {num: 94, a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
+    {num: 95, a: [{m: 1, n: 2}, {m: 2, o: 1}]},
 ];
 
 coll.drop();
@@ -284,7 +284,7 @@ let bulk = coll.initializeUnorderedBulkOp();
 for (let doc of docs) {
     let insertObj = {};
     Object.assign(insertObj, doc);
-    if (doc._num % 2 == 0) {
+    if (doc.num % 2 == 0) {
         insertObj.optionalField = "foo";
     }
     bulk.insert(insertObj);
@@ -294,7 +294,7 @@ bulk.execute();
 assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 
 (function testProjectionOfIndependentPaths() {
-    const kProjection = {_id: 0, _num: 1, "a.b.c": 1, optionalField: 1};
+    const kProjection = {_id: 0, "a.b.c": 1, num: 1, optionalField: 1};
 
     let explain = coll.find({}, kProjection).explain();
     assert(planHasStage(db, explain, "COLUMN_SCAN"),
@@ -304,16 +304,15 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
     assert.eq(results.length, docs.length, "With no filter should have returned all docs");
 
     for (let res of results) {
-        const trueResult =
-            coll.find({_num: res._num}, kProjection).hint({$natural: 1}).toArray()[0];
-        const originalDoc = coll.findOne({_num: res._num});
+        const trueResult = coll.find({num: res.num}, kProjection).hint({$natural: 1}).toArray()[0];
+        const originalDoc = coll.findOne({num: res.num});
         assert.docEq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
     }
 })();
 
 // Run a similar query that projects multiple fields with a shared parent object.
 (function testProjectionOfSiblingPaths() {
-    const kSiblingProjection = {_id: 0, _num: 1, "a.m": 1, "a.n": 1};
+    const kSiblingProjection = {_id: 0, "a.m": 1, "a.n": 1, num: 1};
 
     let explain = coll.find({}, kSiblingProjection).explain();
     assert(planHasStage(db, explain, "COLUMN_SCAN"),
@@ -324,15 +323,15 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 
     for (let res of results) {
         const trueResult =
-            coll.find({_num: res._num}, kSiblingProjection).hint({$natural: 1}).toArray()[0];
-        const originalDoc = coll.findOne({_num: res._num});
+            coll.find({num: res.num}, kSiblingProjection).hint({$natural: 1}).toArray()[0];
+        const originalDoc = coll.findOne({num: res.num});
         assert.eq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
     }
 })();
 
 // Run a query that tests the SERVER-67742 fix.
 (function testPrefixPath() {
-    const kPrefixProjection = {_id: 0, _num: 1, "a": 1};
+    const kPrefixProjection = {_id: 0, "a": 1, num: 1};
 
     // Have to use the index hint because SERVER-67264 blocks selection of CSI.
     let explain = coll.find({"a.m": 1}, kPrefixProjection).hint({"$**": "columnstore"}).explain();
@@ -348,8 +347,8 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 
     for (let res of results) {
         const trueResult =
-            coll.find({_num: res._num}, kPrefixProjection).hint({$natural: 1}).toArray()[0];
-        const originalDoc = coll.findOne({_num: res._num});
+            coll.find({num: res.num}, kPrefixProjection).hint({$natural: 1}).toArray()[0];
+        const originalDoc = coll.findOne({num: res.num});
         assert.eq(res, trueResult, "Mismatched projection of " + tojson(originalDoc));
     }
 })();
@@ -359,7 +358,7 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 (function testGroup() {
     // Sanity check that we are comparing the plans we expect to be.
     let pipeline = [
-        {$group: {_id: "$a.b.c", docs: {$push: "$_num"}}},
+        {$group: {_id: "$a.b.c", docs: {$push: "$num"}}},
         {$set: {docs: {$sortArray: {input: "$docs", sortBy: 1}}}}
     ];
     let naturalExplain = coll.explain().aggregate(pipeline, {hint: {$natural: 1}});
