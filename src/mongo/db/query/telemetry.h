@@ -127,10 +127,10 @@ public:
     /**
      * Redact a given telemetry key and set _keySize.
      */
-    StatusWith<BSONObj> redactKey(const BSONObj& key,
-                                  bool redactIdentifiers,
-                                  std::string redactionKey,
-                                  OperationContext* opCtx) const;
+    BSONObj redactKey(const BSONObj& key,
+                      bool redactIdentifiers,
+                      std::string redactionKey,
+                      OperationContext* opCtx) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -231,11 +231,10 @@ void writeTelemetry(OperationContext* opCtx,
  * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
  * with all field names and literals redacted.
  */
-StatusWith<BSONObj> makeTelemetryKey(
-    const FindCommandRequest& findCommand,
-    const SerializationOptions& opts,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<const TelemetryMetrics&> existingMetrics = boost::none);
+BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
+                         const SerializationOptions& opts,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         boost::optional<const TelemetryMetrics&> existingMetrics = boost::none);
 
 /**
  * Collects metrics for telemetry from the current operation onto OpDebug. This must be called prior

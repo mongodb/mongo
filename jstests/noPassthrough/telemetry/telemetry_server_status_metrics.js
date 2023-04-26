@@ -101,6 +101,29 @@ function telemetryStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
     assert(fullSize >= halfWayPointSize * 1.95 && fullSize <= halfWayPointSize * 2.05,
            tojson({fullSize, halfWayPointSize}));
 }
+
+function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
+    const debugBuild = testDB.adminCommand('buildInfo').debug;
+    if (debugBuild) {
+        jsTestLog("Skipping telemetry store write errors test because debug build will tassert.");
+        return;
+    }
+
+    const errorsBefore = testDB.serverStatus().metrics.telemetry.numTelemetryStoreWriteErrors;
+    assert.eq(errorsBefore, 0);
+    for (let i = 0; i < 5; i++) {
+        // Command should succeed and record the error.
+        let query = {};
+        query["foo" + i] = "bar";
+        coll.aggregate([{$match: query}]).itcount();
+    }
+
+    // Make sure that we recorded a write error for each run.
+    // TODO SERVER-73152 we attempt to write to the telemetry store twice for each aggregate, which
+    // seems wrong.
+    assert.eq(testDB.serverStatus().metrics.telemetry.numTelemetryStoreWriteErrors, 10);
+}
+
 /**
  * In this configuration, we insert enough entries into the telemetry store to trigger LRU
  * eviction.
@@ -152,4 +175,16 @@ runTestWithMongodOptions({
     setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
 },
                          telemetryStoreSizeEstimateTest);
+
+/**
+ * Use a very small telemetry store size and assert that errors in writing to the telemetry store
+ * are tracked.
+ */
+runTestWithMongodOptions({
+    setParameter: {
+        internalQueryConfigureTelemetryCacheSize: "0.00001MB",
+        internalQueryConfigureTelemetrySamplingRate: -1
+    },
+},
+                         telemetryStoreWriteErrorsTest);
 }());

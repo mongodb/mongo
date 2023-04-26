@@ -185,10 +185,10 @@ BSONObj redactLetSpec(BSONObj letSpec,
     return bob.obj();
 }
 
-StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
-                                     const SerializationOptions& opts,
-                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     boost::optional<const TelemetryMetrics&> existingMetrics) {
+BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
+                         const SerializationOptions& opts,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         boost::optional<const TelemetryMetrics&> existingMetrics) {
     // TODO: SERVER-75156 Factor query shape out of telemetry. That ticket will involve splitting
     // this function up and moving most of it to another, non-telemetry related header.
 
@@ -238,16 +238,12 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     // Filter.
     {
         auto filter = findCommand.getFilter();
-        auto filterParsed =
+        filterExpr = uassertStatusOKWithContext(
             MatchExpressionParser::parse(findCommand.getFilter(),
                                          expCtx,
                                          ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures);
-        if (!filterParsed.isOK()) {
-            return filterParsed.getStatus();
-        }
-
-        filterExpr = std::move(filterParsed.getValue());
+                                         MatchExpressionParser::kAllowAllSpecialFeatures),
+            "Failed to parse 'filter' option when making telemetry key");
         bob.append(FindCommandRequest::kFilterFieldName, filterExpr->serialize(opts));
     }
 
@@ -325,6 +321,7 @@ namespace {
 
 CounterMetric telemetryEvictedMetric("telemetry.numEvicted");
 CounterMetric telemetryRateLimitedRequestsMetric("telemetry.numRateLimitedRequests");
+CounterMetric telemetryStoreWriteErrorsMetric("telemetry.numTelemetryStoreWriteErrors");
 
 /**
  * Cap the telemetry store size.
@@ -580,10 +577,10 @@ static const StringData replacementForLiteralArgs = "?"_sd;
 
 }  // namespace
 
-StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
-                                                bool redactIdentifiers,
-                                                std::string redactionKey,
-                                                OperationContext* opCtx) const {
+BSONObj TelemetryMetrics::redactKey(const BSONObj& key,
+                                    bool redactIdentifiers,
+                                    std::string redactionKey,
+                                    OperationContext* opCtx) const {
     // The redacted key for each entry is cached on first computation. However, if the redaction
     // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
     // to the function, so entries returned to the user match the redaction strategy requested in
@@ -613,11 +610,7 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         expCtx->stopExpressionCounters();
 
-        auto swRedactedKey = makeTelemetryKey(*findCommand, options, expCtx, *this);
-        if (!swRedactedKey.isOK()) {
-            return swRedactedKey.getStatus();
-        }
-        _redactedKey = std::move(swRedactedKey.getValue());
+        _redactedKey = makeTelemetryKey(*findCommand, options, expCtx, *this);
         return *_redactedKey;
     }
 
@@ -741,14 +734,7 @@ void registerFindRequest(const FindCommandRequest& request,
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
-    auto swTelemetryKey = makeTelemetryKey(request, options, expCtx);
-    tassert(7349402,
-            str::stream() << "Error encountered when extracting query shape from command for "
-                             "telemetry collection: "
-                          << swTelemetryKey.getStatus().toString(),
-            swTelemetryKey.isOK());
-
-    CurOp::get(opCtx)->debug().telemetryStoreKey = std::move(swTelemetryKey.getValue());
+    CurOp::get(opCtx)->debug().telemetryStoreKey = makeTelemetryKey(request, options, expCtx);
 }
 
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
@@ -780,10 +766,18 @@ void writeTelemetry(OperationContext* opCtx,
                                partitionLock);
         telemetryEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*telemetryKey);
-        // This can happen if the budget is immediately exceeded. Specifically if the there is
-        // not enough room for a single new entry if the number of partitions is too high
-        // relative to the size.
-        tassert(7064700, "Should find telemetry store entry", newMetrics.isOK());
+        if (!newMetrics.isOK()) {
+            // This can happen if the budget is immediately exceeded. Specifically if the there is
+            // not enough room for a single new entry if the number of partitions is too high
+            // relative to the size.
+            telemetryStoreWriteErrorsMetric.increment();
+            LOGV2_DEBUG(7560900,
+                        1,
+                        "Failed to store telemetry entry.",
+                        "status"_attr = newMetrics.getStatus(),
+                        "rawKey"_attr = redact(*telemetryKey));
+            return;
+        }
         metrics = newMetrics.getValue()->second;
     }
 

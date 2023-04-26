@@ -37,6 +37,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+namespace {
+CounterMetric telemetryRedactionErrors("telemetry.numRedactionErrors");
+}
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
                                            DocumentSourceTelemetry::LiteParsed::parse,
@@ -185,22 +188,24 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
-            auto swKey = metrics->redactKey(key, _redactIdentifiers, _redactionKey, pExpCtx->opCtx);
-            if (!swKey.isOK()) {
+            try {
+                auto redactedKey =
+                    metrics->redactKey(key, _redactIdentifiers, _redactionKey, pExpCtx->opCtx);
+                _materializedPartition.push_back({{"key", std::move(redactedKey)},
+                                                  {"metrics", metrics->toBSON()},
+                                                  {"asOf", partitionReadTime}});
+            } catch (const DBException& ex) {
+                telemetryRedactionErrors.increment();
                 LOGV2_DEBUG(7349403,
                             3,
                             "Error encountered when redacting query shape, will not publish "
                             "telemetry for this entry.",
-                            "status"_attr = swKey.getStatus());
+                            "status"_attr = ex.toStatus());
                 if (kDebugBuild) {
                     tasserted(7349401,
                               "Was not able to re-parse telemetry key when reading telemetry.");
                 }
-                continue;
             }
-            _materializedPartition.push_back({{"key", std::move(swKey.getValue())},
-                                              {"metrics", metrics->toBSON()},
-                                              {"asOf", partitionReadTime}});
         }
     }
 }

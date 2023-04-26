@@ -135,7 +135,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
-    auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    auto redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -154,7 +154,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     // Add sort.
     fcr.setSort(BSON("sortVal" << 1 << "otherSort" << -1));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -176,7 +176,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     // Add inclusion projection.
     fcr.setProjection(BSON("e" << true << "f" << true));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -206,7 +206,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     << "$a"
                     << "var2"
                     << "const1"));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -239,7 +239,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -285,7 +285,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setMaxTimeMS(1000);
     fcr.setNoCursorTimeout(false);
 
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -389,7 +389,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
-    auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    auto redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -414,7 +414,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
 
-    auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    auto redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -445,7 +445,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setHint(BSON("$hint"
                      << "z"));
 
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -475,7 +475,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = boost::none;
     opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -504,7 +504,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -532,7 +532,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
 
     // Test that $natural comes through unmodified.
     fcr.setHint(BSON("$natural" << -1));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -576,8 +576,6 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
 
     bool redactIdentifiers = false;
     auto redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
-    ASSERT_OK(redacted.getStatus());
-
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "testColl",
@@ -599,13 +597,12 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
             },
             "$db": "testDB"
         })",
-        redacted.getValue());
+        redacted);
 
     // Now be sure the variable names are redacted. We don't currently expose a different way to do
     // the hashing, so we'll just stick with the big long strings here for now.
     redactIdentifiers = true;
     redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
-    ASSERT_OK(redacted.getStatus());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -631,6 +628,6 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
                 "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
             }
         })",
-        redacted.getValue());
+        redacted);
 }
 }  // namespace mongo::telemetry
