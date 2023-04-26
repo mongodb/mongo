@@ -59,10 +59,12 @@ stdx::unordered_set<ShardId> getAllDbPrimaryShards(OperationContext* opCtx) {
         opCtx, aggRequest, {repl::ReadConcernLevel::kMajorityReadConcern});
 
     stdx::unordered_set<ShardId> shardIds;
-    shardIds.reserve(aggResponse.size());
+    shardIds.reserve(aggResponse.size() + 1);
     for (auto&& responseEntry : aggResponse) {
         shardIds.insert(responseEntry.firstElement().str());
     }
+    // The config server is authoritative for config database
+    shardIds.insert(ShardId::kConfigServerId);
     return shardIds;
 }
 

@@ -127,14 +127,6 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
     for (const auto& coll : collections) {
         const auto& nss = coll.getNss();
 
-        // The only sharded collection in the config database with indexes is
-        // config.system.sessions. Unfortunately, the code path to run aggregation
-        // below would currently invariant if one of the targeted shards was the config
-        // server itself.
-        if (nss.isConfigDB()) {
-            continue;
-        }
-
         // Serialize with concurrent DDL operations that modify indexes
         const auto collectionDDLLock = ddlLockManager->lock(
             opCtx, nss.toString(), kLockReason, DDLLockManager::kDefaultLockTimeout);
@@ -266,7 +258,7 @@ public:
                              it != collCatalogSnapshot->end(opCtx);
                              ++it) {
                             const auto coll = *it;
-                            if (!coll || !coll->ns().isNormalCollection()) {
+                            if (!coll) {
                                 continue;
                             }
                             localCollections.emplace_back(CollectionPtr(coll));
