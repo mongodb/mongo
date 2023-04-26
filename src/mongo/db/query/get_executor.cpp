@@ -2036,13 +2036,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                            nss);
     }
 
-    // Pass index information to the update driver, so that it can determine for us whether the
-    // update affects indices.
-    const auto& updateIndexData = CollectionQueryInfo::get(collectionPtr).getIndexKeys(opCtx);
-    driver->refreshIndexKeys(&updateIndexData);
-
     if (!parsedUpdate->hasParsedQuery()) {
-
         // Only consider using the idhack if no hint was provided.
         if (request->getHint().isEmpty()) {
             // This is the idhack fast-path for getting a PlanExecutor without doing the work

@@ -599,11 +599,6 @@ void UpdateStage::doRestoreStateRequiresCollection() {
                                 << nsString.toStringForErrorMsg());
     }
 
-    // The set of indices may have changed during yield. Make sure that the update driver has up to
-    // date index information.
-    const auto& updateIndexData = CollectionQueryInfo::get(collection()).getIndexKeys(opCtx());
-    _params.driver->refreshIndexKeys(&updateIndexData);
-
     _preWriteFilter.restoreState();
     _cachedShardingCollectionDescription.restoreState();
 }

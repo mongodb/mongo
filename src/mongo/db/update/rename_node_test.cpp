@@ -122,7 +122,6 @@ TEST_F(RenameNodeTest, SimpleNumberAtRoot) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, i: {b: 2}}}"));
@@ -140,7 +139,6 @@ TEST_F(RenameNodeTest, ToExistsAtSameLevel) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, u: {b: 2}}}"));
@@ -158,7 +156,6 @@ TEST_F(RenameNodeTest, ToAndFromHaveSameValue) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, u: {b: 2}}}"));
@@ -176,7 +173,6 @@ TEST_F(RenameNodeTest, RenameToFieldWithSameValueButDifferentType) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 1}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, u: {b: 1}}}"));
@@ -194,7 +190,6 @@ TEST_F(RenameNodeTest, FromDottedElement) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}, b: {d: 6}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {u: {b: {d: 6}}, sa: {d: {c: false}}}}"));
@@ -212,7 +207,6 @@ TEST_F(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {c: 4, d: 2}}, b: 3, c: {}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {sa: {sb: {u: {c: 4}}}, sc: {d: {d: false}}}}"));
@@ -231,7 +225,6 @@ TEST_F(RenameNodeTest, MissingCompleteTo) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["c"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 1, c: {r: {d: 2}}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, sc: {i: {r: {d: 2}}}}}"));
@@ -249,7 +242,6 @@ TEST_F(RenameNodeTest, ToIsCompletelyMissing) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: {c: {d: 2}}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, i: {b: {c: {d: 2}}}}}"));
@@ -267,7 +259,6 @@ TEST_F(RenameNodeTest, ToMissingDottedField) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: {c: {d: [{a:2, b:1}]}}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, i: {b: {c: {d: [{a: 2, b: 1}]}}}}}"));
@@ -386,7 +377,6 @@ TEST_F(RenameNodeTest, ReplaceArrayField) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, u: {b: 2}}}"));
@@ -404,7 +394,6 @@ TEST_F(RenameNodeTest, ReplaceWithArrayField) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: []}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {a: false}, u: {b: []}}}"));
@@ -422,7 +411,6 @@ TEST_F(RenameNodeTest, CanRenameFromInvalidFieldName) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 2}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {d: {$a: false}, i: {a: 2}}}"));
@@ -454,7 +442,6 @@ TEST_F(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
 
     assertOplogEntryIsNoop();
@@ -473,7 +460,6 @@ TEST_F(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFa
     setValidateForStorage(false);
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     auto updated = BSON("a" << BSON("$ref"
                                     << "c")
                             << "b" << 0);
@@ -544,7 +530,6 @@ TEST_F(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {}}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 

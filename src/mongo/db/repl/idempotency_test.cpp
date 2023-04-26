@@ -213,9 +213,9 @@ void RandomizedIdempotencyTest::runUpdateV2IdempotencyTestCase() {
             // state would look like and compute diffs based on that.
             generatedDoc = generateDocWithId(kDocId);
             auto diffOutput = doc_diff::computeOplogDiff(
-                oldDoc, *generatedDoc, update_oplog_entry::kSizeOfDeltaOplogEntryMetadata, nullptr);
+                oldDoc, *generatedDoc, update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
             ASSERT(diffOutput);
-            oplogDiff = BSON("$v" << 2 << "diff" << diffOutput->diff);
+            oplogDiff = BSON("$v" << 2 << "diff" << *diffOutput);
             auto op = update(kDocId, oplogDiff);
             ASSERT_OK(runOpInitialSync(op));
             if (generatedDoc) {

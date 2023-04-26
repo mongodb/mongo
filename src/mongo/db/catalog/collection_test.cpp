@@ -322,9 +322,9 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     ASSERT_TRUE(!oldRecordId.isNull());
 
     auto newDoc = BSON("_id" << 1 << "a" << 5 << "b" << 32);
-    auto diff = doc_diff::computeOplogDiff(oldDoc, newDoc, 0, nullptr);
+    auto diff = doc_diff::computeOplogDiff(oldDoc, newDoc, 0);
     ASSERT(diff);
-    auto damagesOutput = doc_diff::computeDamages(oldDoc, diff->diff, false);
+    auto damagesOutput = doc_diff::computeDamages(oldDoc, *diff, false);
     {
         WriteUnitOfWork wuow(opCtx);
         Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);

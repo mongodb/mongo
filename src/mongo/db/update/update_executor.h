@@ -90,9 +90,6 @@ public:
         // constraints.
         bool validateForStorage = true;
 
-        // Used to determine whether indexes are affected.
-        const UpdateIndexData* indexData = nullptr;
-
         // Indicates whether/what type of oplog entry should be produced by the update executor.
         // If 'logMode' indicates an oplog entry should be produced but the update turns out to be
         // a noop, an oplog entry may not be produced.
@@ -108,13 +105,11 @@ public:
     struct ApplyResult {
         static ApplyResult noopResult() {
             ApplyResult applyResult;
-            applyResult.indexesAffected = false;
             applyResult.noop = true;
             applyResult.containsDotsAndDollarsField = false;
             return applyResult;
         }
 
-        bool indexesAffected = true;
         bool noop = false;
         bool containsDotsAndDollarsField = false;
 

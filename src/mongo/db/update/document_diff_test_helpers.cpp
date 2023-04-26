@@ -121,8 +121,7 @@ BSONObj generateDoc(PseudoRandom* rng, MutableDocument* doc, int depthLevel) {
 BSONObj applyDiffTestHelper(BSONObj preImage,
                             BSONObj diff,
                             bool mustCheckExistenceForInsertOperations) {
-    UpdateIndexData indexData;
-    return applyDiff(preImage, diff, &indexData, mustCheckExistenceForInsertOperations).postImage;
+    return applyDiff(preImage, diff, mustCheckExistenceForInsertOperations);
 }
 
 }  // namespace mongo::doc_diff
