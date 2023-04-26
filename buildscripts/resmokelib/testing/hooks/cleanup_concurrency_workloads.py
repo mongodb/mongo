@@ -68,11 +68,6 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
                 exclude_dbs.append(same_db_name)
         self.logger.info("Dropping all databases except for %s", exclude_dbs)
 
-        is_sharded_fixture = isinstance(self._hook.fixture, shardedcluster.ShardedClusterFixture)
-        # Stop the balancer.
-        if is_sharded_fixture and self._hook.fixture.enable_balancer:
-            self._hook.fixture.stop_balancer()
-
         for db_name in [db for db in db_names if db not in exclude_dbs]:
             self.logger.info("Dropping database %s", db_name)
             try:
@@ -93,7 +88,3 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
                     self.logger.exception("Encountered an error while dropping db % collection %s.",
                                           same_db_name, coll)
                     raise
-
-        # Start the balancer.
-        if is_sharded_fixture and self._hook.fixture.enable_balancer:
-            self._hook.fixture.start_balancer()
