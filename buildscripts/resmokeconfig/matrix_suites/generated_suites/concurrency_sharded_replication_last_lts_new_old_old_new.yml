@@ -40,12 +40,12 @@ executor:
       mongod_options:
         oplogSize: 1024
   hooks:
+  - class: CheckShardFilteringMetadata
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: ValidateCollections
   - class: CleanupConcurrencyWorkloads
 matrix_suite: true

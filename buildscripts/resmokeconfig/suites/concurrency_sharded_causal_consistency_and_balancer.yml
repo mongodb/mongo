@@ -119,12 +119,12 @@ executor:
           runningWithCausalConsistency: true
           runningWithBalancer: true
   hooks:
+  - class: CheckShardFilteringMetadata
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:

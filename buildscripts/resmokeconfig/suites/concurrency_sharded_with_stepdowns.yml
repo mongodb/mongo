@@ -185,11 +185,11 @@ executor:
     config_stepdown: true
     shard_stepdown: true
     use_action_permitted_file: true
+  - class: CheckShardFilteringMetadata
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:

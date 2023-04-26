@@ -233,11 +233,11 @@ executor:
   - class: ContinuousInitialSync
     use_action_permitted_file: true
     sync_interval_secs: 15
+  - class: CheckShardFilteringMetadata
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: CheckClusterIndexConsistency
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
     shell_options:

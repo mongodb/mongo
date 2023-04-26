@@ -118,6 +118,7 @@ executor:
         TestData:
           runningWithBalancer: false
   hooks:
+  - class: CheckShardFilteringMetadata
   # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
   # - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
@@ -125,7 +126,6 @@ executor:
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:
