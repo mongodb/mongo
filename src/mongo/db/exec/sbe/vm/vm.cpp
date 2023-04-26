@@ -6039,6 +6039,117 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
     return {true, objTag, objVal};
 }
 
+std::tuple<value::Array*, size_t, int32_t, int32_t> multiAccState(value::TypeTags accTag,
+                                                                  value::Value accVal) {
+    uassert(7548600, "The accumulator state should be an array", accTag == value::TypeTags::Array);
+    auto acc = value::getArrayView(accVal);
+
+    uassert(7548601,
+            "The accumulator state should have correct number of elements",
+            acc->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
+
+    auto [arrayTag, arrayVal] = acc->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
+    uassert(7548602,
+            "Internal array component is not of correct type",
+            arrayTag == value::TypeTags::Array);
+    auto array = value::getArrayView(arrayVal);
+
+    auto [maxSizeTag, maxSize] = acc->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
+    uassert(7548603,
+            "MaxSize component should be a 64-bit integer",
+            maxSizeTag == value::TypeTags::NumberInt64);
+
+    auto [memUsageTag, memUsage] = acc->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
+    uassert(7548612,
+            "MemUsage component should be a 32-bit integer",
+            memUsageTag == value::TypeTags::NumberInt32);
+
+    auto [memLimitTag, memLimit] = acc->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
+    uassert(7548613,
+            "MemLimit component should be a 32-bit integer",
+            memLimitTag == value::TypeTags::NumberInt32);
+
+    return {array, maxSize, memUsage, memLimit};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstN(ArityType arity) {
+    auto [accTag, accVal] = moveOwnedFromStack(0);
+    auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
+    value::ValueGuard guard{fieldTag, fieldVal};
+
+    auto [accArr, accSize, memUsage, memLimit] = multiAccState(accTag, accVal);
+
+    if (accArr->size() < accSize) {
+        // update memusage
+        memUsage += value::getApproximateSize(fieldTag, fieldVal);
+        auto maxMemAllowed = memLimit;
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream()
+                    << "$firstN used too much memory and spilling to disk cannot reduce memory "
+                       "consumption any further. Memory limit: "
+                    << maxMemAllowed << " bytes",
+                memUsage < maxMemAllowed);
+
+        // add to array
+        guard.reset();
+        accArr->push_back(fieldTag, fieldVal);
+
+        // update the memUsageBytes
+        value::getArrayView(accVal)->setAt(
+            static_cast<size_t>(AggMultiElems::kMemUsage), value::TypeTags::NumberInt32, memUsage);
+    }
+    return {true, accTag, accVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNMerge(ArityType arity) {
+    auto [mergeAccTag, mergeAccVal] = moveOwnedFromStack(0);
+    auto [accTag, accVal] = moveOwnedFromStack(1);
+    value::ValueGuard guard{accTag, accVal};
+
+    auto [mergeArr, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        multiAccState(mergeAccTag, mergeAccVal);
+    auto [arr, maxSize, memUsage, memLimit] = multiAccState(accTag, accVal);
+    uassert(7548604,
+            "Two arrays to merge should have the same MaxSize component",
+            maxSize == mergeMaxSize);
+
+    if (mergeArr->size() < maxSize) {
+        auto mergeCount = std::min((maxSize - mergeArr->size()), arr->size());
+        for (size_t i = 0; i < mergeCount; ++i) {
+            auto [tag, val] = arr->swapAt(i, value::TypeTags::Null, 0);
+
+            mergeMemUsage += value::getApproximateSize(tag, val);
+            auto maxMemAllowed = mergeMemLimit;
+            uassert(ErrorCodes::ExceededMemoryLimit,
+                    str::stream()
+                        << "$firstN used too much memory and spilling to disk cannot reduce memory "
+                           "consumption any further. Memory limit: "
+                        << maxMemAllowed << " bytes",
+                    mergeMemUsage < maxMemAllowed);
+
+            mergeArr->push_back(tag, val);
+        }
+        value::getArrayView(mergeAccVal)
+            ->setAt(static_cast<size_t>(AggMultiElems::kMemUsage),
+                    value::TypeTags::NumberInt32,
+                    mergeMemUsage);
+    }
+
+    return {true, mergeAccTag, mergeAccVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNFinalize(ArityType arity) {
+    auto [accTag, accVal] = moveOwnedFromStack(0);
+    value::ValueGuard guard{accTag, accVal};
+
+    uassert(7548605, "expected an array", accTag == value::TypeTags::Array);
+    auto accArr = value::getArrayView(accVal);
+
+    auto [outputTag, outputVal] =
+        accArr->swapAt(static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
+    return {true, outputTag, outputVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity) {
     switch (f) {
@@ -6305,6 +6416,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinObjectToArray(arity);
         case Builtin::arrayToObject:
             return builtinArrayToObject(arity);
+        case Builtin::aggFirstN:
+            return builtinAggFirstN(arity);
+        case Builtin::aggFirstNMerge:
+            return builtinAggFirstNMerge(arity);
+        case Builtin::aggFirstNFinalize:
+            return builtinAggFirstNFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -6577,6 +6694,12 @@ std::string builtinToString(Builtin b) {
             return "objectToArray";
         case Builtin::arrayToObject:
             return "arrayToObject";
+        case Builtin::aggFirstN:
+            return "aggFirstN";
+        case Builtin::aggFirstNMerge:
+            return "aggFirstNMerge";
+        case Builtin::aggFirstNFinalize:
+            return "aggFirstNFinalize";
         default:
             MONGO_UNREACHABLE;
     }

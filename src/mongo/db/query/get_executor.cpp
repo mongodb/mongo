@@ -63,6 +63,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request_gen.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/canonical_query.h"
@@ -1457,7 +1458,21 @@ bool shouldUseRegularSbe(const CanonicalQuery& cq) {
     // The 'ExpressionContext' may indicate that there are expressions which are only supported in
     // SBE when 'featureFlagSbeFull' is set, or fully supported regardless of the value of the
     // feature flag. This function should only return true in the latter case.
-    return cq.getExpCtx()->sbeCompatibility == SbeCompatibility::fullyCompatible;
+    if (cq.getExpCtx()->sbeCompatibility != SbeCompatibility::fullyCompatible) {
+        return false;
+    }
+    for (const auto& stage : cq.pipeline()) {
+        if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage->documentSource())) {
+            // Group stage wouldn't be pushed down if it's not supported in SBE.
+            tassert(7548611,
+                    "Unexpected SBE compatibility value",
+                    groupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
+            if (groupStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /**

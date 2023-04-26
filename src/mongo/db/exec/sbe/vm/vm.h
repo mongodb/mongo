@@ -753,9 +753,24 @@ enum class Builtin : uint8_t {
     isoWeek,
     objectToArray,
     arrayToObject,
+
+    aggFirstN,
+    aggFirstNMerge,
+    aggFirstNFinalize,
 };
 
 std::string builtinToString(Builtin b);
+
+/**
+ * This enum defines indices into an 'Array' that store state for $AccumulatorN expressions.
+ *
+ * The array might contain up to four elements:
+ * - The elements at indices `kInternalArr` is the array that holds the values.
+ * - The element at index `kMaxSize` is the maximum number entries the data structure holds.
+ * - The element at index `kMemUsage` holds the current memory usage
+ * - The element at index `kMemLimit` holds the max memory limit allowed
+ */
+enum class AggMultiElems { kInternalArr, kMaxSize, kMemUsage, kMemLimit, kSizeOfArray };
 
 /**
  * This enum defines indices into an 'Array' that returns the partial sum result when 'needsMerge'
@@ -1574,6 +1589,11 @@ private:
 
     FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
+
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstN(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNMerge(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNFinalize(ArityType arity);
+
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
     static constexpr size_t offsetOwned = 0;
