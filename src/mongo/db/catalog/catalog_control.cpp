@@ -212,7 +212,7 @@ void openCatalog(OperationContext* opCtx,
 
     // Remove catalogId mappings for larger timestamp than 'stableTimestamp'.
     CollectionCatalog::write(opCtx, [stableTimestamp](CollectionCatalog& catalog) {
-        catalog.cleanupForCatalogReopen(stableTimestamp);
+        catalog.catalogIdTracker().rollback(stableTimestamp);
     });
 
     // Ignore orphaned idents because this function is used during rollback and not at

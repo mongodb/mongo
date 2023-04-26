@@ -34,6 +34,7 @@
 #include <set>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/historical_catalogid_tracker.h"
 #include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/profile_filter.h"
@@ -446,27 +447,6 @@ public:
     bool containsCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
-     * Returns the CatalogId for a given 'nss' or 'uuid' at timestamp 'ts'.
-     */
-    struct CatalogIdLookup {
-        enum class Existence {
-            // Namespace or UUID exists at time 'ts' and catalogId set in 'id'.
-            kExists,
-            // Namespace or UUID does not exist at time 'ts'.
-            kNotExists,
-            // Namespace or UUID existence at time 'ts' is unknown. The durable catalog must be
-            // scanned to determine.
-            kUnknown
-        };
-        RecordId id;
-        Existence result;
-    };
-    CatalogIdLookup lookupCatalogIdByNSS(const NamespaceString& nss,
-                                         boost::optional<Timestamp> ts = boost::none) const;
-    CatalogIdLookup lookupCatalogIdByUUID(const UUID& uuid,
-                                          boost::optional<Timestamp> ts = boost::none) const;
-
-    /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
      * 'callback' to each view.  If the 'callback' returns false, the iterator exits early.
      *
@@ -656,28 +636,18 @@ public:
     iterator end(OperationContext* opCtx) const;
 
     /**
-     * Checks if 'cleanupForOldestTimestampAdvanced' should be called when the oldest timestamp
-     * advanced. Used to avoid a potentially expensive call to 'cleanupForOldestTimestampAdvanced'
-     * if no write is needed.
-     */
-    bool needsCleanupForOldestTimestamp(Timestamp oldest) const;
-
-    /**
-     * Cleans up internal structures when the oldest timestamp advances
-     */
-    void cleanupForOldestTimestampAdvanced(Timestamp oldest);
-
-    /**
-     * Cleans up internal structures after catalog reopen
-     */
-    void cleanupForCatalogReopen(Timestamp stable);
-
-    /**
      * Ensures we have a MODE_X lock on a collection or MODE_IX lock for newly created collections.
      */
     static void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
                                                         const NamespaceString& nss);
     static bool hasExclusiveAccessToCollection(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Returns HistoricalCatalogIdTracker for historical namespace/uuid mappings to catalogId based
+     * on timestamp.
+     */
+    const HistoricalCatalogIdTracker& catalogIdTracker() const;
+    HistoricalCatalogIdTracker& catalogIdTracker();
 
 private:
     friend class CollectionCatalog::iterator;
@@ -786,43 +756,6 @@ private:
                                       NamespaceType type) const;
 
     /**
-     * CatalogId with Timestamp
-     */
-    struct TimestampedCatalogId {
-        boost::optional<RecordId> id;
-        Timestamp ts;
-    };
-
-    // Push a catalogId for namespace and UUID at given Timestamp. Timestamp needs to be larger than
-    // other entries for this namespace and UUID. boost::none for catalogId represent drop,
-    // boost::none for timestamp turns this operation into a no-op.
-    void _pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
-                                     const UUID& uuid,
-                                     boost::optional<RecordId> catalogId,
-                                     boost::optional<Timestamp> ts);
-
-    // Push a catalogId for 'from' and 'to' for a rename operation at given Timestamp. Timestamp
-    // needs to be larger than other entries for these namespaces. boost::none for timestamp turns
-    // this operation into a no-op.
-    void _pushCatalogIdForRename(const NamespaceString& from,
-                                 const NamespaceString& to,
-                                 boost::optional<Timestamp> ts);
-
-    // Inserts a catalogId for namespace and UUID at given Timestamp, if not boost::none. Used after
-    // scanning the durable catalog for a correct mapping at the given timestamp.
-    void _insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<const NamespaceString&> nss,
-                                                boost::optional<UUID> uuid,
-                                                boost::optional<RecordId> catalogId,
-                                                Timestamp ts);
-
-    // Helper to calculate if a namespace or UUID needs to be marked for cleanup for a set of
-    // timestamped catalogIds
-    template <class Key, class CatalogIdChangesContainer>
-    void _markForCatalogIdCleanupIfNeeded(const Key& key,
-                                          CatalogIdChangesContainer& catalogIdChangesContainer,
-                                          const std::vector<TimestampedCatalogId>& ids);
-
-    /**
      * Returns true if catalog information about this namespace or UUID should be looked up from the
      * durable catalog rather than using the in-memory state of the catalog.
      *
@@ -857,12 +790,6 @@ private:
         const NamespaceStringOrUUID& nssOrUUID,
         Timestamp readTimestamp) const;
 
-    // Helpers for 'lookupCatalogIdByNSS' and 'lookupCatalogIdByUUID'.
-    CatalogIdLookup _checkWithOldestCatalogIdTimestampMaintained(
-        boost::optional<Timestamp> ts) const;
-    CatalogIdLookup _findCatalogIdInRange(boost::optional<Timestamp> ts,
-                                          const std::vector<TimestampedCatalogId>& range) const;
-
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
      * to pre-close NSS. See also onCloseCatalog.
@@ -890,21 +817,8 @@ private:
     immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>> _pendingCommitNamespaces;
     immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash> _pendingCommitUUIDs;
 
-    // CatalogId mappings for all known namespaces and UUIDs for the CollectionCatalog. The vector
-    // is sorted on timestamp. UUIDs will have at most two entries. One for the create and another
-    // for the drop. UUIDs stay the same across collection renames.
-    immutable::unordered_map<NamespaceString, std::vector<TimestampedCatalogId>> _nssCatalogIds;
-    immutable::unordered_map<UUID, std::vector<TimestampedCatalogId>, UUID::Hash> _uuidCatalogIds;
-    // Set of namespaces and UUIDs that need cleanup when the oldest timestamp advances
-    // sufficiently.
-    immutable::unordered_set<NamespaceString> _nssCatalogIdChanges;
-    immutable::unordered_set<UUID, UUID::Hash> _uuidCatalogIdChanges;
-    // Point at which the oldest timestamp need to advance for there to be any catalogId namespace
-    // that can be cleaned up
-    Timestamp _lowestCatalogIdTimestampForCleanup = Timestamp::max();
-    // The oldest timestamp at which the catalog maintains catalogId mappings. Anything older than
-    // this is unknown and must be discovered by scanning the durable catalog.
-    Timestamp _oldestCatalogIdTimestampMaintained = Timestamp::max();
+    // Provides functionality to lookup catalogId by namespace/uuid for a given timestamp.
+    HistoricalCatalogIdTracker _catalogIdTracker;
 
     // Map of database names to their corresponding views and other associated state.
     ViewsForDatabaseMap _viewsForDatabase;

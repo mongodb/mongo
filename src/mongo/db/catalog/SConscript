@@ -293,6 +293,7 @@ env.Library(
     target='collection_catalog',
     source=[
         'collection_catalog.cpp',
+        'historical_catalogid_tracker.cpp',
         'uncommitted_catalog_updates.cpp',
         'uncommitted_multikey.cpp',
         'views_for_database.cpp',
@@ -679,6 +680,7 @@ if wiredtiger:
             'create_collection_test.cpp',
             'database_test.cpp',
             'drop_database_test.cpp',
+            'historical_catalogid_tracker_test.cpp',
             'index_build_entry_test.cpp',
             'index_builds_manager_test.cpp',
             'index_key_validate_test.cpp',

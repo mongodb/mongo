@@ -95,10 +95,9 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
               // The global lock is held by the timestamp monitor while callbacks are executed, so
               // there can be no batched CollectionCatalog writer and we are thus safe to write
               // using the service context.
-              if (CollectionCatalog::latest(serviceContext)
-                      ->needsCleanupForOldestTimestamp(timestamp)) {
+              if (CollectionCatalog::latest(serviceContext)->catalogIdTracker().dirty(timestamp)) {
                   CollectionCatalog::write(serviceContext, [timestamp](CollectionCatalog& catalog) {
-                      catalog.cleanupForOldestTimestampAdvanced(timestamp);
+                      catalog.catalogIdTracker().cleanup(timestamp);
                   });
               }
           }),
@@ -279,7 +278,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
     Timestamp minValidTs = stableTs ? *stableTs : Timestamp::min();
     CollectionCatalog::write(opCtx, [&minValidTs](CollectionCatalog& catalog) {
         // Let the CollectionCatalog know that we are maintaining timestamps from minValidTs
-        catalog.cleanupForCatalogReopen(minValidTs);
+        catalog.catalogIdTracker().rollback(minValidTs);
     });
     for (DurableCatalog::EntryIdentifier entry : catalogEntries) {
         if (_options.forRestore) {
