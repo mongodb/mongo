@@ -134,7 +134,6 @@ def main():
                 FunctionCall("cleanup environment"),
                 FunctionCall("set up venv"),
                 FunctionCall("upload pip requirements"),
-                FunctionCall("get all modified patch files"),
                 FunctionCall("f_expansions_write"),
                 FunctionCall("configure evergreen api credentials"),
                 FunctionCall("get buildnumber"),

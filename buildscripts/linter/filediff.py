@@ -34,7 +34,7 @@ def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     return repos, revision_map
 
 
-def _filter_file(filename: str, is_interesting_file: Callable) -> bool:
+def _filter_file(filename: str, is_interesting_file: Callable[[str], bool]) -> bool:
     """
     Determine if file should be included based on existence and passed in method.
 
@@ -45,7 +45,7 @@ def _filter_file(filename: str, is_interesting_file: Callable) -> bool:
     return os.path.exists(filename) and is_interesting_file(filename)
 
 
-def gather_changed_files_for_lint(is_interesting_file: Callable) -> List[str]:
+def gather_changed_files_for_lint(is_interesting_file: Callable[[str], bool]) -> List[str]:
     """
     Get the files that have changes since the last git commit.
 

@@ -240,7 +240,6 @@ variables:
   # "set up venv".
   - func: "set up venv"
   - func: "upload pip requirements"
-  - func: "get all modified patch files"
   - func: "f_expansions_write"
   - func: "configure evergreen api credentials"
   - func: "get buildnumber"
@@ -731,23 +730,6 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/functions/shared_scons_directory_umount.sh"
-
-  "get all modified patch files":
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/functions/modified_patch_files_get_all.sh"
-
-  # This function should only be called from patch-build-only tasks.
-  "get added and modified patch files":
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/functions/added_and_modified_patch_files_get.sh"
 
   "determine resmoke jobs": &determine_resmoke_jobs
     command: subprocess.exec
@@ -1501,7 +1483,8 @@ functions:
     params:
       binary: bash
       args:
-      - "./src/evergreen/lint_fuzzer_sanity_patch.sh"
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/lint_fuzzer_sanity_patch.py"
 
   "lint fuzzer sanity all":
   - *f_expansions_write
@@ -4520,7 +4503,6 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
-  - func: "get added and modified patch files"
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity patch"
 
