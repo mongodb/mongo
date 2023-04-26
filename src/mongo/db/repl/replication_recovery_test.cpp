@@ -712,7 +712,33 @@ TEST_F(ReplicationRecoveryTest,
     testRecoveryToStableAppliesDocumentsWithNoAppliedThrough(false);
 }
 
-TEST_F(ReplicationRecoveryTest, RecoveryIgnoresDroppedCollections) {
+TEST_F(ReplicationRecoveryTest, UnstableRecoveryIgnoresDroppedCollections) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
+
+    ASSERT_OK(getStorageInterface()->dropCollection(opCtx, testNs));
+    {
+        AutoGetCollectionForReadCommand autoColl(opCtx, testNs);
+        ASSERT_FALSE(autoColl.getCollection());
+    }
+
+    // Not setting a stable timestamp in order to perform unstable recovery,
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
+    {
+        AutoGetCollectionForReadCommand autoColl(opCtx, testNs);
+        ASSERT_FALSE(autoColl.getCollection());
+    }
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
+}
+
+DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+                   StableRecoveryCrashOnDroppedCollectionsInTests,
+                   "Fatal assertion.*5415000") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -726,14 +752,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryIgnoresDroppedCollections) {
 
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
     recovery.recoverFromOplog(opCtx, boost::none);
-
-    _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
-    {
-        AutoGetCollectionForReadCommand autoColl(opCtx, testNs);
-        ASSERT_FALSE(autoColl.getCollection());
-    }
-    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehindAfterTruncation) {
@@ -1233,7 +1251,7 @@ TEST_F(ReplicationRecoveryTest,
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
-TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToBeforeEndOfOplog) {
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpTo) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1244,8 +1262,16 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToBeforeEndOfOplog) {
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
     _assertDocsInTestCollection(opCtx, {3, 4, 5});
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
+}
 
-    // Recovers operations with timestamps: 6, 7, 8, 9.
+TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToBeforeEndOfOplog) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {2, 3, 4, 5, 6, 7, 8, 9, 10});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+
+    // Recovers operations with timestamps: 3, 4, 5, 6, 7, 8, 9.
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(9, 9));
     _assertDocsInTestCollection(opCtx, {3, 4, 5, 6, 7, 8, 9});
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(9, 9), 1));
@@ -1314,9 +1340,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToDoesNotExceedEndPoint) {
 
     _setUpOplog(opCtx, getStorageInterface(), {2, 5, 10});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-
-    recovery.recoverFromOplogUpTo(opCtx, Timestamp(9, 9));
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(15, 15));
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(10, 10), 1));

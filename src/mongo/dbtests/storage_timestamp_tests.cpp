@@ -1415,7 +1415,7 @@ public:
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
-            repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
             writerPool.get());
 
         uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
@@ -1517,7 +1517,7 @@ public:
             _coordinatorMock,
             _consistencyMarkers,
             storageInterface,
-            repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
             writerPool.get());
 
         uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
