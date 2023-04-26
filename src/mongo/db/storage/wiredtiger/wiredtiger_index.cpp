@@ -1813,16 +1813,73 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
         return;
     }
 
-    // After a rolling upgrade an index can have keys from both timestamp unsafe (old) and
-    // timestamp safe (new) unique indexes. Old format keys just had the index key while new
-    // format key has index key + Record id. WT_NOTFOUND is possible if index key is in old format.
-    // Retry removal of key using old format.
+    // WT_NOTFOUND is possible if index key is in old (v4.0) format. Retry removal of key using old
+    // format.
+    _unindexTimestampUnsafe(opCtx, c, keyString, dupsAllowed);
+}
+
+void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
+                                                    WT_CURSOR* c,
+                                                    const KeyString::Value& keyString,
+                                                    bool dupsAllowed) {
+    // The old unique index format had a key-value of indexKey-RecordId. This means that the
+    // RecordId in an index entry might not match the indexKey+RecordId keyString passed into this
+    // function: an index on a field where multiple collection documents have the same field value
+    // but only one passes the partial index filter.
+    //
+    // The dupsAllowed flag is no longer relevant for the old unique index format. No new index
+    // entries are written in the old format, let alone during temporary phases of the server when
+    // duplicates are allowed.
+
+    const RecordId id =
+        KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    invariant(id.isValid());
+
     auto sizeWithoutRecordId =
         KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
-    ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
+    if (_partial) {
+        int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
+        if (ret == WT_NOTFOUND) {
+            return;
+        }
+        invariantWTOK(ret, c->session);
+
+        WT_ITEM value;
+        invariantWTOK(c->get_value(c, &value), c->session);
+        BufReader br(value.data, value.size);
+        fassert(40416, br.remaining());
+
+        // Check that the record id matches. We may be called to unindex records that are not
+        // present in the index due to the partial filter expression.
+        bool foundRecord = [&]() {
+            if (KeyString::decodeRecordIdLong(&br) != id) {
+                return false;
+            }
+            return true;
+        }();
+
+        // Ensure the index entry value is not a list of RecordIds, which should only be possible
+        // temporarily in v4.0 when dupsAllowed is true, not ever across upgrades or in upgraded
+        // versions.
+        KeyString::TypeBits::fromBuffer(getKeyStringVersion(), &br);
+        if (br.remaining()) {
+            LOGV2_FATAL_NOTRACE(
+                7592201,
+                "An index entry was found that contains an unexpected old format that should no "
+                "longer exist. The index should be dropped and rebuilt.",
+                "indexName"_attr = _indexName,
+                "collectionUUID"_attr = _collectionUUID);
+        }
+
+        if (!foundRecord) {
+            return;
+        }
+    }
+
+    int ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
     if (ret == WT_NOTFOUND) {
         return;
     }
