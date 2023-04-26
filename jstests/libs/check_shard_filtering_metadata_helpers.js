@@ -75,13 +75,6 @@ var CheckShardFilteringMetadataHelpers = (function() {
                 return;
             }
 
-            if (collectionMetadataOnNode.timestamp === undefined) {
-                // Versions earlier than v6.3 did not report the timestamp on shardingState command
-                // (SERVER-70790). This early exit can be removed after v6.0 is no longer tested in
-                // multiversion suites.
-                return;
-            }
-
             if (timestampCmp(collectionMetadataOnNode.timestamp, Timestamp(0, 0)) === 0) {
                 // The metadata reflects an unsharded collection. It is okay for a node to have this
                 // stale metadata, as long as the node knows the correct dbVersion.
