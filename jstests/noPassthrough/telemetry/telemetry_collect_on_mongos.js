@@ -71,10 +71,12 @@ const assertExpectedResults = (results,
     const coll = db[collName];
 
     const telemetryKey = {
-        cmdNs: {db: "test", coll: "coll"},
-        find: collName,
-        filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
-        batchSize: "?number",
+        queryShape: {
+            cmdNs: {db: "test", coll: "coll"},
+            find: collName,
+            filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
+            batchSize: "?number",
+        },
         readConcern: {level: "local", provenance: "implicitDefault"},
         applicationName: "MongoDB Shell",
     };
@@ -204,10 +206,12 @@ const assertExpectedResults = (results,
     const coll = db[collName];
 
     const telemetryKey = {
-        cmdNs: {db: "test", coll: "coll"},
-        find: collName,
-        filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
-        batchSize: "?number",
+        queryShape: {
+            cmdNs: {db: "test", coll: "coll"},
+            find: collName,
+            filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
+            batchSize: "?number",
+        },
         readConcern: {level: "local", provenance: "implicitDefault"},
         applicationName: "MongoDB Shell"
     };

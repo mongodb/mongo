@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/query_request_helper.h"
 
 namespace mongo::query_shape {
 
@@ -61,5 +62,9 @@ BSONObj representativePredicateShape(
 BSONObj sortShape(const BSONObj& sortSpec,
                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const SerializationOptions& opts);
+
+BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+                          const SerializationOptions& opts,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 }  // namespace mongo::query_shape

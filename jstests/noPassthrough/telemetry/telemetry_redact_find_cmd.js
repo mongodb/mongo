@@ -20,8 +20,8 @@ function runTest(conn) {
     let telemetry = getTelemetryRedacted(admin);
 
     assert.eq(1, telemetry.length);
-    assert.eq(kHashedCollName, telemetry[0].key.find);
-    assert.eq({[kHashedFieldName]: {$eq: "?number"}}, telemetry[0].key.filter);
+    assert.eq(kHashedCollName, telemetry[0].key.queryShape.find);
+    assert.eq({[kHashedFieldName]: {$eq: "?number"}}, telemetry[0].key.queryShape.filter);
 
     db.test.insert({v: 2});
 
@@ -35,11 +35,11 @@ function runTest(conn) {
 
     telemetry = getTelemetryRedacted(admin);
     assert.eq(2, telemetry.length);
-    assert.eq(kHashedCollName, telemetry[1].key.find);
+    assert.eq(kHashedCollName, telemetry[1].key.queryShape.find);
     assert.eq({
         "$and": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$lt": "?number"}}]
     },
-              telemetry[1].key.filter);
+              telemetry[1].key.queryShape.filter);
 }
 
 const conn = MongoRunner.runMongod({

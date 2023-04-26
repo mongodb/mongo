@@ -68,69 +68,6 @@ namespace telemetry {
  * operator.
  */
 namespace {
-static std::string hintSpecialField = "$hint";
-void addLiteralFields(BSONObjBuilder* bob,
-                      const FindCommandRequest& findCommand,
-                      const SerializationOptions& opts) {
-
-    if (auto limit = findCommand.getLimit()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kLimitFieldName, static_cast<long long>(*limit));
-    }
-    if (auto skip = findCommand.getSkip()) {
-        opts.appendLiteral(bob, FindCommandRequest::kSkipFieldName, static_cast<long long>(*skip));
-    }
-    if (auto batchSize = findCommand.getBatchSize()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
-    }
-    if (auto maxTimeMs = findCommand.getMaxTimeMS()) {
-        opts.appendLiteral(bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
-    }
-    if (auto noCursorTimeout = findCommand.getNoCursorTimeout()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kNoCursorTimeoutFieldName, bool(noCursorTimeout));
-    }
-}
-
-static std::vector<
-    std::pair<StringData, std::function<const OptionalBool(const FindCommandRequest&)>>>
-    boolArgMap = {
-        {FindCommandRequest::kSingleBatchFieldName, &FindCommandRequest::getSingleBatch},
-        {FindCommandRequest::kAllowDiskUseFieldName, &FindCommandRequest::getAllowDiskUse},
-        {FindCommandRequest::kReturnKeyFieldName, &FindCommandRequest::getReturnKey},
-        {FindCommandRequest::kShowRecordIdFieldName, &FindCommandRequest::getShowRecordId},
-        {FindCommandRequest::kTailableFieldName, &FindCommandRequest::getTailable},
-        {FindCommandRequest::kAwaitDataFieldName, &FindCommandRequest::getAwaitData},
-        {FindCommandRequest::kAllowPartialResultsFieldName,
-         &FindCommandRequest::getAllowPartialResults},
-        {FindCommandRequest::kMirroredFieldName, &FindCommandRequest::getMirrored},
-};
-
-std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandRequest&)>>>
-    objArgMap = {
-        {FindCommandRequest::kCollationFieldName, &FindCommandRequest::getCollation},
-
-};
-
-void addRemainingFindCommandFields(BSONObjBuilder* bob,
-                                   const FindCommandRequest& findCommand,
-                                   const SerializationOptions& opts) {
-    for (auto [fieldName, getterFunction] : boolArgMap) {
-        auto optBool = getterFunction(findCommand);
-        if (optBool.has_value()) {
-            opts.appendLiteral(bob, fieldName, optBool.value_or(false));
-        }
-    }
-    if (auto optObj = findCommand.getReadConcern()) {
-        // Read concern should not be considered a literal.
-        bob->append(FindCommandRequest::kReadConcernFieldName, optObj.get());
-    }
-    auto collation = findCommand.getCollation();
-    if (!collation.isEmpty()) {
-        opts.appendLiteral(bob, FindCommandRequest::kCollationFieldName, collation);
-    }
-}
 
 boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
     if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
@@ -139,163 +76,18 @@ boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
     return boost::none;
 }
 }  // namespace
-BSONObj redactHintComponent(BSONObj obj, const SerializationOptions& opts, bool redactValues) {
-    BSONObjBuilder bob;
-    for (BSONElement elem : obj) {
-        if (hintSpecialField.compare(elem.fieldName()) == 0) {
-            tassert(7421703,
-                    "Hinted field must be a string with $hint operator",
-                    elem.type() == BSONType::String);
-            bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
-            continue;
-        }
-
-        // $natural doesn't need to be redacted.
-        if (elem.fieldNameStringData().compare(query_request_helper::kNaturalSortField) == 0) {
-            bob.append(elem);
-            continue;
-        }
-
-        if (opts.replacementForLiteralArgs && redactValues) {
-            bob.append(opts.serializeFieldPathFromString(elem.fieldName()),
-                       opts.replacementForLiteralArgs.get());
-        } else {
-            bob.appendAs(elem, opts.serializeFieldPathFromString(elem.fieldName()));
-        }
-    }
-    return bob.obj();
-}
-
-/**
- * In a let specification all field names are variable names, and all values are either expressions
- * or constants.
- */
-BSONObj redactLetSpec(BSONObj letSpec,
-                      const SerializationOptions& opts,
-                      boost::intrusive_ptr<ExpressionContext> expCtx) {
-
-    BSONObjBuilder bob;
-    for (BSONElement elem : letSpec) {
-        auto redactedValue =
-            Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState)
-                ->serialize(opts);
-        // Note that this will throw on deeply nested let variables.
-        redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
-    }
-    return bob.obj();
-}
 
 BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
                          const SerializationOptions& opts,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          boost::optional<const TelemetryMetrics&> existingMetrics) {
-    // TODO: SERVER-75156 Factor query shape out of telemetry. That ticket will involve splitting
-    // this function up and moving most of it to another, non-telemetry related header.
 
-    if (!opts.redactIdentifiers && !opts.replacementForLiteralArgs) {
-        // Short circuit if no redaction needs to be done.
-        BSONObjBuilder bob;
-        findCommand.serialize({}, &bob);
-        return bob.obj();
-    }
-
-    // This function enumerates all the fields in a find command and either copies or attempts to
-    // redact them.
     BSONObjBuilder bob;
-
-    // Serialize the namespace as part of the query shape.
-    {
-        BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
-        auto ns = findCommand.getNamespaceOrUUID();
-        if (ns.nss()) {
-            auto nss = ns.nss().value();
-            if (nss.tenantId()) {
-                cmdNs.append("tenantId",
-                             opts.serializeIdentifier(nss.tenantId().value().toString()));
-            }
-            cmdNs.append("db", opts.serializeIdentifier(nss.db()));
-            cmdNs.append("coll", opts.serializeIdentifier(nss.coll()));
-        } else {
-            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid()->toString()));
-        }
-        cmdNs.done();
+    bob.append("queryShape", query_shape::extractQueryShape(findCommand, opts, expCtx));
+    if (auto optObj = findCommand.getReadConcern()) {
+        // Read concern should not be considered a literal.
+        bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
     }
-
-    // Redact the namespace of the command.
-    {
-        auto nssOrUUID = findCommand.getNamespaceOrUUID();
-        std::string toSerialize;
-        if (nssOrUUID.uuid()) {
-            toSerialize = opts.serializeIdentifier(nssOrUUID.toString());
-        } else {
-            // Database is set at the command level, only serialize the collection here.
-            toSerialize = opts.serializeIdentifier(nssOrUUID.nss()->coll());
-        }
-        bob.append(FindCommandRequest::kCommandName, toSerialize);
-    }
-
-    std::unique_ptr<MatchExpression> filterExpr;
-    // Filter.
-    {
-        auto filter = findCommand.getFilter();
-        filterExpr = uassertStatusOKWithContext(
-            MatchExpressionParser::parse(findCommand.getFilter(),
-                                         expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures),
-            "Failed to parse 'filter' option when making telemetry key");
-        bob.append(FindCommandRequest::kFilterFieldName, filterExpr->serialize(opts));
-    }
-
-    // Let Spec.
-    if (auto letSpec = findCommand.getLet()) {
-        auto redactedObj = redactLetSpec(letSpec.get(), opts, expCtx);
-        auto ownedObj = redactedObj.getOwned();
-        bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
-    }
-
-    if (!findCommand.getProjection().isEmpty()) {
-        // Parse to Projection
-        auto projection =
-            projection_ast::parseAndAnalyze(expCtx,
-                                            findCommand.getProjection(),
-                                            filterExpr.get(),
-                                            findCommand.getFilter(),
-                                            ProjectionPolicies::findProjectionPolicies());
-
-        bob.append(FindCommandRequest::kProjectionFieldName,
-                   projection_ast::serialize(*projection.root(), opts));
-    }
-
-    // Assume the hint is correct and contains field names. It is possible that this hint
-    // doesn't actually represent an index, but we can't detect that here.
-    // Hint, max, and min won't serialize if the object is empty.
-    if (!findCommand.getHint().isEmpty()) {
-        bob.append(FindCommandRequest::kHintFieldName,
-                   redactHintComponent(findCommand.getHint(), opts, false));
-        // Max/Min aren't valid without hint.
-        if (!findCommand.getMax().isEmpty()) {
-            bob.append(FindCommandRequest::kMaxFieldName,
-                       redactHintComponent(findCommand.getMax(), opts, true));
-        }
-        if (!findCommand.getMin().isEmpty()) {
-            bob.append(FindCommandRequest::kMinFieldName,
-                       redactHintComponent(findCommand.getMin(), opts, true));
-        }
-    }
-
-    // Sort.
-    if (!findCommand.getSort().isEmpty()) {
-        bob.append(FindCommandRequest::kSortFieldName,
-                   query_shape::sortShape(findCommand.getSort(), expCtx, opts));
-    }
-
-    // Fields for literal redaction. Adds limit, skip, batchSize, maxTimeMS, and noCursorTimeOut
-    addLiteralFields(&bob, findCommand, opts);
-
-    // Add the fields that require no redaction.
-    addRemainingFindCommandFields(&bob, findCommand, opts);
-
     auto appName = [&]() -> boost::optional<std::string> {
         if (existingMetrics.has_value()) {
             if (existingMetrics->applicationName.has_value()) {
@@ -311,7 +103,6 @@ BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
     if (appName.has_value()) {
         bob.append("applicationName", opts.serializeIdentifier(appName.value()));
     }
-
     return bob.obj();
 }
 
@@ -581,17 +372,25 @@ BSONObj TelemetryMetrics::redactKey(const BSONObj& key,
                                     bool redactIdentifiers,
                                     std::string redactionKey,
                                     OperationContext* opCtx) const {
-    // The redacted key for each entry is cached on first computation. However, if the redaction
-    // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
-    // to the function, so entries returned to the user match the redaction strategy requested in
-    // the most recent telemetry command.
     if (!redactIdentifiers) {
         return key;
     }
+
     if (_redactedKey) {
         return *_redactedKey;
     }
-
+    // The telemetry key for find queries is generated by serializing all the command fields
+    // and redacting if SerializationOptions indicate to do so. The resulting key is of the form:
+    // {
+    //    queryShape: {
+    //        cmdNs: {db: "...", coll: "..."},
+    //        find: "...",
+    //        filter: {"...": {"$eq": "?number"}},
+    //    },
+    //    applicationName: kHashedApplicationName
+    // }
+    // queryShape may include additional fields, eg hint, limit sort, etc, depending on the original
+    // query.
     if (cmdObj.hasField(FindCommandRequest::kCommandName)) {
         tassert(7198600, "Find command must have a namespace string.", this->nss.nss().has_value());
         auto findCommand =
@@ -599,9 +398,11 @@ BSONObj TelemetryMetrics::redactKey(const BSONObj& key,
         auto nss = findCommand->getNamespaceOrUUID().nss();
         uassert(7349400, "Namespace must be defined", nss.has_value());
 
-        SerializationOptions options(
-            [&](StringData sd) { return sha256HmacStringDataHasher(redactionKey, sd); },
-            LiteralSerializationPolicy::kToDebugTypeString);
+        auto serializationOpts = redactIdentifiers
+            ? SerializationOptions(
+                  [&](StringData sd) { return sha256HmacStringDataHasher(redactionKey, sd); },
+                  LiteralSerializationPolicy::kToDebugTypeString)
+            : SerializationOptions(false);
 
         auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                         *findCommand,
@@ -610,12 +411,18 @@ BSONObj TelemetryMetrics::redactKey(const BSONObj& key,
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         expCtx->stopExpressionCounters();
 
-        _redactedKey = makeTelemetryKey(*findCommand, options, expCtx, *this);
-        return *_redactedKey;
+        auto key = makeTelemetryKey(*findCommand, serializationOpts, expCtx, *this);
+        // TODO: SERVER-76526 as part of this ticket, no form of the key (redacted or not) will be
+        // cached with TelemetryMetrics.
+        if (redactIdentifiers) {
+            _redactedKey = key;
+            return *_redactedKey;
+        }
+        return key;
     }
 
-    // The telemetry key is of the following form:
-    // { "<CMD_TYPE>": {...}, "namespace": "...", "applicationName": "...", ... }
+    // The telemetry key for agg queries is of the following form:
+    // { "agg": {...}, "namespace": "...", "applicationName": "...", ... }
     //
     // The part of the key we need to redact is the object in the <CMD_TYPE> element. In the case of
     // an aggregate() command, it will look something like:
@@ -623,10 +430,6 @@ BSONObj TelemetryMetrics::redactKey(const BSONObj& key,
     //					{ "$addFields" : { "x" : { "$someExpr" {} } } } ],
     // We should preserve the top-level stage names in the pipeline but redact all field names of
     // children.
-    //
-    // The find-specific key will look like so:
-    // > "find" : { "find" : "###", "filter" : { "_id" : { "$ne" : "###" } } },
-    // Again, we should preserve the top-level keys and redact all field names of children.
     BSONObjBuilder redacted;
     for (BSONElement e : key) {
         if ((e.type() == Object || e.type() == Array) &&

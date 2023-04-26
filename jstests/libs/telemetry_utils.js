@@ -63,7 +63,9 @@ function getTelemetryRedacted(
     // Hashed application name is generated using the default redactionKey argument.
     const kApplicationName = "T1iwlAqhXYroi7HTycmBJvWZSETwKXnaNa5akM4q0H4=";
     // Filter out agg queries, including $telemetry.
-    const match = {$match: {"key.find": {$exists: true}, "key.applicationName": kApplicationName}};
+    const match = {
+        $match: {"key.queryShape.find": {$exists: true}, "key.applicationName": kApplicationName}
+    };
     if (!redactIdentifiers) {
         match.$match["key.applicationName"] = "MongoDB Shell";
     }

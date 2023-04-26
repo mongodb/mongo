@@ -139,14 +139,16 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
                 }
             }
         })",
@@ -157,19 +159,21 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
         redacted);
@@ -179,24 +183,26 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
         redacted);
@@ -209,28 +215,30 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
         redacted);
@@ -242,38 +250,40 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
         redacted);
@@ -288,43 +298,45 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
-                }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
-            },
-            "limit": "?number",
-            "skip": "?number",
-            "batchSize": "?number",
-            "maxTimeMS": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
+                },
+                "limit": "?number",
+                "skip": "?number",
+                "batchSize": "?number",
+                "maxTimeMS": "?number"
+            }
         })",
         redacted);
 
@@ -338,43 +350,45 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setMirrored(true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
-                }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
-            },
-            "limit": "?number",
-            "skip": "?number",
-            "batchSize": "?number",
-            "maxTimeMS": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
+                },
+                "limit": "?number",
+                "skip": "?number",
+                "batchSize": "?number",
+                "maxTimeMS": "?number"
+            }
         })",
         redacted);
 }
@@ -392,12 +406,14 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     auto redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {}
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {}
+            }
         })",
         redacted);  // NOLINT (test auto-update)
 }
@@ -418,25 +434,27 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "testDB",
-                "coll": "testColl"
-            },
-            "find": "testColl",
-            "filter": {
-                "b": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "find": "testColl",
+                "filter": {
+                    "b": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "z": 1,
+                    "c": 1
+                },
+                "max": {
+                    "z": "?"
+                },
+                "min": {
+                    "z": "?"
                 }
-            },
-            "hint": {
-                "z": 1,
-                "c": 1
-            },
-            "max": {
-                "z": "?"
-            },
-            "min": {
-                "z": "?"
             }
         })",
         redacted);
@@ -448,24 +466,26 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "testDB",
-                "coll": "testColl"
-            },
-            "find": "testColl",
-            "filter": {
-                "b": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "find": "testColl",
+                "filter": {
+                    "b": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "$hint": "z"
+                },
+                "max": {
+                    "z": "?"
+                },
+                "min": {
+                    "z": "?"
                 }
-            },
-            "hint": {
-                "$hint": "z"
-            },
-            "max": {
-                "z": "?"
-            },
-            "min": {
-                "z": "?"
             }
         })",
         redacted);
@@ -478,25 +498,27 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": 1
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<b>": {
+                        "$eq": 1
+                    }
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": 25
+                },
+                "min": {
+                    "HASH<z>": 80
                 }
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": 25
-            },
-            "min": {
-                "HASH<z>": 80
             }
         })",
         redacted);
@@ -507,25 +529,27 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<b>": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
                 }
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
             }
         })",
         redacted);
@@ -535,24 +559,26 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<b>": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "$natural": -1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
                 }
-            },
-            "hint": {
-                "$natural": -1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
             }
         })",
         redacted);
@@ -576,6 +602,8 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
 
     bool redactIdentifiers = false;
     auto redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
+    // As the query never moves through registerFindRequest and redaction is not enabled,
+    // makeTelemetryKey() never gets called and consequently the query never gets shapified.
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "testColl",
@@ -605,27 +633,29 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
     redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
-                "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
-            },
-            "find": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c=",
-            "filter": {
-                "$expr": [
-                    {
-                        "$eq": [
-                            "$lhWpXUozYRjENbnNVMXoZEq5VrVzqikmJ0oSgLZnRxM=",
-                            "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8="
-                        ]
-                    }
-                ]
-            },
-            "let": {
-                "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
-            },
-            "projection": {
-                "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
-                "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
+            "queryShape": {
+                "cmdNs": {
+                    "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
+                    "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
+                },
+                "find": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c=",
+                "filter": {
+                    "$expr": [
+                        {
+                            "$eq": [
+                                "$lhWpXUozYRjENbnNVMXoZEq5VrVzqikmJ0oSgLZnRxM=",
+                                "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8="
+                            ]
+                        }
+                    ]
+                },
+                "let": {
+                    "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
+                },
+                "projection": {
+                    "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
+                    "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
+                }
             }
         })",
         redacted);
