@@ -42,8 +42,10 @@ class ReplicationRecoveryMock : public ReplicationRecovery {
 public:
     ReplicationRecoveryMock() = default;
 
-    void recoverFromOplog(OperationContext* opCtx,
-                          boost::optional<Timestamp> stableTimestamp) override {}
+    boost::optional<Timestamp> recoverFromOplog(
+        OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) override {
+        return stableTimestamp;
+    }
 
     void recoverFromOplogAsStandalone(OperationContext* opCtx,
                                       bool duringInitialSync = false) override {}

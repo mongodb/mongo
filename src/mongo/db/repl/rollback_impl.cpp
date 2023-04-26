@@ -667,7 +667,7 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // transactions were aborted (i.e. the in-memory counts were rolled-back) before computing
     // collection counts, reconstruct the prepared transactions now, adding on any additional counts
     // to the now corrected record store.
-    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
+    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kStableRecovering);
 }
 
 void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {

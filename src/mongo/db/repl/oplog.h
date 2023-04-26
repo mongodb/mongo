@@ -198,7 +198,10 @@ using IncrementOpsAppliedStatsFn = std::function<void()>;
 class OplogApplication {
 public:
     static constexpr StringData kInitialSyncOplogApplicationMode = "InitialSync"_sd;
+    // This only being used in 'applyOps' command when sent by client.
     static constexpr StringData kRecoveringOplogApplicationMode = "Recovering"_sd;
+    static constexpr StringData kStableRecoveringOplogApplicationMode = "StableRecovering"_sd;
+    static constexpr StringData kUnstableRecoveringOplogApplicationMode = "UnstableRecovering"_sd;
     static constexpr StringData kSecondaryOplogApplicationMode = "Secondary"_sd;
     static constexpr StringData kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
 
@@ -207,9 +210,12 @@ public:
         kInitialSync,
 
         // Used when we are applying oplog operations to recover the database state following an
-        // unclean shutdown, or when we are recovering from the oplog after we rollback to a
+        // clean/unclean shutdown, or when we are recovering from the oplog after we rollback to a
         // checkpoint.
-        kRecovering,
+        // If recovering from a unstable stable checkpoint.
+        kUnstableRecovering,
+        // If recovering from a stable checkpoint.~
+        kStableRecovering,
 
         // Used when a secondary node is applying oplog operations from the primary during steady
         // state replication.
@@ -220,9 +226,20 @@ public:
         kApplyOpsCmd
     };
 
+    static bool inRecovering(Mode mode) {
+        return mode == Mode::kUnstableRecovering || mode == Mode::kStableRecovering;
+    }
+
     static StringData modeToString(Mode mode);
 
     static StatusWith<Mode> parseMode(const std::string& mode);
+
+    // Server will crash on oplog application failure during recovery from stable checkpoint in the
+    // test environment.
+    static void checkOnOplogFailureForRecovery(OperationContext* opCtx,
+                                               const mongo::NamespaceString& nss,
+                                               const mongo::BSONObj& oplogEntry,
+                                               const std::string& errorMsg);
 };
 
 inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {

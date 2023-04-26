@@ -392,12 +392,12 @@ protected:
     virtual void reset() const = 0;
 };
 
-// Some operations are only idempotent when in RECOVERING, not in SECONDARY.  This includes
-// duplicate inserts and deletes.
+// Some operations are only idempotent when in RECOVERING from unstable checkpoint, not in
+// SECONDARY.  This includes duplicate inserts and deletes.
 class Recovering : public Base {
 protected:
     virtual OplogApplication::Mode getOplogApplicationMode() {
-        return OplogApplication::Mode::kRecovering;
+        return OplogApplication::Mode::kUnstableRecovering;
     }
 };
 

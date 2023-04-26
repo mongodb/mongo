@@ -67,10 +67,10 @@ public:
         Options() = delete;
         explicit Options(OplogApplication::Mode inputMode)
             : mode(inputMode),
-              allowNamespaceNotFoundErrorsOnCrudOps(
-                  inputMode == OplogApplication::Mode::kInitialSync ||
-                  inputMode == OplogApplication::Mode::kRecovering),
-              skipWritesToOplog(inputMode == OplogApplication::Mode::kRecovering) {}
+              allowNamespaceNotFoundErrorsOnCrudOps(inputMode ==
+                                                        OplogApplication::Mode::kInitialSync ||
+                                                    OplogApplication::inRecovering(inputMode)),
+              skipWritesToOplog(OplogApplication::inRecovering(inputMode)) {}
         explicit Options(OplogApplication::Mode mode,
                          bool allowNamespaceNotFoundErrorsOnCrudOps,
                          bool skipWritesToOplog)
