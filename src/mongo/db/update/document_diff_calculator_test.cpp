@@ -53,9 +53,9 @@ void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
 
 TEST(DocumentDiffCalculatorTest, SameObjectsNoDiff) {
     auto assertDiffEmpty = [](const BSONObj& doc) {
-        auto oplogDiff = doc_diff::computeOplogDiff(doc, doc, 5, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(doc, doc, 5);
         ASSERT(oplogDiff);
-        ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, BSONObj());
+        ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, BSONObj());
         auto inlineDiff = doc_diff::computeInlineDiff(doc, doc);
         ASSERT(inlineDiff);
         ASSERT_BSONOBJ_BINARY_EQ(*inlineDiff, BSONObj());
@@ -72,7 +72,7 @@ TEST(DocumentDiffCalculatorTest, SameObjectsNoDiff) {
 TEST(DocumentDiffCalculatorTest, EmptyObjsNoDiff) {
     auto preObj = BSONObj();
     auto postObj = BSONObj();
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT_FALSE(oplogDiff);
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
@@ -82,9 +82,9 @@ TEST(DocumentDiffCalculatorTest, EmptyObjsNoDiff) {
 TEST(DocumentDiffCalculatorTest, SimpleInsert) {
     auto preObj = fromjson("{a: {b: 1}}");
     auto postObj = fromjson("{a: {b: 1}, c: 1}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{i: {c: 1}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{i: {c: 1}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: 'i'}"));
@@ -93,9 +93,9 @@ TEST(DocumentDiffCalculatorTest, SimpleInsert) {
 TEST(DocumentDiffCalculatorTest, SimpleUpdate) {
     auto preObj = fromjson("{a: {b: 1}, c: 1}}");
     auto postObj = fromjson("{a: {b: 1}, c: 2}}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{u: {c: 2}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{u: {c: 2}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: 'u'}"));
@@ -104,9 +104,9 @@ TEST(DocumentDiffCalculatorTest, SimpleUpdate) {
 TEST(DocumentDiffCalculatorTest, SimpleDelete) {
     auto preObj = fromjson("{a: {b: 1}, c: 1}}");
     auto postObj = fromjson("{a: {b: 1}}}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{d: {c: false}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{d: {c: false}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: 'd'}"));
@@ -115,9 +115,9 @@ TEST(DocumentDiffCalculatorTest, SimpleDelete) {
 TEST(DocumentDiffCalculatorTest, SimpleInsertNestedSingle) {
     auto preObj = fromjson("{a: {}, e: 1, f: 1}");
     auto postObj = fromjson("{a: {b: {c: {d: 1}}}, e: 1, f: 1}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{u: {a: {b: {c: {d: 1}}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{u: {a: {b: {c: {d: 1}}}}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{a: {b: {c: {d: 'i'}}}}"));
@@ -126,10 +126,9 @@ TEST(DocumentDiffCalculatorTest, SimpleInsertNestedSingle) {
 TEST(DocumentDiffCalculatorTest, SimpleInsertNestedMultiple) {
     auto preObj = fromjson("{a: 1, g: 1, h: 1}");
     auto postObj = fromjson("{a: {b: 2, c: [2], d: {e: 2}, f: 1}, g: 1, h: 1}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff,
-                             fromjson("{u: {a: {b: 2, c: [2], d: {e: 2}, f: 1}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{u: {a: {b: 2, c: [2], d: {e: 2}, f: 1}}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff,
@@ -139,9 +138,9 @@ TEST(DocumentDiffCalculatorTest, SimpleInsertNestedMultiple) {
 TEST(DocumentDiffCalculatorTest, SimpleUpdateNestedObj) {
     auto preObj = fromjson("{a: {b: {c: {d: 1, e: 1, f: 1}}}}");
     auto postObj = fromjson("{a: {b: {c: {d: 2, e: 1, f: 1}}}}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sa: {sb: {sc: {u: {d: 2}}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sa: {sb: {sc: {u: {d: 2}}}}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{a: {b: {c: {d: 'u'}}}}"));
@@ -150,9 +149,9 @@ TEST(DocumentDiffCalculatorTest, SimpleUpdateNestedObj) {
 TEST(DocumentDiffCalculatorTest, SimpleUpdateNestedArray) {
     auto preObj = fromjson("{a: {b: {c: {d: [1], e: 1, f: 1}}}}");
     auto postObj = fromjson("{a: {b: {c: {d: [2], e: 1, f: 1}}}}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sa: {sb: {sc: {u: {d: [2]}}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sa: {sb: {sc: {u: {d: [2]}}}}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{a: {b: {c: {d: 'u'}}}}"));
@@ -161,9 +160,9 @@ TEST(DocumentDiffCalculatorTest, SimpleUpdateNestedArray) {
 TEST(DocumentDiffCalculatorTest, SimpleDeleteNestedObj) {
     auto preObj = fromjson("{a: {b: {c: {d: 1}, e: 1, f: 1}}}");
     auto postObj = fromjson("{a: {b: {c: {}, e: 1, f: 1}}}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sa: {sb: {u: {c: {}}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sa: {sb: {u: {c: {}}}}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{a: {b: {c: {d: 'd'}}}}"));
@@ -172,7 +171,7 @@ TEST(DocumentDiffCalculatorTest, SimpleDeleteNestedObj) {
 TEST(DocumentDiffCalculatorTest, ReplaceAllFieldsLargeDelta) {
     auto preObj = fromjson("{a: 1, b: 2, c: 3}");
     auto postObj = fromjson("{A: 1, B: 2, C: 3}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT_FALSE(oplogDiff);
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
@@ -183,7 +182,7 @@ TEST(DocumentDiffCalculatorTest, ReplaceAllFieldsLargeDelta) {
 TEST(DocumentDiffCalculatorTest, InsertFrontFieldLargeDelta) {
     auto preObj = fromjson("{b: 1, c: 1, d: 1}");
     auto postObj = fromjson("{a: 1, b: 1, c: 1, d: 1}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT_FALSE(oplogDiff);
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
@@ -194,7 +193,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPostObjLargeDelta) {
     {
         auto preObj = fromjson("{b: 1}");
         auto postObj = BSONObj();
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -203,7 +202,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPostObjLargeDelta) {
     {
         auto preObj = fromjson("{a: {b: 1}}");
         auto postObj = fromjson("{}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -212,7 +211,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPostObjLargeDelta) {
     {
         auto preObj = fromjson("{b: [1, 2, 3]}");
         auto postObj = BSONObj();
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -221,7 +220,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPostObjLargeDelta) {
     {
         auto preObj = fromjson("{b: {}}");
         auto postObj = BSONObj();
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -233,7 +232,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPreObjLargeDelta) {
     {
         auto preObj = BSONObj();
         auto postObj = fromjson("{b: 1}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -242,7 +241,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPreObjLargeDelta) {
     {
         auto preObj = fromjson("{}");
         auto postObj = fromjson("{a: {b: 1}}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -251,7 +250,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPreObjLargeDelta) {
     {
         auto preObj = BSONObj();
         auto postObj = fromjson("{b: [1, 2, 3]}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -260,7 +259,7 @@ TEST(DocumentDiffCalculatorTest, EmptyPreObjLargeDelta) {
     {
         auto preObj = BSONObj();
         auto postObj = fromjson("{b: {}}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -271,16 +270,16 @@ TEST(DocumentDiffCalculatorTest, EmptyPreObjLargeDelta) {
 TEST(DocumentDiffCalculatorTest, BSONSizeLimitLargeDelta) {
     auto preObj = BSON(std::string(BSONObjMaxUserSize, 'a') << 1);
     auto postObj = BSONObj();
-    ASSERT_FALSE(doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr));
+    ASSERT_FALSE(doc_diff::computeOplogDiff(preObj, postObj, 0));
     ASSERT_FALSE(doc_diff::computeInlineDiff(preObj, postObj));
 }
 
 TEST(DocumentDiffCalculatorTest, DeleteAndInsertFieldAtTheEnd) {
     auto preObj = fromjson("{a: 1, b: 'valueString', c: 3, d: 4}");
     auto postObj = fromjson("{b: 'valueString', c: 3, d: 4, a: 1}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{i: {a: 1}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{i: {a: 1}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{a: 'i'}"));
@@ -290,9 +289,9 @@ TEST(DocumentDiffCalculatorTest, DeletesRecordedInAscendingOrderOfFieldNames) {
     {
         auto preObj = fromjson("{b: 1, a: 2, c: 3, d: 4, e: 'valueString'}");
         auto postObj = fromjson("{c: 3, d: 4, e: 'valueString'}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
         ASSERT(oplogDiff);
-        ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{d: {a: false, b: false}}"));
+        ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{d: {a: false, b: false}}"));
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
         assertBsonObjEqualUnordered(*inlineDiff, fromjson("{a: 'd', b: 'd'}"));
@@ -303,9 +302,9 @@ TEST(DocumentDiffCalculatorTest, DeletesRecordedInAscendingOrderOfFieldNames) {
         auto preObj =
             fromjson("{b: 1, a: 2, c: 'value', d: 'valueString', e: 'valueString', g: 1, f: 1}");
         auto postObj = fromjson("{c: 'value', d: 'valueString', e: 'valueString'}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
         ASSERT(oplogDiff);
-        ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff,
+        ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff,
                                  fromjson("{d: {g: false, f: false, a: false, b: false}}"));
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -320,23 +319,23 @@ TEST(DocumentDiffCalculatorTest, DataTypeChangeRecorded) {
         fromjson("{a: 'valueString', b: 2, c: {subField1: 1, subField2: 3}, d: 4}");
     const auto objWithLongValue =
         fromjson("{a: 'valueString', b: 2, c: {subField1: 1, subField2: NumberLong(3)}, d: 4}");
-    auto oplogDiff = doc_diff::computeOplogDiff(objWithDoubleValue, objWithIntValue, 15, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(objWithDoubleValue, objWithIntValue, 15);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sc: {u: {subField2: 3}} }"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sc: {u: {subField2: 3}} }"));
     auto inlineDiff = doc_diff::computeInlineDiff(objWithDoubleValue, objWithIntValue);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: {subField2: 'u'}}"));
 
-    oplogDiff = doc_diff::computeOplogDiff(objWithIntValue, objWithLongValue, 15, nullptr);
+    oplogDiff = doc_diff::computeOplogDiff(objWithIntValue, objWithLongValue, 15);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sc: {u: {subField2: NumberLong(3)}} }"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sc: {u: {subField2: NumberLong(3)}} }"));
     inlineDiff = doc_diff::computeInlineDiff(objWithIntValue, objWithLongValue);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: {subField2: 'u'}}"));
 
-    oplogDiff = doc_diff::computeOplogDiff(objWithLongValue, objWithDoubleValue, 15, nullptr);
+    oplogDiff = doc_diff::computeOplogDiff(objWithLongValue, objWithDoubleValue, 15);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sc: {u: {subField2: 3.0}} }"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sc: {u: {subField2: 3.0}} }"));
     inlineDiff = doc_diff::computeInlineDiff(objWithLongValue, objWithDoubleValue);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: {subField2: 'u'}}"));
@@ -346,7 +345,7 @@ TEST(DocumentDiffCalculatorTest, NullAndMissing) {
     {
         auto preObj = fromjson("{a: null}");
         auto postObj = fromjson("{}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
         ASSERT_FALSE(oplogDiff);
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -356,9 +355,9 @@ TEST(DocumentDiffCalculatorTest, NullAndMissing) {
     {
         auto preObj = fromjson("{a: null, b: undefined, c: null, d: 'someValueStr'}");
         auto postObj = fromjson("{a: null, b: undefined, c: undefined, d: 'someValueStr'}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
         ASSERT(oplogDiff);
-        ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{u: {c: undefined}}"));
+        ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{u: {c: undefined}}"));
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
         assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: 'u'}"));
@@ -368,9 +367,9 @@ TEST(DocumentDiffCalculatorTest, NullAndMissing) {
 TEST(DocumentDiffCalculatorTest, FieldOrder) {
     auto preObj = fromjson("{a: 1, b: 2, c: {p: 1, q: 1, s: 1, r: 2}, d: 4}");
     auto postObj = fromjson("{a: 1, b: 2, c: {p: 1, q: 1, r: 2, s: 1}, d: 4}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 10, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 10);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sc: {i: {s: 1}} }"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sc: {i: {s: 1}} }"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{c: {s: 'i'}}"));
@@ -379,9 +378,9 @@ TEST(DocumentDiffCalculatorTest, FieldOrder) {
 TEST(DocumentDiffCalculatorTest, SimpleArrayPush) {
     auto preObj = fromjson("{field1: 'abcd', field2: [1, 2, 3]}");
     auto postObj = fromjson("{field1: 'abcd', field2: [1, 2, 3, 4]}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 5, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 5);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sfield2: {a: true, 'u3': 4}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sfield2: {a: true, 'u3': 4}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{field2: 'u'}"));
@@ -391,11 +390,11 @@ TEST(DocumentDiffCalculatorTest, NestedArray) {
     {
         auto preObj = fromjson("{field1: 'abcd', field2: [1, 2, 3, [[2]]]}");
         auto postObj = fromjson("{field1: 'abcd', field2: [1, 2, 3, [[4]]]}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT(oplogDiff);
         // When the sub-array delta is larger than the size of the sub-array, we record it as an
         // update operation.
-        ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sfield2: {a: true, 'u3': [[4]]}}"));
+        ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sfield2: {a: true, 'u3': [[4]]}}"));
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
         assertBsonObjEqualUnordered(*inlineDiff, fromjson("{field2: 'u'}"));
@@ -406,10 +405,10 @@ TEST(DocumentDiffCalculatorTest, NestedArray) {
             "{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [2], 4, 5, 6], 5, 5, 5]}");
         auto postObj =
             fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [4], 4], 5, 6]}");
-        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+        auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
         ASSERT(oplogDiff);
         ASSERT_BSONOBJ_BINARY_EQ(
-            oplogDiff->diff,
+            *oplogDiff,
             fromjson("{sfield2: {a: true, l: 6, 's3': {a: true, l: 4, 'u2': [4]}, 'u5': 6}}"));
         auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
         ASSERT(inlineDiff);
@@ -422,10 +421,10 @@ TEST(DocumentDiffCalculatorTest, SubObjHasEmptyFieldName) {
         fromjson("{'': '1', field2: [1, 2, 3, {'': {'': 1, padding: 'largeFieldValue'}}]}");
     auto postObj =
         fromjson("{'': '2', field2: [1, 2, 3, {'': {'': 2, padding: 'largeFieldValue'}}]}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
     ASSERT(oplogDiff);
     ASSERT_BSONOBJ_BINARY_EQ(
-        oplogDiff->diff, fromjson("{u: {'': '2'}, sfield2: {a: true, s3: {s: {u: {'': 2}}} }}"));
+        *oplogDiff, fromjson("{u: {'': '2'}, sfield2: {a: true, s3: {s: {u: {'': 2}}} }}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{'': 'u', field2: 'u'}"));
@@ -438,10 +437,10 @@ TEST(DocumentDiffCalculatorTest, SubObjInSubArrayUpdateElements) {
     auto postObj = fromjson(
         "{field1: 'abcd', field2: [1, 2, 3, {'field3': "
         "['veryLargeStringValueveryLargeStringValue', 2, 4, 3, 5]}]}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
     ASSERT_BSONOBJ_BINARY_EQ(
-        oplogDiff->diff,
+        *oplogDiff,
         fromjson("{sfield2: {a: true, s3: {sfield3: {a: true, u2: 4, u3: 3, u4: 5}} }}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
@@ -453,11 +452,10 @@ TEST(DocumentDiffCalculatorTest, SubObjInSubArrayDeleteElements) {
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {'field3': ['largeString', 2, 3, 4, 5]}]}");
     auto postObj =
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {'field3': ['largeString', 2, 3, 5]}]}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
     ASSERT(oplogDiff);
     ASSERT_BSONOBJ_BINARY_EQ(
-        oplogDiff->diff,
-        fromjson("{sfield2: {a: true, 's3': {sfield3: {a: true, l: 4, 'u3': 5}} }}"));
+        *oplogDiff, fromjson("{sfield2: {a: true, 's3': {sfield3: {a: true, l: 4, 'u3': 5}} }}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{field2: 'u'}"));
@@ -472,9 +470,9 @@ TEST(DocumentDiffCalculatorTest, NestedSubObjs) {
         "{level1Field1: 'abcd', level1Field2: {level2Field1: {level3Field1: {q: 1}, "
         "level3Field2: {q: 1}}, level2Field2: 2}, level1Field3: '3', level1Field4: "
         "{level2Field1: {level3Field1: {q: 1}, level3Field2: {q: 1}}} }");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff,
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff,
                              fromjson("{u: {level1Field3: '3'}, slevel1Field2: {slevel2Field1: {u: "
                                       "{level3Field1: {q: 1}}}}, slevel1Field4: {slevel2Field1: "
                                       "{u: {level3Field1: {q: 1}}}} }"));
@@ -490,9 +488,9 @@ TEST(DocumentDiffCalculatorTest, NestedSubObjs) {
 TEST(DocumentDiffCalculatorTest, SubArrayInSubArrayLargeDelta) {
     auto preObj = fromjson("{field1: 'abcd', field2: [1, 2, 3, {field3: [2, 3, 4, 5]}]}");
     auto postObj = fromjson("{field1: 'abcd', field2: [1, 2, 3, {field3: [1, 2, 3, 4, 5]}]}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 15);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff,
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff,
                              fromjson("{sfield2: {a: true, 'u3': {field3: [1, 2, 3, 4, 5]}} }"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
@@ -502,10 +500,9 @@ TEST(DocumentDiffCalculatorTest, SubArrayInSubArrayLargeDelta) {
 TEST(DocumentDiffCalculatorTest, SubObjInSubArrayLargeDelta) {
     auto preObj = fromjson("{field1: [1, 2, 3, 4, 5, 6, {a: 1, b: 2, c: 3, d: 4}, 7]}");
     auto postObj = fromjson("{field1: [1, 2, 3, 4, 5, 6, {p: 1, q: 2}, 7]}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff,
-                             fromjson("{sfield1: {a: true, 'u6': {p: 1, q: 2}} }"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sfield1: {a: true, 'u6': {p: 1, q: 2}} }"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{field1: 'u'}"));
@@ -514,9 +511,9 @@ TEST(DocumentDiffCalculatorTest, SubObjInSubArrayLargeDelta) {
 TEST(DocumentDiffCalculatorTest, SubObjInSubObjLargeDelta) {
     auto preObj = fromjson("{field: {p: 'someString', q: 2, r: {a: 1, b: 2, c: 3, 'd': 4}, s: 3}}");
     auto postObj = fromjson("{field: {p: 'someString', q: 2, r: {p: 1, q: 2}, s: 3}}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sfield: {u: {r: {p: 1, q: 2} }} }"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sfield: {u: {r: {p: 1, q: 2} }} }"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(
@@ -526,9 +523,9 @@ TEST(DocumentDiffCalculatorTest, SubObjInSubObjLargeDelta) {
 TEST(DocumentDiffCalculatorTest, SubArrayInSubObjLargeDelta) {
     auto preObj = fromjson("{field: {p: 'someString', q: 2, r: [1, 3, 4, 5], s: 3}}");
     auto postObj = fromjson("{field: {p: 'someString', q: 2, r: [1, 2, 3, 4], s: 3}}");
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{sfield: {u: {r: [1, 2, 3, 4]}} }"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{sfield: {u: {r: [1, 2, 3, 4]}} }"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{field: {r: 'u'}}"));
@@ -566,9 +563,9 @@ TEST(DocumentDiffCalculatorTest, DeeplyNestObjectGenerateDiff) {
     auto postObj = postBob.done();
 
     // Just deleting the deeply nested sub-object should give the post object.
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, fromjson("{d: {subObj: false}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{d: {subObj: false}}"));
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff, fromjson("{subObj: 'd'}"));
@@ -579,9 +576,9 @@ TEST(DocumentDiffCalculatorTest, DeeplyNestObjectGenerateDiff) {
     auto postObj2 = postBob2.done();
 
     // Deleting the deepest field should give the post object.
-    oplogDiff = doc_diff::computeOplogDiff(preObj, postObj2, 0, nullptr);
+    oplogDiff = doc_diff::computeOplogDiff(preObj, postObj2, 0);
     ASSERT(oplogDiff);
-    ASSERT_OK(validateBSON(oplogDiff->diff));
+    ASSERT_OK(validateBSON(*oplogDiff));
     BSONObjBuilder expectedOplogDiffBuilder;
     buildDeepObj(&expectedOplogDiffBuilder,
                  "ssubObj",
@@ -592,7 +589,7 @@ TEST(DocumentDiffCalculatorTest, DeeplyNestObjectGenerateDiff) {
                          builder->append("d", BSON("subObj" << false));
                      }
                  });
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, expectedOplogDiffBuilder.obj());
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, expectedOplogDiffBuilder.obj());
 
     inlineDiff = doc_diff::computeInlineDiff(preObj, postObj2);
     ASSERT(inlineDiff);
@@ -632,9 +629,9 @@ TEST(DocumentDiffCalculatorTest, DeepestObjectSubDiff) {
     auto postObj = postBob.done();
     ASSERT_OK(validateBSON(postObj));
 
-    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0, nullptr);
+    auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
-    ASSERT_OK(validateBSON(oplogDiff->diff));
+    ASSERT_OK(validateBSON(*oplogDiff));
     BSONObjBuilder expectedOplogDiffBuilder;
     buildDeepObj(&expectedOplogDiffBuilder,
                  "ssubObj",
@@ -645,7 +642,7 @@ TEST(DocumentDiffCalculatorTest, DeepestObjectSubDiff) {
                          builder->append("u", BSON("field" << 2));
                      }
                  });
-    ASSERT_BSONOBJ_BINARY_EQ(oplogDiff->diff, expectedOplogDiffBuilder.obj());
+    ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, expectedOplogDiffBuilder.obj());
 
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);

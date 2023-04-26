@@ -145,7 +145,6 @@ void applyChild(const UpdateNode& child,
     UpdateNode::UpdateNodeApplyParams childUpdateNodeApplyParams = *updateNodeApplyParams;
     auto childApplyResult = child.apply(childApplyParams, childUpdateNodeApplyParams);
 
-    applyResult->indexesAffected = applyResult->indexesAffected || childApplyResult.indexesAffected;
     applyResult->noop = applyResult->noop && childApplyResult.noop;
     applyResult->containsDotsAndDollarsField =
         applyResult->containsDotsAndDollarsField || childApplyResult.containsDotsAndDollarsField;

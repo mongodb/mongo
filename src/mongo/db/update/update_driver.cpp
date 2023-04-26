@@ -249,7 +249,6 @@ Status UpdateDriver::update(OperationContext* opCtx,
     applyParams.fromOplogApplication = _fromOplogApplication;
     applyParams.skipDotsDollarsCheck = _skipDotsDollarsCheck;
     applyParams.validateForStorage = validateForStorage;
-    applyParams.indexData = _indexedFields;
     applyParams.modifiedPaths = modifiedPaths;
     // The supplied 'modifiedPaths' must be an empty set.
     invariant(!modifiedPaths || modifiedPaths->empty());

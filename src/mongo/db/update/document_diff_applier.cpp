@@ -474,9 +474,8 @@ int32_t computeDamageOnArray(const BSONObj& preImageRoot,
 
 class DiffApplier {
 public:
-    DiffApplier(const UpdateIndexData* indexData, bool mustCheckExistenceForInsertOperations)
-        : _indexData(indexData),
-          _mustCheckExistenceForInsertOperations{mustCheckExistenceForInsertOperations} {}
+    DiffApplier(bool mustCheckExistenceForInsertOperations)
+        : _mustCheckExistenceForInsertOperations{mustCheckExistenceForInsertOperations} {}
 
     void applyDiffToObject(const BSONObj& preImage,
                            FieldRef* path,
@@ -492,7 +491,6 @@ public:
             for (auto&& elt : tables.fieldsToInsert) {
                 builder->append(elt);
                 FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
-                updateIndexesAffected(path);
             }
             return;
         }
@@ -514,12 +512,10 @@ public:
                 OverloadedVisitor{
                     [this, &path](Delete) {
                         // Do not append anything.
-                        updateIndexesAffected(path);
                     },
 
                     [this, &path, &builder, &elt, &fieldsToSkipInserting](const Update& update) {
                         builder->append(update.newElt);
-                        updateIndexesAffected(path);
                         fieldsToSkipInserting.insert(elt.fieldNameStringData());
                     },
 
@@ -548,7 +544,6 @@ public:
                             // null and expect the future value to overwrite the value here.
 
                             builder->appendNull(elt.fieldNameStringData());
-                            updateIndexesAffected(path);
                         }
 
                         // Note: There's no need to update 'fieldsToSkipInserting' here, because a
@@ -577,7 +572,6 @@ public:
                 if (isComponentPartOfCanonicalizedIndexPath ||
                     !alreadyDidUpdateIndexAffectedForBasePath || path->empty()) {
                     FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
-                    updateIndexesAffected(path);
 
                     // If we checked whether the update affects indexes for a path where the tail
                     // element is not considered part of the 'canonicalized' path (as defined by
@@ -590,10 +584,6 @@ public:
                 }
             }
         }
-    }
-
-    bool indexesAffected() const {
-        return _indexesAffected;
     }
 
 private:
@@ -610,7 +600,6 @@ private:
                 [this, &path, builder](const BSONElement& update) {
                     invariant(!update.eoo());
                     builder->append(update);
-                    updateIndexesAffected(path);
                 },
                 [this, builder, &preImageValue, &path](auto reader) {
                     if (!preImageValue) {
@@ -618,7 +607,6 @@ private:
                         // future oplog entry will either re-write the value of this array index
                         // (or some parent) so we append a null and move on.
                         builder->appendNull();
-                        updateIndexesAffected(path);
                         return;
                     }
                     if constexpr (std::is_same_v<decltype(reader), ArrayDiffReader>) {
@@ -639,7 +627,6 @@ private:
                     // entry will either re-write the value of this array index (or some
                     // parent) so we append a null and move on.
                     builder->appendNull();
-                    updateIndexesAffected(path);
                 },
             },
             modification);
@@ -655,11 +642,6 @@ private:
         // the second is the modification type.
         auto nextMod = reader->next();
         BSONObjIterator preImageIt(arrayPreImage);
-
-        // If there is a resize of array, check if indexes are affected by the array modification.
-        if (resizeVal) {
-            updateIndexesAffected(path);
-        }
 
         size_t idx = 0;
         for (; preImageIt.more() && (!resizeVal || idx < *resizeVal); ++idx, ++preImageIt) {
@@ -684,7 +666,6 @@ private:
                 nextMod = reader->next();
             } else {
                 // This field is not mentioned in the diff so we pad the post image with null.
-                updateIndexesAffected(path);
                 builder->appendNull();
             }
         }
@@ -692,25 +673,16 @@ private:
         invariant(!resizeVal || *resizeVal == idx);
     }
 
-    void updateIndexesAffected(FieldRef* path) {
-        if (_indexData) {
-            _indexesAffected = _indexesAffected || _indexData->mightBeIndexed(*path);
-        }
-    }
-
-    const UpdateIndexData* _indexData;
     bool _mustCheckExistenceForInsertOperations = true;
-    bool _indexesAffected = false;
 };
 }  // namespace
 
-ApplyDiffOutput applyDiff(const BSONObj& pre,
-                          const Diff& diff,
-                          const UpdateIndexData* indexData,
-                          bool mustCheckExistenceForInsertOperations) {
+BSONObj applyDiff(const BSONObj& pre,
+                  const Diff& diff,
+                  bool mustCheckExistenceForInsertOperations) {
     DocumentDiffReader reader(diff);
     BSONObjBuilder out;
-    DiffApplier applier(indexData, mustCheckExistenceForInsertOperations);
+    DiffApplier applier(mustCheckExistenceForInsertOperations);
     FieldRef path;
 
     // Use size of pre + diff as an approximation for size needed for post object when the diff is
@@ -722,7 +694,7 @@ ApplyDiffOutput applyDiff(const BSONObj& pre,
     out.bb().reserveBytes(estimatedSize);
     out.bb().claimReservedBytes(estimatedSize);
     applier.applyDiffToObject(pre, &path, &reader, &out);
-    return {out.obj(), applier.indexesAffected()};
+    return out.obj();
 }
 
 DamagesOutput computeDamages(const BSONObj& pre,

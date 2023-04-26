@@ -150,10 +150,6 @@ public:
         return _updateType;
     }
 
-    void refreshIndexKeys(const UpdateIndexData* indexedFields) {
-        _indexedFields = indexedFields;
-    }
-
     bool logOp() const {
         return _logOp;
     }
@@ -218,12 +214,6 @@ private:
     UpdateType _updateType = UpdateType::kOperator;
 
     std::unique_ptr<UpdateExecutor> _updateExecutor;
-
-    // What are the list of fields in the collection over which the update is going to be
-    // applied that participate in indices?
-    //
-    // NOTE: Owned by the collection's info cache!.
-    const UpdateIndexData* _indexedFields = nullptr;
 
     //
     // mutable properties after parsing

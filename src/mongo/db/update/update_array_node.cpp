@@ -154,8 +154,6 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
             auto childApplyResult =
                 mergedChild->apply(childApplyParams, childUpdateNodeApplyParams);
 
-            applyResult.indexesAffected =
-                applyResult.indexesAffected || childApplyResult.indexesAffected;
             applyResult.noop = applyResult.noop && childApplyResult.noop;
             if (!childApplyResult.noop) {
                 modifiedElement = childElement;

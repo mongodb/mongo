@@ -37,11 +37,6 @@
 
 namespace mongo::doc_diff {
 
-struct DiffResult {
-    Diff diff;
-    bool indexesAffected;  // Whether the index data need to be modified if the diff is applied.
-};
-
 /**
  * Returns the oplog v2 diff between the given 'pre' and 'post' images. The diff has the following
  * format:
@@ -55,14 +50,11 @@ struct DiffResult {
  * }
  * If the size of the computed diff is larger than the 'post' image then the function returns
  * 'boost::none'. The 'paddingForDiff' represents the additional size that needs be added to the
- * size of the diff, while comparing whether the diff is viable. If any paths in 'indexData' are
- * affected by the generated diff, then the 'indexesAffected' field in the output will be set to
- * true, false otherwise.
+ * size of the diff, while comparing whether the diff is viable.
  */
-boost::optional<DiffResult> computeOplogDiff(const BSONObj& pre,
-                                             const BSONObj& post,
-                                             size_t paddingForDiff,
-                                             const UpdateIndexData* indexData);
+boost::optional<Diff> computeOplogDiff(const BSONObj& pre,
+                                       const BSONObj& post,
+                                       size_t paddingForDiff);
 
 /**
  * Returns the inline diff between the given 'pre' and 'post' images. The diff has the same schema

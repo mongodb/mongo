@@ -36,11 +36,6 @@
 namespace mongo {
 namespace doc_diff {
 
-struct ApplyDiffOutput {
-    BSONObj postImage;
-    bool indexesAffected;
-};
-
 struct DamagesOutput {
     const BSONObj preImage;
     SharedBuffer damageSource;
@@ -48,17 +43,15 @@ struct DamagesOutput {
 };
 
 /**
- * Applies the diff to 'pre' and returns the post image. Throws if the diff is invalid. The
- * 'indexData' parameter is optional, if provided computes whether the indexes are affected.
- * The final, 'mustCheckExistenceForInsertOperations' parameter signals whether we must check if an
- * inserted field already exists within a (sub)document. This should generally be set to true,
- * unless the caller has knowledge of the pre-image and the diff, and can guarantee that we will not
- * re-insert anything.
+ * Applies the diff to 'pre' and returns the post image.
+ * Throws if the diff is invalid.
+ *
+ * 'mustCheckExistenceForInsertOperations' parameter signals whether we must check if an inserted
+ * field already exists within a (sub)document. This should generally be set to true, unless the
+ * caller has knowledge of the pre-image and the diff, and can guarantee that we will not re-insert
+ * anything.
  */
-ApplyDiffOutput applyDiff(const BSONObj& pre,
-                          const Diff& diff,
-                          const UpdateIndexData* indexData,
-                          bool mustCheckExistenceForInsertOperations);
+BSONObj applyDiff(const BSONObj& pre, const Diff& diff, bool mustCheckExistenceForInsertOperations);
 
 /**
  * Computes the damage events from the diff for 'pre' and return the pre-image, damage source, and

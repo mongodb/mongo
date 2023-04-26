@@ -256,16 +256,11 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
     UnsetNode unsetElement;
     auto unsetElementApplyResult = unsetElement.apply(unsetParams, unsetUpdateNodeApplyParams);
 
-    // Determine the final result based on the results of the $set and $unset.
-    ApplyResult applyResult;
-    applyResult.indexesAffected =
-        setElementApplyResult.indexesAffected || unsetElementApplyResult.indexesAffected;
-
     // The $unset would only be a no-op if the source element did not exist, in which case we would
     // have exited early with a no-op result.
     invariant(!unsetElementApplyResult.noop);
 
-    return applyResult;
+    return {};
 }
 
 }  // namespace mongo

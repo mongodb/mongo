@@ -41,14 +41,12 @@ DeltaExecutor::ApplyResult DeltaExecutor::applyUpdate(
     UpdateExecutor::ApplyParams applyParams) const {
     const auto originalDoc = applyParams.element.getDocument().getObject();
 
-    auto applyDiffOutput = doc_diff::applyDiff(
-        originalDoc, _diff, applyParams.indexData, _mustCheckExistenceForInsertOperations);
-    const auto& postImage = applyDiffOutput.postImage;
+    auto postImage =
+        doc_diff::applyDiff(originalDoc, _diff, _mustCheckExistenceForInsertOperations);
     auto postImageHasId = postImage.hasField("_id");
 
     auto result = ObjectReplaceExecutor::applyReplacementUpdate(
         std::move(applyParams), postImage, postImageHasId);
-    result.indexesAffected = applyDiffOutput.indexesAffected;
     result.oplogEntry = _outputOplogEntry;
     return result;
 }

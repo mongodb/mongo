@@ -565,8 +565,7 @@ public:
                    const write_ops::UpdateModification& updateSpec,
                    StringData matchedField = StringData(),
                    std::vector<BSONObj> arrayFilterSpec = {},
-                   bool fromOplog = false,
-                   UpdateIndexData* indexData = nullptr) {
+                   bool fromOplog = false) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         _driver = std::make_unique<UpdateDriver>(expCtx);
         std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
@@ -579,7 +578,6 @@ public:
         }
 
         _driver->setFromOplogApplication(fromOplog);
-        _driver->refreshIndexKeys(indexData);
         _driver->parse(updateSpec, arrayFilters);
 
         const bool validateForStorage = true;

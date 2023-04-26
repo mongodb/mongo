@@ -211,48 +211,6 @@ private:
     StringData str;
 };
 
-template <class DiffNode>
-bool anyIndexesMightBeAffected(const DiffNode* node,
-                               const UpdateIndexData* indexData,
-                               FieldRef* path) {
-    for (auto&& [field, child] : node->getChildren()) {
-        // The 'field' here can either be an integer or a string.
-        StringWrapper wrapper(field);
-        FieldRef::FieldRefTempAppend tempAppend(*path, wrapper.getStr());
-        switch (child->type()) {
-            case diff_tree::NodeType::kDelete:
-            case diff_tree::NodeType::kUpdate:
-            case diff_tree::NodeType::kInsert: {
-                if (indexData && indexData->mightBeIndexed(*path)) {
-                    return true;
-                }
-                break;
-            }
-            case diff_tree::NodeType::kDocumentSubDiff: {
-                if (anyIndexesMightBeAffected<diff_tree::DocumentSubDiffNode>(
-                        checked_cast<const diff_tree::DocumentSubDiffNode*>(child.get()),
-                        indexData,
-                        path)) {
-                    return true;
-                }
-                break;
-            }
-            case diff_tree::NodeType::kArray: {
-                auto* arrayNode = checked_cast<const diff_tree::ArrayNode*>(child.get());
-                if ((arrayNode->getResize() && indexData && indexData->mightBeIndexed(*path)) ||
-                    anyIndexesMightBeAffected<diff_tree::ArrayNode>(arrayNode, indexData, path)) {
-                    return true;
-                }
-                break;
-            }
-            case diff_tree::NodeType::kDocumentInsert: {
-                MONGO_UNREACHABLE;
-            }
-        }
-    }
-    return false;
-}
-
 /**
  * Appends the given element to the given BSONObjBuilder. If the element is an object, sets the
  * value of the most inner field(s) to 'innerValue'. Otherwise, sets the value of the field to
@@ -443,17 +401,11 @@ void anyIndexesMightBeAffected(ArrayDiffReader* reader,
 }
 }  // namespace
 
-boost::optional<DiffResult> computeOplogDiff(const BSONObj& pre,
-                                             const BSONObj& post,
-                                             size_t padding,
-                                             const UpdateIndexData* indexData) {
+boost::optional<Diff> computeOplogDiff(const BSONObj& pre, const BSONObj& post, size_t padding) {
     if (auto diffNode = computeDocDiff(pre, post, false /* ignoreSizeLimit */, padding)) {
         auto diff = diffNode->serialize();
         if (diff.objsize() < post.objsize()) {
-            FieldRef path;
-            return DiffResult{diff,
-                              anyIndexesMightBeAffected<diff_tree::DocumentSubDiffNode>(
-                                  diffNode.get(), indexData, &path)};
+            return diff;
         }
     }
     return {};

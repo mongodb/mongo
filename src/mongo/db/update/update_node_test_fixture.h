@@ -85,7 +85,6 @@ protected:
         applyParams.insert = _insert;
         applyParams.fromOplogApplication = _fromOplogApplication;
         applyParams.validateForStorage = _validateForStorage;
-        applyParams.indexData = _indexData.get();
         applyParams.modifiedPaths = &_modifiedPaths;
         applyParams.logMode = ApplyParams::LogMode::kGenerateOplogEntry;
         return applyParams;
