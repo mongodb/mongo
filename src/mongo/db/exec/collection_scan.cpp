@@ -280,6 +280,13 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 }
 
 void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
+    // Since this method is only ever called when iterating a change collection, the following check
+    // effectively disables optime advancement in Serverless, for reasons outlined in SERVER-76288.
+    // TODO SERVER-76309: re-enable optime advancement to support sharding in Serverless.
+    if (collection()->ns().isChangeCollection()) {
+        return;
+    }
+
     const auto readTimestamp = opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx());
 
     // If we don't have a read timestamp, we take no action here.
