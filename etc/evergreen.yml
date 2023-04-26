@@ -203,7 +203,6 @@ variables:
     - windows-2016-dc
   - name: .jscore .common !.sharding
   - name: .jstestfuzz .common
-  - name: .logical_session_cache
   - name: replica_sets_auth_gen
   - name: sasl
   - name: sharding_auth_audit_gen
@@ -263,7 +262,6 @@ variables:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -843,7 +841,6 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
   - name: .jscore .common !.decimal !.sharding
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   # TODO(SERVER-64009): Re-enable replica_sets_auth_gen.
   # - name: replica_sets_auth_gen
@@ -880,7 +877,6 @@ buildvariants:
   # TODO: SERVER-66945 Re-enable ESE on enterprise macos
   # - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
   - name: .jscore .common !.decimal !.sharding
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
@@ -912,7 +908,6 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -1221,6 +1216,9 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
+    distros:
+    - rhel80-medium
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -1482,7 +1480,6 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: jsCore
   - name: jsCore_txns
-  - name: .logical_session_cache .repl
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_auth_gen
@@ -1621,7 +1618,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2019,7 +2015,6 @@ buildvariants:
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
-  - name: .logical_session_cache
   - name: .multi_shard .common
   - name: .query_fuzzer
   - name: .read_write_concern
@@ -2143,7 +2138,6 @@ buildvariants:
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
-  - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_jscore_passthrough
@@ -2249,7 +2243,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: jsCore_wildcard_indexes
   - name: json_schema
-  - name: .logical_session_cache
   - name: .misc_js
   - name: .multi_shard .common
   - name: query_golden_classic
@@ -2592,7 +2585,6 @@ buildvariants:
   - name: .jscore .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2636,7 +2628,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2679,7 +2670,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2727,7 +2717,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2775,7 +2764,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2821,8 +2809,6 @@ buildvariants:
   - name: .concurrency .common !.kill_terminate
     patch_only: true
   - name: .jscore .common
-    patch_only: true
-  - name: .logical_session_cache .one_sec
     patch_only: true
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
     patch_only: true

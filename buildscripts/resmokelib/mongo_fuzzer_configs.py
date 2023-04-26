@@ -112,33 +112,57 @@ def generate_flow_control_parameters(rng):
     return configs
 
 
-def generate_independent_parameters(rng, mode):
-    """Return a dictionary with values for each independent parameter."""
+def generate_mongod_parameters(rng, mode):
+    """Return a dictionary with values for each mongod parameter."""
     ret = {}
+    ret["analyzeShardKeySplitPointExpirationSecs"] = rng.randint(1, 300)
+    ret["chunkMigrationConcurrency"] = rng.choice([1, 4, 16])
+    ret["disableLogicalSessionCacheRefresh"] = rng.choice([True, False])
+    ret["initialServiceExecutorUseDedicatedThread"] = rng.choice([True, False])
+    # TODO (SERVER-75632): Uncomment this to enable passthrough testing.
+    # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
+    if not ret["disableLogicalSessionCacheRefresh"]:
+        ret["logicalSessionRefreshMillis"] = rng.choice([100, 1000, 10000, 100000])
+    ret["maxNumberOfTransactionOperationsInSingleOplogEntry"] = rng.randint(1, 10) * rng.choice(
+        [1, 10, 100])
+    ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(30, 600)])
+    ret["mirrorReads"] = {"samplingRate": rng.random()}
+    ret["queryAnalysisSampleExpirationSecs"] = rng.choice([1, 10, 100, 1000])
+    ret["queryAnalysisSamplerConfigurationRefreshSecs"] = rng.choice([1, 10, 100])
+    ret["queryAnalysisWriterIntervalSecs"] = rng.choice([1, 10, 100])
+    ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(1, 100) * 1024 * 1024
+    ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
     ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
     ret["storageEngineConcurrencyAdjustmentAlgorithm"] = "fixedConcurrentTransactions"
-    ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
-    ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
-    ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])
     if rng.choice(3 * [True] + [False]):
         # The old retryable writes format is used by other variants. Weight towards turning on the
         # new retryable writes format on in this one.
         ret["storeFindAndModifyImagesInSideCollection"] = True
-    ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
-    ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(5, 600)])
-    # TODO (SERVER-75632): Uncomment this to enable passthrough testing.
-    # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
+    ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
+    ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
+    ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])
 
+    # We need a higher timeout to account for test slowness
+    ret["receiveChunkWaitForRangeDeleterTimeoutMS"] = 300000
     return ret
 
 
-def fuzz_set_parameters(mode, seed, user_provided_params):
+def generate_mongos_parameters(rng, mode):
+    """Return a dictionary with values for each mongos parameter."""
+    ret = {}
+    ret["initialServiceExecutorUseDedicatedThread"] = rng.choice([True, False])
+    ret["opportunisticSecondaryTargeting"] = rng.choice([True, False])
+    ret["queryAnalysisSamplerConfigurationRefreshSecs"] = rng.choice([1, 10, 100])
+    return ret
+
+
+def fuzz_mongod_set_parameters(mode, seed, user_provided_params):
     """Randomly generate mongod configurations and wiredTigerConnectionString."""
     rng = random.Random(seed)
 
     ret = {}
-    params = [generate_flow_control_parameters(rng), generate_independent_parameters(rng, mode)]
+    params = [generate_flow_control_parameters(rng), generate_mongod_parameters(rng, mode)]
     for dct in params:
         for key, value in dct.items():
             ret[key] = value
@@ -148,3 +172,18 @@ def fuzz_set_parameters(mode, seed, user_provided_params):
 
     return utils.dump_yaml(ret), generate_eviction_configs(rng, mode), generate_table_configs(rng), \
         generate_table_configs(rng)
+
+
+def fuzz_mongos_set_parameters(mode, seed, user_provided_params):
+    """Randomly generate mongos configurations."""
+    rng = random.Random(seed)
+
+    ret = {}
+    params = generate_mongos_parameters(rng, mode)
+    for key, value in params.items():
+        ret[key] = value
+
+    for key, value in utils.load_yaml(user_provided_params).items():
+        ret[key] = value
+
+    return utils.dump_yaml(ret)

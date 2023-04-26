@@ -5,6 +5,9 @@
  * @tags: [
  *   # The test is designed to work with an unsharded collection.
  *   assumes_unsharded_collection,
+ *   # The config fuzzer may run logical session cache refreshes in the background, which modifies
+ *   # some serverStatus metrics read in this test.
+ *   does_not_support_config_fuzzer,
  *   # The test relies on the precise number of executions of commands.
  *   requires_non_retryable_writes,
  *   # This test contains assertions on the number of executed operations, and tenant migrations

@@ -5149,6 +5149,7 @@ tasks:
       suite: concurrency_sharded_replication
       resmoke_args: >-
         --fuzzMongodConfigs=normal
+        --fuzzMongosConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
 
@@ -5175,6 +5176,7 @@ tasks:
       suite: concurrency_sharded_replication
       resmoke_args: >-
         --fuzzMongodConfigs=stress
+        --fuzzMongosConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
       exec_timeout_secs: 14400 # 4 hours
@@ -5201,6 +5203,7 @@ tasks:
       suite: sharding_jscore_passthrough
       resmoke_args: >-
         --fuzzMongodConfigs=normal
+        --fuzzMongosConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
 
@@ -6503,84 +6506,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache", "repl"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache", "repl"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache", "one_sec", "repl"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache", "repl"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_sharding_100ms_refresh_jscore_txns_passthrough_gen
-  tags: ["logical_session_cache"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache", "one_sec"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache", "one_sec"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
-  tags: ["logical_session_cache"]
-  commands:
-  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: retryable_writes_jscore_stepdown_passthrough_gen

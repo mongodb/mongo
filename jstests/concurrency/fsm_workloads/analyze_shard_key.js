@@ -15,7 +15,7 @@
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
  *  does_not_support_stepdowns,
- *  assumes_balancer_off
+ *  assumes_balancer_off,
  * ]
  */
 load("jstests/concurrency/fsm_libs/extend_workload.js");

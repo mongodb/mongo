@@ -45,7 +45,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -109,7 +108,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common
@@ -168,7 +166,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -340,7 +337,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -497,7 +493,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -663,7 +658,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -728,7 +722,6 @@ buildvariants:
     - debian10-large
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -785,7 +778,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -845,7 +837,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -901,7 +892,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -1009,7 +999,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -1192,7 +1181,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1254,7 +1242,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
@@ -1314,7 +1301,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common !.multiversion
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1377,7 +1363,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -1440,7 +1425,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1503,7 +1487,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
@@ -1575,7 +1558,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: multiversion_gen
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1636,7 +1618,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -1693,7 +1674,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -1749,7 +1729,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -1811,7 +1790,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: .powercycle
   - name: replica_sets_gen
@@ -1891,7 +1869,6 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .ocsp
@@ -1957,7 +1934,6 @@ buildvariants:
   - name: fle
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -2054,7 +2030,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   # - name: multiversion_gen
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
@@ -2111,7 +2086,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   # - name: multiversion_gen
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
@@ -2180,7 +2154,6 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2247,7 +2220,6 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2309,7 +2281,6 @@ buildvariants:
   - name: fle
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -2404,7 +2375,6 @@ buildvariants:
   - name: fle
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -2636,7 +2606,6 @@ buildvariants:
   - name: .jstestfuzz .interrupt
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
-  - name: .logical_session_cache .one_sec
   - name: .query_fuzzer
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
@@ -2691,7 +2660,6 @@ buildvariants:
   - name: .jstestfuzz .interrupt
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
-  - name: .logical_session_cache .one_sec
   - name: .query_fuzzer
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
@@ -2745,7 +2713,6 @@ buildvariants:
   # - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2790,7 +2757,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough

@@ -6,6 +6,9 @@
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   no_selinux,
+//   # The config fuzzer may run logical session cache refreshes in the background, which interferes
+//   # with this test.
+//   does_not_support_config_fuzzer,
 // ]
 
 // Basic tests for the $listSessions aggregation stage.
