@@ -100,7 +100,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/transaction/transaction',
