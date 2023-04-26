@@ -7743,7 +7743,7 @@ tasks:
          'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
 - name: crypt_push
-  run_on: rhel80-small
+  run_on: rhel8.7-small
   tags: ["publish_crypt"]
   patchable: false
   stepback: false
@@ -7780,13 +7780,18 @@ tasks:
       aws_key_remote: ${repo_aws_key}
       aws_secret_remote: ${repo_aws_secret}
   - func: "f_expansions_write"
-  - func: "set up notary client credentials"
+  # login to container registry
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -oe
+        podman login --username ${release_tools_container_registry_username} --password ${release_tools_container_registry_password} ${release_tools_container_registry}
   - command: subprocess.exec
-    type: test
     params:
       binary: bash
       args:
-      - "./src/evergreen/notary_client_crypt_run.sh"
+      - "./src/evergreen/garasign_gpg_crypt_sign.sh"
   # Put the crypt tarball/zipfile
   - command: s3.put
     params:
