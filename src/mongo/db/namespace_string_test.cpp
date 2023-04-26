@@ -322,38 +322,177 @@ TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyDb) {
     ASSERT_EQ(nss.db(), StringData{});
 }
 
+TEST(NamespaceStringTest, EmptyDbWithColl) {
+    NamespaceString nss{"", "coll"};
+    ASSERT_EQ(nss.db(), StringData{});
+    ASSERT_EQ(nss.coll(), "coll");
+}
+
 TEST(NamespaceStringTest, NSSWithTenantId) {
     TenantId tenantId(OID::gen());
-    std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
 
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
-    ASSERT_EQ(nss.ns(), "foo.bar");
-    ASSERT_EQ(nss.toString(), "foo.bar");
-    ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
-    ASSERT(nss.tenantId());
-    ASSERT_EQ(*nss.tenantId(), tenantId);
+    {
+        std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
+        ASSERT_EQ(nss.size(), 7);
+        ASSERT_EQ(nss.ns(), "foo.bar");
+        ASSERT_EQ(nss.toString(), "foo.bar");
+        ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss.db(), "foo");
+        ASSERT_EQ(nss.coll(), "bar");
+        ASSERT_EQ(nss.dbName().db(), "foo");
+        ASSERT_EQ(nss.size(), 7);
+        ASSERT(nss.tenantId());
+        ASSERT(nss.dbName().tenantId());
+        ASSERT_EQ(*nss.tenantId(), tenantId);
+        ASSERT_EQ(*nss.dbName().tenantId(), tenantId);
+    }
 
-    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
-    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "bar");
-    ASSERT_EQ(nss2.ns(), "foo.bar");
-    ASSERT_EQ(nss2.toString(), "foo.bar");
-    ASSERT_EQ(nss2.toStringWithTenantId(), tenantNsStr);
-    ASSERT(nss2.tenantId());
-    ASSERT_EQ(*nss2.tenantId(), tenantId);
+    {
+        std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo";
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo");
+        ASSERT_EQ(nss.size(), 3);
+        ASSERT_EQ(nss.ns(), "foo");
+        ASSERT_EQ(nss.toString(), "foo");
+        ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss.db(), "foo");
+        ASSERT_EQ(nss.coll(), "");
+        ASSERT_EQ(nss.dbName().db(), "foo");
+        ASSERT_EQ(nss.size(), 3);
+        ASSERT(nss.tenantId());
+        ASSERT(nss.dbName().tenantId());
+        ASSERT_EQ(*nss.tenantId(), tenantId);
+        ASSERT_EQ(*nss.dbName().tenantId(), tenantId);
+    }
 
-    NamespaceString nss3("foo", "bar", tenantId);
-    ASSERT_EQ(nss3.ns(), "foo.bar");
-    ASSERT_EQ(nss3.toString(), "foo.bar");
-    ASSERT_EQ(nss3.toStringWithTenantId(), tenantNsStr);
-    ASSERT(nss3.tenantId());
-    ASSERT_EQ(*nss3.tenantId(), tenantId);
+    {
+        std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
+        DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
+        NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+        ASSERT_EQ(nss2.size(), 7);
+        ASSERT_EQ(nss2.ns(), "foo.bar");
+        ASSERT_EQ(nss2.toString(), "foo.bar");
+        ASSERT_EQ(nss2.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss2.db(), "foo");
+        ASSERT_EQ(nss2.coll(), "bar");
+        ASSERT_EQ(nss2.dbName().db(), "foo");
+        ASSERT(nss2.tenantId());
+        ASSERT(nss2.dbName().tenantId());
+        ASSERT_EQ(*nss2.tenantId(), tenantId);
+        ASSERT_EQ(*nss2.dbName().tenantId(), tenantId);
+    }
 
-    NamespaceString nss4(dbName);
-    ASSERT_EQ(nss4.ns(), "foo");
-    ASSERT_EQ(nss4.toString(), "foo");
-    ASSERT_EQ(nss4.toStringWithTenantId(), "{}_foo"_format(tenantId.toString()));
-    ASSERT(nss4.tenantId());
-    ASSERT_EQ(*nss4.tenantId(), tenantId);
+    {
+        std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
+        NamespaceString nss3("foo", "bar", tenantId);
+        ASSERT_EQ(nss3.size(), 7);
+        ASSERT_EQ(nss3.ns(), "foo.bar");
+        ASSERT_EQ(nss3.toString(), "foo.bar");
+        ASSERT_EQ(nss3.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss3.db(), "foo");
+        ASSERT_EQ(nss3.coll(), "bar");
+        ASSERT_EQ(nss3.dbName().db(), "foo");
+        ASSERT(nss3.tenantId());
+        ASSERT(nss3.dbName().tenantId());
+        ASSERT_EQ(*nss3.tenantId(), tenantId);
+        ASSERT_EQ(*nss3.dbName().tenantId(), tenantId);
+    }
+
+    {
+        DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
+        NamespaceString nss4(dbName);
+        ASSERT_EQ(nss4.size(), 3);
+        ASSERT_EQ(nss4.ns(), "foo");
+        ASSERT_EQ(nss4.toString(), "foo");
+        ASSERT_EQ(nss4.toStringWithTenantId(), "{}_foo"_format(tenantId.toString()));
+        ASSERT_EQ(nss4.db(), "foo");
+        ASSERT_EQ(nss4.coll(), "");
+        ASSERT_EQ(nss4.dbName().db(), "foo");
+        ASSERT(nss4.tenantId());
+        ASSERT(nss4.dbName().tenantId());
+        ASSERT_EQ(*nss4.tenantId(), tenantId);
+        ASSERT_EQ(*nss4.dbName().tenantId(), tenantId);
+    }
+
+    {
+        NamespaceString multiNss("config.system.change_collection", tenantId);
+        ASSERT(multiNss.isConfigDB());
+        ASSERT_EQ(multiNss.size(), 31);
+        ASSERT_EQ(multiNss.ns(), "config.system.change_collection");
+        ASSERT_EQ(multiNss.toString(), "config.system.change_collection");
+        ASSERT_EQ(multiNss.toStringWithTenantId(),
+                  "{}_config.system.change_collection"_format(tenantId.toString()));
+        ASSERT_EQ(multiNss.db(), "config");
+        ASSERT_EQ(multiNss.coll(), "system.change_collection");
+        ASSERT_EQ(multiNss.dbName().db(), "config");
+        ASSERT(multiNss.tenantId());
+        ASSERT(multiNss.dbName().tenantId());
+        ASSERT_EQ(*multiNss.tenantId(), tenantId);
+        ASSERT_EQ(*multiNss.dbName().tenantId(), tenantId);
+    }
+
+    {
+        NamespaceString empty{};
+        ASSERT_EQ(empty.size(), 0);
+        ASSERT_EQ(empty.db(), "");
+        ASSERT_EQ(empty.coll(), "");
+        ASSERT_EQ(empty.tenantId(), boost::none);
+        ASSERT_EQ(empty.toString(), "");
+        ASSERT_EQ(empty.toStringWithTenantId(), "");
+        ASSERT_EQ(empty.dbName().db(), "");
+        ASSERT_EQ(empty.dbName().tenantId(), boost::none);
+        ASSERT_EQ(empty.dbName().toString(), "");
+        ASSERT_EQ(empty.dbName().toStringWithTenantId(), "");
+    }
+
+    {
+        NamespaceString emptyWithTenant{"", tenantId};
+        ASSERT_EQ(emptyWithTenant.size(), 0);
+        ASSERT_EQ(emptyWithTenant.db(), "");
+        ASSERT_EQ(emptyWithTenant.coll(), "");
+        ASSERT(emptyWithTenant.tenantId());
+        ASSERT_EQ(*emptyWithTenant.tenantId(), tenantId);
+        ASSERT_EQ(emptyWithTenant.toString(), "");
+        ASSERT_EQ(emptyWithTenant.toStringWithTenantId(), "{}_"_format(tenantId.toString()));
+        ASSERT_EQ(emptyWithTenant.dbName().db(), "");
+        ASSERT(emptyWithTenant.dbName().tenantId());
+        ASSERT_EQ(emptyWithTenant.dbName().tenantId(), tenantId);
+        ASSERT_EQ(emptyWithTenant.dbName().toString(), "");
+        ASSERT_EQ(emptyWithTenant.dbName().toStringWithTenantId(),
+                  "{}_"_format(tenantId.toString()));
+    }
+
+    {
+        NamespaceString dbWithoutColl{"foo"};
+        ASSERT_EQ(dbWithoutColl.size(), 3);
+        ASSERT_EQ(dbWithoutColl.db(), "foo");
+        ASSERT_EQ(dbWithoutColl.coll(), "");
+        ASSERT_FALSE(dbWithoutColl.tenantId());
+        ASSERT_EQ(dbWithoutColl.toString(), "foo");
+        ASSERT_EQ(dbWithoutColl.toStringWithTenantId(), "foo");
+        ASSERT_EQ(dbWithoutColl.dbName().db(), "foo");
+        ASSERT_FALSE(dbWithoutColl.dbName().tenantId());
+        ASSERT_EQ(dbWithoutColl.dbName().toString(), "foo");
+        ASSERT_EQ(dbWithoutColl.dbName().toStringWithTenantId(), "foo");
+    }
+
+    {
+        NamespaceString dbWithoutCollWithTenant{"foo", tenantId};
+        ASSERT_EQ(dbWithoutCollWithTenant.size(), 3);
+        ASSERT_EQ(dbWithoutCollWithTenant.db(), "foo");
+        ASSERT_EQ(dbWithoutCollWithTenant.coll(), "");
+        ASSERT(dbWithoutCollWithTenant.tenantId());
+        ASSERT_EQ(*dbWithoutCollWithTenant.tenantId(), tenantId);
+        ASSERT_EQ(dbWithoutCollWithTenant.toString(), "foo");
+        ASSERT_EQ(dbWithoutCollWithTenant.toStringWithTenantId(),
+                  fmt::format("{}_foo", tenantId.toString()));
+        ASSERT_EQ(dbWithoutCollWithTenant.dbName().db(), "foo");
+        ASSERT(dbWithoutCollWithTenant.dbName().tenantId());
+        ASSERT_EQ(dbWithoutCollWithTenant.dbName().tenantId(), tenantId);
+        ASSERT_EQ(dbWithoutCollWithTenant.dbName().toString(), "foo");
+        ASSERT_EQ(dbWithoutCollWithTenant.dbName().toStringWithTenantId(),
+                  fmt::format("{}_foo", tenantId.toString()));
+    }
 }
 
 TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
@@ -421,6 +560,16 @@ TEST(NamespaceStringTest, CompareNSSWithTenantId) {
            NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar"));
     ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") >=
            NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar"));
+
+
+    TenantId tenantId1(OID::gen());
+    TenantId tenantId2(OID::gen());
+    auto ns1 = NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
+    auto ns2 = NamespaceString::createNamespaceString_forTest(tenantId1, "foo.bar");
+    auto ns3 = NamespaceString::createNamespaceString_forTest(tenantId2, "foo.bar");
+    ASSERT_LT(ns1, ns2);
+    ASSERT_LT(ns1, ns3);
+    ASSERT_GT(ns3, ns2);
 }
 
 }  // namespace

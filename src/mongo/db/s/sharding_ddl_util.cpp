@@ -550,7 +550,7 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
 void shardedRenameMetadata(OperationContext* opCtx,
                            const std::shared_ptr<Shard>& configShard,
                            ShardingCatalogClient* catalogClient,
-                           CollectionType& fromCollType,
+                           CollectionType fromCollType,
                            const NamespaceString& toNss,
                            const WriteConcernOptions& writeConcern) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));

@@ -594,6 +594,28 @@ TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
 }
 
+TEST_F(CollectionCatalogTest, GetAllTenants) {
+    TenantId tid1 = TenantId(OID::gen());
+    TenantId tid2 = TenantId(OID::gen());
+    std::vector<NamespaceString> nsss = {
+        NamespaceString::createNamespaceString_forTest(boost::none, "a"),
+        NamespaceString::createNamespaceString_forTest(boost::none, "c"),
+        NamespaceString::createNamespaceString_forTest(boost::none, "l"),
+        NamespaceString::createNamespaceString_forTest(tid1, "c"),
+        NamespaceString::createNamespaceString_forTest(tid2, "c")};
+
+    for (auto& nss : nsss) {
+        std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
+        auto uuid = UUID::gen();
+        catalog.registerCollection(opCtx.get(), uuid, std::move(newColl), boost::none);
+    }
+
+    std::set<TenantId> expectedTenants = {tid1, tid2};
+    ASSERT_EQ(catalog.getAllTenants(), expectedTenants);
+
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
+}
+
 // Test setting and fetching the profile level for a database.
 TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
     DatabaseName testDBNameFirst =

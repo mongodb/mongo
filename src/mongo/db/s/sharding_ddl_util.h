@@ -127,7 +127,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONOb
 void shardedRenameMetadata(OperationContext* opCtx,
                            const std::shared_ptr<Shard>& configShard,
                            ShardingCatalogClient* catalogClient,
-                           CollectionType& fromCollType,
+                           CollectionType fromCollType,
                            const NamespaceString& toNss,
                            const WriteConcernOptions& writeConcern);
 

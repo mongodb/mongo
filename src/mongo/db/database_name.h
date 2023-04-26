@@ -106,25 +106,45 @@ public:
 #include "database_name_reserved.def.h"
 #undef DBNAME_CONSTANT
 
+    static constexpr size_t kMaxDatabaseNameLength = 63;
+
     /**
      * Constructs an empty DatabaseName.
      */
     DatabaseName() = default;
-
     /**
      * Constructs a DatabaseName from the given tenantId and database name.
      * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.
      */
-    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString)
-        : _tenantId(std::move(tenantId)), _dbString(dbString.toString()) {
+    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
         uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in a db name: " + _dbString,
+                "'.' is an invalid character in a db name: " + dbString,
                 dbString.find('.') == std::string::npos);
-
         uassert(ErrorCodes::InvalidNamespace,
                 "database names cannot have embedded null characters",
                 dbString.find('\0') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("db name must be at most {} characters, found: {}",
+                            kMaxDatabaseNameLength,
+                            dbString.size()),
+                dbString.size() <= kMaxDatabaseNameLength);
+
+        uint8_t details = dbString.size() & kDatabaseNameOffsetEndMask;
+        size_t dbStartIndex = kDataOffset;
+        if (tenantId) {
+            dbStartIndex += OID::kOIDSize;
+            details |= kTenantIdMask;
+        }
+
+        _data.resize(dbStartIndex + dbString.size());
+        *reinterpret_cast<uint8_t*>(_data.data()) = details;
+        if (tenantId) {
+            std::memcpy(_data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
+        }
+        if (!dbString.empty()) {
+            std::memcpy(_data.data() + dbStartIndex, dbString.rawData(), dbString.size());
+        }
     }
 
     static DatabaseName createDatabaseName_forTest(boost::optional<TenantId> tenantId,
@@ -139,12 +159,21 @@ public:
     explicit DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
         : DatabaseName(std::move(tenantId), dbName) {}
 
-    const boost::optional<TenantId>& tenantId() const {
-        return _tenantId;
+    boost::optional<TenantId> tenantId() const {
+        if (!_hasTenantId()) {
+            return boost::none;
+        }
+
+        return TenantId{OID::from(&_data[kDataOffset])};
     }
 
     StringData db() const {
-        return _dbString;
+        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        return StringData{_data.data() + offset, _data.size() - offset};
+    }
+
+    bool isEmpty() const {
+        return _data.size() == kDataOffset;
     }
 
     std::string toString() const {
@@ -152,10 +181,12 @@ public:
     }
 
     std::string toStringWithTenantId() const {
-        if (_tenantId)
-            return str::stream() << *_tenantId << '_' << _dbString;
+        if (_hasTenantId()) {
+            auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
+            return str::stream() << tenantId.toString() << "_" << db();
+        }
 
-        return _dbString;
+        return db().toString();
     }
 
     /**
@@ -174,7 +205,9 @@ public:
     }
 
     bool equalCaseInsensitive(const DatabaseName& other) const {
-        return (_tenantId == other._tenantId) && boost::iequals(toString(), other.toString());
+        return StringData{_data.data() + kDataOffset, _data.size() - kDataOffset}
+            .equalCaseInsensitive(
+                StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
     }
 
     friend std::ostream& operator<<(std::ostream& stream, const DatabaseName& tdb) {
@@ -185,36 +218,46 @@ public:
         return builder << tdb.toString();
     }
 
-    friend bool operator==(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() == b._lens();
+    int compare(const DatabaseName& other) const {
+        if (_hasTenantId() && !other._hasTenantId()) {
+            return 1;
+        }
+
+        if (other._hasTenantId() && !_hasTenantId()) {
+            return -1;
+        }
+
+        return StringData{_data.data() + kDataOffset, _data.size() - kDataOffset}.compare(
+            StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
     }
 
-    friend bool operator!=(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() != b._lens();
+    friend bool operator==(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs._data == rhs._data;
     }
 
-    friend bool operator<(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() < b._lens();
+    friend bool operator!=(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs._data != rhs._data;
     }
 
-    friend bool operator>(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() > b._lens();
+    friend bool operator<(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) < 0;
     }
 
-    friend bool operator<=(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() <= b._lens();
+    friend bool operator<=(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) <= 0;
     }
 
-    friend bool operator>=(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() >= b._lens();
+    friend bool operator>(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) > 0;
+    }
+
+    friend bool operator>=(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) >= 0;
     }
 
     template <typename H>
     friend H AbslHashValue(H h, const DatabaseName& obj) {
-        if (obj._tenantId) {
-            return H::combine(std::move(h), obj._tenantId.get(), obj._dbString);
-        }
-        return H::combine(std::move(h), obj._dbString);
+        return H::combine(std::move(h), obj._data);
     }
 
     friend auto logAttrs(const DatabaseName& obj) {
@@ -222,12 +265,22 @@ public:
     }
 
 private:
-    std::tuple<const boost::optional<TenantId>&, const std::string&> _lens() const {
-        return std::tie(_tenantId, _dbString);
+    friend class NamespaceString;
+
+    static constexpr size_t kDataOffset = sizeof(uint8_t);
+    static constexpr uint8_t kTenantIdMask = 0x80;
+    static constexpr uint8_t kDatabaseNameOffsetEndMask = 0x7F;
+
+    inline bool _hasTenantId() const {
+        return static_cast<uint8_t>(_data.front()) & kTenantIdMask;
     }
 
-    boost::optional<TenantId> _tenantId = boost::none;
-    std::string _dbString;
+    // Private constructor for NamespaceString to construct DatabaseName from its own internal data
+    struct TrustedInitTag {};
+    DatabaseName(std::string data, TrustedInitTag) : _data(std::move(data)) {}
+
+    // Same in-memory layout as NamespaceString, see documentation in its header
+    std::string _data{'\0'};
 };
 
 // The `constexpr` definitions for `DatabaseName::ConstantProxy` static data members are below. See

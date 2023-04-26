@@ -138,7 +138,7 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
 
-    if (dbname.size() >= 64)
+    if (dbname.size() > DatabaseName::kMaxDatabaseNameLength)
         return Status(ErrorCodes::BadValue, "db name is too long");
 
     if (dbname.find('.') != std::string::npos)

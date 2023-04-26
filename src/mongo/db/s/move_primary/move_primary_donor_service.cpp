@@ -381,8 +381,8 @@ MovePrimaryDonor::MovePrimaryDonor(ServiceContext* serviceContext,
                                    MovePrimaryDonorDependencies dependencies)
     : _serviceContext{serviceContext},
       _donorService{donorService},
-      _metadata{std::move(initialState.getMetadata())},
-      _mutableFields{std::move(initialState.getMutableFields())},
+      _metadata{initialState.getMetadata()},
+      _mutableFields{initialState.getMutableFields()},
       _metrics{MovePrimaryMetrics::initializeFrom(initialState, _serviceContext)},
       _cleanupExecutor{cleanupExecutor},
       _externalState{std::move(dependencies.externalState)} {

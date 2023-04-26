@@ -107,6 +107,9 @@ public:
     void serializeToBSON(BSONArrayBuilder* builder) const;
 
 private:
+    friend class NamespaceString;
+    friend class DatabaseName;
+
     OID _oid;
 };
 
