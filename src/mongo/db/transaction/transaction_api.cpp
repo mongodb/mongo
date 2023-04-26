@@ -55,6 +55,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -521,6 +522,43 @@ BatchedCommandResponse SEPTransactionClient::runCRUDOpSync(const BatchedCommandR
     return std::move(result).get();
 }
 
+ExecutorFuture<BulkWriteCommandReply> SEPTransactionClient::_runCRUDOp(
+    const BulkWriteCommandRequest& cmd) const {
+    BSONObjBuilder cmdBob(cmd.toBSON(BSONObj()));
+    // BulkWrite can only execute on admin DB.
+    return runCommand(DatabaseName::kAdmin, cmdBob.obj())
+        .thenRunOn(_executor)
+        .then([](BSONObj reply) {
+            uassertStatusOK(getStatusFromWriteCommandReply(reply));
+
+            IDLParserContext ctx("BulkWriteCommandReplyParse");
+            auto response = BulkWriteCommandReply::parse(ctx, reply);
+            return response;
+        });
+}
+
+SemiFuture<BulkWriteCommandReply> SEPTransactionClient::runCRUDOp(
+    const BulkWriteCommandRequest& cmd) const {
+    return _runCRUDOp(cmd).semi();
+}
+
+BulkWriteCommandReply SEPTransactionClient::runCRUDOpSync(
+    const BulkWriteCommandRequest& cmd) const {
+
+    Notification<void> mayReturn;
+
+    auto result =
+        _runCRUDOp(cmd)
+            .unsafeToInlineFuture()
+            // Use tap and tapError instead of tapAll since tapAll is not move-only type friendly
+            .tap([&](auto&&) { mayReturn.set(); })
+            .tapError([&](auto&&) { mayReturn.set(); });
+
+    runFutureInline(_inlineExecutor.get(), mayReturn);
+
+    return std::move(result).get();
+}
+
 ExecutorFuture<std::vector<BSONObj>> SEPTransactionClient::_exhaustiveFind(
     const FindCommandRequest& cmd) const {
     return runCommand(cmd.getDbName(), cmd.toBSON({}))
@@ -816,7 +854,9 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
             !isRetryableWriteCommand(
                 cmdBuilder->asTempObj().firstElement().fieldNameStringData()) ||
                 (cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdsFieldName) ||
-                 cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdFieldName)),
+                 cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdFieldName)) ||
+                (cmdBuilder->hasField(BulkWriteCommandRequest::kStmtIdFieldName) ||
+                 cmdBuilder->hasField(BulkWriteCommandRequest::kStmtIdsFieldName)),
             str::stream()
                 << "In a retryable write transaction every retryable write command should have an "
                    "explicit statement id, command: "

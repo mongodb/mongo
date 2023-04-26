@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/resource_yielder.h"
@@ -127,6 +128,13 @@ public:
                                                          std::vector<StmtId> stmtIds) const = 0;
     virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const = 0;
+
+    /**
+     * Helper method to run BulkWriteCommandRequest in the transaction client's transaction.
+     */
+    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
+        const BulkWriteCommandRequest& cmd) const = 0;
+    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const = 0;
 
     /**
      * Helper method that runs the given find in the transaction client's transaction and will
@@ -291,6 +299,10 @@ public:
     virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const override;
 
+    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
+        const BulkWriteCommandRequest& cmd) const override;
+    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override;
+
     virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
         const FindCommandRequest& cmd) const override;
     virtual std::vector<BSONObj> exhaustiveFindSync(const FindCommandRequest& cmd) const override;
@@ -308,6 +320,8 @@ private:
 
     ExecutorFuture<BatchedCommandResponse> _runCRUDOp(const BatchedCommandRequest& cmd,
                                                       std::vector<StmtId> stmtIds) const;
+
+    ExecutorFuture<BulkWriteCommandReply> _runCRUDOp(const BulkWriteCommandRequest& cmd) const;
 
     ExecutorFuture<std::vector<BSONObj>> _exhaustiveFind(const FindCommandRequest& cmd) const;
 

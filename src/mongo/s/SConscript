@@ -698,6 +698,7 @@ env.CppUnitTest(
         'write_ops/batch_write_op_test.cpp',
         'write_ops/batched_command_request_test.cpp',
         'write_ops/batched_command_response_test.cpp',
+        'write_ops/bulk_write_command_modifier_test.cpp',
         'write_ops/bulk_write_exec_test.cpp',
         'write_ops/write_op_test.cpp',
         'write_ops/write_without_shard_key_util_test.cpp',

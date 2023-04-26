@@ -204,6 +204,15 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
+        const BulkWriteCommandRequest& cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
     virtual bool supportsClientTransactionContext() const override {
         return true;
     }
@@ -502,6 +511,15 @@ public:
 
     virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
+        const BulkWriteCommandRequest& cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override {
         MONGO_UNREACHABLE;
     }
 
