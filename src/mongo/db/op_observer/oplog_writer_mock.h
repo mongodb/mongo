@@ -69,8 +69,15 @@ public:
                          Date_t wallTime,
                          bool isAbortIndexBuild) override {}
 
+    /**
+     * Returns a vector of 'count' non-null OpTimes.
+     * Some tests have to populate test collections, which may require OpObserverImpl::onInserts()
+     * to be able to acquire non-null optimes for insert operations even though no oplog entries
+     * are appended to the oplog.
+     * If the test requires actual OpTimes to work, use OplogWriterImpl instead.
+     */
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override {
-        return {};
+        return std::vector<OplogSlot>{count, OplogSlot(Timestamp(1, 1), /*term=*/1LL)};
     }
 };
 
