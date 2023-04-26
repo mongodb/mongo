@@ -46,7 +46,6 @@ struct CostAndCEInternal {
         uassert(7034001, "Invalid cardinality", std::isfinite(ce._value) && ce >= 0.0);
     }
 
-    // TODO: SERVER-71799: Cost model manager to deliver costs via a strong type.
     double _cost;
     CEType _ce;
 };
