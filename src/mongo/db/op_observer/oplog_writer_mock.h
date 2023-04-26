@@ -46,16 +46,6 @@ public:
                                    repl::OplogLink* oplogLink,
                                    const std::vector<StmtId>& stmtIds) override {}
 
-    std::vector<repl::OpTime> logInsertOps(OperationContext* opCtx,
-                                           repl::MutableOplogEntry* oplogEntryTemplate,
-                                           std::vector<InsertStatement>::const_iterator begin,
-                                           std::vector<InsertStatement>::const_iterator end,
-                                           std::vector<bool> fromMigrate,
-                                           const ShardingWriteRouter& shardingWriteRouter,
-                                           const CollectionPtr& collectionPtr) override {
-        return {};
-    }
-
     repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override {
         return {};
     }

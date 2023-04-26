@@ -40,18 +40,6 @@ void OplogWriterImpl::appendOplogEntryChainInfo(OperationContext* opCtx,
     return repl::appendOplogEntryChainInfo(opCtx, oplogEntry, oplogLink, stmtIds);
 }
 
-std::vector<repl::OpTime> OplogWriterImpl::logInsertOps(
-    OperationContext* opCtx,
-    repl::MutableOplogEntry* oplogEntryTemplate,
-    std::vector<InsertStatement>::const_iterator begin,
-    std::vector<InsertStatement>::const_iterator end,
-    std::vector<bool> fromMigrate,
-    const ShardingWriteRouter& shardingWriteRouter,
-    const CollectionPtr& collectionPtr) {
-    return repl::logInsertOps(
-        opCtx, oplogEntryTemplate, begin, end, fromMigrate, shardingWriteRouter, collectionPtr);
-}
-
 repl::OpTime OplogWriterImpl::logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) {
     return repl::logOp(opCtx, oplogEntry);
 }

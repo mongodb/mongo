@@ -34,9 +34,8 @@
 
 #include "mongo/db/catalog/collection.h"  // for CollectionPtr
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"        // for InsertStatement and OplogLink
-#include "mongo/db/repl/oplog_entry.h"  // for MutableOplogEntry
-#include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/repl/oplog.h"                  // for OplogLink
+#include "mongo/db/repl/oplog_entry.h"            // for MutableOplogEntry
 #include "mongo/db/session/logical_session_id.h"  // for StmtId
 #include "mongo/db/storage/record_store.h"        // for Record
 #include "mongo/util/time_support.h"              // for Date_t
@@ -70,19 +69,6 @@ public:
                                            repl::MutableOplogEntry* oplogEntry,
                                            repl::OplogLink* oplogLink,
                                            const std::vector<StmtId>& stmtIds) = 0;
-
-    /**
-     * Log insert(s) to the local oplog. Returns the OpTime of every insert.
-     * Refer to repl::logInsertOps() in repl/oplog.h.
-     */
-    virtual std::vector<repl::OpTime> logInsertOps(
-        OperationContext* opCtx,
-        repl::MutableOplogEntry* oplogEntryTemplate,
-        std::vector<InsertStatement>::const_iterator begin,
-        std::vector<InsertStatement>::const_iterator end,
-        std::vector<bool> fromMigrate,
-        const ShardingWriteRouter& shardingWriteRouter,
-        const CollectionPtr& collectionPtr) = 0;
 
     /**
      * Returns the optime of the oplog entry written to the oplog.
