@@ -278,6 +278,10 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
+    // To diagnose any intermittent failures, maximize logging from WiredTigerKVEngine and friends.
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kStorage,
+                                                              logv2::LogSeverity::Debug(3)};
+
     std::unique_ptr<Checkpointer> checkpointer = std::make_unique<Checkpointer>();
     checkpointer->go();
 
@@ -300,11 +304,6 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
         storageGlobalParams.syncdelay = 1;
     }
     ();
-
-
-    // To diagnose any intermittent failures, maximize logging from WiredTigerKVEngine and friends.
-    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kStorage,
-                                                              logv2::LogSeverity::Debug(3)};
 
     // Simulate the callback that queries config.transactions for the oldest active transaction.
     boost::optional<Timestamp> oldestActiveTxnTimestamp;
