@@ -1806,14 +1806,14 @@ TEST(PhysRewriter, SargableProjectionRenames) {
     // projections.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
-        "Evaluation [{pa} = Variable [pa1]]\n"
+        "Evaluation [{pa1} = Variable [pa]]\n"
         "Sargable [Complete]\n"
         "|   |   requirements: \n"
-        "|   |       {{{root, 'PathGet [a] PathIdentity []', pa1, {{{=Const [1]}}}}}}\n"
+        "|   |       {{{root, 'PathGet [a] PathIdentity []', pa, {{{=Const [1]}}}}}}\n"
         "|   scanParams: \n"
-        "|       {'a': pa1}\n"
+        "|       {'a': pa}\n"
         "|           residualReqs: \n"
-        "|               {{{pa1, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
+        "|               {{{pa, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
         "Scan [c1, {root}]\n",
         optimized);
 }
@@ -1981,10 +1981,7 @@ TEST(PhysRewriter, CoveredScan) {
 
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN_AUTO(  //
-        3,
-        6,
-        phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Since we do not optimize with fast null handling, we need to split the predicate between the
     // index scan and fetch in order to handle null.
@@ -1994,8 +1991,8 @@ TEST(PhysRewriter, CoveredScan) {
         "|   |   Const [true]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'a': pa}, c1]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {<Const "
-        "[1]}]\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {<Const [1"
+        "]}]\n",
         optimized);
 }
 

@@ -237,33 +237,15 @@ private:
 /**
  * This comparator is used to compare paths with Get, Traverse, and Id.
  */
-struct IndexPathLessComparator {
+struct IndexPath3WComparator {
     bool operator()(const ABT& path1, const ABT& path2) const;
 };
 
-using IndexPathSet = std::set<ABT, IndexPathLessComparator>;
+using IndexPathSet = std::set<ABT, IndexPath3WComparator>;
 
-struct PartialSchemaKeyComparator {
-    struct Less {
-        bool operator()(const PartialSchemaKey& k1, const PartialSchemaKey& k2) const;
-    };
-
-    struct Cmp3W {
-        int operator()(const PartialSchemaKey& k1, const PartialSchemaKey& k2) const;
-    };
+struct PartialSchemaKeyLessComparator {
+    bool operator()(const PartialSchemaKey& k1, const PartialSchemaKey& k2) const;
 };
-struct PartialSchemaRequirementComparator {
-    struct Less {
-        bool operator()(const PartialSchemaRequirement& req1,
-                        const PartialSchemaRequirement& req2) const;
-    };
-
-    struct Cmp3W {
-        int operator()(const PartialSchemaRequirement& req1,
-                       const PartialSchemaRequirement& req2) const;
-    };
-};
-
 
 /**
  * Used to track cardinality estimates per predicate inside a PartialSchemaRequirement. The order of
@@ -271,7 +253,7 @@ struct PartialSchemaRequirementComparator {
  */
 using PartialSchemaKeyCE = std::vector<std::pair<PartialSchemaKey, CEType>>;
 
-using PartialSchemaKeySet = std::set<PartialSchemaKey, PartialSchemaKeyComparator::Less>;
+using PartialSchemaKeySet = std::set<PartialSchemaKey, PartialSchemaKeyLessComparator>;
 
 // Requirements which are not satisfied directly by an IndexScan, PhysicalScan or Seek (e.g. using
 // an index field, or scan field). The index refers to the underlying entry in the
