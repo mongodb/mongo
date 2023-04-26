@@ -201,6 +201,7 @@ let testCases = {
     streams_startStreamSample: {skip: "internal command"},
     streams_stopStreamProcessor: {skip: "internal command"},
     streams_getMoreStreamSample: {skip: "internal command"},
+    streams_getStats: {skip: "internal command"},
     streams_testOnlyInsert: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     _vectorClockPersist: {skip: "internal command"},

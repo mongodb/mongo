@@ -213,6 +213,7 @@ let viewsCommandTests = {
     streams_startStreamSample: {skip: isAnInternalCommand},
     streams_stopStreamProcessor: {skip: isAnInternalCommand},
     streams_getMoreStreamSample: {skip: isAnInternalCommand},
+    streams_getStats: {skip: isAnInternalCommand},
     streams_testOnlyInsert: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
