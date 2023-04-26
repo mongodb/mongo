@@ -55,6 +55,7 @@ const binaryTestCases = [
     },
     {document: {left: NumberDecimal("12.5"), right: null}, expected: null},
 
+    // Test null
     {document: {left: null, right: NumberInt(2)}, expected: null},
     {document: {left: null, right: 2.55}, expected: null},
     {document: {left: null, right: NumberLong("2")}, expected: null},

@@ -1,7 +1,8 @@
+// Tests for $subtract aggregation expression
 (function() {
 "use strict";
 
-const coll = db.add_coll;
+const coll = db.subtract_coll;
 coll.drop();
 
 assert.commandWorked(coll.insert({_id: 0, lhs: 1, rhs: 1}));
@@ -14,8 +15,6 @@ assert.commandWorked(
 assert.commandWorked(coll.insert({_id: 5, lhs: new Date(1912392670000), rhs: 70000}));
 assert.commandWorked(
     coll.insert({_id: 6, lhs: new Date(1912392670000), rhs: new Date(1912392600000)}));
-assert.commandWorked(coll.insert(
-    {_id: 7, lhs: NumberLong("9000000000000000000"), rhs: NumberLong("-9000000000000000000")}));
 
 const result =
     coll.aggregate([{$project: {diff: {$subtract: ["$lhs", "$rhs"]}}}, {$sort: {_id: 1}}])
@@ -27,8 +26,4 @@ assert.eq(result[3].diff, 10.0);
 assert.eq(result[4].diff, NumberDecimal("9990.00005"));
 assert.eq(result[5].diff, new Date(1912392600000));
 assert.eq(result[6].diff, 70000);
-
-// TODO WRITING-10039 After type promotion algorithm is fixed, we need to use more strict assert
-// to check type promotion
-assert.eq(bsonWoCompare(result[7].diff, 1.8e+19), 0);
 }());

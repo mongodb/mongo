@@ -144,6 +144,13 @@ FastTuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeTa
                 // The result does not fit into int64_t so fallthru to the wider type.
                 [[fallthrough]];
             }
+            case value::TypeTags::NumberDouble: {
+                double result;
+                Op::doOperation(numericCast<double>(lhsTag, lhsValue),
+                                numericCast<double>(rhsTag, rhsValue),
+                                result);
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
+            }
             case value::TypeTags::NumberDecimal: {
                 Decimal128 result;
                 Op::doOperation(numericCast<Decimal128>(lhsTag, lhsValue),
@@ -151,13 +158,6 @@ FastTuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeTa
                                 result);
                 auto [tag, val] = value::makeCopyDecimal(result);
                 return {true, tag, val};
-            }
-            case value::TypeTags::NumberDouble: {
-                double result;
-                Op::doOperation(numericCast<double>(lhsTag, lhsValue),
-                                numericCast<double>(rhsTag, rhsValue),
-                                result);
-                return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
             }
             default:
                 MONGO_UNREACHABLE;
