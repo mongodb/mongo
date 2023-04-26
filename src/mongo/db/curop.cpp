@@ -1677,6 +1677,10 @@ BSONObj OpDebug::makeMongotDebugStatsObject() const {
     if (msWaitingForMongot) {
         cursorBuilder.append("timeWaitingMillis", msWaitingForMongot.get());
     }
+
+    if (!mongotCountVal.isEmpty()) {
+        cursorBuilder.append("resultCount", mongotCountVal);
+    }
     return cursorBuilder.obj();
 }
 

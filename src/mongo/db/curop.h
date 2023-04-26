@@ -234,6 +234,8 @@ public:
     boost::optional<long long> mongotCursorId{boost::none};
     boost::optional<long long> msWaitingForMongot{boost::none};
 
+    BSONObj mongotCountVal = BSONObj();
+
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 
     bool usedDisk{false};  // true if the given query used disk
