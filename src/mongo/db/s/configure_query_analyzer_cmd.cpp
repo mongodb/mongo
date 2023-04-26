@@ -111,13 +111,13 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a standalone mongod",
+                    "configureQueryAnalyzer command is not supported on a standalone mongod",
                     repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a multitenant replica set",
+                    "configureQueryAnalyzer command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a configsvr mongod",
+                    "configureQueryAnalyzer command is not supported on a configsvr mongod",
                     !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             const auto& nss = ns();

@@ -71,7 +71,7 @@ public:
                     "analyzeShardKey command is not supported on a standalone mongod",
                     repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a multitenant replica set",
+                    "analyzeShardKey command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
             uassert(ErrorCodes::IllegalOperation,
                     "analyzeShardKey command is not supported on a configsvr mongod",
