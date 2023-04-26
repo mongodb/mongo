@@ -1694,6 +1694,12 @@ long long WiredTigerRecordStore::_reserveIdBlock(OperationContext* opCtx, size_t
 void WiredTigerRecordStore::_changeNumRecordsAndDataSize(OperationContext* opCtx,
                                                          int64_t numRecordDiff,
                                                          int64_t dataSizeDiff) {
+    if (numRecordDiff == 0 && dataSizeDiff == 0) {
+        // If there's nothing to increment/decrement this will be a no-op. Avoid all the other
+        // checks and early return.
+        return;
+    }
+
     if (!_tracksSizeAdjustments) {
         return;
     }
