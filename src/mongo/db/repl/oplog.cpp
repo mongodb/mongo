@@ -29,9 +29,6 @@
 
 #include "mongo/db/repl/oplog.h"
 
-#include <deque>
-#include <fmt/format.h>
-#include <memory>
 #include <set>
 #include <vector>
 
@@ -54,7 +51,6 @@
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog/local_oplog_info.h"
-#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
@@ -116,18 +112,10 @@
 
 namespace mongo {
 
-using std::endl;
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-using std::vector;
-
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace repl {
 namespace {
-
-using namespace fmt::literals;
 
 // Failpoint to block after a write and its oplog entry have been written to the storage engine and
 // are visible, but before we have advanced 'lastApplied' for the write.
