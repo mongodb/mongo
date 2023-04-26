@@ -1334,8 +1334,7 @@ buildvariants:
   - name: .concurrency .sharded .large
     distros:
     - rhel80-medium
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
-  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+  - name: .multi_shard
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
