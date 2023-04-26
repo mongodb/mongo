@@ -65,6 +65,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
+        '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbhelpers',

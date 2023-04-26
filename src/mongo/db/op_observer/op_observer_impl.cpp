@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -378,6 +379,30 @@ void logGlobalIndexDDLOperation(OperationContext* opCtx,
     onWriteOpCompleted(opCtx, {stmtId}, sessionTxnRecord);
 }
 
+/**
+ * See isTenantChangeStreamEnabled() in oplog.cpp.
+ */
+bool isTenantChangeStreamEnabled(OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    const auto& settings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
+    if (!settings.isServerless()) {
+        return false;
+    }
+
+    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+        return false;
+    }
+
+    if (!tenantId) {
+        return false;
+    }
+
+    if (!change_stream_serverless_helpers::isChangeStreamEnabled(opCtx, tenantId.get())) {
+        return false;
+    }
+
+    return true;
+}
+
 }  // namespace
 
 OpObserverImpl::OpObserverImpl(std::unique_ptr<OplogWriter> oplogWriter)
@@ -570,6 +595,128 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
 }
 
+namespace {
+
+std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
+                                        MutableOplogEntry* oplogEntryTemplate,
+                                        std::vector<InsertStatement>::const_iterator begin,
+                                        std::vector<InsertStatement>::const_iterator end,
+                                        const std::vector<bool>& fromMigrate,
+                                        const ShardingWriteRouter& shardingWriteRouter,
+                                        const CollectionPtr& collectionPtr,
+                                        OplogWriter* oplogWriter) {
+    invariant(begin != end);
+
+    auto nss = oplogEntryTemplate->getNss();
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->isOplogDisabledFor(opCtx, nss)) {
+        invariant(!begin->stmtIds.empty());
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "retryable writes is not supported for unreplicated ns: "
+                              << nss.toStringForErrorMsg(),
+                begin->stmtIds.front() == kUninitializedStmtId);
+        return {};
+    }
+
+    // The number of entries in 'fromMigrate' should be consistent with the number of insert
+    // operations in [begin, end). Also, 'fromMigrate' is a sharding concept, so there is no
+    // need to check 'fromMigrate' for inserts that are not replicated. See SERVER-75829.
+    invariant(std::distance(fromMigrate.begin(), fromMigrate.end()) == std::distance(begin, end),
+              oplogEntryTemplate->toReplOperation().toBSON().toString());
+
+    // If this oplog entry is from a tenant migration, include the tenant migration
+    // UUID and optional donor timeline metadata.
+    if (const auto& recipientInfo = repl::tenantMigrationInfo(opCtx)) {
+        oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
+        if (isTenantChangeStreamEnabled(opCtx, oplogEntryTemplate->getTid()) &&
+            recipientInfo->donorOplogEntryData) {
+            oplogEntryTemplate->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
+            oplogEntryTemplate->setDonorApplyOpsIndex(
+                recipientInfo->donorOplogEntryData->applyOpsIndex);
+        }
+    }
+
+    const size_t count = end - begin;
+
+    // Use OplogAccessMode::kLogOp to avoid recursive locking.
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
+
+    WriteUnitOfWork wuow(opCtx);
+
+    std::vector<repl::OpTime> opTimes(count);
+    std::vector<Timestamp> timestamps(count);
+    std::vector<BSONObj> bsonOplogEntries(count);
+    std::vector<Record> records(count);
+    for (size_t i = 0; i < count; i++) {
+        // Make a copy from the template for each insert oplog entry.
+        MutableOplogEntry oplogEntry = *oplogEntryTemplate;
+        // Make a mutable copy.
+        auto insertStatementOplogSlot = begin[i].oplogSlot;
+        // Fetch optime now, if not already fetched.
+        if (insertStatementOplogSlot.isNull()) {
+            insertStatementOplogSlot = oplogWriter->getNextOpTimes(opCtx, 1U)[0];
+        }
+        const auto docKey =
+            repl::getDocumentKey(opCtx, collectionPtr, begin[i].doc).getShardKeyAndId();
+        oplogEntry.setObject(begin[i].doc);
+        oplogEntry.setObject2(docKey);
+        oplogEntry.setOpTime(insertStatementOplogSlot);
+        oplogEntry.setDestinedRecipient(
+            shardingWriteRouter.getReshardingDestinedRecipient(begin[i].doc));
+        repl::addDestinedRecipient.execute([&](const BSONObj& data) {
+            auto recipient = data["destinedRecipient"].String();
+            oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
+        });
+
+        repl::OplogLink oplogLink;
+        if (i > 0)
+            oplogLink.prevOpTime = opTimes[i - 1];
+
+        oplogEntry.setFromMigrateIfTrue(fromMigrate[i]);
+
+        oplogWriter->appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtIds);
+
+        opTimes[i] = insertStatementOplogSlot;
+        timestamps[i] = insertStatementOplogSlot.getTimestamp();
+        bsonOplogEntries[i] = oplogEntry.toBSON();
+        // The storage engine will assign the RecordId based on the "ts" field of the oplog entry,
+        // see record_id_helpers::extractKey.
+        records[i] = Record{
+            RecordId(), RecordData(bsonOplogEntries[i].objdata(), bsonOplogEntries[i].objsize())};
+    }
+
+    repl::sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
+        auto numMillis = data["waitForMillis"].numberInt();
+        LOGV2(7456300,
+              "Sleeping for {sleepMillis}ms after receiving {numOpTimesReceived} optimes from "
+              "{firstOpTime} to "
+              "{lastOpTime}",
+              "Sleeping due to sleepBetweenInsertOpTimeGenerationAndLogOp failpoint",
+              "sleepMillis"_attr = numMillis,
+              "numOpTimesReceived"_attr = count,
+              "firstOpTime"_attr = opTimes.front(),
+              "lastOpTime"_attr = opTimes.back());
+        sleepmillis(numMillis);
+    });
+
+    invariant(!opTimes.empty());
+    auto lastOpTime = opTimes.back();
+    invariant(!lastOpTime.isNull());
+    auto wallClockTime = oplogEntryTemplate->getWallClockTime();
+    oplogWriter->logOplogRecords(opCtx,
+                                 nss,
+                                 &records,
+                                 timestamps,
+                                 oplogWrite.getCollection(),
+                                 lastOpTime,
+                                 wallClockTime,
+                                 /*isAbortIndexBuild=*/false);
+    wuow.commit();
+    return opTimes;
+}
+
+}  // namespace
+
 void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
@@ -644,13 +791,14 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         Date_t lastWriteDate = getWallClockTimeForOpLog(opCtx);
         oplogEntryTemplate.setWallClockTime(lastWriteDate);
 
-        opTimeList = _oplogWriter->logInsertOps(opCtx,
-                                                &oplogEntryTemplate,
-                                                first,
-                                                last,
-                                                std::move(fromMigrate),
-                                                shardingWriteRouter,
-                                                coll);
+        opTimeList = _logInsertOps(opCtx,
+                                   &oplogEntryTemplate,
+                                   first,
+                                   last,
+                                   std::move(fromMigrate),
+                                   shardingWriteRouter,
+                                   coll,
+                                   _oplogWriter.get());
         if (!opTimeList.empty())
             lastOpTime = opTimeList.back();
 
