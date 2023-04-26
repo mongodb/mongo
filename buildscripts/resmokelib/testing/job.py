@@ -7,6 +7,7 @@ from collections import namedtuple
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing import testcases
+from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures.interface import create_fixture_table
 from buildscripts.resmokelib.testing.testcases import fixture as _fixture
 from buildscripts.resmokelib.utils import queue as _queue
@@ -282,7 +283,13 @@ class Job(object):
         @param test: the test after which we run the hooks.
         @param background: whether to run background hooks.
         """
+        suite_with_balancer = isinstance(
+            self.fixture, shardedcluster.ShardedClusterFixture) and self.fixture.enable_balancer
+
         try:
+            if not background and suite_with_balancer:
+                self.logger.info("Stopping the balancer before running end-test hooks")
+                self.fixture.stop_balancer()
             for hook in self.hooks:
                 if hook.IS_BACKGROUND == background:
                     self._run_hook(hook, hook.after_test, test, hook_failure_flag)
@@ -306,6 +313,10 @@ class Job(object):
         except:
             self.report.setError(test, sys.exc_info())
             raise
+
+        if not background and suite_with_balancer:
+            self.logger.info("Resuming the balancer after running end-test hooks")
+            self.fixture.start_balancer()
 
     def _fail_test(self, test, exc_info, return_code=1):
         """Provide helper to record a test as a failure with the provided return code.

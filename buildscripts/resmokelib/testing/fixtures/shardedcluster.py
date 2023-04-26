@@ -139,7 +139,7 @@ class ShardedClusterFixture(interface.Fixture):
 
         # Turn off the balancer if it is not meant to be enabled.
         if not self.enable_balancer:
-            self.stop_balancer()
+            self.stop_balancer(join_migrations=False)
 
         # Inform mongos about each of the shards
         for idx, shard in enumerate(self.shards):
@@ -192,10 +192,15 @@ class ShardedClusterFixture(interface.Fixture):
                                 .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
                         time.sleep(0.1)
 
-    def stop_balancer(self, timeout_ms=300000):
+    # TODO SERVER-76343 remove the join_migrations parameter and the if clause depending on it.
+    def stop_balancer(self, timeout_ms=300000, join_migrations=True):
         """Stop the balancer."""
         client = interface.build_client(self, self.auth_options)
         client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
+        if join_migrations:
+            for shard in self.shards:
+                shard_client = interface.build_client(shard.get_primary(), self.auth_options)
+                shard_client.admin.command({"_shardsvrJoinMigrations": 1})
         self.logger.info("Stopped the balancer")
 
     def start_balancer(self, timeout_ms=300000):
