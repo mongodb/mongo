@@ -205,7 +205,8 @@ public:
     void onTransactionStart(OperationContext* opCtx) final {}
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations) final {}
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) final {}
 
     void onPreparedTransactionCommit(
         OperationContext* opCtx,

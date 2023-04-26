@@ -120,10 +120,11 @@ public:
         transactionPrepared = true;
     };
 
-    void onUnpreparedTransactionCommit(
-        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations);
+        OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations, opAccumulator);
 
         uassert(ErrorCodes::OperationFailed,
                 "onUnpreparedTransactionCommit() failed",

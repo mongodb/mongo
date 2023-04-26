@@ -128,7 +128,8 @@ public:
     };
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations) override;
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) override;
     bool onUnpreparedTransactionCommitThrowsException = false;
     bool unpreparedTransactionCommitted = false;
     std::function<void(const std::vector<repl::ReplOperation>&)> onUnpreparedTransactionCommitFn =
@@ -195,7 +196,9 @@ void OpObserverMock::onTransactionPrepare(
 }
 
 void OpObserverMock::onUnpreparedTransactionCommit(
-    OperationContext* opCtx, const TransactionOperations& transactionOperations) {
+    OperationContext* opCtx,
+    const TransactionOperations& transactionOperations,
+    OpStateAccumulator* opAccumulator) {
     ASSERT(opCtx->lockState()->inAWriteUnitOfWork());
 
     OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations);

@@ -218,7 +218,8 @@ public:
                        const UUID& uuid) final;
     void onTransactionStart(OperationContext* opCtx) final;
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations) final;
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) final;
     void onBatchedWriteStart(OperationContext* opCtx) final;
     void onBatchedWriteCommit(OperationContext* opCtx) final;
     void onBatchedWriteAbort(OperationContext* opCtx) final;

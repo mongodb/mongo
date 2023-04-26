@@ -209,8 +209,9 @@ public:
 
     void onTransactionStart(OperationContext* opCtx) override {}
 
-    void onUnpreparedTransactionCommit(
-        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {}
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) override {}
 
     void onPreparedTransactionCommit(
         OperationContext* opCtx,

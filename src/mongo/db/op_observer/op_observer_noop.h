@@ -185,8 +185,9 @@ public:
                        const NamespaceString& collectionName,
                        const UUID& uuid) override {}
     void onTransactionStart(OperationContext* opCtx) override {}
-    void onUnpreparedTransactionCommit(
-        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {}
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) override {}
     void onBatchedWriteStart(OperationContext* opCtx) final {}
     void onBatchedWriteCommit(OperationContext* opCtx) final {}
     void onBatchedWriteAbort(OperationContext* opCtx) final {}

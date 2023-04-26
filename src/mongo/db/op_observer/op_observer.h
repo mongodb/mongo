@@ -53,9 +53,9 @@ struct OpTimeBundle {
 };
 
 /**
- * The generic container for onUpdate/onDelete state-passing between OpObservers. Despite the
- * naming, some OpObserver's don't strictly observe. This struct is written by OpObserverImpl and
- * useful for later observers to inspect state they need.
+ * The generic container for onUpdate/onDelete/onUnpreparedTransactionCommit state-passing between
+ * OpObservers. Despite the naming, some OpObserver's don't strictly observe. This struct is written
+ * by OpObserverImpl and useful for later observers to inspect state they need.
  */
 struct OpStateAccumulator {
     OpTimeBundle opTime;
@@ -447,8 +447,9 @@ public:
      * The 'transactionOperations' contains the list of CRUD operations (formerly 'statements') to
      * be applied in this transaction.
      */
-    virtual void onUnpreparedTransactionCommit(
-        OperationContext* opCtx, const TransactionOperations& transactionOperations) = 0;
+    virtual void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                               const TransactionOperations& transactionOperations,
+                                               OpStateAccumulator* opAccumulator = nullptr) = 0;
     /**
      * The onPreparedTransactionCommit method is called on the commit of a prepared transaction,
      * after the RecoveryUnit onCommit() is called.  It must not be called when no transaction is

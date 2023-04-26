@@ -424,11 +424,13 @@ public:
         }
     }
 
-    void onUnpreparedTransactionCommit(
-        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
+        OpStateAccumulator opStateAccumulator;
         for (auto& o : _observers)
-            o->onUnpreparedTransactionCommit(opCtx, transactionOperations);
+            o->onUnpreparedTransactionCommit(opCtx, transactionOperations, &opStateAccumulator);
     }
 
     void onPreparedTransactionCommit(

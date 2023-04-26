@@ -1909,7 +1909,9 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 void OpObserverImpl::onTransactionStart(OperationContext* opCtx) {}
 
 void OpObserverImpl::onUnpreparedTransactionCommit(
-    OperationContext* opCtx, const TransactionOperations& transactionOperations) {
+    OperationContext* opCtx,
+    const TransactionOperations& transactionOperations,
+    OpStateAccumulator* opAccumulator) {
     const auto& statements = transactionOperations.getOperationsForOpObserver();
     auto numberOfPrePostImagesToWrite = transactionOperations.getNumberOfPrePostImagesToWrite();
 
@@ -1924,7 +1926,6 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     if (statements.empty())
         return;
 
-    repl::OpTime commitOpTime;
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots =
@@ -2008,8 +2009,12 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
     }
 
-    commitOpTime = oplogSlots[numOplogEntries - 1];
+    repl::OpTime commitOpTime = oplogSlots[numOplogEntries - 1];
     invariant(!commitOpTime.isNull());
+    if (opAccumulator) {
+        opAccumulator->opTime.writeOpTime = commitOpTime;
+        opAccumulator->opTime.wallClockTime = wallClockTime;
+    }
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
 }
 
