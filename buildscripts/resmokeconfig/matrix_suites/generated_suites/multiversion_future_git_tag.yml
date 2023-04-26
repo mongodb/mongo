@@ -19,7 +19,6 @@ selector:
   - jstests/multiVersion/libs/*.js
   - jstests/multiVersion/targetedTestsLastContinuousFeatures/*.js
   - jstests/multiVersion/targetedTestsLastLtsFeatures/*.js
-  - jstests/multiVersion/genericSetFCVUsage/balancer_multiVersion_detect.js
   - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
   exclude_with_any_tags:

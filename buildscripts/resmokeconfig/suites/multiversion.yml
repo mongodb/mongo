@@ -8,9 +8,6 @@ selector:
   # Do not execute files with helper functions.
   - jstests/multiVersion/libs/*.js
 
-  # TODO: SERVER-21578
-  - jstests/multiVersion/genericSetFCVUsage/balancer_multiVersion_detect.js
-
   # TODO: SERVER-28104
   - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
 
