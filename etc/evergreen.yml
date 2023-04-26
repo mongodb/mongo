@@ -7890,7 +7890,7 @@ tasks:
           ./curator repo submit --service ${barque_url} --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
 
 - name: push
-  run_on: rhel80-small
+  run_on: rhel8.7-small
   tags: ["publish"]
   patchable: false
   depends_on:
