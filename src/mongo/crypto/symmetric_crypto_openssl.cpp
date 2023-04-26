@@ -84,26 +84,6 @@ public:
     }
 
     StatusWith<std::size_t> update(ConstDataRange in, DataRange out) final {
-        size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx.get());
-
-
-        if (out.data() == nullptr) {
-            // Presumed intentional null output buffer
-            invariant(out.length() == 0);
-        } else {
-            // Data is padded to the next multiple of cipherBlockSize
-            size_t minimumOutputSize = in.length();
-            if (auto remainder = in.length() % cipherBlockSize) {
-                minimumOutputSize += cipherBlockSize - remainder;
-            }
-
-            if (out.length() < minimumOutputSize) {
-                return Status(ErrorCodes::Overflow,
-                              str::stream() << "Write buffer too small for Encryptor update: "
-                                            << static_cast<int>(out.length()));
-            }
-        }
-
         int len = 0;
         if (1 !=
             EVP_EncryptUpdate(
@@ -134,14 +114,6 @@ public:
     }
 
     StatusWith<std::size_t> finalize(DataRange out) final {
-
-        size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx.get());
-
-        if (cipherBlockSize > 1 && out.length() < cipherBlockSize) {
-            return Status(ErrorCodes::Overflow,
-                          str::stream() << "Write buffer too small for Encryptor finalize: "
-                                        << static_cast<int>(out.length()));
-        }
         int len = 0;
         if (1 != EVP_EncryptFinal_ex(_ctx.get(), out.data<std::uint8_t>(), &len)) {
             return Status(ErrorCodes::UnknownError,
@@ -185,25 +157,6 @@ public:
 
     StatusWith<std::size_t> update(ConstDataRange in, DataRange out) final {
         int len = 0;
-
-        if (out.data() == nullptr) {
-            // Presumed intentional null output buffer
-            invariant(out.length() == 0);
-        } else {
-
-            size_t minimumOutputSize = in.length();
-            size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx.get());
-            if (in.length() % cipherBlockSize) {
-                minimumOutputSize += cipherBlockSize;
-            }
-
-            if (out.length() < minimumOutputSize) {
-                return Status(ErrorCodes::Overflow,
-                              str::stream() << "Write buffer too small for Decryptor update: "
-                                            << static_cast<int>(out.length()));
-            }
-        }
-
         if (1 !=
             EVP_DecryptUpdate(
                 _ctx.get(), out.data<std::uint8_t>(), &len, in.data<std::uint8_t>(), in.length())) {
@@ -234,14 +187,6 @@ public:
 
     StatusWith<std::size_t> finalize(DataRange out) final {
         int len = 0;
-
-        size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx.get());
-        if (cipherBlockSize > 1 && out.length() < cipherBlockSize) {
-            return Status(ErrorCodes::Overflow,
-                          str::stream() << "Write buffer too small for Encryptor finalize: "
-                                        << static_cast<int>(out.length()));
-        }
-
         if (1 != EVP_DecryptFinal_ex(_ctx.get(), out.data<std::uint8_t>(), &len)) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
