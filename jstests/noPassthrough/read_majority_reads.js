@@ -19,8 +19,9 @@
 (function() {
 'use strict';
 
-// Skip metadata consistency check since the sharded clsuter is started with 0 shards
+// Skip metadata consistency checks since the sharded cluster is started with 0 shards
 TestData.skipCheckMetadataConsistency = true;
+TestData.skipCheckRoutingTableConsistency = true;
 
 var testServer = MongoRunner.runMongod();
 var db = testServer.getDB("test");

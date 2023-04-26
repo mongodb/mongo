@@ -104,18 +104,8 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
                     str::stream() << "Could not remove database metadata from config server for '"
                                   << dbName << "'.");
 
-                // pre-check to guarantee idempotence: in case of a retry, the placement history
-                // entry may already exist
-                if (deleteDatabaseEntryResponse.getN() == 0) {
-                    BatchedCommandResponse noOp;
-                    noOp.setN(0);
-                    noOp.setStatus(Status::OK());
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOp));
-                }
-
                 const auto currentTime = VectorClock::get(opCtx)->getTime();
                 const auto currentTimestamp = currentTime.clusterTime().asTimestamp();
-
                 NamespacePlacementType placementInfo(NamespaceString(dbName), currentTimestamp, {});
 
                 write_ops::InsertCommandRequest insertPlacementEntry(

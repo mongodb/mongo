@@ -397,7 +397,14 @@ function testAddShard() {
     }
 
     // Execute the test case teardown
-    st.s.adminCommand({removeShard: newShardName});
+    for (const dbName of dbsOnNewReplicaSet) {
+        assert.commandWorked(st.getDB(dbName).dropDatabase());
+    }
+
+    let res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
+    assert.eq('started', res.state);
+    res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
+    assert.eq('completed', res.state);
     newReplicaSet.stopSet();
 }
 

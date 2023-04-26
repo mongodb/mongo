@@ -2,6 +2,7 @@
 
 // Do not check metadata consistency as the database version is missing for testing purposes.
 TestData.skipCheckMetadataConsistency = true;
+TestData.skipCheckRoutingTableConsistency = true;
 
 (function() {
 "use strict";
