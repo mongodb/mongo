@@ -86,7 +86,8 @@ public:
 
     explicit RenameParticipantInstance(const BSONObj& participantDoc)
         : _doc(RenameCollectionParticipantDocument::parse(
-              IDLParserContext("RenameCollectionParticipantDocument"), participantDoc)) {}
+              IDLParserContext("RenameCollectionParticipantDocument"), participantDoc)),
+          _request(_doc.getRenameCollectionRequest()) {}
 
     ~RenameParticipantInstance();
 
@@ -140,6 +141,7 @@ public:
 
 private:
     RenameCollectionParticipantDocument _doc;
+    const RenameCollectionRequest _request;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override final;
