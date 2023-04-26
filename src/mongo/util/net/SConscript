@@ -94,6 +94,16 @@ if not get_option('ssl') == 'off':
         )
 
     env.Library(
+        target='ssl_util',
+        source=[
+            'ssl_util.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+        ],
+    )
+
+    env.Library(
         target='ssl_manager',
         source=[
             "sock.cpp",
@@ -104,7 +114,6 @@ if not get_option('ssl') == 'off':
             "ssl_stream.cpp",
             "ssl_peer_info.cpp",
             'ssl_parameters.idl',
-            "ssl_util.cpp",
             "ocsp/ocsp_manager.cpp",
         ],
         LIBDEPS=[
@@ -119,6 +128,7 @@ if not get_option('ssl') == 'off':
             'openssl_init' if ssl_provider == 'openssl' else '',
             'ssl_options',
             'ssl_types',
+            'ssl_util',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base/secure_allocator',

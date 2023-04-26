@@ -29,26 +29,38 @@
 
 #pragma once
 
-#include <cstring>
-#include <functional>
-#include <numeric>
+#include <list>
 
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/impl/rpc_method.h>
-#include <grpcpp/impl/rpc_service_method.h>
 #include <grpcpp/impl/service_type.h>
-#include <grpcpp/support/byte_buffer.h>
-#include <grpcpp/support/method_handler.h>
 #include <grpcpp/support/status.h>
-#include <grpcpp/support/sync_stream.h>
 
-#include "mongo/transport/grpc/grpc_server_context.h"
-#include "mongo/transport/grpc/grpc_server_stream.h"
-#include "mongo/transport/grpc/server_context.h"
-#include "mongo/transport/grpc/server_stream.h"
-#include "mongo/util/shared_buffer.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/grpc/client_cache.h"
+#include "mongo/transport/grpc/grpc_session.h"
+#include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/grpc/wire_version_provider.h"
 
 namespace mongo::transport::grpc {
+
+/**
+ * Base type for all gRPC services, allowing type-specific shutdown and stringifying logic for each
+ * service.
+ */
+class Service : public ::grpc::Service {
+public:
+    virtual StringData name() const = 0;
+
+    virtual void shutdown() = 0;
+
+    std::string toString() const {
+        return name().toString();
+    }
+};
+
+inline std::string toStringForLogging(const std::unique_ptr<Service>& service) {
+    return service->toString();
+}
 
 /**
  * A gRPC service definition for handling commands according to the MongoDB gRPC Protocol.
@@ -58,56 +70,58 @@ namespace mongo::transport::grpc {
  * These methods use SharedBuffer as the message type (not a protocol buffer), the contents of which
  * are either OP_MSG or OP_COMPRESSED encoded bytes.
  */
-class Service : public ::grpc::Service {
+class CommandService : public Service {
 public:
-    using RpcHandler = std::function<::grpc::Status(ServerContext&, ServerStream&)>;
+    using InSessionPtr = std::shared_ptr<IngressSession>;
+    using RpcHandler = std::function<::grpc::Status(InSessionPtr)>;
 
     static constexpr const char* kAuthenticatedCommandStreamMethodName =
         "/MongoDB/AuthenticatedCommandStream";
     static constexpr const char* kUnauthenticatedCommandStreamMethodName =
         "/MongoDB/UnauthenticatedCommandStream";
 
-    Service(RpcHandler unauthenticatedCommandStreamHandler,
-            RpcHandler authenticatedCommandStreamHandler)
-        : _unauthenticatedCommandStreamHandler{std::move(unauthenticatedCommandStreamHandler)},
-          _authenticatedCommandStreamHandler{std::move(authenticatedCommandStreamHandler)} {
+    // Client-provided metadata keys.
+    static constexpr StringData kAuthenticationTokenKey = "authorization"_sd;
+    static constexpr StringData kClientIdKey = "mongodb-clientid"_sd;
+    static constexpr StringData kClientMetadataKey = "mongodb-client"_sd;
+    static constexpr StringData kWireVersionKey = "mongodb-wireversion"_sd;
 
-        AddMethod(new ::grpc::internal::RpcServiceMethod(
-            kAuthenticatedCommandStreamMethodName,
-            ::grpc::internal::RpcMethod::BIDI_STREAMING,
-            new ::grpc::internal::BidiStreamingHandler<Service, SharedBuffer, ConstSharedBuffer>(
-                [](Service* service,
-                   ::grpc::ServerContext* nativeServerCtx,
-                   ::grpc::ServerReaderWriter<ConstSharedBuffer, SharedBuffer>*
-                       nativeServerStream) {
-                    GRPCServerContext ctx{nativeServerCtx};
-                    GRPCServerStream stream{nativeServerStream};
+    // Server-provided metadata keys.
+    // This is defined as a std::string instead of StringData to avoid having to copy it when
+    // passing to gRPC APIs that expect a const std::string&.
+    static const std::string kClusterMaxWireVersionKey;
 
-                    return service->_authenticatedCommandStreamHandler(ctx, stream);
-                },
-                this)));
+    /**
+     * The provided callback is used to handle streams created from both methods. The status
+     * returned from the callback will be communicated to the client. The callback MUST terminate
+     * the session before returning.
+     */
+    CommandService(GRPCTransportLayer* tl,
+                   RpcHandler callback,
+                   std::shared_ptr<WireVersionProvider> wvProvider);
 
-        AddMethod(new ::grpc::internal::RpcServiceMethod(
-            kUnauthenticatedCommandStreamMethodName,
-            ::grpc::internal::RpcMethod::BIDI_STREAMING,
-            new ::grpc::internal::BidiStreamingHandler<Service, SharedBuffer, ConstSharedBuffer>(
-                [](Service* service,
-                   ::grpc::ServerContext* nativeServerCtx,
-                   ::grpc::ServerReaderWriter<ConstSharedBuffer, SharedBuffer>*
-                       nativeServerStream) {
-                    GRPCServerContext ctx{nativeServerCtx};
-                    GRPCServerStream stream{nativeServerStream};
+    ~CommandService() = default;
 
-                    return service->_unauthenticatedCommandStreamHandler(ctx, stream);
-                },
-                this)));
+    StringData name() const override {
+        return "MongoDB"_sd;
     }
 
-    ~Service() = default;
+    void shutdown() override;
 
 private:
-    RpcHandler _unauthenticatedCommandStreamHandler;
-    RpcHandler _authenticatedCommandStreamHandler;
+    ::grpc::Status _handleStream(ServerContext& serverCtx, ServerStream& stream);
+
+    ::grpc::Status _handleAuthenticatedStream(ServerContext& serverCtx, ServerStream& stream);
+
+    GRPCTransportLayer* _tl;
+    RpcHandler _callback;
+    std::shared_ptr<WireVersionProvider> _wvProvider;
+    std::unique_ptr<ClientCache> _clientCache;
+
+    mutable stdx::mutex _mutex;  // NOLINT
+    stdx::condition_variable _shutdownCV;
+    std::list<InSessionPtr> _sessions;
+    bool _shutdown = false;
 };
 }  // namespace mongo::transport::grpc
 

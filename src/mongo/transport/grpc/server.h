@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,47 +29,51 @@
 
 #pragma once
 
-#include <string>
+#include <memory>
 
-#include "mongo/base/string_data.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/util/duration.h"
+#include <grpcpp/server.h>
 
-namespace mongo {
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/grpc/service.h"
 
-inline constexpr Seconds kMaxKeepIdleSecs{300};
-inline constexpr Seconds kMaxKeepIntvlSecs{1};
+namespace mongo::transport::grpc {
 
+class Server {
+public:
+    struct Options {
+        /**
+         * List of IP addresses, hostnames, and/or Unix domain socket paths to bind to.
+         */
+        std::vector<std::string> addresses;
 
-void setSocketKeepAliveParams(int sock,
-                              logv2::LogSeverity errorLogSeverity,
-                              Seconds maxKeepIdleSecs = kMaxKeepIdleSecs,
-                              Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
+        int port;
+        size_t maxThreads;
+        StringData tlsPEMKeyFile;
+        boost::optional<StringData> tlsCAFile;
+        bool tlsAllowConnectionsWithoutCertificates;
+        bool tlsAllowInvalidCertificates;
+    };
 
-std::string makeUnixSockPath(int port);
+    Server(std::vector<std::unique_ptr<Service>> services, Options options);
 
-inline bool isUnixDomainSocket(const StringData& hostname) {
-    return hostname.find('/') != std::string::npos;
-}
+    ~Server();
 
-// If an ip address is passed in, just return that.  If a hostname is passed
-// in, look up its ip and return that.  Returns "" on failure.
-std::string hostbyname(const char* hostname);
+    void start();
 
-void enableIPv6(bool state = true);
-bool IPv6Enabled();
+    /**
+     * Initiates shutting down of the gRPC server, blocking until all pending RPCs and their
+     * associated handlers have been completed.
+     */
+    void shutdown();
 
-/** this is not cache and does a syscall */
-std::string getHostName();
+    bool isRunning() const;
 
-/** this is cached, so if changes during the process lifetime
- * will be stale */
-std::string getHostNameCached();
+private:
+    Options _options;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("grpc::Server::_mutex");
+    std::vector<std::unique_ptr<Service>> _services;
+    std::unique_ptr<::grpc::Server> _server;
+    bool _shutdown;
+};
 
-/** Returns getHostNameCached():<port>. */
-std::string getHostNameCachedAndPort();
-
-/** Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port. */
-std::string prettyHostName();
-
-}  // namespace mongo
+}  // namespace mongo::transport::grpc

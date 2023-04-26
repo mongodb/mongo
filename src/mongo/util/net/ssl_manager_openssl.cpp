@@ -63,6 +63,7 @@
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_peer_info.h"
@@ -167,18 +168,6 @@ constexpr std::array<std::uint8_t, 384> ffdhe3072_p = {
 
 // Generator for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919 (2)
 constexpr std::uint8_t ffdhe3072_g = 0x02;
-
-// Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
-// Unix Domain Socket endpoint, this function uses the same logic.  (See
-// `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
-// Domain Socket in the present working directory, through a code path which supplies `sa_family_t`
-// as `AF_UNIX` will cause this code to lie.  This will, in turn, cause the
-// `SSLManagerInterface::parseAndValidatePeerCertificate` code to believe a socket is a host, which
-// will then cause a connection failure if and only if that domain socket also has a certificate for
-// SSL and the connection is an SSL connection.
-bool isUnixDomainSocket(const std::string& hostname) {
-    return end(hostname) != std::find(begin(hostname), end(hostname), '/');
-}
 
 using UniqueBIO = std::unique_ptr<BIO, OpenSSLDeleter<decltype(::BIO_free), ::BIO_free>>;
 
@@ -3478,6 +3467,13 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
                    << remoteHost << " does not match " << certificateNames.str();
         std::string msg = msgBuilder.str();
 
+        // isUnixDomainSocket() uses the hostname having a slash to determine if a hostname is a
+        // Unix Domain Socket endpoint.  A user explicitly specifying a Unix
+        // Domain Socket in the present working directory, through a code path which supplies
+        // `sa_family_t` as `AF_UNIX` will cause this code to lie.  This will, in turn, cause the
+        // `SSLManagerInterface::parseAndValidatePeerCertificate` code to believe a socket is a
+        // host, which will then cause a connection failure if and only if that domain socket also
+        // has a certificate for SSL and the connection is an SSL connection.
         if (_allowInvalidCertificates || _allowInvalidHostnames || isUnixDomainSocket(remoteHost)) {
             LOGV2_WARNING(23238,
                           "The server certificate does not match the host name. Hostname: "

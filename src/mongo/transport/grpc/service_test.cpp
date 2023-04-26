@@ -27,18 +27,22 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <string>
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
-#include <grpcpp/create_channel.h>
-#include <grpcpp/security/credentials.h>
 #include <grpcpp/support/byte_buffer.h>
 
+#include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/grpc/grpc_server_context.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/service.h"
 #include "mongo/transport/grpc/test_fixtures.h"
@@ -50,300 +54,200 @@
 
 namespace mongo::transport::grpc {
 
-class TestStub {
+class CommandServiceTest : public unittest::Test {
 public:
-    using ReadMessageType = SharedBuffer;
-    using WriteMessageType = ConstSharedBuffer;
-    using ClientStream = ::grpc::ClientReaderWriter<WriteMessageType, ReadMessageType>;
-
-    TestStub(const std::shared_ptr<::grpc::ChannelInterface> channel)
-        : _channel(channel),
-          _unauthenticatedCommandStreamMethod(Service::kUnauthenticatedCommandStreamMethodName,
-                                              ::grpc::internal::RpcMethod::BIDI_STREAMING,
-                                              channel),
-          _authenticatedCommandStreamMethod(Service::kAuthenticatedCommandStreamMethodName,
-                                            ::grpc::internal::RpcMethod::BIDI_STREAMING,
-                                            channel) {}
-    ~TestStub() = default;
-
-    ClientStream* authenticatedCommandStream(::grpc::ClientContext* context) {
-        return ::grpc::internal::ClientReaderWriterFactory<WriteMessageType, ReadMessageType>::
-            Create(_channel.get(), _authenticatedCommandStreamMethod, context);
-    }
-
-    ClientStream* unauthenticatedCommandStream(::grpc::ClientContext* context) {
-        return ::grpc::internal::ClientReaderWriterFactory<WriteMessageType, ReadMessageType>::
-            Create(_channel.get(), _unauthenticatedCommandStreamMethod, context);
-    }
+    using MethodCallback =
+        std::function<std::shared_ptr<CommandServiceTestFixtures::Stub::ClientStream>(
+            ::grpc::ClientContext&)>;
 
     /**
-     * Executes both RPCs defined in the service sequentially and passes the resultant stream to the
-     * body closure each time. The makeCtx closure will be invoked once before each RPC invocation,
-     * and the resultant context will then be used for the RPC.
+     * Runs a test twice: once for each method provided by CommandService.
+     *
+     * On each run of the test, this creates a new CommandService instance using
+     * the provided handler, starts a new server instance, and then spawns a client thread that
+     * constructs a stub towards the server and runs clientThreadBody. A callback that invokes the
+     * method being tested is passed into clientThreadBody.
      */
-    void executeBoth(std::function<void(::grpc::ClientContext&)> makeCtx,
-                     std::function<void(::grpc::ClientContext&, ClientStream&)> body) {
-        ::grpc::ClientContext unauthenticatedCtx;
-        makeCtx(unauthenticatedCtx);
-        auto unauthenticatedStream = unauthenticatedCommandStream(&unauthenticatedCtx);
-        body(unauthenticatedCtx, *unauthenticatedStream);
-
-        ::grpc::ClientContext authenticatedCtx;
-        makeCtx(authenticatedCtx);
-        auto authenticatedStream = unauthenticatedCommandStream(&authenticatedCtx);
-        body(authenticatedCtx, *authenticatedStream);
-    }
-
-private:
-    std::shared_ptr<::grpc::ChannelInterface> _channel;
-    const ::grpc::internal::RpcMethod _unauthenticatedCommandStreamMethod;
-    const ::grpc::internal::RpcMethod _authenticatedCommandStreamMethod;
-};
-
-class ServiceTest : public unittest::Test {
-public:
-    static constexpr auto kServerAddress = "localhost:50051";
-
-    TestStub makeStub() {
-        LOGV2(7401202,
-              "gRPC client is attempting to connect to the server",
-              "address"_attr = kServerAddress);
-        return TestStub{
-            ::grpc::CreateChannel(kServerAddress, ::grpc::InsecureChannelCredentials())};
-    }
-
-    /**
-     * Starts up a gRPC server with a Service registered that uses the provided handler for both RPC
-     * methods. Executes the clientThreadBody in a separate thread and then waits for it to exit
-     * before shutting down the server.
-     */
-    void runTest(Service::RpcHandler handler,
-                 std::function<void(unittest::ThreadAssertionMonitor&)> clientThreadBody) {
-        unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
-            Service service{handler, handler};
-
-            ::grpc::ServerBuilder builder;
-            builder.AddListeningPort(kServerAddress, ::grpc::InsecureServerCredentials())
-                .RegisterService(&service);
-            std::unique_ptr<::grpc::Server> server(builder.BuildAndStart());
-
-            auto serverThread = monitor.spawn([&] {
-                LOGV2(7401201,
-                      "gRPC server is listening for connections",
-                      "address"_attr = kServerAddress);
-                server->Wait();
+    void runTestWithBothMethods(std::function<::grpc::Status(IngressSession&)> serverStreamHandler,
+                                std::function<void(Server& server,
+                                                   unittest::ThreadAssertionMonitor& monitor,
+                                                   MethodCallback makeStream)> clientThreadBody) {
+        CommandServiceTestFixtures::runWithServer(
+            serverStreamHandler, [&](Server& server, unittest::ThreadAssertionMonitor& monitor) {
+                auto stub = CommandServiceTestFixtures::makeStub();
+                clientThreadBody(server, monitor, [&stub](::grpc::ClientContext& ctx) {
+                    return stub.unauthenticatedCommandStream(&ctx);
+                });
             });
-            auto clientThread = monitor.spawn([&] { clientThreadBody(monitor); });
 
-            clientThread.join();
-            server->Shutdown();
-            serverThread.join();
-        });
+        CommandServiceTestFixtures::runWithServer(
+            serverStreamHandler, [&](Server& server, unittest::ThreadAssertionMonitor& monitor) {
+                auto stub = CommandServiceTestFixtures::makeStub();
+                clientThreadBody(server, monitor, [&stub](::grpc::ClientContext& ctx) {
+                    return stub.authenticatedCommandStream(&ctx);
+                });
+            });
     }
 };
 
-TEST_F(ServiceTest, Echo) {
-    auto echoHandler = [](auto& serverCtx, auto& stream) {
-        while (auto msg = stream.read()) {
-            stream.write(*msg);
-        }
-        return ::grpc::Status::OK;
-    };
-
-    runTest(echoHandler, [&](auto&) {
-        auto stub = makeStub();
-        stub.executeBoth([](auto& ctx) {},
-                         [&](auto& ctx, TestStub::ClientStream& stream) {
-                             auto message = makeUniqueMessage();
-                             ASSERT_TRUE(stream.Write(message.sharedBuffer()));
-                             SharedBuffer readMsg;
-                             ASSERT_TRUE(stream.Read(&readMsg));
-                             ASSERT_EQ_MSG(Message{readMsg}, message);
-                         });
-    });
-}
-
-TEST_F(ServiceTest, ClientMetadataIsAccessible) {
-    MetadataView clientMetadata = {{"foo", "bar"}, {"baz", "quux"}};
-
-    Service::RpcHandler metadataHandler = [&clientMetadata](auto& serverCtx, auto& stream) {
-        MetadataView receivedClientMetadata = serverCtx.getClientMetadata();
-        for (auto& kvp : clientMetadata) {
-            auto it = receivedClientMetadata.find(kvp.first);
-            ASSERT_NE(it, receivedClientMetadata.end());
-            ASSERT_EQ(it->second, kvp.second);
-        }
-        ASSERT_TRUE(stream.write(makeUniqueMessage().sharedBuffer()));
-        return ::grpc::Status::OK;
-    };
-
-    runTest(metadataHandler, [&](auto&) {
-        auto stub = makeStub();
-
-        auto makeContext = [&](auto& ctx) {
-            for (auto kvp : clientMetadata) {
-                ctx.AddMetadata(std::string{kvp.first}, std::string{kvp.second});
+TEST_F(CommandServiceTest, Echo) {
+    auto echoHandler = [](IngressSession& session) {
+        while (true) {
+            auto swMsg = session.sourceMessage();
+            if (!swMsg.isOK()) {
+                ASSERT_EQ(swMsg.getStatus(), ErrorCodes::StreamTerminated);
+                return ::grpc::Status::OK;
             }
-        };
-        auto body = [&](auto& ctx, auto& stream) {
-            SharedBuffer msg;
-            ASSERT_TRUE(stream.Read(&msg));
-        };
-        stub.executeBoth(makeContext, body);
-    });
-}
-
-TEST_F(ServiceTest, ServerMetadataIsAccessible) {
-    MetadataContainer serverMetadata = {{"foo", "bar"}, {"baz", "quux"}};
-
-    Service::RpcHandler metadataHandler = [&serverMetadata](ServerContext& serverCtx,
-                                                            ServerStream& stream) {
-        for (auto& kvp : serverMetadata) {
-            serverCtx.addInitialMetadataEntry(kvp.first, kvp.second);
+            ASSERT_OK(session.sinkMessage(swMsg.getValue()));
         }
-        ASSERT_TRUE(stream.write(makeUniqueMessage().sharedBuffer()));
         return ::grpc::Status::OK;
     };
 
-    runTest(metadataHandler, [&](auto&) {
-        auto stub = makeStub();
+    runTestWithBothMethods(echoHandler, [&](auto&, auto& monitor, auto methodCallback) {
+        auto maxWireVersion =
+            std::to_string(WireSpec::instance().get()->incomingExternalClient.maxWireVersion);
+        ::grpc::ClientContext ctx;
+        CommandServiceTestFixtures::addAllClientMetadata(ctx);
+        auto stream = methodCallback(ctx);
 
-        auto body = [&](::grpc::ClientContext& ctx, auto& stream) {
-            SharedBuffer msg;
-            ASSERT_TRUE(stream.Read(&msg));
-            auto receivedServerMetadata = ctx.GetServerInitialMetadata();
-
-            for (auto& kvp : serverMetadata) {
-                auto it = receivedServerMetadata.find(kvp.first);
-                ASSERT_NE(it, receivedServerMetadata.end());
-                ASSERT_EQ((std::string_view{it->second.data(), it->second.length()}), kvp.second);
-            }
-        };
-        stub.executeBoth([](auto&) {}, body);
+        auto message = makeUniqueMessage();
+        ASSERT_TRUE(stream->Write(message.sharedBuffer()));
+        SharedBuffer readMsg;
+        ASSERT_TRUE(stream->Read(&readMsg)) << stream->Finish().error_message();
+        ASSERT_EQ_MSG(Message{readMsg}, message);
     });
 }
 
-TEST_F(ServiceTest, ClientSendsMultipleMessages) {
-    Service::RpcHandler serverHandler = [](ServerContext& serverCtx, ServerStream& stream) {
-        size_t nReceived = 0;
-        while (auto msg = stream.read()) {
+TEST_F(CommandServiceTest, ClientSendsMultipleMessages) {
+    auto serverHandler = [](IngressSession& session) {
+        int32_t nReceived = 0;
+        while (true) {
+            auto swMsg = session.sourceMessage();
+            if (!swMsg.isOK()) {
+                ASSERT_EQ(swMsg.getStatus(), ErrorCodes::StreamTerminated);
+                break;
+            }
             nReceived++;
         }
-        auto response = SharedBuffer::allocate(sizeof(size_t));
-        memcpy(response.get(), &nReceived, sizeof(size_t));
-        ASSERT_TRUE(stream.write(response));
+
+        OpMsg response;
+        response.body = BSON("nReceived" << nReceived);
+        ASSERT_OK(session.sinkMessage(response.serialize()));
         return ::grpc::Status::OK;
     };
 
-    runTest(serverHandler, [&](auto&) {
-        auto stub = makeStub();
+    runTestWithBothMethods(serverHandler, [&](auto&, auto& monitor, auto methodCallback) {
+        ::grpc::ClientContext ctx;
+        CommandServiceTestFixtures::addAllClientMetadata(ctx);
+        auto stream = methodCallback(ctx);
 
-        auto body = [&](::grpc::ClientContext& ctx, TestStub::ClientStream& stream) {
-            size_t nSent = 12;
-            auto msg = makeUniqueMessage();
-            for (size_t i = 0; i < nSent; i++) {
-                ASSERT_TRUE(stream.Write(msg.sharedBuffer()));
-            }
-            ASSERT_TRUE(stream.WritesDone());
+        size_t nSent = 12;
+        auto msg = makeUniqueMessage();
+        for (size_t i = 0; i < nSent; i++) {
+            ASSERT_TRUE(stream->Write(msg.sharedBuffer()));
+        }
+        ASSERT_TRUE(stream->WritesDone());
 
-            SharedBuffer serverResponse;
-            ASSERT_TRUE(stream.Read(&serverResponse));
+        SharedBuffer serverResponse;
+        ASSERT_TRUE(stream->Read(&serverResponse));
 
-            size_t nReceived = *reinterpret_cast<size_t*>(serverResponse.get());
-            ASSERT_EQ(nReceived, nSent);
-        };
-        stub.executeBoth([](auto&) {}, body);
+        auto responseMsg = OpMsg::parse(Message{serverResponse});
+        int32_t nReceived = responseMsg.body.getIntField("nReceived");
+        ASSERT_EQ(nReceived, nSent);
     });
 }
 
-TEST_F(ServiceTest, ServerSendsMultipleMessages) {
-    Service::RpcHandler serverHandler = [&](ServerContext& serverCtx, ServerStream& stream) {
-        size_t nSent = 13;
-        for (size_t i = 0; i < nSent - 1; i++) {
+TEST_F(CommandServiceTest, ServerSendsMultipleMessages) {
+    auto serverHandler = [&](IngressSession& session) {
+        int32_t nSent = 13;
+        for (int32_t i = 0; i < nSent - 1; i++) {
             auto msg = makeUniqueMessage();
             OpMsg::setFlag(&msg, OpMsg::kMoreToCome);
-            ASSERT_TRUE(stream.write(msg.sharedBuffer()));
+            ASSERT_OK(session.sinkMessage(msg));
         }
-        ASSERT_TRUE(stream.write(makeUniqueMessage().sharedBuffer()));
+        ASSERT_OK(session.sinkMessage(makeUniqueMessage()));
 
-        auto response = stream.read();
-        ASSERT_TRUE(response);
-        ASSERT_EQ(*reinterpret_cast<size_t*>(response->get()), nSent);
+        auto swResponse = session.sourceMessage();
+        ASSERT_OK(swResponse.getStatus());
+
+        auto responseMsg = OpMsg::parse(swResponse.getValue());
+        int32_t nReceived = responseMsg.body.getIntField("nReceived");
+        ASSERT_EQ(nReceived, nSent);
         return ::grpc::Status::OK;
     };
 
-    runTest(serverHandler, [&](auto&) {
-        auto stub = makeStub();
+    runTestWithBothMethods(serverHandler, [&](auto&, auto&, auto methodCallback) {
+        ::grpc::ClientContext ctx;
+        CommandServiceTestFixtures::addAllClientMetadata(ctx);
+        auto stream = methodCallback(ctx);
 
-        auto body = [&](::grpc::ClientContext&, TestStub::ClientStream& stream) {
-            size_t nReceived = 0;
+        int32_t nReceived = 0;
+        while (true) {
+            SharedBuffer buf;
+            ASSERT_TRUE(stream->Read(&buf));
+            nReceived++;
 
-            while (true) {
-                SharedBuffer buf;
-                ASSERT_TRUE(stream.Read(&buf));
-                nReceived++;
-
-                if (!OpMsg::isFlagSet(Message{buf}, OpMsg::kMoreToCome)) {
-                    break;
-                }
+            if (!OpMsg::isFlagSet(Message{buf}, OpMsg::kMoreToCome)) {
+                break;
             }
+        }
 
-            auto response = SharedBuffer::allocate(sizeof(size_t));
-            memcpy(response.get(), &nReceived, sizeof(size_t));
-            ASSERT_TRUE(stream.Write(response));
-        };
-        stub.executeBoth([](auto&) {}, body);
+        OpMsg response;
+        response.body = BSON("nReceived" << nReceived);
+        ASSERT_TRUE(stream->Write(response.serialize().sharedBuffer()));
     });
 }
 
-TEST_F(ServiceTest, ServerHandlesMultipleClients) {
-    const auto kMetadataId = "client-thread";
-    Service::RpcHandler serverHandler = [&](ServerContext& serverCtx, ServerStream& stream) {
-        auto threadIdIt = serverCtx.getClientMetadata().find(kMetadataId);
-        ASSERT_NE(threadIdIt, serverCtx.getClientMetadata().end());
+TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
+    auto serverHandler = [&](IngressSession& session) {
+        while (true) {
+            auto swMsg = session.sourceMessage();
+            if (!swMsg.isOK()) {
+                ASSERT_EQ(swMsg.getStatus(), ErrorCodes::StreamTerminated);
+                break;
+            }
 
-        LOGV2(7401203,
-              "ServerHandlesMultipleClients received stream request",
-              "thread-id"_attr = threadIdIt->second);
-        serverCtx.addInitialMetadataEntry(kMetadataId, std::string{threadIdIt->second});
-        while (auto msg = stream.read()) {
-            ASSERT_TRUE(stream.write(*msg));
+            auto clientId = session.clientId();
+            ASSERT_TRUE(clientId);
+            auto response = OpMsg::parseOwned(swMsg.getValue());
+            response.body =
+                response.body.addFields(BSON(CommandService::kClientIdKey << clientId->toString()));
+            ASSERT_OK(session.sinkMessage(response.serialize()));
         }
         return ::grpc::Status::OK;
     };
 
-    runTest(serverHandler, [&](unittest::ThreadAssertionMonitor& monitor) {
-        auto stub = makeStub();
+    runTestWithBothMethods(
+        serverHandler,
+        [&](auto&, unittest::ThreadAssertionMonitor& monitor, MethodCallback methodCallback) {
+            std::vector<stdx::thread> threads;
+            for (int32_t i = 0; i < 10; i++) {
+                auto clientId = UUID::gen().toString();
+                threads.push_back(monitor.spawn([&, clientId] {
+                    ::grpc::ClientContext ctx;
+                    CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+                    ctx.AddMetadata(std::string{CommandService::kClientIdKey}, clientId);
+                    CommandServiceTestFixtures::addClientMetadataDocument(ctx);
 
-        std::vector<stdx::thread> threads;
-        for (size_t i = 0; i < 10; i++) {
-            threads.push_back(monitor.spawn([&, i] {
-                auto makeCtx = [i, &kMetadataId](::grpc::ClientContext& ctx) {
-                    ctx.AddMetadata(kMetadataId, std::to_string(i));
-                };
+                    auto stream = methodCallback(ctx);
 
-                auto body = [&, i](::grpc::ClientContext& ctx, TestStub::ClientStream& stream) {
-                    auto msg = makeUniqueMessage();
-                    ASSERT_TRUE(stream.Write(msg.sharedBuffer()));
+                    OpMsg msg;
+                    msg.body = BSON("thread" << i);
+                    ASSERT_TRUE(stream->Write(msg.serialize().sharedBuffer()));
 
                     SharedBuffer receivedMsg;
-                    ASSERT_TRUE(stream.Read(&receivedMsg));
-                    ASSERT_EQ_MSG(Message{receivedMsg}, msg);
+                    ASSERT_TRUE(stream->Read(&receivedMsg));
 
-                    auto serverMetadata = ctx.GetServerInitialMetadata();
-                    auto threadIdIt = serverMetadata.find(kMetadataId);
-                    ASSERT_NE(threadIdIt, serverMetadata.end());
-                    ASSERT_EQ(threadIdIt->second, std::to_string(i));
-                };
+                    auto response = OpMsg::parse(Message{receivedMsg});
+                    ASSERT_EQ(response.body.getIntField("thread"), i);
+                    ASSERT_EQ(response.body.getStringField(CommandService::kClientIdKey), clientId);
+                }));
+            }
 
-                stub.executeBoth(makeCtx, body);
-            }));
-        }
-
-        for (auto& t : threads) {
-            t.join();
-        }
-    });
+            for (auto& t : threads) {
+                t.join();
+            }
+        });
 }
 
 class GRPCInteropTest : public unittest::Test {};
@@ -378,8 +282,8 @@ TEST_F(GRPCInteropTest, SerializationRoundTrip) {
         ASSERT_TRUE(status.ok()) << "expected serialization to succeed: " << status.error_message();
     }
 
-    // Even though the source buffer is out of scope, the serialized gRPC ByteBuffer should still be
-    // valid.
+    // Even though the source buffer is out of scope, the serialized gRPC ByteBuffer should
+    // still be valid.
     SharedBuffer outputBuffer;
     auto status = ::grpc::SerializationTraits<SharedBuffer>::Deserialize(&grpcBuf, &outputBuffer);
     ASSERT_TRUE(status.ok()) << "expected deserialization to succeed: " << status.error_message();

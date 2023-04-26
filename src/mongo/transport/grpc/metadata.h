@@ -32,9 +32,18 @@
 #include <map>
 #include <string>
 
+#include "mongo/base/string_data.h"
+
 namespace mongo::transport::grpc {
 
+/**
+ * A gRPC metadata map that owns its keys and values.
+ */
 using MetadataContainer = std::multimap<std::string, std::string>;
-using MetadataView = std::multimap<std::string_view, std::string_view>;
+
+/**
+ * A gRPC metadata map that references its keys and values but does not own them.
+ */
+using MetadataView = std::multimap<StringData, StringData>;
 
 }  // namespace mongo::transport::grpc

@@ -617,20 +617,6 @@ int SSLManagerWindows::SSL_shutdown(SSLConnectionInterface* conn) {
     return 0;
 }
 
-StatusWith<std::string> readFile(StringData fileName) {
-    std::ifstream pemFile(fileName.toString(), std::ios::binary);
-    if (!pemFile.is_open()) {
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Failed to open PEM file: " << fileName);
-    }
-
-    std::string buf((std::istreambuf_iterator<char>(pemFile)), std::istreambuf_iterator<char>());
-
-    pemFile.close();
-
-    return buf;
-}
-
 // Decode a base-64 PEM blob with headers into a binary blob
 StatusWith<std::vector<BYTE>> decodePEMBlob(StringData blob) {
     DWORD decodeLen{0};
@@ -766,7 +752,7 @@ Status addCertificatesToStore(HCERTSTORE certStore, std::vector<UniqueCertificat
 // Read a Certificate PEM file with a private key from disk
 StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
                                                             StringData password) {
-    auto swBuf = readFile(fileName);
+    auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
         return swBuf.getStatus();
     }
@@ -1016,7 +1002,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
 Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
 
-    auto swBuf = readFile(fileName);
+    auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
         return swBuf.getStatus();
     }
@@ -1036,7 +1022,7 @@ Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
 
 Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
 
-    auto swBuf = readFile(fileName);
+    auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
         return swBuf.getStatus();
     }

@@ -51,6 +51,7 @@
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -212,10 +213,6 @@ void uassertOSStatusOK(::OSStatus status, SocketErrorKind kind) {
         throwSocketError(kind, str::stream() << "Unknown SSL error" << static_cast<int>(status));
     }
     throwSocketError(kind, swMsg.getValue());
-}
-
-bool isUnixDomainSocket(const std::string& hostname) {
-    return end(hostname) != std::find(begin(hostname), end(hostname), '/');
 }
 
 ::OSStatus posixErrno(int err) {

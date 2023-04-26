@@ -507,7 +507,7 @@ public:
 private:
     boost::optional<EndpointVector> _checkForUnixSocket(const HostAndPort& peer) {
 #ifndef _WIN32
-        if (str::contains(peer.host(), '/')) {
+        if (isUnixDomainSocket(peer.host())) {
             asio::local::stream_protocol::endpoint ep(peer.host());
             return EndpointVector{WrappedEndpoint(ep)};
         }

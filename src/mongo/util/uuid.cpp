@@ -62,7 +62,7 @@ StatusWith<UUID> UUID::parse(BSONElement from) {
     }
 }
 
-StatusWith<UUID> UUID::parse(const std::string& s) {
+StatusWith<UUID> UUID::parse(StringData s) {
     if (!isUUIDString(s)) {
         return {ErrorCodes::InvalidUUID, "Invalid UUID string: {}"_format(s)};
     }
@@ -76,7 +76,7 @@ StatusWith<UUID> UUID::parse(const std::string& s) {
         if (s[j] == '-')
             j++;
 
-        uuid[i] = hexblob::decodePair(StringData(s).substr(j, 2));
+        uuid[i] = hexblob::decodePair(s.substr(j, 2));
         j += 2;
     }
 

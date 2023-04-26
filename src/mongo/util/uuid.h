@@ -64,7 +64,7 @@ public:
      * If the given string represents a valid UUID, constructs and returns the UUID,
      * otherwise returns an error.
      */
-    static StatusWith<UUID> parse(const std::string& s);
+    static StatusWith<UUID> parse(StringData s);
 
     /**
      * If the given BSONElement represents a valid UUID, constructs and returns the UUID,

@@ -153,6 +153,10 @@ private:
 
 /**
  * Represents an ingress gRPC session (the server side of the stream).
+ *
+ * Calling sinkMessage() or sourceMessage() is only allowed from the thread that owns the underlying
+ * gRPC stream. This is necessary to ensure accessing _ctx and _stream does not result in
+ * use-after-free.
  */
 class IngressSession final : public GRPCSession {
 public:
@@ -169,8 +173,8 @@ public:
                     2,
                     "Constructed a new gRPC ingress session",
                     "id"_attr = id(),
-                    "clientId"_attr = _clientIdStr(),
-                    "remote"_attr = _ctx->getHostAndPort());
+                    "remoteClientId"_attr = clientIdStr(),
+                    "remote"_attr = _remote);
     }
 
     ~IngressSession() {
@@ -179,8 +183,8 @@ public:
                     2,
                     "Finished cleaning up a gRPC ingress session",
                     "id"_attr = id(),
-                    "clientId"_attr = _clientIdStr(),
-                    "remote"_attr = _ctx->getHostAndPort(),
+                    "remoteClientId"_attr = clientIdStr(),
+                    "remote"_attr = _remote,
                     "status"_attr = ts);
         if (MONGO_unlikely(!ts)) {
             terminate({ErrorCodes::StreamTerminated, "Terminating session through destructor"});
@@ -196,7 +200,7 @@ public:
      * session (either with or without an error).
      */
     bool isConnected() override {
-        return !(_ctx->isCancelled() || terminationStatus());
+        return !(terminationStatus() || _ctx->isCancelled());
     }
 
     StatusWith<Message> sourceMessage() noexcept override {
@@ -216,21 +220,27 @@ public:
     }
 
     void terminate(Status status) override {
-        if (MONGO_unlikely(!status.isOK())) {
+        auto shouldCancel = !status.isOK() && !terminationStatus();
+        // Need to invoke GRPCSession::terminate before cancelling the server context so that when
+        // an RPC handler is interrupted, it will be guaranteed to have access to its termination
+        // status.
+        GRPCSession::terminate(std::move(status));
+        if (MONGO_unlikely(shouldCancel)) {
             _ctx->tryCancel();
         }
-        GRPCSession::terminate(std::move(status));
     }
 
     const HostAndPort& remote() const override {
         return _remote;
     }
 
-private:
-    std::string _clientIdStr() const {
+    std::string clientIdStr() const {
         return _clientId ? _clientId->toString() : "N/A";
     }
 
+private:
+    // _ctx and _stream are only valid while the RPC handler is still running. They should not be
+    // accessed after the stream has been terminated.
     ServerContext* const _ctx;
     ServerStream* const _stream;
     const boost::optional<UUID> _clientId;

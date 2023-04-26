@@ -10,11 +10,18 @@ env.Library(
     source=[
         'client_cache.cpp',
         'grpc_transport_layer.cpp',
+        'server.cpp',
+        'service.cpp',
+        'util.cpp',
         'wire_version_provider.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/net/ssl_util',
         '$BUILD_DIR/third_party/shim_grpc',
     ],
 )
@@ -46,6 +53,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/third_party/shim_grpc',

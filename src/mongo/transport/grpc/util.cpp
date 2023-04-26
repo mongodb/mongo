@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,49 +27,22 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/transport/grpc/util.h"
 
-#include <string>
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_util.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/util/duration.h"
+namespace mongo::transport::grpc {
 
-namespace mongo {
+::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath) {
 
-inline constexpr Seconds kMaxKeepIdleSecs{300};
-inline constexpr Seconds kMaxKeepIntvlSecs{1};
+    ::grpc::SslServerCredentialsOptions::PemKeyCertPair certPair;
 
+    auto certificateKeyFileContents = uassertStatusOK(ssl_util::readPEMFile(filePath));
+    certPair.cert_chain = certificateKeyFileContents;
+    certPair.private_key = certificateKeyFileContents;
 
-void setSocketKeepAliveParams(int sock,
-                              logv2::LogSeverity errorLogSeverity,
-                              Seconds maxKeepIdleSecs = kMaxKeepIdleSecs,
-                              Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
-
-std::string makeUnixSockPath(int port);
-
-inline bool isUnixDomainSocket(const StringData& hostname) {
-    return hostname.find('/') != std::string::npos;
+    return certPair;
 }
 
-// If an ip address is passed in, just return that.  If a hostname is passed
-// in, look up its ip and return that.  Returns "" on failure.
-std::string hostbyname(const char* hostname);
-
-void enableIPv6(bool state = true);
-bool IPv6Enabled();
-
-/** this is not cache and does a syscall */
-std::string getHostName();
-
-/** this is cached, so if changes during the process lifetime
- * will be stale */
-std::string getHostNameCached();
-
-/** Returns getHostNameCached():<port>. */
-std::string getHostNameCachedAndPort();
-
-/** Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port. */
-std::string prettyHostName();
-
-}  // namespace mongo
+}  // namespace mongo::transport::grpc
