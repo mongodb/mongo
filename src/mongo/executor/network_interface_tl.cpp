@@ -248,12 +248,7 @@ std::string NetworkInterfaceTL::getDiagnosticString() {
 }
 
 void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const {
-    auto pool = [&] {
-        stdx::lock_guard<Latch> lk(_mutex);
-        return _pool.get();
-    }();
-    if (pool)
-        pool->appendConnectionStats(stats);
+    _pool->appendConnectionStats(stats);
 }
 
 void NetworkInterfaceTL::appendStats(BSONObjBuilder& bob) const {
@@ -271,8 +266,6 @@ std::string NetworkInterfaceTL::getHostName() {
 }
 
 void NetworkInterfaceTL::startup() {
-    stdx::lock_guard<Latch> lk(_mutex);
-
     _ioThread = stdx::thread([this] {
         setThreadName(_instanceName);
         _run();
@@ -362,24 +355,19 @@ bool NetworkInterfaceTL::inShutdown() const {
 }
 
 void NetworkInterfaceTL::waitForWork() {
-    stdx::unique_lock<Latch> lk(_mutex);
-    MONGO_IDLE_THREAD_BLOCK;
-    _workReadyCond.wait(lk, [this] { return _isExecutorRunnable; });
+    // waitForWork should only be used by network-mocking code and should not be reachable in the
+    // NetworkInterfaceTL.
+    MONGO_UNREACHABLE;
 }
 
 void NetworkInterfaceTL::waitForWorkUntil(Date_t when) {
-    stdx::unique_lock<Latch> lk(_mutex);
-    MONGO_IDLE_THREAD_BLOCK;
-    _workReadyCond.wait_until(lk, when.toSystemTimePoint(), [this] { return _isExecutorRunnable; });
+    // waitForWorkUntil should only be used by network-mocking code and should not be reachable in
+    // the NetworkInterfaceTL.
+    MONGO_UNREACHABLE;
 }
 
-void NetworkInterfaceTL::signalWorkAvailable() {
-    stdx::unique_lock<Latch> lk(_mutex);
-    if (!_isExecutorRunnable) {
-        _isExecutorRunnable = true;
-        _workReadyCond.notify_one();
-    }
-}
+// This is a no-op in the NetworkInterfaceTL since the waitForWork API is unreachable here.
+void NetworkInterfaceTL::signalWorkAvailable() {}
 
 Date_t NetworkInterfaceTL::now() {
     // TODO This check is because we set up NetworkInterfaces in MONGO_INITIALIZERS and then expect
