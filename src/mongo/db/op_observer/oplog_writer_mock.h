@@ -60,6 +60,15 @@ public:
         return {};
     }
 
+    void logOplogRecords(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         std::vector<Record>* records,
+                         const std::vector<Timestamp>& timestamps,
+                         const CollectionPtr& oplogCollection,
+                         repl::OpTime finalOpTime,
+                         Date_t wallTime,
+                         bool isAbortIndexBuild) override {}
+
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override {
         return {};
     }

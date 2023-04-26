@@ -32,11 +32,14 @@
 #include <cstddef>  // for std::size_t
 #include <vector>
 
+#include "mongo/db/catalog/collection.h"  // for CollectionPtr
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"        // for InsertStatement and OplogLink
 #include "mongo/db/repl/oplog_entry.h"  // for MutableOplogEntry
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session/logical_session_id.h"  // for StmtId
+#include "mongo/db/storage/record_store.h"        // for Record
+#include "mongo/util/time_support.h"              // for Date_t
 
 namespace mongo {
 
@@ -86,6 +89,30 @@ public:
      * Returns a null optime if oplog was not modified.
      */
     virtual repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) = 0;
+
+    /**
+     * Low level oplog function used by logOp() and similar functions to append
+     * storage engine records to the oplog collection.
+     *
+     * This function has to be called within the scope of a WriteUnitOfWork with
+     * a valid CollectionPtr reference to the oplog.
+     *
+     * @param records a vector of oplog records to be written. Records hold references
+     * to unowned BSONObj data.
+     * @param timestamps a vector of respective Timestamp objects for each oplog record.
+     * @param oplogCollection collection to be written to.
+     * @param finalOpTime the OpTime of the last oplog record.
+     * @param wallTime the wall clock time of the last oplog record.
+     * @param isAbortIndexBuild for tenant migration use only.
+     */
+    virtual void logOplogRecords(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 std::vector<Record>* records,
+                                 const std::vector<Timestamp>& timestamps,
+                                 const CollectionPtr& oplogCollection,
+                                 repl::OpTime finalOpTime,
+                                 Date_t wallTime,
+                                 bool isAbortIndexBuild) = 0;
 
     /**
      * Allocates optimes for new entries in the oplog.  Returns a vector of OplogSlots, which

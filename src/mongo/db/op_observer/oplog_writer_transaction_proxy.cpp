@@ -64,6 +64,18 @@ repl::OpTime OplogWriterTransactionProxy::logOp(OperationContext* opCtx,
     return _targetOplogWriter->logOp(opCtx, oplogEntry);
 }
 
+void OplogWriterTransactionProxy::logOplogRecords(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  std::vector<Record>* records,
+                                                  const std::vector<Timestamp>& timestamps,
+                                                  const CollectionPtr& oplogCollection,
+                                                  repl::OpTime finalOpTime,
+                                                  Date_t wallTime,
+                                                  bool isAbortIndexBuild) {
+    _targetOplogWriter->logOplogRecords(
+        opCtx, nss, records, timestamps, oplogCollection, finalOpTime, wallTime, isAbortIndexBuild);
+}
+
 std::vector<OplogSlot> OplogWriterTransactionProxy::getNextOpTimes(OperationContext* opCtx,
                                                                    std::size_t count) {
     return _targetOplogWriter->getNextOpTimes(opCtx, count);
