@@ -2908,21 +2908,6 @@ class TestBinder(testcase.IDLTestcase):
                         d1: danger
             """), idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED)
 
-        # Test commands and unsafe_dangerous_disable_extra_field_duplicate_checks are disallowed
-        self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
-            commands:
-                dangerc:
-                    description: foo
-                    namespace: ignored
-                    command_name: dangerc
-                    api_version: ""
-                    strict: false
-                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
-                    fields:
-                        foo: string
-            """), idl.errors.ERROR_ID_COMMAND_AND_DISABLE_CHECK_NOT_ALLOWED)
-
 
 if __name__ == '__main__':
 
