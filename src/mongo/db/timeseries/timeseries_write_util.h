@@ -54,6 +54,13 @@ BSONObj makeNewDocumentForWrite(
     const boost::optional<TimeseriesOptions>& options,
     const boost::optional<const StringData::ComparatorInterface*>& comparator);
 
+std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
+    const std::vector<BSONObj>& measurements,
+    const NamespaceString& nss,
+    const BSONObj& metadata,
+    const TimeseriesOptions& options,
+    const StringData::ComparatorInterface* comparator);
+
 /**
  * Performs modifications atomically for a user command on a time-series collection.
  *

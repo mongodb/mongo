@@ -37,6 +37,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -141,6 +142,25 @@ BSONObj makeNewDocumentForWrite(
     invariant(minmax);
 
     return makeNewDocument(bucketId, metadata, minmax->min(), minmax->max(), dataBuilders);
+}
+
+std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
+    const std::vector<BSONObj>& measurements,
+    const NamespaceString& nss,
+    const BSONObj& metadata,
+    const TimeseriesOptions& options,
+    const StringData::ComparatorInterface* comparator) {
+    std::vector<write_ops::InsertCommandRequest> insertOps;
+    for (const auto& measurement : measurements) {
+        auto res = bucket_catalog::internal::extractBucketingParameters(
+            nss, comparator, options, measurement);
+        uassertStatusOK(res);
+        auto time = res.getValue().second;
+        auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
+        insertOps.push_back(
+            {nss, {makeNewDocumentForWrite(oid, {measurement}, metadata, options, comparator)}});
+    }
+    return insertOps;
 }
 
 Status performAtomicWrites(OperationContext* opCtx,
