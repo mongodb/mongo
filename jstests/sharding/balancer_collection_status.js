@@ -1,5 +1,9 @@
 /**
  * Test the balancerCollectionStatus command and its possible outputs
+ *
+ * @tags: [
+ *   does_not_support_stepdowns
+ * ]
  */
 
 (function() {
