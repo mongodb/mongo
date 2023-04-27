@@ -57,6 +57,15 @@ class ResmokeSymbolizerConfig(NamedTuple):
         """
         return sys.platform == "win32" or sys.platform == "cygwin"
 
+    @staticmethod
+    def is_macos() -> bool:
+        """
+        Whether we are on MacOS.
+
+        :return: True if on MacOS.
+        """
+        return sys.platform == "darwin"
+
 
 class ResmokeSymbolizer:
     """Symbolize stacktraces inside test logs."""
@@ -133,6 +142,10 @@ class ResmokeSymbolizer:
 
         if self.config.is_windows():
             test.logger.info("Running on Windows, skipping symbolization")
+            return False
+
+        if self.config.is_macos():
+            test.logger.info("Running on MacOS, skipping symbolization")
             return False
 
         return True

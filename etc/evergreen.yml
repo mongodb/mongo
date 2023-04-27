@@ -814,7 +814,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos-rosetta-2 enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -847,7 +846,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos enterprise-macos
   display_name: "Enterprise macOS DEBUG"
@@ -882,7 +880,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
@@ -913,7 +910,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: .crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 ###########################################
 #          Redhat buildvariants           #

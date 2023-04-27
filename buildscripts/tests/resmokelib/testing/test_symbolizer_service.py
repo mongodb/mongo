@@ -15,6 +15,7 @@ def mock_resmoke_symbolizer_config():
     config_mock.client_id = "client_id"
     config_mock.client_secret = "client_secret"
     config_mock.is_windows.return_value = False
+    config_mock.is_macos.return_value = False
     return config_mock
 
 
@@ -82,6 +83,11 @@ class TestResmokeSymbolizer(unittest.TestCase):
 
     def test_should_not_symbolize_if_on_windows(self):
         self.config_mock.is_windows.return_value = True
+        ret = self.resmoke_symbolizer.should_symbolize(MagicMock())
+        self.assertFalse(ret)
+
+    def test_should_not_symbolize_if_on_macos(self):
+        self.config_mock.is_macos.return_value = True
         ret = self.resmoke_symbolizer.should_symbolize(MagicMock())
         self.assertFalse(ret)
 
