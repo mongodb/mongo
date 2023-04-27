@@ -1695,6 +1695,7 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
 }
 
 void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
+                                    boost::optional<CEType> baseCE,
                                     std::vector<SelectivityType> indexPredSels,
                                     ResidualRequirementsWithOptionalCE::Node requirements,
                                     const PathToIntervalFn& pathToInterval,
@@ -1705,7 +1706,7 @@ void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
     if (ResidualRequirementsWithOptionalCE::isSingletonDisjunction(requirements)) {
         ResidualRequirementsWithOptionalCE::visitDNF(
             requirements, [&](const ResidualRequirementWithOptionalCE& entry) {
-                auto residualCE = scanGroupCE;
+                auto residualCE = baseCE;
                 if (residualCE) {
                     if (!indexPredSels.empty()) {
                         *residualCE *= ce::conjExponentialBackoff(indexPredSels);
@@ -1756,10 +1757,10 @@ void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
             toOr.push_back(makeBalancedBooleanOpTree(Operations::And, std::move(toAnd)));
         });
 
-    boost::optional<CEType> finalFilterCE = scanGroupCE;
+    boost::optional<CEType> finalFilterCE = baseCE;
     if (!disjSels.empty()) {
         indexPredSels.push_back(ce::disjExponentialBackoff(disjSels));
-        finalFilterCE = *scanGroupCE * ce::conjExponentialBackoff(indexPredSels);
+        finalFilterCE = *baseCE * ce::conjExponentialBackoff(indexPredSels);
     }
     builder.make<FilterNode>(finalFilterCE,
                              makeBalancedBooleanOpTree(Operations::Or, std::move(toOr)),

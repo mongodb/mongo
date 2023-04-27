@@ -662,6 +662,7 @@ public:
                 if (residualReqs) {
                     auto reqsWithCE = createResidualReqsWithCE(*residualReqs, partialSchemaKeyCE);
                     lowerPartialSchemaRequirements(scanGroupCE,
+                                                   scanGroupCE,
                                                    std::move(indexPredSels),
                                                    std::move(reqsWithCE),
                                                    _pathToInterval,
@@ -733,8 +734,12 @@ public:
 
             if (residualReqs) {
                 auto reqsWithCE = createResidualReqsWithCE(*residualReqs, partialSchemaKeyCE);
-                lowerPartialSchemaRequirements(
-                    baseCE, {} /*indexPredSels*/, std::move(reqsWithCE), _pathToInterval, builder);
+                lowerPartialSchemaRequirements(scanGroupCE,
+                                               baseCE,
+                                               {} /*indexPredSels*/,
+                                               std::move(reqsWithCE),
+                                               _pathToInterval,
+                                               builder);
             }
 
             optimizeChildrenNoAssert(_queue,

@@ -1145,11 +1145,12 @@ static void lowerSargableNode(const SargableNode& node, RewriteContext& ctx) {
     PhysPlanBuilder builder{node.getChild()};
     const auto& reqMap = node.getReqMap();
     lowerPartialSchemaRequirements(boost::none /*scanGroupCE*/,
+                                   boost::none /*baseCE*/,
                                    {} /*indexPredSels*/,
                                    createResidualReqsWithEmptyCE(reqMap.getRoot()),
                                    ctx.getPathToInterval(),
                                    builder);
-    ctx.addNode(builder._node, true /*clear*/);
+    ctx.addNode(builder._node, true /*substitute*/);
 }
 
 template <class Type>

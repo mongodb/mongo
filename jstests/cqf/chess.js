@@ -100,17 +100,15 @@ const res = coll.explain("executionStats").aggregate([
 
 // TODO: verify expected results.
 
-// Verify we are getting an intersection between "minutes" and either "turns" or "avgRating".
-// The plan is currently not stable due to sampling.
-{
-    const indexNode = navigateToPlanPath(res, "child.child.leftChild.leftChild");
-    assertValueOnPath("IndexScan", indexNode, "nodeType");
-    assertValueOnPath("minutes_1", indexNode, "indexDefName");
-}
-{
-    const indexNode = navigateToPlanPath(res, "child.child.leftChild.rightChild.children.0.child");
-    assertValueOnPath("IndexScan", indexNode, "nodeType");
-    const indexName = navigateToPath(indexNode, "indexDefName");
-    assert(indexName === "turns_1" || indexName === "avgRating_1");
-}
+/**
+ * Demonstrate the following:
+ * 1. Limit is subsumed into the collation node above.
+ * 2. We have one index scan on minutes and the range is between 2 and 150 (we can encode both
+ * comparisons as a single index scan).
+ */
+assertValueOnPlanPath("Collation", res, "child.nodeType");
+
+const indexNode = navigateToPlanPath(res, "child.child.leftChild");
+assertValueOnPath("IndexScan", indexNode, "nodeType");
+assertValueOnPath("minutes_1", indexNode, "indexDefName");
 }());

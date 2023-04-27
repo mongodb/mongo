@@ -359,9 +359,14 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
 /**
  * Lower ResidualRequirementsWithCE to a subtree consisting of functionally equivalent Filter and
  * Eval nodes. Note that we take indexPredSels by value here because the implementation needs its
- * own copy.
+ * own copy. "scanGroupCE" is the estimated cardinality of the underlying collection scan (the
+ * Sargable node's child group), while the "baseCE" is the initial cardinality on top of which the
+ * residual predicates act. For a sargable node with a "Seek" target it is "1" to reflect the fact
+ * that we fetch one row id at a time, and for "Complete" and "Index" it is the same as the
+ * "scanGroupCE".
  */
 void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
+                                    boost::optional<CEType> baseCE,
                                     std::vector<SelectivityType> indexPredSels,
                                     ResidualRequirementsWithOptionalCE::Node requirements,
                                     const PathToIntervalFn& pathToInterval,

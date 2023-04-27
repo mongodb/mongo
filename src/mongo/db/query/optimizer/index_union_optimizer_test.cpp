@@ -388,7 +388,7 @@ TEST(PhysRewriter, LowerRequirementsWithTopLevelDisjunction) {
         .pop();
     auto residReqs = residReqsBuilder.finish().get();
     lowerPartialSchemaRequirements(
-        scanGroupCE, indexPredSels, residReqs, defaultConvertPathToInterval, builder);
+        scanGroupCE, scanGroupCE, indexPredSels, residReqs, defaultConvertPathToInterval, builder);
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Filter []\n"

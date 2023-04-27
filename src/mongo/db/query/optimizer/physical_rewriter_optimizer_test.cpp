@@ -1340,18 +1340,23 @@ TEST(PhysRewriter, FilterIndexingStress) {
     ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.child.child.nodeType");
     ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.child.child.child.nodeType");
     ASSERT_BSON_PATH(
-        "\"LimitSkip\"", explainNLJ, "rightChild.child.child.child.child.child.child.nodeType");
+        "\"Filter\"", explainNLJ, "rightChild.child.child.child.child.child.child.nodeType");
     ASSERT_BSON_PATH(
-        "\"Seek\"", explainNLJ, "rightChild.child.child.child.child.child.child.child.nodeType");
+        "\"Filter\"", explainNLJ, "rightChild.child.child.child.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"LimitSkip\"",
+                     explainNLJ,
+                     "rightChild.child.child.child.child.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"",
+                     explainNLJ,
+                     "rightChild.child.child.child.child.child.child.child.child.child.nodeType");
 
-    ASSERT_BSON_PATH("\"MergeJoin\"", explainNLJ, "leftChild.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"index1\"", explainNLJ, "leftChild.leftChild.indexDefName");
-    ASSERT_BSON_PATH("\"Union\"", explainNLJ, "leftChild.rightChild.nodeType");
-    ASSERT_BSON_PATH("\"Evaluation\"", explainNLJ, "leftChild.rightChild.children.0.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.rightChild.children.0.child.nodeType");
-    ASSERT_BSON_PATH(
-        "\"index3\"", explainNLJ, "leftChild.rightChild.children.0.child.indexDefName");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.nodeType");
+
+    // With heuristic CE both indexes are equally preferable.
+    const auto& indexName =
+        dotted_path_support::extractElementAtPath(explainNLJ, "leftChild.indexDefName")
+            .toString(false /*includeFieldName*/);
+    ASSERT_TRUE(indexName == "\"index1\"" || indexName == "\"index3\"");
 }
 
 TEST(PhysRewriter, FilterIndexingVariable) {
