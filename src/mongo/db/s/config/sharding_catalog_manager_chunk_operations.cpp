@@ -2310,14 +2310,17 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
     std::shared_ptr<const std::vector<ChunkType>> splitChunks,
     std::shared_ptr<ChunkType> controlChunk,
     const ShardId& donorShardId) {
-    // Verify the placement info for collectionUUID needs to be updated because the donor is losing
-    // its last chunk for the namespace.
-    const auto removeDonorFromPlacementHistory = !controlChunk && splitChunks->empty();
 
-    // Verify the placement info for collectionUUID needs to be updated because the recipient is
-    // acquiring its first chunk for the namespace.
-    const auto addRecipientToPlacementHistory = [&] {
-        const auto chunkQuery =
+    const auto placementChangeInParentColl = [&] {
+        // Check if the donor will stop owning data of the parent collection once the migration
+        // is committed.
+        if (!controlChunk && splitChunks->empty()) {
+            return true;
+        }
+
+        // Check if the recipient isn't owning data of the parent collection prior to the
+        // migration commit.
+        const auto query =
             BSON(ChunkType::collectionUUID << migratedChunk->getCollectionUUID() << ChunkType::shard
                                            << migratedChunk->getShard());
         auto findResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
@@ -2325,10 +2328,14 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
             ChunkType::ConfigNS,
-            chunkQuery,
+            query,
             BSONObj(),
             1 /* limit */));
-        return findResponse.docs.empty();
+        if (findResponse.docs.empty()) {
+            return true;
+        }
+
+        return false;
     }();
 
     const auto configChunksUpdateRequest = [&migratedChunk, &splitChunks, &controlChunk] {
@@ -2370,9 +2377,8 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
          recipientShardId = migratedChunk->getShard(),
          migrationCommitTime = migratedChunk->getHistory().front().getValidAfter(),
          configChunksUpdateRequest = std::move(configChunksUpdateRequest),
-         removeDonorFromPlacementHistory,
-         addRecipientToPlacementHistory](const txn_api::TransactionClient& txnClient,
-                                         ExecutorPtr txnExec) -> SemiFuture<void> {
+         placementChangeInParentColl](const txn_api::TransactionClient& txnClient,
+                                      ExecutorPtr txnExec) -> SemiFuture<void> {
         const long long nChunksToUpdate = configChunksUpdateRequest.getUpdates().size();
 
         auto updateConfigChunksFuture =
@@ -2387,124 +2393,41 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
                             updateResponse.getN() == nChunksToUpdate);
                 });
 
-        if (!(removeDonorFromPlacementHistory || addRecipientToPlacementHistory)) {
+        if (!placementChangeInParentColl) {
             // End the transaction here.
             return std::move(updateConfigChunksFuture).semi();
         }
 
-        // The main method to store placement info as part of the transaction, given a valid
-        // descriptor.
-        auto persistPlacementInfoSubchain = [txnExec,
-                                             &txnClient](NamespacePlacementType&& placementInfo) {
-            write_ops::InsertCommandRequest insertPlacementEntry(
-                NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
-            return txnClient.runCRUDOp(insertPlacementEntry, {})
-                .thenRunOn(txnExec)
-                .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
-                    uassertStatusOK(insertPlacementEntryResponse.toStatus());
-                })
-                .semi();
-        };
-
-        // Obtain a valid placement descriptor from config.chunks and then store it as part of the
-        // transaction.
-        auto generateAndPersistPlacementInfoSubchain =
-            [txnExec, &txnClient](const NamespaceString& nss,
-                                  const UUID& collUuid,
-                                  const Timestamp& migrationCommitTime) {
-                // Compose the query - equivalent to
-                // 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'
-                DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
-                distinctRequest.setKey(ChunkType::shard.name());
-                distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
-                return txnClient.runCommand(DatabaseName::kConfig, distinctRequest.toBSON({}))
-                    .thenRunOn(txnExec)
-                    .then([=, &txnClient](BSONObj reply) {
-                        uassertStatusOK(getStatusFromWriteCommandReply(reply));
-                        std::vector<ShardId> shardIds;
-                        for (const auto& valueElement : reply.getField("values").Array()) {
-                            shardIds.emplace_back(valueElement.String());
-                        }
-
-                        NamespacePlacementType placementInfo(
-                            nss, migrationCommitTime, std::move(shardIds));
-                        placementInfo.setUuid(collUuid);
-                        write_ops::InsertCommandRequest insertPlacementEntry(
-                            NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                            {placementInfo.toBSON()});
-
-                        return txnClient.runCRUDOp(insertPlacementEntry, {});
-                    })
-                    .thenRunOn(txnExec)
-                    .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
-                        uassertStatusOK(insertPlacementEntryResponse.toStatus());
-                    })
-                    .semi();
-            };
-
-        // Extend the transaction to also upsert the placement information that matches the
-        // migration commit.
+        // Extend the transaction to also persist the collection placement change.
         return std::move(updateConfigChunksFuture)
             .thenRunOn(txnExec)
             .then([&] {
-                // Retrieve the previous placement entry - it will be used as a base for the next
-                // update.
-                FindCommandRequest placementInfoQuery{
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace};
-                placementInfoQuery.setFilter(BSON(NamespacePlacementType::kNssFieldName
-                                                  << nss.toString()
-                                                  << NamespacePlacementType::kTimestampFieldName
-                                                  << BSON("$lte" << migrationCommitTime)));
-                placementInfoQuery.setSort(BSON(NamespacePlacementType::kTimestampFieldName << -1));
-                placementInfoQuery.setLimit(1);
-                return txnClient.exhaustiveFind(placementInfoQuery);
+                // Use the updated content of config.chunks to build the collection placement
+                // metadata.
+                // The request is equivalent to "configDb.chunks.distinct('shard',{uuid:collUuid})".
+                DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
+                distinctRequest.setKey(ChunkType::shard.name());
+                distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
+                return txnClient.runCommand(DatabaseName::kConfig, distinctRequest.toBSON({}));
             })
             .thenRunOn(txnExec)
-            .then([&,
-                   persistPlacementInfo = std::move(persistPlacementInfoSubchain),
-                   generateAndPersistPlacementInfo =
-                       std::move(generateAndPersistPlacementInfoSubchain)](
-                      const std::vector<BSONObj>& queryResponse) {
-                tassert(6892800,
-                        str::stream() << "Unexpected number of placement entries retrieved"
-                                      << nss.toStringForErrorMsg(),
-                        queryResponse.size() <= 1);
-
-                if (queryResponse.size() == 0) {
-                    //  Historical placement data may not be available due to an FCV transition -
-                    //  invoke the more expensive fallback method.
-                    return generateAndPersistPlacementInfo(nss, collUuid, migrationCommitTime);
+            .then([=, &txnClient](BSONObj reply) {
+                uassertStatusOK(getStatusFromWriteCommandReply(reply));
+                std::vector<ShardId> shardIds;
+                for (const auto& valueElement : reply.getField("values").Array()) {
+                    shardIds.emplace_back(valueElement.String());
                 }
 
-                // Leverage the most recent placement info to build the new version.
-                auto placementInfo = NamespacePlacementType::parse(
-                    IDLParserContext("CommitMoveChunk"), queryResponse.front());
-                placementInfo.setTimestamp(migrationCommitTime);
+                NamespacePlacementType placementInfo(nss, migrationCommitTime, std::move(shardIds));
+                placementInfo.setUuid(collUuid);
+                write_ops::InsertCommandRequest insertPlacementEntry(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
 
-                const auto& originalShardList = placementInfo.getShards();
-                std::vector<ShardId> updatedShardList;
-                updatedShardList.reserve(originalShardList.size() + 1);
-                if (addRecipientToPlacementHistory) {
-                    updatedShardList.push_back(recipientShardId);
-                }
-
-                std::copy_if(std::make_move_iterator(originalShardList.begin()),
-                             std::make_move_iterator(originalShardList.end()),
-                             std::back_inserter(updatedShardList),
-                             [&](const ShardId& shardId) {
-                                 if (removeDonorFromPlacementHistory && shardId == donorShardId) {
-                                     return false;
-                                 }
-                                 if (addRecipientToPlacementHistory &&
-                                     shardId == recipientShardId) {
-                                     // Ensure that the added recipient will only appear once.
-                                     return false;
-                                 }
-                                 return true;
-                             });
-                placementInfo.setShards(std::move(updatedShardList));
-
-                return persistPlacementInfo(std::move(placementInfo));
+                return txnClient.runCRUDOp(insertPlacementEntry, {});
+            })
+            .thenRunOn(txnExec)
+            .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
+                uassertStatusOK(insertPlacementEntryResponse.toStatus());
             })
             .semi();
     };

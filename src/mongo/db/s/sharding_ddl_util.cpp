@@ -587,30 +587,8 @@ void shardedRenameMetadata(OperationContext* opCtx,
     updateTags(opCtx, configShard, fromNss, toNss, writeConcern);
 
     auto renamedCollPlacementInfo = [&]() {
-        // Retrieve the latest placement document about "FROM" prior to its deletion (which will
-        // have left an entry with an empty set of shards).
-        auto query = BSON(NamespacePlacementType::kNssFieldName
-                          << fromNss.ns() << NamespacePlacementType::kShardsFieldName
-                          << BSON("$ne" << BSONArray()));
-
-        auto queryResponse =
-            uassertStatusOK(configShard->exhaustiveFindOnConfig(
-                                opCtx,
-                                ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
-                                repl::ReadConcernLevel::kMajorityReadConcern,
-                                NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                query,
-                                BSON(NamespacePlacementType::kTimestampFieldName << -1) /*sort*/,
-                                1 /*limit*/))
-                .docs;
-
-        if (!queryResponse.empty()) {
-            return NamespacePlacementType::parse(IDLParserContext("shardedRenameMetadata"),
-                                                 queryResponse.back());
-        }
-
-        // Persisted placement information may be unavailable as a consequence of FCV
-        // transitions. Use the content of config.chunks as a fallback.
+        // Use the content of config.chunks to obtain the placement of the collection being renamed.
+        // The request is equivalent to 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'.
         DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
         distinctRequest.setKey(ChunkType::shard.name());
         distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << fromUUID));
