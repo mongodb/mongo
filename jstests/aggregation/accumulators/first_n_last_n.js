@@ -4,6 +4,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 load("jstests/aggregation/extras/utils.js");
 
 const coll = db[jsTestName()];
@@ -20,17 +21,19 @@ const kMaxSales = 20;
 let expectedFirstThree = [];
 let expectedLastThree = [];
 let expectedAllResults = [];
+let expectedFirstNWithInitExpr = [];
 for (const states
          of [{state: 'AZ', sales: 3}, {state: 'CA', sales: 2}, {state: 'NY', sales: kMaxSales}]) {
     let allResults = [];
     let firstThree = [];
     let lastThree = [];
+    let resultsWithInitExpr = [];
     const state = states['state'];
     const sales = states['sales'];
     for (let i = 0; i < kMaxSales; ++i) {
         const salesAmt = i * 10;
         if (i < sales) {
-            docs.push({state: state, sales: salesAmt});
+            docs.push({state: state, sales: salesAmt, stateObj: {"st": state}, n: 3});
 
             // First N candidate.
             if (i < defaultN) {
@@ -40,12 +43,17 @@ for (const states
             if (i + defaultN >= sales) {
                 lastThree.push(salesAmt);
             }
+
+            if (i == 0 || (state == 'AZ' && i < defaultN)) {
+                resultsWithInitExpr.push(salesAmt);
+            }
             allResults.push(salesAmt);
         }
     }
     expectedFirstThree.push({_id: state, sales: firstThree});
     expectedLastThree.push({_id: state, sales: lastThree});
     expectedAllResults.push({_id: state, sales: allResults});
+    expectedFirstNWithInitExpr.push({_id: state, sales: resultsWithInitExpr});
 }
 
 assert.commandWorked(coll.insert(docs));
@@ -64,6 +72,54 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
     assert(arrayEq(expectedFirstNResults, actualFirstNResults),
            () => "expected " + tojson(expectedFirstNResults) + " actual " +
                tojson(actualFirstNResults));
+
+    const firstNResultsWithInitExpr =
+        coll.aggregate([
+                {$sort: {_id: 1}},
+                {
+                    $group: {
+                        _id: {"st": "$state"},
+                        sales: {
+                            $firstN: {
+                                input: "$sales",
+                                n: {$cond: {if: {$eq: ["$st", 'AZ']}, then: defaultN, else: 1}}
+                            }
+                        }
+                    }
+                },
+            ])
+            .toArray();
+
+    let expectedResult = [];
+    expectedFirstNWithInitExpr.forEach(
+        i => expectedResult.push({'_id': {'st': i['_id']}, sales: i['sales']}));
+    assert(arrayEq(expectedResult, firstNResultsWithInitExpr),
+           () => "expected " + tojson(expectedResult) + " actual " +
+               tojson(firstNResultsWithInitExpr));
+
+    const firstNResultsWithInitExprAndVariableGroupId =
+        coll.aggregate([
+                {$sort: {_id: 1}},
+                {
+                    $group: {
+                        _id: "$stateObj",
+                        sales: {
+                            $firstN: {
+                                input: "$sales",
+                                n: {$cond: {if: {$eq: ["$st", 'AZ']}, then: defaultN, else: 1}}
+                            }
+                        }
+                    }
+                },
+            ])
+            .toArray();
+
+    expectedResult = [];
+    expectedFirstNWithInitExpr.forEach(
+        i => expectedResult.push({'_id': {'st': i['_id']}, sales: i['sales']}));
+    assert(arrayEq(expectedResult, firstNResultsWithInitExprAndVariableGroupId),
+           () => "expected " + tojson(expectedResult) + " actual " +
+               tojson(firstNResultsWithInitExprAndVariableGroupId));
 
     const actualLastNResults =
         coll.aggregate([

@@ -2305,14 +2305,17 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
     }
 }
 
-sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
-                                           const AccumulationStatement& accStmt,
-                                           const PlanStageSlots& outputs,
-                                           sbe::value::SlotIdGenerator* slotIdGenerator,
-                                           sbe::HashAggStage::AggExprVector& aggSlotExprs) {
+sbe::value::SlotVector generateAccumulator(
+    StageBuilderState& state,
+    const AccumulationStatement& accStmt,
+    const PlanStageSlots& outputs,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::HashAggStage::AggExprVector& aggSlotExprs,
+    boost::optional<sbe::value::SlotId> initializerRootSlot) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
     auto argExpr = generateExpression(state, accStmt.expr.argument.get(), rootSlot, &outputs);
-    auto initExpr = generateExpression(state, accStmt.expr.initializer.get(), rootSlot, &outputs);
+    auto initExpr =
+        generateExpression(state, accStmt.expr.initializer.get(), initializerRootSlot, nullptr);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2320,7 +2323,8 @@ sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
     auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     auto accExprs = stage_builder::buildAccumulator(
         accStmt, argExpr.extractExpr(state), collatorSlot, *state.frameIdGenerator);
-    std::vector<std::unique_ptr<sbe::EExpression>> accInitExprs(accExprs.size());
+    auto accInitExprs = stage_builder::buildInitialize(
+        accStmt, initExpr.extractExpr(state), *state.frameIdGenerator);
 
     tassert(7567301,
             "The accumulation and initialization expression should have the same length",
@@ -2609,8 +2613,56 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         childEvalStage = makeProject(std::move(childEvalStage), std::move(fpMap), nodeId);
     }
 
-    auto [groupBySlots, groupByEvalStage, idFinalExpr] = generateGroupByKey(
+    bool isVariableGroupInitializer = false;
+    for (const auto& accStmt : accStmts) {
+        isVariableGroupInitializer = isVariableGroupInitializer ||
+            !ExpressionConstant::isNullOrConstant(accStmt.expr.initializer);
+    }
+
+    sbe::value::SlotVector groupBySlots;
+    EvalStage groupByEvalStage;
+    std::unique_ptr<sbe::EExpression> idFinalExpr;
+
+    std::tie(groupBySlots, groupByEvalStage, idFinalExpr) = generateGroupByKey(
         _state, idExpr, childOutputs, std::move(childEvalStage), nodeId, &_slotIdGenerator);
+
+    auto initializerRootSlot = [&]() {
+        if (isVariableGroupInitializer) {
+            sbe::value::SlotId idSlot;
+            // We materialize the groupId before the group stage to provide it as root to
+            // initializer expression
+            if (idFinalExpr) {
+                auto [slot, projectStage] = projectEvalExpr(std::move(idFinalExpr),
+                                                            std::move(groupByEvalStage),
+                                                            nodeId,
+                                                            &_slotIdGenerator,
+                                                            _state);
+                groupBySlots.clear();
+                groupBySlots.push_back(slot);
+                idFinalExpr = nullptr;
+                groupByEvalStage = std::move(projectStage);
+                idSlot = slot;
+            } else {
+                idSlot = groupBySlots[0];
+            }
+
+            // As per the mql semantics add a project expression 'isObject(id) ? id : {}'
+            // which will be provided as root to initializer expression
+            auto [emptyObjTag, emptyObjVal] = sbe::value::makeNewObject();
+            auto isObjectExpr = sbe::makeE<sbe::EIf>(
+                sbe::makeE<sbe::EFunction>("isObject"_sd, sbe::makeEs(makeVariable(idSlot))),
+                makeVariable(idSlot),
+                makeConstant(emptyObjTag, emptyObjVal));
+            auto [isObjSlot, isObjStage] = projectEvalExpr(std::move(isObjectExpr),
+                                                           std::move(groupByEvalStage),
+                                                           nodeId,
+                                                           &_slotIdGenerator,
+                                                           _state);
+            groupByEvalStage = std::move(isObjStage);
+            return boost::optional<sbe::value::SlotId>{isObjSlot};
+        }
+        return boost::optional<sbe::value::SlotId>{};
+    }();
 
     // Translates accumulators which are executed inside the group stage and gets slots for
     // accumulators.
@@ -2622,8 +2674,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // to combine partial aggregates that have been spilled to disk.
     sbe::SlotExprPairVector mergingExprs;
     for (const auto& accStmt : accStmts) {
-        sbe::value::SlotVector curAggSlots =
-            generateAccumulator(_state, accStmt, childOutputs, &_slotIdGenerator, aggSlotExprs);
+        sbe::value::SlotVector curAggSlots = generateAccumulator(
+            _state, accStmt, childOutputs, &_slotIdGenerator, aggSlotExprs, initializerRootSlot);
 
         sbe::SlotExprPairVector curMergingExprs =
             generateMergingExpressions(_state, accStmt, curAggSlots.size());
