@@ -102,6 +102,17 @@ struct SerializationContext {
         return *stateCommandRequest;
     }
 
+    static const SerializationContext& stateStorageRequest() {
+        static StaticImmortal<SerializationContext> stateStorageRequest{Source::Storage,
+                                                                        CallerType::Request};
+        return *stateStorageRequest;
+    }
+
+    static const SerializationContext& stateDefault() {
+        static StaticImmortal<SerializationContext> stateDefault{};
+        return *stateDefault;
+    }
+
     /**
      * Setters for flags that may not be known during construction time, used by producers
      */
@@ -127,6 +138,15 @@ struct SerializationContext {
     }
     bool receivedNonPrefixedTenantId() const {
         return _nonPrefixedTenantId;
+    }
+
+    friend bool operator==(const SerializationContext& lhs, const SerializationContext& rhs) {
+        return (lhs._prefixState == rhs._prefixState) && (lhs._callerType == rhs._callerType) &&
+            (lhs._source == rhs._source);
+    }
+
+    friend bool operator!=(const SerializationContext& lhs, const SerializationContext& rhs) {
+        return !(lhs == rhs);
     }
 
 private:

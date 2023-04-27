@@ -1803,15 +1803,26 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('bool firstFieldFound = false;')
             self._writer.write_empty_line()
 
-            # inject a context into the IDLParserContext that tags the class as a command request
-            self._writer.write_line(
-                'setSerializationContext(SerializationContext::stateCommandRequest());')
-
             # Update the serialization context whether or not we received a tenantId object
             if tenant == 'request.getValidatedTenantId()':
+                # inject a context into the IDLParserContext that tags the class as a command request
+                self._writer.write_line(
+                    'setSerializationContext(SerializationContext::stateCommandRequest());')
                 self._writer.write_line(
                     '_serializationContext.setTenantIdSource(request.getValidatedTenantId() != boost::none);'
                 )
+            else:
+                # if a non-default serialization context was passed in via the IDLParserContext,
+                # use that to set the local serialization context, otherwise set it to a command
+                # request
+                with self._block(
+                        'if (ctxt.getSerializationContext() != SerializationContext::stateDefault()) {',
+                        '}'):
+                    self._writer.write_line(
+                        'setSerializationContext(ctxt.getSerializationContext());')
+                with self._block('else {', '}'):
+                    self._writer.write_line(
+                        'setSerializationContext(SerializationContext::stateCommandRequest());')
 
             # some fields are consumed in the BSON iteration loop and need to be parsed before
             # entering the main loop
