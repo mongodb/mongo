@@ -4026,7 +4026,7 @@ buildvariants:
   display_name: "Cppsuite Stress Tests"
   batchtime: 480 # 3 times a day
   run_on:
-  - ubuntu2004-test
+  - ubuntu2004-medium
   expansions:
     test_env_vars:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
