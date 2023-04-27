@@ -72,12 +72,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                           << " must be run through mongos in a sharded cluster",
             !ShardingState::get(opCtx)->enabled());
 
-    uassert(
-        7592901,
-        "The preview version of compactStructuredEncryptionData is no longer supported in this "
-        "binary version",
-        gFeatureFlagFLE2CompactForProtocolV2.isEnabled(serverGlobalParams.featureCompatibility));
-
     // Only allow one instance of compactStructuredEncryptionData to run at a time.
     Lock::ExclusiveLock fleCompactCommandLock(opCtx, commandMutex);
 

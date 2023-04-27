@@ -59,12 +59,6 @@ feature_flags:
         cpp_varname: gFeatureFlagAdditionalParticipants
         default: false
         shouldBeFCVGated: true
-    featureFlagUseNewCompactStructuredEncryptionDataCoordinator:
-        description: "Use the new 6.1 compact structured encryption data coordinator"
-        cpp_varname: gFeatureFlagUseNewCompactStructuredEncryptionDataCoordinator
-        default: true
-        version: 6.1
-        shouldBeFCVGated: true
     featureFlagOIDC:
         description: "Feature flag for OIDC support"
         cpp_varname: gFeatureFlagOIDC
@@ -94,8 +88,8 @@ feature_flags:
         default: false
         shouldBeFCVGated: true
     featureFlagConfigurableX509ClusterAuthn:
-        description: >- 
-            Enable configurable parameters for detection of peer server nodes using X.509 
+        description: >-
+            Enable configurable parameters for detection of peer server nodes using X.509
             intracluster authentication.
         cpp_varname: gFeatureFlagConfigurableX509ClusterAuthn
         default: true
