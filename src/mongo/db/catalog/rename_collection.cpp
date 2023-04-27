@@ -862,7 +862,7 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
 
     uassert(ErrorCodes::IllegalOperation,
             "Renaming system.buckets collections is not allowed",
-            options.allowBuckets || !source.isTimeseriesBucketsCollection());
+            source.isOutTmpBucketsCollection() || !source.isTimeseriesBucketsCollection());
 }
 
 void validateAndRunRenameCollection(OperationContext* opCtx,

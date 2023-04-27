@@ -182,6 +182,9 @@ public:
     static constexpr StringData kGlobalIndexCollectionPrefix = "globalIndex."_sd;
 
 
+    // Prefix for the temporary collection used by the $out stage.
+    static constexpr StringData kOutTmpCollectionPrefix = "tmp.agg_out."_sd;
+
     // Maintainers Note: The large set of `NamespaceString`-typed static data
     // members of the `NamespaceString` class representing system-reserved
     // collections is now generated from "namespace_string_reserved.def.h".
@@ -596,6 +599,12 @@ public:
      * Returns true if the namespace is a system.statistics collection, false otherwise.
      */
     bool isSystemStatsCollection() const;
+
+    /**
+     * Returns true if the collection starts with "system.buckets.tmp.agg_out". Used for $out to
+     * time-series collections.
+     */
+    bool isOutTmpBucketsCollection() const;
 
     /**
      * Returns the time-series buckets namespace for this view.

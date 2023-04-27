@@ -38,6 +38,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/destructor_guard.h"
@@ -68,7 +69,7 @@ DocumentSourceOut::~DocumentSourceOut() {
 
         // If creating a time-series collection, '_tempNs' is translated to include the
         // "system.buckets" prefix.
-        if (_tempNs.size() || (_timeseries && !_timeseriesViewCreated)) {
+        if (_tempNs.size() || (_timeseries && !_timeseriesStateConsistent)) {
             auto cleanupClient =
                 pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
 
@@ -115,7 +116,6 @@ NamespaceString DocumentSourceOut::makeBucketNsIfTimeseries(const NamespaceStrin
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-
     auto outSpec = parseOutSpecAndResolveTargetNamespace(spec, nss.dbName());
     NamespaceString targetNss = NamespaceStringUtil::parseNamespaceFromRequest(
         nss.dbName().tenantId(), outSpec.getDb(), outSpec.getColl());
@@ -126,26 +126,27 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
     return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
-void DocumentSourceOut::validateTimeseries() {
+boost::optional<TimeseriesOptions> DocumentSourceOut::validateTimeseries() {
     const NamespaceString& outNs = getOutputNs();
+    auto existingOpts = mongo::timeseries::getTimeseriesOptions(pExpCtx->opCtx, outNs, true);
+
+    // If the user did not specify the 'timeseries' option in the input, but the target namespace is
+    // a time-series collection, then we can fetch the time-series options from the
+    // CollectionCatalog and treat this operation as a write to time-series collection. If the user
+    // did specify 'timeseries' options and the target namespace exists, then the options should
+    // match.
     if (!_timeseries) {
-        return;
+        return existingOpts;
     }
-    // check if a time-series collection already exists in that namespace.
-    auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(pExpCtx->opCtx, outNs, true);
-    if (timeseriesOpts) {
-        uassert(7268701,
-                "Time field inputted does not match the time field of the existing time-series "
-                "collection.",
-                _timeseries->getTimeField() == timeseriesOpts->getTimeField());
-        uassert(7268702,
-                "Meta field inputted does not match the time field of the existing time-series "
-                "collection.",
-                !_timeseries->getMetaField() ||
-                    _timeseries->getMetaField() == timeseriesOpts->getMetaField());
+
+    if (existingOpts) {
+        uassert(7406103,
+                str::stream() << "Time-series options inputted must match the existing time-series "
+                                 "collection. Received: "
+                              << _timeseries->toBSON().toString()
+                              << "Found: " << existingOpts->toBSON().toString(),
+                timeseries::optionsAreEqual(_timeseries.value(), existingOpts.value()));
     } else {
-        // if a time-series collection doesn't exist, the namespace should not have a
-        // collection nor a conflicting view.
         auto collection = CollectionCatalog::get(pExpCtx->opCtx)
                               ->lookupCollectionByNamespace(pExpCtx->opCtx, outNs);
         uassert(7268700,
@@ -155,10 +156,21 @@ void DocumentSourceOut::validateTimeseries() {
         uassert(
             7268703, "Cannot create a time-series collection from a non time-series view.", !view);
     }
+    return _timeseries;
 }
 
 void DocumentSourceOut::initialize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+
+    // Must be called before all other functions, since sets the value of '_timeseries', which the
+    // rest of the function heavily relies on.
+    _timeseries = validateTimeseries();
+
+    uassert(7406100,
+            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
+            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
+                serverGlobalParams.featureCompatibility) ||
+                !_timeseries);
 
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
 
@@ -168,10 +180,9 @@ void DocumentSourceOut::initialize() {
     // consultation.
     _tempNs = NamespaceStringUtil::parseNamespaceFromRequest(
         getOutputNs().tenantId(),
-        str::stream() << getOutputNs().dbName().toString() << ".tmp.agg_out." << UUID::gen());
+        str::stream() << getOutputNs().dbName().toString() << "."
+                      << NamespaceString::kOutTmpCollectionPrefix << UUID::gen());
 
-    _timeseriesViewCreated = false;
-    validateTimeseries();
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
     _originalOutOptions =
@@ -193,15 +204,19 @@ void DocumentSourceOut::initialize() {
         BSONObjBuilder cmd;
         cmd << "create" << _tempNs.coll();
         cmd << "temp" << true;
-        cmd.appendElementsUnique(_originalOutOptions);
         if (_timeseries) {
-            cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
-            pExpCtx->mongoProcessInterface->createTimeseries(
-                pExpCtx->opCtx, _tempNs, cmd.done(), false);
+            // Append the original collection options without the 'validator' and 'clusteredIndex'
+            // fields since these fields are invalid with the 'timeseries' field and will be
+            // recreated when the buckets collection is created.
+            _originalOutOptions.isEmpty()
+                ? cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON()
+                : cmd.appendElementsUnique(_originalOutOptions.removeFields(
+                      StringDataSet{"clusteredIndex", "validator"}));
         } else {
-            pExpCtx->mongoProcessInterface->createCollection(
-                pExpCtx->opCtx, _tempNs.dbName(), cmd.done());
+            cmd.appendElementsUnique(_originalOutOptions);
         }
+        pExpCtx->mongoProcessInterface->createCollection(
+            pExpCtx->opCtx, _tempNs.dbName(), cmd.done());
     }
 
     // After creating the tmp collection we should update '_tempNs' to represent the buckets
@@ -235,32 +250,38 @@ void DocumentSourceOut::initialize() {
 void DocumentSourceOut::finalize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
-    // If the collection is timeseries, must rename to the "real" buckets collection
+    uassert(7406101,
+            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
+            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
+                serverGlobalParams.featureCompatibility) ||
+                !_timeseries);
+
+    // If the collection is time-series, we must rename to the "real" buckets collection.
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
 
-    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
-        pExpCtx->opCtx,
-        _tempNs,
-        outputNs,
-        true /* dropTarget */,
-        false /* stayTemp */,
-        _timeseries ? true : false /* allowBuckets */,
-        _originalOutOptions,
-        _originalIndexes);
+    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(pExpCtx->opCtx,
+                                                                            _tempNs,
+                                                                            outputNs,
+                                                                            true /* dropTarget */,
+                                                                            false /* stayTemp */,
+                                                                            _originalOutOptions,
+                                                                            _originalIndexes);
 
     // The rename succeeded, so the temp collection no longer exists.
     _tempNs = {};
 
-    // If the collection is timeseries, try to create the view.
+    _timeseriesStateConsistent = false;
+    // If the collection is time-series, try to create the view.
     if (_timeseries) {
         BSONObjBuilder cmd;
+        cmd << "create" << getOutputNs().coll();
         cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
-        pExpCtx->mongoProcessInterface->createTimeseries(
-            pExpCtx->opCtx, getOutputNs(), cmd.done(), true);
+        pExpCtx->mongoProcessInterface->createTimeseriesView(
+            pExpCtx->opCtx, getOutputNs(), cmd.done(), _timeseries.value());
     }
 
     // Creating the view succeeded, so the boolean should be set to true.
-    _timeseriesViewCreated = true;
+    _timeseriesStateConsistent = true;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(

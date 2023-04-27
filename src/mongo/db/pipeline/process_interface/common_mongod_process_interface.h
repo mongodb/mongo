@@ -192,6 +192,11 @@ protected:
                                            const BSONObj& originalCollectionOptions,
                                            const std::list<BSONObj>& originalIndexes);
 
+    void _handleTimeseriesCreateError(const DBException& ex,
+                                      OperationContext* opCtx,
+                                      const NamespaceString& ns,
+                                      TimeseriesOptions userOpts);
+
 private:
     /**
      * Looks up the collection default collator for the collection given by 'collectionUUID'. A

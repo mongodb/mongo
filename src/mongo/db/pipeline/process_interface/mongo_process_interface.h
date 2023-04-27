@@ -279,7 +279,6 @@ public:
         const NamespaceString& targetNs,
         bool dropTarget,
         bool stayTemp,
-        bool allowBuckets,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) = 0;
 
@@ -290,12 +289,13 @@ public:
     virtual void createCollection(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   const BSONObj& cmdObj) = 0;
-
-    virtual void createTimeseries(OperationContext* opCtx,
-                                  const NamespaceString& ns,
-                                  const BSONObj& options,
-                                  bool createView) = 0;
-
+    /**
+     * Creates the view backing a time-series collection.
+     */
+    virtual void createTimeseriesView(OperationContext* opCtx,
+                                      const NamespaceString& ns,
+                                      const BSONObj& cmdObj,
+                                      const TimeseriesOptions& userOpts) = 0;
 
     /**
      * Runs createIndexes on the given database for the given index specs. If running on a shardsvr

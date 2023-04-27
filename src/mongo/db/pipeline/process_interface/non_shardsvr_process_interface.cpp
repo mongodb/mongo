@@ -42,8 +42,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 
@@ -215,49 +213,24 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& targetNs,
     bool dropTarget,
     bool stayTemp,
-    bool allowBuckets,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     RenameCollectionOptions options;
     options.dropTarget = dropTarget;
     options.stayTemp = stayTemp;
-    options.allowBuckets = allowBuckets;
     // skip sharding validation on non sharded servers
     doLocalRenameIfOptionsAndIndexesHaveNotChanged(
         opCtx, sourceNs, targetNs, options, originalIndexes, originalCollectionOptions);
 }
 
-void NonShardServerProcessInterface::createTimeseries(OperationContext* opCtx,
-                                                      const NamespaceString& ns,
-                                                      const BSONObj& options,
-                                                      bool createView) {
-
-    // try to create the view, but catch the error if the view already exists.
-    if (createView) {
-        try {
-            uassertStatusOK(mongo::createTimeseries(opCtx, ns, options));
-        } catch (DBException& ex) {
-            auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
-            if (ex.code() != ErrorCodes::NamespaceExists || !view || !view->timeseries()) {
-                throw;
-                // check the time-series spec matches.
-            } else {
-                auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(opCtx, ns, true);
-                BSONObj inputOpts = options.getField("timeseries").Obj();
-                if (!timeseriesOpts ||
-                    timeseriesOpts->getTimeField() !=
-                        inputOpts.getField(timeseries::kTimeFieldName).valueStringData() ||
-                    (inputOpts.hasField(timeseries::kMetaFieldName) &&
-                     timeseriesOpts->getMetaField() !=
-                         inputOpts.getField(timeseries::kMetaFieldName).valueStringData())) {
-                    throw;
-                }
-            }
-        }
-        // creating the buckets collection should always succeed.
-    } else {
-        uassertStatusOK(
-            mongo::createTimeseries(opCtx, ns, options, TimeseriesCreateLevel::kBucketsCollOnly));
+void NonShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,
+                                                          const NamespaceString& ns,
+                                                          const BSONObj& cmdObj,
+                                                          const TimeseriesOptions& userOpts) {
+    try {
+        uassertStatusOK(mongo::createTimeseries(opCtx, ns, cmdObj));
+    } catch (DBException& ex) {
+        _handleTimeseriesCreateError(ex, opCtx, ns, userOpts);
     }
 }
 

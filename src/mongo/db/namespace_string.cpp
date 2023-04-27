@@ -422,6 +422,11 @@ bool NamespaceString::isSystemStatsCollection() const {
     return coll().startsWith(kStatisticsCollectionPrefix);
 }
 
+bool NamespaceString::isOutTmpBucketsCollection() const {
+    return isTimeseriesBucketsCollection() &&
+        getTimeseriesViewNamespace().coll().startsWith(kOutTmpCollectionPrefix);
+}
+
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
     return {dbName(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }

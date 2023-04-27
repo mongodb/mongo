@@ -333,11 +333,9 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
     };
 }
 
-Status _createTimeseries(
-    OperationContext* opCtx,
-    const NamespaceString& ns,
-    const CollectionOptions& optionsArg,
-    enum TimeseriesCreateLevel createOpt = TimeseriesCreateLevel::kBothCollAndView) {
+Status _createTimeseries(OperationContext* opCtx,
+                         const NamespaceString& ns,
+                         const CollectionOptions& optionsArg) {
     // This path should only be taken when a user creates a new time-series collection on the
     // primary. Secondaries replicate individual oplog entries.
     invariant(!ns.isTimeseriesBucketsCollection());
@@ -464,8 +462,9 @@ Status _createTimeseries(
         });
 
     // If compatible bucket collection already exists then proceed with creating view defintion.
-    if ((!ret.isOK() && !existingBucketCollectionIsCompatible) ||
-        createOpt == TimeseriesCreateLevel::kBucketsCollOnly)
+    // If the 'temp' flag is true, we are in the $out stage, and should return without creating the
+    // view defintion.
+    if ((!ret.isOK() && !existingBucketCollectionIsCompatible) || options.temp)
         return ret;
 
     ret = writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
@@ -719,15 +718,14 @@ Status createCollection(OperationContext* opCtx,
 
 Status createTimeseries(OperationContext* opCtx,
                         const NamespaceString& ns,
-                        const BSONObj& options,
-                        TimeseriesCreateLevel level) {
+                        const BSONObj& options) {
     StatusWith<CollectionOptions> statusWith =
         CollectionOptions::parse(options, CollectionOptions::parseForCommand);
     if (!statusWith.isOK()) {
         return statusWith.getStatus();
     }
     auto collectionOptions = statusWith.getValue();
-    return _createTimeseries(opCtx, ns, collectionOptions, level);
+    return _createTimeseries(opCtx, ns, collectionOptions);
 }
 
 Status createCollection(OperationContext* opCtx,

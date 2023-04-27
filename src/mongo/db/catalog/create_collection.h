@@ -42,8 +42,6 @@ namespace mongo {
 
 class OperationContext;
 
-enum class TimeseriesCreateLevel { kBothCollAndView, kBucketsCollOnly };
-
 /**
  * Creates a collection as described in "cmdObj" on the database "dbName". Creates the collection's
  * _id index according to 'idIndex', if it is non-empty. When 'idIndex' is empty, creates the
@@ -89,12 +87,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    bool allowRenameOutOfTheWay,
                                    const boost::optional<BSONObj>& idIndex = boost::none);
 /**
- * Creates a time-series collection as described in 'option' on the namespace 'ns'. If the level is
- * set to 'kBothCollAndView' both the buckets collection and the view will be created. If the level
- * is set to 'kBucketsCollOnly' only the buckets collection will be created.
+ * Creates a time-series collection as described in 'option' on the namespace 'ns'.
  */
-Status createTimeseries(OperationContext* opCtx,
-                        const NamespaceString& ns,
-                        const BSONObj& options,
-                        TimeseriesCreateLevel level = TimeseriesCreateLevel::kBothCollAndView);
+Status createTimeseries(OperationContext* opCtx, const NamespaceString& ns, const BSONObj& options);
 }  // namespace mongo

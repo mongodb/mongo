@@ -13,11 +13,8 @@
  *   requires_timeseries,
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
- *   requires_capped,
- *   assumes_unsharded_collection,
- *   # TODO SERVER-74601 remove tag after support for secondaries.
- *   does_not_support_causal_consistency,
- *   requires_fcv_71
+ *   requires_fcv_71,
+ *   featureFlagAggOutTimeseries
  * ]
  */
 load('jstests/concurrency/fsm_workloads/agg_out.js');  // for $super state functions
@@ -39,7 +36,7 @@ var $config = extendWorkload($config, function($config, $super) {
                     $out: {
                         db: db.getName(),
                         coll: this.outputCollName,
-                        timeseries: {timeField: "time"}
+                        timeseries: {timeField: timeFieldName, metaField: metaFieldName}
                     }
                 }
             ],
@@ -57,8 +54,7 @@ var $config = extendWorkload($config, function($config, $super) {
         if (res.ok) {
             const cursor = new DBCommandCursor(db, res);
             assertAlways.eq(0, cursor.itcount());  // No matter how many documents were in the
-            // original input stream, $out should never
-            // return any results.
+            // original input stream, $out should never return any results.
         }
     };
 
@@ -81,6 +77,9 @@ var $config = extendWorkload($config, function($config, $super) {
      * 'convertToCapped' should always fail with a 'CommandNotSupportedOnView' error.
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
+        if (isMongos(db)) {
+            return;  // convertToCapped can't be run against a mongos.
+        }
         assertWhenOwnDB.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
             ErrorCodes.CommandNotSupportedOnView);
@@ -91,13 +90,8 @@ var $config = extendWorkload($config, function($config, $super) {
      * and all subsequent $out's to this collection should fail.
      */
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {
-        try {
-            $super.states.shardCollection.apply(this, arguments);
-        } catch (err) {
-            if (err.code !== ErrorCodes.Interrupted) {
-                throw err;
-            }
-        }
+        // TODO SERVER-76626 change this from a no-op.
+        return;
     };
 
     $config.teardown = function teardown(db) {
@@ -117,7 +111,8 @@ var $config = extendWorkload($config, function($config, $super) {
      * Create a time-series collection and insert 100 documents.
      */
     $config.setup = function setup(db, collName, cluster) {
-        assert.commandWorked(db.createCollection(
+        db[collName].drop();
+        assertWhenOwnDB.commandWorked(db.createCollection(
             collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
         const docs = [];
         for (let i = 0; i < numDocs; ++i) {
@@ -126,7 +121,8 @@ var $config = extendWorkload($config, function($config, $super) {
                 [metaFieldName]: (this.tid * numDocs) + i,
             });
         }
-        assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));
+        assertWhenOwnDB.commandWorked(
+            db.runCommand({insert: collName, documents: docs, ordered: false}));
     };
 
     return $config;

@@ -82,6 +82,7 @@ selector:
   - jstests/concurrency/fsm_workloads/yield_and_hashed.js
   - jstests/concurrency/fsm_workloads/yield_and_sorted.js
   - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js

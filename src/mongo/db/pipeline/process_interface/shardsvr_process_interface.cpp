@@ -183,7 +183,6 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& targetNs,
     bool dropTarget,
     bool stayTemp,
-    bool allowBuckets,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     auto cachedDbInfo =
@@ -387,6 +386,26 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     uassertStatusOKWithContext(getWriteConcernStatusFromCommandResult(result),
                                str::stream()
                                    << "write concern failed while running command " << cmdObj);
+}
+
+void ShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,
+                                                       const NamespaceString& ns,
+                                                       const BSONObj& cmdObj,
+                                                       const TimeseriesOptions& userOpts) {
+    try {
+        ShardServerProcessInterface::createCollection(opCtx, ns.dbName(), cmdObj);
+    } catch (const DBException& ex) {
+        _handleTimeseriesCreateError(ex, opCtx, ns, userOpts);
+    }
+}
+
+Status ShardServerProcessInterface::insertTimeseries(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::vector<BSONObj>&& objs,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+    return ShardServerProcessInterface::insert(expCtx, ns, std::move(objs), wc, targetEpoch);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>

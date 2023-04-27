@@ -133,7 +133,11 @@ private:
         auto targetEpoch = boost::none;
         if (_timeseries) {
             uassertStatusOK(pExpCtx->mongoProcessInterface->insertTimeseries(
-                pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
+                pExpCtx,
+                _tempNs.getTimeseriesViewNamespace(),
+                std::move(batch),
+                _writeConcern,
+                targetEpoch));
         } else {
             uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
                 pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
@@ -149,11 +153,15 @@ private:
     void waitWhileFailPointEnabled() override;
 
     /**
-     * Checks that the time-series spec passed by the user matches the existing time-series
-     * collection, if one exists. It will set '_timeseriesExists' to true if a time-series
-     * collection exists.
+     * Determines if an error exists with the user input and existing collections.
+     * The function will error if:
+     * 1. The user provides the 'timeseries' field, but a non time-series collection or view exists
+     * in that namespace.
+     * 2. The user provides the 'timeseries' field with a specification that does not match an
+     * existing time-series collection. The function will replace the value of '_timeseries' if the
+     * user does not provide the 'timeseries' field, but a time-series collection exists.
      */
-    void validateTimeseries();
+    boost::optional<TimeseriesOptions> validateTimeseries();
 
     NamespaceString makeBucketNsIfTimeseries(const NamespaceString& ns);
     // Holds on to the original collection options and index specs so we can check they didn't
@@ -164,11 +172,13 @@ private:
     // The temporary namespace for the $out writes.
     NamespaceString _tempNs;
 
+    // Set if $out is writing to a time-series collection. This is how $out determines if it is
+    // writing to a time-series collection or not.
     boost::optional<TimeseriesOptions> _timeseries;
 
     // Set to true if the stage has not initialized or the view was successfully created.
-    // Used by the destructor to determine if the buckets collection should be destroyed.
-    bool _timeseriesViewCreated = true;
+    // Used by the destructor to determine if the "real" buckets collection should be destroyed.
+    bool _timeseriesStateConsistent = true;
 };
 
 }  // namespace mongo

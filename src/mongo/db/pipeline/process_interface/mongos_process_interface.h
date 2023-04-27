@@ -154,7 +154,6 @@ public:
                                                  const NamespaceString& targetNs,
                                                  bool dropTarget,
                                                  bool stayTemp,
-                                                 bool allowBuckets,
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes) final {
         MONGO_UNREACHABLE;
@@ -167,10 +166,10 @@ public:
     }
 
 
-    void createTimeseries(OperationContext* opCtx,
-                          const NamespaceString& ns,
-                          const BSONObj& options,
-                          bool createView) final {
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) final {
         MONGO_UNREACHABLE;
     }
 

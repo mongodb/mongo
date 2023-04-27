@@ -115,7 +115,6 @@ public:
         const NamespaceString& targetNs,
         bool dropTarget,
         bool stayTemp,
-        bool allowBuckets,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) override;
 
@@ -123,10 +122,10 @@ public:
                           const DatabaseName& dbName,
                           const BSONObj& cmdObj) override;
 
-    void createTimeseries(OperationContext* opCtx,
-                          const NamespaceString& ns,
-                          const BSONObj& options,
-                          bool createView) override;
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) override;
 
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;
 

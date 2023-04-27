@@ -69,6 +69,9 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
@@ -863,6 +866,27 @@ BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
     }
     indexArrayBuilder.done();
     return newCmd.obj();
+}
+
+void CommonMongodProcessInterface::_handleTimeseriesCreateError(const DBException& ex,
+                                                                OperationContext* opCtx,
+                                                                const NamespaceString& ns,
+                                                                TimeseriesOptions userOpts) {
+    // If we receive a NamespaceExists error for a time-series view that has the same
+    // specification as the time-series view we wanted to create, we should not throw an
+    // error. The user is allowed to overwrite an existing time-series collection when
+    // entering this function.
+    auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
+    // Confirming the error is NamespaceExists and that there is a time-series view in that
+    // namespace.
+    if (ex.code() != ErrorCodes::NamespaceExists || !view || !view->timeseries()) {
+        throw;
+    }
+    // Confirming the time-series options of the existing view are the same as expected.
+    auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(opCtx, ns, true);
+    if (!timeseriesOpts || !mongo::timeseries::optionsAreEqual(timeseriesOpts.value(), userOpts)) {
+        throw;
+    }
 }
 
 void CommonMongodProcessInterface::writeRecordsToRecordStore(

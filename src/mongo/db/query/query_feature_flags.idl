@@ -136,3 +136,10 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchBatchSizeLimit
       default: false
       shouldBeFCVGated: true
+
+    featureFlagAggOutTimeseries:
+      description: "Feature flag for enabling support for $out to write to time-series collections"
+      cpp_varname: gFeatureFlagAggOutTimeseries
+      default: true
+      version: 7.1
+      shouldBeFCVGated: true
