@@ -782,11 +782,6 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"arrayToObject",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::arrayToObject, false}},
     {"array", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::newArray, false}},
-    {"aggFirstN", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggFirstN, true}},
-    {"aggFirstNMerge",
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggFirstNMerge, true}},
-    {"aggFirstNFinalize",
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggFirstNFinalize, false}},
 };
 
 /**

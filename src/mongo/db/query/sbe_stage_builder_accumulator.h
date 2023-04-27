@@ -77,5 +77,5 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
     const AccumulationStatement& acc,
     std::unique_ptr<sbe::EExpression> initExpr,
-    sbe::value::FrameIdGenerator&);
+    boost::optional<sbe::value::SlotId> collatorSlot);
 }  // namespace mongo::stage_builder

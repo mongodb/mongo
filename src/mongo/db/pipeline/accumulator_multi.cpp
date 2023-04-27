@@ -255,12 +255,7 @@ template <FirstLastSense v>
 AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext* const expCtx,
                                                               BSONElement elem,
                                                               VariablesParseState vps) {
-    if constexpr (v == Sense::kFirst) {
-        expCtx->sbeGroupCompatibility =
-            std::min(expCtx->sbeGroupCompatibility, SbeCompatibility::flagGuarded);
-    } else {
-        expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
-    }
+    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
     auto name = [] {
         if constexpr (v == Sense::kFirst) {
             return AccumulatorFirstN::getName();

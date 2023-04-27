@@ -857,17 +857,6 @@ public:
         return _vals[idx];
     }
 
-    std::pair<TypeTags, Value> swapAt(std::size_t idx, TypeTags tag, Value val) {
-        if (idx >= _vals.size() || tag == TypeTags::Nothing) {
-            return {TypeTags::Nothing, 0};
-        }
-
-        auto ret = _vals[idx];
-        _vals[idx].first = tag;
-        _vals[idx].second = val;
-        return ret;
-    }
-
     auto& values() const noexcept {
         return _vals;
     }

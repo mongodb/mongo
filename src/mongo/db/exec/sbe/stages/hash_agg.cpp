@@ -214,12 +214,12 @@ void HashAggStage::prepare(CompileCtx& ctx) {
         _outAccessors[slot] = _outAggAccessors.back().get();
 
         ctx.root = this;
+        ctx.aggExpression = true;
+        ctx.accumulator = _outAggAccessors.back().get();
         std::unique_ptr<vm::CodeFragment> initCode{nullptr};
         if (expr.init) {
             initCode = expr.init->compile(ctx);
         }
-        ctx.aggExpression = true;
-        ctx.accumulator = _outAggAccessors.back().get();
         _aggCodes.emplace_back(std::move(initCode), expr.acc->compile(ctx));
         ctx.aggExpression = false;
 
@@ -443,8 +443,6 @@ void HashAggStage::open(bool reOpen) {
                 auto [it, _] = _ht->emplace(std::move(key), value::MaterializedRow{0});
                 it->second.resize(_outAggAccessors.size());
 
-                _htIt = it;
-
                 // Run accumulator initializer if needed.
                 for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
                     if (_aggCodes[idx].first) {
@@ -452,6 +450,7 @@ void HashAggStage::open(bool reOpen) {
                         _outHashAggAccessors[idx]->reset(owned, tag, val);
                     }
                 }
+                _htIt = it;
             }
 
             // Accumulate state in '_ht'.
@@ -704,9 +703,9 @@ std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
         ret.emplace_back("=");
         DebugPrinter::addBlocks(ret, expr.acc->debugPrint());
         if (expr.init) {
-            ret.emplace_back(DebugPrinter::Block("init{`"));
+            ret.emplace_back(DebugPrinter::Block("(`"));
             DebugPrinter::addBlocks(ret, expr.init->debugPrint());
-            ret.emplace_back(DebugPrinter::Block("`}"));
+            ret.emplace_back(DebugPrinter::Block("`)"));
         }
         first = false;
     }
