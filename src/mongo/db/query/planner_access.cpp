@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/planner_access.h"
@@ -1356,6 +1357,42 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
 
             refineTightnessForMaybeCoveredQuery(query, scanState.tightness);
             handleFilter(&scanState);
+        }
+    }
+
+    // If the index is partial and we have reached children without index tag, check if they are
+    // covered by the index' filter expression. In this case the child can be removed. In some cases
+    // this enables to remove the fetch stage from the plan.
+    // The check could be put inside the 'handleFilterAnd()' function, but if moved then the
+    // optimization will not be applied if the predicate contains an $elemMatch expression, since
+    // then the 'handleFilterAnd()' is not called.
+    if (IndexTag::kNoIndex != scanState.currentIndexNumber) {
+        const IndexEntry& index = indices[scanState.currentIndexNumber];
+        if (index.filterExpr != nullptr) {
+            while (scanState.curChild < root->numChildren()) {
+                MatchExpression* child = root->getChild(scanState.curChild);
+                if (expression::isSubsetOf(index.filterExpr, child)) {
+                    // When the documents satisfying the index filter predicate are a subset of the
+                    // documents satisfying the child expression, the child predicate is redundant.
+                    // Remove the child from the root's children.
+                    // For example: index on 'a' with a filter {$and: [{a: {$gt: 10}}, {b: {$lt:
+                    // 100}}]} and a query predicate {$and: [{a: {$gt: 20}}, {b: {$lt: 100}}]}. The
+                    // non-indexed child {b: {$lt: 100}} is always satisfied by the index filter and
+                    // can be removed.
+
+                    // In case of index filter predicate with $or, this optimization is not
+                    // applicable, since the subset relationship doesn't hold.
+                    // For example, an index on field 'c' with a filter expression {$or: [{a: {$gt:
+                    // 10}}, {b: {$lt: 100}}]} could be applicable for the query with a predicate
+                    // {$and: [{c: {$gt: 100}}, {b: {$lt: 100}}]}, but the predicate will not be
+                    // removed.
+                    scanState.tightness = IndexBoundsBuilder::EXACT;
+                    refineTightnessForMaybeCoveredQuery(query, scanState.tightness);
+                    handleFilter(&scanState);
+                } else {
+                    ++scanState.curChild;
+                }
+            }
         }
     }
 
