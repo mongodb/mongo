@@ -37,6 +37,7 @@
 #include "MongoStdOptionalCheck.h"
 #include "MongoTraceCheck.h"
 #include "MongoUninterruptibleLockGuardCheck.h"
+#include "MongoUnstructuredLogCheck.h"
 #include "MongoVolatileCheck.h"
 
 #include <clang-tidy/ClangTidy.h>
@@ -63,6 +64,7 @@ public:
         CheckFactories.registerCheck<MongoMutexCheck>("mongo-mutex-check");
         CheckFactories.registerCheck<MongoAssertCheck>("mongo-assert-check");
         CheckFactories.registerCheck<MongoFCVConstantCheck>("mongo-fcv-constant-check");
+        CheckFactories.registerCheck<MongoUnstructuredLogCheck>("mongo-unstructured-log-check");
     }
 };
 

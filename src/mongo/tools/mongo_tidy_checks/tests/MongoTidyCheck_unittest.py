@@ -261,6 +261,21 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoUnstructuredLogCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-unstructured-log-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "error: Illegal use of unstructured logging, this is only for local development use and should not be committed [mongo-unstructured-log-check,-warnings-as-errors]\n    logd();",
+            "error: Illegal use of unstructured logging, this is only for local development use and should not be committed [mongo-unstructured-log-check,-warnings-as-errors]\n    doUnstructuredLogImpl();",
+        ]
+
+        self.run_clang_tidy()
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()

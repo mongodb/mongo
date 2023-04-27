@@ -133,6 +133,7 @@ mongo_custom_check = env.SharedLibrary(
         "MongoMutexCheck.cpp",
         "MongoAssertCheck.cpp",
         "MongoFCVConstantCheck.cpp",
+        "MongoUnstructuredLogCheck.cpp",
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
