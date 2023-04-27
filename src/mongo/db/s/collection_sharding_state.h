@@ -90,10 +90,14 @@ public:
 
         ScopedCollectionShardingState(Lock::ResourceLock lock, CollectionShardingState* css);
 
+        // Constructor without the ResourceLock.
+        // Important: Only for use in non-shard servers!
+        ScopedCollectionShardingState(CollectionShardingState* css);
+
         static ScopedCollectionShardingState acquireScopedCollectionShardingState(
             OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
 
-        Lock::ResourceLock _lock;
+        boost::optional<Lock::ResourceLock> _lock;
         CollectionShardingState* _css;
     };
     static ScopedCollectionShardingState assertCollectionLockedAndAcquire(
