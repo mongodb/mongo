@@ -11,9 +11,9 @@ load("jstests/libs/telemetry_utils.js");
 
 // Assert the expected telemetry key with no redaction.
 function assertUnredactedTelemetryKey(telemetryKey) {
-    assert.eq(telemetryKey.filter, {"foo": {"$lte": "?number"}});
-    assert.eq(telemetryKey.sort, {"bar": -1});
-    assert.eq(telemetryKey.limit, "?number");
+    assert.eq(telemetryKey.queryShape.filter, {"foo": {"$lte": "?number"}});
+    assert.eq(telemetryKey.queryShape.sort, {"bar": -1});
+    assert.eq(telemetryKey.queryShape.limit, "?number");
 }
 
 function runTest(conn) {
@@ -28,10 +28,10 @@ function runTest(conn) {
 
     // Turning on redaction should redact field names on all entries, even previously cached ones.
     const telemetryKey = getTelemetryRedacted(conn)[0]["key"];
-    assert.eq(telemetryKey.filter,
+    assert.eq(telemetryKey.queryShape.filter,
               {"fNWkKfogMv6MJ77LpBcuPrO7Nq+R+7TqtD+Lgu3Umc4=": {"$lte": "?number"}});
-    assert.eq(telemetryKey.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
-    assert.eq(telemetryKey.limit, "?number");
+    assert.eq(telemetryKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
+    assert.eq(telemetryKey.queryShape.limit, "?number");
 
     // Turning redaction back off should preserve field names on all entries, even previously cached
     // ones.
