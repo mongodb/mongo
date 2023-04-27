@@ -44,6 +44,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     upd = upd_arg;
     prev_upd_ts = WT_TS_NONE;
     added_to_txn = append = inserted_to_update_chain = false;
+    upd_size = 0;
 
     /*
      * We should have one of the following:

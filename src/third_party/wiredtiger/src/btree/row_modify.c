@@ -69,6 +69,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
     upd = upd_arg;
     prev_upd_ts = WT_TS_NONE;
     added_to_txn = inserted_to_update_chain = false;
+    upd_size = 0;
 
     /*
      * We should have one of the following:

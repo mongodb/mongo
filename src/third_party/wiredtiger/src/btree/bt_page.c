@@ -132,6 +132,7 @@ __page_inmem_prepare_update(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UN
     WT_UPDATE *upd, *tombstone;
     size_t size, total_size;
 
+    size = 0;
     *sizep = 0;
 
     tombstone = upd = NULL;

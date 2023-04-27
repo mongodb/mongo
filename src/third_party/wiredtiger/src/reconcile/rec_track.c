@@ -34,6 +34,10 @@ __ovfl_discard_verbose(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, c
     WT_CELL_UNPACK_KV *unpack, _unpack;
     WT_DECL_ITEM(tmp);
 
+    /* Because we dereference the page pointer, it can't be NULL */
+    if (page == NULL)
+        WT_RET(EINVAL);
+
     WT_RET(__wt_scr_alloc(session, 512, &tmp));
 
     unpack = &_unpack;

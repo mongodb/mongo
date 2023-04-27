@@ -80,7 +80,7 @@ __rec_append_orig_value(
       session, upd != NULL && unpack != NULL && unpack->type != WT_CELL_DEL && !unpack->tw.prepare);
 
     append = oldest_upd = tombstone = NULL;
-    total_size = 0;
+    size = total_size = 0;
     tombstone_globally_visible = false;
 
     /* Review the current update list, checking conditions that mean no work is needed. */
