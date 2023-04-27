@@ -74,11 +74,13 @@ Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& 
     constexpr auto kSnappy = "snappy"_sd;
     constexpr auto kZlib = "zlib"_sd;
     constexpr auto kZstd = "zstd"_sd;
+    constexpr auto kIaa = "iaa"_sd;
 
     if (!kNone.equalCaseInsensitive(value) && !kSnappy.equalCaseInsensitive(value) &&
-        !kZlib.equalCaseInsensitive(value) && !kZstd.equalCaseInsensitive(value)) {
+        !kZlib.equalCaseInsensitive(value) && !kZstd.equalCaseInsensitive(value) &&
+        !kIaa.equalCaseInsensitive(value)) {
         return {ErrorCodes::BadValue,
-                "Compression option must be one of: 'none', 'snappy', 'zlib', or 'zstd'"};
+                "Compression option must be one of: 'none', 'snappy', 'zlib', 'zstd', or 'iaa'"};
     }
 
     return Status::OK();
