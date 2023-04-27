@@ -1133,7 +1133,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
