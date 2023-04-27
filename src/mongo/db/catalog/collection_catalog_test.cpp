@@ -378,7 +378,7 @@ TEST_F(CollectionCatalogTest, OnDropCollection) {
 
     // The global catalog is used to refresh the CollectionPtr's internal state, so we temporarily
     // replace the global instance initialized in the service context test fixture with our own.
-    CollectionCatalogStasher catalogStasher(opCtx.get(), sharedCatalog);
+    CollectionCatalog::stash(opCtx.get(), sharedCatalog);
 
     // Before dropping collection, confirm that the CollectionPtr can be restored successfully.
     yieldableColl.restore();
@@ -420,7 +420,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
 
     // The global catalog is used to refresh the CollectionPtr's internal state, so we temporarily
     // replace the global instance initialized in the service context test fixture with our own.
-    CollectionCatalogStasher catalogStasher(opCtx.get(), sharedCatalog);
+    CollectionCatalog::stash(opCtx.get(), sharedCatalog);
 
     // Before renaming collection, confirm that the CollectionPtr can be restored successfully.
     yieldableColl.restore();

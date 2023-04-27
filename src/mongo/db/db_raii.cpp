@@ -238,7 +238,6 @@ template <typename GetCollectionAndEstablishReadSourceFunc,
 auto acquireCollectionAndConsistentSnapshot(
     OperationContext* opCtx,
     bool isLockFreeReadSubOperation,
-    CollectionCatalogStasher& catalogStasher,
     GetCollectionAndEstablishReadSourceFunc getCollectionAndEstablishReadSource,
     ResetFunc reset,
     SetSecondaryState setSecondaryState,
@@ -252,7 +251,6 @@ auto acquireCollectionAndConsistentSnapshot(
                                         .first);
 
     CollectionPtrT collection;
-    catalogStasher.reset();
     while (true) {
         // AutoGetCollectionForReadBase can choose a read source based on the current replication
         // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
@@ -313,7 +311,7 @@ auto acquireCollectionAndConsistentSnapshot(
                 resolvedSecondaryNamespaces)) {
             bool isAnySecondaryNssShardedOrAView = !resolvedSecondaryNamespaces.has_value();
             setSecondaryState(isAnySecondaryNssShardedOrAView);
-            catalogStasher.stash(std::move(catalog));
+            CollectionCatalog::stash(opCtx, std::move(catalog));
             break;
         }
 
@@ -877,8 +875,6 @@ CollectionPtr::RestoreFn AutoGetCollectionForReadLockFree::_makeRestoreFromYield
     const DatabaseName& dbName) {
     return [this, options, callerExpectedToConflictWithSecondaryBatchApplication, dbName](
                OperationContext* opCtx, UUID uuid) -> const Collection* {
-        _catalogStasher.reset();
-
         auto nsOrUUID = NamespaceStringOrUUID(dbName, uuid);
         try {
             auto catalogStateForNamespace = acquireCatalogStateForNamespace(
@@ -890,7 +886,7 @@ CollectionPtr::RestoreFn AutoGetCollectionForReadLockFree::_makeRestoreFromYield
 
             _resolvedNss = catalogStateForNamespace.resolvedNss;
             _view = catalogStateForNamespace.view;
-            _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
+            CollectionCatalog::stash(opCtx, std::move(catalogStateForNamespace.catalog));
 
             return catalogStateForNamespace.collection;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -910,7 +906,6 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID, AutoGetCollection::Options options)
     : _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()),
       _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
-      _catalogStasher(opCtx),
       _callerExpectedToConflictWithSecondaryBatchApplication(
           opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
       _shouldNotConflictWithSecondaryBatchApplicationBlock(
@@ -974,7 +969,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         if (_view) {
             _lockFreeReadsBlock.reset();
         }
-        _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
+        CollectionCatalog::stash(opCtx, std::move(catalogStateForNamespace.catalog));
         _secondaryNssIsAViewOrSharded = catalogStateForNamespace.isAnySecondaryNssShardedOrAView;
 
         _collectionPtr = CollectionPtr(catalogStateForNamespace.collection);
@@ -1179,21 +1174,17 @@ bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAViewO
 }
 
 AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
-    : _catalogStash(opCtx),
-      _lockFreeReadsBlock(opCtx),
+    : _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, [] {
           Lock::GlobalLockSkipOptions options;
           options.skipRSTLLock = true;
           return options;
       }()) {
-    // The catalog will be stashed inside the CollectionCatalogStasher.
     FakeCollection fakeColl;
     acquireCollectionAndConsistentSnapshot(
         opCtx,
         /* isLockFreeReadSubOperation */
         false,
-        /* CollectionCatalogStasher */
-        _catalogStash,
         /* GetCollectionAndEstablishReadSourceFunc */
         [&](OperationContext* opCtx, const CollectionCatalog&, bool) {
             return std::make_pair(&fakeColl, /* isView */ false);
@@ -1207,21 +1198,17 @@ AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
 AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
                                                    Date_t deadline)
-    : _catalogStash(opCtx),
-      _lockFreeReadsBlock(opCtx),
+    : _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, [] {
           Lock::GlobalLockSkipOptions options;
           options.skipRSTLLock = true;
           return options;
       }()) {
-    // The catalog will be stashed inside the CollectionCatalogStasher.
     FakeCollection fakeColl;
     acquireCollectionAndConsistentSnapshot(
         opCtx,
         /* isLockFreeReadSubOperation */
         false,
-        /* CollectionCatalogStasher */
-        _catalogStash,
         /* GetCollectionAndEstablishReadSourceFunc */
         [&](OperationContext* opCtx, const CollectionCatalog&, bool) {
             // Check that the sharding database version matches our read.

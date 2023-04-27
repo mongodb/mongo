@@ -2238,43 +2238,6 @@ bool CollectionCatalog::_alreadyClonedForBatchedWriter(
     return _isCatalogBatchWriter() && collection.use_count() == kNumCollectionReferencesStored + 1;
 }
 
-CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx)
-    : _opCtx(opCtx), _stashed(false) {}
-
-CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx,
-                                                   std::shared_ptr<const CollectionCatalog> catalog)
-    : _opCtx(opCtx), _stashed(true) {
-    invariant(catalog);
-    CollectionCatalog::stash(_opCtx, std::move(catalog));
-}
-
-CollectionCatalogStasher::CollectionCatalogStasher(CollectionCatalogStasher&& other)
-    : _opCtx(other._opCtx), _stashed(other._stashed) {
-    other._stashed = false;
-}
-
-CollectionCatalogStasher::~CollectionCatalogStasher() {
-    if (_opCtx->isLockFreeReadsOp()) {
-        // Leave the catalog stashed on the opCtx because there is another Stasher instance still
-        // using it.
-        return;
-    }
-
-    reset();
-}
-
-void CollectionCatalogStasher::stash(std::shared_ptr<const CollectionCatalog> catalog) {
-    CollectionCatalog::stash(_opCtx, std::move(catalog));
-    _stashed = true;
-}
-
-void CollectionCatalogStasher::reset() {
-    if (_stashed) {
-        CollectionCatalog::stash(_opCtx, nullptr);
-        _stashed = false;
-    }
-}
-
 BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext* opCtx)
     : _opCtx(opCtx) {
     invariant(_opCtx->lockState()->isW());
