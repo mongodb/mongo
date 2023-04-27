@@ -158,7 +158,7 @@ public:
                                 "Inserting a database collection entry with fixed metadata",
                                 "db"_attr = _dbName());
                     uassertStatusOK(insertDatabaseEntryForBackwardCompatibility(
-                        opCtx, DatabaseName{_dbName()}));
+                        opCtx, DatabaseNameUtil::deserialize(boost::none, _dbName())));
                 }
 
                 return;
@@ -167,7 +167,8 @@ public:
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
-                AutoGetDb autoDb(opCtx, DatabaseName{_dbName()}, MODE_IS);
+                AutoGetDb autoDb(
+                    opCtx, DatabaseNameUtil::deserialize(boost::none, _dbName()), MODE_IS);
 
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime

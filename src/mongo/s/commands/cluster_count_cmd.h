@@ -231,7 +231,9 @@ public:
             return exceptionToStatus();
         }
 
-        const NamespaceString nss = parseNs(DatabaseName{request.getDatabase()}, cmdObj);
+        const NamespaceString nss = parseNs(
+            DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
+            cmdObj);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
                               << "'",

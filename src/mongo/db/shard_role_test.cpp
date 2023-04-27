@@ -133,7 +133,7 @@ protected:
 
     const ShardId thisShardId{"this"};
 
-    const DatabaseName dbNameTestDb{"test"};
+    const DatabaseName dbNameTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     const DatabaseVersion dbVersionTestDb{UUID::gen(), Timestamp(1, 0)};
 
     const NamespaceString nssUnshardedCollection1 =

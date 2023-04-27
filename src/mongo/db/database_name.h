@@ -135,13 +135,6 @@ public:
         return DatabaseName(tenantId, dbString);
     }
 
-    /**
-     * Prefer to use the constructor above.
-     * TODO SERVER-65456 Remove this constructor.
-     */
-    explicit DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
-        : DatabaseName(std::move(tenantId), dbName) {}
-
     boost::optional<TenantId> tenantId() const {
         if (!_hasTenantId()) {
             return boost::none;
@@ -251,6 +244,13 @@ private:
     friend class NamespaceString;
     friend class NamespaceStringOrUUID;
     friend class DatabaseNameUtil;
+
+    /**
+     * Prefer to use the constructor below.
+     * TODO SERVER-65456 Remove this constructor.
+     */
+    explicit DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
+        : DatabaseName(std::move(tenantId), dbName) {}
 
     /**
      * Constructs a DatabaseName from the given tenantId and database name.

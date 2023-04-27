@@ -198,7 +198,7 @@ void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
  * Removes database from catalog, bypassing dropDatabase().
  */
 void _removeDatabaseFromCatalog(OperationContext* opCtx, StringData dbName) {
-    AutoGetDb autoDB(opCtx, DatabaseName{dbName}, MODE_X);
+    AutoGetDb autoDB(opCtx, DatabaseName::createDatabaseName_forTest(boost::none, dbName), MODE_X);
     auto db = autoDB.getDb();
     // dropDatabase can call awaitReplication more than once, so do not attempt to drop the database
     // twice.

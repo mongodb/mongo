@@ -87,7 +87,7 @@ void executeChildBatches(OperationContext* opCtx,
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        DatabaseName("admin"),
+        DatabaseName::kAdmin,
         requests,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
@@ -290,7 +290,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     // TODO (SERVER-72989): Attach stmtIds etc. when building support for retryable
     // writes on mongos
 
-    request.setDbName(DatabaseName("admin"));
+    request.setDbName(DatabaseName::kAdmin);
 
     return request;
 }

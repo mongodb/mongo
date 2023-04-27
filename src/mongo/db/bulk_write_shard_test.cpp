@@ -76,9 +76,11 @@ protected:
 
     const ShardId thisShardId{"this"};
 
-    const DatabaseName dbNameTestDb1{"testDB1"};
+    const DatabaseName dbNameTestDb1 =
+        DatabaseName::createDatabaseName_forTest(boost::none, "testDB1");
     const DatabaseVersion dbVersionTestDb1{UUID::gen(), Timestamp(1, 0)};
-    const DatabaseName dbNameTestDb2{"testDB2"};
+    const DatabaseName dbNameTestDb2 =
+        DatabaseName::createDatabaseName_forTest(boost::none, "testDB2");
     const DatabaseVersion dbVersionTestDb2{UUID::gen(), Timestamp(2, 0)};
 
     const NamespaceString nssUnshardedCollection1 =

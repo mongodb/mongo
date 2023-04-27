@@ -234,7 +234,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
             // will allow change streams to stop collecting events on the namespace created from
             // shards != resolvedPrimaryShard.
             {
-                DatabasesAdded prepareCommitEvent({DatabaseName(dbName)}, false /*areImported*/);
+                DatabasesAdded prepareCommitEvent(
+                    {DatabaseNameUtil::deserialize(boost::none, dbName)}, false /*areImported*/);
                 prepareCommitEvent.setPhase(CommitPhaseEnum::kPrepare);
                 prepareCommitEvent.setPrimaryShard(resolvedPrimaryShard->getId());
                 uassertStatusOK(_notifyClusterOnNewDatabases(
@@ -278,7 +279,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
             hangBeforeNotifyingCreateDatabaseCommitted.pauseWhileSet();
 
-            DatabasesAdded commitCompletedEvent({DatabaseName(dbName)}, false /*areImported*/);
+            DatabasesAdded commitCompletedEvent(
+                {DatabaseNameUtil::deserialize(boost::none, dbName)}, false /*areImported*/);
             commitCompletedEvent.setPhase(CommitPhaseEnum::kSuccessful);
             const auto notificationOutcome = _notifyClusterOnNewDatabases(
                 opCtx, commitCompletedEvent, {resolvedPrimaryShard->getId()});

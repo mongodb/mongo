@@ -232,7 +232,8 @@ void fastForwardCommittedSnapshotOpTime(
 bool hasActiveSplitForTenants(OperationContext* opCtx, const std::vector<TenantId>& tenantIds) {
     return std::all_of(tenantIds.begin(), tenantIds.end(), [&](const auto& tenantId) {
         return tenant_migration_access_blocker::hasActiveTenantMigration(
-            opCtx, DatabaseName(tenantId.toString() + "_db"));
+            opCtx,
+            DatabaseName::createDatabaseName_forTest(boost::none, tenantId.toString() + "_db"));
     });
 }
 

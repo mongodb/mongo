@@ -177,7 +177,11 @@ TEST_F(ApplyOpsTest, ApplyOpsInsertIntoNonexistentCollectionReturnsNamespaceNotF
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  applyOps(opCtx.get(), DatabaseName("test"), cmdObj, mode, &resultBuilder));
+                  applyOps(opCtx.get(),
+                           DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                           cmdObj,
+                           mode,
+                           &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
@@ -202,7 +206,11 @@ TEST_F(ApplyOpsTest, ApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, applyOpsUuid, documentToInsert);
     BSONObjBuilder resultBuilder;
     ASSERT_EQUALS(ErrorCodes::UnknownError,
-                  applyOps(opCtx.get(), DatabaseName("test"), cmdObj, mode, &resultBuilder));
+                  applyOps(opCtx.get(),
+                           DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                           cmdObj,
+                           mode,
+                           &resultBuilder));
 }
 
 TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {

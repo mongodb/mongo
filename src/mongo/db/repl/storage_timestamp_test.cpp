@@ -1196,7 +1196,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
 
         BSONObjBuilder resultBuilder;
         auto swResult = doApplyOps(
-            DatabaseName(dbName),
+            DatabaseName::createDatabaseName_forTest(boost::none, dbName),
             {
                 BSON("ts" << _presentTs << "t" << 1LL << "op"
                           << "i"

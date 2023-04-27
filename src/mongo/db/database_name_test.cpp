@@ -183,9 +183,9 @@ TEST(DatabaseNameTest, EmptyDbString) {
 
 TEST(DatabaseNameTest, FromDataEquality) {
     NamespaceString test{"foo"};
-    ASSERT_EQ(test.dbName(), DatabaseName{"foo"});
-    NamespaceString testTwo{DatabaseName{"foo"}};
-    ASSERT_EQ(testTwo.dbName(), DatabaseName{"foo"});
+    ASSERT_EQ(test.dbName(), DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
+    NamespaceString testTwo{DatabaseName::createDatabaseName_forTest(boost::none, "foo")};
+    ASSERT_EQ(testTwo.dbName(), DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
 }
 
 }  // namespace

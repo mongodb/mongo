@@ -147,7 +147,7 @@ TEST_F(ResourceCatalogTest, CollisionTest) {
 }
 
 DEATH_TEST_F(ResourceCatalogTest, AddDatabaseInvalidResourceType, "invariant") {
-    catalog.add({RESOURCE_GLOBAL, 0}, DatabaseName{"db"});
+    catalog.add({RESOURCE_GLOBAL, 0}, DatabaseName::createDatabaseName_forTest(boost::none, "db"));
 }
 
 DEATH_TEST_F(ResourceCatalogTest, AddCollectionInvalidResourceType, "invariant") {

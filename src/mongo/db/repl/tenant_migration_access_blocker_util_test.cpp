@@ -58,7 +58,8 @@ static const UUID kMigrationId = UUID::gen();
 class TenantMigrationAccessBlockerUtilTest : public ServiceContextTest {
 public:
     const TenantId kTenantId = TenantId(OID::gen());
-    const DatabaseName kTenantDB = DatabaseName(kTenantId.toString() + "_ db");
+    const DatabaseName kTenantDB =
+        DatabaseName::createDatabaseName_forTest(boost::none, kTenantId.toString() + "_ db");
 
     void setUp() {
         _opCtx = makeOperationContext();
