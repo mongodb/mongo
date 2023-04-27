@@ -635,11 +635,6 @@ bool handleUpdateOp(OperationContext* opCtx,
             // match.
             int retryAttempts = 0;
             for (;;) {
-                const ExtensionsCallbackReal extensionsCallback(
-                    opCtx, &updateRequest.getNamespaceString());
-                ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-                uassertStatusOK(parsedUpdate.parseRequest());
-
                 try {
                     boost::optional<BSONObj> docFound;
                     auto result = write_ops_exec::writeConflictRetryUpsert(opCtx,
@@ -650,11 +645,20 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                            false,
                                                                            updateRequest.isUpsert(),
                                                                            docFound,
-                                                                           &parsedUpdate);
+                                                                           &updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
                     responses.addUpdateReply(currentOpIdx, result, docFound, boost::none);
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                    const ExtensionsCallbackReal extensionsCallback(
+                        opCtx, &updateRequest.getNamespaceString());
+
+                    // We are only using this to check if we should retry the command, so we don't
+                    // need to pass it a real collection object.
+                    ParsedUpdate parsedUpdate(
+                        opCtx, &updateRequest, extensionsCallback, CollectionPtr::null);
+                    uassertStatusOK(parsedUpdate.parseRequest());
+
                     if (!parsedUpdate.hasParsedQuery()) {
                         uassertStatusOK(parsedUpdate.parseQueryToCQ());
                     }

@@ -703,7 +703,7 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
                                       bool remove,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
-                                      ParsedUpdate* parsedUpdate) {
+                                      const UpdateRequest* updateRequest) {
     AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
     Database* db = autoColl.ensureDbExists(opCtx);
 
@@ -757,8 +757,13 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
             !inTransaction);
     }
 
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
+
+    ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback, collection);
+    uassertStatusOK(parsedUpdate.parseRequest());
+
     const auto exec = uassertStatusOK(
-        getExecutorUpdate(opDebug, &collection, parsedUpdate, boost::none /* verbosity */));
+        getExecutorUpdate(opDebug, &collection, &parsedUpdate, boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1126,8 +1131,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         }
     }();
 
-    UpdateStageParams::DocumentCounter documentCounter = nullptr;
-
     if (source == OperationSource::kTimeseriesUpdate) {
         uassert(ErrorCodes::NamespaceNotFound,
                 "Could not find time-series buckets collection for update",
@@ -1137,12 +1140,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         uassert(ErrorCodes::InvalidOptions,
                 "Time-series buckets collection is missing time-series options",
                 timeseriesOptions);
-
-        auto metaField = timeseriesOptions->getMetaField();
-        uassert(
-            ErrorCodes::InvalidOptions,
-            "Cannot perform an update on a time-series collection that does not have a metaField",
-            metaField);
 
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform a non-multi update on a time-series collection",
@@ -1159,12 +1156,20 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                     *timeseriesOptions, updateRequest->getHint())));
         }
 
-        updateRequest->setQuery(timeseries::translateQuery(updateRequest->getQuery(), *metaField));
-        updateRequest->setUpdateModification(
-            timeseries::translateUpdate(updateRequest->getUpdateModification(), *metaField));
+        if (!feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            auto metaField = timeseriesOptions->getMetaField();
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot perform an update on a time-series collection that does not have a "
+                    "metaField",
+                    timeseriesOptions->getMetaField());
 
-        documentCounter =
-            timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
+            updateRequest->setQuery(
+                timeseries::translateQuery(updateRequest->getQuery(), *metaField));
+            auto modification = uassertStatusOK(
+                timeseries::translateUpdate(updateRequest->getUpdateModification(), *metaField));
+            updateRequest->setUpdateModification(modification);
+        }
     }
 
     if (const auto& coll = collection.getCollectionPtr()) {
@@ -1173,7 +1178,12 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
-    ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback, forgoOpCounterIncrements);
+
+    ParsedUpdate parsedUpdate(opCtx,
+                              updateRequest,
+                              extensionsCallback,
+                              collection.getCollectionPtr(),
+                              forgoOpCounterIncrements);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -1187,6 +1197,15 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }
 
     assertCanWrite_inlock(opCtx, ns);
+
+    auto documentCounter = [&] {
+        if (source == OperationSource::kTimeseriesUpdate &&
+            !parsedUpdate.isEligibleForArbitraryTimeseriesUpdate()) {
+            return timeseries::numMeasurementsForBucketCounter(
+                collection.getCollectionPtr()->getTimeseriesOptions()->getTimeField());
+        }
+        return UpdateStageParams::DocumentCounter{};
+    }();
 
     auto exec = uassertStatusOK(getExecutorUpdate(&curOp.debug(),
                                                   &collection,
@@ -1304,7 +1323,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
             return ret;
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
             const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-            ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
+            // We are only using this to check if we should retry the command, so we don't need to
+            // pass it a real collection object.
+            ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, CollectionPtr::null);
             uassertStatusOK(parsedUpdate.parseRequest());
 
             if (!parsedUpdate.hasParsedQuery()) {
@@ -1507,8 +1528,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     const auto collection = acquireCollection(
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
-    DeleteStageParams::DocumentCounter documentCounter = nullptr;
-
     if (source == OperationSource::kTimeseriesDelete) {
         uassert(ErrorCodes::NamespaceNotFound,
                 "Could not find time-series buckets collection for write",
@@ -1540,9 +1559,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 request.setQuery(timeseries::translateQuery(request.getQuery(), *metaField));
             }
         }
-
-        documentCounter =
-            timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
     }
 
     ParsedDelete parsedDelete(opCtx,
@@ -1560,6 +1576,15 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
+
+    auto documentCounter = [&] {
+        if (source == OperationSource::kTimeseriesDelete &&
+            !parsedDelete.isEligibleForArbitraryTimeseriesDelete()) {
+            return timeseries::numMeasurementsForBucketCounter(
+                collection.getCollectionPtr()->getTimeseriesOptions()->getTimeField());
+        }
+        return DeleteStageParams::DocumentCounter{};
+    }();
 
     auto exec = uassertStatusOK(getExecutorDelete(&curOp.debug(),
                                                   collection,

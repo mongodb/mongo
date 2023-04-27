@@ -50,10 +50,11 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField);
  * Translates the given update on the time-series collection to an update on the time-series
  * collection's underlying buckets collection. Creates and returns a translated UpdateModification
  * where all occurrences of metaField in updateMod are replaced with the literal "meta". Requires
- * that updateMod is an update document and that the given metaField is not empty.
+ * that updateMod is an update document and that the given metaField is not empty. Returns an
+ * invalid status if the update cannot be translated.
  */
-write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
-                                              StringData metaField);
+StatusWith<write_ops::UpdateModification> translateUpdate(
+    const write_ops::UpdateModification& updateMod, boost::optional<StringData> metaField);
 
 /**
  * Returns the function to use to count the number of documents updated or deleted.

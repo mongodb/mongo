@@ -111,7 +111,9 @@ bool shardKeyHasCollatableType(const BSONObj& shardKey) {
 
 BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& updateRequest) {
     ExtensionsCallbackNoop extensionsCallback = ExtensionsCallbackNoop();
-    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
+    // We are only using this to parse the query for producing the upsert document, so we don't need
+    // to pass it a real collection object.
+    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback, CollectionPtr::null);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const CanonicalQuery* canonicalQuery =

@@ -491,8 +491,9 @@ void statsToBSON(const PlanStageStats& stats,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("nBucketsUnpacked", static_cast<long long>(spec->nBucketsUnpacked));
-            bob->appendNumber("nMeasurementsDeleted",
-                              static_cast<long long>(spec->nMeasurementsDeleted));
+            bob->appendNumber(spec->opType.starts_with("update") ? "nMeasurementsUpdated"
+                                                                 : "nMeasurementsDeleted",
+                              static_cast<long long>(spec->nMeasurementsModified));
         }
     } else if (STAGE_UNPACK_TIMESERIES_BUCKET == stats.stageType) {
         UnpackTimeseriesBucketStats* spec =

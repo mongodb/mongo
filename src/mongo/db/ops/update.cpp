@@ -95,7 +95,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
 
     // Parse the update, get an executor for it, run the executor, get stats out.
     const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-    ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
+    ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, collection);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;

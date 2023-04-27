@@ -558,8 +558,18 @@ public:
                     "explained write batches must be of size 1",
                     request().getUpdates().size() == 1);
 
+            auto isRequestToTimeseries = isTimeseries(opCtx, request());
+            auto nss = [&] {
+                auto nss = request().getNamespace();
+                if (!isRequestToTimeseries) {
+                    return nss;
+                }
+                return nss.isTimeseriesBucketsCollection() ? nss
+                                                           : nss.makeTimeseriesBucketsNamespace();
+            }();
+
             UpdateRequest updateRequest(request().getUpdates()[0]);
-            updateRequest.setNamespaceString(request().getNamespace());
+            updateRequest.setNamespaceString(nss);
             if (shouldDoFLERewrite(request())) {
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
@@ -580,8 +590,6 @@ public:
 
             const ExtensionsCallbackReal extensionsCallback(opCtx,
                                                             &updateRequest.getNamespaceString());
-            ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-            uassertStatusOK(parsedUpdate.parseRequest());
 
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
@@ -590,6 +598,27 @@ public:
                 CollectionAcquisitionRequest::fromOpCtx(
                     opCtx, request().getNamespace(), AcquisitionPrerequisites::kWrite),
                 MODE_IX);
+
+            if (isRequestToTimeseries) {
+                uassert(ErrorCodes::NamespaceNotFound,
+                        "Could not find time-series buckets collection for write explain",
+                        collection.getCollectionPtr());
+                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
+                uassert(ErrorCodes::InvalidOptions,
+                        "Time-series buckets collection is missing time-series options",
+                        timeseriesOptions);
+
+                const auto& requestHint = request().getUpdates()[0].getHint();
+                if (timeseries::isHintIndexKey(requestHint)) {
+                    updateRequest.setHint(
+                        uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                            *timeseriesOptions, requestHint)));
+                }
+            }
+
+            ParsedUpdate parsedUpdate(
+                opCtx, &updateRequest, extensionsCallback, collection.getCollectionPtr());
+            uassertStatusOK(parsedUpdate.parseRequest());
 
             auto exec = uassertStatusOK(getExecutorUpdate(
                 &CurOp::get(opCtx)->debug(), &collection, &parsedUpdate, verbosity));

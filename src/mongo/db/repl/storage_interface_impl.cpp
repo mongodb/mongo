@@ -984,16 +984,6 @@ Status _updateWithQuery(OperationContext* opCtx,
 
     auto& nss = request.getNamespaceString();
     return writeConflictRetry(opCtx, "_updateWithQuery", nss.ns(), [&] {
-        // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
-        // CanonicalQuery whose ownership will be transferred to the plan executor in
-        // getExecutorUpdate().
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
-        auto parsedUpdateStatus = parsedUpdate.parseRequest();
-        if (!parsedUpdateStatus.isOK()) {
-            return parsedUpdateStatus;
-        }
-
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto collectionResult = getCollection(
             autoColl,
@@ -1004,6 +994,17 @@ Status _updateWithQuery(OperationContext* opCtx,
             return collectionResult.getStatus();
         }
         const auto& collection = *collectionResult.getValue();
+
+        // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
+        // CanonicalQuery whose ownership will be transferred to the plan executor in
+        // getExecutorUpdate().
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
+        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, collection);
+        auto parsedUpdateStatus = parsedUpdate.parseRequest();
+        if (!parsedUpdateStatus.isOK()) {
+            return parsedUpdateStatus;
+        }
+
         WriteUnitOfWork wuow(opCtx);
         if (!ts.isNull()) {
             uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
@@ -1068,7 +1069,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         // ParsedUpdate needs to be inside the write conflict retry loop because it contains
         // the UpdateDriver whose state may be modified while we are applying the update.
         const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
+        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, collection);
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;

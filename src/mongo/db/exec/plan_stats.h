@@ -1185,7 +1185,11 @@ struct TimeseriesModifyStats final : public SpecificStats {
     BSONObj bucketFilter;
     BSONObj residualFilter;
     size_t nBucketsUnpacked = 0u;
-    size_t nMeasurementsDeleted = 0u;
+    size_t nMeasurementsMatched = 0u;
+    size_t nMeasurementsModified = 0u;
+
+    // True iff this is a $mod update.
+    bool isModUpdate;
 };
 
 struct SampleFromTimeseriesBucketStats final : public SpecificStats {

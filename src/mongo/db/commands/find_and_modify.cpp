@@ -389,16 +389,17 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         updateRequest.setNamespaceString(nss);
         update::makeUpdateRequest(opCtx, request, verbosity, &updateRequest);
 
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-        uassertStatusOK(parsedUpdate.parseRequest());
-
         // Explain calls of the findAndModify command are read-only, but we take write
         // locks so that the timing information is more accurate.
         AutoGetCollection collection(opCtx, nss, MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 collection.getDb());
+
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
+        ParsedUpdate parsedUpdate(
+            opCtx, &updateRequest, extensionsCallback, collection.getCollection());
+        uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
             ->checkShardVersionOrThrow(opCtx);
@@ -525,11 +526,6 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 updateRequest.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
                     req.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
 
-                const ExtensionsCallbackReal extensionsCallback(
-                    opCtx, &updateRequest.getNamespaceString());
-                ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-                uassertStatusOK(parsedUpdate.parseRequest());
-
                 try {
                     boost::optional<BSONObj> docFound;
                     auto updateResult =
@@ -541,11 +537,20 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                                  req.getRemove().value_or(false),
                                                                  req.getUpsert().value_or(false),
                                                                  docFound,
-                                                                 &parsedUpdate);
+                                                                 &updateRequest);
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                    const ExtensionsCallbackReal extensionsCallback(
+                        opCtx, &updateRequest.getNamespaceString());
+
+                    // We are only using this to check if we should retry the command, so we don't
+                    // need to pass it a real collection object.
+                    ParsedUpdate parsedUpdate(
+                        opCtx, &updateRequest, extensionsCallback, CollectionPtr::null);
+                    uassertStatusOK(parsedUpdate.parseRequest());
+
                     if (!parsedUpdate.hasParsedQuery()) {
                         uassertStatusOK(parsedUpdate.parseQueryToCQ());
                     }

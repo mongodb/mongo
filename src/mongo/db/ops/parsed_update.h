@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/ops/parsed_writes_common.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/update/update_driver.h"
@@ -69,6 +70,7 @@ public:
     ParsedUpdate(OperationContext* opCtx,
                  const UpdateRequest* request,
                  const ExtensionsCallback& extensionsCallback,
+                 const CollectionPtr& collection,
                  bool forgoOpCounterIncrements = false);
 
     /**
@@ -120,19 +122,27 @@ public:
     std::unique_ptr<CanonicalQuery> releaseParsedQuery();
 
     /**
-     * Sets this ParsedUpdate's collator.
-     *
-     * This setter can be used to override the collator that was created from the update request
-     * during ParsedUpdate construction.
-     */
-    void setCollator(std::unique_ptr<CollatorInterface> collator);
-
-    /**
      * Never returns nullptr.
      */
     boost::intrusive_ptr<ExpressionContext> expCtx() const {
         return _expCtx;
     }
+
+    /**
+     * Releases the ownership of the residual MatchExpression.
+     *
+     * Note: see _timeseriesUpdateQueryExprs._bucketMatchExpr for more details.
+     */
+    std::unique_ptr<MatchExpression> releaseResidualExpr() {
+        return _timeseriesUpdateQueryExprs ? std::move(_timeseriesUpdateQueryExprs->_residualExpr)
+                                           : nullptr;
+    }
+
+    /**
+     * Returns true when we are performing multi updates using a residual predicate on a time-series
+     * collection or when performing singleton updates on a time-series collection.
+     */
+    bool isEligibleForArbitraryTimeseriesUpdate() const;
 
 private:
     /**
@@ -159,11 +169,21 @@ private:
     // Driver for processing updates on matched documents.
     UpdateDriver _driver;
 
+    // Requested update modifications on matched documents.
+    std::unique_ptr<write_ops::UpdateModification> _modification;
+
     // Parsed query object, or NULL if the query proves to be an id hack query.
     std::unique_ptr<CanonicalQuery> _canonicalQuery;
 
     // Reference to an extensions callback used when parsing to a canonical query.
     const ExtensionsCallback& _extensionsCallback;
+
+    // Reference to the collection this update is being performed on.
+    const CollectionPtr& _collection;
+
+    // Contains the residual expression and the bucket-level expression that should be pushed down
+    // to the bucket collection.
+    std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesUpdateQueryExprs;
 };
 
 }  // namespace mongo

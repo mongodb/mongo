@@ -45,6 +45,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/parsed_update',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         'query/cluster_query',

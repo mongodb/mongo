@@ -29,8 +29,10 @@
 
 #include "mongo/db/exec/timeseries_modify.h"
 
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/update/update_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -39,7 +41,7 @@ namespace mongo {
 const char* TimeseriesModifyStage::kStageType = "TS_MODIFY";
 
 TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
-                                             std::unique_ptr<DeleteStageParams> params,
+                                             TimeseriesModifyParams&& params,
                                              WorkingSet* ws,
                                              std::unique_ptr<PlanStage> child,
                                              const CollectionPtr& coll,
@@ -51,28 +53,39 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
       _bucketUnpacker{std::move(bucketUnpacker)},
       _residualPredicate(std::move(residualPredicate)),
       _preWriteFilter(opCtx(), coll->ns()) {
+    uassert(ErrorCodes::InvalidOptions, "Arbitrary updates not yet enabled", !_params.isUpdate);
     tassert(7308200,
-            "multi is true and no residual predicate was specified",
-            _isDeleteOne() || _residualPredicate);
+            "Multi deletes must have a residual predicate",
+            _isSingletonWrite() || _residualPredicate || _params.isUpdate);
     _children.emplace_back(std::move(child));
 
     // These three properties are only used for the queryPlanner explain and will not change while
     // executing this stage.
     _specificStats.opType = [&] {
-        if (_isDeleteOne()) {
-            return "deleteOne";
-        } else {
-            return "deleteMany";
+        if (_params.isUpdate) {
+            return _isMultiWrite() ? "updateMany" : "updateOne";
         }
+        return _isMultiWrite() ? "deleteMany" : "deleteOne";
     }();
-    _specificStats.bucketFilter = _params->canonicalQuery->getQueryObj();
+    _specificStats.bucketFilter = _params.canonicalQuery->getQueryObj();
     if (_residualPredicate) {
         _specificStats.residualFilter = _residualPredicate->serialize();
     }
+
+    tassert(7314202,
+            "Updates must specify an update driver",
+            _params.updateDriver || !_params.isUpdate);
+    _specificStats.isModUpdate =
+        _params.isUpdate && _params.updateDriver->type() == UpdateDriver::UpdateType::kOperator;
+
+    // TODO SERVER-73143 Enable these cases.
+    uassert(ErrorCodes::InvalidOptions,
+            "Timeseries arbitrary updates must be modifier updates",
+            !_specificStats.isModUpdate);
 }
 
 bool TimeseriesModifyStage::isEOF() {
-    if (_isDeleteOne() && _specificStats.nMeasurementsDeleted > 0) {
+    if (_isSingletonWrite() && _specificStats.nMeasurementsModified > 0) {
         return true;
     }
     return child()->isEOF() && _retryBucketId == WorkingSet::INVALID_ID;
@@ -91,15 +104,16 @@ std::unique_ptr<PlanStageStats> TimeseriesModifyStage::getStats() {
 PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
     WorkingSetID bucketWsmId,
     const std::vector<BSONObj>& unchangedMeasurements,
-    const std::vector<BSONObj>& deletedMeasurements,
+    const std::vector<BSONObj>& modifiedMeasurements,
     bool bucketFromMigrate) {
-    if (_params->isExplain) {
-        _specificStats.nMeasurementsDeleted += deletedMeasurements.size();
+    if (_params.isExplain) {
+        _specificStats.nMeasurementsModified += modifiedMeasurements.size();
+        _specificStats.nMeasurementsMatched += modifiedMeasurements.size();
         return PlanStage::NEED_TIME;
     }
 
-    // No measurements needed to be deleted from the bucket document.
-    if (deletedMeasurements.empty()) {
+    // No measurements needed to be updated or deleted from the bucket document.
+    if (modifiedMeasurements.empty()) {
         return PlanStage::NEED_TIME;
     }
 
@@ -118,11 +132,12 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
 
     auto recordId = _ws->get(bucketWsmId)->recordId;
 
-    auto yieldAndRetry = [&](unsigned logId) {
+    auto yieldAndRetry = [&](unsigned logId, Status status) {
         LOGV2_DEBUG(logId,
                     5,
                     "Retrying bucket due to conflict attempting to write out changes",
-                    "bucket_rid"_attr = recordId);
+                    "bucket_rid"_attr = recordId,
+                    "status"_attr = status);
         _retryBucket(bucketWsmId);
         return PlanStage::NEED_YIELD;
     };
@@ -133,9 +148,9 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
         write_ops::DeleteCommandRequest op(collection()->ns(), {deleteEntry});
 
         auto result = timeseries::performAtomicWrites(
-            opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params->stmtId);
+            opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params.stmtId);
         if (!result.isOK()) {
-            return yieldAndRetry(7309300);
+            return yieldAndRetry(7309300, result);
         }
     } else {
         auto timeseriesOptions = collection()->getTimeseriesOptions();
@@ -160,13 +175,13 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
         write_ops::UpdateCommandRequest op(collection()->ns(), {updateEntry});
 
         auto result = timeseries::performAtomicWrites(
-            opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params->stmtId);
+            opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params.stmtId);
         if (!result.isOK()) {
-            return yieldAndRetry(7309301);
+            return yieldAndRetry(7309301, result);
         }
     }
-
-    _specificStats.nMeasurementsDeleted += deletedMeasurements.size();
+    _specificStats.nMeasurementsMatched += modifiedMeasurements.size();
+    _specificStats.nMeasurementsModified += modifiedMeasurements.size();
 
     // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
     // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
@@ -180,9 +195,9 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
             return PlanStage::NEED_TIME;
         },
         // yieldHandler
-        // Note we don't need to retry anything in this case since the delete already was committed.
-        // However, we still need to return the deleted document (if it was requested).
-        // TODO SERVER-73089 for findAndModify we need to return the deleted doc.
+        // Note we don't need to retry anything in this case since the write already was committed.
+        // However, we still need to return the affected document (if it was requested).
+        // TODO SERVER-73089 for findAndModify we need to return the affected doc.
         [&] { /* noop */ });
 }
 
@@ -193,11 +208,11 @@ TimeseriesModifyStage::_checkIfWritingToOrphanedBucket(ScopeGuard<F>& bucketFree
     // If we are in explain mode, we do not need to check if the bucket is orphaned since we're not
     // writing to bucket. If we are migrating a bucket, we also do not need to check if the bucket
     // is not writable and just return it.
-    if (_params->isExplain || _params->fromMigrate) {
-        return {boost::none, _params->fromMigrate};
+    if (_params.isExplain || _params.fromMigrate) {
+        return {boost::none, _params.fromMigrate};
     }
     return _preWriteFilter.checkIfNotWritable(_ws->get(id)->doc.value(),
-                                              "timeseriesDelete"_sd,
+                                              "timeseries "_sd + _specificStats.opType,
                                               collection()->ns(),
                                               [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                                                   planExecutorShardingCriticalSectionFuture(
@@ -230,7 +245,7 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
         collection()->ns().ns(),
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
-                collection(), opCtx(), _ws, id, _params->canonicalQuery);
+                collection(), opCtx(), _ws, id, _params.canonicalQuery);
             return PlanStage::NEED_TIME;
         },
         [&] {
@@ -300,22 +315,22 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     ++_specificStats.nBucketsUnpacked;
 
     std::vector<BSONObj> unchangedMeasurements;
-    std::vector<BSONObj> deletedMeasurements;
+    std::vector<BSONObj> modifiedMeasurements;
 
     while (_bucketUnpacker.hasNext()) {
         auto measurement = _bucketUnpacker.getNext().toBson();
         // We should stop deleting measurements once we hit the limit of one in the not multi case.
-        bool shouldContinueDeleting = _isDeleteMulti() || deletedMeasurements.empty();
-        if (shouldContinueDeleting &&
+        bool shouldContinueModifying = _isMultiWrite() || modifiedMeasurements.empty();
+        if (shouldContinueModifying &&
             (!_residualPredicate || _residualPredicate->matchesBSON(measurement))) {
-            deletedMeasurements.push_back(measurement);
+            modifiedMeasurements.push_back(measurement);
         } else {
             unchangedMeasurements.push_back(measurement);
         }
     }
 
     status = _writeToTimeseriesBuckets(
-        id, unchangedMeasurements, deletedMeasurements, bucketFromMigrate);
+        id, unchangedMeasurements, modifiedMeasurements, bucketFromMigrate);
     if (status != PlanStage::NEED_TIME) {
         *out = WorkingSet::INVALID_ID;
         bucketFreer.dismiss();

@@ -58,8 +58,9 @@ protected:
     }
 
     BSONObj _translateUpdate(const BSONObj& update) const {
-        return timeseries::translateUpdate(
-                   write_ops::UpdateModification::parseFromClassicUpdate(update), _metaField)
+        return uassertStatusOK(
+                   timeseries::translateUpdate(
+                       write_ops::UpdateModification::parseFromClassicUpdate(update), _metaField))
             .getUpdateModifier();
     }
 

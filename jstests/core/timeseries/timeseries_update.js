@@ -29,6 +29,8 @@ if (FixtureHelpers.isMongos(db) &&
     return;
 }
 
+const arbitraryUpdatesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesUpdatesSupport");
+
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
@@ -845,18 +847,20 @@ TimeseriesTest.run((insert) => {
         n: 2
     });
 
-    // Query for documents using $jsonSchema with the metaField in dot notation required.
-    testUpdate({
-        initialDocList: [doc1, doc2, doc3],
-        updateList: [{
-            q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}},
-            u: {$set: {[metaFieldName]: "a"}},
-            multi: true
-        }],
-        resultDocList: [doc1, doc2, doc3],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        // Query for documents using $jsonSchema with the metaField in dot notation required.
+        testUpdate({
+            initialDocList: [doc1, doc2, doc3],
+            updateList: [{
+                q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}},
+                u: {$set: {[metaFieldName]: "a"}},
+                multi: true
+            }],
+            resultDocList: [doc1, doc2, doc3],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Query for documents using $jsonSchema with a field that is not the metaField required.
     testUpdate({
@@ -873,24 +877,25 @@ TimeseriesTest.run((insert) => {
 
     const nestedMetaObj =
         {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: {[metaFieldName]: "A"}};
-
-    // Query for documents using $jsonSchema with the metaField required and a required subfield of
-    // the metaField with the same name as the metaField.
-    testUpdate({
-        initialDocList: [doc1, nestedMetaObj],
-        updateList: [{
-            q: {
-                "$jsonSchema": {
-                    "required": [metaFieldName],
-                    "properties": {[metaFieldName]: {"required": [metaFieldName]}}
-                }
-            },
-            u: {$set: {[metaFieldName]: "a"}},
-            multi: true
-        }],
-        resultDocList: [doc1, {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: "a"}],
-        n: 1
-    });
+    if (!arbitraryUpdatesEnabled) {
+        // Query for documents using $jsonSchema with the metaField required and a required
+        // subfield of the metaField with the same name as the metaField.
+        testUpdate({
+            initialDocList: [doc1, nestedMetaObj],
+            updateList: [{
+                q: {
+                    "$jsonSchema": {
+                        "required": [metaFieldName],
+                        "properties": {[metaFieldName]: {"required": [metaFieldName]}}
+                    }
+                },
+                u: {$set: {[metaFieldName]: "a"}},
+                multi: true
+            }],
+            resultDocList: [doc1, {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: "a"}],
+            n: 1
+        });
+    }
 
     // Query for documents using $jsonSchema with the metaField required and an optional field that
     // is not the metaField.
@@ -1110,7 +1115,7 @@ TimeseriesTest.run((insert) => {
         initialDocList: [doc3],
         updateList: [{
             q: {f: "F"},
-            u: {},
+            u: {$set: {f: "FF"}},
             multi: true,
         }],
         resultDocList: [doc3],
@@ -1124,7 +1129,7 @@ TimeseriesTest.run((insert) => {
         initialDocList: [doc3],
         updateList: [{
             q: {},
-            u: {},
+            u: {$set: {f: "FF"}},
             multi: true,
         }],
         resultDocList: [doc3],
@@ -1138,7 +1143,7 @@ TimeseriesTest.run((insert) => {
         initialDocList: [doc3],
         updateList: [{
             q: {},
-            u: {f: "FF"},
+            u: {$set: {f: "FF"}},
             multi: true,
         }],
         resultDocList: [doc3],

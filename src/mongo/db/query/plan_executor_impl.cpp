@@ -50,6 +50,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/subplan.h"
+#include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -605,6 +606,18 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
                 static_cast<const UpdateStats&>(*stats),
                 static_cast<UpdateStage*>(_root->child().get())->containsDotsAndDollarsField());
         }
+        case StageType::STAGE_TIMESERIES_MODIFY: {
+            const auto& stats =
+                static_cast<const TimeseriesModifyStats&>(*_root->getSpecificStats());
+            return UpdateResult(
+                stats.nMeasurementsModified > 0 /* Did we update at least one obj? */,
+                stats.isModUpdate /* Is this a $mod update? */,
+                stats.nMeasurementsModified /* number of modified docs, no no-ops */,
+                stats.nMeasurementsMatched /* # of docs matched/updated, even no-ops */,
+                // TODO SERVER-76551 Add upsert support.
+                BSONObj() /* objInserted */,
+                static_cast<TimeseriesModifyStage*>(_root.get())->containsDotsAndDollarsField());
+        }
         default:
             invariant(StageType::STAGE_UPDATE == _root->stageType());
             const auto stats = _root->getSpecificStats();
@@ -637,7 +650,7 @@ long long PlanExecutorImpl::executeDelete() {
         case StageType::STAGE_TIMESERIES_MODIFY: {
             const auto* tsModifyStats =
                 static_cast<const TimeseriesModifyStats*>(_root->getSpecificStats());
-            return tsModifyStats->nMeasurementsDeleted;
+            return tsModifyStats->nMeasurementsModified;
         }
         default: {
             invariant(StageType::STAGE_DELETE == _root->stageType() ||

@@ -51,10 +51,10 @@
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
+#include "mongo/db/exec/spool.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/timeseries_modify.h"
-#include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -1925,7 +1925,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         // directly.
         root = std::make_unique<TimeseriesModifyStage>(
             expCtxRaw,
-            std::move(deleteStageParams),
+            TimeseriesModifyParams(deleteStageParams.get()),
             ws.get(),
             std::move(root),
             collectionPtr,
@@ -1991,13 +1991,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // collection or database creation.
     if (!collectionPtr && request->isUpsert()) {
         invariant(request->explain());
-    }
-
-    // If the parsed update does not have a user-specified collation, set it from the collection
-    // default.
-    if (collectionPtr && parsedUpdate->getRequest()->getCollation().isEmpty() &&
-        collectionPtr->getDefaultCollator()) {
-        parsedUpdate->setCollator(collectionPtr->getDefaultCollator()->clone());
     }
 
     // If this is a user-issued update, then we want to return an error: you cannot perform
@@ -2111,12 +2104,27 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     updateStageParams.canonicalQuery = cq.get();
     const bool isUpsert = updateStageParams.request->isUpsert();
-    root =
-        (isUpsert
-             ? std::make_unique<UpsertStage>(
-                   cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release())
-             : std::make_unique<UpdateStage>(
-                   cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release()));
+    if (isUpsert) {
+        root = std::make_unique<UpsertStage>(
+            cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release());
+    } else if (parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
+        if (request->isMulti()) {
+            // If this is a multi-update, we need to spool the data before beginning to apply
+            // updates, in order to avoid the Halloween problem.
+            root = std::make_unique<SpoolStage>(cq->getExpCtxRaw(), ws.get(), std::move(root));
+        }
+        root = std::make_unique<TimeseriesModifyStage>(
+            cq->getExpCtxRaw(),
+            TimeseriesModifyParams(&updateStageParams),
+            ws.get(),
+            std::move(root),
+            collectionPtr,
+            BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+            parsedUpdate->releaseResidualExpr());
+    } else {
+        root = std::make_unique<UpdateStage>(
+            cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release());
+    }
 
     if (projection) {
         root = std::make_unique<ProjectionStageDefault>(

@@ -35,12 +35,17 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
 namespace mongo {
 
+// Note: The caller should hold a lock on the 'collection' so that it can stay alive until the end
+// of the ParsedUpdate's lifetime.
 ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const UpdateRequest* request,
                            const ExtensionsCallback& extensionsCallback,
+                           const CollectionPtr& collection,
                            bool forgoOpCounterIncrements)
     : _opCtx(opCtx),
       _request(request),
@@ -55,8 +60,17 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
           // change this.
           request->explain())),
       _driver(_expCtx),
+      _modification(
+          std::make_unique<write_ops::UpdateModification>(_request->getUpdateModification())),
       _canonicalQuery(),
-      _extensionsCallback(extensionsCallback) {
+      _extensionsCallback(extensionsCallback),
+      _collection(collection),
+      _timeseriesUpdateQueryExprs(request->source() == OperationSource::kTimeseriesUpdate
+                                      ? createTimeseriesWritesQueryExprsIfNecessary(
+                                            feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                                                serverGlobalParams.featureCompatibility),
+                                            collection)
+                                      : nullptr) {
     if (forgoOpCounterIncrements) {
         _expCtx->enabledCounters = false;
     }
@@ -88,14 +102,10 @@ Status ParsedUpdate::parseRequest() {
     // UpdateStage would not return any document.
     invariant(_request->getProj().isEmpty() || _request->shouldReturnAnyDocs());
 
-    if (!_request->getCollation().isEmpty()) {
-        auto collator = CollatorFactoryInterface::get(_opCtx->getServiceContext())
-                            ->makeFromBSON(_request->getCollation());
-        if (!collator.isOK()) {
-            return collator.getStatus();
-        }
-        _expCtx->setCollator(std::move(collator.getValue()));
-    }
+    auto [collatorToUse, collationMatchesDefault] =
+        resolveCollator(_opCtx, _request->getCollation(), _collection);
+    _expCtx->setCollator(std::move(collatorToUse));
+    _expCtx->collationMatchesDefault = collationMatchesDefault;
 
     auto statusWithArrayFilters = parsedUpdateArrayFilters(
         _expCtx, _request->getArrayFilters(), _request->getNamespaceString());
@@ -103,6 +113,39 @@ Status ParsedUpdate::parseRequest() {
         return statusWithArrayFilters.getStatus();
     }
     _arrayFilters = std::move(statusWithArrayFilters.getValue());
+
+    if (_timeseriesUpdateQueryExprs) {
+        tassert(7314206, "collection must not be null", _collection);
+
+        // With timeseries updates, we have to parse the query first to determine whether we will be
+        // performing the update directly on the bucket document (and therefore need to translate
+        // the update modifications), or if we will unpack the measurements first and be able to use
+        // the modifications as-is.
+        // (We know that we will always need to produce a query for this case because timeseries is
+        // not eligible for idhack.)
+        Status status = parseQueryToCQ();
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (_request->isMulti() && !_timeseriesUpdateQueryExprs->_residualExpr) {
+            // If we don't have a residual predicate and this is not a single update, we might be
+            // able to perform this update directly on the buckets collection. Attempt to translate
+            // the update modification accordingly, if it succeeds, bail out and do a direct write.
+            // If we can't translate it (due to referencing data fields), go ahead with the
+            // arbitrary updates path.
+            const auto& timeseriesOptions = _collection->getTimeseriesOptions();
+            auto swModification =
+                timeseries::translateUpdate(*_modification, timeseriesOptions->getMetaField());
+            if (swModification.isOK()) {
+                _modification =
+                    std::make_unique<write_ops::UpdateModification>(swModification.getValue());
+                _timeseriesUpdateQueryExprs = nullptr;
+            }
+        }
+        parseUpdate();
+        return Status::OK();
+    }
 
     // We parse the update portion before the query portion because the dispostion of the update
     // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
@@ -122,6 +165,9 @@ Status ParsedUpdate::parseRequest() {
 
 Status ParsedUpdate::parseQuery() {
     dassert(!_canonicalQuery.get());
+    tassert(7314204,
+            "timeseries updates should always require a canonical query to be parsed",
+            !_timeseriesUpdateQueryExprs);
 
     if (!_driver.needMatchDetails() && CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
@@ -136,13 +182,33 @@ Status ParsedUpdate::parseQueryToCQ() {
     // The projection needs to be applied after the update operation, so we do not specify a
     // projection during canonicalization.
     auto findCommand = std::make_unique<FindCommandRequest>(_request->getNamespaceString());
-    findCommand->setFilter(_request->getQuery());
+
+    _expCtx->startExpressionCounters();
+
+    if (_timeseriesUpdateQueryExprs) {
+        // If we're updating documents in a time-series collection, splits the match expression
+        // into a bucket-level match expression and a residual expression so that we can push down
+        // the bucket-level match expression to the system bucket collection scan or fetch/ixscan.
+        *_timeseriesUpdateQueryExprs = timeseries::getMatchExprsForWrites(
+            _expCtx, *_collection->getTimeseriesOptions(), _request->getQuery());
+
+        // At this point, we parsed user-provided match expression. After this point, the new
+        // canonical query is internal to the bucket SCAN or FETCH and will have additional internal
+        // match expression. We do not need to track the internal match expression counters and so
+        // we stop the counters because we do not want to count the internal match expression.
+        _expCtx->stopExpressionCounters();
+
+        // At least, the bucket-level filter must contain the closed bucket filter.
+        tassert(7314200,
+                "Bucket-level filter must not be null",
+                _timeseriesUpdateQueryExprs->_bucketExpr);
+        findCommand->setFilter(_timeseriesUpdateQueryExprs->_bucketExpr->serialize());
+    } else {
+        findCommand->setFilter(_request->getQuery());
+    }
     findCommand->setSort(_request->getSort());
     findCommand->setHint(_request->getHint());
-
-    // We get the collation off the ExpressionContext because it may contain a collection-default
-    // collator if no collation was included in the user's request.
-    findCommand->setCollation(_expCtx->getCollatorBSON());
+    findCommand->setCollation(_request->getCollation().getOwned());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
@@ -151,6 +217,13 @@ Status ParsedUpdate::parseQueryToCQ() {
     // has not actually updated a document. This behavior is fine for findAndModify, but should
     // not apply to update in general.
     if (!_request->isMulti() && !_request->getSort().isEmpty()) {
+        // TODO: Due to the complexity which is related to the efficient sort support, we don't
+        // support yet findAndModify with a query and sort but it should not be impossible.
+        // This code assumes that in findAndModify code path, the parsed update constructor should
+        // be called with source == kTimeseriesUpdate for a time-series collection.
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform a findAndModify with a query and sort on a time-series collection.",
+                !_timeseriesUpdateQueryExprs);
         findCommand->setLimit(1);
     }
 
@@ -171,7 +244,6 @@ Status ParsedUpdate::parseQueryToCQ() {
         findCommand->setLet(*letParams);
     }
 
-    _expCtx->startExpressionCounters();
     auto statusWithCQ = CanonicalQuery::canonicalize(_opCtx,
                                                      std::move(findCommand),
                                                      static_cast<bool>(_request->explain()),
@@ -202,10 +274,8 @@ void ParsedUpdate::parseUpdate() {
         _driver.setSkipDotsDollarsCheck(true);
     }
     _expCtx->isParsingPipelineUpdate = true;
-    _driver.parse(_request->getUpdateModification(),
-                  _arrayFilters,
-                  _request->getUpdateConstants(),
-                  _request->isMulti());
+    _driver.parse(
+        *_modification, _arrayFilters, _request->getUpdateConstants(), _request->isMulti());
     _expCtx->isParsingPipelineUpdate = false;
 }
 
@@ -230,20 +300,8 @@ UpdateDriver* ParsedUpdate::getDriver() {
     return &_driver;
 }
 
-void ParsedUpdate::setCollator(std::unique_ptr<CollatorInterface> collator) {
-    auto* rawCollator = collator.get();
-
-    if (_canonicalQuery) {
-        _canonicalQuery->setCollator(std::move(collator));
-    } else {
-        _expCtx->setCollator(std::move(collator));
-    }
-
-    _driver.setCollator(rawCollator);
-
-    for (auto&& arrayFilter : _arrayFilters) {
-        arrayFilter.second->getFilter()->setCollator(rawCollator);
-    }
+bool ParsedUpdate::isEligibleForArbitraryTimeseriesUpdate() const {
+    return _timeseriesUpdateQueryExprs.get() != nullptr;
 }
 
 }  // namespace mongo

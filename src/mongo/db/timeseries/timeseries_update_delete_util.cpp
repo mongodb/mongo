@@ -54,7 +54,7 @@ static const std::unique_ptr<MatchExpression> closedBucketFilter =
  * Returns whether the given metaField is the first element of the dotted path in the given
  * field.
  */
-bool isMetaFieldFirstElementOfDottedPathField(StringData field, StringData metaField) {
+bool isFieldFirstElementOfDottedPathField(StringData field, StringData metaField) {
     return field.substr(0, field.find('.')) == metaField;
 }
 
@@ -76,12 +76,13 @@ void assertQueryFieldIsMetaField(bool isMetaField, StringData metaField) {
             isMetaField);
 }
 
-void assertUpdateFieldIsMetaField(bool isMetaField, StringData metaField) {
-    uassert(ErrorCodes::InvalidOptions,
-            fmt::format("Cannot perform an update on a time-series collection which updates a "
-                        "field that is not the metaField '{}'",
-                        metaField),
-            isMetaField);
+Status checkUpdateFieldIsMetaField(bool isMetaField, StringData metaField) {
+    return isMetaField
+        ? Status::OK()
+        : Status(ErrorCodes::InvalidOptions,
+                 fmt::format("Cannot perform an update on a time-series collection which updates a "
+                             "field that is not the metaField '{}'",
+                             metaField));
 }
 
 /**
@@ -132,7 +133,7 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
     }
 
     if (isTopLevelField && (fieldName.empty() || fieldName[0] != '$')) {
-        assertQueryFieldIsMetaField(isMetaFieldFirstElementOfDottedPathField(fieldName, metaField),
+        assertQueryFieldIsMetaField(isFieldFirstElementOfDottedPathField(fieldName, metaField),
                                     metaField);
         invariantStatusOK(elem.rename(getRenamedField(fieldName)));
     }
@@ -157,9 +158,8 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField) {
     return queryDoc.getObject();
 }
 
-write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
-                                              StringData metaField) {
-    invariant(!metaField.empty());
+StatusWith<write_ops::UpdateModification> translateUpdate(
+    const write_ops::UpdateModification& updateMod, boost::optional<StringData> metaField) {
     invariant(updateMod.type() != write_ops::UpdateModification::Type::kDelta);
 
     uassert(ErrorCodes::InvalidOptions,
@@ -169,6 +169,13 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
     uassert(ErrorCodes::InvalidOptions,
             "Cannot perform an update on a time-series collection using a replacement document",
             updateMod.type() != write_ops::UpdateModification::Type::kReplacement);
+
+    // We can't translate an update without a meta field.
+    if (!metaField) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "Cannot perform an update on a time-series collection that does not have a "
+                      "metaField");
+    }
 
     const auto& document = updateMod.getUpdateModifier();
 
@@ -191,16 +198,23 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
              fieldValuePair = fieldValuePair.rightSibling()) {
             auto fieldName = fieldValuePair.getFieldName();
 
-            assertUpdateFieldIsMetaField(
-                isMetaFieldFirstElementOfDottedPathField(fieldName, metaField), metaField);
+            auto status = checkUpdateFieldIsMetaField(
+                isFieldFirstElementOfDottedPathField(fieldName, *metaField), *metaField);
+            if (!status.isOK()) {
+                return status;
+            }
             invariantStatusOK(fieldValuePair.rename(getRenamedField(fieldName)));
 
             // If this is a $rename, we also need to translate the value.
             if (updatePair.getFieldName() == "$rename") {
-                assertUpdateFieldIsMetaField(fieldValuePair.isType(BSONType::String) &&
-                                                 isMetaFieldFirstElementOfDottedPathField(
-                                                     fieldValuePair.getValueString(), metaField),
-                                             metaField);
+                auto status = checkUpdateFieldIsMetaField(
+                    fieldValuePair.isType(BSONType::String) &&
+                        isFieldFirstElementOfDottedPathField(fieldValuePair.getValueString(),
+                                                             *metaField),
+                    *metaField);
+                if (!status.isOK()) {
+                    return status;
+                }
                 invariantStatusOK(fieldValuePair.setValueString(
                     getRenamedField(fieldValuePair.getValueString())));
             }
