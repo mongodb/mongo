@@ -189,7 +189,7 @@ Status _createView(OperationContext* opCtx,
 
         // Cannot directly create a view on a system.buckets collection, only by creating a
         // time-series collection.
-        auto viewOnNss = NamespaceString{collectionOptions.viewOn};
+        NamespaceString viewOnNss{nss.db(), collectionOptions.viewOn};
         uassert(ErrorCodes::InvalidNamespace,
                 "Cannot create view on a system.buckets namespace except by creating a time-series "
                 "collection",
