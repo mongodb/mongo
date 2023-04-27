@@ -25,10 +25,10 @@ coll.drop();
 coll1.drop();
 
 const cursorEntryValidator = function(entry, expectedEntry) {
-    assert(entry.ok == expectedEntry.ok);
-    assert(entry.idx == expectedEntry.idx);
-    assert(entry.n == expectedEntry.n);
-    assert(entry.code == expectedEntry.code);
+    assert.eq(entry.ok, expectedEntry.ok);
+    assert.eq(entry.idx, expectedEntry.idx);
+    assert.eq(entry.n, expectedEntry.n);
+    assert.eq(entry.code, expectedEntry.code);
 };
 
 // TODO SERVER-31242 findAndModify retry doesn't apply 'fields' to response.
@@ -77,7 +77,7 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, nModified: 1});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
 assert.docEq(res.cursor.firstBatch[1].value, {skey: "MongoDB2"});
 assert(!res.cursor.firstBatch[2]);
 
@@ -103,7 +103,7 @@ assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, nModified: 2});
+cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 2, nModified: 2});
 assert(!res.cursor.firstBatch[2].value);
 assert(!res.cursor.firstBatch[3]);
 assert.sameMembers(coll.find().toArray(), [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB2"}]);

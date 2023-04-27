@@ -158,8 +158,7 @@ commands.push({
 
         // The update was a noop.
         assert.eq(res.cursor.firstBatch[1].ok, 1);
-        // TODO SERVER-75946: assert on n here.
-        // assert.eq(res.cursor.firstBatch[1].n, 1);
+        assert.eq(res.cursor.firstBatch[1].n, 1);
         assert.eq(res.cursor.firstBatch[1].nModified, 0);
     },
     noopMakerConfirmFunc: function(res) {
@@ -192,8 +191,7 @@ commands.push({
 
         // the update was a no-op
         assert.eq(res.cursor.firstBatch[1].ok, 1);
-        // TODO SERVER-75946: assert on n here.
-        // assert.eq(res.cursor.firstBatch[1].n, 0);
+        assert.eq(res.cursor.firstBatch[1].n, 0);
         assert.eq(res.cursor.firstBatch[1].nModified, 0);
     },
     noopMakerReq: {update: collName, updates: [{q: {a: 1}, u: {b: 2}}]},
@@ -229,9 +227,8 @@ commands.push({
         // the update failed
         assert.eq(res.cursor.firstBatch[1].ok, 0);
         assert.eq(res.cursor.firstBatch[1].code, ErrorCodes.ImmutableField);
-        // TODO SERVER-75946: assert on n and nModified here.
-        // assert.eq(res.cursor.firstBatch[1].n, 0);
-        // assert.eq(res.cursor.firstBatch[1].nModified, 0);
+        assert.eq(res.cursor.firstBatch[1].n, 0);
+        assert.eq(res.cursor.firstBatch[1].nModified, 0);
     },
     noopMakerReq: {insert: collName, documents: [{_id: 1}]},
     noopMakerConfirmFunc: function(res) {

@@ -26,11 +26,11 @@ coll.drop();
 coll1.drop();
 
 const cursorEntryValidator = function(entry, expectedEntry) {
-    assert(entry.ok == expectedEntry.ok);
-    assert(entry.idx == expectedEntry.idx);
-    assert(entry.n == expectedEntry.n);
-    assert(entry.nModified == expectedEntry.nModified);
-    assert(entry.code == expectedEntry.code);
+    assert.eq(entry.ok, expectedEntry.ok);
+    assert.eq(entry.idx, expectedEntry.idx);
+    assert.eq(entry.n, expectedEntry.n);
+    assert.eq(entry.nModified, expectedEntry.nModified);
+    assert.eq(entry.code, expectedEntry.code);
 };
 
 // Make sure invalid fields are not accepted
@@ -132,7 +132,8 @@ var res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidOptions});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.InvalidOptions});
 assert(!res.cursor.firstBatch[1]);
 
 // Test update providing returnFields without return option.
@@ -154,7 +155,8 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.InvalidOptions});
+cursorEntryValidator(res.cursor.firstBatch[1],
+                     {ok: 0, idx: 1, n: 0, nModified: 0, code: ErrorCodes.InvalidOptions});
 assert(!res.cursor.firstBatch[2]);
 
 coll.drop();
@@ -175,7 +177,8 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.InvalidNamespace});
 assert(!res.cursor.firstBatch[1]);
 
 var coll2 = db.getCollection("coll2");
@@ -204,8 +207,10 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.DuplicateKey});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, nModified: 0});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.DuplicateKey});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 0});
+
 assert.docEq(res.cursor.firstBatch[1].upserted, {index: 0, _id: 1});
 assert.docEq(res.cursor.firstBatch[1].value, {_id: 1, skey: "MongoDB2"});
 assert(!res.cursor.firstBatch[2]);
@@ -235,7 +240,8 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.DuplicateKey});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.DuplicateKey});
 assert(!res.cursor.firstBatch[1]);
 coll.drop();
 coll2.drop();
@@ -267,16 +273,18 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-assert(res.cursor.id == 0);
+assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 
 // In most cases we expect this to fail because it tries to insert a document that is too large.
 // In some cases we may see the javascript execution interrupted because it takes longer than
 // our default time limit, so we allow that possibility.
 try {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.BadValue});
+    cursorEntryValidator(res.cursor.firstBatch[1],
+                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.BadValue});
 } catch {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.Interrupted});
+    cursorEntryValidator(res.cursor.firstBatch[1],
+                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});
 }
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, n: 1, idx: 2});
 assert(!res.cursor.firstBatch[3]);
@@ -298,16 +306,18 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-assert(res.cursor.id == 0);
+assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 
 // In most cases we expect this to fail because it tries to insert a document that is too large.
 // In some cases we may see the javascript execution interrupted because it takes longer than
 // our default time limit, so we allow that possibility.
 try {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.BadValue});
+    cursorEntryValidator(res.cursor.firstBatch[1],
+                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.BadValue});
 } catch {
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.Interrupted});
+    cursorEntryValidator(res.cursor.firstBatch[1],
+                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});
 }
 assert(!res.cursor.firstBatch[2]);
 
@@ -327,7 +337,7 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-assert(res.cursor.id == 0);
+assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 11000});
 // Make sure that error extra info was correctly added
@@ -355,7 +365,7 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-assert(res.cursor.id == 0);
+assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 11000});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, n: 1, idx: 2});
@@ -378,7 +388,8 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidOptions});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, n: 0, idx: 0, code: ErrorCodes.InvalidOptions});
 assert(!res.cursor.firstBatch[1]);
 
 // Test delete providing returnFields without return option.
@@ -395,7 +406,8 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.InvalidOptions});
+cursorEntryValidator(res.cursor.firstBatch[1],
+                     {ok: 0, n: 0, idx: 1, code: ErrorCodes.InvalidOptions});
 assert(!res.cursor.firstBatch[2]);
 
 coll.drop();
@@ -415,7 +427,8 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
 assert(!res.cursor.firstBatch[1]);
 
 // Test delete continues on error with ordered:false.
@@ -436,7 +449,8 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 assert.docEq(res.cursor.firstBatch[1].value, {_id: 1, skey: "MongoDB"});
 assert(!res.cursor.firstBatch[2]);
@@ -463,7 +477,8 @@ res = db.adminCommand({
 assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0],
+                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
 assert(!res.cursor.firstBatch[1]);
 
 assert.eq(coll.findOne().skey, "MongoDB");
@@ -500,7 +515,7 @@ try {
 
 if (processCursor) {
     cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, nModified: 1});
+    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
     assert.docEq(res.cursor.firstBatch[1].value, {_id: 1, skey: "MongoDB"});
     cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
     assert.docEq(res.cursor.firstBatch[2].value, {_id: 1, skey: "MongoDB2"});
@@ -536,7 +551,7 @@ if (processCursor) {
     cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
     cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
     assert.docEq(res.cursor.firstBatch[2].value, {_id: 2, skey: "MongoDB"});
-    cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, nModified: 1});
+    cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1, nModified: 1});
     assert.docEq(res.cursor.firstBatch[3].value, {_id: 1, skey: "MongoDB"});
     assert(!res.cursor.firstBatch[4]);
 }
@@ -580,6 +595,26 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 assert.eq(res.numErrors, 3);
+coll.drop();
 
+// Checking n and nModified on update success and failure.
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
+        {update: 0, filter: {_id: 1}, updateMods: {$set: {skey: "MongoDB2"}}},
+        {update: 0, filter: {_id: 1}, updateMods: {$set: {_id: 2}}},
+    ],
+    nsInfo: [{ns: "test.coll"}]
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
+cursorEntryValidator(res.cursor.firstBatch[2],
+                     {ok: 0, idx: 2, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
+assert(!res.cursor.firstBatch[3]);
 coll.drop();
 })();
