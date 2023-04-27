@@ -23,7 +23,9 @@ Unix only.
 
 import os
 import sys
+import time
 import traceback
+from threading import Thread
 import unittest
 from itertools import cycle
 from multiprocessing import cpu_count
@@ -40,9 +42,29 @@ _all__ = [
     'partition_tests',
 ]
 
+# This file has been modified from the original concurrencytest-0.1.2 to wait for the child processes
+# preventing defunct processes and to prefix output with the running PID for debuggability.
 
 CPU_COUNT = cpu_count()
 
+def wait_for_children(pids):
+    while pids:
+        try:
+            # As Windows doesn't support -1 for all children, loop through each child pid explicitly.
+            for child_pid in pids:
+                pid, exit_status = os.waitpid(child_pid, os.WNOHANG)
+                exit_code = os.waitstatus_to_exitcode(exit_status)
+                if exit_code != 0:
+                    pids.remove(pid)
+                    if exit_code > 0:
+                        print("[pid:{}]: Unexpected exit ({}) for child process ({})".format(os.getpid(), exit_code, pid))
+                    else:
+                        print("[pid:{}]: Unexpected exit by signal ({}) for child process ({})".format(os.getpid(), abs(exit_code), pid))
+        except ChildProcessError:
+            # No children processes.
+            break
+        # Sleep as the waipid is non blocking.
+        time.sleep(5)
 
 def fork_for_tests(concurrency_num=CPU_COUNT):
     """Implementation of `make_tests` used to construct `ConcurrentTestSuite`.
@@ -61,6 +83,7 @@ def fork_for_tests(concurrency_num=CPU_COUNT):
         test_blocks = partition_tests(suite, concurrency_num)
         # Clear the tests from the original suite so it doesn't keep them alive
         suite._tests[:] = []
+        pids = []
         for process_tests in test_blocks:
             process_suite = unittest.TestSuite(process_tests)
             # Also clear each split list so new suite has only reference
@@ -79,6 +102,8 @@ def fork_for_tests(concurrency_num=CPU_COUNT):
                     subunit_result = AutoTimingTestResultDecorator(
                         TestProtocolClient(stream)
                     )
+                    # Set the pid tag for the parent to log with this information.
+                    subunit_result.tags(["pid:" + str(os.getpid())], [])
                     process_suite.run(subunit_result)
                 except:
                     # Try and report traceback on stream, but exit with error
@@ -87,7 +112,7 @@ def fork_for_tests(concurrency_num=CPU_COUNT):
                     # written in one go to avoid interleaving lines from
                     # multiple failing children.
                     try:
-                        stream.write(traceback.format_exc())
+                        print("[pid:{}]: {}".format(os.getpid(), traceback.format_exc()))
                     finally:
                         os._exit(1)
                 os._exit(0)
@@ -96,6 +121,10 @@ def fork_for_tests(concurrency_num=CPU_COUNT):
                 stream = os.fdopen(c2pread, 'rb', 1)
                 test = ProtocolTestCase(stream)
                 result.append(test)
+                pids.append(pid)
+            # Monitor our children to prevent leaving <defunct> processes around.
+            wait_thread = Thread(target = wait_for_children, args = (pids, ))
+            wait_thread.start()
         return result
     return do_fork
 
@@ -112,7 +141,6 @@ def partition_tests(suite, count):
     for partition, test in zip(cycle(partitions), tests):
         partition.append(test)
     return partitions
-
 
 if __name__ == '__main__':
     import time
