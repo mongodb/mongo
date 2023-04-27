@@ -433,8 +433,8 @@ export const authCommandsLib = {
           },
           testcases: [
             {
-              runOnDb: adminDbName, 
-              roles: roles_clusterManager, 
+              runOnDb: adminDbName,
+              roles: roles_clusterManager,
               privileges: [{resource: {cluster: true}, actions: ["transitionFromDedicatedConfigServer"]}]
             },
             {runOnDb: firstDbName, roles: {}},
@@ -5733,7 +5733,7 @@ export const authCommandsLib = {
         },
         {
           testname: "movePrimary",
-          command: {movePrimary: "x"},
+          command: {movePrimary: "x", to: "a"},
           skipUnlessSharded: true,
           testcases: [
               {
@@ -6167,9 +6167,9 @@ export const authCommandsLib = {
           skipUnlessSharded: true,
           testcases: [
             {
-              runOnDb: adminDbName, 
-              roles: roles_clusterManager, 
-              expectFail: true, 
+              runOnDb: adminDbName,
+              roles: roles_clusterManager,
+              expectFail: true,
               privileges: [{resource: {cluster: true}, actions: ["transitionToDedicatedConfigServer"]}]
             },
             {runOnDb: firstDbName, roles: {}},
