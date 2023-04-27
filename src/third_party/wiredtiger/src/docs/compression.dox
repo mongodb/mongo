@@ -1,7 +1,7 @@
 /*! @page compression Compressors
 
 This section explains how to configure WiredTiger's builtin support for
-the lz4, snappy, zlib and zstd compression engines.
+the lz4, snappy, zlib, zstd and iaa compression engines.
 
 @section compression_lz4 Using LZ4 compression
 
@@ -131,6 +131,35 @@ Finally, when creating the WiredTiger object, set \c block_compressor
 to \c zstd:
 
 @snippet ex_all.c Create a zstd compressed table
+
+@section compression_iaa Using iaa compression
+
+To use the builtin support for Intel's
+<a href="https://github.com/intel/qpl/">qpl</a>
+compression, first check that qpl is installed in include and library
+directories searched by the compiler.  Once qpl is installed, you can
+enable iaa using the \c -DENABLE_IAA=1 option to cmake.
+
+If iaa is installed in a location not normally searched by the
+compiler toolchain, you'll need to modify the include and library paths
+to indicate these locations.  For example, with the iaa includes and
+libraries installed in \c /usr/local/include and \c /usr/local/lib, you
+would run cmake with the following additional arguments:
+
+@code
+-DENABLE_IAA=1 -DCMAKE_INCLUDE_PATH=/usr/local/include -DCMAKE_LIBRARY_PATH=/usr/local/lib
+@endcode
+
+When opening the WiredTiger database, load the iaa shared library as
+an extension.  For example, with the WiredTiger library installed in
+\c /usr/local/lib, you would use the following extension:
+
+@snippet ex_all.c Configure iaa extension
+
+Finally, when creating the WiredTiger object, set \c block_compressor
+to \c iaa:
+
+@snippet ex_all.c Create a iaa compressed table
 
 @section compression_upgrading Upgrading compression engines
 

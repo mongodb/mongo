@@ -75,6 +75,7 @@ Checksums
 CityHash
 CloseHandle
 CmP
+Codec
 Comparator
 Config
 Coverity
@@ -168,6 +169,7 @@ HANDLEOPS
 HFS
 HOTBACKUP
 Hendrik
+IAA
 IC
 IEC
 IKEY
@@ -291,6 +293,7 @@ Preload
 Prepend
 Prepending
 Prev
+Ptr
 Px
 QQQS
 QSQ
@@ -804,6 +807,8 @@ hval
 hw
 iS
 iSh
+iaa
+iaaInterface
 ibackup
 icount
 idlems

@@ -117,6 +117,9 @@ func_ok()
         -e '/int index_compare_primary$/d' \
         -e '/int index_compare_u$/d' \
         -e '/int index_extractor_u$/d' \
+        -e '/int iaa_error$/d' \
+        -e '/int iaa_pre_size$/d' \
+        -e '/int iaa_terminate$/d' \
         -e '/int dir_store_directory_list_free$/d' \
         -e '/int dir_store_err$/d' \
         -e '/int dir_store_file_lock$/d' \

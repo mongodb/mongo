@@ -630,6 +630,13 @@ session_ops_create(WT_SESSION *session)
       session, "table:mytable", "block_compressor=zstd,key_format=S,value_format=S"));
     /*! [Create a zstd compressed table] */
     error_check(session->drop(session, "table:mytable", NULL));
+
+    /*! [Create a iaa compressed table] */
+    error_check(session->create(
+      session, "table:mytable", "block_compressor=iaa,key_format=S,value_format=S"));
+    /*! [Create a iaa compressed table] */
+    error_check(session->drop(session, "table:mytable", NULL));
+
 #endif
 
     /*! [Configure checksums to uncompressed] */
@@ -1226,6 +1233,12 @@ main(int argc, char *argv[])
       "create,extensions=[/usr/local/lib/libwiredtiger_zstd.so=[config=[compression_level=9]]]",
       &conn));
     /*! [Configure zstd extension with compression level] */
+    error_check(conn->close(conn, NULL));
+
+    /*! [Configure iaa extension] */
+    error_check(wiredtiger_open(
+      home, NULL, "create,extensions=[/usr/local/lib/libwiredtiger_iaa.so]", &conn));
+    /*! [Configure iaa extension] */
     error_check(conn->close(conn, NULL));
 
     /* this is outside the example snippet on purpose; don't encourage compiling in keys */

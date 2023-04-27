@@ -8,6 +8,7 @@ set(default_enable_lz4 OFF)
 set(default_enable_snappy OFF)
 set(default_enable_zlib OFF)
 set(default_enable_zstd OFF)
+set(default_enable_iaa OFF)
 set(default_enable_tcmalloc ${HAVE_LIBTCMALLOC})
 set(default_enable_debug_info ON)
 set(default_enable_static OFF)
@@ -43,6 +44,9 @@ if(NOT HAVE_BUILTIN_EXTENSION_ZLIB)
 endif()
 if(NOT HAVE_BUILTIN_EXTENSION_ZSTD)
     set(default_enable_zstd ${HAVE_LIBZSTD})
+endif()
+if(NOT HAVE_BUILTIN_EXTENSION_IAA)
+    set(default_enable_iaa ${HAVE_LIBQPL})
 endif()
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
@@ -259,6 +263,16 @@ config_bool(
     # Specifically throw a fatal error if a user tries to enable the zstd compressor without
     # actually having the library available (as opposed to silently defaulting to OFF).
     DEPENDS_ERROR ON "Failed to find zstd library"
+)
+
+config_bool(
+    ENABLE_IAA
+    "Build the libqpl compressor extension"
+    DEFAULT ${default_enable_iaa}
+    DEPENDS "HAVE_LIBQPL"
+    # Specifically throw a fatal error if a user tries to enable the qpl compressor without
+    # actually having the library available (as opposed to silently defaulting to OFF).
+    DEPENDS_ERROR ON "Failed to find qpl library"
 )
 
 config_bool(

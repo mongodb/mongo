@@ -24,6 +24,9 @@
 /* ZSTD support automatically loaded. */
 #cmakedefine HAVE_BUILTIN_EXTENSION_ZSTD 1
 
+/* IAA support automatically loaded. */
+#cmakedefine HAVE_BUILTIN_EXTENSION_IAA 1
+
 /* libsodium support automatically loaded. */
 #cmakedefine HAVE_BUILTIN_EXTENSION_SODIUM 1
 
@@ -71,6 +74,12 @@
 /* Define to 1 if you have the `dl' library (-ldl). */
 #cmakedefine HAVE_LIBDL 1
 
+/* Define to 1 if you have the `stdc++' library (-lstdc++). */
+#cmakedefine HAVE_LIBCXX 1
+
+/* Define to 1 if you have the `accel-config' library (-laccel-config). */
+#cmakedefine HAVE_LIBACCEL_CONFIG 1
+
 /* Define to 1 if you have the `lz4' library (-llz4). */
 #cmakedefine HAVE_LIBLZ4 1
 
@@ -111,6 +120,9 @@
 
 /* Define to 1 if you have the `zstd' library (-lzstd). */
 #cmakedefine HAVE_LIBZSTD 1
+
+/* Define to 1 if you have the `qpl' library (-lqpl). */
+#cmakedefine HAVE_LIBQPL 1
 
 /* Define to 1 if you have the `sodium' library (-lsodium). */
 #cmakedefine HAVE_LIBSODIUM 1
