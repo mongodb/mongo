@@ -3988,33 +3988,6 @@ buildvariants:
     - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
 
-- name: large-scale-tests
-  display_name: "Large scale tests"
-  batchtime: 480 # 3 times a day
-  run_on:
-  - ubuntu2004-test
-  expansions:
-    make_command: ninja
-    cmake_generator: Ninja
-    posix_configure_flags:
-      -DENABLE_PYTHON=1
-      -DENABLE_ZLIB=1
-      -DENABLE_SNAPPY=1
-      -DENABLE_STRICT=1
-      -DENABLE_STATIC=1
-      -DENABLE_TCMALLOC=1
-      -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
-    test_env_vars:
-      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-      WT_TOPDIR=$(git rev-parse --show-toplevel)
-      WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
-    upload_source_dir: mongo-tests/largescale/many-collection-artifacts
-    upload_filename: many-collection.tgz
-  tasks:
-    - name: many-collection-test
-      distros: ubuntu2004-wt-large
-
 - name: cppsuite-stress-tests
   display_name: "Cppsuite Stress Tests"
   batchtime: 480 # 3 times a day
