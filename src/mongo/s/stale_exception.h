@@ -93,17 +93,14 @@ private:
     boost::optional<OperationType> _duringOperationType;
 };
 
-// TODO (SERVER-74380): Rename the StaleEpoch code to StaleDownstreamRouter and the info to
-// StaleDownstreamRouterInfo
+// TODO (SERVER-75888): Rename the StaleEpoch code to StaleUpstreamRouter and the info to
+// StaleUpstreamRouterInfo
 class StaleEpochInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleEpoch;
 
     StaleEpochInfo(NamespaceString nss, ShardVersion received, ShardVersion wanted)
         : _nss(std::move(nss)), _received(received), _wanted(wanted) {}
-
-    // TODO (SERVER-74380): Remove this constructor
-    StaleEpochInfo(NamespaceString nss) : _nss(std::move(nss)) {}
 
     const auto& getNss() const {
         return _nss;
@@ -123,10 +120,8 @@ public:
 private:
     NamespaceString _nss;
 
-    // TODO (SERVER-74380): These two fields are boost::optional for backwards compatibility. Either
-    // both of them are boost::none or both are set.
-    boost::optional<ShardVersion> _received;
-    boost::optional<ShardVersion> _wanted;
+    ShardVersion _received;
+    ShardVersion _wanted;
 };
 
 class StaleDbRoutingVersion final : public ErrorExtraInfo {

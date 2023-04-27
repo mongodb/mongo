@@ -6,10 +6,8 @@
  * We restart a mongod to cause it to forget that a collection was sharded. When restarted, we
  * expect it to still have all the previous data.
  *
- * // TODO (SERVER-74380): Remove requires_fcv_70 once SERVER-74380 has been backported to v6.0
  * @tags: [
  *  requires_persistence,
- *  requires_fcv_70
  * ]
  *
  */

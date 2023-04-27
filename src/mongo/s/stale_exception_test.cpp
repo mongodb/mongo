@@ -54,22 +54,6 @@ TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
     ASSERT_EQUALS(deserializedInfo->getShardId(), kShardId);
 }
 
-TEST(StaleExceptionTest, StaleEpochInfoLegacySerializationTest) {
-    StaleEpochInfo info(kNss);
-
-    // Serialize
-    BSONObjBuilder bob;
-    info.serialize(&bob);
-
-    // Deserialize
-    auto deserializedInfo =
-        std::static_pointer_cast<const StaleEpochInfo>(StaleEpochInfo::parse(bob.obj()));
-
-    ASSERT_EQUALS(deserializedInfo->getNss(), kNss);
-    ASSERT(!deserializedInfo->getVersionReceived());
-    ASSERT(!deserializedInfo->getVersionWanted());
-}
-
 TEST(StaleExceptionTest, StaleEpochInfoSerializationTest) {
     StaleEpochInfo info(kNss, ShardVersion::UNSHARDED(), ShardVersion::UNSHARDED());
 
