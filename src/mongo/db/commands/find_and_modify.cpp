@@ -474,7 +474,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         opCtx, ns(), analyze_shard_key::SampledCommandNameEnum::kFindAndModify, req);
     if (sampleId) {
         analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-            ->addFindAndModifyQuery(*sampleId, req)
+            ->addFindAndModifyQuery(opCtx, *sampleId, req)
             .getAsync([](auto) {});
     }
 

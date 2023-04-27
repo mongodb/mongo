@@ -1401,7 +1401,7 @@ WriteResult performUpdates(OperationContext* opCtx,
             opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kUpdate, singleOp);
         if (sampleId) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addUpdateQuery(*sampleId, wholeOp, currentOpIndex)
+                ->addUpdateQuery(opCtx, *sampleId, wholeOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 
@@ -1672,7 +1672,7 @@ WriteResult performDeletes(OperationContext* opCtx,
         if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
                 opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kDelete, singleOp)) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addDeleteQuery(*sampleId, wholeOp, currentOpIndex)
+                ->addDeleteQuery(opCtx, *sampleId, wholeOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 

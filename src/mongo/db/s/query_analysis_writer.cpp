@@ -94,6 +94,11 @@ BSONObj createIndex(OperationContext* opCtx, const NamespaceString& nss, const B
     return resObj;
 }
 
+bool isInternalClient(const OperationContext* opCtx) {
+    return !opCtx->getClient()->session() ||
+        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+}
+
 struct SampledCommandRequest {
     UUID sampleId;
     NamespaceString nss;
@@ -119,7 +124,10 @@ SampledCommandRequest makeSampledReadCommand(const UUID& sampleId,
  * Returns a sampled update command for the update at 'opIndex' in the given update command.
  */
 SampledCommandRequest makeSampledUpdateCommandRequest(
-    const UUID& sampleId, const write_ops::UpdateCommandRequest& originalCmd, int opIndex) {
+    const OperationContext* opCtx,
+    const UUID& sampleId,
+    const write_ops::UpdateCommandRequest& originalCmd,
+    int opIndex) {
     auto op = originalCmd.getUpdates()[opIndex];
     if (op.getSampleId()) {
         tassert(ErrorCodes::IllegalOperation,
@@ -131,10 +139,14 @@ SampledCommandRequest makeSampledUpdateCommandRequest(
     // If the initial query was a write without shard key, the two phase write protocol modifies the
     // query in the write phase. In order to get correct metrics, we need to reconstruct the
     // original query here.
-    if (originalCmd.getOriginalQuery()) {
+    if (originalCmd.getOriginalQuery() || originalCmd.getOriginalCollation()) {
         tassert(7406500,
                 "Found a _clusterWithoutShardKey command with batch size > 1",
                 originalCmd.getUpdates().size() == 1);
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot specify '$_originalQuery' or '$_originalCollation' since they are internal "
+                "fields",
+                isInternalClient(opCtx));
         op.setQ(*originalCmd.getOriginalQuery());
         op.setCollation(originalCmd.getOriginalCollation());
     }
@@ -151,7 +163,10 @@ SampledCommandRequest makeSampledUpdateCommandRequest(
  * Returns a sampled delete command for the delete at 'opIndex' in the given delete command.
  */
 SampledCommandRequest makeSampledDeleteCommandRequest(
-    const UUID& sampleId, const write_ops::DeleteCommandRequest& originalCmd, int opIndex) {
+    const OperationContext* opCtx,
+    const UUID& sampleId,
+    const write_ops::DeleteCommandRequest& originalCmd,
+    int opIndex) {
     auto op = originalCmd.getDeletes()[opIndex];
     if (op.getSampleId()) {
         tassert(ErrorCodes::IllegalOperation,
@@ -163,10 +178,14 @@ SampledCommandRequest makeSampledDeleteCommandRequest(
     // If the initial query was a write without shard key, the two phase write protocol modifies the
     // query in the write phase. In order to get correct metrics, we need to reconstruct the
     // original query here.
-    if (originalCmd.getOriginalQuery()) {
+    if (originalCmd.getOriginalQuery() || originalCmd.getOriginalCollation()) {
         tassert(7406501,
                 "Found a _clusterWithoutShardKey command with batch size > 1",
                 originalCmd.getDeletes().size() == 1);
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot specify '$_originalQuery' or '$_originalCollation' since they are internal "
+                "fields",
+                isInternalClient(opCtx));
         op.setQ(*originalCmd.getOriginalQuery());
         op.setCollation(originalCmd.getOriginalCollation());
     }
@@ -183,7 +202,9 @@ SampledCommandRequest makeSampledDeleteCommandRequest(
  * Returns a sampled findAndModify command for the given findAndModify command.
  */
 SampledCommandRequest makeSampledFindAndModifyCommandRequest(
-    const UUID& sampleId, const write_ops::FindAndModifyCommandRequest& originalCmd) {
+    OperationContext* opCtx,
+    const UUID& sampleId,
+    const write_ops::FindAndModifyCommandRequest& originalCmd) {
     write_ops::FindAndModifyCommandRequest sampledCmd(originalCmd.getNamespace());
     if (sampledCmd.getSampleId()) {
         tassert(ErrorCodes::IllegalOperation,
@@ -195,7 +216,11 @@ SampledCommandRequest makeSampledFindAndModifyCommandRequest(
     // If the initial query was a write without shard key, the two phase write protocol modifies the
     // query in the write phase. In order to get correct metrics, we need to reconstruct the
     // original query here.
-    if (originalCmd.getOriginalQuery()) {
+    if (originalCmd.getOriginalQuery() || originalCmd.getOriginalCollation()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot specify '$_originalQuery' or '$_originalCollation' since they are internal "
+                "fields",
+                isInternalClient(opCtx));
         sampledCmd.setQuery(*originalCmd.getOriginalQuery());
         sampledCmd.setCollation(originalCmd.getOriginalCollation());
     } else {
@@ -626,12 +651,16 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
-    const UUID& sampleId, const write_ops::UpdateCommandRequest& updateCmd, int opIndex) {
+    OperationContext* originalOpCtx,
+    const UUID& sampleId,
+    const write_ops::UpdateCommandRequest& updateCmd,
+    int opIndex) {
     invariant(_executor);
 
     return ExecutorFuture<void>(_executor)
         .then([this,
-               sampledUpdateCmd = makeSampledUpdateCommandRequest(sampleId, updateCmd, opIndex)]() {
+               sampledUpdateCmd =
+                   makeSampledUpdateCommandRequest(originalOpCtx, sampleId, updateCmd, opIndex)]() {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
@@ -673,19 +702,23 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
-    const write_ops::UpdateCommandRequest& updateCmd, int opIndex) {
+    OperationContext* opCtx, const write_ops::UpdateCommandRequest& updateCmd, int opIndex) {
     auto sampleId = updateCmd.getUpdates()[opIndex].getSampleId();
     invariant(sampleId);
-    return addUpdateQuery(*sampleId, updateCmd, opIndex);
+    return addUpdateQuery(opCtx, *sampleId, updateCmd, opIndex);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
-    const UUID& sampleId, const write_ops::DeleteCommandRequest& deleteCmd, int opIndex) {
+    OperationContext* originalOpCtx,
+    const UUID& sampleId,
+    const write_ops::DeleteCommandRequest& deleteCmd,
+    int opIndex) {
     invariant(_executor);
 
     return ExecutorFuture<void>(_executor)
         .then([this,
-               sampledDeleteCmd = makeSampledDeleteCommandRequest(sampleId, deleteCmd, opIndex)]() {
+               sampledDeleteCmd =
+                   makeSampledDeleteCommandRequest(originalOpCtx, sampleId, deleteCmd, opIndex)]() {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
@@ -727,20 +760,22 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
-    const write_ops::DeleteCommandRequest& deleteCmd, int opIndex) {
+    OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteCmd, int opIndex) {
     auto sampleId = deleteCmd.getDeletes()[opIndex].getSampleId();
     invariant(sampleId);
-    return addDeleteQuery(*sampleId, deleteCmd, opIndex);
+    return addDeleteQuery(opCtx, *sampleId, deleteCmd, opIndex);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
-    const UUID& sampleId, const write_ops::FindAndModifyCommandRequest& findAndModifyCmd) {
+    OperationContext* originalOpCtx,
+    const UUID& sampleId,
+    const write_ops::FindAndModifyCommandRequest& findAndModifyCmd) {
     invariant(_executor);
 
     return ExecutorFuture<void>(_executor)
         .then([this,
-               sampledFindAndModifyCmd =
-                   makeSampledFindAndModifyCommandRequest(sampleId, findAndModifyCmd)]() {
+               sampledFindAndModifyCmd = makeSampledFindAndModifyCommandRequest(
+                   originalOpCtx, sampleId, findAndModifyCmd)]() {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
@@ -782,10 +817,10 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
-    const write_ops::FindAndModifyCommandRequest& findAndModifyCmd) {
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyCmd) {
     auto sampleId = findAndModifyCmd.getSampleId();
     invariant(sampleId);
-    return addFindAndModifyQuery(*sampleId, findAndModifyCmd);
+    return addFindAndModifyQuery(opCtx, *sampleId, findAndModifyCmd);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,

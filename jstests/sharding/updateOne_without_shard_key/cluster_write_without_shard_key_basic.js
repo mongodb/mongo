@@ -369,6 +369,90 @@ function runAndVerifyCommand(testCase) {
         targetDocId: {_id: _id},
     };
     assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.IllegalOperation);
+
+    // Cannot pass $_originalQuery as an external client in an update command.
+    cmdObj = {
+        update: collName,
+        updates: [
+            {
+                q: {},
+                u: {$set: {a: aFieldValue}},
+                sampleId: UUID(),
+            },
+        ],
+        $_originalQuery: {},
+    };
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
+                                 ErrorCodes.InvalidOptions);
+
+    // Cannot pass $_originalCollation as an external client in an update command.
+    cmdObj = {
+        update: collName,
+        updates: [
+            {
+                q: {},
+                u: {$set: {a: aFieldValue}},
+                sampleId: UUID(),
+                collation: {locale: "simple"},
+            },
+        ],
+        $_originalCollation: {},
+    };
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
+                                 ErrorCodes.InvalidOptions);
+
+    // Cannot pass $_originalQuery as an external client in a delete command.
+    cmdObj = {
+        delete: collName,
+        deletes: [
+            {
+                q: {},
+                limit: 1,
+                sampleId: UUID(),
+            },
+        ],
+        $_originalQuery: {},
+    };
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
+                                 ErrorCodes.InvalidOptions);
+
+    // Cannot pass $_originalCollation as an external client in a delete command.
+    cmdObj = {
+        delete: collName,
+        deletes: [
+            {
+                q: {},
+                limit: 1,
+                sampleId: UUID(),
+                collation: {locale: "simple"},
+            },
+        ],
+        $_originalCollation: {},
+    };
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
+                                 ErrorCodes.InvalidOptions);
+
+    // Cannot pass $_originalQuery as an external client in a findandmodify command.
+    cmdObj = {
+        findandmodify: collName,
+        query: {},
+        update: [{$set: {a: aFieldValue}}],
+        sampleId: UUID(),
+        $_originalQuery: {},
+    };
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
+                                 ErrorCodes.InvalidOptions);
+
+    // Cannot pass $_originalCollation as an external client in a findandmodify command.
+    cmdObj = {
+        findandmodify: collName,
+        query: {},
+        update: [{$set: {a: aFieldValue}}],
+        sampleId: UUID(),
+        $_originalCollation: {},
+    };
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
+                                 ErrorCodes.InvalidOptions);
 })();
 
 st.stop();
