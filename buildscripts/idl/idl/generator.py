@@ -1578,6 +1578,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 else:
                     validate_and_assign_or_uassert(field, object_value)
 
+                    # if we explicitly set _dollarTenant, we know we have a non-prefixed tenantId
+                    if field.name == '$tenant':
+                        self._writer.write_line('_serializationContext.setTenantIdSource(true);')
+
             if is_command_field and predicate:
                 with self._block('else {', '}'):
                     self._writer.write_line(

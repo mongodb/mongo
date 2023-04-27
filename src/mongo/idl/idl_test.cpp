@@ -5012,6 +5012,7 @@ TEST(IDLFieldTests, TenantOverrideField) {
         auto obj = BasicIgnoredCommand::parse(IDLParserContext{"nil"}, mkdoc(boost::none));
         auto tenant = obj.getDollarTenant();
         ASSERT(tenant == boost::none);
+        ASSERT_FALSE(obj.getSerializationContext().receivedNonPrefixedTenantId());
     }
 
     // Test passing an tenant id (acting on behalf of a specific tenant)
@@ -5020,6 +5021,7 @@ TEST(IDLFieldTests, TenantOverrideField) {
         auto obj = BasicIgnoredCommand::parse(IDLParserContext{"oid"}, mkdoc(id));
         auto tenant = obj.getDollarTenant();
         ASSERT(tenant == id);
+        ASSERT_TRUE(obj.getSerializationContext().receivedNonPrefixedTenantId());
     }
 }
 
