@@ -2833,29 +2833,22 @@ tasks:
         params:
           working_dir: mongo-tests/largescale
           shell: bash
+          include_expansions_in_env:
+            - atlas_wt_perf_test_user
+            - atlas_wt_perf_pass
           script: |
             set -o errexit
             set -o verbose
             export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
             virtualenv -p python3 venv
             source venv/bin/activate
-            pip3 install lorem pymongo==3.12.2
+            # Need both pymongo and pymongo[srv] as upload-results-atlas.py uses mongo+srv for the URI.
+            pip3 install lorem pymongo==3.12.2 "pymongo[srv]==3.12.2"
             mongod_path=$(find ../../mongo/build -executable -type f -path \*/bin/mongod)
             ./run_many_coll.sh $mongod_path mongodb.log config/many-collection-testing many-collection clean-and-populate
-
-      - command: shell.exec
-        params:
-          working_dir: mongo-tests/largescale
-          shell: bash
-          silent: true
-          script: |
-            set -o errexit
-            set -o verbose
-            virtualenv -p python3 venv
-            source venv/bin/activate
-            pip3 install "pymongo[srv]==3.12.2"
+            # upload the results
             res_dir=`find ./ -type d -name "many-collection-artifacts" -print`
-            ./upload-results-atlas.py ${atlas_wt_perf_test_user} ${atlas_wt_perf_pass} wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
+            ./upload-results-atlas.py wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
 
   - name: cyclomatic-complexity
     commands:
