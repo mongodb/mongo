@@ -8,13 +8,12 @@
  * ]
  */
 var $config = (function() {
-    const data = {numIds: 10};
+    const data = {numIds: 10, docValue: "mydoc"};
 
     const states = {
         init: function init(db, collName) {
             this.session = db.getMongo().startSession({causalConsistency: true});
             this.sessionDb = this.session.getDatabase(db.getName());
-            this.docValue = "mydoc";
         },
 
         insertDocs: function insertDocs(db, collName) {
