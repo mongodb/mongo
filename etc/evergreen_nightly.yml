@@ -14,6 +14,8 @@ include:
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/ninja.yml
 - filename: etc/evergreen_yml_components/variants/compile_static_analysis.yml
+### Uncomment when using this file for a LTS or Rapid release branch. ###
+- filename: etc/evergreen_yml_components/variants/classic_engine.yml
 
 
 parameters:
