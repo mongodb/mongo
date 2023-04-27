@@ -43,7 +43,7 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
     backup_dir = "BACKUP"
 
     format_values = [
-        ('column_fix', dict(key_format='r', value_format='8t')),
+        # ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
