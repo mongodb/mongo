@@ -50,6 +50,79 @@
 namespace mongo {
 namespace crypto {
 
+
+/**
+ * Class to load singleton instances of each Encryption Cipher algorithm.
+ */
+#if OPENSSL_VERSION_NUMBER > 0x30000000L
+
+class OpenSSLCipherLoader {
+public:
+    OpenSSLCipherLoader() {
+        _algoAES256CBC = EVP_CIPHER_fetch(NULL, "AES-256-CBC", NULL);
+        _algoAES256GCM = EVP_CIPHER_fetch(NULL, "AES-256-GCM", NULL);
+        _algoAES256CTR = EVP_CIPHER_fetch(NULL, "AES-256-CTR", NULL);
+    }
+
+    ~OpenSSLCipherLoader() {
+        EVP_CIPHER_free(_algoAES256CBC);
+        EVP_CIPHER_free(_algoAES256GCM);
+        EVP_CIPHER_free(_algoAES256CTR);
+    }
+
+    const EVP_CIPHER* getAES256CTR() {
+        return _algoAES256CTR;
+    }
+
+    const EVP_CIPHER* getAES256GCM() {
+        return _algoAES256GCM;
+    }
+
+    const EVP_CIPHER* getAES256CBC() {
+        return _algoAES256CBC;
+    }
+
+private:
+    EVP_CIPHER* _algoAES256CTR;
+    EVP_CIPHER* _algoAES256GCM;
+    EVP_CIPHER* _algoAES256CBC;
+};
+#else
+
+class OpenSSLCipherLoader {
+public:
+    OpenSSLCipherLoader() {
+        _algoAES256CBC = EVP_get_cipherbyname("aes-256-cbc");
+        _algoAES256GCM = EVP_get_cipherbyname("aes-256-gcm");
+        _algoAES256CTR = EVP_get_cipherbyname("aes-256-ctr");
+    }
+
+    const EVP_CIPHER* getAES256CTR() {
+        return _algoAES256CTR;
+    }
+
+    const EVP_CIPHER* getAES256GCM() {
+        return _algoAES256GCM;
+    }
+
+    const EVP_CIPHER* getAES256CBC() {
+        return _algoAES256CBC;
+    }
+
+private:
+    const EVP_CIPHER* _algoAES256CTR;
+    const EVP_CIPHER* _algoAES256GCM;
+    const EVP_CIPHER* _algoAES256CBC;
+};
+
+#endif
+
+static OpenSSLCipherLoader& getOpenSSLCipherLoader() {
+    static OpenSSLCipherLoader* loader = new OpenSSLCipherLoader();
+    return *loader;
+}
+
+
 namespace {
 template <typename Init>
 void initCipherContext(
@@ -58,11 +131,11 @@ void initCipherContext(
     const EVP_CIPHER* cipher = nullptr;
     if (keySize == sym256KeySize) {
         if (mode == crypto::aesMode::cbc) {
-            cipher = EVP_get_cipherbyname("aes-256-cbc");
+            cipher = getOpenSSLCipherLoader().getAES256CBC();
         } else if (mode == crypto::aesMode::gcm) {
-            cipher = EVP_get_cipherbyname("aes-256-gcm");
+            cipher = getOpenSSLCipherLoader().getAES256GCM();
         } else if (mode == crypto::aesMode::ctr) {
-            cipher = EVP_get_cipherbyname("aes-256-ctr");
+            cipher = getOpenSSLCipherLoader().getAES256CTR();
         }
     }
     uassert(ErrorCodes::BadValue,
