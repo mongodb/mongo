@@ -33,9 +33,20 @@ if sys.version_info[0] < 3:
         "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
 
 
+def get_unique_ptr_bytes(obj):
+    """Read the value of a libstdc++ std::unique_ptr.
+
+    Returns a gdb.Value where its type resolves to `unsigned char*`. The caller must take care to
+    cast the returned value themselves. This function is particularly useful in the context of
+    mongo::Decorable<> types which store the decorations as a slab of memory with
+    std::unique_ptr<unsigned char[]>. In all other cases get_unique_ptr() can be preferred.
+    """
+    return obj.cast(gdb.lookup_type('std::_Head_base<0, unsigned char*, false>'))['_M_head_impl']
+
+
 def get_unique_ptr(obj):
     """Read the value of a libstdc++ std::unique_ptr."""
-    return obj.cast(gdb.lookup_type('std::_Head_base<0, unsigned char*, false>'))['_M_head_impl']
+    return get_unique_ptr_bytes(obj).cast(obj.type.template_argument(0).pointer())
 
 
 ###################################################################################################
@@ -326,7 +337,7 @@ class DecorablePrinter(object):
 
     def children(self):
         """Children."""
-        decoration_data = get_unique_ptr(self.val["_decorations"]["_decorationData"])
+        decoration_data = get_unique_ptr_bytes(self.val["_decorations"]["_decorationData"])
 
         for index in range(self.count):
             descriptor = self.start[index]
