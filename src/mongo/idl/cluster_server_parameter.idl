@@ -92,10 +92,12 @@ feature_flags:
         cpp_varname: gFeatureFlagClusterWideConfigM2
         default: true
         version: 6.1
+        shouldBeFCVGated: true
     featureFlagClusterWideToaster:
         description: Feature flag for testing use of feature flags with CW server params
         cpp_varname: gFeatureFlagClusterWideToaster
         default: false
+        shouldBeFCVGated: true
 
 server_parameters:
     testIntClusterParameter:

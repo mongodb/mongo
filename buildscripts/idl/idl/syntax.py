@@ -886,6 +886,8 @@ class FeatureFlag(common.SourceLocation):
         self.cpp_varname = None  # type: str
         self.default = None  # type: Expression
         self.version = None  # type: str
+        # pylint: disable=C0103
+        self.shouldBeFCVGated = None  # type: Expression
 
         super(FeatureFlag, self).__init__(file_name, line, column)
 

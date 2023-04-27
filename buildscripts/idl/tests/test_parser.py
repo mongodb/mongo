@@ -1591,6 +1591,17 @@ class TestParser(testcase.IDLTestcase):
                 featureFlagToaster:
                     description: "Make toast"
                     cpp_varname: gToaster
+                    shouldBeFCVGated: true
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
+        # Missing shouldBeFCVGated
+        self.assert_parse_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
 
     def _test_field_list(self, field_list_name, should_forward_name):

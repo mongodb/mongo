@@ -36,27 +36,32 @@ feature_flags:
     description: "Feature flag for enabling sharding catalog features for global indexes"
     cpp_varname: feature_flags::gGlobalIndexesShardingCatalog
     default: false
+    shouldBeFCVGated: true
   featureFlagRangeDeleterService:
     description: "Feature flag protecting instantiation and usages of the range deleter service"
     cpp_varname: feature_flags::gRangeDeleterService
     default: true
     version: 6.2
+    shouldBeFCVGated: true
   featureFlagCollModCoordinatorV3:
     description: "Feature for enabling new coll mod coordinator v3"
     cpp_varname: feature_flags::gCollModCoordinatorV3
     default: true
     version: 6.1
+    shouldBeFCVGated: true
   featureFlagCreateCollectionCoordinatorV3:
     description: "Feature for enabling new createCollection coordinator v3"
     cpp_varname: feature_flags::gCreateCollectionCoordinatorV3
     default: true
     version: 6.2
+    shouldBeFCVGated: true
   # TODO SERVER-68217 remove once 7.0 becomes last LTS
   featureFlagHistoricalPlacementShardingCatalog:
     description: "Feature flag for enabling the storage and access to historical placement data at shards granularity through the Sharding Catalog"
     cpp_varname: feature_flags::gHistoricalPlacementShardingCatalog
     default: true
     version: 7.0
+    shouldBeFCVGated: true
   featureFlagImplicitDDLTimeseriesNssTranslation:
     description: "When enabled, the logic to evaluate whether a DDL is targeting a Timeseries operation
                   will always be executed by the DDL Coordinator (VS doing the evaluation when the command is received by the primary shard).
@@ -64,40 +69,49 @@ feature_flags:
     cpp_varname: feature_flags::gImplicitDDLTimeseriesNssTranslation
     default: true
     version: 6.1
+    shouldBeFCVGated: true
   featureFlagConcurrencyInChunkMigration:
     description: "Feature flag for enabling concurrency within a chunk migration"
     cpp_varname: feature_flags::gConcurrencyInChunkMigration
     default: true
     version: 6.3
+    shouldBeFCVGated: true
   featureFlagStopUsingConfigVersion:
   # TODO SERVER-68889 remove once 7.0 becomes last LTS
     description: "Stop using deprecated config version fields to check metadata compatibility between different version"
     cpp_varname: feature_flags::gStopUsingConfigVersion
     default: true
     version: 6.2
+    shouldBeFCVGated: true
   featureFlagAutoMerger:
     description: "Feature flag for enabling auto-merging of contiguous chunks belonging to the same shard"
     cpp_varname: feature_flags::gAutoMerger
     default: true
     version: 7.0
+    shouldBeFCVGated: true
   # TODO (SERVER-70396): Remove once 7.0 becomes last LTS
   featureFlagCheckMetadataConsistency:
     description: "Feature flag for checking metadata consistency in the cluster, database or collection"
     cpp_varname: feature_flags::gCheckMetadataConsistency
     default: true
     version: 7.0
+    shouldBeFCVGated: true
   # TODO SERVER-73627: Remove once 7.0 becomes last LTS.
   featureFlagDropCollectionHoldingCriticalSection:
     description: "Feature flag for enabling the new implementation of the dropCollection DDL operation."
     cpp_varname: feature_flags::gDropCollectionHoldingCriticalSection
     default: true
     version: 7.0
+    shouldBeFCVGated: true
+
   featureFlagCheckForDirectShardOperations:
     description: "Feature flag for checking for direct shard operations."
     cpp_varname: feature_flags::gCheckForDirectShardOperations
     default: false
+    shouldBeFCVGated: true
   featureFlagClusterCardinalityParameter:
     description: "Feature flag for enabling the cluster parameter tracking cluster cardinality."
     cpp_varname: feature_flags::gClusterCardinalityParameter
     default: true
     version: 7.0
+    shouldBeFCVGated: true

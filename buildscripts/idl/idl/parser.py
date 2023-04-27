@@ -986,6 +986,9 @@ def _parse_feature_flag(ctxt, spec, name, node):
                           mapping_parser_func=_parse_expression),
             "version":
                 _RuleDesc('scalar'),
+            "shouldBeFCVGated":
+                _RuleDesc('scalar_or_mapping', _RuleDesc.REQUIRED,
+                          mapping_parser_func=_parse_expression),
         })
 
     spec.feature_flags.append(param)

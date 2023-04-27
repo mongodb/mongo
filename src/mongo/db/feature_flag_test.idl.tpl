@@ -42,11 +42,19 @@ feature_flags:
       description: "Create a feature flag"
       cpp_varname: gFeatureFlagToaster
       default: false
+      shouldBeFCVGated: true
 
     featureFlagFryer:
       description: "Create a feature flag"
       cpp_varname: gFeatureFlagFryer
       default: false
+      shouldBeFCVGated: true
+    
+    featureFlagFork:
+      description: "Create a feature flag that should not be FCV gated"
+      cpp_varname: gFeatureFlagFork
+      default: true
+      shouldBeFCVGated: false
 
 #def $ver_str(v): ${'{}.{}'.format(v.major, v.minor)}
     featureFlagBlender:
@@ -56,6 +64,7 @@ feature_flags:
       # The version should be a valid FCV not equal to GenericFCV::kLastLTS in
       # the generated 'releases.h' file.
       version: $ver_str(latest)
+      shouldBeFCVGated: true
 
     featureFlagSpoon:
       description: "Create a feature flag"
@@ -63,6 +72,7 @@ feature_flags:
       default: true
       # The version should match GenericFCV::kLastLTS in the generated 'releases.h' file.
       version: $ver_str(last_lts)
+      shouldBeFCVGated: true
 
 server_parameters:
     spTestNeedsFeatureFlagToaster:

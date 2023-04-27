@@ -34,6 +34,7 @@ feature_flags:
     description: Suppress network interface transport layer exceptions
     cpp_varname: gSuppressNetworkInterfaceTransportLayerExceptions
     default: false 
+    shouldBeFCVGated: true
 
 server_parameters:
   opportunisticSecondaryTargeting:

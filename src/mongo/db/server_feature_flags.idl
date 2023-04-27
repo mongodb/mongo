@@ -34,6 +34,7 @@ feature_flags:
         description: "Enable parsing and handling of SecurityTokens in multitenancy mode"
         cpp_varname: gFeatureFlagSecurityToken
         default: false
+        shouldBeFCVGated: true
     featureFlagRequireTenantID:
         # Only available with the server parameter "multitenancySupport".
         description: >-
@@ -41,47 +42,57 @@ feature_flags:
             require tenantID to be a part of NamespaceString and TenantDatabase.
         cpp_varname: gFeatureFlagRequireTenantID
         default: false
+        shouldBeFCVGated: true
     featureFlagConnHealthMetrics:
         description: "Enable newly added cluster connection health metrics"
         cpp_varname: gFeatureFlagConnHealthMetrics
         default: true
         version: 6.3
+        shouldBeFCVGated: true
     featureFlagGlobalIndexes:
         description: "Enable support for global indexes"
         cpp_varname: gFeatureFlagGlobalIndexes
         default: false
+        shouldBeFCVGated: true
     featureFlagAdditionalParticipants:
         description: "Adding additional participants to existing transactions"
         cpp_varname: gFeatureFlagAdditionalParticipants
         default: false
+        shouldBeFCVGated: true
     featureFlagUseNewCompactStructuredEncryptionDataCoordinator:
         description: "Use the new 6.1 compact structured encryption data coordinator"
         cpp_varname: gFeatureFlagUseNewCompactStructuredEncryptionDataCoordinator
         default: true
         version: 6.1
+        shouldBeFCVGated: true
     featureFlagOIDC:
         description: "Feature flag for OIDC support"
         cpp_varname: gFeatureFlagOIDC
         default: true
         version: 7.0
+        shouldBeFCVGated: true
     featureFlagBulkWriteCommand:
         description: "Support for bulkWrite command and one-shot transactions"
         cpp_varname: gFeatureFlagBulkWriteCommand
         default: false
+        shouldBeFCVGated: true
     featureFlagAuditConfigClusterParameter:
         description: "Enable use of new auditConfig cluster server parameter"
         cpp_varname: feature_flags::gFeatureFlagAuditConfigClusterParameter
         default: false
+        shouldBeFCVGated: true
     featureFlagStreams:
         description: "Enable support for streams"
         cpp_varname: gFeatureFlagStreams
         default: false
+        shouldBeFCVGated: true
     featureFlagUseUnreplicatedTruncatesForDeletions:
         description: "Feature flag to enable pre-image collection and change collection maintenance
         using unreplicated truncates instead of normal document deletions replicated from the
         primary."
         cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
         default: false
+        shouldBeFCVGated: true
     featureFlagConfigurableX509ClusterAuthn:
         description: >- 
             Enable configurable parameters for detection of peer server nodes using X.509 
@@ -89,3 +100,4 @@ feature_flags:
         cpp_varname: gFeatureFlagConfigurableX509ClusterAuthn
         default: true
         version: 7.0
+        shouldBeFCVGated: true

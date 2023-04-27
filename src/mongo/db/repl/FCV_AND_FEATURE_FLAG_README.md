@@ -544,6 +544,7 @@ Feature flags are created by adding it to an IDL file:
      description: "Create a feature flag"
      cpp_varname: gFeatureFlagToaster
      default: false
+     shouldBeFCVGated: true
 ```
 
 A feature flag has the following properties:
@@ -569,6 +570,13 @@ A feature flag has the following properties:
 * Version: string - a string for the FCV version
     * Required field if default is true, Must be a string acceptable to 
     FeatureCompatibilityVersionParser.
+* shouldBeFCVGated: boolean
+    * This should usually be true in order to gate the feature flag based on the FCV.
+    * However, some feature flags should not be FCV gated (for example, if the feature only exists
+    on mongos, which doesn't have an FCV, or if the feature doesn't have any upgrade downgrade 
+    concerns and can be enabled as soon as the binary is upgraded/downgraded.
+    * When set to false, the feature flag won't require a version parameter, so it will only be
+    gated based on whether it is enabled by default on that binary version.
 
 To turn on a feature flag for testing when starting up a server, we would use the following command
 line (for the Toaster feature):
@@ -599,9 +607,12 @@ if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompat
 }
 ```
 
-Note that `isEnabled` checks if the feature flag is enabled on the input FCV, which is usually 
-the server's current FCV `serverGlobalParams.featureCompatibility`. If the FCV has not been 
+Note that `isEnabled` checks if the feature flag is enabled on the input FCV, which is usually
+the server's current FCV `serverGlobalParams.featureCompatibility`. If the FCV has not been
 initialized yet, it will check if the feature flag is enabled on the lastLTS FCV.
+If the feature flag has `shouldBeFCVGated` set to false, then `isEnabled` will simply return
+whether the feature flag is enabled.
+
 
 There are some places where we only want to check if the feature flag is turned on, regardless of
 which FCV we are on. For example, this could be the case if we need to perform the check in a spot

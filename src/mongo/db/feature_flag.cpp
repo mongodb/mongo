@@ -35,8 +35,10 @@
 namespace mongo {
 
 // (Generic FCV reference): feature flag support
-FeatureFlag::FeatureFlag(bool enabled, StringData versionString)
-    : _enabled(enabled), _version(multiversion::GenericFCV::kLatest) {
+FeatureFlag::FeatureFlag(bool enabled, StringData versionString, bool shouldBeFCVGated)
+    : _enabled(enabled),
+      _version(multiversion::GenericFCV::kLatest),
+      _shouldBeFCVGated(shouldBeFCVGated) {
 
     // Verify the feature flag invariants. IDL binder verifies these hold but we add these checks to
     // prevent incorrect direct instantiation.
@@ -44,7 +46,7 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString)
     // If default is true, then version should be present.
     // If default is false, then no version is allowed.
     if (kDebugBuild) {
-        if (enabled) {
+        if (enabled && shouldBeFCVGated) {
             dassert(!versionString.empty());
         } else {
             dassert(versionString.empty());
@@ -57,6 +59,12 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString)
 }
 
 bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv) const {
+    // If the feature flag is not FCV gated, return whether it is enabled.
+    if (!_shouldBeFCVGated) {
+        return _enabled;
+    }
+
+
     // If the FCV is not initialized yet, we check whether the feature flag is enabled on the last
     // LTS FCV, which is the lowest FCV we can have on this server. Because the version of a feature
     // flag is not supposed to change, we are sure that if the feature flag is enabled on the last
@@ -70,13 +78,27 @@ bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv)
         return false;
     }
 
+    // If the feature flag is enabled, return whether the server's FCV is >= to the version the
+    // feature flag was enabled on.
     return fcv.isGreaterThanOrEqualTo(_version);
 }
 
+// isEnabledAndIgnoreFCVUnsafe should NOT be used in general, as it checks if the feature flag is
+// turned on, regardless of which FCV we are on. It can result in unsafe scenarios
+// where we enable a feature on an FCV where it is not supported or where the feature has not been
+// fully implemented yet. In order to use isEnabledAndIgnoreFCVUnsafe, you **must** add a comment
+// above that line starting with "(Ignore FCV check):" describing why we can safely ignore checking
+// the FCV here.
+// Note that if the feature flag does not have any upgrade/downgrade concerns, then shouldBeFCVGated
+// should be set to false and FeatureFlag::isEnabled() should be used instead of this function.
 bool FeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
     return _enabled;
 }
 
+// isEnabledAndIgnoreFCVUnsafeAtStartup should only be used on startup, if we want to check if the
+// feature flag if the feature flag is turned on, regardless of which FCV we are on.
+// Note that if the feature flag does not have any upgrade/downgrade concerns, then shouldBeFCVGated
+// should be set to false and FeatureFlag::isEnabled() should be used instead of this function.
 bool FeatureFlag::isEnabledAndIgnoreFCVUnsafeAtStartup() const {
     return _enabled;
 }

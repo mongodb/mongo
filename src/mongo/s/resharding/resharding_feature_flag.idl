@@ -40,3 +40,4 @@ feature_flags:
         cpp_varname: gFeatureFlagResharding
         default: true
         version: 5.0
+        shouldBeFCVGated: true

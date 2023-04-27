@@ -2335,7 +2335,7 @@ class TestBinder(testcase.IDLTestcase):
         # type: () -> None
         """Test feature flag checks around version."""
 
-        # feature flag can default to false without a version
+        # feature flag can default to false without a version (shouldBeFCVGated can be true or false)
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2343,9 +2343,20 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: false
+                    shouldBeFCVGated: false
             """))
 
-        # feature flag can default to true with a version
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    shouldBeFCVGated: true
+            """))
+
+        # if shouldBeFCVGated: true, feature flag can default to true with a version
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2354,9 +2365,21 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     version: 123
+                    shouldBeFCVGated: true
             """))
 
-        # true is only allowed with a version
+        # if shouldBeFCVGated: false, we do not need a version
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    shouldBeFCVGated: false
+            """))
+
+        # if shouldBeFCVGated: true and default: true, a version is required
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2364,9 +2387,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: true
+                    shouldBeFCVGated: true
             """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION)
 
-        # false is not allowed with a version
+        # false is not allowed with a version and shouldBeFCVGated: true
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2375,7 +2399,32 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: false
                     version: 123
+                    shouldBeFCVGated: true
             """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+
+        # false is not allowed with a version and shouldBeFCVGated: false
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    version: 123
+                    shouldBeFCVGated: false
+            """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+
+        # if shouldBeFCVGated is false, a version is not allowed
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    version: 123
+                    shouldBeFCVGated: false
+            """), idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION)
 
     def test_access_check(self):
         # type: () -> None

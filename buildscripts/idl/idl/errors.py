@@ -137,6 +137,7 @@ ERROR_ID_CANNOT_BE_LITERAL_AND_FIELDPATH = "ID0097"
 ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE = "ID0098"
 ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0099"
 ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0100"
+ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION = "ID0101"
 
 
 class IDLError(Exception):
@@ -843,9 +844,10 @@ class ParserContext(object):
 
     def add_feature_flag_default_true_missing_version(self, location):
         # type: (common.SourceLocation) -> None
-        """Add an error about a default flag with a default value of true but no version."""
-        self._add_error(location, ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION,
-                        ("Missing 'version' required for feature flag that defaults to true"))
+        """Add an error about a default flag with a default value of true and should be FCV gated but no version."""
+        self._add_error(location, ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION, (
+            "Missing 'version' required for feature flag that defaults to true and should be FCV gated"
+        ))
 
     def add_feature_flag_default_false_has_version(self, location):
         # type: (common.SourceLocation) -> None
@@ -853,6 +855,13 @@ class ParserContext(object):
         self._add_error(
             location, ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
             ("The 'version' attribute is not allowed for feature flag that defaults to false"))
+
+    def add_feature_flag_fcv_gated_false_has_version(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about a feature flag that should not be FCV gated but has a version."""
+        self._add_error(
+            location, ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION,
+            ("The 'version' attribute is not allowed for feature flag that should be FCV gated"))
 
     def add_reply_type_invalid_type(self, location, command_name, reply_type_name):
         # type: (common.SourceLocation, str, str) -> None

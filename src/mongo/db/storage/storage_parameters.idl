@@ -171,55 +171,67 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesMetricIndexes
         default: true
         version: 6.0
+        shouldBeFCVGated: true
     featureFlagCollModIndexUnique:
         description: "When enabled, collMod supports making an index unique"
         cpp_varname: feature_flags::gCollModIndexUnique
         default: true
         version: 6.0
+        shouldBeFCVGated: true
     featureFlagSelectiveBackup:
         description: "When enabled, support selective backups and restores on collections"
         cpp_varname: feature_flags::gSelectiveBackup
         default: true
         version: 6.0
+        shouldBeFCVGated: true
     featureFlagBatchMultiDeletes:
         description: "When enabled, support batching multi-document deletions"
         cpp_varname: feature_flags::gBatchMultiDeletes
         default: true
         version: 6.1
+        shouldBeFCVGated: true
     featureFlagDocumentSourceListCatalog:
         description: "When enabled, allow the use of the $listCatalog aggregation stage"
         cpp_varname: feature_flags::gDocumentSourceListCatalog
         default: true
         version: 6.0
+        shouldBeFCVGated: true
     featureFlagDerivedMetadata:
         description: "When enabled, support storing derived collection and index metadata"
         cpp_varname: feature_flags::gDerivedMetadata
         default: false
+        shouldBeFCVGated: true
     featureFlagTimeseriesScalabilityImprovements:
         description: "Enable scalability and usability improvements for time-series collections"
         cpp_varname: feature_flags::gTimeseriesScalabilityImprovements
         default: true
         version: 6.3
+        shouldBeFCVGated: true
     featureFlagExtendValidateCommand:
         description: "Enable checks on more types of inconsistencies for the validate command"
         cpp_varname: feature_flags::gExtendValidateCommand
         default: true
         version: 6.2
+        shouldBeFCVGated: true
     featureFlagInternalWritesAreReplicatedTransactionally:
         description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
         cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
         default: false
+        shouldBeFCVGated: true
     featureFlagTimeseriesDeletesSupport:
         description: "Enable support for arbitrary deletes on time-series collections"
         cpp_varname: feature_flags::gTimeseriesDeletesSupport
         default: true
         version: 7.0
+        shouldBeFCVGated: true
     featureFlagTimeseriesUpdatesSupport:
         description: "Enable support for arbitrary updates on time-series collections"
         cpp_varname: feature_flags::gTimeseriesUpdatesSupport
         default: false
+        shouldBeFCVGated: true
     featureFlagIndexBuildGracefulErrorHandling:
         description: "Enable index build error handling improvements"
         cpp_varname: feature_flags::gIndexBuildGracefulErrorHandling
         default: true
         version: 7.1
+        shouldBeFCVGated: true

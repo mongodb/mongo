@@ -35,9 +35,11 @@ feature_flags:
         cpp_varname: gFeatureFlagCatalogShard
         default: true
         version: 7.0
+        shouldBeFCVGated: true
 
     featureFlagTransitionToCatalogShard:
         description: "Feature flag for transitioning a config server in and out of config shard mode"
         cpp_varname: gFeatureFlagTransitionToCatalogShard
         default: true
         version: 7.0
+        shouldBeFCVGated: true

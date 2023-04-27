@@ -39,13 +39,16 @@ feature_flags:
         description: Feature flag to enable always creating the config.transactions partial index on step up to primary even if the collection is not empty.
         cpp_varname: gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
         default: false
+        shouldBeFCVGated: true
 
     featureFlagUpdateDocumentShardKeyUsingTransactionApi:
         description: Feature flag to enable usage of the transaction api for update findAndModify and update commands that change a document's shard key.
         cpp_varname: gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi
         default: false
+        shouldBeFCVGated: true
 
     featureFlagUpdateOneWithoutShardKey:
         description: Feature flag to enable updateOne, deleteOne, and findAndModify without a shard key or _id equality in their filter against a sharded collection.
         cpp_varname: gFeatureFlagUpdateOneWithoutShardKey
         default: false
+        shouldBeFCVGated: true

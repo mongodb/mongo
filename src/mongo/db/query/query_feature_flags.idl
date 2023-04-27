@@ -35,88 +35,104 @@ feature_flags:
       cpp_varname: gFeatureFlagChangeStreamsRewrite
       default: true
       version: 5.1
+      shouldBeFCVGated: true
 
     featureFlagShardedTimeSeries:
       description: "Feature flag for allowing sharding a Time Series collection"
       cpp_varname: gFeatureFlagShardedTimeSeries
       default: true
       version: 5.1
+      shouldBeFCVGated: true
 
     featureFlagShardedTimeSeriesUpdateDelete:
       description: "Feature flag for allowing update and delete operations on a sharded Time Series collection"
       cpp_varname: gFeatureFlagShardedTimeSeriesUpdateDelete
       default: true
       version: 5.1
+      shouldBeFCVGated: true
 
     featureFlagChangeStreamsFurtherEnrichedEvents:
       description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
       cpp_varname: gFeatureFlagChangeStreamsFurtherEnrichedEvents
       default: true
       version: 6.1
+      shouldBeFCVGated: true
 
     featureFlagCommonQueryFramework:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gFeatureFlagCommonQueryFramework
       default: false
+      shouldBeFCVGated: true
 
     featureFlagBucketUnpackWithSort:
       description: "Enables a time-series optimization that allows for partially-blocking sort on time"
       cpp_varname: gFeatureFlagBucketUnpackWithSort
       default: true
       version: 6.0
+      shouldBeFCVGated: true
 
     featureFlagColumnstoreIndexes:
       description: "Enables creation of a new columnstore index type"
       cpp_varname: gFeatureFlagColumnstoreIndexes
       default: false
+      shouldBeFCVGated: true
 
     featureFlagServerlessChangeStreams:
       description: "Feature flag to enable reading change events from the change collection rather than the oplog"
       cpp_varname: gFeatureFlagServerlessChangeStreams
       default: false
+      shouldBeFCVGated: true
 
     featureFlagSbeFull:
       description: "Feature flag for SBE behaviors, features, or extensions that are not yet enabled
                     by default"
       cpp_varname: gFeatureFlagSbeFull
       default: false
+      shouldBeFCVGated: true
 
     featureFlagTelemetry:
       description: "Feature flag for enabling the telemetry store."
       cpp_varname: gFeatureFlagTelemetry
       default: false
+      shouldBeFCVGated: true
 
     featureFlagBitwiseAggOperators:
       description: "Feature flag for enabling support for bitwise operators in the aggregation language."
       cpp_varname: gFeatureFlagBitwise
       default: true
       version: 6.3
+      shouldBeFCVGated: true
 
     featureFlagCompoundWildcardIndexes:
       description: "Feature flag to enable compound wildcard indexes."
       cpp_varname: gFeatureFlagCompoundWildcardIndexes
       default: true
       version: 7.0
+      shouldBeFCVGated: true
 
     featureFlagShardedSearchCustomSort:
       description: "Feature flag to enable user specified sort for sharded $search queries."
       cpp_varname: gFeatureFlagShardedSearchCustomSort
       default: true
       version: 7.0
+      shouldBeFCVGated: true
 
     featureFlagUserRoles:
       description: "Feature flag to enable usage of $$USER_ROLES."
       cpp_varname: gFeatureFlagUserRoles
       default: true
       version: 7.0
+      shouldBeFCVGated: true
 
     featureFlagApproxPercentiles:
       description: "Feature flag to enable approximate $percentile accumulator/expression."
       cpp_varname: gFeatureFlagApproxPercentiles
       default: true
       version: 7.0
+      shouldBeFCVGated: true
 
     featureFlagSearchBatchSizeLimit:
       description: "Feature flag to enable the search batchsize and limit optimization."
       cpp_varname: gFeatureFlagSearchBatchSizeLimit
       default: false
+      shouldBeFCVGated: true

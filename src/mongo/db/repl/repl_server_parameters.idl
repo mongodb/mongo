@@ -769,17 +769,20 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagRetryableFindAndModify
         default: true
         version: 5.1
+        shouldBeFCVGated: true
 
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.
         cpp_varname: feature_flags::gShardMerge
         default: false
+        shouldBeFCVGated: true
 
     featureFlagShardSplit:
         description: When enabled, multitenant migration can use the shard split commands.
         cpp_varname: feature_flags::gShardSplit
         default: true
         version: 6.3
+        shouldBeFCVGated: true
 
     featureFlagDowngradingToUpgrading:
         description: When enabled, 
@@ -787,9 +790,11 @@ feature_flags:
         cpp_varname: feature_flags::gDowngradingToUpgrading
         default: true
         version: 7.0
+        shouldBeFCVGated: true
 
     featureFlagApplyPreparedTxnsInParallel:
         description: when enabled, secondaries will apply prepared transactions in parallel.
         cpp_varname: feature_flags::gApplyPreparedTxnsInParallel
         default: true
         version: 7.0
+        shouldBeFCVGated: true
