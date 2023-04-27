@@ -59,6 +59,7 @@
 {  "_id" : 9,  "a" : {  "d" : 1 } }
 Collection count: 53
 
+
 [jsTest] ----
 [jsTest] Creating indexes:
 [jsTest] ----
@@ -790,6 +791,7 @@ Collection count: 53
 {  "_id" : {  "a" : {  "b" : {  "c" : 1 },  "d" : 2 },  "e" : 3 },  "x" : 4 }
 {  "_id" : {  "x" : 1 },  "y" : 2 }
 Collection count: 7
+
 
 [jsTest] ----
 [jsTest] Creating indexes:

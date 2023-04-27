@@ -225,6 +225,7 @@
 {  "a" : { "$minKey" : 1 } }
 Collection count: 213
 
+
 [jsTest] ----
 [jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : { "$minKey" : 1 } } },  "projection" : {  "_id" : 0 } }
 [jsTest] ----

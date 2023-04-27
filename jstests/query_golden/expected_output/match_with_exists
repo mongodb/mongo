@@ -13,6 +13,7 @@
 {  "_id" : 6,  "a" : [ { "b" : 4 } ] }
 Collection count: 7
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$exists" : true } } } ]
 [jsTest] ----
@@ -76,6 +77,7 @@ Collection count: 7
 {  "_id" : 1,  "a" : [ ] }
 Collection count: 1
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$exists" : true } } } ]
 [jsTest] ----
@@ -97,6 +99,7 @@ Collection count: 1
 {  "_id" : 1,  "a" : false }
 Collection count: 1
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$exists" : true } } } ]
 [jsTest] ----
@@ -117,6 +120,7 @@ Collection count: 1
 
 {  "_id" : 1,  "a" : [ { "b" : 2 }, { "a" : 1 } ] }
 Collection count: 1
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a.a" : { "$exists" : true } } } ]
@@ -146,6 +150,7 @@ Collection count: 1
 {  "_id" : 1,  "a" : [ [ { "b" : 1 } ] ] }
 Collection count: 1
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a.b" : { "$exists" : false } } } ]
 [jsTest] ----
@@ -167,6 +172,7 @@ Collection count: 1
 {  "_id" : 1,  "a" : [ 1 ] }
 {  "_id" : 2,  "a" : [ 2 ] }
 Collection count: 2
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$elemMatch" : { "$exists" : true } } } } ]

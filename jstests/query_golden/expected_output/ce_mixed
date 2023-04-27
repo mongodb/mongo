@@ -2821,6 +2821,7 @@
 	}
 ]
 
+
 [jsTest] ----
 [jsTest] Settings before: internalQueryCardinalityEstimatorMode: sampling, internalQueryFrameworkControl: forceBonsai
 [jsTest] ----
@@ -2845,6 +2846,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 17.32050807568877,
@@ -2867,6 +2869,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "likesPizza" : false } returned 150 documents.
 [jsTest] ----
@@ -2885,6 +2888,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 17.32050807568877,
@@ -2907,6 +2911,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") } } returned 299 documents.
 [jsTest] ----
@@ -2925,6 +2930,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 60,
@@ -2947,6 +2953,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "date" : {  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 179 documents.
 [jsTest] ----
@@ -2965,6 +2972,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 60,
@@ -2986,6 +2994,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "name" : {  "$lte" : "Bob Bennet" } } returned 37 documents.
@@ -3014,6 +3023,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 99,
@@ -3026,6 +3036,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "favPizzaToppings" : "mushrooms" } returned 120 documents.
@@ -3045,6 +3056,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 17.32050807568877,
@@ -3057,6 +3069,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi" } returned 62 documents.
@@ -3076,6 +3089,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 17.32050807568877,
@@ -3088,6 +3102,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos" } returned 113 documents.
@@ -3107,6 +3122,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 17.32050807568877,
@@ -3119,6 +3135,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "likesPizza" : true,  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z"),  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 89 documents.
@@ -3142,6 +3159,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 7.745966692414833,
@@ -3167,6 +3185,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "likesPizza" : false,  "name" : {  "$lte" : "Bob Bennet" } } returned 17 documents.
@@ -3199,6 +3218,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 9.949874371066198,
@@ -3224,6 +3244,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "favPizzaToppings" : "mushrooms",  "name" : {  "$lte" : "Bob Bennet" } } returned 16 documents.
@@ -3256,6 +3277,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 9.949874371066198,
@@ -3272,6 +3294,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "likesPizza" : true }, { "date" : { "$lt" : ISODate("1955-01-01T00:00:00Z") } } ] } returned 168 documents.
@@ -3291,6 +3314,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 67.03119854910238,
@@ -3303,6 +3327,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "favPizzaToppings" : "mushrooms" }, { "name" : { "$lte" : "Bob Bennet", "$gte" : "Alice Smith" } } ] } returned 130 documents.
@@ -3322,6 +3347,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 67.03119854910238,
@@ -3334,6 +3360,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "$and" : [ { "likesPizza" : false }, { "name" : { "$lte" : "Bob Bennet" } } ] }, { "$and" : [ { "likesPizza" : true }, { "name" : { "$gte" : "Tom Watson" } } ] } ] } returned 34 documents.
@@ -3353,6 +3380,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 14.800368851048507,
@@ -3365,6 +3393,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "$and" : [ { "likesPizza" : false }, { "name" : { "$lte" : "Bob Bennet" } } ] }, { "date" : { "$lte" : "1960-01-01T00:00:00" } } ] } returned 17 documents.
@@ -3384,6 +3413,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 102.36131345698406,
@@ -3396,6 +3426,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "likesPizza" : true } returned 62 documents.
@@ -3419,6 +3450,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 4.161791450287816,
@@ -3445,6 +3477,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "likesPizza" : false } returned 0 documents.
 [jsTest] ----
@@ -3467,6 +3500,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 4.161791450287816,
@@ -3493,6 +3527,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") } } returned 62 documents.
 [jsTest] ----
@@ -3515,6 +3550,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 7.745966692414833,
@@ -3541,6 +3577,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 37 documents.
 [jsTest] ----
@@ -3563,6 +3600,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 7.745966692414833,
@@ -3589,6 +3627,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Zizzi",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z"),  "$lt" : ISODate("1979-12-06T00:00:00Z") } } returned 37 documents.
 [jsTest] ----
@@ -3611,6 +3650,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 7.745966692414833,
@@ -3636,6 +3676,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "name" : {  "$lte" : "Bob Bennet" } } returned 13 documents.
@@ -3668,6 +3709,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 9.949874371066198,
@@ -3684,6 +3726,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "favPizzaToppings" : "mushrooms" } returned 20 documents.
@@ -3707,6 +3750,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 4.161791450287816,
@@ -3723,6 +3767,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "lastPizzaShopVisited" : "Pacinos",  "date" : {  "$gt" : ISODate("1950-01-01T00:00:00Z") },  "favPizzaToppings" : "mushrooms",  "likesPizza" : true } returned 20 documents.
@@ -3754,6 +3799,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 1.6682798577318312,
@@ -3788,6 +3834,7 @@ Heuristic explain:  {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "likesPizza" : true } ] } returned 150 documents.
 [jsTest] ----
@@ -3806,6 +3853,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 25.602073215185506,
@@ -3818,6 +3866,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "date" : { "$gt" : ISODate("1950-01-01T00:00:00Z"), "$lt" : ISODate("1960-01-01T00:00:00Z") } } ] } returned 109 documents.
@@ -3837,6 +3886,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 67.03119854910238,
@@ -3849,6 +3899,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$lte" : "John Watson" } } ] }, { "$and" : [ { "favPizzaToppings" : "mushrooms" }, { "likesPizza" : true } ] } ] } returned 126 documents.
@@ -3868,6 +3919,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 11.968780936383162,
@@ -3880,6 +3932,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$lte" : "John Watson" } } ] }, { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$gte" : "Kate Knight" } } ] } ] } returned 56 documents.
@@ -3899,6 +3952,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 14.800368851048507,
@@ -3911,6 +3965,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "$and" : [ { "lastPizzaShopVisited" : "Zizzi" }, { "name" : { "$lte" : "John Watson" } } ] }, { "favPizzaToppings" : "mushrooms" } ] } returned 126 documents.
@@ -3930,6 +3985,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 22.04774379816937,
@@ -3942,6 +3998,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Query: {  "$or" : [ { "$and" : [ { "favPizzaToppings" : "mushrooms" }, { "name" : { "$lte" : "John Watson" } } ] }, { "lastPizzaShopVisited" : "Zizzi" } ] } returned 101 documents.
@@ -3961,6 +4018,7 @@ Histogram explain:  {
 		}
 	}
 }
+
 Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 22.04774379816937,
@@ -3973,6 +4031,7 @@ Heuristic explain:  {
 		}
 	}
 }
+
 
 [jsTest] ----
 [jsTest] Settings after: { "internalQueryFrameworkControl" : "forceBonsai", "ok" : 1 }
