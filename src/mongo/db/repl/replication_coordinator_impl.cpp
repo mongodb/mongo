@@ -516,12 +516,12 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
         LOGV2_FATAL_NOTRACE(
             28545,
             "Locally stored replica set configuration does not parse; See "
-            "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
-            "for information on how to recover from this. Got \"{error}\" while parsing "
+            "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+            "for more information about replica set reconfig. Got \"{error}\" while parsing "
             "{config}",
             "Locally stored replica set configuration does not parse; See "
-            "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
-            "for information on how to recover from this",
+            "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+            "for more information about replica set reconfig",
             "error"_attr = status,
             "config"_attr = cfg.getValue());
     }
@@ -609,12 +609,12 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         } else {
             LOGV2_ERROR(21415,
                         "Locally stored replica set configuration is invalid; See "
-                        "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config"
-                        " for information on how to recover from this. Got \"{error}\" "
+                        "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+                        "for more information about replica set reconfig. Got \"{error}\" "
                         "while validating {localConfig}",
                         "Locally stored replica set configuration is invalid; See "
-                        "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config"
-                        " for information on how to recover from this",
+                        "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+                        "for more information about replica set reconfig",
                         "error"_attr = myIndex.getStatus(),
                         "localConfig"_attr = localConfig.toBSON());
             fassertFailedNoTrace(28544);
