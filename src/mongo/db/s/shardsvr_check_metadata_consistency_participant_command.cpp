@@ -32,13 +32,13 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/cursor_manager.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
@@ -157,15 +157,27 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
                     return;
                 }
 
-                auto cursorPin = uassertStatusOK(
-                    CursorManager::get(opCtx)->pinCursor(opCtx, indexStatsCursor.getCursorId()));
-                auto exec = cursorPin->getExecutor();
+                const auto authzSession = AuthorizationSession::get(opCtx->getClient());
+                const auto authChecker =
+                    [&authzSession](const boost::optional<UserName>& userName) -> Status {
+                    return authzSession->isCoauthorizedWith(userName)
+                        ? Status::OK()
+                        : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
+                };
 
-                BSONObj nextDoc;
-                while (!exec->isEOF()) {
-                    auto state = exec->getNext(&nextDoc, nullptr);
-                    if (state == PlanExecutor::ADVANCED) {
-                        results.emplace_back(nextDoc);
+                // Check out the cursor. If the cursor is not found, all data was retrieve in the
+                // first batch.
+                const auto cursorManager = Grid::get(opCtx)->getCursorManager();
+                auto pinnedCursor = uassertStatusOK(cursorManager->checkOutCursor(
+                    indexStatsCursor.getCursorId(), opCtx, authChecker));
+                while (true) {
+                    auto next = pinnedCursor->next();
+                    if (!next.isOK() || next.getValue().isEOF()) {
+                        break;
+                    }
+
+                    if (auto data = next.getValue().getResult()) {
+                        results.emplace_back(data.get().getOwned());
                     }
                 }
             });

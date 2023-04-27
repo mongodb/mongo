@@ -49,6 +49,8 @@ namespace metadata_consistency_util {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(insertFakeInconsistencies);
+
 /*
  * Emit a warning log containing information about the given inconsistency
  */
@@ -152,6 +154,15 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
         make_intrusive<ExpressionContext>(opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
     auto ws = std::make_unique<WorkingSet>();
     auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+
+    insertFakeInconsistencies.execute([&](const BSONObj& data) {
+        const auto numInconsistencies = data["numInconsistencies"].safeNumberLong();
+        for (int i = 0; i < numInconsistencies; i++) {
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
+                CollectionUUIDMismatchDetails{nss, ShardId{"shard"}, UUID::gen(), UUID::gen()}));
+        }
+    });
 
     for (auto&& inconsistency : inconsistencies) {
         // Every inconsistency encountered need to be logged with the same format
