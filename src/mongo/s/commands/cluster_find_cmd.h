@@ -38,6 +38,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
@@ -224,8 +225,11 @@ public:
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
             if (!_didDoFLERewrite) {
-                telemetry::registerFindRequest(
-                    cq->getFindCommandRequest(), cq->nss(), opCtx, cq->getExpCtx());
+                telemetry::registerRequest(
+                    telemetry::FindRequestShapifier(cq->getFindCommandRequest(), opCtx),
+                    cq->nss(),
+                    opCtx,
+                    cq->getExpCtx());
             }
 
             try {

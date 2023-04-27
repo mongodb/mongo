@@ -528,7 +528,7 @@ TEST(SortPatternShape, NormalSortPattern) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"a.b.c":1,"foo":-1})",
-        query_shape::sortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"), expCtx, opts));
 }
 
 TEST(SortPatternShape, NaturalSortPattern) {
@@ -538,10 +538,10 @@ TEST(SortPatternShape, NaturalSortPattern) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: 1})",
-        query_shape::sortShape(fromjson(R"({$natural: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: 1})"), expCtx, opts));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: -1})",
-        query_shape::sortShape(fromjson(R"({$natural: -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: -1})"), expCtx, opts));
 }
 
 TEST(SortPatternShape, NaturalSortPatternWithMeta) {
@@ -551,7 +551,7 @@ TEST(SortPatternShape, NaturalSortPatternWithMeta) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: 1, x: '?'})",
-        query_shape::sortShape(
+        query_shape::extractSortShape(
             fromjson(R"({$natural: 1, x: {$meta: "textScore"}})"), expCtx, opts));
 }
 
@@ -562,7 +562,8 @@ TEST(SortPatternShape, MetaPatternWithoutNatural) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"normal":1,"$computed1":{"$meta":"textScore"}})",
-        query_shape::sortShape(fromjson(R"({normal: 1, x: {$meta: "textScore"}})"), expCtx, opts));
+        query_shape::extractSortShape(
+            fromjson(R"({normal: 1, x: {$meta: "textScore"}})"), expCtx, opts));
 }
 
 // Here we have one test to ensure that the redaction policy is accepted and applied in the
@@ -576,12 +577,12 @@ TEST(SortPatternShape, RespectsRedactionPolicy) {
     opts.identifierRedactionPolicy = redactFieldNameForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"REDACT_normal":1,"REDACT_y":1})",
-        query_shape::sortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
 
     // No need to redact $natural.
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$natural":1,"REDACT_y":1})",
-        query_shape::sortShape(fromjson(R"({$natural: 1, y: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: 1, y: 1})"), expCtx, opts));
 }
 
 TEST(QueryShapeIDL, ShapifyIDLStruct) {

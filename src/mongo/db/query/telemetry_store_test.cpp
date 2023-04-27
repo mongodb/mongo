@@ -29,7 +29,9 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/pipeline/aggregate_request_shapifier.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -127,6 +129,8 @@ std::string redactFieldNameForTest(StringData s) {
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
+
     fcr.setFilter(BSON("a" << 1));
     SerializationOptions opts;
     // TODO SERVER-75419 Use only 'literalPolicy.'
@@ -135,7 +139,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
-    auto redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    auto redacted = findShapifier.makeTelemetryKey(opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -156,7 +160,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     // Add sort.
     fcr.setSort(BSON("sortVal" << 1 << "otherSort" << -1));
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -180,7 +184,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     // Add inclusion projection.
     fcr.setProjection(BSON("e" << true << "f" << true));
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -212,7 +216,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     << "$a"
                     << "var2"
                     << "const1"));
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -247,7 +251,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -295,7 +299,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setMaxTimeMS(1000);
     fcr.setNoCursorTimeout(false);
 
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -348,6 +352,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setShowRecordId(true);
     fcr.setAwaitData(false);
     fcr.setMirrored(true);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -387,14 +392,22 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "limit": "?number",
                 "skip": "?number",
                 "batchSize": "?number",
-                "maxTimeMS": "?number"
+                "maxTimeMS": "?number",
+                "singleBatch": "?bool",
+                "allowDiskUse": "?bool",
+                "showRecordId": "?bool",
+                "awaitData": "?bool",
+                "allowPartialResults": "?bool",
+                "mirrored": "?bool"
             }
         })",
         redacted);
 }
+
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
     fcr.setFilter(BSONObj());
     fcr.setSort(BSONObj());
     fcr.setProjection(BSONObj());
@@ -403,7 +416,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
-    auto redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    auto redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -421,6 +434,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
 TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
+
     fcr.setFilter(BSON("b" << 1));
     SerializationOptions opts;
     // TODO SERVER-75419 Use only 'literalPolicy.'
@@ -430,7 +445,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
 
-    auto redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    auto redacted = findShapifier.makeTelemetryKey(opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -463,7 +478,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setHint(BSON("$hint"
                      << "z"));
 
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -495,7 +510,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = boost::none;
     opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -526,7 +541,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -556,7 +571,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
 
     // Test that $natural comes through unmodified.
     fcr.setHint(BSON("$natural" << -1));
-    redacted = telemetry::makeTelemetryKey(fcr, opts, expCtx);
+    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -627,8 +642,8 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
         })",
         redacted);
 
-    // Now be sure the variable names are redacted. We don't currently expose a different way to do
-    // the hashing, so we'll just stick with the big long strings here for now.
+    // Now be sure the variable names are redacted. We don't currently expose a different
+    // way to do the hashing, so we'll just stick with the big long strings here for now.
     redactIdentifiers = true;
     redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -659,5 +674,405 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
             }
         })",
         redacted);
+}
+
+TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimplePipeline) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    AggregateCommandRequest acr(NamespaceString("testDB.testColl"));
+    auto matchStage = fromjson(R"({
+            $match: {
+                foo: { $in: ["a", "b"] },
+                bar: { $gte: { $date: "2022-01-01T00:00:00Z" } }
+            }
+        })");
+    auto unwindStage = fromjson("{$unwind: '$x'}");
+    auto groupStage = fromjson(R"({
+            $group: {
+                _id: "$_id",
+                c: { $first: "$d.e" },
+                f: { $sum: 1 }
+            }
+        })");
+    auto limitStage = fromjson("{$limit: 10}");
+    auto outStage = fromjson(R"({$out: 'outColl'})");
+    auto rawPipeline = {matchStage, unwindStage, groupStage, limitStage, outStage};
+    acr.setPipeline(rawPipeline);
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    AggregateRequestShapifier aggShapifier(acr, *pipeline, expCtx->opCtx);
+
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
+    opts.redactIdentifiers = false;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
+
+    auto shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "aggregate": "testColl",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "foo": {
+                                "$in": [
+                                    "a",
+                                    "b"
+                                ]
+                            },
+                            "bar": {
+                                "$gte": {"$date":"2022-01-01T00:00:00.000Z"}
+                            }
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$x"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$_id",
+                            "c": {
+                                "$first": "$d.e"
+                            },
+                            "f": {
+                                "$sum": {
+                                    "$const": 1
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "$limit": 10
+                    },
+                    {
+                        "$out": {
+                            "coll": "outColl",
+                            "db": "test"
+                        }
+                    }
+                ]
+            }
+        })",
+        shapified);
+
+    // TODO SERVER-75419 Use only 'literalPolicy.'
+    opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    opts.redactIdentifiers = true;
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ]
+            }
+        })",
+        shapified);
+
+    // Add the fields that shouldn't be abstracted.
+    acr.setExplain(ExplainOptions::Verbosity::kExecStats);
+    acr.setAllowDiskUse(false);
+    acr.setHint(BSON("z" << 1 << "c" << 1));
+    acr.setCollation(BSON("locale"
+                          << "simple"));
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ],
+                "explain": true,
+                "allowDiskUse": false,
+                "collation": {
+                    "locale": "simple"
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                }
+            }
+        })",
+        shapified);
+
+    // Add let.
+    acr.setLet(BSON("var1"
+                    << "$foo"
+                    << "var2"
+                    << "bar"));
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ],
+                "explain": true,
+                "allowDiskUse": false,
+                "collation": {
+                    "locale": "simple"
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<foo>",
+                    "HASH<var2>": "?string"
+                }
+            }
+        })",
+        shapified);
+
+    // Add the fields that should be abstracted.
+    auto cursorOptions = SimpleCursorOptions();
+    cursorOptions.setBatchSize(10);
+    acr.setCursor(cursorOptions);
+    acr.setMaxTimeMS(500);
+    acr.setBypassDocumentValidation(true);
+    expCtx->opCtx->setComment(BSON("comment"
+                                   << "note to self"));
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ],
+                "explain": true,
+                "allowDiskUse": false,
+                "collation": {
+                    "locale": "simple"
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<foo>",
+                    "HASH<var2>": "?string"
+                }
+            },
+            "cursor": {
+                "batchSize": "?number"
+            },
+            "maxTimeMS": "?number",
+            "bypassDocumentValidation": "?bool"
+        })",
+        shapified);
+}
+TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    AggregateCommandRequest acr(NamespaceString("testDB.testColl"));
+    acr.setPipeline({});
+    auto pipeline = Pipeline::parse({}, expCtx);
+    AggregateRequestShapifier aggShapifier(acr, *pipeline, expCtx->opCtx);
+
+    SerializationOptions opts;
+    // TODO SERVER-75419 Use only 'literalPolicy.'
+    opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
+
+    auto shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": []
+            }
+        })",
+        shapified);  // NOLINT (test auto-update)
 }
 }  // namespace mongo::telemetry

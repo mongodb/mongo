@@ -39,6 +39,8 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/find_command_gen.h"
+// TODO SERVER-76557 remove include of find_request_shapifier
+#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
@@ -77,6 +79,7 @@ boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
 }
 }  // namespace
 
+// TODO SERVER-76557 can remove this makeTelemetryKey
 BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
                          const SerializationOptions& opts,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -411,6 +414,7 @@ BSONObj TelemetryMetrics::redactKey(const BSONObj& key,
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         expCtx->stopExpressionCounters();
 
+        // TODO SERVER-76557 call makeTelemetryKey thru FindRequestShapifier kept in telemetry store
         auto key = makeTelemetryKey(*findCommand, serializationOpts, expCtx, *this);
         // TODO: SERVER-76526 as part of this ticket, no form of the key (redacted or not) will be
         // cached with TelemetryMetrics.
@@ -471,12 +475,12 @@ BSONObj TelemetryMetrics::redactKey(const BSONObj& key,
 // is necessary to register the original query during planning and persist it after
 // execution.
 
-// During planning, registerAggRequest or registerFindRequest are called to serialize the query
-// shape and context (together, the telemetry context) and save it to OpDebug. Moreover, as query
-// execution may span more than one request/operation and OpDebug does not persist through cursor
-// iteration, it is necessary to communicate the telemetry context across operations. In this way,
-// the telemetry context is registered to the cursor, so upon getMore() calls, the cursor manager
-// passes the telemetry key from the pinned cursor to the new OpDebug.
+// During planning, registerRequest is called to serialize the query shape and context (together,
+// the telemetry context) and save it to OpDebug. Moreover, as query execution may span more than
+// one request/operation and OpDebug does not persist through cursor iteration, it is necessary to
+// communicate the telemetry context across operations. In this way, the telemetry context is
+// registered to the cursor, so upon getMore() calls, the cursor manager passes the telemetry key
+// from the pinned cursor to the new OpDebug.
 
 // Once query execution is complete, the telemetry context is grabbed from OpDebug, a telemetry key
 // is generated from this and metrics are paired to this key in the telemetry store.
@@ -517,10 +521,10 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
 }
 
-void registerFindRequest(const FindCommandRequest& request,
-                         const NamespaceString& collection,
-                         OperationContext* opCtx,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+void registerRequest(const RequestShapifier& requestShapifier,
+                     const NamespaceString& collection,
+                     OperationContext* opCtx,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (!isTelemetryEnabled(opCtx->getServiceContext())) {
         return;
     }
@@ -537,7 +541,8 @@ void registerFindRequest(const FindCommandRequest& request,
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
-    CurOp::get(opCtx)->debug().telemetryStoreKey = makeTelemetryKey(request, options, expCtx);
+    CurOp::get(opCtx)->debug().telemetryStoreKey =
+        requestShapifier.makeTelemetryKey(options, expCtx);
 }
 
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {

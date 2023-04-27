@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/request_shapifier.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 #include <cstdint>
@@ -210,13 +211,13 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx);
  *
  * Note that calling this affects internal state. It should be called once for each request for
  * which telemetry may be collected.
+ * TODO SERVER-76557 remove request-specific registers, leave only registerRequest
  */
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx);
-
-void registerFindRequest(const FindCommandRequest& request,
-                         const NamespaceString& collection,
-                         OperationContext* ocCtx,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+void registerRequest(const RequestShapifier&,
+                     const NamespaceString& collection,
+                     OperationContext* opCtx,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
  * Writes telemetry to the telemetry store for the operation identified by `telemetryKey`.

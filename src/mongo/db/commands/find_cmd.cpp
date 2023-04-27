@@ -52,6 +52,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/telemetry.h"
@@ -562,10 +563,11 @@ public:
             if (collection) {
                 // Collect telemetry. Exclude queries against collections with encrypted fields.
                 if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
-                    telemetry::registerFindRequest(cq->getFindCommandRequest(),
-                                                   collection.get()->ns(),
-                                                   opCtx,
-                                                   cq->getExpCtx());
+                    telemetry::registerRequest(
+                        telemetry::FindRequestShapifier(cq->getFindCommandRequest(), opCtx),
+                        collection.get()->ns(),
+                        opCtx,
+                        cq->getExpCtx());
                 }
             }
 

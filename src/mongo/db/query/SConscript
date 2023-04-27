@@ -138,6 +138,8 @@ env.Library(
         "explain_common.cpp",
         "find_common.cpp",
         "parsed_distinct.cpp",
+        # TODO SERVER-76557 move into new query_shape target
+        "find_request_shapifier.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
