@@ -388,11 +388,18 @@ MigrateInfosWithReason BalancerPolicy::balance(
 
                 invariant(to != stat.shardId);
 
-                migrations.emplace_back(to,
-                                        distribution.nss(),
-                                        chunk,
-                                        ForceJumbo::kForceBalancer,
-                                        collDataSizeInfo.maxChunkSizeBytes);
+                migrations.emplace_back(
+                    to,
+                    chunk.getShard(),
+                    distribution.nss(),
+                    chunk.getCollectionUUID(),
+                    chunk.getMin(),
+                    boost::none /* max */,
+                    chunk.getVersion(),
+                    // Always force jumbo chunks to be migrated off draining shards
+                    ForceJumbo::kForceBalancer,
+                    collDataSizeInfo.maxChunkSizeBytes);
+
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::drain;
                 }
@@ -462,11 +469,16 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 invariant(to != stat.shardId);
 
                 migrations.emplace_back(to,
+                                        chunk.getShard(),
                                         distribution.nss(),
-                                        chunk,
+                                        chunk.getCollectionUUID(),
+                                        chunk.getMin(),
+                                        boost::none /* max */,
+                                        chunk.getVersion(),
                                         forceJumbo ? ForceJumbo::kForceBalancer
                                                    : ForceJumbo::kDoNotForce,
                                         collDataSizeInfo.maxChunkSizeBytes);
+
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::zoneViolation;
                 }
@@ -634,7 +646,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
                                  distribution.nss(),
                                  chunk.getCollectionUUID(),
                                  chunk.getMin(),
-                                 boost::none /* call moveRange*/,
+                                 boost::none /* max */,
                                  chunk.getVersion(),
                                  forceJumbo,
                                  collDataSizeInfo.maxChunkSizeBytes);

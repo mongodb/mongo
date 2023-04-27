@@ -374,6 +374,8 @@ last-continuous:
     ticket: SERVER-76311
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
+  - test_file: jstests/sharding/shard_drain_works_with_chunks_of_any_size.js
+    ticket: SERVER-76550
   suites: null
 last-lts:
   all:
@@ -831,4 +833,6 @@ last-lts:
     ticket: SERVER-76311
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
+  - test_file: jstests/sharding/shard_drain_works_with_chunks_of_any_size.js
+    ticket: SERVER-76550
   suites: null
