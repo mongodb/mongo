@@ -3926,8 +3926,6 @@ buildvariants:
     upload_filename: many-collection.tgz
   tasks:
     - name: many-dhandle-stress-test
-    - name: many-collection-test
-      distros: ubuntu2004-wt-large
 
 - name: cppsuite-stress-tests
   display_name: "Cppsuite Stress Tests"
