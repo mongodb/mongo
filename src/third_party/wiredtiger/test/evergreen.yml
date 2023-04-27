@@ -2785,19 +2785,9 @@ tasks:
             set -o errexit
             set -o verbose
             sh -x s_all -A -E 2>&1
-
-  - name: s-string
-    # Run the script with "-r" option to remove no-longer-needed words in s_string.ok
-    # This task only needs to be scheduled every a few months. A failure can remind us
-    # to keep the s_string.ok word list up-to-date.
-    commands:
-      - func: "get project"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/dist"
-          script: |
-            set -o errexit
-            set -o verbose
+            # Run s_string with the "-r" option to remove no-longer-needed words from s_string.ok
+            # This is run separately from s_all as it can be too proactive when run as part of 
+            # developers local workflow, but needs to be run in PR builds before the code is merged.
             sh s_string -r 2>&1
 
   - name: s-outdated-fixmes
