@@ -61,6 +61,10 @@ struct OpStateAccumulator {
     OpTimeBundle opTime;
 };
 
+struct InsertsOpStateAccumulator {
+    std::vector<repl::OpTime> opTimes;
+};
+
 enum class RetryableFindAndModifyLocation {
     // The operation is not retryable, or not a "findAndModify" command. Do not record a
     // pre-image.
@@ -204,7 +208,8 @@ public:
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
                            std::vector<bool> fromMigrate,
-                           bool defaultFromMigrate) = 0;
+                           bool defaultFromMigrate,
+                           InsertsOpStateAccumulator* opAccumulator = nullptr) = 0;
 
     virtual void onInsertGlobalIndexKey(OperationContext* opCtx,
                                         const NamespaceString& globalIndexNss,

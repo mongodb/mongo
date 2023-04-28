@@ -181,7 +181,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end,
                                       std::vector<bool> fromMigrate,
-                                      bool defaultFromMigrate) {
+                                      bool defaultFromMigrate,
+                                      InsertsOpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
     for (auto it = begin; it != end; ++it) {

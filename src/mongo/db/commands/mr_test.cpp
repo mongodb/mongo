@@ -265,7 +265,8 @@ public:
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
-                   bool defaultFromMigrate) override;
+                   bool defaultFromMigrate,
+                   InsertsOpStateAccumulator* opAccumulator = nullptr) override;
 
     /**
      * Tracks the temporary collections mapReduces creates.
@@ -323,7 +324,8 @@ void MapReduceOpObserver::onInserts(OperationContext* opCtx,
                                     std::vector<InsertStatement>::const_iterator begin,
                                     std::vector<InsertStatement>::const_iterator end,
                                     std::vector<bool> fromMigrate,
-                                    bool defaultFromMigrate) {
+                                    bool defaultFromMigrate,
+                                    InsertsOpStateAccumulator* opAccumulator) {
     onInsertsFn();
 }
 

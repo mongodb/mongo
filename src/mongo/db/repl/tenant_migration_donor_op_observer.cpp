@@ -238,7 +238,8 @@ void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
                                                std::vector<InsertStatement>::const_iterator first,
                                                std::vector<InsertStatement>::const_iterator last,
                                                std::vector<bool> fromMigrate,
-                                               bool defaultFromMigrate) {
+                                               bool defaultFromMigrate,
+                                               InsertsOpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; it++) {

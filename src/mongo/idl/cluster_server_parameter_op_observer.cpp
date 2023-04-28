@@ -60,7 +60,8 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
                                                  std::vector<InsertStatement>::const_iterator first,
                                                  std::vector<InsertStatement>::const_iterator last,
                                                  std::vector<bool> fromMigrate,
-                                                 bool defaultFromMigrate) {
+                                                 bool defaultFromMigrate,
+                                                 InsertsOpStateAccumulator* opAccumulator) {
     if (!isConfigNamespace(coll->ns())) {
         return;
     }

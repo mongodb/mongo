@@ -52,7 +52,8 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              std::vector<InsertStatement>::const_iterator first,
                                              std::vector<InsertStatement>::const_iterator last,
                                              std::vector<bool> fromMigrate,
-                                             bool defaultFromMigrate) {
+                                             bool defaultFromMigrate,
+                                             InsertsOpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
     if (!defaultFromMigrate) {

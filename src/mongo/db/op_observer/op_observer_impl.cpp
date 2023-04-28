@@ -722,7 +722,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                std::vector<bool> fromMigrate,
-                               bool defaultFromMigrate) {
+                               bool defaultFromMigrate,
+                               InsertsOpStateAccumulator* opAccumulator) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
@@ -816,6 +817,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         sessionTxnRecord.setLastWriteOpTime(lastOpTime);
         sessionTxnRecord.setLastWriteDate(lastWriteDate);
         onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord);
+    }
+
+    if (opAccumulator) {
+        opAccumulator->opTimes = opTimeList;
     }
 
     shardObserveInsertsOp(opCtx,
