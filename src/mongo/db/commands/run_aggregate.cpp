@@ -451,15 +451,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               allowDiskUseByDefault.load());
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
-
-    // If the request explicitly specified NOT to use v2 resume tokens for change streams, set this
-    // on the expCtx. This can happen if a the request originated from 6.0 mongos, or in test mode.
-    if (request.getGenerateV2ResumeTokens().has_value()) {
-        // We only ever expect an explicit $_generateV2ResumeTokens to be false.
-        uassert(6528200, "Invalid request for v2 tokens", !request.getGenerateV2ResumeTokens());
-        expCtx->changeStreamTokenVersion = 1;
-    }
-
     return expCtx;
 }
 

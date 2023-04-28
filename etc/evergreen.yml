@@ -1308,7 +1308,6 @@ buildvariants:
   - name: change_streams_multi_stmt_txn_mongos_passthrough
   - name: change_streams_multi_stmt_txn_sharded_collections_passthrough
   - name: change_streams_per_shard_cursor_passthrough
-  - name: change_streams_v1_resume_token_sharded_collections_passthrough
   - name: fle2_sharding_high_cardinality
   - name: fle2_sharding
   - name: jstestfuzz_sharded_causal_consistency_gen

@@ -283,12 +283,6 @@ commands:
                 cpp_name: passthroughToShard
                 optional: true
                 stability: unstable
-            # TODO SERVER-65369: $_generateV2ResumeTokens can be removed after 7.0.
-            $_generateV2ResumeTokens:
-                description: "Internal parameter to signal whether v2 resume tokens should be generated."
-                type: optionalBool
-                cpp_name: generateV2ResumeTokens
-                stability: internal
             encryptionInformation:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation
