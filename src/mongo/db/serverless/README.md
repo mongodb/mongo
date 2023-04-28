@@ -66,12 +66,12 @@ This so-called “serverless operation lock” is acquired the first time a stat
 ### Cleanup
 Once a shard slit operation has completed it will return either [CommandFailed](https://github.com/mongodb/mongo/blob/1c4fafd4ae5c082f36a8af1442aa48174962b1b4/src/mongo/db/serverless/shard_split_commands.cpp#L166-L169) (if the operation was aborted for any reason), or [TenantMigrationCommitted](https://github.com/mongodb/mongo/blob/1c4fafd4ae5c082f36a8af1442aa48174962b1b4/src/mongo/db/serverless/shard_split_commands.cpp#L171-L173) (if the operation succeeded). At this point it is the caller’s responsibility to take any necessary post-operation actions (such as updating routing tables), before calling `forgetShardSplit` on the donor primary. Calling this command will cause the donor primary to mark the operation garbage-collectable, by [setting the expireAt field in the operation state document](https://github.com/mongodb/mongo/blob/1c4fafd4ae5c082f36a8af1442aa48174962b1b4/src/mongo/db/serverless/shard_split_donor_service.cpp#L1140-L1141) to a configurable timeout called `repl::shardSplitGarbageCollectionDelayMS` with a [default value of 15 minutes](https://github.com/mongodb/mongo/blob/1c4fafd4ae5c082f36a8af1442aa48174962b1b4/src/mongo/db/repl/repl_server_parameters.idl#L688-L696).  The operation will wait for the delay and then [delete the state document](https://github.com/mongodb/mongo/blob/1c4fafd4ae5c082f36a8af1442aa48174962b1b4/src/mongo/db/serverless/shard_split_donor_service.cpp#L1186), which in turn removes access blockers installed for the operation. It is now the responsibility of the caller to remove orphaned data on the donor and recipient.
 
-## Serverless server parameter
+### Serverless server parameter
 The [replication.serverless](https://github.com/mongodb/mongo/blob/e75a51a7dcbe842e07a24343438706d865de96dc/src/mongo/db/mongod_options_replication.idl#L77) server parameter  allows starting a mongod without providing a replica set name. It cannot be used at the same time as [replication.replSet](https://github.com/mongodb/mongo/blob/e75a51a7dcbe842e07a24343438706d865de96dc/src/mongo/db/mongod_options_replication.idl#L64) or [replication.replSetName](https://github.com/mongodb/mongo/blob/e75a51a7dcbe842e07a24343438706d865de96dc/src/mongo/db/mongod_options_replication.idl#L70). When `replication.serverless` is used, the replica set name is learned through [replSetInitiate](https://www.mongodb.com/docs/manual/reference/command/replSetInitiate/) or [through an hearbeat](https://github.com/mongodb/mongo/blob/e75a51a7dcbe842e07a24343438706d865de96dc/src/mongo/db/repl/replication_coordinator_impl.cpp#L5848) from another mongod. Mongod can only learn its replica set name once.
 
 Using `replication.serverless` also enables a node to apply a recipient config to join a new recipient set as part of a split.
 
-## Glossary
+### Glossary
 **recipient config**
 The config for the recipient replica set.
 
@@ -80,3 +80,20 @@ A config based on the original config which excludes the recipient nodes, and in
 
 **blockTimestamp**
 Timestamp after which reads and writes are blocked on the donor replica set for all tenants involved until completion of the split.
+
+## Change Streams
+Change Stream data for a Serverless cluster is stored in a handful of tenantId-prefixed collections:
+
+* change collection: `<tenantId>_config.system.change_collection`
+* pre-images: `<tenantId>_config.system.preimages`
+* cluster parameters: `<tenantId>_config.system.cluster_parameters`
+
+A Shard Split operation will copy these collections from donor to recipient via Initial Sync. Upon completion, these collections will be cleaned up on the donor (by the cloud control plane) along with all other tenant-specific databases.
+
+A Shard Merge operation will copy these collections from donor to recipient via backup cursor. For writes that take place during the oplog catchup phase, some additional handling is required in order to ensure correctness of the data written to the tenant's change collection and pre-image collection.
+
+We extract the 'o2' entry from a given noop oplog entry written during this phase (which will contain the original entry on the donor timeline) and write it to the tenant's change collection (see [here](https://github.com/10gen/mongo/blob/26a441e07f3885dc8b3d9ef9b564eb4f5143bded/src/mongo/db/change_stream_change_collection_manager.cpp#L133-L135) for implementation details). Change collection entries written on the recipient during oplog catchup must be written on the donor timeline so that a change stream can be resumed on the recipient after the Shard Merge.
+
+For pre-image support, two oplog entry fields (`donorOpTime` and `donorApplyOpsIndex`, see [here](https://github.com/10gen/mongo/blob/26a441e07f3885dc8b3d9ef9b564eb4f5143bded/src/mongo/db/repl/oplog_entry.idl#L168-L180
+)) were added in order to ensure that pre-image entries written on the recipient will be identical to those on the donor. These fields are conditionally set on oplog entries written during the oplog catchup phase of a Shard Merge and used to determine which timestamp and applyOps index to use when writing pre-images. See [here](https://github.com/10gen/mongo/blob/07b38e091b48acd305469d525b81aebf3aeadbf1/src/mongo/db/repl/oplog.cpp#L1237-L1268) for details.
+
