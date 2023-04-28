@@ -40,6 +40,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/s/balancer_stats_registry.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/logv2/log.h"
@@ -255,15 +256,22 @@ void _appendInProgressIndexesStats(OperationContext* opCtx,
             }
         }
 
-        // Not all indexes in the collection stats may be visible or consistent with our
-        // snapshot. For this reason, it is unsafe to check `isReady` on the entry, which
-        // asserts that the index's in-memory state is consistent with our snapshot.
-        if (!entry->isPresentInMySnapshot(opCtx)) {
-            continue;
-        }
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
+            if (!entry->isReady(opCtx)) {
+                indexBuilds.push_back(descriptor->indexName());
+            }
+        } else {
+            // Not all indexes in the collection stats may be visible or consistent with our
+            // snapshot. For this reason, it is unsafe to check `isReady` on the entry, which
+            // asserts that the index's in-memory state is consistent with our snapshot.
+            if (!entry->isPresentInMySnapshot(opCtx)) {
+                continue;
+            }
 
-        if (!entry->isReadyInMySnapshot(opCtx)) {
-            indexBuilds.push_back(descriptor->indexName());
+            if (!entry->isReadyInMySnapshot(opCtx)) {
+                indexBuilds.push_back(descriptor->indexName());
+            }
         }
     }
 

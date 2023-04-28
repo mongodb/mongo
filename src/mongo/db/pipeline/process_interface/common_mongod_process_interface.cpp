@@ -216,15 +216,22 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         auto entry = idxCatalog->getEntry(idx);
         doc["spec"] = Value(idx->infoObj());
 
-        // Not all indexes in the CollectionIndexUsageTracker may be visible or consistent with our
-        // snapshot. For this reason, it is unsafe to check `isReady` on the entry, which
-        // asserts that the index's in-memory state is consistent with our snapshot.
-        if (!entry->isPresentInMySnapshot(opCtx)) {
-            continue;
-        }
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
+            if (!entry->isReady(opCtx)) {
+                doc["building"] = Value(true);
+            }
+        } else {
+            // Not all indexes in the CollectionIndexUsageTracker may be visible or consistent with
+            // our snapshot. For this reason, it is unsafe to check `isReady` on the entry, which
+            // asserts that the index's in-memory state is consistent with our snapshot.
+            if (!entry->isPresentInMySnapshot(opCtx)) {
+                continue;
+            }
 
-        if (!entry->isReadyInMySnapshot(opCtx)) {
-            doc["building"] = Value(true);
+            if (!entry->isReadyInMySnapshot(opCtx)) {
+                doc["building"] = Value(true);
+            }
         }
 
         indexStats.push_back(doc.freeze());
