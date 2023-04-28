@@ -2398,8 +2398,6 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
                 opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options));
         }
-        // Mark the index build setup as complete, from now on cleanup is required on failure/abort.
-        replState->completeSetup();
     } catch (DBException& ex) {
         _indexBuildsManager.abortIndexBuild(
             opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
@@ -2418,14 +2416,39 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         throw;
     }
 
-    if (isIndexBuildResumable(opCtx, *replState, indexBuildOptions)) {
-        // We should only set this value if this is a hybrid index build.
-        invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
+    // Mark the index build setup as complete, from now on cleanup is required on failure/abort.
+    // _setUpIndexBuildInner must not throw after this point, or risk secondaries getting stuck
+    // applying the 'startIndexBuild' oplog entry, because throwing here would cause the node to
+    // vote for abort and subsequently await the 'abortIndexBuild' entry before fulfilling the start
+    // promise, while the oplog applier is waiting for the start promise.
+    replState->completeSetup();
 
-        // After the interceptors are set, get the latest optime in the oplog that could have
-        // contained a write to this collection. We need to be holding the collection lock in X mode
-        // so that we ensure that there are not any uncommitted transactions on this collection.
-        replState->setLastOpTimeBeforeInterceptors(getLatestOplogOpTime(opCtx));
+    // Failing to establish lastOpTime before interceptors is not fatal, the index build will
+    // continue as non-resumable. The build can continue as non-resumable even if this step
+    // succeeds, if it timeouts during the wait for majority read concern on the timestamp
+    // established here.
+    try {
+        if (isIndexBuildResumable(opCtx, *replState, indexBuildOptions)) {
+            // We should only set this value if this is a hybrid index build.
+            invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
+
+            // After the interceptors are set, get the latest optime in the oplog that could have
+            // contained a write to this collection. We need to be holding the collection lock in X
+            // mode so that we ensure that there are not any uncommitted transactions on this
+            // collection.
+            replState->setLastOpTimeBeforeInterceptors(getLatestOplogOpTime(opCtx));
+        }
+    } catch (DBException& ex) {
+        // It is fine to let the build continue even if we are interrupted, interrupt check before
+        // actually starting the build will trigger the abort, after having signalled the start
+        // promise.
+        LOGV2(7484300,
+              "Index build: failed to setup index build resumability, will continue as "
+              "non-resumable.",
+              "buildUUID"_attr = replState->buildUUID,
+              logAttrs(replState->dbName),
+              "collectionUUID"_attr = replState->collectionUUID,
+              "reason"_attr = ex.toStatus());
     }
 
     return PostSetupAction::kContinueIndexBuild;
@@ -2496,14 +2519,6 @@ void IndexBuildsCoordinator::_runIndexBuild(
         return;
     }
     auto replState = invariant(swReplState);
-
-    // Try to set index build state to in-progress, if it has been aborted or interrupted then
-    // signal any waiters and return early.
-    auto tryStartStatus = replState->tryStart(opCtx);
-    if (!tryStartStatus.isOK()) {
-        replState->sharedPromise.setError(tryStartStatus);
-        return;
-    }
 
     // Add build UUID to lock manager diagnostic output.
     auto locker = opCtx->lockState();
@@ -2723,6 +2738,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // This Status stays unchanged unless we catch an exception in the following try-catch block.
     auto status = Status::OK();
     try {
+        // Try to set index build state to in-progress, if it has been aborted or interrupted the
+        // attempt will fail.
+        replState->setInProgress(opCtx);
 
         hangAfterInitializingIndexBuild.pauseWhileSet(opCtx);
         failIndexBuildWithError.executeIf(

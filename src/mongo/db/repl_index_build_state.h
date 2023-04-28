@@ -297,10 +297,10 @@ public:
     void completeSetup();
 
     /**
-     * Try to set the index build to in-progress state. Returns true on success, or false if the
-     * build is already aborted / interrupted.
+     * Try to set the index build to in-progress state, does an interrupt check and throws if the
+     * build is already killed.
      */
-    Status tryStart(OperationContext* opCtx);
+    void setInProgress(OperationContext* opCtx);
 
     /**
      * Indicate that the index build has attempted to vote for commit readiness. After calling this,
