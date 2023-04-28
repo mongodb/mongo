@@ -53,16 +53,6 @@ struct MakeObjSpec {
           numKeepOrDrops(fields.size()),
           fieldNames(buildIndexedFieldVector(std::move(fields), std::move(projects))) {}
 
-    MakeObjSpec(const MakeObjSpec& other)
-        : fieldBehavior(other.fieldBehavior),
-          numKeepOrDrops(other.numKeepOrDrops),
-          fieldNames(other.fieldNames) {}
-
-    MakeObjSpec(MakeObjSpec&& other)
-        : fieldBehavior(other.fieldBehavior),
-          numKeepOrDrops(other.numKeepOrDrops),
-          fieldNames(std::move(other.fieldNames)) {}
-
     std::string toString() const {
         StringBuilder builder;
         builder << (fieldBehavior == MakeObjSpec::FieldBehavior::keep ? "keep" : "drop") << ", [";
