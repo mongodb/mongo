@@ -1793,8 +1793,8 @@ methods = {
         configure flushing objects to tiered storage after checkpoint''',
         type='category', subconfig= [
             Config('enabled', 'false', r'''
-                if true, perform one iteration of object switching and flushing objects to
-                tiered storage''',
+                if true and tiered storage is in use, perform one iteration of object switching
+                and flushing objects to tiered storage''',
                 type='boolean'),
             Config('force', 'false', r'''
                 if false (the default), flush_tier of any individual object may be skipped if the

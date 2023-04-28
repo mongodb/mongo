@@ -95,6 +95,11 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     conn->flush_ckpt_complete = false;
     conn->flush_most_recent = conn->ckpt_most_recent;
     conn->flush_ts = conn->txn_global.last_ckpt_timestamp;
+    /*
+     * It would be more efficient to return here if no tiered storage is enabled in the system. If
+     * the user asks for a flush_tier without tiered storage, the loop below is effectively a no-op
+     * and will not be incorrect. But we could also just return.
+     */
 
     /*
      * Walk the metadata cursor to find tiered tables to flush. This should be optimized to avoid
