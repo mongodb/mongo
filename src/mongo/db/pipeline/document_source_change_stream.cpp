@@ -72,6 +72,10 @@ using std::list;
 using std::string;
 using std::vector;
 
+namespace {
+CounterMetric changeStreamsShowExpandedEvents("changeStreams.showExpandedEvents");
+}
+
 // The $changeStream stage is an alias for many stages.
 REGISTER_DOCUMENT_SOURCE(changeStream,
                          DocumentSourceChangeStream::LiteParsed::parse,
@@ -340,6 +344,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceMatch::create(
             change_stream_filter::getMatchFilterForClassicOperationTypes(), expCtx));
     }
+    changeStreamsShowExpandedEvents.increment(spec.getShowExpandedEvents());
     return stages;
 }
 
