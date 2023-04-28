@@ -37,6 +37,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
+#include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -704,6 +705,49 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAborted) {
 
         ASSERT_OK(mtab->checkIfCanBuildIndex());
     }
+}
+
+TEST_F(RecoverAccessBlockerTest, ShardSplitDonorBlocking) {
+    const auto tagName = "recipientTag";
+    const auto setName = "recipientSet";
+
+    ShardSplitDonorDocument donorDoc(kMigrationId);
+    donorDoc.setTenantIds(_tenantIds);
+    donorDoc.setRecipientSetName(StringData{setName});
+    donorDoc.setRecipientTagName(StringData{tagName});
+    donorDoc.setState(mongo::ShardSplitDonorStateEnum::kBlocking);
+    donorDoc.setBlockOpTime(repl::OpTime{Timestamp{100, 1}, 1});
+
+    insertStateDocument(NamespaceString::kShardSplitDonorsNamespace, donorDoc.toBSON());
+
+    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx());
+
+    auto accessBlockers = TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+                              .getDonorAccessBlockersForMigration(kMigrationId);
+    ASSERT_EQ(accessBlockers.size(), 2);
+
+    // Shard Split use the same access blockers for both tenants.
+    ASSERT_EQ(accessBlockers[0], accessBlockers[1]);
+
+    auto mtab = accessBlockers[0];
+    ASSERT(mtab);
+
+    repl::ReadConcernArgs::get(opCtx()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+    auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
+    ASSERT_TRUE(readFuture.isReady());
+    ASSERT_OK(readFuture.getNoThrow());
+
+    repl::ReadConcernArgs::get(opCtx()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+    repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{101, 1});
+    auto afterReadFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
+    ASSERT_FALSE(afterReadFuture.isReady());
+
+    ASSERT_EQ(mtab->checkIfCanWrite(Timestamp{101, 1}).code(), ErrorCodes::TenantMigrationConflict);
+
+    auto indexStatus = mtab->checkIfCanBuildIndex();
+    ASSERT_EQ(indexStatus.code(), ErrorCodes::TenantMigrationConflict);
 }
 
 }  // namespace mongo

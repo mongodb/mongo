@@ -583,36 +583,34 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
         auto optionalTenants = doc.getTenantIds();
         invariant(optionalTenants);
-        for (const auto& tenantId : optionalTenants.value()) {
-            auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-                opCtx->getServiceContext(), doc.getId());
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .add(tenantId, mtab);
+        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
+                                                                        doc.getId());
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+            .add(optionalTenants.value(), mtab);
 
-            switch (doc.getState()) {
-                case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
-                    break;
-                case ShardSplitDonorStateEnum::kBlocking:
-                    invariant(doc.getBlockOpTime());
+        switch (doc.getState()) {
+            case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+                break;
+            case ShardSplitDonorStateEnum::kBlocking:
+                invariant(doc.getBlockOpTime());
+                mtab->startBlockingWrites();
+                mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
+                break;
+            case ShardSplitDonorStateEnum::kCommitted:
+                invariant(doc.getBlockOpTime());
+                mtab->startBlockingWrites();
+                mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
+                mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
+                break;
+            case ShardSplitDonorStateEnum::kAborted:
+                if (doc.getBlockOpTime()) {
                     mtab->startBlockingWrites();
                     mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
-                    break;
-                case ShardSplitDonorStateEnum::kCommitted:
-                    invariant(doc.getBlockOpTime());
-                    mtab->startBlockingWrites();
-                    mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
-                    mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
-                    break;
-                case ShardSplitDonorStateEnum::kAborted:
-                    if (doc.getBlockOpTime()) {
-                        mtab->startBlockingWrites();
-                        mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
-                    }
-                    mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
-                    break;
-                case ShardSplitDonorStateEnum::kUninitialized:
-                    MONGO_UNREACHABLE;
-            }
+                }
+                mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
+                break;
+            case ShardSplitDonorStateEnum::kUninitialized:
+                MONGO_UNREACHABLE;
         }
         return true;
     });
