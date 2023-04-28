@@ -252,5 +252,5 @@ executor:
           # TODO: SERVER-45994 remove
           skipCheckingCatalogCacheConsistencyWithShardingCatalog: true
           skipCheckOrphans: true
-      eval: "load('jstests/libs/override_methods/sharding_continuous_config_stepdown.js');"
+      eval: "load('jstests/libs/override_methods/sharding_csrs_continuous_config_stepdown.js');"
       nodb: ''

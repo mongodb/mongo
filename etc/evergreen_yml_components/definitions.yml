@@ -6284,7 +6284,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: sharding_continuous_config_stepdown
       use_large_distro: "true"
 
 # This is a subset of sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen and
