@@ -14,7 +14,7 @@ import gdb
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr
+    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr, get_unique_ptr_bytes
 
 
 def detect_toolchain(progspace):
@@ -249,7 +249,7 @@ def get_decorations(obj):
         type_name = type_name[0:type_name.rindex(">")]
         type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
         # get_unique_ptr should be loaded from 'mongo_printers.py'.
-        decoration_data = get_unique_ptr(decorable["_decorations"]["_decorationData"])
+        decoration_data = get_unique_ptr_bytes(decorable["_decorations"]["_decorationData"])
 
         if type_name.endswith('*'):
             type_name = type_name[0:len(type_name) - 1]
