@@ -1,7 +1,10 @@
 import gdb.printing
 import os
+import sys
+import inspect
 
-path = os.path.dirname(__file__)
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+path = os.path.dirname(os.path.abspath(filename))
 if not path in sys.path:
     sys.path.append(path)
 from printers import immer_lookup_function
