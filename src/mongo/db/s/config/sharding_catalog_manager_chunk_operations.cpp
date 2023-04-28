@@ -2080,7 +2080,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
     bool allowMigrations) {
-    std::set<ShardId> shardsIds;
+    std::set<ShardId> cmShardIds;
     {
         // Mark opCtx as interruptible to ensure that all reads and writes to the metadata
         // collections under the exclusive _kChunkOpLock happen on the same term.
@@ -2100,7 +2100,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                               << " for ns " << nss,
                 !collectionUUID || collectionUUID == cm.getUUID());
 
-        cm.getAllShardIds(&shardsIds);
+        cm.getAllShardIds(&cmShardIds);
         withTransaction(
             opCtx,
             CollectionType::ConfigNS,
@@ -2141,13 +2141,25 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
         // will own chunks for this collection.
     }
 
-    // Trigger a refresh on each shard containing chunks for this collection.
+    // Trigger a refresh on every shard. We send this to every shard and not just shards that own
+    // chunks for the collection because the set of shards owning chunks is updated before the
+    // critical section is released during chunk migrations. If the last chunk is moved off of a
+    // shard and this flush is not sent to that donor, stopMigrations will not wait for the critical
+    // section to finish on that shard (SERVER-73984).
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    sharding_util::tellShardsToRefreshCollection(
-        opCtx,
-        {std::make_move_iterator(shardsIds.begin()), std::make_move_iterator(shardsIds.end())},
-        nss,
-        executor);
+    // TODO (SERVER-74477): Remove catch of invalid view definition once 7.0 becomes LastLTS
+    try {
+        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        sharding_util::tellShardsToRefreshCollection(opCtx, allShardIds, nss, executor);
+    } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>&) {
+        // In multiversion scenarios, some nodes may hit the bug in SERVER-74313. We should retry
+        // the command only on the shards that own chunks.
+        sharding_util::tellShardsToRefreshCollection(opCtx,
+                                                     {std::make_move_iterator(cmShardIds.begin()),
+                                                      std::make_move_iterator(cmShardIds.end())},
+                                                     nss,
+                                                     executor);
+    }
 }
 
 void ShardingCatalogManager::bumpCollectionMinorVersionInTxn(OperationContext* opCtx,

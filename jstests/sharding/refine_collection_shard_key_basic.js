@@ -715,9 +715,8 @@ assert.eq(3, oldTagsArr.length);
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
 validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr);
 
-// Verify that all shards containing chunks in the namespace 'db.foo' eventually refresh (i.e. the
-// secondary shard will not refresh because it does not contain any chunks in 'db.foo'). NOTE: This
-// will only succeed in a linear jstest without failovers.
+// Verify that all shards in the namespace 'db.foo' eventually refresh. NOTE: This will only succeed
+// in a linear jstest without failovers.
 const isStepdownSuite = typeof ContinuousStepdown !== 'undefined';
 if (!isStepdownSuite) {
     dropAndReshardColl(oldKeyDoc);
@@ -738,7 +737,7 @@ if (!isStepdownSuite) {
     assert.soon(() => oldPrimaryEpoch !==
                     st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
                         .metadata.shardVersionEpoch.toString());
-    assert.soon(() => oldSecondaryEpoch ===
+    assert.soon(() => oldSecondaryEpoch !==
                     st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
                         .metadata.shardVersionEpoch.toString());
 }

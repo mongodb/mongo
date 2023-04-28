@@ -338,6 +338,8 @@ last-continuous:
     ticket: SERVER-74131
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-69952
+  - test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    ticket: SERVER-76394
   suites: null
 last-lts:
   all:
@@ -747,4 +749,6 @@ last-lts:
     ticket: SERVER-74131
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-69952
+  - test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    ticket: SERVER-76394
   suites: null
