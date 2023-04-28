@@ -165,6 +165,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
+  - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
     distros:
     - windows-vsCurrent-large
@@ -235,6 +236,7 @@ buildvariants:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: audit
   - name: .auth
+  - name: buildscripts_test
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
