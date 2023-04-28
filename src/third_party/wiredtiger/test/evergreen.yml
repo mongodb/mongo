@@ -1851,6 +1851,16 @@ tasks:
         vars:
           test_name: incr_backup
 
+  - name: csuite-random-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: random
+
   - name: csuite-random-abort-test
     tags: ["pull_request"]
     depends_on:
