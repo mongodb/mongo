@@ -240,7 +240,14 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
     if (sortBy) {
         for (const auto& part : *sortBy) {
-            combined.push_back(part);
+            // Check and filter out the partition by field within the sort field. The partition
+            // field is already added to the combined sort field variable. As the partition only
+            // contains documents that have the same value in the partition key an additional sort
+            // over that field does not change the order or the documents within the partition.
+            // Hence a sort by $partion does not change the sort order.
+            if (!simplePartitionBy || *simplePartitionBy != part.fieldPath) {
+                combined.push_back(part);
+            }
         }
     }
 

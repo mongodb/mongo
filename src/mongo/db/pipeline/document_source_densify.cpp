@@ -28,13 +28,13 @@
  */
 
 #include "mongo/db/pipeline/document_source_densify.h"
-#include "mongo/base/exact_cast.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/string_map.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -190,10 +190,16 @@ SortPattern getSortPatternForDensify(RangeStatement rangeStatement,
         }
     }
 
-    // Add field path to sort spec.
-    SortPatternPart part;
-    part.fieldPath = field.fullPath();
-    sortParts.push_back(std::move(part));
+    // Add field path to sort spec if it is not yet in the sort spec.
+    const auto inserted = std::find_if(
+        sortParts.begin(), sortParts.end(), [&field](const SortPatternPart& s) -> bool {
+            return s.fieldPath->fullPath().compare(field.fullPath()) == 0;
+        });
+    if (inserted == sortParts.end()) {
+        SortPatternPart part;
+        part.fieldPath = field.fullPath();
+        sortParts.push_back(std::move(part));
+    }
     return SortPattern{sortParts};
 }
 

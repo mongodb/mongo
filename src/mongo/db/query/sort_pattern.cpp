@@ -97,7 +97,13 @@ SortPattern::SortPattern(const BSONObj& obj,
 
         patternPart.fieldPath = FieldPath{fieldName};
         patternPart.isAscending = (direction > 0);
-        _paths.insert(patternPart.fieldPath->fullPath());
+
+        const auto [_, inserted] = _paths.insert(patternPart.fieldPath->fullPath());
+        uassert(7472500,
+                str::stream() << "$sort key must not contain duplicate keys (duplicate: '"
+                              << patternPart.fieldPath->fullPath() << "')",
+                inserted);
+
         _sortPattern.push_back(std::move(patternPart));
     }
 }

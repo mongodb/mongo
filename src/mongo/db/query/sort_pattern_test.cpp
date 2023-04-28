@@ -31,6 +31,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "serialization_options.h"
 namespace mongo {
@@ -95,6 +96,29 @@ TEST(SerializeSortPatternTest, SerializeNoRedaction) {
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"val":1})",
         sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization));
+}
+
+
+// Throw assertion in the case we have double defined sort order for a field.
+TEST(SortStageDefaultTest, WrongSortKeyDefinition) {
+    auto expCtx = getExpCtx();
+    ASSERT_THROWS_CODE(SortPattern(fromjson("{b: 1, b: 1}"), expCtx), AssertionException, 7472500);
+
+    // Test if the sort order is ignored for the duplication detection.
+    ASSERT_THROWS_CODE(SortPattern(fromjson("{b: 1, b: -1}"), expCtx), AssertionException, 7472500);
+
+    // Tests that include subdocuments.
+    ASSERT_DOES_NOT_THROW(SortPattern(fromjson("{a:1, 'b.a':1}"), expCtx));
+
+    ASSERT_THROWS_CODE(
+        SortPattern(fromjson("{a:1, 'b.a':1, 'b.a':-1}"), expCtx), AssertionException, 7472500);
+
+    // Test the other SortPattern constructor.
+    std::vector<SortPattern::SortPatternPart> sortKeys;
+    sortKeys.push_back(SortPattern::SortPatternPart{false, FieldPath("a")});
+    sortKeys.push_back(SortPattern::SortPatternPart{false, FieldPath("b")});
+    sortKeys.push_back(SortPattern::SortPatternPart{true, FieldPath("a")});
+    ASSERT_THROWS_CODE(SortPattern(std::move(sortKeys)), AssertionException, 7472501);
 }
 
 }  // namespace

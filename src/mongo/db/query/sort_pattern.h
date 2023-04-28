@@ -65,8 +65,13 @@ public:
 
     SortPattern(std::vector<SortPatternPart> patterns) : _sortPattern(std::move(patterns)) {
         for (auto&& patternPart : _sortPattern) {
-            if (patternPart.fieldPath)
-                _paths.insert(patternPart.fieldPath->fullPath());
+            if (patternPart.fieldPath) {
+                const auto [_, inserted] = _paths.insert(patternPart.fieldPath->fullPath());
+                uassert(7472501,
+                        str::stream() << "$sort key must not contain duplicate keys (field: '"
+                                      << patternPart.fieldPath->fullPath() << "')",
+                        inserted);
+            }
         }
     }
 
