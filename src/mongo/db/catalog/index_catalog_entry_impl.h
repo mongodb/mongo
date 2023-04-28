@@ -173,10 +173,6 @@ public:
 
     bool shouldValidateDocument() const final;
 
-    bool isPresentInMySnapshot(OperationContext* opCtx) const final;
-
-    bool isReadyInMySnapshot(OperationContext* opCtx) const final;
-
     const UpdateIndexData& getIndexedPaths() const final {
         return _indexedPaths;
     }
