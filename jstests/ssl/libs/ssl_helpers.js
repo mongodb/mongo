@@ -322,7 +322,7 @@ function sslProviderSupportsTLS1_0() {
         return false;
     }
 
-    return !isDebian10() && !isUbuntu2004();
+    return !isDebian() && !isUbuntu2004();
 }
 
 function sslProviderSupportsTLS1_1() {
@@ -335,7 +335,7 @@ function sslProviderSupportsTLS1_1() {
         return false;
     }
 
-    return !isDebian10() && !isUbuntu2004();
+    return !isDebian() && !isUbuntu2004();
 }
 
 function isOpenSSL3orGreater() {
@@ -360,6 +360,22 @@ function opensslVersionAsInt() {
     let version = (matches[1] << 24) | (matches[2] << 16) | (matches[3] << 8);
 
     return version;
+}
+
+function supportsFIPS() {
+    // OpenSSL supports FIPS
+    let expectSupportsFIPS = (determineSSLProvider() == "openssl");
+
+    // But OpenSSL supports FIPS only sometimes
+    // - Debian does not support FIPS, Fedora 37 does not, Fedora 38 does
+    // - Ubuntu only supports FIPS with Ubuntu pro
+    if (expectSupportsFIPS) {
+        if (isDebian() || isUbuntu()) {
+            expectSupportsFIPS = false;
+        }
+    }
+
+    return expectSupportsFIPS;
 }
 
 function copyCertificateFile(a, b) {
