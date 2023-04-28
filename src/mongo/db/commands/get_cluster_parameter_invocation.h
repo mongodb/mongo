@@ -43,13 +43,8 @@ public:
 
     GetClusterParameterInvocation() = default;
 
-    // Retrieves in-memory parameters. Used by mongod getClusterParameter and mongoses
-    // with featureFlagClusterWideConfigM2 enabled.
+    // Retrieves in-memory parameters.
     Reply getCachedParameters(OperationContext* opCtx, const GetClusterParameter& request);
-
-    // Retrieves durable cluster server parameters from config server. Used by mongoses with
-    // featureFlagClusterWideConfigM2 disabled.
-    Reply getDurableParameters(OperationContext* opCtx, const GetClusterParameter& request);
 
 private:
     // Parses the command body and retrieves the BSON representation and names of the requested
