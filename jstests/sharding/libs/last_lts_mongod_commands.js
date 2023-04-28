@@ -9,7 +9,6 @@ const commandsRemovedFromMongodSinceLastLTS = [
     "_configsvrRepairShardedCollectionChunksHistory",
     "_configsvrTransitionToCatalogShard",
     "mapreduce.shardedfinish",
-    "availableQueryOptions",  // TODO SERVER-67689: remove this once 7.0 becomes last-lts
     "getLastError",
     "driverOIDTest",
 ];
