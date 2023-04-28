@@ -30,6 +30,7 @@
 #include "mongo/db/storage/execution_control/throughput_probing.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo::execution_control {
 namespace throughput_probing {
@@ -103,6 +104,15 @@ private:
     std::shared_ptr<MockPeriodicJob> _job;
 };
 
+namespace {
+TickSourceMock<Microseconds>* initTickSource(ServiceContext* svcCtx) {
+    auto mockTickSource = std::make_unique<TickSourceMock<Microseconds>>();
+    auto tickSourcePtr = mockTickSource.get();
+    svcCtx->setTickSource(std::move(mockTickSource));
+    return tickSourcePtr;
+}
+}  // namespace
+
 class ThroughputProbingTest : public unittest::Test {
 protected:
     explicit ThroughputProbingTest(int32_t size = 64)
@@ -112,13 +122,25 @@ protected:
               svcCtx->setPeriodicRunner(std::move(runner));
               return runnerPtr;
           }()),
+          _tickSource(initTickSource(_svcCtx.get())),
           _throughputProbing([&]() -> ThroughputProbing {
               throughput_probing::gInitialConcurrency = size;
               return {_svcCtx.get(), &_readTicketHolder, &_writeTicketHolder, Milliseconds{1}};
-          }()) {}
+          }()) {
+        // We need to advance the ticks to something other than zero, since that is used to
+        // determine the if we're in the first iteration or not.
+        _tick();
+
+        // First loop is a no-op and initializes state.
+        _run();
+    }
 
     void _run() {
         _runner->run(_client.get());
+    }
+
+    void _tick() {
+        _tickSource->advance(Microseconds(1000));
     }
 
     ServiceContext::UniqueServiceContext _svcCtx = ServiceContext::make();
@@ -127,7 +149,7 @@ protected:
     MockPeriodicRunner* _runner;
     MockTicketHolder _readTicketHolder;
     MockTicketHolder _writeTicketHolder;
-
+    TickSourceMock<Microseconds>* _tickSource;
     ThroughputProbing _throughputProbing;
 };
 
@@ -149,6 +171,7 @@ TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
     _readTicketHolder.setUsed(size);
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
 
     // Stable. Probe up next since tickets are exhausted.
     _run();
@@ -158,6 +181,7 @@ TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
     // Throughput inreases.
     size = _readTicketHolder.outof();
     _readTicketHolder.setNumFinishedProcessing(3);
+    _tick();
 
     // Probing up succeeds; the new value is promoted to stable.
     _run();
@@ -171,6 +195,7 @@ TEST_F(ThroughputProbingTest, ProbeUpFails) {
     _readTicketHolder.setUsed(size);
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
 
     // Stable. Probe up next since tickets are exhausted.
     _run();
@@ -179,6 +204,7 @@ TEST_F(ThroughputProbingTest, ProbeUpFails) {
 
     // Throughput does not increase.
     _readTicketHolder.setNumFinishedProcessing(2);
+    _tick();
 
     // Probing up fails since throughput did not increase. Return to stable.
     _run();
@@ -191,6 +217,7 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     auto size = _readTicketHolder.outof();
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
 
     // Stable. Probe down next since tickets are not exhausted.
     _run();
@@ -200,6 +227,7 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     // Throughput increases.
     size = _readTicketHolder.outof();
     _readTicketHolder.setNumFinishedProcessing(3);
+    _tick();
 
     // Probing down succeeds; the new value is promoted to stable.
     _run();
@@ -212,6 +240,7 @@ TEST_F(ThroughputProbingTest, ProbeDownFails) {
     auto size = _readTicketHolder.outof();
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
 
     // Stable. Probe down next since tickets are not exhausted.
     _run();
@@ -220,6 +249,7 @@ TEST_F(ThroughputProbingTest, ProbeDownFails) {
 
     // Throughput does not increase.
     _readTicketHolder.setNumFinishedProcessing(2);
+    _tick();
 
     // Probing down fails since throughput did not increase. Return back to stable.
     _run();
@@ -233,6 +263,7 @@ TEST_F(ThroughputProbingMaxConcurrencyTest, NoProbeUp) {
     _readTicketHolder.setUsed(size);
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
 
     // Stable. Probe down since concurrency is already at its maximum allowed value, even though
     // ticktes are exhausted.
@@ -246,6 +277,7 @@ TEST_F(ThroughputProbingMinConcurrencyTest, NoProbeDown) {
     auto size = _readTicketHolder.outof();
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
 
     // Stable. Do not probe in either direction since tickets are not exhausted but concurrency is
     // already at its minimum allowed value.
@@ -266,6 +298,7 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
     _readTicketHolder.setUsed(size);
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
 
     // Stable. Probe up next since tickets are exhausted.
     _run();
@@ -274,6 +307,7 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
 
     // Throughput inreases.
     _readTicketHolder.setNumFinishedProcessing(3);
+    _tick();
 
     // Probing up succeeds; the new value is promoted to stable.
     _run();

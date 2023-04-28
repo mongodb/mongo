@@ -89,7 +89,8 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                              ? gInitialConcurrency
                              : std::clamp(static_cast<int32_t>(ProcessInfo::getNumCores()),
                                           gMinConcurrency,
-                                          gMaxConcurrency.load())) {
+                                          gMaxConcurrency.load())),
+      _timer(svcCtx->getTickSource()) {
     _readTicketHolder->resize(_stableConcurrency);
     _writeTicketHolder->resize(_stableConcurrency);
 }
@@ -103,9 +104,16 @@ void ThroughputProbing::_run(Client* client) {
         _readTicketHolder->numFinishedProcessing() + _writeTicketHolder->numFinishedProcessing();
     invariant(numFinishedProcessing >= _prevNumFinishedProcessing);
 
-    auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) /
-        static_cast<double>(durationCount<Milliseconds>(_interval()));
-    _stats.throughput.store(throughput);
+    // Initialize on first iteration.
+    if (_prevNumFinishedProcessing < 0) {
+        _prevNumFinishedProcessing = numFinishedProcessing;
+        _timer.reset();
+        return;
+    }
+
+    double elapsed = _timer.micros();
+    auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) / elapsed;
+    _stats.opsPerSec.store(throughput * 1'000'000);
 
     switch (_state) {
         case ProbingState::kStable:
@@ -119,7 +127,11 @@ void ThroughputProbing::_run(Client* client) {
             break;
     }
 
-    _prevNumFinishedProcessing = numFinishedProcessing;
+    // Reset these with fresh values after we've made our adjustment to establish a better
+    // cause-effect relationship.
+    _prevNumFinishedProcessing =
+        _readTicketHolder->numFinishedProcessing() + _writeTicketHolder->numFinishedProcessing();
+    _timer.reset();
 }
 
 void ThroughputProbing::_probeStable(double throughput) {
@@ -200,7 +212,7 @@ void ThroughputProbing::_setConcurrency(int32_t concurrency) {
 }
 
 void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
-    builder.append("throughput", throughput.load());
+    builder.append("opsPerSec", opsPerSec.load());
     builder.append("timesDecreased", static_cast<long long>(timesDecreased.load()));
     builder.append("timesIncreased", static_cast<long long>(timesIncreased.load()));
     builder.append("totalAmountDecreased", static_cast<long long>(totalAmountDecreased.load()));

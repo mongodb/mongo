@@ -72,13 +72,14 @@ private:
     int32_t _stableConcurrency;
     double _stableThroughput = 0;
     ProbingState _state = ProbingState::kStable;
+    Timer _timer;
 
-    int64_t _prevNumFinishedProcessing = 0;
+    int64_t _prevNumFinishedProcessing = -1;
 
     struct Stats {
         void serialize(BSONObjBuilder& builder) const;
 
-        AtomicWord<double> throughput;
+        AtomicWord<int64_t> opsPerSec;
         AtomicWord<int64_t> timesDecreased;
         AtomicWord<int64_t> timesIncreased;
         AtomicWord<int64_t> totalAmountDecreased;
