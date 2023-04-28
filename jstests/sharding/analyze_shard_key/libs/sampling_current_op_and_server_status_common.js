@@ -110,7 +110,11 @@ function assertCurrentOpAndServerStatusMongos(
     assert.eq(newState.currentOp.length, 1, errMsg);
     assert.eq(newState.currentOp[0].ns, ns, errMsg);
     if (expectedSampleRate !== undefined) {
-        assert.eq(newState.currentOp[0].sampleRate, expectedSampleRate, errMsg);
+        if (newState.currentOp[0].sampleRate != expectedSampleRate) {
+            jsTest.log("The actual sample rate doesn't match the expected sample rate " +
+                       tojson({errMsg, expectedSampleRate}));
+            return false;
+        }
     }
 
     validateServerStatusMongos(newState.serverStatus);

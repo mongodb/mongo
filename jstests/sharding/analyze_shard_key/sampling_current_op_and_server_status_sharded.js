@@ -94,9 +94,6 @@ assert.eq(bsonWoCompare(currentState, makeInitialCurrentOpAndServerStatus(0)), 0
 assert.commandWorked(
     st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
-// Wait for at least one refresh interval to make the inactive mongos find out that its sample rate
-// is 0.
-sleep(2 * queryAnalysisSamplerConfigurationRefreshSecs);
 
 // Execute different kinds of queries and check counters.
 const cmdObj0 = {
