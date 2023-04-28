@@ -71,7 +71,7 @@ public:
 
 private:
     std::shared_ptr<CappedInsertNotifier> _notifier;
-    uint64_t _lastEOFVersion;
+    uint64_t _lastEOFVersion = ~uint64_t(0);
 };
 
 // Class used to notify listeners on majority committed point advancement events.
