@@ -380,22 +380,10 @@ __sync_page_skip(
         return (0);
 
     /*
-     * The checkpoint cleanup fast deletes the obsolete leaf page by marking it as deleted
-     * in the internal page. To achieve this,
-     *
-     * 1. Checkpoint has to read all the internal pages that have obsolete leaf pages.
-     *    To limit the reading of number of internal pages, the aggregated stop durable timestamp
-     *    is checked except when the table is logged. Logged tables do not use timestamps.
-     *
-     * 2. Obsolete leaf pages with overflow keys/values cannot be fast deleted to free
-     *    the overflow blocks. Read the page into cache and mark it dirty to remove the
-     *    overflow blocks during reconciliation.
-     *
-     * FIXME: Read internal pages from non-logged tables when the remove/truncate
-     * operation is performed using no timestamp.
+     * Skip reading the pages that are normal leaf pages or don't have an aggregated durable stop
+     * timestamp.
      */
-    if (addr.type == WT_ADDR_LEAF_NO ||
-      (!F_ISSET(S2BT(session), WT_BTREE_LOGGED) && addr.ta.newest_stop_durable_ts == WT_TS_NONE)) {
+    if (addr.type == WT_ADDR_LEAF_NO || addr.ta.newest_stop_durable_ts == WT_TS_NONE) {
         __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
         WT_STAT_CONN_DATA_INCR(session, cc_pages_walk_skipped);
         *skipp = true;
