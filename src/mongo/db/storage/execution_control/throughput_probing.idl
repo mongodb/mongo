@@ -36,15 +36,15 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<double>
     cpp_varname: gStepMultiple
-    default: 0.2
+    default: 0.1
     validator:
       gte: 0.1
       lte: 0.5
 
   throughputProbingInitialConcurrency:
     description: >-
-      The initial number of concurrent read/write transactions for throughput probing. The default
-      value of 0 means to use the number of logical CPU cores.
+      The initial number of TOTAL concurrent read/write transactions for throughput probing. The
+      default value of 0 means to use the number of logical CPU cores.
     set_at: startup
     cpp_vartype: int32_t
     cpp_varname: gInitialConcurrency
@@ -53,7 +53,9 @@ server_parameters:
       callback: validateInitialConcurrency
 
   throughputProbingMinConcurrency:
-    description: The minimum number of concurrent read/write transactions for throughput probing.
+    description: >-
+      The minimum number of concurrent read/write transactions for throughput probing. This minimum
+      is applied to reads and writes separately.
     set_at: startup
     cpp_vartype: int32_t
     cpp_varname: gMinConcurrency
@@ -62,10 +64,34 @@ server_parameters:
       callback: validateMinConcurrency
 
   throughputProbingMaxConcurrency:
-    description: The maximum number of concurrent read/write transactions for throughput probing.
+    description: >-
+      The maximum number of concurrent read/write transactions for throughput probing. This maximum
+      is applied to reads and writes separately.
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int32_t>
     cpp_varname: gMaxConcurrency
     default: 128
     validator:
       callback: validateMaxConcurrency
+
+  throughputProbingReadWriteRatio:
+    description: The ratio of reads/writes when using throughput probing.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<double>
+    cpp_varname: gReadWriteRatio
+    default: 1
+    validator:
+      gt: 0
+
+  throughputProbingConcurrencyMovingAverageWeight:
+    description: >-
+      How much to weigh newer concurrency measurements into the exponentially-decaying moving
+      average. Higher values respond faster to changes, but with more variability. Lower values
+      respond slower, but with less variability.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<double>
+    cpp_varname: gConcurrencyMovingAverageWeight
+    default: 0.2
+    validator:
+      gt: 0
+      lte: 1

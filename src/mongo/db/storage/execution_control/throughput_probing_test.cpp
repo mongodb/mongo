@@ -157,17 +157,22 @@ using namespace throughput_probing;
 
 class ThroughputProbingMaxConcurrencyTest : public ThroughputProbingTest {
 protected:
-    ThroughputProbingMaxConcurrencyTest() : ThroughputProbingTest(gMaxConcurrency.load()) {}
+    // This input is the total initial concurrency between both ticketholders, so it will be split
+    // evenly between each ticketholder. We are attempting to test a limit that is per-ticketholder.
+    ThroughputProbingMaxConcurrencyTest() : ThroughputProbingTest(gMaxConcurrency.load() * 2) {}
 };
 
 class ThroughputProbingMinConcurrencyTest : public ThroughputProbingTest {
 protected:
-    ThroughputProbingMinConcurrencyTest() : ThroughputProbingTest(gMinConcurrency) {}
+    // This input is the total initial concurrency between both ticketholders, so it will be split
+    // evenly between each ticketholder. We are attempting to test a limit that is per-ticketholder.
+    ThroughputProbingMinConcurrencyTest() : ThroughputProbingTest(gMinConcurrency * 2) {}
 };
 
 TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
     // Tickets are exhausted.
-    auto size = _readTicketHolder.outof();
+    auto initialSize = _readTicketHolder.outof();
+    auto size = initialSize;
     _readTicketHolder.setUsed(size);
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
@@ -183,10 +188,13 @@ TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
     _readTicketHolder.setNumFinishedProcessing(3);
     _tick();
 
-    // Probing up succeeds; the new value is promoted to stable.
+    // Probing up succeeds; the new value is somewhere between the initial value and the probed-up
+    // value.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size);
-    ASSERT_EQ(_writeTicketHolder.outof(), size);
+    ASSERT_LT(_readTicketHolder.outof(), size);
+    ASSERT_GT(_readTicketHolder.outof(), initialSize);
+    ASSERT_LT(_writeTicketHolder.outof(), size);
+    ASSERT_GT(_writeTicketHolder.outof(), initialSize);
 }
 
 TEST_F(ThroughputProbingTest, ProbeUpFails) {
@@ -214,7 +222,8 @@ TEST_F(ThroughputProbingTest, ProbeUpFails) {
 
 TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     // Tickets are not exhausted.
-    auto size = _readTicketHolder.outof();
+    auto initialSize = _readTicketHolder.outof();
+    auto size = initialSize;
     _readTicketHolder.setUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
@@ -229,10 +238,13 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     _readTicketHolder.setNumFinishedProcessing(3);
     _tick();
 
-    // Probing down succeeds; the new value is promoted to stable.
+    // Probing up succeeds; the new value is somewhere between the initial value and the probed-up
+    // value.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size);
-    ASSERT_EQ(_writeTicketHolder.outof(), size);
+    ASSERT_LT(_readTicketHolder.outof(), initialSize);
+    ASSERT_GT(_readTicketHolder.outof(), size);
+    ASSERT_LT(_writeTicketHolder.outof(), initialSize);
+    ASSERT_GT(_writeTicketHolder.outof(), size);
 }
 
 TEST_F(ThroughputProbingTest, ProbeDownFails) {
@@ -288,7 +300,10 @@ TEST_F(ThroughputProbingMinConcurrencyTest, NoProbeDown) {
 
 TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
     gStepMultiple.store(0.1);
-    auto size = _readTicketHolder.outof();
+    // This value is chosen so that it takes two iterations to increase the stable concurrency by 1.
+    gConcurrencyMovingAverageWeight.store(0.3);
+    auto initialSize = _readTicketHolder.outof();
+    auto size = initialSize;
 
     // The concurrency level is low enough that the step multiple on its own is not enough to get to
     // the next integer.
@@ -309,11 +324,82 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
     _readTicketHolder.setNumFinishedProcessing(3);
     _tick();
 
-    // Probing up succeeds; the new value is promoted to stable.
+    // Probing up succeeds; the new value is not enough to increase concurrency yet.
+    _run();
+    ASSERT_EQ(_readTicketHolder.outof(), size);
+    ASSERT_EQ(_writeTicketHolder.outof(), size);
+
+    // Run another iteration.
+
+    // Tickets are exhausted.
+    _readTicketHolder.setUsed(size);
+    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setNumFinishedProcessing(4);
+    _tick();
+
+    // Stable. Probe up next since tickets are exhausted.
+    _run();
+    ASSERT_EQ(_readTicketHolder.outof(), size + 1);
+    ASSERT_EQ(_writeTicketHolder.outof(), size + 1);
+
+    // Throughput inreases.
+    _readTicketHolder.setNumFinishedProcessing(6);
+    _tick();
+
+    // Probing up succeeds; the new value is finally enough to increase concurrency.
     _run();
     ASSERT_EQ(_readTicketHolder.outof(), size + 1);
     ASSERT_EQ(_writeTicketHolder.outof(), size + 1);
 }
+
+TEST_F(ThroughputProbingTest, ReadWriteRatio) {
+    gReadWriteRatio.store(2);  // 33% of tickets for writes, 66% for reads
+    ON_BLOCK_EXIT([]() { gReadWriteRatio.store(1); });
+
+    auto initialReads = _readTicketHolder.outof();
+    auto reads = initialReads;
+    auto initialWrites = _writeTicketHolder.outof();
+    auto writes = initialWrites;
+
+    // Initially these should be equal.
+    ASSERT_EQ(reads, writes);
+
+    // Write tickets are exhausted
+    _writeTicketHolder.setUsed(writes);
+    _writeTicketHolder.setUsed(writes - 1);
+    _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
+
+    // Stable. Probe up next since tickets are exhausted. We expect write tickets to drop because
+    // now the ratio is being applied. Total tickets should still increase.
+    _run();
+    ASSERT_GT(_readTicketHolder.outof(), reads);
+    ASSERT_LT(_writeTicketHolder.outof(), writes);
+    ASSERT_GT(_readTicketHolder.outof() + _writeTicketHolder.outof(), reads + writes);
+
+    // There should be an imbalance.
+    ASSERT_GT(_readTicketHolder.outof(), _writeTicketHolder.outof());
+
+    reads = _readTicketHolder.outof();
+    writes = _writeTicketHolder.outof();
+
+    // Throughput inreases.
+    _readTicketHolder.setNumFinishedProcessing(3);
+    _tick();
+
+    // Probing up succeeds; the new value is somewhere between the initial value and the probed-up
+    // value.
+    _run();
+    ASSERT_LT(_readTicketHolder.outof(), reads);
+    ASSERT_GT(_readTicketHolder.outof(), initialReads);
+    ASSERT_LT(_writeTicketHolder.outof(), writes);
+    ASSERT_LT(_writeTicketHolder.outof(), initialWrites);
+    ASSERT_GT(_readTicketHolder.outof() + _writeTicketHolder.outof(), initialReads + initialWrites);
+
+    // This imbalance should still exist.
+    ASSERT_GT(_readTicketHolder.outof(), _writeTicketHolder.outof());
+}
+
 
 }  // namespace
 }  // namespace mongo::execution_control
