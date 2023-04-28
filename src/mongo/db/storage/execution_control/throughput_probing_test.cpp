@@ -165,7 +165,7 @@ TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
     ASSERT_EQ(_writeTicketHolder.outof(), size);
 }
 
-TEST_F(ThroughputProbingTest, ProbeUpFailsDownSucceeds) {
+TEST_F(ThroughputProbingTest, ProbeUpFails) {
     // Tickets are exhausted.
     auto size = _readTicketHolder.outof();
     _readTicketHolder.setUsed(size);
@@ -180,45 +180,7 @@ TEST_F(ThroughputProbingTest, ProbeUpFailsDownSucceeds) {
     // Throughput does not increase.
     _readTicketHolder.setNumFinishedProcessing(2);
 
-    // Probing up fails since throughput did not increase. Probe down next.
-    _run();
-    ASSERT_LT(_readTicketHolder.outof(), size);
-    ASSERT_LT(_writeTicketHolder.outof(), size);
-
-    // Throughput inreases.
-    size = _readTicketHolder.outof();
-    _readTicketHolder.setNumFinishedProcessing(4);
-
-    // Probing down succeeds; the new value is promoted to stable.
-    _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size);
-    ASSERT_EQ(_writeTicketHolder.outof(), size);
-}
-
-TEST_F(ThroughputProbingTest, ProbeUpFailsDownFails) {
-    // Tickets are exhausted.
-    auto size = _readTicketHolder.outof();
-    _readTicketHolder.setUsed(size);
-    _readTicketHolder.setUsed(size - 1);
-    _readTicketHolder.setNumFinishedProcessing(1);
-
-    // Stable. Probe up next since tickets are exhausted.
-    _run();
-    ASSERT_GT(_readTicketHolder.outof(), size);
-    ASSERT_GT(_writeTicketHolder.outof(), size);
-
-    // Throughput does not increase.
-    _readTicketHolder.setNumFinishedProcessing(2);
-
-    // Probing up fails since throughput did not increase. Probe down next.
-    _run();
-    ASSERT_LT(_readTicketHolder.outof(), size);
-    ASSERT_LT(_writeTicketHolder.outof(), size);
-
-    // Throughput does not increase.
-    _readTicketHolder.setNumFinishedProcessing(3);
-
-    // Probing down fails since throughput did not increase. Return back to stable.
+    // Probing up fails since throughput did not increase. Return to stable.
     _run();
     ASSERT_EQ(_readTicketHolder.outof(), size);
     ASSERT_EQ(_writeTicketHolder.outof(), size);

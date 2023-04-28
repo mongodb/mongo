@@ -131,18 +131,18 @@ void ThroughputProbing::_probeStable(double throughput) {
     _stableThroughput = throughput;
 
     auto outof = _readTicketHolder->outof();
-    auto peakUsed = std::max(_readTicketHolder->getAndResetPeakUsed(),
-                             _writeTicketHolder->getAndResetPeakUsed());
+    auto readPeak = _readTicketHolder->getAndResetPeakUsed();
+    auto writePeak = _writeTicketHolder->getAndResetPeakUsed();
+    auto peakUsed = std::max(readPeak, writePeak);
     if (outof < gMaxConcurrency.load() && peakUsed >= outof) {
         // At least one of the ticket pools is exhausted, so try increasing concurrency.
         _state = ProbingState::kUp;
         _setConcurrency(std::ceil(_stableConcurrency * (1 + gStepMultiple.load())));
-    } else if (_readTicketHolder->used() > gMinConcurrency ||
-               _writeTicketHolder->used() > gMinConcurrency) {
+    } else if (readPeak > gMinConcurrency || writePeak > gMinConcurrency) {
         // Neither of the ticket pools are exhausted, so try decreasing concurrency to just below
         // the current level of usage.
         _state = ProbingState::kDown;
-        _setConcurrency(std::floor(peakUsed * (1 - gStepMultiple.load())));
+        _setConcurrency(std::floor(_stableConcurrency * (1 - gStepMultiple.load())));
     }
 }
 
@@ -161,10 +161,10 @@ void ThroughputProbing::_probeUp(double throughput) {
         _stableThroughput = throughput;
         _stableConcurrency = concurrency;
     } else if (_readTicketHolder->outof() > gMinConcurrency) {
-        // Increasing concurrency did not cause throughput to increase, so try decreasing
-        // concurrency instead.
-        _state = ProbingState::kDown;
-        _setConcurrency(std::floor(_stableConcurrency * (1 - gStepMultiple.load())));
+        // Increasing concurrency did not cause throughput to increase, so go back to stable and get
+        // a new baseline to compare against.
+        _state = ProbingState::kStable;
+        _setConcurrency(_stableConcurrency);
     }
 }
 
