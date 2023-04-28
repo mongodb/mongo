@@ -203,10 +203,14 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
         if (hashesMatch) {
             return SeverityEnum::Info;
         }
-        // Implicitly replicated collections and capped collections not replicating truncation are
-        // not designed to be consistent, so inconsistency is not necessarily pathological.
+        // We relax inconsistency checks for some collections to a simple warning in some cases.
+        // preimages and change collections may be using untimestamped truncates on each node
+        // independently and can easily be inconsistent. In addition, by design
+        // the image_collection can skip a write during steady-state replication, and the preimages
+        // collection can be inconsistent during logical initial sync, all of which is
+        // harmless.
         if (nss.isChangeStreamPreImagesCollection() || nss.isConfigImagesCollection() ||
-            (options && options->capped)) {
+            nss.isChangeCollection() || (options && options->capped)) {
             return SeverityEnum::Warning;
         }
 

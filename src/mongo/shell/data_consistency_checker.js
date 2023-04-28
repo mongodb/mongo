@@ -253,6 +253,12 @@ var {DataConsistencyChecker} = (function() {
         }
 
         static canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName) {
+            if (collName === "system.preimages") {
+                print(`Ignoring hash inconsistencies for 'system.preimages' as those can be ` +
+                      `expected with independent truncates. Content is checked separately by ` +
+                      `ReplSetTest.checkPreImageCollection`);
+                return true;
+            }
             if (collName !== "image_collection") {
                 return false;
             }
@@ -407,15 +413,18 @@ var {DataConsistencyChecker} = (function() {
                     // Although rare, the 'config.image_collection' table can be inconsistent after
                     // an initial sync or after a restart (see SERVER-60048). Dump the collection
                     // diff anyways for more visibility as a sanity check.
+                    //
+                    // 'config.system.preimages' can potentially be inconsistent via hashes,
+                    // there's a special process that verifies them with
+                    // ReplSetTest.checkPreImageCollection so it is safe to ignore failures here.
                     this.dumpCollectionDiff(
                         collectionPrinted, sourceCollInfos, syncingCollInfos, coll.name);
                     const shouldIgnoreFailure =
                         this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, coll.name);
                     if (shouldIgnoreFailure) {
-                        prettyPrint(
-                            `Collection diff in ${dbName}.${coll.name} can be ignored: ${dbHashesMsg}
-                            . Inconsistencies in the image collection can be expected in certain
-                            restart scenarios.`);
+                        prettyPrint(`Collection diff in ${dbName}.${coll.name} can be ignored: ` +
+                                    `${dbHashesMsg}. Inconsistencies in the collection can be ` +
+                                    `expected in certain scenarios.`);
                     }
                     success = shouldIgnoreFailure && success;
                     didIgnoreFailure = shouldIgnoreFailure || didIgnoreFailure;
@@ -593,10 +602,11 @@ var {DataConsistencyChecker} = (function() {
                     dbHashesMsg}`);
                 if (didIgnoreFailure) {
                     // We only expect database hash mismatches on the config db, where
-                    // config.image_collection is expected to have inconsistencies in certain
-                    // scenarios.
-                    prettyPrint(`Ignoring hash mismatch for the ${dbName} database since
-                        inconsistencies in 'config.image_collection' can be expected`);
+                    // config.image_collection and config.system.preimages are expected to have
+                    // inconsistencies in certain scenarios.
+                    prettyPrint(`Ignoring hash mismatch for the ${dbName} database since ` +
+                                `inconsistencies in 'config.image_collection' or ` +
+                                `'config.system.preimages' can be expected`);
                     return success;
                 }
                 success = false;
