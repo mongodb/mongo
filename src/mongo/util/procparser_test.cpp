@@ -120,6 +120,11 @@ StringMap toNestedStringMap(BSONObj& obj) {
     ASSERT_OK(procparser::parseProcSysFsFileNr(_key, _x, &builder)); \
     auto obj = builder.obj();                                        \
     auto stringMap = toStringMap(obj);
+#define ASSERT_PARSE_PRESSURE(_x)                           \
+    BSONObjBuilder builder;                                 \
+    ASSERT_OK(procparser::parseProcPressure(_x, &builder)); \
+    auto obj = builder.obj();                               \
+    auto stringMap = toStringMap(obj);
 
 TEST(FTDCProcStat, TestStat) {
 
@@ -932,6 +937,112 @@ TEST(FTDCProcSysFsFileNr, TestFile) {
     // Non-existent file case
     ASSERT_NOT_OK(procparser::parseProcSysFsFileNrFile(
         "/proc/non-existent-file", procparser::FileNrKey::kFileHandlesInUse, &builder));
+}
+
+TEST(FTDCProcPressure, TestSuccess) {
+    // Normal cases
+    {
+        ASSERT_PARSE_PRESSURE(
+            "some avg10=0.10 avg60=6.50 avg300=1.00 total=14\nfull avg10=2.30 "
+            "avg60=0.00 avg300=0.14 total=10");
+        ASSERT(obj["some"]["totalMicros"].Double() == 14);
+
+        ASSERT(obj["full"]["totalMicros"].Double() == 10);
+    }
+    {
+        ASSERT_PARSE_PRESSURE("some avg10=0.10 avg60=6.50 avg300=1.00 total=14");
+        ASSERT(obj["some"]["totalMicros"].Double() == 14);
+
+        ASSERT(!obj["full"]);
+    }
+    {
+        ASSERT_PARSE_PRESSURE(
+            "some avg10=0.10    avg60=6.50      avg300=1.00 total=14\nfull avg10=2.30 "
+            "avg60=0.00 avg300=0.14        total=10");
+        ASSERT(obj["some"]["totalMicros"].Double() == 14);
+
+        ASSERT(obj["full"]["totalMicros"].Double() == 10);
+    }
+}
+
+TEST(FTDCProcPressure, TestFailure) {
+    // Failure cases
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(procparser::parseProcPressureFile("", "", &builder));
+    }
+
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(
+            procparser::parseProcPressureFile("cpu", "/proc/non-existent-file", &builder));
+    }
+
+    // 'total' is not found in the data given.
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(
+            procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00", &builder));
+    }
+
+    // 'total' is not found in one of the rows.
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(
+            procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00\nfull avg10=2.30 "
+                                          "avg60=0.00 avg300=0.14 total=10",
+                                          &builder));
+    }
+
+    // 'total' is not given a valid number value.
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(procparser::parseProcPressure(
+            "some avg10=0.10 avg60=6.50 avg300=1.00 total=invalid", &builder));
+    }
+}
+
+TEST(FTDCProcPressure, TestLocalPressureInfo) {
+    if (boost::filesystem::exists("/proc/pressure/cpu")) {
+        BSONObjBuilder builder;
+
+        ASSERT_OK(procparser::parseProcPressureFile("cpu", "/proc/pressure/cpu", &builder));
+
+        BSONObj obj = builder.obj();
+        ASSERT(obj.hasField("cpu"));
+        ASSERT(obj["cpu"]["some"]);
+        ASSERT(obj["cpu"]["some"]["totalMicros"]);
+
+        ASSERT(!obj["cpu"]["full"]);
+    }
+
+    if (boost::filesystem::exists("/proc/pressure/memory")) {
+        BSONObjBuilder builder;
+
+        ASSERT_OK(procparser::parseProcPressureFile("memory", "/proc/pressure/memory", &builder));
+
+        BSONObj obj = builder.obj();
+        ASSERT(obj.hasField("memory"));
+        ASSERT(obj["memory"]["some"]);
+        ASSERT(obj["memory"]["some"]["totalMicros"]);
+
+        ASSERT(obj["memory"]["full"]);
+        ASSERT(obj["memory"]["full"]["totalMicros"]);
+    }
+
+    if (boost::filesystem::exists("/proc/pressure/io")) {
+        BSONObjBuilder builder;
+
+        ASSERT_OK(procparser::parseProcPressureFile("io", "/proc/pressure/io", &builder));
+
+        BSONObj obj = builder.obj();
+        ASSERT(obj.hasField("io"));
+        ASSERT(obj["io"]["some"]);
+        ASSERT(obj["io"]["some"]["totalMicros"]);
+
+        ASSERT(obj["io"]["full"]);
+        ASSERT(obj["io"]["full"]["totalMicros"]);
+    }
 }
 
 }  // namespace
