@@ -40,6 +40,8 @@ server_parameters:
             If true, MongoDB will not execute queries that require a table scan and will return an error.
         set_at: [ startup, runtime ]
         cpp_varname: 'storageGlobalParams.noTableScan'
+    # This is an alias for the 'storage.syncPeriodSecs' config, and the default is defined in the
+    # StorageGlobalParams struct to resolve a conflict between config parameter and set parameter evaluation.
     syncdelay:
         # In almost every situation you should not set this value and use the default setting.
         description: >-
@@ -50,6 +52,8 @@ server_parameters:
         validator:
             gte: 0.0
             lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
+    # This is an alias for the 'storage.journal.commitIntervalMs' config, and the default is defined in the
+    # StorageGlobalParams struct to resolve a conflict between config parameter and set parameter evaluation.
     journalCommitInterval:
         description: 'Number of milliseconds between journal commits'
         set_at: [ startup, runtime ]
