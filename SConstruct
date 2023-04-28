@@ -3667,6 +3667,9 @@ def doConfigure(myenv):
         # Don't issue warnings about potentially evaluated expressions
         myenv.AddToCCFLAGSIfSupported("-Wno-potentially-evaluated-expression")
 
+        # SERVER-76472 we don't try to maintain ABI so disable warnings about possible ABI issues.
+        myenv.AddToCCFLAGSIfSupported("-Wno-psabi")
+
         # Warn about moves of prvalues, which can inhibit copy elision.
         myenv.AddToCXXFLAGSIfSupported("-Wpessimizing-move")
 
