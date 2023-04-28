@@ -23,6 +23,14 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
+  enterprise-rhel80-debug-complete-tsan:
+  - task: aggregation_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
+
+  enterprise-rhel80-debug-tsan:
+  - task: aggregation_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
+
   macos:
   - task: concurrency
     idle_timeout: 15
@@ -35,6 +43,10 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
+  rhel80-asan:
+  - task: aggregation_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
+
   rhel80-debug-ubsan:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
@@ -45,4 +57,8 @@ overrides:
 
   rhel80-debug-aubsan-all-feature-flags:
   - task: update_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
+
+  ubuntu1804-asan:
+  - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
