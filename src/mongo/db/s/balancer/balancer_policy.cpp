@@ -504,11 +504,26 @@ MigrateInfosWithReason BalancerPolicy::balance(
                     return boost::none;
                 }();
 
-                migrations.emplace_back(to,
-                                        distribution.nss(),
-                                        chunk,
-                                        MoveChunkRequest::ForceJumbo::kForceBalancer,
-                                        maxChunkSizeBytes);
+                if (collDataSizeInfo.has_value()) {
+                    migrations.emplace_back(
+                        to,
+                        chunk.getShard(),
+                        distribution.nss(),
+                        chunk.getCollectionUUID(),
+                        chunk.getMin(),
+                        boost::none /* max */,
+                        chunk.getVersion(),
+                        // Always force jumbo chunks to be migrated off draining shards
+                        MoveChunkRequest::ForceJumbo::kForceBalancer,
+                        maxChunkSizeBytes);
+                } else {
+                    migrations.emplace_back(to,
+                                            distribution.nss(),
+                                            chunk,
+                                            MoveChunkRequest::ForceJumbo::kForceBalancer,
+                                            maxChunkSizeBytes);
+                }
+
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::drain;
                 }
@@ -584,12 +599,28 @@ MigrateInfosWithReason BalancerPolicy::balance(
                     return boost::none;
                 }();
 
-                migrations.emplace_back(to,
-                                        distribution.nss(),
-                                        chunk,
-                                        forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
-                                                   : MoveChunkRequest::ForceJumbo::kDoNotForce,
-                                        maxChunkSizeBytes);
+                if (collDataSizeInfo.has_value()) {
+                    migrations.emplace_back(to,
+                                            chunk.getShard(),
+                                            distribution.nss(),
+                                            chunk.getCollectionUUID(),
+                                            chunk.getMin(),
+                                            boost::none /* max */,
+                                            chunk.getVersion(),
+                                            forceJumbo
+                                                ? MoveChunkRequest::ForceJumbo::kForceBalancer
+                                                : MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                            maxChunkSizeBytes);
+                } else {
+                    migrations.emplace_back(to,
+                                            distribution.nss(),
+                                            chunk,
+                                            forceJumbo
+                                                ? MoveChunkRequest::ForceJumbo::kForceBalancer
+                                                : MoveChunkRequest::ForceJumbo::kDoNotForce,
+                                            maxChunkSizeBytes);
+                }
+
                 if (firstReason == MigrationReason::none) {
                     firstReason = MigrationReason::zoneViolation;
                 }
@@ -882,7 +913,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
                                  distribution.nss(),
                                  chunk.getCollectionUUID(),
                                  chunk.getMin(),
-                                 boost::none /* call moveRange*/,
+                                 boost::none /* max */,
                                  chunk.getVersion(),
                                  forceJumbo,
                                  collDataSizeInfo.maxChunkSizeBytes);
