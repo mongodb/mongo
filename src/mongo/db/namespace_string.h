@@ -833,7 +833,9 @@ private:
 
         auto dotIndex = ns.find('.');
         uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("db name must be at most {} characters, found: {}", dotIndex),
+                fmt::format("db name must be at most {} characters, found: {}",
+                            DatabaseName::kMaxDatabaseNameLength,
+                            dotIndex),
                 (dotIndex != std::string::npos ? dotIndex : ns.size()) <=
                     DatabaseName::kMaxDatabaseNameLength);
 

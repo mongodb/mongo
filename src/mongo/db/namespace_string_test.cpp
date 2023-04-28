@@ -122,6 +122,11 @@ TEST(NamespaceStringTest, DatabaseValidNames) {
         "ThisIsADatabaseNameThatBrokeAllRecordsForValidLengthForDBName63"));
     ASSERT(!NamespaceString::validDBName(
         "WhileThisDatabaseNameExceedsTheMaximumLengthForDatabaseNamesof63"));
+
+    ASSERT_THROWS_CODE(
+        NamespaceString{"WhileThisDatabaseNameExceedsTheMaximumLengthForDatabaseNamesof63"},
+        AssertionException,
+        ErrorCodes::InvalidNamespace);
 }
 
 TEST(NamespaceStringTest, ListCollectionsCursorNS) {
