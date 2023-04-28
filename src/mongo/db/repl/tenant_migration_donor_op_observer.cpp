@@ -206,21 +206,9 @@ public:
                 // The migration durably aborted and is now marked as garbage collectable,
                 // remove its TenantMigrationDonorAccessBlocker right away to allow back-to-back
                 // migration retries.
-                if (_donorStateDoc.getProtocol().value_or(
-                        MigrationProtocolEnum::kMultitenantMigrations) ==
-                    MigrationProtocolEnum::kMultitenantMigrations) {
-                    const auto tenantId = TenantId::parseFromString(_donorStateDoc.getTenantId());
-                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
-                } else {
-                    tassert(6448701,
-                            "Bad protocol",
-                            _donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
-                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .removeAccessBlockersForMigration(
-                            _donorStateDoc.getId(),
-                            TenantMigrationAccessBlocker::BlockerType::kDonor);
-                }
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAccessBlockersForMigration(
+                        _donorStateDoc.getId(), TenantMigrationAccessBlocker::BlockerType::kDonor);
             }
             return;
         }

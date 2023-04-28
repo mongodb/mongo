@@ -256,46 +256,6 @@ void fassertOnUnsafeInitialSync(const UUID& migrationId) {
         "migrationId"_attr = migrationId);
 }
 
-std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
-    ServiceContext* serviceContext, const UUID& migrationId) {
-    return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
-        TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getAccessBlockerForMigration(migrationId,
-                                          TenantMigrationAccessBlocker::BlockerType::kDonor));
-}
-
-std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlockerForMigration(
-    ServiceContext* serviceContext, const UUID& migrationId) {
-    return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
-        TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getAccessBlockerForMigration(migrationId,
-                                          TenantMigrationAccessBlocker::BlockerType::kRecipient));
-}
-
-std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
-    ServiceContext* const serviceContext, StringData tenantId) {
-
-    TenantId tid = TenantId::parseFromString(tenantId);
-
-    return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
-        TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getTenantMigrationAccessBlockerForTenantId(tid, MtabType::kRecipient));
-}
-
-void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
-                                              const StringData& tenantId,
-                                              const UUID& migrationId) {
-    if (getTenantMigrationRecipientAccessBlocker(serviceContext, tenantId)) {
-        return;
-    }
-
-    auto mtab =
-        std::make_shared<TenantMigrationRecipientAccessBlocker>(serviceContext, migrationId);
-
-    const auto tid = TenantId::parseFromString(tenantId);
-    TenantMigrationAccessBlockerRegistry::get(serviceContext).add(tid, mtab);
-}
-
 void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
                                 const NamespaceString& nss,
                                 const UUID& migrationId) {

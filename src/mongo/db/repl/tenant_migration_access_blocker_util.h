@@ -40,23 +40,7 @@ namespace mongo {
 
 namespace tenant_migration_access_blocker {
 
-std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
-    ServiceContext* serviceContext, const UUID& migrationId);
-
-std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlockerForMigration(
-    ServiceContext* serviceContext, const UUID& migrationId);
-
-std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
-    ServiceContext* serviceContext, StringData tenantId);
-
 void fassertOnUnsafeInitialSync(const UUID& migrationId);
-
-/**
- * Add an access blocker if one does not already exist.
- */
-void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
-                                              const StringData& tenantId,
-                                              const UUID& migrationId);
 
 /**
  * Parse the tenantId from a database name, or return boost::none if there is no tenantId.

@@ -160,10 +160,13 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                                      migrationId);
                 });
 
-                auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
-                    opCtx->getServiceContext(), migrationId);
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .add(recipientStateDoc.getTenantIds(), mtab);
+                auto& registry =
+                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
+                for (const auto& tenantId : recipientStateDoc.getTenantIds()) {
+                    registry.add(tenantId,
+                                 std::make_shared<TenantMigrationRecipientAccessBlocker>(
+                                     opCtx->getServiceContext(), migrationId));
+                }
                 opCtx->recoveryUnit()->onRollback([migrationId](OperationContext* opCtx) {
                     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                         .removeAccessBlockersForMigration(
@@ -240,11 +243,15 @@ void onTransitioningToConsistent(OperationContext* opCtx,
     assertImportDoneMarkerLocalCollectionExists(opCtx, recipientStateDoc.getId());
     if (recipientStateDoc.getRejectReadsBeforeTimestamp()) {
         opCtx->recoveryUnit()->onCommit([recipientStateDoc](OperationContext* opCtx, auto _) {
-            auto mtab = tenant_migration_access_blocker::getRecipientAccessBlockerForMigration(
-                opCtx->getServiceContext(), recipientStateDoc.getId());
-            invariant(mtab);
-            mtab->startRejectingReadsBefore(
-                recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+            auto mtabVector =
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getRecipientAccessBlockersForMigration(recipientStateDoc.getId());
+            invariant(!mtabVector.empty());
+            for (auto& mtab : mtabVector) {
+                invariant(mtab);
+                mtab->startRejectingReadsBefore(
+                    recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+            }
         });
     }
 }
@@ -262,12 +269,15 @@ void onTransitioningToCommitted(OperationContext* opCtx,
 
     if (markedGCAfterMigrationStart) {
         opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {
-            auto mtab = tenant_migration_access_blocker::getRecipientAccessBlockerForMigration(
-                opCtx->getServiceContext(), migrationId);
-            invariant(mtab);
-            // Once the migration is committed and state doc is marked garbage collectable,
-            // the TTL deletions should be unblocked for the imported donor collections.
-            mtab->stopBlockingTTL();
+            auto mtabVector = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                                  .getRecipientAccessBlockersForMigration(migrationId);
+            invariant(!mtabVector.empty());
+            for (auto& mtab : mtabVector) {
+                invariant(mtab);
+                // Once the migration is committed and state doc is marked garbage collectable,
+                // the TTL deletions should be unblocked for the imported donor collections.
+                mtab->stopBlockingTTL();
+            }
 
             ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                 .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,

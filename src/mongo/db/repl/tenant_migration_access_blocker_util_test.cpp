@@ -176,24 +176,28 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseForUnr
 }
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseAfterRemoveWithBoth) {
+    auto recipientId = UUID::gen();
     auto recipientMtab =
-        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), UUID::gen());
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), recipientId);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, recipientMtab);
 
+    auto donorId = UUID::gen();
     auto donorMtab =
-        std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), UUID::gen());
+        std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), donorId);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
 
     // Remove donor, should still be a migration.
     TenantMigrationAccessBlockerRegistry::get(getServiceContext())
-        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+        .removeAccessBlockersForMigration(donorId,
+                                          TenantMigrationAccessBlocker::BlockerType::kDonor);
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
 
     // Remove recipient, there should be no migration.
     TenantMigrationAccessBlockerRegistry::get(getServiceContext())
-        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        .removeAccessBlockersForMigration(recipientId,
+                                          TenantMigrationAccessBlocker::BlockerType::kRecipient);
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
 }
 
@@ -222,7 +226,8 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveShardMergeFalseAfterRemove
 
     // Remove recipient, there should be no migration.
     TenantMigrationAccessBlockerRegistry::get(getServiceContext())
-        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        .removeAccessBlockersForMigration(migrationId,
+                                          TenantMigrationAccessBlocker::BlockerType::kRecipient);
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
     ASSERT_FALSE(
         tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), DatabaseName::kAdmin));

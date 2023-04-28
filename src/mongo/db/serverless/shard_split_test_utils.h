@@ -31,6 +31,7 @@
 
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class OperationContext;
@@ -44,13 +45,13 @@ namespace shard_split {
 // test fixture, which introduces additional errors in the test and makes debugging harder.
 class ScopedTenantAccessBlocker {
 public:
-    ScopedTenantAccessBlocker(const std::vector<TenantId>& tenants, OperationContext* opCtx);
+    ScopedTenantAccessBlocker(const UUID& uuid, OperationContext* opCtx);
     ~ScopedTenantAccessBlocker();
 
     void dismiss();
 
 private:
-    std::vector<TenantId> _tenants;
+    boost::optional<UUID> _uuid;
     OperationContext* _opCtx;
 };
 

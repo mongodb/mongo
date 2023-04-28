@@ -497,7 +497,7 @@ void mockCommandReplies(MockReplicaSet* replSet) {
 
 TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) {
     auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -560,7 +560,7 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitFailsWhenLockIsHeld) {
 
 TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpRetryable) {
     auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -600,7 +600,7 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
 
     auto opCtx = makeOperationContext();
     auto serviceContext = getServiceContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -629,7 +629,7 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
 
 TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
     auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -687,7 +687,7 @@ TEST_F(ShardSplitDonorServiceTest, SendReplSetStepUpToHighestLastApplied) {
     // by replacing the default `hello` replies (set by the MockReplicaSet) with ones that report
     // `lastWrite.opTime` values in a deterministic way.
     auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -731,7 +731,7 @@ TEST_F(ShardSplitDonorServiceTest, CreateInstanceInAbortedState) {
     auto opCtx = makeOperationContext();
     auto serviceContext = getServiceContext();
 
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -759,7 +759,7 @@ TEST_F(ShardSplitDonorServiceTest, CreateInstanceThenAbort) {
     auto opCtx = makeOperationContext();
     auto serviceContext = getServiceContext();
 
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         serviceContext, _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -792,7 +792,7 @@ TEST_F(ShardSplitDonorServiceTest, CreateInstanceThenAbort) {
 
 TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -826,7 +826,7 @@ TEST_F(ShardSplitDonorServiceTest, DeleteStateDocMarkedGarbageCollectable) {
 
     auto opCtx = makeOperationContext();
 
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -859,7 +859,7 @@ TEST_F(ShardSplitDonorServiceTest, DeleteStateDocMarkedGarbageCollectable) {
 TEST_F(ShardSplitDonorServiceTest, AbortDueToRecipientNodesValidation) {
     auto opCtx = makeOperationContext();
     auto serviceContext = getServiceContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
 
     // Matching recipientSetName to the replSetName to fail validation and abort shard split.
     test::shard_split::reconfigToAddRecipientNodes(
@@ -962,7 +962,7 @@ TEST(RecipientAcceptSplitListenerTest, FutureNotReadyWrongSet) {
 
 TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
     auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
@@ -1062,7 +1062,7 @@ public:
 
 TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
     auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_uuid, opCtx.get());
 
     ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
 

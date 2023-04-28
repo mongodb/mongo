@@ -898,14 +898,18 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            // Start blocking writes before getting an oplog slot to guarantee no
                            // writes to the tenant's data can commit with a timestamp after the
                            // block timestamp.
-                           auto mtab =
-                               tenant_migration_access_blocker::getDonorAccessBlockerForMigration(
-                                   _serviceContext, uuid);
-                           invariant(mtab);
-                           mtab->startBlockingWrites();
+                           auto mtabVector =
+                               TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                                   .getDonorAccessBlockersForMigration(uuid);
+                           invariant(!mtabVector.empty());
 
-                           opCtx->recoveryUnit()->onRollback(
-                               [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
+                           for (auto& mtab : mtabVector) {
+                               invariant(mtab);
+                               mtab->startBlockingWrites();
+
+                               opCtx->recoveryUnit()->onRollback(
+                                   [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
+                           }
                        }
 
                        // Reserve an opTime for the write.

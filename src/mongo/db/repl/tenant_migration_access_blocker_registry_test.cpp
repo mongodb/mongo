@@ -81,26 +81,6 @@ TEST_F(TenantMigrationAccessBlockerRegistryTest, AddAccessBlocker) {
         ErrorCodes::ConflictingServerlessOperation);
 }
 
-TEST_F(TenantMigrationAccessBlockerRegistryTest, RemoveAccessBlocker) {
-    auto& registry = TenantMigrationAccessBlockerRegistry::get(getServiceContext());
-    const auto uuid = UUID::gen();
-    const auto tenant = TenantId{OID::gen()};
-
-    registry.add(tenant,
-                 std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid));
-    ASSERT(registry.getTenantMigrationAccessBlockerForTenantId(
-        tenant, TenantMigrationAccessBlocker::BlockerType::kDonor));
-
-    registry.remove(tenant, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-    ASSERT(registry.getTenantMigrationAccessBlockerForTenantId(
-        tenant, TenantMigrationAccessBlocker::BlockerType::kDonor));
-
-    registry.remove(tenant, TenantMigrationAccessBlocker::BlockerType::kDonor);
-
-    ASSERT_FALSE(registry.getTenantMigrationAccessBlockerForTenantId(
-        tenant, TenantMigrationAccessBlocker::BlockerType::kDonor));
-}
-
 TEST_F(TenantMigrationAccessBlockerRegistryTest, RemoveAccessBlockersForMigration) {
     auto& registry = TenantMigrationAccessBlockerRegistry::get(getServiceContext());
     const auto uuid = UUID::gen();
@@ -259,24 +239,56 @@ TEST_F(TenantMigrationAccessBlockerRegistryTest, GetDonorAccessBlockersForMigrat
         TenantId{OID::gen()},
         std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), UUID::gen()));
     ASSERT(registry.getDonorAccessBlockersForMigration(uuid).empty());
-    std::cout << "1" << std::endl;
     auto donorBlocker =
         std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid);
     registry.add(TenantId{OID::gen()}, donorBlocker);
     assertVector(registry.getDonorAccessBlockersForMigration(uuid), {donorBlocker});
-    std::cout << "2" << std::endl;
 
     auto globalBlocker =
         std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid);
     registry.addGlobalDonorAccessBlocker(globalBlocker);
     assertVector(registry.getDonorAccessBlockersForMigration(uuid), {globalBlocker, donorBlocker});
-    std::cout << "3" << std::endl;
 
     ASSERT(registry.getDonorAccessBlockersForMigration(UUID::gen()).empty());
 
     registry.add(TenantId{OID::gen()},
                  std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid));
     ASSERT_EQ(registry.getDonorAccessBlockersForMigration(uuid).size(), 3);
+}
+
+TEST_F(TenantMigrationAccessBlockerRegistryTest, GetRecipientAccessBlockersForMigration) {
+    auto& registry = TenantMigrationAccessBlockerRegistry::get(getServiceContext());
+    const auto uuid = UUID::gen();
+
+    auto assertVector =
+        [](const std::vector<std::shared_ptr<TenantMigrationRecipientAccessBlocker>>& result,
+           const std::vector<std::shared_ptr<TenantMigrationRecipientAccessBlocker>>& expected) {
+            // Order might change. Check that vector size is equal and all expected entries are
+            // found.
+            ASSERT_EQ(result.size(), expected.size());
+            for (const auto& ptr : expected) {
+                ASSERT_NE(std::find_if(result.begin(),
+                                       result.end(),
+                                       [ptr](const auto& entry) { return entry == ptr; }),
+                          result.end());
+            }
+        };
+
+    registry.add(
+        TenantId{OID::gen()},
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), UUID::gen()));
+    ASSERT(registry.getRecipientAccessBlockersForMigration(uuid).empty());
+
+    auto recipientBlocker =
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), uuid);
+    registry.add(TenantId{OID::gen()}, recipientBlocker);
+    assertVector(registry.getRecipientAccessBlockersForMigration(uuid), {recipientBlocker});
+
+    auto secondBlocker =
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), uuid);
+    registry.add(TenantId{OID::gen()}, secondBlocker);
+    assertVector(registry.getRecipientAccessBlockersForMigration(uuid),
+                 {recipientBlocker, secondBlocker});
 }
 
 }  // namespace mongo

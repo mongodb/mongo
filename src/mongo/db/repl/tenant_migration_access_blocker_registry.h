@@ -127,11 +127,6 @@ public:
     void addGlobalDonorAccessBlocker(std::shared_ptr<TenantMigrationDonorAccessBlocker> mtab);
 
     /**
-     * Removes the entry for (tenantId, mtab)
-     */
-    void remove(const TenantId& tenantId, TenantMigrationAccessBlocker::BlockerType type);
-
-    /**
      * Remove all access blockers of the provided type for a migration.
      */
     void removeAccessBlockersForMigration(const UUID& migrationId,
@@ -148,13 +143,6 @@ public:
      */
     boost::optional<DonorRecipientAccessBlockerPair> getAccessBlockersForDbName(
         const DatabaseName& dbName);
-
-
-    /**
-     * Returns the access blocker associated with a migration, if it exists.
-     */
-    std::shared_ptr<TenantMigrationAccessBlocker> getAccessBlockerForMigration(
-        const UUID& migrationId, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Iterates through each of the TenantMigrationAccessBlockers and
@@ -177,6 +165,12 @@ public:
      */
     std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>>
     getDonorAccessBlockersForMigration(const UUID& migrationId);
+
+    /**
+     * Return the recipient access blockers associated with a migration.
+     */
+    std::vector<std::shared_ptr<TenantMigrationRecipientAccessBlocker>>
+    getRecipientAccessBlockersForMigration(const UUID& migrationId);
 
     using applyAllCallback = std::function<void(
         const TenantId& tenantId, std::shared_ptr<TenantMigrationAccessBlocker>& mtab)>;

@@ -2940,9 +2940,11 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        pauseAfterRunTenantMigrationRecipientInstance.pauseWhileSet();
 
                        if (_protocol != MigrationProtocolEnum::kShardMerge) {
-                           auto mtab = tenant_migration_access_blocker::
-                               getTenantMigrationRecipientAccessBlocker(_serviceContext,
-                                                                        _stateDoc.getTenantId());
+                           TenantId tid = TenantId::parseFromString(_stateDoc.getTenantId());
+                           auto mtab =
+                               TenantMigrationAccessBlockerRegistry::get(_serviceContext)
+                                   .getTenantMigrationAccessBlockerForTenantId(
+                                       tid, TenantMigrationAccessBlocker::BlockerType::kRecipient);
                            if (mtab && mtab->getMigrationId() != _migrationUuid) {
                                // There is a conflicting migration. If its state doc has already
                                // been marked as garbage collectable, this instance must correspond
