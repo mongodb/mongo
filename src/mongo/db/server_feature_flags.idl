@@ -59,12 +59,6 @@ feature_flags:
         cpp_varname: gFeatureFlagAdditionalParticipants
         default: false
         shouldBeFCVGated: true
-    featureFlagOIDC:
-        description: "Feature flag for OIDC support"
-        cpp_varname: gFeatureFlagOIDC
-        default: true
-        version: 7.0
-        shouldBeFCVGated: true
     featureFlagBulkWriteCommand:
         description: "Support for bulkWrite command and one-shot transactions"
         cpp_varname: gFeatureFlagBulkWriteCommand

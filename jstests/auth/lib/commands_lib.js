@@ -5767,8 +5767,7 @@ export const authCommandsLib = {
           // Only enterprise knows of this command.
           skipTest:
               (conn) => {
-                return !getBuildInfo().modules.includes("enterprise")
-                        || !TestData.setParameters.featureFlagOIDC;
+                return !getBuildInfo().modules.includes("enterprise");
               },
           testcases: [
             {
@@ -5785,8 +5784,7 @@ export const authCommandsLib = {
           // Only enterprise knows of this command.
           skipTest:
               (conn) => {
-                return !getBuildInfo().modules.includes("enterprise")
-                    || !TestData.setParameters.featureFlagOIDC;
+                return !getBuildInfo().modules.includes("enterprise");
               },
           testcases: [
             {
