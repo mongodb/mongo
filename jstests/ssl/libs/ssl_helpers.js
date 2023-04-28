@@ -1,4 +1,5 @@
 load('jstests/multiVersion/libs/multi_rs.js');
+load('jstests/libs/os_helpers.js');
 
 // Do not fail if this test leaves unterminated processes because this file expects replset1.js to
 // throw for invalid SSL options.
@@ -387,12 +388,37 @@ function isDebian10() {
     }
 }
 
+function isDebian9() {
+    if (_isWindows()) {
+        return false;
+    }
+
+    // Debian 9 supports TLS 1.1 but Debian 10 does not
+    try {
+        // this file exists on systemd-based systems, necessary to avoid mischaracterizing debian
+        // derivatives as stock debian
+        const releaseFile = cat("/etc/os-release").toLowerCase();
+        const prettyName = releaseFile.split('\n').find(function(line) {
+            return line.startsWith("pretty_name");
+        });
+        return prettyName.includes("debian") &&
+            (prettyName.includes("9") || prettyName.includes("stretch"));
+    } catch (e) {
+        return false;
+    }
+}
+
 function sslProviderSupportsTLS1_0() {
     if (isRHEL8()) {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
-    return !isDebian10() && !isUbuntu2004();
+
+    if (isOpenSSL3orGreater()) {
+        return false;
+    }
+
+    return !isDebian() && !isUbuntu2004();
 }
 
 function sslProviderSupportsTLS1_1() {
@@ -400,7 +426,22 @@ function sslProviderSupportsTLS1_1() {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
-    return !isDebian10() && !isUbuntu2004();
+
+    if (isOpenSSL3orGreater()) {
+        return false;
+    }
+
+    return isDebian9() || (!isDebian() && !isUbuntu2004());
+}
+
+function isOpenSSL3orGreater() {
+    // Windows and macOS do not have "openssl.compiled" in buildInfo but they do have "running"
+    const opensslCompiledIn = getBuildInfo().openssl.compiled !== undefined;
+    if (!opensslCompiledIn) {
+        return false;
+    }
+
+    return opensslVersionAsInt() >= 0x3000000;
 }
 
 function opensslVersionAsInt() {
@@ -415,6 +456,22 @@ function opensslVersionAsInt() {
     let version = (matches[1] << 24) | (matches[2] << 16) | (matches[3] << 8);
 
     return version;
+}
+
+function supportsFIPS() {
+    // OpenSSL supports FIPS
+    let expectSupportsFIPS = (determineSSLProvider() == "openssl");
+
+    // But OpenSSL supports FIPS only sometimes
+    // - Debian does not support FIPS, Fedora 37 does not, Fedora 38 does
+    // - Ubuntu only supports FIPS with Ubuntu pro
+    if (expectSupportsFIPS) {
+        if (isDebian() || isUbuntu()) {
+            expectSupportsFIPS = false;
+        }
+    }
+
+    return expectSupportsFIPS;
 }
 
 function copyCertificateFile(a, b) {
