@@ -134,7 +134,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_s390x,requires_increased_memlock_limits
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: small_compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
   - name: .aggregation .common
