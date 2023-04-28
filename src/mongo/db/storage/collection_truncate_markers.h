@@ -239,6 +239,22 @@ private:
 protected:
     CollectionTruncateMarkers(CollectionTruncateMarkers&& other);
 
+    template <typename F>
+    auto modifyMarkersWith(F&& f) {
+        static_assert(std::is_invocable_v<F, std::deque<Marker>&>,
+                      "Function must be of type T(std::deque<Marker>&)");
+        stdx::lock_guard lk(_markersMutex);
+        return f(_markers);
+    }
+
+    template <typename F>
+    auto checkMarkersWith(F&& f) const {
+        static_assert(std::is_invocable_v<F, const std::deque<Marker>&>,
+                      "Function must be of type T(const std::deque<Marker>&)");
+        stdx::lock_guard lk(_markersMutex);
+        return f(_markers);
+    }
+
     const std::deque<Marker>& getMarkers() const {
         return _markers;
     }
@@ -285,10 +301,6 @@ private:
     RecordId _lastHighestRecordId;
     Date_t _lastHighestWallTime;
 
-    // Replaces the highest marker if _isMarkerLargerThanHighest returns true.
-    void _replaceNewHighestMarkingIfNecessary(const RecordId& newMarkerRecordId,
-                                              Date_t newMarkerWallTime);
-
     // Used to decide if the current partially built marker has expired.
     virtual bool _hasPartialMarkerExpired(OperationContext* opCtx) const {
         return false;
@@ -301,6 +313,9 @@ protected:
     std::pair<const RecordId&, const Date_t&> getPartialMarker() const {
         return {_lastHighestRecordId, _lastHighestWallTime};
     }
+
+    // Updates the highest seen RecordId and wall time if they are above the current ones.
+    void _updateHighestSeenRecordIdAndWallTime(const RecordId& rId, Date_t wallTime);
 };
 
 }  // namespace mongo

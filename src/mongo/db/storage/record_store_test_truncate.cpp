@@ -33,6 +33,7 @@
 
 
 #include "mongo/db/storage/record_store.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -114,5 +115,15 @@ TEST(RecordStoreTestHarness, TruncateNonEmpty) {
     }
 }
 
+DEATH_TEST(RecordStoreTestHarness,
+           RangeTruncateMustHaveBoundsTest,
+           "Ranged truncate must have one bound defined") {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    auto opCtx = harnessHelper->newOperationContext();
+
+    auto result = rs->rangeTruncate(opCtx.get(), RecordId(), RecordId(), 0, 0);
+}
 }  // namespace
 }  // namespace mongo

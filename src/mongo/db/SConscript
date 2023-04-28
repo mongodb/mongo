@@ -531,6 +531,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
+        'change_streams_cluster_parameter',
+        'record_id_helpers',
     ],
 )
 

@@ -13,6 +13,8 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/collection_drop_recreate.js");
 // For ChangeStreamMultitenantReplicaSetTest.
 load("jstests/serverless/libs/change_collection_util.js");
+// For FeatureFlagUtil.
+load("jstests/libs/feature_flag_util.js");
 
 const getTenantConnection = ChangeStreamMultitenantReplicaSetTest.getTenantConnection;
 
@@ -24,11 +26,17 @@ const kExpireAfterSeconds = 1;
 const kSleepBetweenWritesSeconds = 5;
 // Millisecond(s) that can be added to the wall time to advance it marginally.
 const kSafetyMarginMillis = 1;
+// To imitate 1-by-1 deletion we specify a low amount of bytes per marker.
+const kMinBytesPerMarker = 1;
 
 const replSet = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 2,
-    setParameter:
-        {changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredRemovalJobSleepSeconds}
+    nodeOptions: {
+        setParameter: {
+            changeCollectionTruncateMarkersMinBytes: kMinBytesPerMarker,
+            changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredRemovalJobSleepSeconds
+        }
+    }
 });
 
 const primary = replSet.getPrimary();
@@ -46,14 +54,20 @@ function assertChangeCollectionDocuments(
     // Assert that querying for 'expectedRetainedDocs' yields documents that are exactly the same as
     // 'expectedRetainedDocs'.
     if (expectedRetainedDocs.length > 0) {
-        const retainedDocs = changeColl.aggregate(pipeline(expectedRetainedDocs)).toArray();
-        assert.eq(retainedDocs, expectedRetainedDocs);
+        assert.soonNoExcept(() => {
+            const retainedDocs = changeColl.aggregate(pipeline(expectedRetainedDocs)).toArray();
+            assert.eq(retainedDocs, expectedRetainedDocs);
+            return true;
+        });
     }
 
     // Assert that the query for any `expectedDeletedDocs` yields no results.
     if (expectedDeletedDocs.length > 0) {
-        const deletedDocs = changeColl.aggregate(pipeline(expectedDeletedDocs)).toArray();
-        assert.eq(deletedDocs.length, 0);
+        assert.soonNoExcept(() => {
+            const deletedDocs = changeColl.aggregate(pipeline(expectedDeletedDocs)).toArray();
+            assert.eq(deletedDocs.length, 0);
+            return true;
+        });
     }
 }
 
@@ -133,8 +147,12 @@ const citiesColl = assertDropAndRecreateCollection(citiesTestDb, "cities");
 const notUsedColl = assertDropAndRecreateCollection(notUsedTestDb, "notUsed");
 
 // Wait until the remover job hangs.
-let fpHangBeforeRemovingDocs = configureFailPoint(primary, "hangBeforeRemovingExpiredChanges");
-fpHangBeforeRemovingDocs.wait();
+let fpHangBeforeRemovingDocsPrimary =
+    configureFailPoint(primary, "hangBeforeRemovingExpiredChanges");
+let fpHangBeforeRemovingDocsSecondary =
+    configureFailPoint(secondary, "hangBeforeRemovingExpiredChanges");
+fpHangBeforeRemovingDocsPrimary.wait();
+fpHangBeforeRemovingDocsSecondary.wait();
 
 // Insert 5 documents to the 'stocks' collection owned by the 'stocksTenantId' that should be
 // deleted.
@@ -250,20 +268,29 @@ assertChangeCollectionDocuments(citiesChangeCollectionSecondary,
 // 'currentWallTime' < first-non-expired-document.
 const currentWallTime =
     new Date(lastExpiredDocumentTime + kExpireAfterSeconds * 1000 + kSafetyMarginMillis);
-const fpInjectWallTime = configureFailPoint(
-    primary, "injectCurrentWallTimeForRemovingExpiredDocuments", {currentWallTime});
+const failpointName =
+    FeatureFlagUtil.isPresentAndEnabled(stocksTestDb, "UseUnreplicatedTruncatesForDeletions")
+    ? "injectCurrentWallTimeForCheckingMarkers"
+    : "injectCurrentWallTimeForRemovingExpiredDocuments";
+const fpInjectWallTimePrimary = configureFailPoint(primary, failpointName, {currentWallTime});
+const fpInjectWallTimeSecondary = configureFailPoint(secondary, failpointName, {currentWallTime});
 
 // Unblock the change collection remover job such that it picks up on the injected
 // 'currentWallTime'.
-fpHangBeforeRemovingDocs.off();
+fpHangBeforeRemovingDocsPrimary.off();
+fpHangBeforeRemovingDocsSecondary.off();
 
 // Wait until the remover job has retrieved the injected 'currentWallTime' and reset the first
 // failpoint.
-fpInjectWallTime.wait();
+fpInjectWallTimePrimary.wait();
+fpInjectWallTimeSecondary.wait();
 
 // Wait for a complete cycle of the TTL job.
-fpHangBeforeRemovingDocs = configureFailPoint(primary, "hangBeforeRemovingExpiredChanges");
-fpHangBeforeRemovingDocs.wait();
+fpHangBeforeRemovingDocsPrimary = configureFailPoint(primary, "hangBeforeRemovingExpiredChanges");
+fpHangBeforeRemovingDocsSecondary =
+    configureFailPoint(secondary, "hangBeforeRemovingExpiredChanges");
+fpHangBeforeRemovingDocsPrimary.wait();
+fpHangBeforeRemovingDocsSecondary.wait();
 
 // Assert that only required documents are retained in change collections on the primary.
 assertChangeCollectionDocuments(
@@ -279,7 +306,8 @@ assertChangeCollectionDocuments(
 assertChangeCollectionDocuments(
     citiesChangeCollectionSecondary, citiesColl, citiesExpiredDocuments, citiesNonExpiredDocuments);
 
-fpHangBeforeRemovingDocs.off();
+fpHangBeforeRemovingDocsPrimary.off();
+fpHangBeforeRemovingDocsSecondary.off();
 
 replSet.stopSet();
 })();

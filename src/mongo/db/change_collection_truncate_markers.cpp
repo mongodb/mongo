@@ -28,10 +28,33 @@
  */
 
 #include "mongo/db/change_collection_truncate_markers.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
+
+namespace {
+MONGO_FAIL_POINT_DEFINE(injectCurrentWallTimeForCheckingMarkers);
+
+Date_t getWallTimeToUse(OperationContext* opCtx) {
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    injectCurrentWallTimeForCheckingMarkers.execute(
+        [&](const BSONObj& data) { now = data.getField("currentWallTime").date(); });
+    return now;
+}
+
+bool hasMarkerWallTimeExpired(OperationContext* opCtx,
+                              Date_t markerWallTime,
+                              const TenantId& tenantId) {
+    auto now = getWallTimeToUse(opCtx);
+    auto expireAfterSeconds =
+        Seconds{change_stream_serverless_helpers::getExpireAfterSeconds(tenantId)};
+    auto expirationTime = now - expireAfterSeconds;
+    return markerWallTime <= expirationTime;
+}
+}  // namespace
+
 ChangeCollectionTruncateMarkers::ChangeCollectionTruncateMarkers(TenantId tenantId,
                                                                  std::deque<Marker> markers,
                                                                  int64_t leftoverRecordsCount,
@@ -56,11 +79,88 @@ bool ChangeCollectionTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx)
         return false;
     }
 
-    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
-    auto expireAfterSeconds =
-        Seconds{change_stream_serverless_helpers::getExpireAfterSeconds(_tenantId)};
-    auto expirationTime = now - expireAfterSeconds;
+    return hasMarkerWallTimeExpired(opCtx, oldestMarker.wallTime, _tenantId);
+}
 
-    return oldestMarker.wallTime <= expirationTime;
+bool ChangeCollectionTruncateMarkers::_hasPartialMarkerExpired(OperationContext* opCtx) const {
+    const auto& [_, highestSeenWallTime] = getPartialMarker();
+
+    return hasMarkerWallTimeExpired(opCtx, highestSeenWallTime, _tenantId);
+}
+
+void ChangeCollectionTruncateMarkers::expirePartialMarker(OperationContext* opCtx,
+                                                          const Collection* changeCollection) {
+    createPartialMarkerIfNecessary(opCtx);
+    // We can't use the normal peekOldestMarkerIfNeeded method since that calls _hasExcessMarkers
+    // and it will return false since the new oldest marker will have the last entry.
+    auto oldestMarker =
+        checkMarkersWith([&](const std::deque<CollectionTruncateMarkers::Marker>& markers)
+                             -> boost::optional<CollectionTruncateMarkers::Marker> {
+            // Partial marker did not get generated, early exit.
+            if (markers.empty()) {
+                return {};
+            }
+            auto firstMarker = markers.front();
+            // We will only consider the case of an expired marker.
+            if (!hasMarkerWallTimeExpired(opCtx, firstMarker.wallTime, _tenantId)) {
+                return {};
+            }
+            return firstMarker;
+        });
+
+    if (!oldestMarker) {
+        // The oldest marker hasn't expired, nothing to do here.
+        return;
+    }
+
+    // Abandon the snapshot so we can fetch the most recent version of the table. This increases the
+    // chances the last entry isn't present in the new partial marker.
+    opCtx->recoveryUnit()->abandonSnapshot();
+    WriteUnitOfWork wuow(opCtx);
+
+    auto backCursor = changeCollection->getRecordStore()->getCursor(opCtx, false);
+    // If the oldest marker does not contain the last entry it's a normal marker, don't perform any
+    // modifications to it.
+    auto obj = backCursor->next();
+    if (!obj || obj->id > oldestMarker->lastRecord) {
+        return;
+    }
+
+    // At this point the marker contains the last entry of the collection, we have to shift the last
+    // entry to the next marker so we can expire the previous entries.
+    auto bytesNotTruncated = obj->data.size();
+    const auto& doc = obj->data.toBson();
+    auto wallTime = doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
+
+    updateCurrentMarkerAfterInsertOnCommit(opCtx, bytesNotTruncated, obj->id, wallTime, 1);
+
+    auto bytesDeleted = oldestMarker->bytes - bytesNotTruncated;
+    auto docsDeleted = oldestMarker->records - 1;
+
+    // We build the previous record id based on the extracted value
+    auto previousRecordId = [&] {
+        auto currId = doc[repl::OplogEntry::k_idFieldName].timestamp();
+        invariant(currId > Timestamp::min(), "Last entry timestamp must be larger than 0");
+
+        auto fixedBson = BSON(repl::OplogEntry::k_idFieldName << (currId - 1));
+
+        auto recordId = invariantStatusOK(
+            record_id_helpers::keyForDoc(fixedBson,
+                                         changeCollection->getClusteredInfo()->getIndexSpec(),
+                                         changeCollection->getDefaultCollator()));
+        return recordId;
+    }();
+    auto newMarker =
+        CollectionTruncateMarkers::Marker{docsDeleted, bytesDeleted, previousRecordId, wallTime};
+
+    // Replace now the oldest marker with a version that doesn't contain the last entry. This is
+    // susceptible to races with concurrent inserts. But the invariant of metrics being correct in
+    // aggregate still holds. Ignoring this issue is a valid strategy here as we move the ignored
+    // bytes to the next partial marker and we only guarantee eventual correctness.
+    modifyMarkersWith([&](std::deque<CollectionTruncateMarkers::Marker>& markers) {
+        markers.pop_front();
+        markers.emplace_front(std::move(newMarker));
+    });
+    wuow.commit();
 }
 }  // namespace mongo

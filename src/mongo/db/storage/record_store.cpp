@@ -88,6 +88,8 @@ Status RecordStore::rangeTruncate(OperationContext* opCtx,
                                   int64_t hintDataSizeDiff,
                                   int64_t hintNumRecordsDiff) {
     validateWriteAllowed(opCtx);
+    invariant(minRecordId != RecordId() || maxRecordId != RecordId(),
+              "Ranged truncate must have one bound defined");
     invariant(minRecordId <= maxRecordId, "Start position cannot be after end position");
     return doRangeTruncate(opCtx, minRecordId, maxRecordId, hintDataSizeDiff, hintNumRecordsDiff);
 }

@@ -1406,12 +1406,15 @@ Status WiredTigerRecordStore::doRangeTruncate(OperationContext* opCtx,
         return Status::OK();
     }
     invariantWTOK(ret, start->session);
+    // Make sure to reset the cursor since we have to replace it with what the user provided us.
+    invariantWTOK(start->reset(start), start->session);
 
     boost::optional<CursorKey> startKey;
     if (minRecordId != RecordId()) {
-        invariantWTOK(start->reset(start), start->session);
         startKey = makeCursorKey(minRecordId, _keyFormat);
         setKey(start, &(*startKey));
+    } else {
+        start = nullptr;
     }
     WiredTigerCursor endWrap(_uri, _tableId, true, opCtx);
     boost::optional<CursorKey> endKey;
