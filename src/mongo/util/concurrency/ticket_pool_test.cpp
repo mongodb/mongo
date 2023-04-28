@@ -77,7 +77,7 @@ static inline const Milliseconds kSleepTime{1};
     }
 
 TEST(TicketPoolTest, BasicTimeout) {
-    TicketPool pool(0, std::make_unique<FifoTicketQueue>());
+    TicketPool<FifoTicketQueue> pool(0);
 
     {
         AdmissionContext ctx;
@@ -91,7 +91,7 @@ TEST(TicketPoolTest, BasicTimeout) {
 }
 
 TEST(TicketPoolTest, HandOverWorks) {
-    TicketPool pool(0, std::make_unique<FifoTicketQueue>());
+    TicketPool<FifoTicketQueue> pool(0);
 
     {
         ASSERT_FALSE(pool.tryAcquire());
@@ -106,7 +106,7 @@ TEST(TicketPoolTest, HandOverWorks) {
             return true;
         });
 
-        { ASSERT_TRUE(pool.releaseIfWaiters()); }
+        pool.release();
 
         waitingThread.join();
     }
@@ -130,7 +130,7 @@ TEST(TicketPoolTest, HandOverWorks) {
         });
 
         for (int i = 1; i <= threadsToTest; i++) {
-            ASSERT_TRUE(pool.releaseIfWaiters());
+            pool.release();
             assertSoon([&] {
                 ASSERT_SOON_EXP(pendingThreads.load() == threadsToTest - i);
                 return true;

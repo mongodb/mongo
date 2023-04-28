@@ -45,18 +45,16 @@ namespace mongo {
 PriorityTicketHolder::PriorityTicketHolder(int32_t numTickets,
                                            int32_t lowPriorityBypassThreshold,
                                            ServiceContext* serviceContext)
-    : TicketHolder(numTickets, serviceContext), _serviceContext(serviceContext) {
-
-    auto queue = std::make_unique<SimplePriorityTicketQueue>(lowPriorityBypassThreshold);
-    _pool = std::make_unique<TicketPool>(numTickets, std::move(queue));
-}
+    : TicketHolder(numTickets, serviceContext),
+      _serviceContext(serviceContext),
+      _pool(numTickets, lowPriorityBypassThreshold) {}
 
 int32_t PriorityTicketHolder::available() const {
-    return _pool->available();
+    return _pool.available();
 }
 
 int64_t PriorityTicketHolder::queued() const {
-    return _pool->queued();
+    return _pool.queued();
 }
 
 int64_t PriorityTicketHolder::numFinishedProcessing() const {
@@ -65,22 +63,22 @@ int64_t PriorityTicketHolder::numFinishedProcessing() const {
 }
 
 int64_t PriorityTicketHolder::expedited() const {
-    return static_cast<SimplePriorityTicketQueue*>(_pool->getQueue())->expedited();
+    return _pool.getQueue().expedited();
 }
 
 int64_t PriorityTicketHolder::bypassed() const {
-    return static_cast<SimplePriorityTicketQueue*>(_pool->getQueue())->bypassed();
+    return _pool.getQueue().bypassed();
 }
 
 void PriorityTicketHolder::updateLowPriorityAdmissionBypassThreshold(int32_t newBypassThreshold) {
-    auto queue = static_cast<SimplePriorityTicketQueue*>(_pool->getQueue());
-    queue->updateLowPriorityAdmissionBypassThreshold(newBypassThreshold);
+    auto& queue = _pool.getQueue();
+    queue.updateLowPriorityAdmissionBypassThreshold(newBypassThreshold);
 }
 
 boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
     invariant(admCtx);
 
-    if (_pool->tryAcquire()) {
+    if (_pool.tryAcquire()) {
         return Ticket(this, admCtx);
     }
 
@@ -97,11 +95,11 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
         // maximum period of time. This may or may not succeed, in which case we will retry until
         // timing out or getting interrupted.
         auto maxUntil = std::min(until, Date_t::now() + Milliseconds(500));
-        auto acquired = _pool->acquire(admCtx, maxUntil);
+        auto acquired = _pool.acquire(admCtx, maxUntil);
         ScopeGuard rereleaseIfTimedOutOrInterrupted([&] {
             // We may have gotten a ticket that we can't use, release it back to the ticket pool.
             if (acquired) {
-                _pool->release();
+                _pool.release();
             }
         });
 
@@ -125,7 +123,7 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
 void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
     // 'Immediate' priority operations should bypass the ticketing system completely.
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
-    _pool->release();
+    _pool.release();
 }
 
 void PriorityTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
@@ -134,13 +132,13 @@ void PriorityTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
     if (difference > 0) {
         // Hand out tickets one-by-one until we've given them all out.
         for (auto remaining = difference; remaining > 0; remaining--) {
-            _pool->release();
+            _pool.release();
         }
     } else {
         AdmissionContext admCtx;
         // Take tickets one-by-one without releasing.
         for (auto remaining = -difference; remaining > 0; remaining--) {
-            _pool->acquire(&admCtx, Date_t::max());
+            _pool.acquire(&admCtx, Date_t::max());
         }
     }
 }
