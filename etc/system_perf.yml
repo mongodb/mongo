@@ -2505,7 +2505,7 @@ buildvariants:
 
   - name: linux-3-node-replSet.2022-11
     display_name: Linux 3-Node ReplSet 2022-11
-    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
+    cron: "0 */12 * * *" # Every 12 hours starting at midnight, will change it back after 7.0 release
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
