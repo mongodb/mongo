@@ -238,7 +238,10 @@ void DropCollectionCoordinator::_freezeMigrations(
         opCtx, "dropCollection.start", nss().ns(), logChangeDetail.obj());
 
     if (_doc.getCollInfo()) {
-        sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollInfo()->getUuid());
+        _updateSession(opCtx);
+
+        sharding_ddl_util::stopMigrations(
+            opCtx, nss(), _doc.getCollInfo()->getUuid(), getCurrentSession());
     }
 }
 

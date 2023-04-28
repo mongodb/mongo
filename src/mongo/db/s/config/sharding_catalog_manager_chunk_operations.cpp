@@ -47,6 +47,7 @@
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -2178,14 +2179,13 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                 !collectionUUID || collectionUUID == cm.getUUID());
 
         cm.getAllShardIds(&cmShardIds);
-        withTransaction(
-            opCtx,
-            CollectionType::ConfigNS,
-            [this, allowMigrations, &nss, &collectionUUID](OperationContext* opCtx,
-                                                           TxnNumber txnNumber) {
-                // Update the 'allowMigrations' field. An unset 'allowMigrations' field implies
-                // 'true'. To ease backwards compatibility we omit 'allowMigrations' instead of
-                // setting it explicitly to 'true'.
+
+        auto updateCollectionAndChunkFn = [allowMigrations, &nss, &collectionUUID](
+                                              const txn_api::TransactionClient& txnClient,
+                                              ExecutorPtr txnExec) {
+            write_ops::UpdateCommandRequest updateCollOp(CollectionType::ConfigNS);
+            updateCollOp.setUpdates([&] {
+                write_ops::UpdateOpEntry entry;
                 const auto update = allowMigrations
                     ? BSON("$unset" << BSON(CollectionType::kAllowMigrationsFieldName << ""))
                     : BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false));
@@ -2195,25 +2195,81 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                     query =
                         query.addFields(BSON(CollectionType::kUuidFieldName << *collectionUUID));
                 }
+                entry.setQ(query);
+                entry.setU(update);
+                entry.setMulti(false);
+                return std::vector<write_ops::UpdateOpEntry>{entry};
+            }());
 
-                const auto res = writeToConfigDocumentInTxn(
-                    opCtx,
-                    CollectionType::ConfigNS,
-                    BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
-                                                         query,
-                                                         update /* update */,
-                                                         false /* upsert */,
-                                                         false /* multi */),
-                    txnNumber);
-                const auto numDocsModified = UpdateOp::parseResponse(res).getN();
-                uassert(ErrorCodes::ConflictingOperationInProgress,
-                        str::stream() << "Expected to match one doc for query " << query
-                                      << " but matched " << numDocsModified,
-                        numDocsModified == 1);
+            auto updateCollResponse = txnClient.runCRUDOpSync(updateCollOp, {0});
+            uassertStatusOK(updateCollResponse.toStatus());
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Expected to match one doc but matched "
+                                  << updateCollResponse.getNModified(),
+                    updateCollResponse.getNModified() == 1);
 
-                bumpCollectionMinorVersion(opCtx, _localConfigShard.get(), nss, txnNumber);
-            });
+            FindCommandRequest collQuery{CollectionType::ConfigNS};
+            collQuery.setFilter(BSON(CollectionType::kNssFieldName << nss.ns()));
+            collQuery.setLimit(1);
 
+            const auto findCollResponse = txnClient.exhaustiveFindSync(collQuery);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    "Collection does not exist",
+                    findCollResponse.size() == 1);
+            const CollectionType coll(findCollResponse[0]);
+
+            // Find the newest chunk
+            FindCommandRequest chunkQuery{ChunkType::ConfigNS};
+            chunkQuery.setFilter(BSON(ChunkType::collectionUUID << coll.getUuid()));
+            chunkQuery.setSort(BSON(ChunkType::lastmod << -1));
+            chunkQuery.setLimit(1);
+            const auto findChunkResponse = txnClient.exhaustiveFindSync(chunkQuery);
+
+            uassert(ErrorCodes::IncompatibleShardingMetadata,
+                    str::stream() << "Tried to find max chunk version for collection " << nss.ns()
+                                  << ", but found no chunks",
+                    findChunkResponse.size() == 1);
+
+            const auto newestChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+                findChunkResponse[0], coll.getEpoch(), coll.getTimestamp()));
+            const auto targetVersion = [&]() {
+                ChunkVersion version = newestChunk.getVersion();
+                version.incMinor();
+                return version;
+            }();
+
+            write_ops::UpdateCommandRequest updateChunkOp(ChunkType::ConfigNS);
+            BSONObjBuilder updateBuilder;
+            BSONObjBuilder updateVersionClause(updateBuilder.subobjStart("$set"));
+            updateVersionClause.appendTimestamp(ChunkType::lastmod(), targetVersion.toLong());
+            updateVersionClause.doneFast();
+            const auto update = updateBuilder.obj();
+            updateChunkOp.setUpdates([&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON(ChunkType::name << newestChunk.getName()));
+                entry.setU(update);
+                entry.setMulti(false);
+                entry.setUpsert(false);
+                return std::vector<write_ops::UpdateOpEntry>{entry};
+            }());
+            auto updateChunkResponse = txnClient.runCRUDOpSync(updateChunkOp, {1});
+            uassertStatusOK(updateChunkResponse.toStatus());
+            LOGV2_DEBUG(
+                7353900, 1, "Finished all transaction operations in setAllowMigrations command");
+
+            return SemiFuture<void>::makeReady();
+        };
+        auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+        auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+
+        txn_api::SyncTransactionWithRetries txn(
+            opCtx,
+            sleepInlineExecutor,
+            TransactionParticipantResourceYielder::make("setAllowMigrationsAndBumpOneChunk"),
+            inlineExecutor);
+
+        txn.run(opCtx, updateCollectionAndChunkFn);
         // From now on migrations are not allowed anymore, so it is not possible that new shards
         // will own chunks for this collection.
     }

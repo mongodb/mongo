@@ -365,7 +365,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     const auto& nss = coll.getNss();
                     LOGV2_DEBUG(5494505, 2, "Dropping collection", logAttrs(nss));
 
-                    sharding_ddl_util::stopMigrations(opCtx, nss, coll.getUuid());
+                    _updateSession(opCtx);
+                    sharding_ddl_util::stopMigrations(
+                        opCtx, nss, coll.getUuid(), getCurrentSession());
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);

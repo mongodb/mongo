@@ -108,6 +108,10 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
 } configsvrSetAllowMigrationsCmd;
 
 }  // namespace
