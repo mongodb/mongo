@@ -96,6 +96,8 @@ public:
 
     bool remotesExhausted() final;
 
+    bool hasBeenKilled() final;
+
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
     boost::optional<LogicalSessionId> getLsid() const final;
@@ -183,10 +185,7 @@ private:
     // If boost::none, telemetry should not be collected for this cursor.
     boost::optional<BSONObj> _telemetryStoreKey;
 
-    // Tracks if kill() has been called on the cursor. Multiple calls to kill() are treated as a
-    // noop.
-    // TODO SERVER-74482 investigate where kill() is called multiple times and remove unnecessary
-    // calls
+    // Tracks if kill() has been called on the cursor. Multiple calls to kill() is an error.
     bool _hasBeenKilled = false;
 };
 

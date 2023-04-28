@@ -130,6 +130,10 @@ bool ClusterClientCursorMock::remotesExhausted() {
     return _remotesExhausted;
 }
 
+bool ClusterClientCursorMock::hasBeenKilled() {
+    return _killed;
+}
+
 void ClusterClientCursorMock::queueError(Status status) {
     _resultsQueue.push({status});
 }

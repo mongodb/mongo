@@ -111,6 +111,8 @@ public:
      */
     bool remotesExhausted() final;
 
+    bool hasBeenKilled() final;
+
     /**
      * Queues an error response.
      */

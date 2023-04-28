@@ -131,13 +131,9 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
 }
 
 void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
-    if (_hasBeenKilled) {
-        LOGV2_DEBUG(7372700,
-                    3,
-                    "Kill called on cluster client cursor after cursor has already been killed, so "
-                    "ignoring");
-        return;
-    }
+    tassert(7448200,
+            "Cannot kill a cluster client cursor that has already been killed",
+            !_hasBeenKilled);
 
     if (_telemetryStoreKey && opCtx) {
         telemetry::writeTelemetry(opCtx,
@@ -208,6 +204,10 @@ void ClusterClientCursorImpl::queueResult(const ClusterQueryResult& result) {
 
 bool ClusterClientCursorImpl::remotesExhausted() {
     return _root->remotesExhausted();
+}
+
+bool ClusterClientCursorImpl::hasBeenKilled() {
+    return _hasBeenKilled;
 }
 
 Status ClusterClientCursorImpl::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {

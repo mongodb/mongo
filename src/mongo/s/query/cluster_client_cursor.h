@@ -158,6 +158,13 @@ public:
     virtual bool remotesExhausted() = 0;
 
     /**
+     * Returns whether or not the cursor has been killed. Repeated calls to kill() can occur in
+     * ~ClusterClientCursorGuard() if the cursor was killed while the cursor was checked out or in
+     * use with the guard.
+     */
+    virtual bool hasBeenKilled() = 0;
+
+    /**
      * Sets the maxTimeMS value that the cursor should forward with any internally issued getMore
      * requests.
      *
