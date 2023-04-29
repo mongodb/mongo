@@ -30,12 +30,12 @@ Welcome to MongoDB!
   To run a single server database:
 
   ```bash
-    $ sudo mkdir -p /data/db
-    $ ./mongod
-    $
-    $ # The mongo javascript shell connects to localhost and test database by default:
-    $ ./mongo
-    > help
+  $ sudo mkdir -p /data/db
+  $ ./mongod
+  $
+  $ # The mongo javascript shell connects to localhost and test database by default:
+  $ ./mongo
+  > help
   ```
 
 ## Installing Compass
@@ -43,7 +43,7 @@ Welcome to MongoDB!
   You can install compass using the `install_compass` script packaged with MongoDB:
 
   ```bash
-    $ ./install_compass
+  $ ./install_compass
   ```
 
   This will download the appropriate MongoDB Compass package for your platform
@@ -57,7 +57,7 @@ Welcome to MongoDB!
 
 ## Bug Reports
 
-  See https://github.com/mongodb/mongo/wiki/Submit-Bug-Reports.
+  See this submit the bug report: https://github.com/mongodb/mongo/wiki/Submit-Bug-Reports.
 
 ## Packaging
 
@@ -67,23 +67,23 @@ Welcome to MongoDB!
 ## Learn MongoDB 
 
   Documentation - https://docs.mongodb.com/manual/
+
   Developer Center -  https://www.mongodb.com/developer/
+  
   MongoDB University - https://learn.mongodb.com
 
 ## Cloud Hosted MongoDB
 
-  https://www.mongodb.com/cloud/atlas
+  Here is the link of the Cloud Hosted MongoDB: https://www.mongodb.com/cloud/atlas
 
 ## Forums
+  Technical questions about using MongoDB.
 
   - https://community.mongodb.com
 
-      Technical questions about using MongoDB.
+  Technical questions about building and developing MongoDB.
 
   - https://community.mongodb.com/c/server-dev
-
-      Technical questions about building and developing MongoDB.
-
 
 ## LICENSE
 
