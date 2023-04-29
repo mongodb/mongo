@@ -55,6 +55,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/abt/field_map_builder.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/query/bind_input_params.h"
@@ -2305,6 +2306,45 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
     }
 }
 
+template <TopBottomSense sense, bool single>
+std::unique_ptr<sbe::EExpression> getSortSpecFromTopBottomN(
+    const AccumulatorTopBottomN<sense, single>* acc) {
+    tassert(5807013, "Accumulator state must not be null", acc);
+    auto sortPattern =
+        acc->getSortPattern().serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
+    auto sortSpec = std::make_unique<sbe::value::SortSpec>(sortPattern);
+    auto sortSpecExpr =
+        makeConstant(sbe::value::TypeTags::sortSpec,
+                     sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec.release()));
+    return sortSpecExpr;
+}
+
+std::unique_ptr<sbe::EExpression> getSortSpecFromTopBottomN(const AccumulationStatement& accStmt) {
+    auto acc = accStmt.expr.factory();
+    if (accStmt.expr.name == AccumulatorTopBottomN<kTop, true>::getName()) {
+        return getSortSpecFromTopBottomN(
+            dynamic_cast<AccumulatorTopBottomN<kTop, true>*>(acc.get()));
+    } else if (accStmt.expr.name == AccumulatorTopBottomN<kBottom, true>::getName()) {
+        return getSortSpecFromTopBottomN(
+            dynamic_cast<AccumulatorTopBottomN<kBottom, true>*>(acc.get()));
+    } else if (accStmt.expr.name == AccumulatorTopBottomN<kTop, false>::getName()) {
+        return getSortSpecFromTopBottomN(
+            dynamic_cast<AccumulatorTopBottomN<kTop, false>*>(acc.get()));
+    } else if (accStmt.expr.name == AccumulatorTopBottomN<kBottom, false>::getName()) {
+        return getSortSpecFromTopBottomN(
+            dynamic_cast<AccumulatorTopBottomN<kBottom, false>*>(acc.get()));
+    } else {
+        MONGO_UNREACHABLE;
+    }
+}
+
+bool isTopBottomN(const AccumulationStatement& accStmt) {
+    return accStmt.expr.name == AccumulatorTopBottomN<kTop, true>::getName() ||
+        accStmt.expr.name == AccumulatorTopBottomN<kBottom, true>::getName() ||
+        accStmt.expr.name == AccumulatorTopBottomN<kTop, false>::getName() ||
+        accStmt.expr.name == AccumulatorTopBottomN<kBottom, false>::getName();
+}
+
 sbe::value::SlotVector generateAccumulator(
     StageBuilderState& state,
     const AccumulationStatement& accStmt,
@@ -2313,16 +2353,67 @@ sbe::value::SlotVector generateAccumulator(
     sbe::HashAggStage::AggExprVector& aggSlotExprs,
     boost::optional<sbe::value::SlotId> initializerRootSlot) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
-    auto argExpr = generateExpression(state, accStmt.expr.argument.get(), rootSlot, &outputs);
-    auto initExpr =
-        generateExpression(state, accStmt.expr.initializer.get(), initializerRootSlot, nullptr);
+    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
     // as sum(1).
-    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
-    auto accExprs = stage_builder::buildAccumulator(
-        accStmt, argExpr.extractExpr(state), collatorSlot, *state.frameIdGenerator);
+    auto accExprs = [&]() {
+        // $topN/$bottomN accumulators require multiple arguments to the accumulator builder.
+        if (isTopBottomN(accStmt)) {
+            StringDataMap<std::unique_ptr<sbe::EExpression>> accArgs;
+            auto sortSpecExpr = getSortSpecFromTopBottomN(accStmt);
+            accArgs.emplace(AccArgs::kTopBottomNSortSpec, sortSpecExpr->clone());
+
+            // Build the key expression for the accumulator.
+            tassert(5807014,
+                    str::stream() << accStmt.expr.name
+                                  << " accumulator must have the root slot set",
+                    rootSlot);
+            auto key = collatorSlot ? makeFunction("generateCheapSortKey",
+                                                   std::move(sortSpecExpr),
+                                                   makeVariable(*rootSlot),
+                                                   makeVariable(*collatorSlot))
+                                    : makeFunction("generateCheapSortKey",
+                                                   std::move(sortSpecExpr),
+                                                   makeVariable(*rootSlot));
+            accArgs.emplace(AccArgs::kTopBottomNKey,
+                            makeFunction("sortKeyComponentVectorToArray", std::move(key)));
+
+            // Build the value expression for the accumulator.
+            auto expObj = dynamic_cast<ExpressionObject*>(accStmt.expr.argument.get());
+            tassert(5807015,
+                    str::stream() << accStmt.expr.name
+                                  << " accumulator must have an object argument",
+                    expObj);
+            for (auto& [key, value] : expObj->getChildExpressions()) {
+                if (key == AccumulatorN::kFieldNameOutput) {
+                    auto outputExpr = generateExpression(state, value.get(), rootSlot, &outputs);
+                    accArgs.emplace(AccArgs::kTopBottomNValue,
+                                    makeFillEmptyNull(outputExpr.extractExpr(state)));
+                    break;
+                }
+            }
+            tassert(5807016,
+                    str::stream() << accStmt.expr.name
+                                  << " accumulator must have an output field in the argument",
+                    accArgs.find(AccArgs::kTopBottomNValue) != accArgs.end());
+
+            auto accExprs = stage_builder::buildAccumulator(
+                accStmt, std::move(accArgs), collatorSlot, *state.frameIdGenerator);
+
+            return accExprs;
+        } else {
+            auto argExpr =
+                generateExpression(state, accStmt.expr.argument.get(), rootSlot, &outputs);
+            auto accExprs = stage_builder::buildAccumulator(
+                accStmt, argExpr.extractExpr(state), collatorSlot, *state.frameIdGenerator);
+            return accExprs;
+        }
+    }();
+
+    auto initExpr =
+        generateExpression(state, accStmt.expr.initializer.get(), initializerRootSlot, nullptr);
     auto accInitExprs = stage_builder::buildInitialize(
         accStmt, initExpr.extractExpr(state), *state.frameIdGenerator);
 
@@ -2362,8 +2453,18 @@ sbe::SlotExprPairVector generateMergingExpressions(StageBuilderState& state,
 
     auto spillSlots = slotIdGenerator->generateMultiple(numInputSlots);
     auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
-    auto mergingExprs =
-        buildCombinePartialAggregates(accStmt, spillSlots, collatorSlot, *frameIdGenerator);
+
+    auto mergingExprs = [&]() {
+        if (isTopBottomN(accStmt)) {
+            StringDataMap<std::unique_ptr<sbe::EExpression>> mergeArgs;
+            mergeArgs.emplace(AccArgs::kTopBottomNSortSpec, getSortSpecFromTopBottomN(accStmt));
+            return buildCombinePartialAggregates(
+                accStmt, spillSlots, std::move(mergeArgs), collatorSlot, *frameIdGenerator);
+        } else {
+            return buildCombinePartialAggregates(
+                accStmt, spillSlots, collatorSlot, *frameIdGenerator);
+        }
+    }();
 
     // Zip the slot vector and expression vector into a vector of pairs.
     tassert(7039550,
@@ -2409,13 +2510,33 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
         }
     }();
 
+    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     auto finalSlots{sbe::value::SlotVector{finalGroupBySlot}};
     std::vector<std::string> fieldNames{"_id"};
     size_t idxAccFirstSlot = dedupedGroupBySlots.size();
     for (size_t idxAcc = 0; idxAcc < accStmts.size(); ++idxAcc) {
         // Gathers field names for the output object from accumulator statements.
         fieldNames.push_back(accStmts[idxAcc].fieldName);
-        auto finalExpr = stage_builder::buildFinalize(state, accStmts[idxAcc], aggSlotsVec[idxAcc]);
+
+        auto finalExpr = [&]() {
+            const auto& accStmt = accStmts[idxAcc];
+            if (isTopBottomN(accStmt)) {
+                StringDataMap<std::unique_ptr<sbe::EExpression>> finalArgs;
+                finalArgs.emplace(AccArgs::kTopBottomNSortSpec, getSortSpecFromTopBottomN(accStmt));
+                return buildFinalize(state,
+                                     accStmts[idxAcc],
+                                     aggSlotsVec[idxAcc],
+                                     std::move(finalArgs),
+                                     collatorSlot,
+                                     *state.frameIdGenerator);
+            } else {
+                return buildFinalize(state,
+                                     accStmts[idxAcc],
+                                     aggSlotsVec[idxAcc],
+                                     collatorSlot,
+                                     *state.frameIdGenerator);
+            }
+        }();
 
         // The final step may not return an expression if it's trivial. For example, $first and
         // $last's final steps are trivial.
@@ -2512,6 +2633,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (!groupNode->needWholeDocument) {
         // Tracks whether we need to request kResult.
         bool rootDocIsNeeded = false;
+        bool sortKeyIsNeeded = false;
         auto referencesRoot = [&](const ExpressionFieldPath* fieldExpr) {
             rootDocIsNeeded = rootDocIsNeeded || fieldExpr->isROOT();
         };
@@ -2520,23 +2642,29 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         walkAndActOnFieldPaths(idExpr.get(), referencesRoot);
         for (const auto& accStmt : accStmts) {
             walkAndActOnFieldPaths(accStmt.expr.argument.get(), referencesRoot);
+            if (isTopBottomN(accStmt)) {
+                sortKeyIsNeeded = true;
+            }
         }
 
-        // If the group node doesn't have any dependency (e.g. $count) or if the dependency can be
-        // satisfied by the child node (e.g. covered index scan), we can clear the kResult
-        // requirement for the child.
-        if (groupNode->requiredFields.empty() || !rootDocIsNeeded) {
-            childReqs.clear(kResult);
-        } else if (childNode->getType() == StageType::STAGE_PROJECTION_COVERED) {
-            auto pn = static_cast<const ProjectionNodeCovered*>(childNode);
-            std::set<std::string> providedFieldSet;
-            for (auto&& elt : pn->coveredKeyObj) {
-                providedFieldSet.emplace(elt.fieldNameStringData());
-            }
-            if (std::all_of(groupNode->requiredFields.begin(),
-                            groupNode->requiredFields.end(),
-                            [&](const std::string& f) { return providedFieldSet.count(f); })) {
+        // If any accumulator requires generating sort key, we cannot clear the kResult.
+        if (!sortKeyIsNeeded) {
+            // If the group node doesn't have any dependency (e.g. $count) or if the dependency can
+            // be satisfied by the child node (e.g. covered index scan), we can clear the kResult
+            // requirement for the child.
+            if (groupNode->requiredFields.empty() || !rootDocIsNeeded) {
                 childReqs.clear(kResult);
+            } else if (childNode->getType() == StageType::STAGE_PROJECTION_COVERED) {
+                auto pn = static_cast<const ProjectionNodeCovered*>(childNode);
+                std::set<std::string> providedFieldSet;
+                for (auto&& elt : pn->coveredKeyObj) {
+                    providedFieldSet.emplace(elt.fieldNameStringData());
+                }
+                if (std::all_of(groupNode->requiredFields.begin(),
+                                groupNode->requiredFields.end(),
+                                [&](const std::string& f) { return providedFieldSet.count(f); })) {
+                    childReqs.clear(kResult);
+                }
             }
         }
     }

@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -1678,6 +1679,179 @@ TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorInvalidDynamicN) {
                               static_cast<ErrorCodes::Error>(7548607));
 }
 
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorSingleGroup) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44 << "s" << 4)),
+                                       BSON_ARRAY(BSON("a" << 33 << "s" << 3)),
+                                       BSON_ARRAY(BSON("a" << 22 << "s" << 2)),
+                                       BSON_ARRAY(BSON("a" << 11 << "s" << 1))};
+    runGroupAggregationTest("{_id: null, x: {$top: {output: '$a', sortBy: {s: 1}}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 11)));
+    runGroupAggregationTest("{_id: null, x: {$bottom: {output: '$a', sortBy: {s: 1}}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 44)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$topN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22 << 33))));
+    runGroupAggregationTest(
+        "{_id: null, x: {$bottomN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(22 << 33 << 44))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorCompoundSort) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "s1" << 1 << "s2" << 1)),
+                                       BSON_ARRAY(BSON("a" << 12 << "s1" << 1 << "s2" << 2)),
+                                       BSON_ARRAY(BSON("a" << 21 << "s1" << 2 << "s2" << 1)),
+                                       BSON_ARRAY(BSON("a" << 22 << "s1" << 2 << "s2" << 2))};
+    runGroupAggregationTest("{_id: null, x: {$top: {output: '$a', sortBy: {s1: 1, s2: -1}}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 12)));
+    runGroupAggregationTest("{_id: null, x: {$bottom: {output: '$a', sortBy: {s1: 1, s2: -1}}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 21)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$topN: {output: '$a', sortBy: {s1: 1, s2: -1}, n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(12 << 11 << 22))));
+    runGroupAggregationTest(
+        "{_id: null, x: {$bottomN: {output: '$a', sortBy: {s1: 1, s2: -1}, n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22 << 21))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorCollation) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 41 << "s"
+                                                           << "41")),
+                                       BSON_ARRAY(BSON("a" << 32 << "s"
+                                                           << "32")),
+                                       BSON_ARRAY(BSON("a" << 23 << "s"
+                                                           << "23")),
+                                       BSON_ARRAY(BSON("a" << 14 << "s"
+                                                           << "14"))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$top: {output: '$a', sortBy: {s: 1}}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 41)),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    runGroupAggregationTest(
+        "{_id: null, x: {$bottom: {output: '$a', sortBy: {s: 1}}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 14)),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    runGroupAggregationTest(
+        "{_id: null, x: {$topN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(41 << 32 << 23))),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    runGroupAggregationTest(
+        "{_id: null, x: {$bottomN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(32 << 23 << 14))),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorNotEnoughElement) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 22 << "s" << 2)),
+                                       BSON_ARRAY(BSON("a" << 11 << "s" << 1))};
+    runGroupAggregationTest("{_id: null, x: {$topN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22))));
+    runGroupAggregationTest("{_id: null, x: {$bottomN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorMultiGroup) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44 << "s" << 4 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 33 << "s" << 3 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 22 << "s" << 2 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 11 << "s" << 1 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 88 << "s" << 8 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 77 << "s" << 7 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 66 << "s" << 6 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 55 << "s" << 5 << "n" << 2))};
+    runGroupAggregationTest(
+        "{_id: '$n', x: {$top: {output: '$a', sortBy: {s: 1}}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1 << "x" << 11) << BSON("_id" << 2 << "x" << 55)));
+    runGroupAggregationTest(
+        "{_id: '$n', x: {$bottom: {output: '$a', sortBy: {s: 1}}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1 << "x" << 44) << BSON("_id" << 2 << "x" << 88)));
+    runGroupAggregationTest("{_id: '$n', x: {$topN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 1 << "x" << BSON_ARRAY(11 << 22 << 33))
+                                       << BSON("_id" << 2 << "x" << BSON_ARRAY(55 << 66 << 77))));
+    runGroupAggregationTest("{_id: '$n', x: {$bottomN: {output: '$a', sortBy: {s: 1}, n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 1 << "x" << BSON_ARRAY(22 << 33 << 44))
+                                       << BSON("_id" << 2 << "x" << BSON_ARRAY(66 << 77 << 88))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorDynamicN) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44 << "s" << 4 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 33 << "s" << 3 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 22 << "s" << 2 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 11 << "s" << 1 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 88 << "s" << 8 << "n" << 3)),
+                                       BSON_ARRAY(BSON("a" << 77 << "s" << 7 << "n" << 3)),
+                                       BSON_ARRAY(BSON("a" << 66 << "s" << 6 << "n" << 3)),
+                                       BSON_ARRAY(BSON("a" << 55 << "s" << 5 << "n" << 3))};
+    runGroupAggregationTest(
+        "{_id: {n1: '$n'}, x: {$topN: {output: '$a', sortBy: {s: 1}, n: '$n1'}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSON("n1" << 2) << "x" << BSON_ARRAY(11 << 22))
+                   << BSON("_id" << BSON("n1" << 3) << "x" << BSON_ARRAY(55 << 66 << 77))));
+    runGroupAggregationTest(
+        "{_id: {n1: '$n'}, x: {$bottomN: {output: '$a', sortBy: {s: 1}, n: '$n1'}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSON("n1" << 2) << "x" << BSON_ARRAY(33 << 44))
+                   << BSON("_id" << BSON("n1" << 3) << "x" << BSON_ARRAY(66 << 77 << 88))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorInvalidConstantN) {
+    const std::vector<std::string> accumulators{"$topN", "$bottomN"};
+    const std::vector<std::string> testCases{"'string'", "4.2", "-1", "0"};
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "s" << 1))};
+    for (const auto& acc : accumulators) {
+        for (const auto& testCase : testCases) {
+            runGroupAggregationToFail(str::stream() << "{_id: null, x: {" << acc
+                                                    << ": {output: '$a', sortBy: {s: 1}, n: "
+                                                    << testCase << "}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548606));
+        }
+    }
+}
+
+TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorInvalidDynamicN) {
+    const std::vector<std::string> accumulators{"$topN", "$bottomN"};
+    const std::vector<BSONObj> testCases{BSON("n"
+                                              << "string"),
+                                         BSON("n" << 4.2),
+                                         BSON("n" << -1),
+                                         BSON("n" << 0)};
+    for (const auto& acc : accumulators) {
+        for (const auto& testCase : testCases) {
+            auto docs =
+                std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "s" << 1 << "n1" << testCase))};
+
+            runGroupAggregationToFail(str::stream()
+                                          << "{_id: null, x: {" << acc
+                                          << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548607));
+            runGroupAggregationToFail(str::stream()
+                                          << "{_id: {n: '$n1.n'}, x: {" << acc
+                                          << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548607));
+        }
+    }
+}
+
 class AccumulatorSBEIncompatible final : public AccumulatorState {
 public:
     static constexpr auto kName = "$incompatible"_sd;
@@ -1945,6 +2119,45 @@ public:
 
         resultGuard.reset();
         return {resultTag, resultVal};
+    }
+
+    std::pair<sbe::value::TypeTags, sbe::value::Value> bsonArrayToSbe(BSONArray arr) {
+        auto [arrTag, arrVal] = sbe::value::makeNewArray();
+        auto arrView = sbe::value::getArrayView(arrVal);
+
+        for (auto elem : arr) {
+            auto [tag, val] = sbe::bson::convertFrom<false>(elem);
+            arrView->push_back(tag, val);
+        }
+        return {arrTag, arrVal};
+    }
+
+    /**
+     * Create an accumulator state for $topN/$bottomN, given heap in the format of BSONArray.
+     */
+    std::pair<sbe::value::TypeTags, sbe::value::Value> makeTopBottomNAccumulatorState(
+        BSONArray valuesBson, long maxSize, const sbe::value::SortSpec* sortSpec) {
+        auto [stateTag, stateVal] = sbe::value::makeNewArray();
+        sbe::value::ValueGuard stateGuard{stateTag, stateVal};
+        auto state = sbe::value::getArrayView(stateVal);
+
+        auto [valuesTag, valuesVal] = bsonArrayToSbe(valuesBson);
+        sbe::value::ValueGuard valuesGuard{valuesTag, valuesVal};
+        // Heap
+        state->push_back(valuesTag, valuesVal);
+
+        // Max size
+        state->push_back(sbe::value::TypeTags::NumberInt64, maxSize);
+
+        // Memory usage
+        state->push_back(sbe::value::TypeTags::NumberInt32, 0);
+
+        // Memory limit
+        state->push_back(sbe::value::TypeTags::NumberInt32, INT_MAX);
+
+        valuesGuard.reset();
+        stateGuard.reset();
+        return {stateTag, stateVal};
     }
 
     /**
@@ -2620,5 +2833,59 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNInputArrayEm
     ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
     ASSERT_EQ(compareVal, 0);
     sbe::value::releaseValue(resultTag, resultVal);
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopBottomN) {
+    auto sortPattern = BSON("x" << 1);
+    auto sortSpec = new sbe::value::SortSpec(sortPattern);
+    auto sortSpecConstant = stage_builder::makeConstant(
+        sbe::value::TypeTags::sortSpec, sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec));
+
+    auto topNExpr = stage_builder::makeFunction(
+        "aggTopNMerge", stage_builder::makeVariable(_inputSlotId), sortSpecConstant->clone());
+    auto bottomNExpr = stage_builder::makeFunction(
+        "aggBottomNMerge", stage_builder::makeVariable(_inputSlotId), sortSpecConstant->clone());
+
+    auto aggSlot = bindAccessor(&_aggAccessor);
+    auto topNFinalExpr = stage_builder::makeFunction(
+        "aggTopNFinalize", stage_builder::makeVariable(aggSlot), sortSpecConstant->clone());
+    auto bottomNFinalExpr = stage_builder::makeFunction(
+        "aggBottomNFinalize", stage_builder::makeVariable(aggSlot), sortSpecConstant->clone());
+
+    std::vector<std::tuple<sbe::EExpression*, sbe::EExpression*, BSONArray, BSONArray, BSONArray>>
+        testCases{{topNExpr.get(),
+                   topNFinalExpr.get(),
+                   BSON_ARRAY(BSON_ARRAY(5 << 5) << BSON_ARRAY(3 << 3) << BSON_ARRAY(1 << 1)),
+                   BSON_ARRAY(BSON_ARRAY(6 << 6) << BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2)),
+                   BSON_ARRAY(1 << 2 << 3)},
+                  {bottomNExpr.get(),
+                   bottomNFinalExpr.get(),
+                   BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3) << BSON_ARRAY(5 << 5)),
+                   BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4) << BSON_ARRAY(6 << 6)),
+                   BSON_ARRAY(4 << 5 << 6)}};
+
+    for (auto& [expr, finalExpr, heapMerge, heapIncoming, expected] : testCases) {
+        auto [accTag, accVal] = makeTopBottomNAccumulatorState(heapMerge, 3, sortSpec);
+        _aggAccessor.reset(true, accTag, accVal);
+
+        auto [inputTag, inputVal] = makeTopBottomNAccumulatorState(heapIncoming, 3, sortSpec);
+        _inputAccessor.reset(true, inputTag, inputVal);
+
+        auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+        auto [newAccTag, newAccVal] = runCompiledExpression(compiledExpr.get());
+        _aggAccessor.reset(true, newAccTag, newAccVal);
+
+        auto compiledFinalExpr = compileExpression(*finalExpr);
+
+        auto [resultTag, resultVal] = runCompiledExpression(compiledFinalExpr.get());
+
+        auto [expectedTag, expectedVal] = bsonArrayToSbe(expected);
+        auto [compareTag, compareVal] =
+            sbe::value::compareValue(resultTag, resultVal, expectedTag, expectedVal);
+
+        ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+        ASSERT_EQ(compareVal, 0);
+    }
 }
 }  // namespace mongo

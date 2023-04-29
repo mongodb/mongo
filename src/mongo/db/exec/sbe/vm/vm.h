@@ -37,6 +37,7 @@
 #include "mongo/config.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/exec/sbe/vm/label.h"
@@ -757,6 +758,12 @@ enum class Builtin : uint8_t {
     aggFirstN,
     aggFirstNMerge,
     aggFirstNFinalize,
+    aggTopN,
+    aggTopNMerge,
+    aggTopNFinalize,
+    aggBottomN,
+    aggBottomNMerge,
+    aggBottomNFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -771,6 +778,64 @@ std::string builtinToString(Builtin b);
  * - The element at index `kMemLimit` holds the max memory limit allowed
  */
 enum class AggMultiElems { kInternalArr, kMaxSize, kMemUsage, kMemLimit, kSizeOfArray };
+
+/**
+ * Less than comparison based on a sort pattern.
+ */
+struct SortPatternLess {
+    SortPatternLess(const value::SortSpec* sortSpec) : _sortSpec(sortSpec) {}
+
+    bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
+                    const std::pair<value::TypeTags, value::Value>& rhs) const {
+        auto [cmpTag, cmpVal] = _sortSpec->compare(lhs.first, lhs.second, rhs.first, rhs.second);
+        uassert(5807000, "Invalid comparison result", cmpTag == value::TypeTags::NumberInt32);
+        return value::bitcastTo<int32_t>(cmpVal) < 0;
+    }
+
+private:
+    const value::SortSpec* _sortSpec;
+};
+
+/**
+ * Greater than comparison based on a sort pattern.
+ */
+struct SortPatternGreater {
+    SortPatternGreater(const value::SortSpec* sortSpec) : _sortSpec(sortSpec) {}
+
+    bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
+                    const std::pair<value::TypeTags, value::Value>& rhs) const {
+        auto [cmpTag, cmpVal] = _sortSpec->compare(lhs.first, lhs.second, rhs.first, rhs.second);
+        uassert(5807001, "Invalid comparison result", cmpTag == value::TypeTags::NumberInt32);
+        return value::bitcastTo<int32_t>(cmpVal) > 0;
+    }
+
+private:
+    const value::SortSpec* _sortSpec;
+};
+
+/**
+ * Comparison based on the key of a pair of elements.
+ */
+template <typename Comp>
+struct PairKeyComp {
+    PairKeyComp(const Comp& comp) : _comp(comp) {}
+
+    bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
+                    const std::pair<value::TypeTags, value::Value>& rhs) const {
+        auto [lPairTag, lPairVal] = lhs;
+        auto lPair = value::getArrayView(lPairVal);
+        auto lKey = lPair->getAt(0);
+
+        auto [rPairTag, rPairVal] = rhs;
+        auto rPair = value::getArrayView(rPairVal);
+        auto rKey = rPair->getAt(0);
+
+        return _comp(lKey, rKey);
+    }
+
+private:
+    const Comp _comp;
+};
 
 /**
  * This enum defines indices into an 'Array' that returns the partial sum result when 'needsMerge'
@@ -1586,13 +1651,17 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinISOWeekYear(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinISODayOfWeek(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinISOWeek(ArityType arity);
-
     FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstN(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNFinalize(ArityType arity);
+    template <typename Less>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomN(ArityType arity);
+    template <typename Less>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNMerge(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

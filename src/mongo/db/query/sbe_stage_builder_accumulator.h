@@ -39,12 +39,27 @@
 namespace mongo::stage_builder {
 class PlanStageSlots;
 
+namespace AccArgs {
+const StringData kTopBottomNSortSpec = "sortSpec"_sd;
+const StringData kTopBottomNKey = "key"_sd;
+const StringData kTopBottomNValue = "value"_sd;
+}  // namespace AccArgs
+
 /**
  * Translates an input AccumulationStatement into an SBE EExpression for accumulation expressions.
  */
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     const AccumulationStatement& acc,
     std::unique_ptr<sbe::EExpression> argExpr,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator&);
+
+/**
+ * Similar to above but takes multiple arguments.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
+    const AccumulationStatement& acc,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
     boost::optional<sbe::value::SlotId> collatorSlot,
     sbe::value::FrameIdGenerator&);
 
@@ -62,13 +77,36 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
     sbe::value::FrameIdGenerator&);
 
 /**
+ * Similar to above but takes multiple arguments.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
+    const AccumulationStatement& acc,
+    const sbe::value::SlotVector& inputSlots,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator&);
+
+/**
  * Translates an input AccumulationStatement into an SBE EExpression that represents an
  * AccumulationStatement's finalization step. The 'stage' parameter provides the input subtree to
  * build on top of.
  */
 std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
                                                 const AccumulationStatement& acc,
-                                                const sbe::value::SlotVector& aggSlots);
+                                                const sbe::value::SlotVector& aggSlots,
+                                                boost::optional<sbe::value::SlotId> collatorSlot,
+                                                sbe::value::FrameIdGenerator& frameIdGenerator);
+
+/**
+ * Similar to above but takes multiple arguments.
+ */
+std::unique_ptr<sbe::EExpression> buildFinalize(
+    StageBuilderState& state,
+    const AccumulationStatement& acc,
+    const sbe::value::SlotVector& aggSlots,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator);
 
 /**
  * Translates an input AccumulationStatement into an SBE EExpression for the initialization of the

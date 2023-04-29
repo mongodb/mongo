@@ -845,6 +845,13 @@ public:
         }
     }
 
+    void pop_back() {
+        if (_vals.size() > 0) {
+            releaseValue(_vals.back().first, _vals.back().second);
+            _vals.pop_back();
+        }
+    }
+
     auto size() const noexcept {
         return _vals.size();
     }
