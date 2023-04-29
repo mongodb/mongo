@@ -99,13 +99,6 @@ assert.commandFailedWithCode(
 
 operation.forget();
 
-// getMore cursor to check if we can getMore after the database is dropped.
-donorTenantSession.getDatabase("config")["system.change_collection"].drop();
-assert.commandFailedWithCode(
-    donorTenantConn.getDB("database")
-        .runCommand("getMore", {getMore: donorCursor2._cursorid, collection: "collection"}),
-    ErrorCodes.QueryPlanKilled);
-
 const recipientRst = test.getRecipient();
 const recipientPrimary = recipientRst.getPrimary();
 
@@ -140,4 +133,12 @@ const cursors = [recipientPrimaryTenantConn, ...recipientSecondaryConns].map(
 });
 
 test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
+
+// getMore cursor to check if we can getMore after the database is dropped.
+donorTenantSession.getDatabase("config")["system.change_collection"].drop();
+assert.commandFailedWithCode(
+    donorTenantConn.getDB("database")
+        .runCommand("getMore", {getMore: donorCursor2._cursorid, collection: "collection"}),
+    ErrorCodes.QueryPlanKilled);
+
 test.stop();
