@@ -67,9 +67,10 @@ private:
     void _probeUp(double throughput);
     void _probeDown(double throughput);
 
-    void _setConcurrency(int32_t concurrency);
+    void _setConcurrency(double concurrency);
 
-    int32_t _stableConcurrency;
+    // This value is split between reads and writes based on the read/write ratio.
+    double _stableConcurrency;
     double _stableThroughput = 0;
     ProbingState _state = ProbingState::kStable;
     Timer _timer;
