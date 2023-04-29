@@ -183,8 +183,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
  */
 void stopMigrations(OperationContext* opCtx,
                     const NamespaceString& nss,
-                    const boost::optional<UUID>& expectedCollectionUUID,
-                    const boost::optional<OperationSessionInfo>& osi = boost::none);
+                    const boost::optional<UUID>& expectedCollectionUUID);
 
 /**
  * Resume migrations and balancing rounds for the given nss.
@@ -193,8 +192,7 @@ void stopMigrations(OperationContext* opCtx,
  */
 void resumeMigrations(OperationContext* opCtx,
                       const NamespaceString& nss,
-                      const boost::optional<UUID>& expectedCollectionUUID,
-                      const boost::optional<OperationSessionInfo>& osi = boost::none);
+                      const boost::optional<UUID>& expectedCollectionUUID);
 
 /**
  * Calls to the config server primary to get the collection document for the given nss.

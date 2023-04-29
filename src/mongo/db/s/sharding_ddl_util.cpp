@@ -269,7 +269,6 @@ write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
 void setAllowMigrations(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const boost::optional<UUID>& expectedCollectionUUID,
-                        const boost::optional<OperationSessionInfo>& osi,
                         bool allowMigrations) {
     ConfigsvrSetAllowMigrations configsvrSetAllowMigrationsCmd(nss, allowMigrations);
     configsvrSetAllowMigrationsCmd.setCollectionUUID(expectedCollectionUUID);
@@ -279,8 +278,7 @@ void setAllowMigrations(OperationContext* opCtx,
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin.toString(),
-            CommandHelpers::appendMajorityWriteConcern(
-                configsvrSetAllowMigrationsCmd.toBSON(osi ? osi->toBSON() : BSONObj())),
+            CommandHelpers::appendMajorityWriteConcern(configsvrSetAllowMigrationsCmd.toBSON({})),
             Shard::RetryPolicy::kIdempotent  // Although ConfigsvrSetAllowMigrations is not really
                                              // idempotent (because it will cause the collection
                                              // version to be bumped), it is safe to be retried.
@@ -770,16 +768,14 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
 
 void stopMigrations(OperationContext* opCtx,
                     const NamespaceString& nss,
-                    const boost::optional<UUID>& expectedCollectionUUID,
-                    const boost::optional<OperationSessionInfo>& osi) {
-    setAllowMigrations(opCtx, nss, expectedCollectionUUID, osi, false);
+                    const boost::optional<UUID>& expectedCollectionUUID) {
+    setAllowMigrations(opCtx, nss, expectedCollectionUUID, false);
 }
 
 void resumeMigrations(OperationContext* opCtx,
                       const NamespaceString& nss,
-                      const boost::optional<UUID>& expectedCollectionUUID,
-                      const boost::optional<OperationSessionInfo>& osi) {
-    setAllowMigrations(opCtx, nss, expectedCollectionUUID, osi, true);
+                      const boost::optional<UUID>& expectedCollectionUUID) {
+    setAllowMigrations(opCtx, nss, expectedCollectionUUID, true);
 }
 
 bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {

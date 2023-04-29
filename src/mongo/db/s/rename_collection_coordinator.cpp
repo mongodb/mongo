@@ -333,15 +333,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // Block migrations on involved sharded collections
                 if (_doc.getOptShardedCollInfo()) {
-                    _updateSession(opCtx);
-                    sharding_ddl_util::stopMigrations(
-                        opCtx, fromNss, _doc.getSourceUUID(), getCurrentSession());
+                    sharding_ddl_util::stopMigrations(opCtx, fromNss, _doc.getSourceUUID());
                 }
 
                 if (_doc.getTargetIsSharded()) {
-                    _updateSession(opCtx);
-                    sharding_ddl_util::stopMigrations(
-                        opCtx, toNss, _doc.getTargetUUID(), getCurrentSession());
+                    sharding_ddl_util::stopMigrations(opCtx, toNss, _doc.getTargetUUID());
                 }
             }))
         .then(_buildPhaseHandler(

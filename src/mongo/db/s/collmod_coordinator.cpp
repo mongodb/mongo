@@ -202,11 +202,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     if (_collInfo->isSharded) {
                         _doc.setCollUUID(
                             sharding_ddl_util::getCollectionUUID(opCtx, _collInfo->nsForTargeting));
-                        _updateSession(opCtx);
-                        sharding_ddl_util::stopMigrations(opCtx,
-                                                          _collInfo->nsForTargeting,
-                                                          _doc.getCollUUID(),
-                                                          getCurrentSession());
+                        sharding_ddl_util::stopMigrations(
+                            opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                     }
                 })();
         })
@@ -229,11 +226,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     if (!migrationsAlreadyBlockedForBucketNss) {
                         _doc.setCollUUID(sharding_ddl_util::getCollectionUUID(
                             opCtx, _collInfo->nsForTargeting, true /* allowViews */));
-                        _updateSession(opCtx);
-                        sharding_ddl_util::stopMigrations(opCtx,
-                                                          _collInfo->nsForTargeting,
-                                                          _doc.getCollUUID(),
-                                                          getCurrentSession());
+                        sharding_ddl_util::stopMigrations(
+                            opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                     }
                 }
 
@@ -380,18 +374,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
                         }
                         _result = builder.obj();
-                        _updateSession(opCtx);
-                        sharding_ddl_util::resumeMigrations(opCtx,
-                                                            _collInfo->nsForTargeting,
-                                                            _doc.getCollUUID(),
-                                                            getCurrentSession());
+                        sharding_ddl_util::resumeMigrations(
+                            opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                     } catch (DBException& ex) {
                         if (!_isRetriableErrorForDDLCoordinator(ex.toStatus())) {
-                            _updateSession(opCtx);
-                            sharding_ddl_util::resumeMigrations(opCtx,
-                                                                _collInfo->nsForTargeting,
-                                                                _doc.getCollUUID(),
-                                                                getCurrentSession());
+                            sharding_ddl_util::resumeMigrations(
+                                opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                         }
                         throw;
                     }
