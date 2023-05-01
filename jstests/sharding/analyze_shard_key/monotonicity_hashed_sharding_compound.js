@@ -17,8 +17,11 @@ load("jstests/sharding/analyze_shard_key/libs/monotonicity_common.js");
 //   collection. The order refers to whether the value is constant, fluctuating, increasing or
 //   decreasing.
 // - 'expected' is the expected monotonicity. Since the shard key is compound, its monotonicity is
-//   determined by the monotonicity of the first non-constant shard key field. If the field is
-//   hashed, then it is not monotonic since hashing guarantees randomness.
+//   determined by the monotonicity of the first non-constant shard key field. However, the
+//   monotonicity of a hashed shard key cannot inferred from the recordIds in the index since
+//   hashing introduces randomness. So the analyzeShardKey command handles hashed shard keys as
+//   follows. If the first field is hashed, it returns "not monotonic". Otherwise, it returns
+//   "unknown".
 const testCases = [];
 
 for (let orderType0 of kOrderTypes) {
@@ -37,7 +40,7 @@ for (let orderType0 of kOrderTypes) {
                 {name: fieldName0, type: fieldType0, order: orderType0.name},
                 {name: fieldName1, type: fieldType1, order: orderType1.name}
             ],
-            expected: orderType0.name == "constant" ? orderType1.monotonicity : "not monotonic"
+            expected: "not monotonic"
         });
 
         // Test compound shard key without a hashed prefix.
@@ -48,7 +51,7 @@ for (let orderType0 of kOrderTypes) {
                 {name: fieldName0, type: fieldType0, order: orderType0.name},
                 {name: fieldName1, type: fieldType1, order: orderType1.name}
             ],
-            expected: orderType0.monotonicity
+            expected: "unknown"
         });
     }
 }

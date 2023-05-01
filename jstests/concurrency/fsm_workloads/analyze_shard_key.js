@@ -103,11 +103,6 @@ var $config = extendWorkload($config, function($config, $super) {
                 key: {[this.currentShardKeyFieldName]: 1, [this.candidateShardKeyFieldName]: 1},
                 unique: isUnique
             }];
-            // For a compound hashed shard key, the exact shard key index is needed for determining
-            // the monotonicity.
-            if (isHashed) {
-                indexSpecs.push({name: "exact_index", key: shardKey});
-            }
         } else {
             shardKey = {[this.candidateShardKeyFieldName]: isHashed ? "hashed" : 1};
             indexSpecs = [{

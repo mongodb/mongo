@@ -542,9 +542,15 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         return metrics;
     }
 
-    if (KeyPattern::isHashedKeyPattern(shardKey) && shardKey.nFields() == 1) {
-        metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
-        metrics.setRecordIdCorrelationCoefficient(0);
+    if (KeyPattern::isHashedKeyPattern(shardKey)) {
+        if (shardKey.nFields() == 1 || shardKey.firstElement().valueStringDataSafe() == "hashed") {
+            metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
+            metrics.setRecordIdCorrelationCoefficient(0);
+        } else {
+            // The monotonicity cannot be inferred from the recordIds in the index since hashing
+            // introduces randomness.
+            metrics.setType(MonotonicityTypeEnum::kUnknown);
+        }
         return metrics;
     }
 
