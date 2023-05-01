@@ -26,7 +26,6 @@ TestData.skipCheckDBHashes = true;
 const shardSplitTest = new ShardSplitTest({
     quickGarbageCollection: true,
     allowStaleReadsOnDonor: true,
-    initiateWithShortElectionTimeout: true,
     // Increase timeout because blocking in the critical section contributes to operation latency.
     nodeOptions: {setParameter: {shardSplitTimeoutMS: 100000}}
 });

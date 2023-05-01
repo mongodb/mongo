@@ -25,7 +25,6 @@ TestData.skipCheckDBHashes = true;
 const test = new ShardSplitTest({
     quickGarbageCollection: true,
     allowStaleReadsOnDonor: true,
-    initiateWithShortElectionTimeout: true
 });
 
 const donorPrimary = test.getDonorPrimary();

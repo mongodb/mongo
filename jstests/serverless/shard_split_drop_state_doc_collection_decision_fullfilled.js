@@ -81,8 +81,7 @@ function testDroppingStateDocCollections(
 }
 
 jsTest.log("Test dropping donor and recipient state doc collections during a shard split.");
-const test =
-    new ShardSplitTest({quickGarbageCollection: true, initiateWithShortElectionTimeout: true});
+const test = new ShardSplitTest({quickGarbageCollection: true});
 
 const fpName = "pauseShardSplitAfterDecision";
 testDroppingStateDocCollections(test, fpName, {dropDonorsCollection: true});

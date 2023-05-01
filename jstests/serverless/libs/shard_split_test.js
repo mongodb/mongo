@@ -355,7 +355,6 @@ export class ShardSplitTest {
         donorRst,
         nodeOptions,
         allowStaleReadsOnDonor = false,
-        initiateWithShortElectionTimeout = false
     } = {}) {
         nodeOptions = nodeOptions || {};
         if (quickGarbageCollection) {
@@ -372,23 +371,12 @@ export class ShardSplitTest {
         } else {
             this.donor = new ReplSetTest({name: "donor", nodes: 3, serverless: true, nodeOptions});
             this.donor.startSet();
-            if (initiateWithShortElectionTimeout) {
-                this.initiateWithShortElectionTimeout();
-            } else {
-                this.donor.initiate();
-            }
+            this.donor.initiate();
         }
 
         this.recipientTagName = recipientTagName;
         this.recipientSetName = recipientSetName;
         this.recipientNodes = [];
-    }
-
-    initiateWithShortElectionTimeout() {
-        let config = this.donor.getReplSetConfig();
-        config.settings = config.settings || {};
-        config.settings["electionTimeoutMillis"] = 500;
-        this.donor.initiate(config);
     }
 
     /*

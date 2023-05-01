@@ -26,7 +26,6 @@ TestData.skipCheckDBHashes = true;
 const tenantMigrationTest = new ShardSplitTest({
     quickGarbageCollection: true,
     allowStaleReadsOnDonor: true,
-    initiateWithShortElectionTimeout: true
 });
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
