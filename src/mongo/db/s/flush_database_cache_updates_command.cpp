@@ -66,8 +66,9 @@ Status insertDatabaseEntryForBackwardCompatibility(OperationContext* opCtx,
 
     DBDirectClient client(opCtx);
     auto commandResponse = client.runCommand([&] {
-        auto dbMetadata =
-            DatabaseType(dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
+        auto dbMetadata = DatabaseType(DatabaseNameUtil::serialize(dbName),
+                                       ShardId::kConfigServerId,
+                                       DatabaseVersion::makeFixed());
 
         write_ops::InsertCommandRequest insertOp(NamespaceString::kShardConfigDatabasesNamespace);
         insertOp.setDocuments({dbMetadata.toBSON()});

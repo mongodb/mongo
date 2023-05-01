@@ -67,6 +67,13 @@ public:
         const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
 
     /**
+     * To be used only for durable catalog. We always include the tenantId as prefixed in a
+     * databasename for the catalog.
+     */
+    static std::string serializeForCatalog(
+        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+
+    /**
      * Deserializes StringData dbName to a DatabaseName object.
      *
      * If multitenancySupport is enabled and featureFlagRequireTenantID is enabled, then a
@@ -104,6 +111,12 @@ public:
         boost::optional<TenantId> tenantId,
         StringData db,
         const SerializationContext& context = SerializationContext());
+
+    /**
+     * To be used only by the storage catalog.
+     */
+    static DatabaseName deserializeForCatalog(
+        StringData db, const SerializationContext& context = SerializationContext());
 
 private:
     static DatabaseName parseDbNameFromStringExpectTenantIdInMultitenancyMode(StringData dbName);

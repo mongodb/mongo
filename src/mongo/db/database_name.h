@@ -152,10 +152,6 @@ public:
         return _data.size() == kDataOffset;
     }
 
-    std::string toString() const {
-        return db().toString();
-    }
-
     std::string toStringWithTenantId() const {
         if (_hasTenantId()) {
             return str::stream() << TenantId{OID::from(&_data[kDataOffset])} << "_" << db();
@@ -185,6 +181,15 @@ public:
      */
     friend std::string toStringForLogging(const DatabaseName& dbName) {
         return dbName.toStringWithTenantId();
+    }
+
+    /**
+     * This function returns the DatabaseName as a string, ignoring the tenantId.
+     *
+     * MUST only be used for tests.
+     */
+    std::string toString_forTest() const {
+        return toString();
     }
 
     bool equalCaseInsensitive(const DatabaseName& other) const {
@@ -285,6 +290,10 @@ private:
         if (!dbString.empty()) {
             std::memcpy(_data.data() + dbStartIndex, dbString.rawData(), dbString.size());
         }
+    }
+
+    std::string toString() const {
+        return db().toString();
     }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);

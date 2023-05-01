@@ -839,10 +839,9 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     auto indexes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nssOrUUID.dbName().toString(),
+                                              DatabaseNameUtil::serialize(nssOrUUID.dbName()),
                                               cmd,
                                               Milliseconds(-1)));
-
     for (auto&& spec : indexes.docs) {
         if (spec[IndexDescriptor::kClusteredFieldName]) {
             // The 'clustered' index is implicitly created upon clustered collection creation.
@@ -885,7 +884,7 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
     auto infosRes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nssOrUUID.dbName().toString(),
+                                              DatabaseNameUtil::serialize(nssOrUUID.dbName()),
                                               cmd,
                                               Milliseconds(-1)));
 

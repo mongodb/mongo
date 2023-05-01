@@ -104,7 +104,7 @@ void _finishDropDatabase(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
     }
 
-    writeConflictRetry(opCtx, "dropDatabase_database", dbName.toString(), [&] {
+    writeConflictRetry(opCtx, "dropDatabase_database", toStringForLogging(dbName), [&] {
         // We need to replicate the dropDatabase oplog entry and clear the collection catalog in the
         // same transaction. This is to prevent stepdown from interrupting between these two
         // operations and leaving this node in an inconsistent state.

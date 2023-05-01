@@ -153,11 +153,10 @@ public:
 
     void checkCollections(const DatabaseName& dbName) {
         unsigned long counter = 0;
-
+        const auto dbNameStr = dbName.toString_forTest();
         for (auto [orderedIt, catalogIt] =
-                 std::tuple{collsIterator(dbName.toString()), catalog.begin(opCtx.get(), dbName)};
-             catalogIt != catalog.end(opCtx.get()) &&
-             orderedIt != collsIteratorEnd(dbName.toString());
+                 std::tuple{collsIterator(dbNameStr), catalog.begin(opCtx.get(), dbName)};
+             catalogIt != catalog.end(opCtx.get()) && orderedIt != collsIteratorEnd(dbNameStr);
              ++catalogIt, ++orderedIt) {
 
             auto catalogColl = *catalogIt;
@@ -167,7 +166,7 @@ public:
             ++counter;
         }
 
-        ASSERT_EQUALS(counter, dbMap[dbName.toString()].size());
+        ASSERT_EQUALS(counter, dbMap[dbNameStr].size());
     }
 
     void dropColl(const std::string dbName, UUID uuid) {

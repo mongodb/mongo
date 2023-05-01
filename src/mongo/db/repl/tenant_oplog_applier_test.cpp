@@ -491,7 +491,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_CollectionMissing) {
-    createDatabase(_opCtx.get(), _dbName.toString());
+    createDatabase(_opCtx.get(), _dbName.toString_forTest());
     auto entry = makeInsertOplogEntry(1,
                                       NamespaceString::createNamespaceString_forTest(
                                           _dbName.toStringWithTenantId_forTest(), "bar"),
@@ -816,7 +816,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
-    createDatabase(_opCtx.get(), _dbName.toString());
+    createDatabase(_opCtx.get(), _dbName.toString_forTest());
     auto entry = makeOplogEntry(OpTypeEnum::kDelete,
                                 NamespaceString::createNamespaceString_forTest(
                                     _dbName.toStringWithTenantId_forTest(), "bar"),
@@ -1281,7 +1281,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
-    createDatabase(_opCtx.get(), _dbName.toString());
+    createDatabase(_opCtx.get(), _dbName.toString_forTest());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         _dbName.toStringWithTenantId_forTest(), "bar");
     UUID uuid(UUID::gen());

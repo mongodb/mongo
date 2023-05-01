@@ -180,7 +180,7 @@ void DocumentSourceOut::initialize() {
     // consultation.
     _tempNs = NamespaceStringUtil::parseNamespaceFromRequest(
         getOutputNs().tenantId(),
-        str::stream() << getOutputNs().dbName().toString() << "."
+        str::stream() << getOutputNs().dbName().db() << "."
                       << NamespaceString::kOutTmpCollectionPrefix << UUID::gen());
 
     // Save the original collection options and index specs so we can check they didn't change

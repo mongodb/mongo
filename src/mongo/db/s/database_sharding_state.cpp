@@ -159,7 +159,8 @@ std::vector<DatabaseName> DatabaseShardingState::getDatabaseNames(OperationConte
 
 void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
                                                     const DatabaseName& dbName) {
-    const auto receivedVersion = OperationShardingState::get(opCtx).getDbVersion(dbName.toString());
+    const auto receivedVersion =
+        OperationShardingState::get(opCtx).getDbVersion(DatabaseNameUtil::serialize(dbName));
     if (!receivedVersion) {
         return;
     }
@@ -179,7 +180,8 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
         const auto optCritSecReason = scopedDss->getCriticalSectionReason();
 
         uassert(
-            StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none, critSecSignal),
+            StaleDbRoutingVersion(
+                DatabaseNameUtil::serialize(dbName), receivedVersion, boost::none, critSecSignal),
             str::stream() << "The critical section for the database "
                           << dbName.toStringForErrorMsg()
                           << " is acquired with reason: " << scopedDss->getCriticalSectionReason(),
@@ -187,13 +189,15 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
     }
 
     const auto wantedVersion = scopedDss->getDbVersion(opCtx);
-    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none),
-            str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
-            wantedVersion);
+    uassert(
+        StaleDbRoutingVersion(DatabaseNameUtil::serialize(dbName), receivedVersion, boost::none),
+        str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
+        wantedVersion);
 
-    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, *wantedVersion),
-            str::stream() << "Version mismatch for the database " << dbName.toStringForErrorMsg(),
-            receivedVersion == *wantedVersion);
+    uassert(
+        StaleDbRoutingVersion(DatabaseNameUtil::serialize(dbName), receivedVersion, *wantedVersion),
+        str::stream() << "Version mismatch for the database " << dbName.toStringForErrorMsg(),
+        receivedVersion == *wantedVersion);
 }
 
 void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
@@ -206,7 +210,8 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
         return;
     }
 
-    auto expectedDbVersion = OperationShardingState::get(opCtx).getDbVersion(dbName.toString());
+    auto expectedDbVersion =
+        OperationShardingState::get(opCtx).getDbVersion(DatabaseNameUtil::serialize(dbName));
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Received request without the version for the database "

@@ -60,6 +60,11 @@ std::string DatabaseNameUtil::serializeForStorage(const DatabaseName& dbName,
     return dbName.toStringWithTenantId();
 }
 
+std::string DatabaseNameUtil::serializeForCatalog(const DatabaseName& dbName,
+                                                  const SerializationContext& context) {
+    return dbName.toStringWithTenantId();
+}
+
 std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
                                                    const SerializationContext& context) {
     // tenantId came from either a $tenant field or security token
@@ -87,7 +92,6 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
             MONGO_UNREACHABLE;
     }
 }
-
 
 DatabaseName DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(
     StringData dbName) {
@@ -194,6 +198,14 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
         massert(8423388, "TenantId must be set", dbName.tenantId() != boost::none);
 
     return dbName;
+}
+
+DatabaseName DatabaseNameUtil::deserializeForCatalog(StringData db,
+                                                     const SerializationContext& context) {
+    // TenantId always prefix in the passed `db` for durable catalog. This method below checks for
+    // multitenancy and will either return a DatabaseName with (tenantId, nonPrefixedDb) or
+    // (none, prefixedDb).
+    return DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(db);
 }
 
 }  // namespace mongo

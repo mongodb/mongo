@@ -614,8 +614,10 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_getUnshardedCollections(
     const auto fromShard =
         uassertStatusOK(shardRegistry->getShard(opCtx, _metadata.getFromShardName().toString()));
 
-    auto collectionsToCloneWithStatus = _cloner->getListOfCollections(
-        opCtx, getDatabaseName().dbName().toString(), fromShard->getConnString().toString());
+    auto collectionsToCloneWithStatus =
+        _cloner->getListOfCollections(opCtx,
+                                      DatabaseNameUtil::serialize(getDatabaseName().dbName()),
+                                      fromShard->getConnString().toString());
     auto collectionsToClone = uassertStatusOK(collectionsToCloneWithStatus);
 
     const auto allCollections = [&] {

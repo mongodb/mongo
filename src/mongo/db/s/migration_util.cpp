@@ -171,7 +171,7 @@ void sendWriteCommandToRecipient(OperationContext* opCtx,
     auto response = recipientShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        cmd.getDbName().toString(),
+        DatabaseNameUtil::serialize(cmd.getDbName()),
         cmdBSON,
         Shard::RetryPolicy::kIdempotent);
 

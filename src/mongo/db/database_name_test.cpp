@@ -44,14 +44,14 @@ TEST(DatabaseNameTest, MultitenancySupportDisabled) {
 
     ASSERT(!dbnWithoutTenant1.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.toString_forTest());
 
     TenantId tenantId(OID::gen());
     DatabaseName dbnWithTenant = DatabaseName::createDatabaseName_forTest(tenantId, "a");
     ASSERT(dbnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.toString_forTest());
     ASSERT_EQUALS(std::string(tenantId.toString() + "_a"),
                   dbnWithTenant.toStringWithTenantId_forTest());
 }
@@ -63,14 +63,14 @@ TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     DatabaseName dbnWithoutTenant = DatabaseName::createDatabaseName_forTest(boost::none, "a");
     ASSERT(!dbnWithoutTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.toString_forTest());
 
     TenantId tenantId(OID::gen());
     DatabaseName dbnWithTenant = DatabaseName::createDatabaseName_forTest(tenantId, "a");
     ASSERT(dbnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString_forTest());
     ASSERT_EQUALS(std::string(tenantId.toString() + "_a"),
                   dbnWithTenant.toStringWithTenantId_forTest());
 }
@@ -165,21 +165,21 @@ TEST(DatabaseNameTest, EmptyDbString) {
     DatabaseName empty{};
     ASSERT_EQ(empty.db(), "");
     ASSERT_FALSE(empty.tenantId());
-    ASSERT_EQ(empty.toString(), "");
+    ASSERT_EQ(empty.toString_forTest(), "");
     ASSERT_EQ(empty.toStringWithTenantId_forTest(), "");
 
     DatabaseName emptyFromStringData =
         DatabaseName::createDatabaseName_forTest(boost::none, StringData());
     ASSERT_EQ(emptyFromStringData.db(), "");
     ASSERT_FALSE(emptyFromStringData.tenantId());
-    ASSERT_EQ(emptyFromStringData.toString(), "");
+    ASSERT_EQ(emptyFromStringData.toString_forTest(), "");
     ASSERT_EQ(emptyFromStringData.toStringWithTenantId_forTest(), "");
 
     TenantId tenantId(OID::gen());
     DatabaseName emptyWithTenantId = DatabaseName::createDatabaseName_forTest(tenantId, "");
     ASSERT_EQ(emptyWithTenantId.db(), "");
     ASSERT(emptyWithTenantId.tenantId());
-    ASSERT_EQ(emptyWithTenantId.toString(), "");
+    ASSERT_EQ(emptyWithTenantId.toString_forTest(), "");
     ASSERT_EQ(emptyWithTenantId.toStringWithTenantId_forTest(),
               fmt::format("{}_", tenantId.toString()));
 }

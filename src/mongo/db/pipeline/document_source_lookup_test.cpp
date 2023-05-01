@@ -1661,7 +1661,7 @@ TEST_F(DocumentSourceLookUpServerlessTest,
                         << "lookup1"));
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        boost::none, expCtx->ns.dbName().toString(), _targetColl);
+        boost::none, expCtx->ns.dbName().toString_forTest(), _targetColl);
 
     for (bool flagStatus : {false, true}) {
         RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",

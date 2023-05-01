@@ -185,7 +185,7 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
                 str::stream() << "Mismatched $db in explain command. Expected "
                               << dbName.toStringForErrorMsg() << " but got "
                               << innerDbName.toStringForErrorMsg(),
-                innerDb.checkAndGetStringData() == dbName.toString());
+                innerDbName == dbName);
     }
     auto explainedCommand = CommandHelpers::findCommand(explainedObj.firstElementFieldName());
     uassert(ErrorCodes::CommandNotFound,

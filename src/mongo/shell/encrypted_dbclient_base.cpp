@@ -167,7 +167,7 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
     }
     invariant(frameStack.size() == 1);
     // Append '$db' which shouldn't contain tenantid.
-    frameStack.top().second.append("$db", dbName.toString());
+    frameStack.top().second.append("$db", dbName.toString_forTest());
     // If encrypt request, append '$tenant' which contains tenantid.
     if (encrypt && dbName.tenantId() && !object.hasField("$tenant")) {
         dbName.tenantId()->serializeToBSON("$tenant", &frameStack.top().second);

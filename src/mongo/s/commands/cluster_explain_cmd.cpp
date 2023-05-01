@@ -170,7 +170,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
         IDLParserContext(ExplainCommandRequest::kCommandName,
                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
         request.body);
-    std::string dbName = cmdObj.getDbName().toString();
+    std::string dbName = DatabaseNameUtil::serialize(cmdObj.getDbName());
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     // This is the nested command which we are explaining. We need to propagate generic
     // arguments into the inner command since it is what is passed to the virtual

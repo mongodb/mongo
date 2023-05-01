@@ -1083,7 +1083,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
         ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
 
         // Assert the tenantId is not included in the serialized namespace.
-        auto dbField = flagStatus ? expCtx->ns.dbName().toString()
+        auto dbField = flagStatus ? expCtx->ns.dbName().toString_forTest()
                                   : expCtx->ns.dbName().toStringWithTenantId_forTest();
         auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 
@@ -1111,7 +1111,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
         ASSERT(mergeSource->getOutputNs().tenantId());
         ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
 
-        auto dbField = flagStatus ? expCtx->ns.dbName().toString()
+        auto dbField = flagStatus ? expCtx->ns.dbName().toString_forTest()
                                   : expCtx->ns.dbName().toStringWithTenantId_forTest();
         auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 

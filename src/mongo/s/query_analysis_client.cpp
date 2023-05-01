@@ -73,7 +73,7 @@ void QueryAnalysisClient::setTaskExecutor(ServiceContext* service,
 bool QueryAnalysisClient::_canAcceptWrites(OperationContext* opCtx, const DatabaseName& dbName) {
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     return mongo::repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-        opCtx, dbName.toString());
+        opCtx, DatabaseNameUtil::serialize(dbName));
 }
 
 BSONObj QueryAnalysisClient::_executeCommandOnPrimaryLocal(
@@ -103,7 +103,7 @@ BSONObj QueryAnalysisClient::_executeCommandOnPrimaryRemote(
     invariant(executor, "Failed to run command since the executor has not been initialized");
 
     executor::RemoteCommandRequest request(
-        std::move(hostAndPort), dbName.toString(), cmdObj, opCtx);
+        std::move(hostAndPort), DatabaseNameUtil::serialize(dbName), cmdObj, opCtx);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));

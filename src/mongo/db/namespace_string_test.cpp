@@ -446,7 +446,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(empty.toStringWithTenantId_forTest(), "");
         ASSERT_EQ(empty.dbName().db(), "");
         ASSERT_EQ(empty.dbName().tenantId(), boost::none);
-        ASSERT_EQ(empty.dbName().toString(), "");
+        ASSERT_EQ(empty.dbName().toString_forTest(), "");
         ASSERT_EQ(empty.dbName().toStringWithTenantId_forTest(), "");
     }
 
@@ -463,7 +463,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(emptyWithTenant.dbName().db(), "");
         ASSERT(emptyWithTenant.dbName().tenantId());
         ASSERT_EQ(emptyWithTenant.dbName().tenantId(), tenantId);
-        ASSERT_EQ(emptyWithTenant.dbName().toString(), "");
+        ASSERT_EQ(emptyWithTenant.dbName().toString_forTest(), "");
         ASSERT_EQ(emptyWithTenant.dbName().toStringWithTenantId_forTest(),
                   "{}_"_format(tenantId.toString()));
     }
@@ -478,7 +478,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(dbWithoutColl.toStringWithTenantId_forTest(), "foo");
         ASSERT_EQ(dbWithoutColl.dbName().db(), "foo");
         ASSERT_FALSE(dbWithoutColl.dbName().tenantId());
-        ASSERT_EQ(dbWithoutColl.dbName().toString(), "foo");
+        ASSERT_EQ(dbWithoutColl.dbName().toString_forTest(), "foo");
         ASSERT_EQ(dbWithoutColl.dbName().toStringWithTenantId_forTest(), "foo");
     }
 
@@ -495,7 +495,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(dbWithoutCollWithTenant.dbName().db(), "foo");
         ASSERT(dbWithoutCollWithTenant.dbName().tenantId());
         ASSERT_EQ(dbWithoutCollWithTenant.dbName().tenantId(), tenantId);
-        ASSERT_EQ(dbWithoutCollWithTenant.dbName().toString(), "foo");
+        ASSERT_EQ(dbWithoutCollWithTenant.dbName().toString_forTest(), "foo");
         ASSERT_EQ(dbWithoutCollWithTenant.dbName().toStringWithTenantId_forTest(),
                   fmt::format("{}_foo", tenantId.toString()));
     }

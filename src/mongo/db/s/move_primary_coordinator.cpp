@@ -69,7 +69,7 @@ MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* se
       _csReason([&] {
           BSONObjBuilder builder;
           builder.append("command", "movePrimary");
-          builder.append("db", _dbName.toString());
+          builder.append("db", DatabaseNameUtil::serialize(_dbName));
           builder.append("to", _doc.getToShardId());
           return builder.obj();
       }()) {}
@@ -481,7 +481,7 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
         details.append("error", status.toString());
     }
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "movePrimary.{}"_format(what), _dbName.toString(), details.obj());
+        opCtx, "movePrimary.{}"_format(what), DatabaseNameUtil::serialize(_dbName), details.obj());
 }
 
 std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
@@ -510,7 +510,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
 
     const auto shardedCollections = [&] {
         auto colls = Grid::get(opCtx)->catalogClient()->getAllShardedCollectionsForDb(
-            opCtx, _dbName.toString(), repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx,
+            DatabaseNameUtil::serialize(_dbName),
+            repl::ReadConcernLevel::kMajorityReadConcern);
 
         std::sort(colls.begin(), colls.end());
         return colls;
@@ -544,7 +546,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
         const auto listResponse = uassertStatusOK(
             toShard->runExhaustiveCursorCommand(opCtx,
                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                _dbName.toString(),
+                                                DatabaseNameUtil::serialize(_dbName),
                                                 listCommand,
                                                 Milliseconds(-1)));
 
@@ -581,7 +583,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
 
     const auto cloneCommand = [&] {
         BSONObjBuilder commandBuilder;
-        commandBuilder.append("_shardsvrCloneCatalogData", _dbName.toString());
+        commandBuilder.append("_shardsvrCloneCatalogData", DatabaseNameUtil::serialize(_dbName));
         commandBuilder.append("from", fromShard->getConnString().toString());
         return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
     }();
@@ -652,14 +654,14 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
     OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
     const auto postCommitDbType = [&]() {
         const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto findResponse = uassertStatusOK(
-            config->exhaustiveFindOnConfig(opCtx,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           repl::ReadConcernLevel::kMajorityReadConcern,
-                                           NamespaceString::kConfigDatabasesNamespace,
-                                           BSON(DatabaseType::kNameFieldName << _dbName.toString()),
-                                           BSONObj(),
-                                           1));
+        auto findResponse = uassertStatusOK(config->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            NamespaceString::kConfigDatabasesNamespace,
+            BSON(DatabaseType::kNameFieldName << DatabaseNameUtil::serialize(_dbName)),
+            BSONObj(),
+            1));
 
         const auto databases = std::move(findResponse.docs);
         uassert(ErrorCodes::IncompatibleShardingMetadata,

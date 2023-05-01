@@ -104,8 +104,8 @@ void MovePrimaryDatabaseCloner::calculateListCatalogEntriesForDonor() {
     Pipeline::SourceContainer stages;
     stages.emplace_back(DocumentSourceListCatalog::createFromBson(
         BSON("$listCatalog" << BSONObj()).firstElement(), expCtx));
-    stages.emplace_back(
-        DocumentSourceMatch::create(BSON("db" << BSON("$eq" << _dbName.toString())), expCtx));
+    stages.emplace_back(DocumentSourceMatch::create(
+        BSON("db" << BSON("$eq" << DatabaseNameUtil::serialize(_dbName))), expCtx));
     stages.emplace_back(DocumentSourceMatch::create(BSON("type" << BSON("$eq"
                                                                         << "collection")),
                                                     expCtx));
@@ -134,7 +134,7 @@ void MovePrimaryDatabaseCloner::calculateListCatalogEntriesForRecipient() {
 
     auto opCtx = _opCtxHolder.get();
     auto recipientShardedColls = _catalogClient->getAllShardedCollectionsForDb(
-        opCtx, _dbName.toString(), repl::ReadConcernLevel::kMajorityReadConcern);
+        opCtx, DatabaseNameUtil::serialize(_dbName), repl::ReadConcernLevel::kMajorityReadConcern);
 
     stdx::unordered_set<NamespaceString> shardedCollsSet;
     std::copy(recipientShardedColls.begin(),

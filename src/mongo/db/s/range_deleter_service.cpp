@@ -56,7 +56,9 @@ BSONObj getShardKeyPattern(OperationContext* opCtx,
         boost::optional<NamespaceString> optNss;
         {
             AutoGetCollection collection(
-                opCtx, NamespaceStringOrUUID{dbName.toString(), collectionUuid}, MODE_IS);
+                opCtx,
+                NamespaceStringOrUUID{DatabaseNameUtil::serialize(dbName), collectionUuid},
+                MODE_IS);
 
             auto optMetadata = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
                                    opCtx, collection.getNss())

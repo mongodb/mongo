@@ -347,7 +347,7 @@ std::shared_ptr<MovePrimaryDonor> MovePrimaryDonor::create(OperationContext* opC
     auto service = registry->lookupServiceByName(MovePrimaryDonorService::kServiceName);
     MovePrimaryCommonMetadata metadata;
     metadata.setMigrationId(UUID::gen());
-    metadata.setDatabaseName(NamespaceString{dbName.toString()});
+    metadata.setDatabaseName(NamespaceString{dbName});
     metadata.setFromShardName(ShardingState::get(opCtx)->shardId());
     metadata.setToShardName(toShard.toString());
     MovePrimaryDonorDocument document;

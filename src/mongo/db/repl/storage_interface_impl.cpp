@@ -405,14 +405,15 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
             hasLocalDatabase = true;
             continue;
         }
-        writeConflictRetry(opCtx, "dropReplicatedDatabases", dbName.toString(), [&] {
+        writeConflictRetry(opCtx, "dropReplicatedDatabases", toStringForLogging(dbName), [&] {
             if (auto db = databaseHolder->getDb(opCtx, dbName)) {
                 WriteUnitOfWork wuow(opCtx);
                 databaseHolder->dropDb(opCtx, db);
                 wuow.commit();
             } else {
                 // This is needed since dropDatabase can't be rolled back.
-                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed.
+                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once
+                // fixed.
                 LOGV2(21755,
                       "dropReplicatedDatabases - database disappeared after retrieving list of "
                       "database names but before drop: {dbName}",
