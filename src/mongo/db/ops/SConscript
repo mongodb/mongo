@@ -131,6 +131,7 @@ env.Library(
     source='parsed_update.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/disk_use_options_idl',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/update/update_driver',
         'parsed_update_array_filters',

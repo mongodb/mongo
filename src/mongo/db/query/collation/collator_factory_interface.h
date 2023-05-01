@@ -31,11 +31,6 @@
 
 #include "mongo/db/query/collation/collator_interface.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
-
 namespace mongo {
 
 class BSONObj;
@@ -80,26 +75,5 @@ public:
      */
     virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
 };
-
-/**
- * Returns a collator for the user-specified collation 'userCollation'.
- *
- * Note: The caller should check if 'userCollation' is not empty since the empty 'userCollation'
- * has the special meaning that the query follows the collection default collation that exists.
- */
-inline std::unique_ptr<CollatorInterface> getUserCollator(OperationContext* opCtx,
-                                                          const BSONObj& userCollation) {
-    tassert(7542402, "Empty user collation", !userCollation.isEmpty());
-    return uassertStatusOK(
-        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(userCollation));
-}
-
-/**
- * Resolves the collator to either the user-specified collation or, if none was specified, to
- * the collection-default collation and also returns a flag indicating whether the user-provided
- * collation matches the collection default collation.
- */
-std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
-resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection);
 
 }  // namespace mongo
