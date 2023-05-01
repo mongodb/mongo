@@ -260,6 +260,21 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 
     stats.add(countInfo.stats.get());
 
+    // Check for the invalid case where emuBinary returned (0,0).
+    // This means that the tokens can't be trusted or the state collections are already hosed.
+    if (emuBinaryResult.cpos.value_or(1) == 0) {
+        // apos must also be 0 if cpos is 0
+        uassert(7666501,
+                "getQueryableEncryptionCountInfo returned an invalid position for the next anchor",
+                emuBinaryResult.apos.has_value() && emuBinaryResult.apos.value() == 0);
+        uasserted(7666502,
+                  str::stream() << "Queryable Encryption compaction encountered invalid searched "
+                                   "ESC positions for field "
+                                << ecocDoc.fieldName
+                                << ". This may be due to invalid compaction tokens or corrupted "
+                                   "state collections.");
+    }
+
     if (emuBinaryResult.cpos == boost::none) {
         // no new non-anchors since the last compact/cleanup, so don't insert a new anchor
         return;

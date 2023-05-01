@@ -488,16 +488,14 @@ TEST_F(FleCompactTest, CompactValueV2_NoNonAnchors) {
     auto ecocDoc = generateTestECOCDocumentV2(testPair);
     assertDocumentCounts(0, 0, 0);
 
-    // Compact an empty ESC; assert compact inserts anchor at apos = 1 with cpos = 0
+    // Compact an empty ESC; assert an error is thrown because compact should not be called
+    // if there are no ESC entries that correspond to the ECOC document.
     // Note: this tests compact where EmuBinary returns (cpos = 0, apos = 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
-    assertDocumentCounts(0, 1, 0);
-    assertESCAnchorDocument(testPair, true, 1, 0);
-
-    // Compact an ESC containing only non-null anchors
-    // Note: this tests compact where EmuBinary returns (cpos = null, apos > 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
-    assertDocumentCounts(0, 1, 0);
+    ASSERT_THROWS_CODE(
+        compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats),
+        DBException,
+        7666502);
+    assertDocumentCounts(0, 0, 0);
 }
 
 TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors) {
