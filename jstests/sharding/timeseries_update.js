@@ -56,6 +56,8 @@ if (!TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
     return;
 }
 
+const arbitraryUpdatesEnabled = TimeseriesTest.arbitraryUpdatesEnabled(st.shard0);
+
 const doc1 = {
     _id: 1,
     [timeField]: dateTime,
@@ -267,6 +269,10 @@ function testCaseReplacementAndPipelineUpdateFails({testUpdate}) {
 }
 
 function testCaseNoMetaFieldQueryUpdateFails({testUpdate}) {
+    if (arbitraryUpdatesEnabled) {
+        return;
+    }
+
     // Query on a field which is not the (nonexistent) metaField.
     testUpdate({
         updates: [{
@@ -331,25 +337,27 @@ function testCaseNoMetaFieldQueryUpdateFails({testUpdate}) {
 }
 
 function testCaseIllegalMetaFieldUpdateFails({testUpdate}) {
-    // Query on the metaField and modify a field that is not the metaField.
-    testUpdate({
-        updates: [{
-            q: {[metaField]: {c: "C", d: 2}},
-            u: {$set: {f2: "f2"}},
-            multi: true,
-        }]
-    },
-               expectFailedUpdate([doc2]));
+    if (!arbitraryUpdatesEnabled) {
+        // Query on the metaField and modify a field that is not the metaField.
+        testUpdate({
+            updates: [{
+                q: {[metaField]: {c: "C", d: 2}},
+                u: {$set: {f2: "f2"}},
+                multi: true,
+            }]
+        },
+                   expectFailedUpdate([doc2]));
 
-    // Query on the metaField and modify the metaField and fields that are not the metaField.
-    testUpdate({
-        updates: [{
-            q: {[metaField]: {c: "C", d: 2}},
-            u: {$set: {[metaField]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}},
-            multi: true,
-        }]
-    },
-               expectFailedUpdate([doc2]));
+        // Query on the metaField and modify the metaField and fields that are not the metaField.
+        testUpdate({
+            updates: [{
+                q: {[metaField]: {c: "C", d: 2}},
+                u: {$set: {[metaField]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}},
+                multi: true,
+            }]
+        },
+                   expectFailedUpdate([doc2]));
+    }
 
     // Rename the metaField.
     testUpdate({
@@ -459,54 +467,56 @@ function testCaseBatchUpdates({testUpdate}) {
 
     // Multiple updates, ordered: query on the metaField and modify a field that is not the
     // metaField using dot notation.
-    testUpdate({
-        updates: [
-            {
-                q: {[metaField]: {c: "C", d: 2}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaField]: {c: "C", d: 2}},
-                u: {$inc: {[metaField + ".d"]: 6}},
-                multi: true,
-            }
-        ]
-    },
-               expectFailedUpdate([doc2]));
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            updates: [
+                {
+                    q: {[metaField]: {c: "C", d: 2}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaField]: {c: "C", d: 2}},
+                    u: {$inc: {[metaField + ".d"]: 6}},
+                    multi: true,
+                }
+            ]
+        },
+                   expectFailedUpdate([doc2]));
 
-    // Multiple updates, unordered: Modify the metaField, a field that is not the metaField, and the
-    // metaField. The first and last updates should succeed.
-    testUpdate({
-        initialDocList: [doc2],
-        updates: [
-            {
-                q: {[metaField]: {c: "C", d: 2}},
-                u: {$inc: {[metaField + ".d"]: 6}},
-                multi: true,
-            },
-            {
-                q: {[metaField]: {c: "C", d: 8}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaField]: {c: "C", d: 8}},
-                u: {$inc: {[metaField + ".d"]: 7}},
-                multi: true,
-            }
-        ],
-        resultDocList: [{
-            _id: 2,
-            [timeField]: dateTime,
-            [metaField]: {c: "C", d: 15},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        ordered: false,
-        n: 2,
-        pathToMetaFieldBeingUpdated: "d",
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, unordered: Modify the metaField, a field that is not the metaField, and
+        // the metaField. The first and last updates should succeed.
+        testUpdate({
+            initialDocList: [doc2],
+            updates: [
+                {
+                    q: {[metaField]: {c: "C", d: 2}},
+                    u: {$inc: {[metaField + ".d"]: 6}},
+                    multi: true,
+                },
+                {
+                    q: {[metaField]: {c: "C", d: 8}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaField]: {c: "C", d: 8}},
+                    u: {$inc: {[metaField + ".d"]: 7}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [{
+                _id: 2,
+                [timeField]: dateTime,
+                [metaField]: {c: "C", d: 15},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            ordered: false,
+            n: 2,
+            pathToMetaFieldBeingUpdated: "d",
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 }
 
 function testCaseValidMetaFieldUpdates({testUpdate}) {
@@ -705,22 +715,24 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
 
     // Query for documents using $jsonSchema with the metaField required and a required subfield of
     // the metaField with the same name as the metaField.
-    testUpdate({
-        initialDocList: [doc1, nestedMetaObj],
-        updates: [{
-            q: {
-                "$jsonSchema": {
-                    "required": [metaField],
-                    "properties": {[metaField]: {"required": [metaField]}}
-                }
-            },
-            u: {$set: {[metaField]: "a"}},
-            multi: true
-        }],
-        resultDocList: [doc1, {_id: 6, [timeField]: dateTime, [metaField]: "a", a: 1}],
-        n: 1,
-        pathToMetaFieldBeingUpdated: "",
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, nestedMetaObj],
+            updates: [{
+                q: {
+                    "$jsonSchema": {
+                        "required": [metaField],
+                        "properties": {[metaField]: {"required": [metaField]}}
+                    }
+                },
+                u: {$set: {[metaField]: "a"}},
+                multi: true
+            }],
+            resultDocList: [doc1, {_id: 6, [timeField]: dateTime, [metaField]: "a", a: 1}],
+            n: 1,
+            pathToMetaFieldBeingUpdated: "",
+        });
+    }
 
     // Query for documents using $jsonSchema with the metaField required and an optional field that
     // is not the metaField.
@@ -926,7 +938,9 @@ const tests = [
     testCaseBatchUpdates,
     testCaseValidMetaFieldUpdates,
 ];
-testUpdates({shardKeyTimeField: timeField, timeseriesOptions: {timeField}, tests});
+if (!arbitraryUpdatesEnabled) {
+    testUpdates({shardKeyTimeField: timeField, timeseriesOptions: {timeField}, tests});
+}
 testUpdates({shardKeyMetaFieldPath: metaField, timeseriesOptions, tests});
 testUpdates(
     {shardKeyTimeField: timeField, shardKeyMetaFieldPath: metaField, timeseriesOptions, tests});

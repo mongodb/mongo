@@ -150,7 +150,44 @@ testUpdate({
     n: 2,
 });
 
-// Query on the metric field and remove the timeField.
+// Query on the metaField and a field that is not the metaField.
+testUpdate({
+    initialDocList: [doc_a_b_string_metric],
+    updateList: [{
+        q: {[metaFieldName]: {a: "A", b: "B"}, f: "F"},
+        u: {$set: {[metaFieldName]: {c: "C"}}},
+        multi: true,
+    }],
+    resultDocList: [
+        {
+            _id: 3,
+            [timeFieldName]: dateTime,
+            [metaFieldName]: {c: "C"},
+            f: "F",
+        },
+    ],
+    n: 1,
+});
+
+// Query on the metaField and modify the metaField and a field that is not the metaField.
+testUpdate({
+    initialDocList: [doc_a_b_string_metric],
+    updateList: [{
+        q: {[metaFieldName]: {a: "A", b: "B"}},
+        u: {$set: {[metaFieldName]: {c: "C"}, f: "FF"}},
+        multi: true,
+    }],
+    resultDocList: [
+        {
+            _id: 3,
+            [timeFieldName]: dateTime,
+            [metaFieldName]: {c: "C"},
+            f: "FF",
+        },
+    ],
+    n: 1,
+});
+
 // This command will fail because all time-series collections require a time field.
 testUpdate({
     initialDocList: [doc_a_b_string_metric, doc_a_c_array_metric_1],
