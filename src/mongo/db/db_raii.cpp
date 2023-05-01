@@ -79,23 +79,6 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
 }
 
 /**
- * Type that pretends to be a Collection. It implements the minimal interface used by
- * acquireCollectionAndConsistentSnapshot(). We are tricking acquireCollectionAndConsistentSnapshot
- * to establish a consistent snapshot with just the catalog and not for a specific Collection.
- */
-class FakeCollection {
-public:
-    // We just need to return something that would not considered to be the oplog. A default
-    // constructed NamespaceString is fine.
-    const NamespaceString& ns() const {
-        return _ns;
-    };
-
-private:
-    NamespaceString _ns;
-};
-
-/**
  * Performs validation of special locking requirements for certain namespaces.
  */
 void verifyNamespaceLockingRequirements(OperationContext* opCtx,
@@ -219,111 +202,6 @@ bool haveAcquiredConsistentCatalogAndSnapshot(
     } else {
         return false;
     }
-}
-
-/**
- * Helper function to acquire a consistent catalog and storage snapshot without holding the RSTL or
- * collection locks.
- *
- * GetCollectionAndEstablishReadSourceFunc is called before we open a snapshot, it needs to fetch
- * the Collection from the catalog and select the read source.
- *
- * ResetFunc is called when we failed to achieve consistency and need to retry.
- *
- * SetSecondaryState sets any of the secondary state that the AutoGet* needs to know about.
- */
-template <typename GetCollectionAndEstablishReadSourceFunc,
-          typename ResetFunc,
-          typename SetSecondaryState>
-auto acquireCollectionAndConsistentSnapshot(
-    OperationContext* opCtx,
-    bool isLockFreeReadSubOperation,
-    GetCollectionAndEstablishReadSourceFunc getCollectionAndEstablishReadSource,
-    ResetFunc reset,
-    SetSecondaryState setSecondaryState,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {}) {
-    // Figure out what type of Collection GetCollectionAndEstablishReadSourceFunc returns. It needs
-    // to behave like a pointer.
-    using CollectionPtrT = decltype(std::declval<GetCollectionAndEstablishReadSourceFunc>()(
-                                        std::declval<OperationContext*>(),
-                                        std::declval<const CollectionCatalog&>(),
-                                        std::declval<bool>())
-                                        .first);
-
-    CollectionPtrT collection;
-    while (true) {
-        // AutoGetCollectionForReadBase can choose a read source based on the current replication
-        // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
-        long long replTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-
-        auto catalog = CollectionCatalog::get(opCtx);
-
-        auto [localColl, isView] =
-            getCollectionAndEstablishReadSource(opCtx, *catalog, isLockFreeReadSubOperation);
-        collection = localColl;
-
-        auto resolvedSecondaryNamespaces =
-            resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
-
-        // A lock request does not always find a collection to lock. But if we found a view abort
-        // LFR setup, we don't need to open a storage snapshot in this case as the lock helper will
-        // be released and we will lock the Collection backing the view later on.
-        if (!collection && isView)
-            break;
-
-        // If this is a nested lock acquisition, then we already have a consistent stashed catalog
-        // and snapshot from which to read and we can skip the below logic.
-        if (isLockFreeReadSubOperation) {
-            // A consistent in-memory and on-disk state is already set up by a higher level AutoGet*
-            // instance. We just need to return the requested Collection which has already been
-            // checked by getCollectionAndEstablishReadSource above.
-            return collection;
-        }
-
-        // We must open a storage snapshot consistent with the fetched in-memory Catalog instance
-        // and chosen read source. The Catalog instance and replication state after opening a
-        // snapshot will be compared with the previously acquired state. If either does not match,
-        // then this loop will retry lock acquisition and read source selection until there is a
-        // match.
-        //
-        // Note: getCollectionAndEstablishReadSource() may open a snapshot for PIT reads, so
-        // preallocateSnapshot() may be a no-op, but that is OK because the snapshot is established
-        // by getCollectionAndEstablishReadSource() after it fetches a Collection instance.
-        if (collection && collection->ns().isOplog()) {
-            // Signal to the RecoveryUnit that the snapshot will be used for reading the oplog.
-            // Normally the snapshot is opened from a cursor that can take special action when
-            // reading from the oplog.
-            opCtx->recoveryUnit()->preallocateSnapshotForOplogRead();
-        } else {
-            opCtx->recoveryUnit()->preallocateSnapshot();
-        }
-
-        // Verify that the catalog has not changed while we opened the storage snapshot. If the
-        // catalog is unchanged, then the requested Collection is also guaranteed to be the same.
-        auto newCatalog = CollectionCatalog::get(opCtx);
-
-        if (haveAcquiredConsistentCatalogAndSnapshot(
-                opCtx,
-                catalog.get(),
-                newCatalog.get(),
-                replTerm,
-                repl::ReplicationCoordinator::get(opCtx)->getTerm(),
-                resolvedSecondaryNamespaces)) {
-            bool isAnySecondaryNssShardedOrAView = !resolvedSecondaryNamespaces.has_value();
-            setSecondaryState(isAnySecondaryNssShardedOrAView);
-            CollectionCatalog::stash(opCtx, std::move(catalog));
-            break;
-        }
-
-        LOGV2_DEBUG(5067701,
-                    3,
-                    "Retrying acquiring state for lock-free read because collection, catalog or "
-                    "replication state changed.");
-        reset();
-        opCtx->recoveryUnit()->abandonSnapshot();
-    }
-
-    return collection;
 }
 
 void assertReadConcernSupported(const CollectionPtr& coll,
@@ -772,6 +650,60 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
     }
 }
 
+/**
+ * Helper function to acquire a consistent catalog and storage snapshot without holding the RSTL or
+ * collection locks.
+ *
+ * Should only be used to setup lock-free reads in a global/db context. Not safe to use for reading
+ * on collections.
+ *
+ * Pass in boost::none as dbName to setup for a global context
+ */
+void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
+                                               boost::optional<const DatabaseName&> dbName) {
+
+    while (true) {
+        // AutoGetCollectionForReadBase can choose a read source based on the current replication
+        // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
+        long long replTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+        auto catalog = CollectionCatalog::get(opCtx);
+
+        // Check that the sharding database version matches our read.
+        if (dbName) {
+            // Check that the sharding database version matches our read.
+            DatabaseShardingState::assertMatchingDbVersion(opCtx, *dbName);
+        }
+
+        // We must open a storage snapshot consistent with the fetched in-memory Catalog instance.
+        // The Catalog instance and replication state after opening a snapshot will be compared with
+        // the previously acquired state. If either does not match, then this loop will retry lock
+        // acquisition and read source selection until there is a match.
+        opCtx->recoveryUnit()->preallocateSnapshot();
+
+        // Verify that the catalog has not changed while we opened the storage snapshot. If the
+        // catalog is unchanged, then the requested Collection is also guaranteed to be the same.
+        auto newCatalog = CollectionCatalog::get(opCtx);
+
+        if (haveAcquiredConsistentCatalogAndSnapshot(
+                opCtx,
+                catalog.get(),
+                newCatalog.get(),
+                replTerm,
+                repl::ReplicationCoordinator::get(opCtx)->getTerm(),
+                boost::none)) {
+            CollectionCatalog::stash(opCtx, std::move(catalog));
+            return;
+        }
+
+        LOGV2_DEBUG(5067701,
+                    3,
+                    "Retrying acquiring state for lock-free read because collection, catalog or "
+                    "replication state changed.");
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+}
+
 std::shared_ptr<const ViewDefinition> lookupView(
     OperationContext* opCtx,
     const std::shared_ptr<const CollectionCatalog>& catalog,
@@ -1180,19 +1112,8 @@ AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
           options.skipRSTLLock = true;
           return options;
       }()) {
-    FakeCollection fakeColl;
-    acquireCollectionAndConsistentSnapshot(
-        opCtx,
-        /* isLockFreeReadSubOperation */
-        false,
-        /* GetCollectionAndEstablishReadSourceFunc */
-        [&](OperationContext* opCtx, const CollectionCatalog&, bool) {
-            return std::make_pair(&fakeColl, /* isView */ false);
-        },
-        /* ResetFunc */
-        []() {},
-        /* SetSecondaryState */
-        [](bool isAnySecondaryNamespaceAViewOrSharded) {});
+
+    acquireConsistentCatalogAndSnapshotUnsafe(opCtx, /*dbName*/ boost::none);
 }
 
 AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
@@ -1204,24 +1125,8 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
           options.skipRSTLLock = true;
           return options;
       }()) {
-    FakeCollection fakeColl;
-    acquireCollectionAndConsistentSnapshot(
-        opCtx,
-        /* isLockFreeReadSubOperation */
-        false,
-        /* GetCollectionAndEstablishReadSourceFunc */
-        [&](OperationContext* opCtx, const CollectionCatalog&, bool) {
-            // Check that the sharding database version matches our read.
-            // Note: this must always be checked, regardless of whether the collection exists, so
-            // that the dbVersion of this node or the caller gets updated quickly in case either is
-            // stale.
-            DatabaseShardingState::assertMatchingDbVersion(opCtx, dbName);
-            return std::make_pair(&fakeColl, /* isView */ false);
-        },
-        /* ResetFunc */
-        []() {},
-        /* SetSecondaryState */
-        [](bool isAnySecondaryNamespaceAViewOrSharded) {});
+
+    acquireConsistentCatalogAndSnapshotUnsafe(opCtx, dbName);
 }
 
 AutoGetDbForReadMaybeLockFree::AutoGetDbForReadMaybeLockFree(OperationContext* opCtx,
