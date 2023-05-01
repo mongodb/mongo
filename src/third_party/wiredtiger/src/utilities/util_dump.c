@@ -213,8 +213,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         if (json && i > 0)
             if (dump_json_separator(session) != 0)
                 goto err;
-        free(uri);
-        free(simpleuri);
+        util_free(uri);
+        util_free(simpleuri);
         uri = simpleuri = NULL;
 
         if ((uri = util_uri(session, argv[i], "table")) == NULL)
@@ -240,7 +240,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
             goto err;
         }
 
-        if ((simpleuri = strdup(uri)) == NULL) {
+        if ((simpleuri = util_strdup(uri)) == NULL) {
             (void)util_err(session, errno, NULL);
             goto err;
         }
@@ -317,8 +317,8 @@ err:
         ret = util_err(session, errno, NULL);
 
     __wt_scr_free(session_impl, &tmp);
-    free(uri);
-    free(simpleuri);
+    util_free(uri);
+    util_free(simpleuri);
 
     return (ret);
 }
@@ -480,7 +480,7 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
     const char *keyformat, *p;
 
     len = strlen(config) + strlen(cursor->value_format) + strlen(cursor->uri) + 20;
-    if ((newconfig = malloc(len)) == NULL)
+    if ((newconfig = util_malloc(len)) == NULL)
         return (util_err(session, errno, NULL));
     *newconfigp = newconfig;
     wt_api = session->connection->get_extension_api(session->connection);
@@ -575,7 +575,7 @@ dump_table_config(
     WT_ERR(dump_table_parts_config(session, mcursor, name, "index:", json));
 
 err:
-    free(proj_config);
+    util_free(proj_config);
     return (ret);
 }
 
@@ -611,10 +611,10 @@ dump_table_parts_config(
     }
 
     len = strlen(entry) + strlen(name) + 1;
-    if ((uriprefix = malloc(len)) == NULL)
+    if ((uriprefix = util_malloc(len)) == NULL)
         return (util_err(session, errno, NULL));
     if ((ret = __wt_snprintf(uriprefix, len, "%s%s", entry, name)) != 0) {
-        free(uriprefix);
+        util_free(uriprefix);
         return (util_err(session, ret, NULL));
     }
 
@@ -625,7 +625,7 @@ dump_table_parts_config(
      */
     cursor->set_key(cursor, uriprefix);
     ret = cursor->search_near(cursor, &exact);
-    free(uriprefix);
+    util_free(uriprefix);
     if (ret == WT_NOTFOUND)
         return (0);
     if (ret != 0)
@@ -906,7 +906,7 @@ dump_explore_bookmark_save(WT_CURSOR *cursor, char **bookmarks)
         if (bookmarks[i] != NULL)
             continue;
         key_size = strlen(key) + 1;
-        if ((bookmarks[i] = malloc(key_size)) == NULL)
+        if ((bookmarks[i] = util_malloc(key_size)) == NULL)
             return (util_err(session, errno, NULL));
         memmove(bookmarks[i], key, key_size);
         printf("Added bookmark %" PRIu64 ": %s.\n", i, key);
@@ -1013,7 +1013,7 @@ dump_explore(WT_CURSOR *cursor, const char *uri, bool reverse, bool pretty, bool
         if (current_arg == NULL)
             continue;
         while (current_arg != NULL) {
-            if ((args[i] = malloc(ARG_BUF_SIZE)) == NULL)
+            if ((args[i] = util_malloc(ARG_BUF_SIZE)) == NULL)
                 WT_ERR(util_err(session, errno, NULL));
             memmove(args[i++], current_arg, strlen(current_arg) + 1);
             ++num_args;
@@ -1268,7 +1268,7 @@ dup_json_string(const char *str, char **result)
     char *q;
 
     nchars = __wt_json_unpack_str(NULL, 0, (const u_char *)str, strlen(str)) + 1;
-    q = malloc(nchars);
+    q = util_malloc(nchars);
     if (q == NULL)
         return (1);
     WT_IGNORE_RET(__wt_json_unpack_str((u_char *)q, nchars, (const u_char *)str, strlen(str)));
@@ -1310,7 +1310,7 @@ print_config(WT_SESSION *session, const char *key, const char *cfg, bool json, b
               key, jsonconfig);
     } else
         ret = fprintf(fp, "%s\n%s\n", key, cfg);
-    free(jsonconfig);
+    util_free(jsonconfig);
     if (ret < 0)
         return (util_err(session, EIO, NULL));
     return (0);

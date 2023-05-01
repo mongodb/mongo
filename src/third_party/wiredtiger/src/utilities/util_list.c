@@ -72,7 +72,7 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 
     ret = list_print(session, uri, cflag, vflag);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }
 
@@ -118,7 +118,7 @@ err:
             ret = tret;
     }
 
-    free(config);
+    util_free(config);
     return (ret);
 }
 

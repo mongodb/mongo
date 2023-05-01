@@ -84,12 +84,12 @@ util_write(WT_SESSION *session, int argc, char *argv[])
      */
     if ((ret = __wt_snprintf(config, sizeof(config), "append=%s,overwrite=%s",
            append ? "true" : "false", overwrite ? "true" : "false")) != 0) {
-        free(uri);
+        util_free(uri);
         return (util_err(session, ret, NULL));
     }
     if ((ret = session->open_cursor(session, uri, NULL, config, &cursor)) != 0)
         (void)util_err(session, ret, "%s: session.open_cursor", uri);
-    free(uri);
+    util_free(uri);
     if (ret != 0)
         return (ret);
 
