@@ -27,6 +27,8 @@
  */
 #include "test_util.h"
 
+#define TIERED_STORAGE_CONFIG_FILE "wt-test-tiered-config.txt"
+
 /*
  * testutil_tiered_begin --
  *     Begin processing for a test program that supports tiered storage.
@@ -103,28 +105,145 @@ testutil_tiered_flush_complete(TEST_OPTS *opts, WT_SESSION *session, void *arg)
 }
 
 /*
+ * tiered_storage_read_config --
+ *     Read configuration from a file, if exists.
+ */
+static bool
+tiered_storage_read_config(const char *home, char *s3_prefix, size_t s3_prefix_size)
+{
+    FILE *f;
+    char config_path[512], str[512];
+    char *s, *value;
+
+    testutil_assert(s3_prefix_size > 0);
+    s3_prefix[0] = '\0';
+
+    testutil_check(__wt_snprintf(config_path, sizeof(config_path), "%s/%s",
+      home == NULL ? "." : home, TIERED_STORAGE_CONFIG_FILE));
+    f = fopen(config_path, "r");
+    if (f == NULL) {
+        testutil_assert_errno(errno == ENOENT);
+        return (false);
+    }
+
+    /*
+     * For now, we only support specifying prefixes in the file, but this can be easily expanded to
+     * include more information, such as the bucket name.
+     */
+    while (fgets(str, sizeof(str), f) != NULL) {
+        if (str[0] == '\0' || str[0] == '#')
+            continue;
+        s = str + strlen(str) - 1;
+        if (*s == '\n')
+            *s = '\0';
+        if (str[0] == '\0')
+            continue;
+
+        value = strchr(str, '=');
+        testutil_assertfmt(value != NULL, "Unexpected format of %s", config_path);
+        *(value++) = '\0';
+
+        if (strcmp(str, "prefix") == 0) {
+            testutil_check(__wt_snprintf(s3_prefix, s3_prefix_size, "%s", value));
+            continue;
+        }
+
+        testutil_die(EINVAL, "Unsupported key in the tiered storage config: %s", str);
+    };
+
+    /* Check that everything is specified. */
+    testutil_assert(s3_prefix[0] != '\0');
+
+    testutil_assert_errno(fclose(f) == 0);
+    return (true);
+}
+
+/*
+ * tiered_storage_write_config --
+ *     Write configuration to a file.
+ */
+static void
+tiered_storage_write_config(const char *home, const char *s3_prefix)
+{
+    FILE *f;
+    char config_path[512];
+
+    testutil_check(__wt_snprintf(config_path, sizeof(config_path), "%s/%s",
+      home == NULL ? "." : home, TIERED_STORAGE_CONFIG_FILE));
+    f = fopen(config_path, "w");
+    testutil_assert_errno(f != NULL);
+
+    testutil_assert_errno(fprintf(f, "# Tiered storage configuration written by testutil\n") >= 0);
+    testutil_assert_errno(fprintf(f, "prefix=%s\n", s3_prefix) >= 0);
+
+    testutil_assert_errno(fclose(f) == 0);
+}
+
+/*
+ * tiered_storage_generate_prefix --
+ *     Generate a unique prefix for objects when creating a new database; reuse the prefix when
+ *     opening an existing database.
+ */
+static void
+tiered_storage_generate_prefix(char *out, size_t size)
+{
+    struct tm time_parsed;
+    size_t n;
+#ifdef _WIN32
+    __time64_t time_now;
+#else
+    time_t time_now;
+#endif
+    char time_str[100];
+
+    /*
+     * Generates a unique prefix to be used with the object keys, e.g.:
+     * "s3test/test/2022-31-01-16-34-10/623843294--".
+     *
+     * Objects with the prefix pattern "s3test/" are deleted after a certain period of time
+     * according to the lifecycle rule on the S3 bucket. Should you wish to make any changes to the
+     * prefix pattern or lifecycle of the object, please speak to the release manager.
+     */
+#ifdef _WIN32
+    time_now = _time64(NULL);
+    testutil_check(_localtime64_s(&time_parsed, &time_now));
+#else
+    time_now = time(NULL);
+    (void)localtime_r(&time_now, &time_parsed);
+#endif
+    n = strftime(time_str, sizeof(time_str), "%F-%H-%M-%S", &time_parsed);
+    testutil_assert(n > 0);
+    testutil_check(
+      __wt_snprintf(out, size, "s3test/test/%s/%" PRIu32 "--", time_str, testutil_random(NULL)));
+}
+
+/*
  * testutil_tiered_storage_configuration --
  *     Set up tiered storage configuration.
  */
 void
-testutil_tiered_storage_configuration(
-  TEST_OPTS *opts, char *tiered_cfg, size_t tiered_cfg_size, char *ext_cfg, size_t ext_cfg_size)
+testutil_tiered_storage_configuration(TEST_OPTS *opts, const char *home, char *tiered_cfg,
+  size_t tiered_cfg_size, char *ext_cfg, size_t ext_cfg_size)
 {
     char auth_token[256];
-    char cwd[256], dir[256];
+    char cwd[256], dir[256], s3_prefix[128];
     const char *s3_access_key, *s3_secret_key, *s3_bucket_name;
+    bool is_dir_store;
 
     s3_bucket_name = NULL;
     auth_token[0] = '\0';
 
     if (opts->tiered_storage) {
-        if (!testutil_is_dir_store(opts)) {
+        is_dir_store = testutil_is_dir_store(opts);
+        if (!is_dir_store) {
             s3_access_key = getenv("aws_sdk_s3_ext_access_key");
             s3_secret_key = getenv("aws_sdk_s3_ext_secret_key");
             s3_bucket_name = getenv("WT_S3_EXT_BUCKET");
 
             if (s3_access_key == NULL || s3_secret_key == NULL)
                 testutil_die(EINVAL, "AWS S3 access key or secret key is not set");
+            testutil_check(
+              __wt_snprintf(auth_token, sizeof(auth_token), "%s;%s", s3_access_key, s3_secret_key));
 
             /*
              * By default the S3 bucket name is S3_DEFAULT_BUCKET_NAME, but it can be overridden
@@ -133,14 +252,24 @@ testutil_tiered_storage_configuration(
             if (s3_bucket_name == NULL)
                 s3_bucket_name = S3_DEFAULT_BUCKET_NAME;
 
-            testutil_check(
-              __wt_snprintf(auth_token, sizeof(auth_token), "%s;%s", s3_access_key, s3_secret_key));
+            /*
+             * Read configuration that we might have saved before to a file, which is what we need
+             * to do when opening an existing database (e.g., for tests that crash, recover, and
+             * verify), so that we use the same object prefix.
+             */
+            if (!tiered_storage_read_config(home, s3_prefix, sizeof(s3_prefix))) {
+                /* Generate a random prefix for the new database. */
+                tiered_storage_generate_prefix(s3_prefix, sizeof(s3_prefix));
+
+                /* Remember it for the next time. */
+                tiered_storage_write_config(home, s3_prefix);
+            }
         }
         testutil_check(__wt_snprintf(ext_cfg, ext_cfg_size, TESTUTIL_ENV_CONFIG_TIERED_EXT,
           opts->build_dir, opts->tiered_storage_source, opts->tiered_storage_source, opts->delay_ms,
           opts->error_ms, opts->force_delay, opts->force_error));
 
-        if (testutil_is_dir_store(opts)) {
+        if (is_dir_store) {
             if (opts->absolute_bucket_dir) {
                 if (opts->home[0] == '/')
                     testutil_check(
@@ -155,9 +284,9 @@ testutil_tiered_storage_configuration(
                 testutil_check(__wt_snprintf(dir, sizeof(dir), "%s", DIR_STORE_BUCKET_NAME));
         }
         testutil_check(__wt_snprintf(tiered_cfg, tiered_cfg_size, TESTUTIL_ENV_CONFIG_TIERED,
-          testutil_is_dir_store(opts) ? dir : s3_bucket_name, opts->local_retention,
-          opts->tiered_storage_source, auth_token));
-        if (testutil_is_dir_store(opts) && opts->make_bucket_dir) {
+          is_dir_store ? dir : s3_bucket_name, is_dir_store ? "pfx-" : s3_prefix,
+          opts->local_retention, opts->tiered_storage_source, auth_token));
+        if (is_dir_store && opts->make_bucket_dir) {
             testutil_check(
               __wt_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME));
             testutil_check(mkdir(dir, 0777));

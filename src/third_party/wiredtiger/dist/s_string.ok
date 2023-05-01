@@ -894,6 +894,7 @@ libmemkind
 libs
 libsodium
 libwiredtiger
+lifecycle
 linux
 llll
 llu

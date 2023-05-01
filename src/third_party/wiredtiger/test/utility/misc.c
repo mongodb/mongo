@@ -592,7 +592,7 @@ testutil_wiredtiger_open(TEST_OPTS *opts, const char *home, const char *config,
 
     opts->local_retention = benchmarkrun ? 0 : 2;
     testutil_tiered_storage_configuration(
-      opts, tiered_cfg, sizeof(tiered_cfg), tiered_ext_cfg, sizeof(tiered_ext_cfg));
+      opts, home, tiered_cfg, sizeof(tiered_cfg), tiered_ext_cfg, sizeof(tiered_ext_cfg));
 
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%s%s%s,extensions=[%s]",
       config == NULL ? "" : config, (rerun ? TESTUTIL_ENV_CONFIG_REC : ""),
