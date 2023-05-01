@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/str.h"
 
@@ -80,7 +81,11 @@ void visitAllValuesAtPathHelper(Document doc,
     // positional specifications, if applicable. For example, it will consume "0" and "1" from the
     // path "a.0.1.b" if the value at "a" is an array with arrays inside it.
     while (fieldPathIndex < path.getPathLength() && nextValue.isArray()) {
-        if (auto index = str::parseUnsignedBase10Integer(path.getFieldName(fieldPathIndex))) {
+        const StringData field = path.getFieldName(fieldPathIndex);
+        // Check for a numeric component that is not prefixed by 0 (for example "1" rather than
+        // "01"). These should act as field names, not as an index into an array.
+        if (auto index = str::parseUnsignedBase10Integer(field);
+            index && FieldRef::isNumericPathComponentStrict(field)) {
             nextValue = nextValue[*index];
             ++fieldPathIndex;
         } else {

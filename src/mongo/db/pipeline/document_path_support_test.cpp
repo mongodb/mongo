@@ -310,6 +310,27 @@ TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueWithinArrayToResults) {
     ASSERT_EQ(values.count(Value(2)), 1UL);
 }
 
+TEST(VisitAllValuesAtPathTest, StrictNumericFields) {
+    auto values = kDefaultValueComparator.makeUnorderedValueSet();
+    auto callback = [&values](const Value& val) {
+        values.insert(val);
+    };
+    {
+        Document doc(fromjson("{a: [[], [{b: [3]}, {b: {\"00\": 2}}]]}"));
+        visitAllValuesAtPath(doc, FieldPath("a.1.b.00"), callback);
+        // We only find 2.
+        ASSERT_EQ(values.size(), 1UL);
+        ASSERT_EQ(values.count(Value(2)), 1UL);
+    }
+    {
+        // Test a 0-prefixed case other than "00".
+        Document doc(fromjson("{a: [{b: [0, 1]}, {b: {\"01\": 2}}]}"));
+        visitAllValuesAtPath(doc, FieldPath("a.b.01"), callback);
+        ASSERT_EQ(values.size(), 1UL);
+        ASSERT_EQ(values.count(Value(2)), 1UL);
+    }
+}
+
 TEST(ExtractElementAlongNonArrayPathTest, ReturnsMissingIfPathDoesNotExist) {
     Document doc{{"a", 1}, {"b", 2}};
     auto result = extractElementAlongNonArrayPath(doc, FieldPath{"c.d"});

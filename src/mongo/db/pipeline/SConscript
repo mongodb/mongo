@@ -205,7 +205,8 @@ env.Library(
         'document_path_support.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
     ],
 )
 
