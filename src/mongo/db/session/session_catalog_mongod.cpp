@@ -565,11 +565,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     abortInProgressTransactions(opCtx, this, _ti.get());
 
     createTransactionTable(opCtx);
-    // (Ignore FCV check): This is intentional to try creating the image_collection collection if
-    // the feature flag is ever enabled.
-    if (repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCVUnsafe()) {
-        createRetryableFindAndModifyTable(opCtx);
-    }
+    createRetryableFindAndModifyTable(opCtx);
 }
 
 boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {

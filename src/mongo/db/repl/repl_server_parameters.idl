@@ -762,15 +762,6 @@ server_parameters:
         default: true
 
 feature_flags:
-    featureFlagRetryableFindAndModify:
-        description: >-
-            When enabled, storeFindAndModifyImagesInOplog=false will change the location of any
-            document images for retryable find and modifies.
-        cpp_varname: feature_flags::gFeatureFlagRetryableFindAndModify
-        default: true
-        version: 5.1
-        shouldBeFCVGated: true
-
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.
         cpp_varname: feature_flags::gShardMerge
