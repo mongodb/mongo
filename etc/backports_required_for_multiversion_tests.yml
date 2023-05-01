@@ -376,6 +376,8 @@ last-continuous:
     ticket: SERVER-76394
   - test_file: jstests/sharding/shard_drain_works_with_chunks_of_any_size.js
     ticket: SERVER-76550
+  - test_file: jstests/sharding/analyze_shard_key/monotonicity_hashed_sharding_compound.js
+    ticket: SERVER-76719
   suites: null
 last-lts:
   all:
@@ -835,4 +837,6 @@ last-lts:
     ticket: SERVER-76394
   - test_file: jstests/sharding/shard_drain_works_with_chunks_of_any_size.js
     ticket: SERVER-76550
+  - test_file: jstests/sharding/analyze_shard_key/monotonicity_hashed_sharding_compound.js
+    ticket: SERVER-76719
   suites: null
