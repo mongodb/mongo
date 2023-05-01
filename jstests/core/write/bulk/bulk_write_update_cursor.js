@@ -312,11 +312,11 @@ res = db.adminCommand({
             update: 0,
             filter: {$expr: {$eq: ["$skey", "$$targetKey"]}},
             updateMods: {skey: "MongoDB2"},
-            let : {targetKey: "MongoDB"},
             return: "post"
         },
     ],
-    nsInfo: [{ns: "test.coll"}]
+    nsInfo: [{ns: "test.coll"}],
+    let : {targetKey: "MongoDB"}
 });
 
 assert.commandWorked(res);
@@ -332,6 +332,71 @@ assert(!res.cursor.firstBatch[4]);
 assert.sameMembers(
     coll.find().toArray(),
     [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB2"}, {_id: 2, skey: "MongoDB3"}]);
+
+coll.drop();
+
+// Test constants works in pipeline update.
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 0, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 1, skey: "MongoDB2"}},
+        {insert: 0, document: {_id: 2, skey: "MongoDB3"}},
+        {
+            update: 0,
+            filter: {$expr: {$eq: ["$skey", "$$targetKey"]}},
+            updateMods: [{$set: {skey: "$$replacedKey"}}],
+            constants: {targetKey: "MongoDB", replacedKey: "MongoDB2"},
+            return: "post"
+        },
+    ],
+    nsInfo: [{ns: "test.coll"}],
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1, nModified: 1});
+assert.docEq(res.cursor.firstBatch[3].value, {_id: 0, skey: "MongoDB2"});
+assert(!res.cursor.firstBatch[4]);
+
+assert.sameMembers(
+    coll.find().toArray(),
+    [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB2"}, {_id: 2, skey: "MongoDB3"}]);
+
+coll.drop();
+
+// Test let matches specific document (targetKey) and constants overwrite let (replacedKey).
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 0, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 1, skey: "MongoDB2"}},
+        {insert: 0, document: {_id: 2, skey: "MongoDB3"}},
+        {
+            update: 0,
+            filter: {$expr: {$eq: ["$skey", "$$targetKey"]}},
+            updateMods: [{$set: {skey: "$$replacedKey"}}],
+            constants: {replacedKey: "MongoDB4"},
+            return: "post"
+        },
+    ],
+    nsInfo: [{ns: "test.coll"}],
+    let : {targetKey: "MongoDB3", replacedKey: "MongoDB2"}
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1, nModified: 1});
+assert.docEq(res.cursor.firstBatch[3].value, {_id: 2, skey: "MongoDB4"});
+assert(!res.cursor.firstBatch[4]);
 
 coll.drop();
 

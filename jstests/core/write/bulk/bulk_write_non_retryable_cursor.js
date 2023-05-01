@@ -131,4 +131,52 @@ assert(!res.cursor.firstBatch[3]);
 assert(!coll.findOne());
 
 coll.drop();
+
+// Test let for multiple updates and a delete, with constants shadowing in one update.
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 0, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 1, skey: "MongoDB2"}},
+        {
+            update: 0,
+            filter: {$expr: {$eq: ["$skey", "$$targetKey1"]}},
+            updateMods: [{$set: {skey: "$$replacedKey1"}}],
+            constants: {replacedKey1: "MongoDB4"},
+            return: "post"
+        },
+        {
+            update: 0,
+            filter: {$expr: {$eq: ["$skey", "$$targetKey2"]}},
+            updateMods: [{$set: {skey: "MongoDB"}}],
+            return: "post"
+        },
+        {delete: 0, filter: {$expr: {$eq: ["$skey", "$$replacedKey2"]}}, return: true}
+    ],
+    nsInfo: [{ns: "test.coll"}],
+    let : {
+        targetKey1: "MongoDB",
+        targetKey2: "MongoDB2",
+        replacedKey1: "MongoDB",
+        replacedKey2: "MongoDB4"
+    }
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1, nModified: 1});
+cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1, nModified: 1});
+cursorEntryValidator(res.cursor.firstBatch[4], {ok: 1, idx: 4, n: 1});
+assert(!res.cursor.firstBatch[5]);
+
+assert.docEq(res.cursor.firstBatch[2].value, {_id: 0, skey: "MongoDB4"});
+assert.docEq(res.cursor.firstBatch[3].value, {_id: 1, skey: "MongoDB"});
+assert.docEq(res.cursor.firstBatch[4].value, {_id: 0, skey: "MongoDB4"});
+
+assert.sameMembers(coll.find().toArray(), [{_id: 1, skey: "MongoDB"}]);
+
+coll.drop();
 })();

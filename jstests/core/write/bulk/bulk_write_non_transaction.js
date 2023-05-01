@@ -617,4 +617,29 @@ cursorEntryValidator(res.cursor.firstBatch[2],
                      {ok: 0, idx: 2, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
 assert(!res.cursor.firstBatch[3]);
 coll.drop();
+
+// Test constants is not supported on non-pipeline update.
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {
+            update: 0,
+            filter: {$expr: {$eq: ["$skey", "MongoDB"]}},
+            updateMods: {skey: "$$targetKey"},
+            constants: {targetKey: "MongoDB2"},
+            return: "post"
+        },
+    ],
+    nsInfo: [{ns: "test.coll"}],
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 51198});
+assert.eq(res.cursor.firstBatch[0].errmsg,
+          "Constant values may only be specified for pipeline updates");
+assert(!res.cursor.firstBatch[1]);
+
+coll.drop();
 })();

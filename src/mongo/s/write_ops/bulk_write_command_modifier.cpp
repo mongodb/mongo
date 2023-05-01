@@ -106,11 +106,7 @@ void BulkWriteCommandModifier::addOp(write_ops::UpdateCommandRequest updateOp) {
         op.setCollation(update.getCollation());
         op.setUpsert(update.getUpsert());
         op.setHint(update.getHint());
-
-        // TODO SERVER-73231 let will be renamed to constants.
-        op.setLet(update.getC());
-
-        // TODO SET OTHER OPTIONAL FIELDS HERE!!!!!!!!
+        op.setConstants(update.getC());
 
         _ops.emplace_back(op);
     }

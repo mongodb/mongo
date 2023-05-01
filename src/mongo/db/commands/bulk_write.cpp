@@ -601,7 +601,8 @@ bool handleUpdateOp(OperationContext* opCtx,
         updateRequest.setProj(op->getReturnFields().value_or(BSONObj()));
         updateRequest.setUpdateModification(op->getUpdateMods());
         updateRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-        updateRequest.setLetParameters(op->getLet());
+        updateRequest.setUpdateConstants(op->getConstants());
+        updateRequest.setLetParameters(req.getLet());
         updateRequest.setSort(op->getSort().value_or(BSONObj()));
         updateRequest.setHint(op->getHint());
         updateRequest.setCollation(op->getCollation().value_or(BSONObj()));
@@ -749,7 +750,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         deleteRequest.setQuery(op->getFilter());
         deleteRequest.setProj(op->getReturnFields().value_or(BSONObj()));
         deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-        deleteRequest.setLet(op->getLet());
+        deleteRequest.setLet(req.getLet());
         deleteRequest.setSort(op->getSort().value_or(BSONObj()));
         deleteRequest.setHint(op->getHint());
         deleteRequest.setCollation(op->getCollation().value_or(BSONObj()));

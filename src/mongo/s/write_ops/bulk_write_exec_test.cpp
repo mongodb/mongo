@@ -509,6 +509,25 @@ TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
     ASSERT_EQUALS(childRequest.getNsInfo()[1].getNs(), request.getNsInfo()[1].getNs());
 }
 
+// Test BatchItemRef.getLet().
+TEST_F(BulkWriteOpTest, BatchItemRefGetLet) {
+    NamespaceString nss("foo.bar");
+
+    // The content of the request (updateOp and Let) do not matter here,
+    // only that BatchItemRef.getLet() matches BulkWriteCommandRequest.setLet().
+    BulkWriteCommandRequest request({BulkWriteUpdateOp(0, BSON("x" << 1), BSON("x" << 2))},
+                                    {NamespaceInfoEntry(nss)});
+
+    BSONObj expected{BSON("key"
+                          << "value")};
+    request.setLet(expected);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    const auto& letOption = bulkWriteOp.getWriteOp_forTest(0).getWriteItem().getLet();
+    ASSERT(letOption.has_value());
+    ASSERT_BSONOBJ_EQ(letOption.value(), expected);
+}
+
 /**
  * Mimics a sharding backend to test BulkWriteExec.
  */

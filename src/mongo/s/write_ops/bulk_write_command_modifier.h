@@ -114,8 +114,6 @@ public:
         return *nsInfoEntry.getDatabaseVersion();
     }
 
-    // TODO SERVER-73231: Add setter for top level let.
-
     void addInsertOps(const NamespaceString& nss, std::vector<BSONObj> docs);
 
     void addUpdateOp(const NamespaceString& nss,

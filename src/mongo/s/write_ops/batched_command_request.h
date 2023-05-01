@@ -286,9 +286,7 @@ public:
         if (_batchedRequest) {
             return _batchedRequest->getLet();
         } else {
-            // TODO(SERVER-73231): Support top-level 'let' variable.
-            tassert(7263706, "invalid bulkWrite request reference", _bulkWriteRequest);
-            MONGO_UNIMPLEMENTED;
+            return _bulkWriteRequest->getLet();
         }
     }
 

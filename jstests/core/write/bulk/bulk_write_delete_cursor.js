@@ -169,14 +169,10 @@ res = db.adminCommand({
         {insert: 0, document: {_id: 0, skey: "MongoDB"}},
         {insert: 0, document: {_id: 1, skey: "MongoDB2"}},
         {insert: 0, document: {_id: 2, skey: "MongoDB3"}},
-        {
-            delete: 0,
-            filter: {$expr: {$eq: ["$skey", "$$targetKey"]}},
-            let : {targetKey: "MongoDB"},
-            return: true
-        },
+        {delete: 0, filter: {$expr: {$eq: ["$skey", "$$targetKey"]}}, return: true},
     ],
-    nsInfo: [{ns: "test.coll"}]
+    nsInfo: [{ns: "test.coll"}],
+    let : {targetKey: "MongoDB"}
 });
 
 assert.commandWorked(res);
