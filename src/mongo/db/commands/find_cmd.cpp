@@ -132,9 +132,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->startExpressionCounters();
 
-    // Set the value of $$USER_ROLES for the find command.
-    expCtx->setUserRoles();
-
     return expCtx;
 }
 
@@ -310,6 +307,10 @@ public:
                                              std::move(expCtx),
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
+
+            // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
+            // $$USER_ROLES for the find command.
+            cq->getExpCtx()->setUserRoles();
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.
@@ -539,6 +540,9 @@ public:
                                              std::move(expCtx),
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
+            // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
+            // $$USER_ROLES for the find command.
+            cq->getExpCtx()->setUserRoles();
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.
