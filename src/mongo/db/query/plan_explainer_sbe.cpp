@@ -56,7 +56,13 @@ void statsToBSON(const QuerySolutionNode* node,
         return;
     }
 
-    bob->append("stage", stageTypeToString(node->getType()));
+    StageType nodeType = node->getType();
+    if ((nodeType == STAGE_COLLSCAN) &&
+        static_cast<const CollectionScanNode*>(node)->doSbeClusteredCollectionScan()) {
+        bob->append("stage", sbeClusteredCollectionScanToString());
+    } else {
+        bob->append("stage", stageTypeToString(node->getType()));
+    }
     bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
 
     // Display the BSON representation of the filter, if there is one.

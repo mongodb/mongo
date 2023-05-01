@@ -1057,7 +1057,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
         NamespaceStringOrUUID nss = parseFromScanDef(def);
 
         // Unused.
-        boost::optional<sbe::value::SlotId> seekKeySlot;
+        boost::optional<sbe::value::SlotId> seekRecordIdSlot;
 
         sbe::ScanCallbacks callbacks({}, {}, {});
         if (n.useParallelScan()) {
@@ -1095,7 +1095,9 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
                                           boost::none,
                                           fields,
                                           vars,
-                                          seekKeySlot,
+                                          seekRecordIdSlot,
+                                          boost::none /* minRecordIdSlot */,
+                                          boost::none /* maxRecordIdSlot */,
                                           forwardScan,
                                           nullptr /*yieldPolicy*/,
                                           planNodeId,
@@ -1245,7 +1247,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
     sbe::value::SlotVector vars;
     generateSlots(slotMap, n.getFieldProjectionMap(), seekRidSlot, rootSlot, fields, vars);
 
-    boost::optional<sbe::value::SlotId> seekKeySlot = slotMap.at(n.getRIDProjectionName());
+    boost::optional<sbe::value::SlotId> seekRecordIdSlot = slotMap.at(n.getRIDProjectionName());
 
     sbe::ScanCallbacks callbacks({}, {}, {});
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
@@ -1259,7 +1261,9 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
                                       boost::none,
                                       fields,
                                       vars,
-                                      seekKeySlot,
+                                      seekRecordIdSlot,
+                                      boost::none /* minRecordIdSlot */,
+                                      boost::none /* maxRecordIdSlot */,
                                       true /*forward*/,
                                       nullptr /*yieldPolicy*/,
                                       planNodeId,

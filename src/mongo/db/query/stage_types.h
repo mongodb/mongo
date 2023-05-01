@@ -44,14 +44,17 @@ using PlanNodeId = uint32_t;
 static constexpr PlanNodeId kEmptyPlanNodeId = 0u;
 
 /**
- * These map to implementations of the PlanStage interface, all of which live in db/exec/
+ * These map to implementations of the PlanStage interface, all of which live in db/exec/. These
+ * stage types are shared between Classic and SBE.
  */
 enum StageType {
     STAGE_AND_HASH,
     STAGE_AND_SORTED,
     STAGE_BATCHED_DELETE,
     STAGE_CACHED_PLAN,
+
     STAGE_COLLSCAN,
+
     STAGE_COLUMN_SCAN,
 
     // A virtual scan stage that simulates a collection scan and doesn't depend on underlying
@@ -160,4 +163,10 @@ inline bool isSortStageType(StageType stageType) {
 }
 
 StringData stageTypeToString(StageType stageType);
+
+/**
+ * Returns the explain() stage type string for a STAGE_COLLSCAN stage that is performing a clustered
+ * collection scan in SBE, to match Classic's explain() output.
+ */
+StringData sbeClusteredCollectionScanToString();
 }  // namespace mongo

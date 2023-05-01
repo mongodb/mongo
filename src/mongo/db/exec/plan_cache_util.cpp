@@ -68,13 +68,32 @@ void logNotCachingNoData(std::string&& solution) {
 }
 }  // namespace log_detail
 
+// TODO SERVER-75715: Remove hasSbeClusteredCollectionScan() and its calls once SBE support
+// for clustered collection scans is fully implemented. This method exists temporarily to
+// prevent caching of CC scan plans until the mentioned ticket adds parameterization for them.
+bool hasSbeClusteredCollectionScan(const QuerySolutionNode* qsn) {
+    if (qsn->getType() == STAGE_COLLSCAN &&
+        static_cast<const CollectionScanNode*>(qsn)->doSbeClusteredCollectionScan()) {
+        return true;
+    }
+    for (const std::unique_ptr<QuerySolutionNode>& child : qsn->children) {
+        if (hasSbeClusteredCollectionScan(child.get())) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void updatePlanCache(OperationContext* opCtx,
                      const MultipleCollectionAccessor& collections,
                      const CanonicalQuery& query,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
                      const stage_builder::PlanStageData& data) {
-    if (shouldCacheQuery(query) && collections.getMainCollection()) {
+    // TODO SERVER-75715: remove hasSbeClusteredCollectionScan() call. This exists temporarily to
+    // prevent caching SBE clustered coll scan execution plans as they are not yet parameterized.
+    if (shouldCacheQuery(query) && collections.getMainCollection() &&
+        !hasSbeClusteredCollectionScan(solution.root())) {
         auto key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
         plan->indexFilterApplied = solution.indexFilterApplied;

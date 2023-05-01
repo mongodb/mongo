@@ -35,7 +35,7 @@
 
 namespace mongo::sbe {
 /**
- * A holder for slots and accessors which are used in a PlanStage tree but:
+ * A holder for "global" slots and accessors. These are used in a PlanStage tree but:
  *  - Cannot be made constants due to restrictions on the lifetime of such values (e.g., they're
  *    singleton instances owned somewhere else).
  *  - Can be changed in runtime outside of the PlanStage tree (e.g., a resume recordId changed by a
@@ -43,14 +43,14 @@ namespace mongo::sbe {
  *
  * A RuntimeEnvironment object is created once per an execution thread. That means that each
  * producer and consumer in a parallel plan will have their own compilation environment, with their
- * own slot accessors. However, slot accessors in each of such environment will access shared data,
+ * own slot accessors. However, slot accessors in each such environment will access shared data,
  * which is the same across all environments.
  *
  * To avoid data races, the values stored in the runtime environment are considered read-only when
  * used with a parallel plan. An attempt to change any slot with 'resetValue' will result in a user
  * exception.
  *
- * If the runtime environment is used in a serial plan, modifications of the slots is allowed.
+ * If the runtime environment is used in a serial plan, modification of the slots is allowed.
  */
 class RuntimeEnvironment final : public optimizer::NamedSlotsProvider {
 public:

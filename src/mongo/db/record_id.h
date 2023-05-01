@@ -350,11 +350,41 @@ public:
         return hash;
     }
 
+    /**
+     * Returns a string form of this RecordId, but in the cases where RecordId is either
+     * Format::kSmallStr or Format::kBigStr this is a raw hex dump. For a human-readable string call
+     * toStringHumanReadable().
+     */
     std::string toString() const {
         return withFormat(
             [](Null n) { return std::string("null"); },
             [](int64_t rid) { return std::to_string(rid); },
             [](const char* str, int size) { return hexblob::encodeLower(str, size); });
+    }
+
+    /**
+     * Returns a human-readable string form of this RecordId. (Call toString() if you prefer a hex
+     * dump of string IDs.)
+     */
+    std::string toStringHumanReadable() const {
+        switch (_format) {
+            case Format::kNull:
+                return "null";
+            case Format::kLong:
+                return std::to_string(_getLongNoCheck());
+            case Format::kSmallStr: {
+                StringData str = _getSmallStrNoCheck();
+                return "kSmallStr size: " + std::to_string(str.size()) + " string: '" +
+                    std::string(str.rawData()) + "'";
+            }
+            case Format::kBigStr: {
+                StringData str = _getBigStrNoCheck();
+                return "kBigStr size: " + std::to_string(str.size()) + " string: '" +
+                    std::string(str.rawData()) + "'";
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 
     /**
@@ -481,9 +511,9 @@ private:
          */
         kLong,
         /**
-         * Stores a variable-length binary string smaller than kSmallStrMaxSize. Data is stored in
-         * the InlineStr struct at '_data.inlineStr'. This RecordId may only be accessed using
-         * getStr().
+         * Stores a variable-length binary string less than or equal to kSmallStrMaxSize. Data is
+         * stored in the InlineStr struct at '_data.inlineStr'. This RecordId may only be accessed
+         * using getStr().
          */
         kSmallStr,
         /**

@@ -12,7 +12,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 -- OUTPUT:
 [2] unwind s3 s4 s2 false 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower UnwindNode keep non-arrays ====
 -- INPUT:
@@ -26,4 +26,4 @@ PhysicalScan [{'<root>': scan0}, collName]
 -- OUTPUT:
 [2] unwind s3 s4 s2 true 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 

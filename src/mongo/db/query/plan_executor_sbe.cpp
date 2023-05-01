@@ -81,13 +81,16 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
+    sbe::RuntimeEnvironment* env = _rootData.env;
     if (_rootData.shouldTrackLatestOplogTimestamp) {
-        _oplogTs = _rootData.env->getAccessor(_rootData.env->getSlot("oplogTs"_sd));
+        _oplogTs = env->getAccessor(env->getSlot("oplogTs"_sd));
     }
 
     if (_rootData.shouldUseTailableScan) {
-        _resumeRecordIdSlot = _rootData.env->getSlot("resumeRecordId"_sd);
+        _resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
     }
+    _minRecordIdSlot = env->getSlotIfExists("minRecordId"_sd);
+    _maxRecordIdSlot = env->getSlotIfExists("maxRecordId"_sd);
 
     if (!_stash.empty()) {
         // The PlanExecutor keeps an extra reference to the last object pulled out of the PlanStage

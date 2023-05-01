@@ -581,7 +581,8 @@ public:
      * call and avoids resource acquisition in getNext().
      *
      * When reOpen flag is true then the plan stage should reinitizalize already acquired resources
-     * (e.g. re-hash, re-sort, re-seek, etc).
+     * (e.g. re-hash, re-sort, re-seek, etc), but it can avoid reinitializing things that do not
+     * contain state and are not destroyed by close(), since close() is not called before a reopen.
      */
     virtual void open(bool reOpen) = 0;
 

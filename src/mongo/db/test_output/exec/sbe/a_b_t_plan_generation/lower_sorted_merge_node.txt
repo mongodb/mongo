@@ -19,7 +19,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] smerge [s4] [asc] [
     [s2] [s2] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: two sources sorted on `a` Ascending ====
@@ -50,10 +50,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [6] smerge [s7] [asc] [
     [s2] [s2] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5] [s5] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: five sources sorted on `a` Ascending ====
@@ -111,19 +111,19 @@ PhysicalScan [{'<root>': scan0}, collName]
 [15] smerge [s16] [asc] [
     [s2] [s2] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5] [s5] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false , 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false , 
     [s8] [s8] [8] project [s9 = getField(s7, "b")] 
     [7] project [s8 = getField(s7, "a")] 
-    [6] scan s7 none none none none none [] @"<collUUID>" true false , 
+    [6] scan s7 none none none none none none none [] @"<collUUID>" true false , 
     [s11] [s11] [11] project [s12 = getField(s10, "b")] 
     [10] project [s11 = getField(s10, "a")] 
-    [9] scan s10 none none none none none [] @"<collUUID>" true false , 
+    [9] scan s10 none none none none none none none [] @"<collUUID>" true false , 
     [s14] [s14] [14] project [s15 = getField(s13, "b")] 
     [13] project [s14 = getField(s13, "a")] 
-    [12] scan s13 none none none none none [] @"<collUUID>" true false 
+    [12] scan s13 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: one source sorted on `a` Ascending and `b` Ascending ====
@@ -146,7 +146,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] smerge [s4, s5] [asc, asc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: two sources sorted on `a` Ascending and `b` Ascending ====
@@ -178,10 +178,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [6] smerge [s7, s8] [asc, asc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: five sources sorted on `a` Ascending and `b` Ascending ====
@@ -240,19 +240,19 @@ PhysicalScan [{'<root>': scan0}, collName]
 [15] smerge [s16, s17] [asc, asc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false , 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false , 
     [s8, s9] [s8, s9] [8] project [s9 = getField(s7, "b")] 
     [7] project [s8 = getField(s7, "a")] 
-    [6] scan s7 none none none none none [] @"<collUUID>" true false , 
+    [6] scan s7 none none none none none none none [] @"<collUUID>" true false , 
     [s11, s12] [s11, s12] [11] project [s12 = getField(s10, "b")] 
     [10] project [s11 = getField(s10, "a")] 
-    [9] scan s10 none none none none none [] @"<collUUID>" true false , 
+    [9] scan s10 none none none none none none none [] @"<collUUID>" true false , 
     [s14, s15] [s14, s15] [14] project [s15 = getField(s13, "b")] 
     [13] project [s14 = getField(s13, "a")] 
-    [12] scan s13 none none none none none [] @"<collUUID>" true false 
+    [12] scan s13 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: one source sorted on `a` Ascending and `b` Descending ====
@@ -275,7 +275,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] smerge [s4, s5] [asc, desc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: two sources sorted on `a` Ascending and `b` Descending ====
@@ -307,10 +307,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [6] smerge [s7, s8] [asc, desc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: five sources sorted on `a` Ascending and `b` Descending ====
@@ -369,19 +369,19 @@ PhysicalScan [{'<root>': scan0}, collName]
 [15] smerge [s16, s17] [asc, desc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false , 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false , 
     [s8, s9] [s8, s9] [8] project [s9 = getField(s7, "b")] 
     [7] project [s8 = getField(s7, "a")] 
-    [6] scan s7 none none none none none [] @"<collUUID>" true false , 
+    [6] scan s7 none none none none none none none [] @"<collUUID>" true false , 
     [s11, s12] [s11, s12] [11] project [s12 = getField(s10, "b")] 
     [10] project [s11 = getField(s10, "a")] 
-    [9] scan s10 none none none none none [] @"<collUUID>" true false , 
+    [9] scan s10 none none none none none none none [] @"<collUUID>" true false , 
     [s14, s15] [s14, s15] [14] project [s15 = getField(s13, "b")] 
     [13] project [s14 = getField(s13, "a")] 
-    [12] scan s13 none none none none none [] @"<collUUID>" true false 
+    [12] scan s13 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: one source sorted on `a` Descending ====
@@ -403,7 +403,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] smerge [s4] [desc] [
     [s2] [s2] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: two sources sorted on `a` Descending ====
@@ -434,10 +434,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [6] smerge [s7] [desc] [
     [s2] [s2] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5] [s5] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: five sources sorted on `a` Descending ====
@@ -495,19 +495,19 @@ PhysicalScan [{'<root>': scan0}, collName]
 [15] smerge [s16] [desc] [
     [s2] [s2] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5] [s5] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false , 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false , 
     [s8] [s8] [8] project [s9 = getField(s7, "b")] 
     [7] project [s8 = getField(s7, "a")] 
-    [6] scan s7 none none none none none [] @"<collUUID>" true false , 
+    [6] scan s7 none none none none none none none [] @"<collUUID>" true false , 
     [s11] [s11] [11] project [s12 = getField(s10, "b")] 
     [10] project [s11 = getField(s10, "a")] 
-    [9] scan s10 none none none none none [] @"<collUUID>" true false , 
+    [9] scan s10 none none none none none none none [] @"<collUUID>" true false , 
     [s14] [s14] [14] project [s15 = getField(s13, "b")] 
     [13] project [s14 = getField(s13, "a")] 
-    [12] scan s13 none none none none none [] @"<collUUID>" true false 
+    [12] scan s13 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: one source sorted on `a` Descending and `b` Ascending ====
@@ -530,7 +530,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] smerge [s4, s5] [desc, asc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: two sources sorted on `a` Descending and `b` Ascending ====
@@ -562,10 +562,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [6] smerge [s7, s8] [desc, asc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: five sources sorted on `a` Descending and `b` Ascending ====
@@ -624,19 +624,19 @@ PhysicalScan [{'<root>': scan0}, collName]
 [15] smerge [s16, s17] [desc, asc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false , 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false , 
     [s8, s9] [s8, s9] [8] project [s9 = getField(s7, "b")] 
     [7] project [s8 = getField(s7, "a")] 
-    [6] scan s7 none none none none none [] @"<collUUID>" true false , 
+    [6] scan s7 none none none none none none none [] @"<collUUID>" true false , 
     [s11, s12] [s11, s12] [11] project [s12 = getField(s10, "b")] 
     [10] project [s11 = getField(s10, "a")] 
-    [9] scan s10 none none none none none [] @"<collUUID>" true false , 
+    [9] scan s10 none none none none none none none [] @"<collUUID>" true false , 
     [s14, s15] [s14, s15] [14] project [s15 = getField(s13, "b")] 
     [13] project [s14 = getField(s13, "a")] 
-    [12] scan s13 none none none none none [] @"<collUUID>" true false 
+    [12] scan s13 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: one source sorted on `a` Descending and `b` Descending ====
@@ -659,7 +659,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] smerge [s4, s5] [desc, desc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: two sources sorted on `a` Descending and `b` Descending ====
@@ -691,10 +691,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [6] smerge [s7, s8] [desc, desc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 ] 
 
 ==== VARIATION: five sources sorted on `a` Descending and `b` Descending ====
@@ -753,17 +753,17 @@ PhysicalScan [{'<root>': scan0}, collName]
 [15] smerge [s16, s17] [desc, desc] [
     [s2, s3] [s2, s3] [2] project [s3 = getField(s1, "b")] 
     [1] project [s2 = getField(s1, "a")] 
-    [0] scan s1 none none none none none [] @"<collUUID>" true false , 
+    [0] scan s1 none none none none none none none [] @"<collUUID>" true false , 
     [s5, s6] [s5, s6] [5] project [s6 = getField(s4, "b")] 
     [4] project [s5 = getField(s4, "a")] 
-    [3] scan s4 none none none none none [] @"<collUUID>" true false , 
+    [3] scan s4 none none none none none none none [] @"<collUUID>" true false , 
     [s8, s9] [s8, s9] [8] project [s9 = getField(s7, "b")] 
     [7] project [s8 = getField(s7, "a")] 
-    [6] scan s7 none none none none none [] @"<collUUID>" true false , 
+    [6] scan s7 none none none none none none none [] @"<collUUID>" true false , 
     [s11, s12] [s11, s12] [11] project [s12 = getField(s10, "b")] 
     [10] project [s11 = getField(s10, "a")] 
-    [9] scan s10 none none none none none [] @"<collUUID>" true false , 
+    [9] scan s10 none none none none none none none [] @"<collUUID>" true false , 
     [s14, s15] [s14, s15] [14] project [s15 = getField(s13, "b")] 
     [13] project [s14 = getField(s13, "a")] 
-    [12] scan s13 none none none none none [] @"<collUUID>" true false 
+    [12] scan s13 none none none none none none none [] @"<collUUID>" true false 
 ] 

@@ -75,13 +75,21 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
         return false;
     }
 
-    // Queries against the oplog, a change collection, a time-series collection, or a clustered
-    // collection are not supported. Also queries on the inner side of a $lookup are not considered
-    // for SBE.
+    // Queries against the oplog, a change collection, or a time-series collection are not
+    // supported. Also queries on the inner side of a $lookup are not considered for SBE.
     const auto& nss = cq->nss();
-    if (expCtx->inLookup || (*collection && collection->get()->isClustered()) || nss.isOplog() ||
-        nss.isChangeCollection() || nss.isTimeseriesBucketsCollection() ||
-        !cq->metadataDeps().none()) {
+    if (expCtx->inLookup || nss.isOplog() || nss.isChangeCollection() ||
+        nss.isTimeseriesBucketsCollection() || !cq->metadataDeps().none()) {
+        return false;
+    }
+
+    // TODO SERVER-75715: Remove this code block once SBE support for clustered collection scans is
+    // fully implemented.
+    // (Ignore FCV check): This is intentional because we always want to use this feature once the
+    // feature flag is enabled.
+    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
+    if (!sbeFull && (*collection && collection->get()->isClustered())) {
+        // Queries against a clustered collection are not currently supported by SBE.
         return false;
     }
 

@@ -44,9 +44,13 @@ namespace mongo::sbe {
  * rather than plain "filter". The predicate is evaluated in the open() call. If the result is
  * false, then 'getNext()' returns EOF immediately.
  *
- * The IsEof template parameter controls 'early out' behavior of the filter expression. If this
+ * The 'IsEof' template parameter controls 'early out' behavior of the filter expression. If this
  * template parameter is true, then the stage is notated as "efilter" rather than plain "filter".
  * Once the filter evaluates to false then the getNext() call returns EOF.
+ *
+ * Only one of 'IsConst' and 'IsEof' may be true.
+ *
+ * Records pass through the filter when the 'filter' expression evaluates to true.
  *
  * Debug string representations:
  *

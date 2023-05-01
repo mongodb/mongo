@@ -233,21 +233,23 @@ TEST_F(PlanSizeTest, Project) {
 
 TEST_F(PlanSizeTest, Scan) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    auto stage = makeS<ScanStage>(collUuid,
-                                  generateSlotId(),
-                                  generateSlotId(),
-                                  generateSlotId(),
-                                  generateSlotId(),
-                                  generateSlotId(),
-                                  generateSlotId(),
-                                  boost::none,
-                                  std::vector<std::string>{"field"},
-                                  mockSV(),
-                                  generateSlotId(),
-                                  true,
-                                  nullptr,
-                                  kEmptyPlanNodeId,
-                                  ScanCallbacks());
+    auto stage = makeS<sbe::ScanStage>(collUuid,
+                                       generateSlotId() /* recordSlot */,
+                                       generateSlotId() /* recordIdSlot */,
+                                       generateSlotId() /* snapshotIdSlot */,
+                                       generateSlotId() /* indexIdSlot */,
+                                       generateSlotId() /* indexKeySlot */,
+                                       generateSlotId() /* indexKeyPatternSlot */,
+                                       boost::none /* oplogTsSlot */,
+                                       std::vector<std::string>{"field"} /* scanFieldNames */,
+                                       mockSV() /* scanFieldSlots */,
+                                       generateSlotId() /* seekRecordIdSlot */,
+                                       generateSlotId() /* minRecordIdSlot */,
+                                       generateSlotId() /* maxRecordIdSlot */,
+                                       true /* forward */,
+                                       nullptr /* yieldPolicy */,
+                                       kEmptyPlanNodeId /* nodeId */,
+                                       ScanCallbacks());
     assertPlanSize(*stage);
 }
 

@@ -14,5 +14,5 @@ IndexScan [{'<rid>': rid}, scanDefName: collName, indexDefName: index0, interval
         [0] ixseek ks(2ll, 0, 23L, 2ll) ks(2ll, 0, 35L, 2ll) none s1 none none [] @"<collUUID>" @"<collUUID>" true 
     right 
         [2] limitskip 1 0 
-        [1] seek s1 s2 none none none none none [] @"<collUUID>" true false 
+        [1] seek s1 s2 none none none none none none none [] @"<collUUID>" true false 
 

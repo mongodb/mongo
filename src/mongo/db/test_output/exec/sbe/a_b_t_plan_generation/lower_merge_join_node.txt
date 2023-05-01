@@ -22,10 +22,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [4] mj 
     [asc] left [s2] [] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s4] [] 
         [3] project [s4 = getField(s3, "id")] 
-        [2] scan s3 none none none none none [] @"<collUUID>" true false 
+        [2] scan s3 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Lower merge join with one projection (collation=Descending) ====
@@ -50,10 +50,10 @@ PhysicalScan [{'<root>': scan0}, collName]
 [4] mj 
     [desc] left [s2] [] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s4] [] 
         [3] project [s4 = getField(s3, "id")] 
-        [2] scan s3 none none none none none [] @"<collUUID>" true false 
+        [2] scan s3 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Lower merge join with two projections (collation=Ascending, Ascending) ====
@@ -89,11 +89,11 @@ PhysicalScan [{'<root>': scan0}, collName]
     [asc, asc] left [s2, s3] [] 
         [2] project [s3 = getField(s1, "city")] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s5, s6] [] 
         [5] project [s6 = getField(s4, "city")] 
         [4] project [s5 = getField(s4, "id")] 
-        [3] scan s4 none none none none none [] @"<collUUID>" true false 
+        [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Lower merge join with two projections (collation=Ascending, Descending) ====
@@ -129,11 +129,11 @@ PhysicalScan [{'<root>': scan0}, collName]
     [asc, desc] left [s2, s3] [] 
         [2] project [s3 = getField(s1, "city")] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s5, s6] [] 
         [5] project [s6 = getField(s4, "city")] 
         [4] project [s5 = getField(s4, "id")] 
-        [3] scan s4 none none none none none [] @"<collUUID>" true false 
+        [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Lower merge join with required projection (collation=Ascending) ====
@@ -176,11 +176,11 @@ PhysicalScan [{'<root>': scan0}, collName]
     [asc] left [s2] [s3] 
         [3] project [s3 = getField(s1, "city")] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s5] [s6] 
         [7] project [s6 = getField(s4, "city")] 
         [5] project [s5 = getField(s4, "id")] 
-        [4] scan s4 none none none none none [] @"<collUUID>" true false 
+        [4] scan s4 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Lower merge join with two projections (collation=Descending, Ascending) ====
@@ -216,11 +216,11 @@ PhysicalScan [{'<root>': scan0}, collName]
     [desc, asc] left [s2, s3] [] 
         [2] project [s3 = getField(s1, "city")] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s5, s6] [] 
         [5] project [s6 = getField(s4, "city")] 
         [4] project [s5 = getField(s4, "id")] 
-        [3] scan s4 none none none none none [] @"<collUUID>" true false 
+        [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Lower merge join with two projections (collation=Descending, Descending) ====
@@ -256,11 +256,11 @@ PhysicalScan [{'<root>': scan0}, collName]
     [desc, desc] left [s2, s3] [] 
         [2] project [s3 = getField(s1, "city")] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s5, s6] [] 
         [5] project [s6 = getField(s4, "city")] 
         [4] project [s5 = getField(s4, "id")] 
-        [3] scan s4 none none none none none [] @"<collUUID>" true false 
+        [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Lower merge join with required projection (collation=Descending) ====
@@ -303,9 +303,9 @@ PhysicalScan [{'<root>': scan0}, collName]
     [desc] left [s2] [s3] 
         [3] project [s3 = getField(s1, "city")] 
         [1] project [s2 = getField(s1, "other_id")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right [s5] [s6] 
         [7] project [s6 = getField(s4, "city")] 
         [5] project [s5 = getField(s4, "id")] 
-        [4] scan s4 none none none none none [] @"<collUUID>" true false 
+        [4] scan s4 none none none none none none none [] @"<collUUID>" true false 
 

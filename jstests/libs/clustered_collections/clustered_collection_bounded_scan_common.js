@@ -23,6 +23,27 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.commandWorked(bulk.execute());
         assert.eq(coll.find().itcount(), batchSize);
     }
+
+    // Checks that the number of docs examined matches the expected number. There are separate
+    // expected args for Classic vs SBE because in Classic there is an extra cursor->next() call
+    // beyond the end of the range if EOF has not been hit, but in SBE there is not. This function
+    // also handles that this stat is in different places for the two engines:
+    //   Classic: executionStats.executionStages.docsExamined
+    //   SBE:     executionStats.totalDocsExamined
+    function assertDocsExamined(executionStats, expectedClassic, expectedSbe) {
+        let sbe = false;
+        let docsExamined = executionStats.executionStages.docsExamined;
+        if (docsExamined == undefined) {
+            sbe = true;
+            docsExamined = executionStats.totalDocsExamined;
+        }
+        if (sbe) {
+            assert.eq(expectedSbe, docsExamined);
+        } else {
+            assert.eq(expectedClassic, docsExamined);
+        }
+    }
+
     function testEq() {
         initAndPopulate(coll, clusterKey);
 
@@ -36,11 +57,12 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(5, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
 
         assert.eq(1, expl.executionStats.executionStages.nReturned);
-        // Expect nReturned + 1 documents examined by design - additional cursor 'next' beyond
-        // the range.
-        assert.eq(2, expl.executionStats.executionStages.docsExamined);
+        // In Classic, expect nReturned + 1 documents examined by design - additional cursor 'next'
+        // beyond the range. In SBE, expect nReturned as it does not examine the extra document.
+        assertDocsExamined(expl.executionStats, 2, 1);
     }
-    function testLT(op, val, expectedNReturned, expectedDocsExamined) {
+
+    function testLT(op, val, expectedNReturned, expectedDocsExaminedClassic) {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
@@ -55,9 +77,14 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(NaN, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
-        assert.eq(expectedDocsExamined, expl.executionStats.executionStages.docsExamined);
+
+        // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
+        // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
+        assertDocsExamined(
+            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedClassic - 1);
     }
-    function testGT(op, val, expectedNReturned, expectedDocsExamined) {
+
+    function testGT(op, val, expectedNReturned, expectedDocsExaminedClassic) {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
@@ -72,9 +99,14 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(89, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
-        assert.eq(expectedDocsExamined, expl.executionStats.executionStages.docsExamined);
+
+        // In this case the scans hit EOF, so there is no extra cursor->next() call in Classic,
+        // making Classic and SBE expect the same number of docs examined.
+        assertDocsExamined(
+            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedClassic);
     }
-    function testRange(min, minVal, max, maxVal, expectedNReturned, expectedDocsExamined) {
+
+    function testRange(min, minVal, max, maxVal, expectedNReturned, expectedDocsExaminedClassic) {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
@@ -92,8 +124,13 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(maxVal, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
-        assert.eq(expectedDocsExamined, expl.executionStats.executionStages.docsExamined);
+
+        // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
+        // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
+        assertDocsExamined(
+            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedClassic - 1);
     }
+
     function testIn() {
         initAndPopulate(coll, clusterKey);
 
@@ -107,10 +144,12 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(30, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
 
         assert.eq(3, expl.executionStats.executionStages.nReturned);
-        // The range scanned is 21 documents + 1 extra document by design - additional cursor
-        // 'next' beyond the range.
-        assert.eq(22, expl.executionStats.executionStages.docsExamined);
+        // The range scanned is 21 documents. In Classic, expect 'docsExamined' to be one higher by
+        // design - additional cursor 'next' beyond the range. In SBE, expect 21 as it does not
+        // examine the extra document.
+        assertDocsExamined(expl.executionStats, 22, 21);
     }
+
     function testNonClusterKeyScan() {
         initAndPopulate(coll, clusterKey);
 
@@ -127,6 +166,12 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
 
     function testBoundedScans(coll, clusterKey) {
         testEq();
+
+        // The last argument of the following calls, 'expectedDocsExaminedClassic', and the specific
+        // comments, are for Classic engine. SBE does not have the additional cursor->next() call
+        // beyond the range, so in calls to testLT() and testRange() its value will be one lower.
+        // This is accounted for by delegations to the assertDocsExamined() helper function.
+
         // Expect docsExamined == nReturned + 2 due to the collection scan bounds being always
         // inclusive and due to the by-design additional cursor 'next' beyond the range.
         testLT("$lt", 10, 10, 12);
@@ -139,7 +184,7 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         testGT("$gt", 89, 10, 11);
         // Expect docsExamined == nReturned.
         testGT("$gte", 89, 11, 11);
-        // docsExamined reflects the fact that collection scan bounds are always exclusive and
+        // docsExamined reflects the fact that collection scan bounds are always inclusive and
         // that by design we do an additional cursor 'next' beyond the range.
         testRange("$gt", 20, "$lt", 40, 19, 22);
         testRange("$gte", 20, "$lt", 40, 20, 22);

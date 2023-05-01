@@ -38,18 +38,18 @@ namespace sbe {
  * Scans a vector of BSON documents. The resulting BSON documents are placed into the
  * given 'recordSlot', if provided.
  *
- * The caller can also optionally provide a vector of top-level field names, 'fields', to extract
- * from each BSON object. The resulting values are placed into the slots indicated by the 'vars'
- * slot vector each time this stage advances. The provided 'fields' and 'vars' vectors must be of
- * equal length.
+ * The caller can also optionally provide a vector of top-level field names, 'scanFieldNames', to
+ * extract from each BSON object. The resulting values are placed into the slots indicated by the
+ * 'scanFieldSlots' slot vector each time this stage advances. The provided 'scanFieldNames' and
+ * 'scanFieldSlots' vectors must be of equal length.
  */
 class BSONScanStage final : public PlanStage {
 public:
     BSONScanStage(std::vector<BSONObj> bsons,
                   boost::optional<value::SlotId> recordSlot,
                   PlanNodeId planNodeId,
-                  std::vector<std::string> fields = {},
-                  value::SlotVector vars = {},
+                  std::vector<std::string> scanFieldNames = {},
+                  value::SlotVector scanFieldSlots = {},
                   bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -70,13 +70,13 @@ private:
     const std::vector<BSONObj> _bsons;
 
     const boost::optional<value::SlotId> _recordSlot;
-    const std::vector<std::string> _fields;
-    const value::SlotVector _vars;
+    const std::vector<std::string> _scanFieldNames;
+    const value::SlotVector _scanFieldSlots;
 
     std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
 
-    value::FieldViewAccessorMap _fieldAccessors;
-    value::SlotAccessorMap _varAccessors;
+    value::FieldViewAccessorMap _scanFieldAccessors;
+    value::SlotAccessorMap _scanFieldAccessorsMap;
 
     std::vector<BSONObj>::const_iterator _bsonCurrent;
 

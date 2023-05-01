@@ -57,17 +57,19 @@ struct ScanCallbacks {
 
 /**
  * Retrieves documents from the collection with the given 'collectionUuid' using the storage API.
- * Can be used as either a full scan of the collection, or as a seek. In the latter case, this stage
- * is given a 'seekKeySlot' from which to read a 'RecordId'. We seek to this 'RecordId' and then
- * scan from that point to the end of the collection.
+ *
+ * Iff resuming a prior scan, this stage is given a 'seekRecordIdSlot' from which to read a
+ * 'RecordId'. We seek to this 'RecordId' before resuming the scan. 'stageType' is set to "seek"
+ * instead of "scan" for this case only.
  *
  * If the 'recordSlot' is provided, then each of the records returned from the scan is placed into
  * an output slot with this slot id. Similarly, if 'recordIdSlot' is provided, then this slot is
  * populated with the record id on each advance.
  *
  * In addition, the scan/seek can extract a set of top-level fields from each document. The caller
- * asks for this by passing a vector of 'fields', along with a corresponding slot vector 'vars' into
- * which the resulting values should be stored. These vectors must have the same length.
+ * asks for this by passing a vector of 'scanFieldNames', along with a corresponding slot vector
+ * 'scanFieldSlots' into which the resulting values should be stored. These vectors must have the
+ * same length.
  *
  * The direction of the scan is controlled by the 'forward' parameter.
  *
@@ -80,18 +82,19 @@ struct ScanCallbacks {
  * storage snapshot from which it was obtained. This information is made available to the seek stage
  * via 'snapshotIdSlot', 'indexIdentSlot', 'indexKeySlot', and 'indexKeyPatternSlot'.
  *
- * If this is an oplog scan, then the 'oplogTsSlot' will be populated with the "ts" field from each
- * oplog entry.
+ * For oplog scans, 'oplogTsSlot' will be populated with a copy of the "ts" field (which is the
+ * oplog clustering key) from the doc if it is a clustered scan (for use by the EOF filter above the
+ * scan) or the caller asked for the latest oplog "ts" value.
  *
  * Debug string representations:
  *
  *  scan recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
- *       indexKeyPatternSlot? [slot1 = fieldName1, ... slot_n = fieldName_n]
- *       collectionUuid forward needOplogSlotForTs
+ *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
+ *       slot_n = fieldName_n] collectionUuid forward needOplogSlotForTs
  *
  *  seek seekKeySlot recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
- *       indexKeyPatternSlot? [slot1 = fieldName1, ... slot_n = fieldName_n]
- *       collectionUuid forward needOplogSlotForTs
+ *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
+ *       slot_n = fieldName_n] collectionUuid forward needOplogSlotForTs
  */
 class ScanStage final : public PlanStage {
 public:
@@ -103,16 +106,19 @@ public:
               boost::optional<value::SlotId> indexKeySlot,
               boost::optional<value::SlotId> indexKeyPatternSlot,
               boost::optional<value::SlotId> oplogTsSlot,
-              std::vector<std::string> fields,
-              value::SlotVector vars,
-              boost::optional<value::SlotId> seekKeySlot,
+              std::vector<std::string> scanFieldNames,
+              value::SlotVector scanFieldSlots,
+              boost::optional<value::SlotId> seekRecordIdSlot,
+              boost::optional<value::SlotId> minRecordIdSlot,
+              boost::optional<value::SlotId> maxRecordIdSlot,
               bool forward,
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
               ScanCallbacks scanCallbacks,
               bool lowPriority = false,
               bool useRandomCursor = false,
-              bool participateInTrialRunTracking = true);
+              bool participateInTrialRunTracking = true,
+              bool excludeScanEndRecordId = false);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -152,11 +158,25 @@ private:
         return uint64_t{1} << computeFieldMaskOffset(name, length);
     }
 
-    void initKey();
+    /**
+     * Resets the state data members for starting the scan in the 'reOpen' case, i.e. skipping state
+     * that would be correct after a prior open() call that was NOT followed by a close() call. This
+     * is also called by the initial open() to set the same subset of state for the first time to
+     * avoid duplicating this code.
+     */
+    void scanResetState(bool reOpen);
+
+    // Only for a resumed scan ("seek"), this sets '_seekRecordId' to the resume point at runtime.
+    void setSeekRecordId();
+
+    // Only for a clustered collection scan, this sets '_minRecordId' to the lower scan bound.
+    void setMinRecordId();
+
+    // Only for a clustered collection scan, this sets '_maxRecordId' to the upper scan bound.
+    void setMaxRecordId();
 
     value::OwnedValueAccessor* getFieldAccessor(StringData name, size_t offset) const;
 
-    const UUID _collUuid;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
@@ -165,11 +185,74 @@ private:
     const boost::optional<value::SlotId> _indexKeyPatternSlot;
     const boost::optional<value::SlotId> _oplogTsSlot;
 
-    const std::vector<std::string> _fields;
-    const value::SlotVector _vars;
+    // '_scanFieldNames' - names of the fields being scanned from the doc
+    // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
+    const std::vector<std::string> _scanFieldNames;
+    const value::SlotVector _scanFieldSlots;
 
-    const boost::optional<value::SlotId> _seekKeySlot;
+    const boost::optional<value::SlotId> _seekRecordIdSlot;
+    const boost::optional<value::SlotId> _minRecordIdSlot;
+    const boost::optional<value::SlotId> _maxRecordIdSlot;
+
+    // Tells if this is a forward (as opposed to reverse) scan.
     const bool _forward;
+
+    const UUID _collUuid;
+
+    const ScanCallbacks _scanCallbacks;
+
+    // Used to return a random sample of the collection.
+    const bool _useRandomCursor;
+
+    // Holds the current record.
+    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+
+    // Holds the RecordId of the current record as a TypeTags::RecordId.
+    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
+    RecordId _recordId;
+
+    value::SlotAccessor* _snapshotIdAccessor{nullptr};
+    value::SlotAccessor* _indexIdentAccessor{nullptr};
+    value::SlotAccessor* _indexKeyAccessor{nullptr};
+    value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
+
+    // For oplog scans only, holds a copy of the "ts" field of the record (which is the oplog
+    // clustering key) for use by the end-bound EOF filter above the scan, if applicable.
+    RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
+
+    // For oplog scans only, holds a cached pointer to the accessor for the "ts" field in the
+    // current document to get this accessor quickly rather than having to look it up in the
+    // '_scanFieldAccessors' hashtable each time.
+    value::SlotAccessor* _tsFieldAccessor{nullptr};
+
+    // These members hold info about the target fields being scanned from the record.
+    //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _scanFieldNames
+    //     '_scanFieldAccessorsMap' - a map from vector index to pointer to the corresponding
+    //         accessor in '_scanFieldAccessors'
+    std::vector<value::OwnedValueAccessor> _scanFieldAccessors;
+    value::SlotAccessorMap _scanFieldAccessorsMap;
+
+    // Only for a resumed scan ("seek"). Slot holding the TypeTags::RecordId of the record to resume
+    // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
+    value::SlotAccessor* _seekRecordIdAccessor{nullptr};
+    RecordId _seekRecordId;
+
+    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
+    value::SlotAccessor* _minRecordIdAccessor{nullptr};
+    RecordId _minRecordId;
+
+    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
+    value::SlotAccessor* _maxRecordIdAccessor{nullptr};
+    RecordId _maxRecordId;
+
+    // Only for clustered collection scans: must ScanStage::getNext() exclude the ending bound?
+    bool _excludeScanEndRecordId = false;
+
+    // Only for clustered collection scans: does the scan have an end bound?
+    bool _hasScanEndRecordId = false;
+
+    // Only for clustered collection scans: have we crossed the scan end bound if there is one?
+    bool _havePassedScanEndRecordId = false;
 
     // These members are default constructed to boost::none and are initialized when 'prepare()'
     // is called. Once they are set, they are never modified again.
@@ -182,28 +265,6 @@ private:
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
 
-    const ScanCallbacks _scanCallbacks;
-
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
-    value::SlotAccessor* _snapshotIdAccessor{nullptr};
-    value::SlotAccessor* _indexIdentAccessor{nullptr};
-    value::SlotAccessor* _indexKeyAccessor{nullptr};
-    value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
-
-    // If this ScanStage was constructed with _oplogTsSlot set, then _oplogTsAccessor will point to
-    // an accessor in the RuntimeEnvironment, and value of the "ts" field (if it exists) from each
-    // record scanned will be written to this accessor. The engine uses mechanism to keep track of
-    // the most recent timestamp that has been observed when scanning the oplog collection.
-    RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
-
-    // Used to return a random sample of the collection.
-    const bool _useRandomCursor;
-
-    std::vector<value::OwnedValueAccessor> _fieldAccessors;
-    value::SlotAccessorMap _varAccessors;
-    value::SlotAccessor* _seekKeyAccessor{nullptr};
-
     // Variant stores pointers to field accessors for all fields with a given bloom filter mask
     // offset. If there is only one field with a given offset, it is stored as a StringData and
     // pointer pair, which allows us to just compare strings instead of hash map lookup.
@@ -215,22 +276,15 @@ private:
     // computeFieldMaskOffset function.
     std::array<FieldAccessorVariant, 64> _maskOffsetToFieldAccessors;
 
-    // _tsFieldAccessor points to the accessor for field "ts". We use _tsFieldAccessor to get at
-    // the accessor quickly rather than having to look it up in the _fieldAccessors hashtable.
-    value::SlotAccessor* _tsFieldAccessor{nullptr};
-
     FieldNameBloomFilter<computeFieldMask> _fieldsBloomFilter;
 
-    RecordId _recordId;
-
     bool _open{false};
-
     std::unique_ptr<SeekableRecordCursor> _cursor;
 
     // TODO: SERVER-62647. Consider removing random cursor when no longer needed.
     std::unique_ptr<RecordCursor> _randomCursor;
 
-    RecordId _key;
+    // Tells whether this is the first getNext() call of the scan or after restarting.
     bool _firstGetNext{false};
 
     // Whether the scan should have low storage admission priority.
@@ -271,8 +325,8 @@ public:
                       boost::optional<value::SlotId> indexIdentSlot,
                       boost::optional<value::SlotId> indexKeySlot,
                       boost::optional<value::SlotId> indexKeyPatternSlot,
-                      std::vector<std::string> fields,
-                      value::SlotVector vars,
+                      std::vector<std::string> scanFieldNames,
+                      value::SlotVector scanFieldSlots,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
                       ScanCallbacks callbacks,
@@ -286,8 +340,8 @@ public:
                       boost::optional<value::SlotId> indexIdentSlot,
                       boost::optional<value::SlotId> indexKeySlot,
                       boost::optional<value::SlotId> indexKeyPatternSlot,
-                      std::vector<std::string> fields,
-                      value::SlotVector vars,
+                      std::vector<std::string> scanFieldNames,
+                      value::SlotVector scanFieldSlots,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
                       ScanCallbacks callbacks,
@@ -321,15 +375,39 @@ private:
         _currentRange = std::numeric_limits<std::size_t>::max();
     }
 
-    const UUID _collUuid;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const boost::optional<value::SlotId> _indexIdentSlot;
     const boost::optional<value::SlotId> _indexKeySlot;
     const boost::optional<value::SlotId> _indexKeyPatternSlot;
-    const std::vector<std::string> _fields;
-    const value::SlotVector _vars;
+
+    // '_scanFieldNames' - names of the fields being scanned from the doc
+    // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
+    const std::vector<std::string> _scanFieldNames;
+    const value::SlotVector _scanFieldSlots;
+
+    const UUID _collUuid;
+    const ScanCallbacks _scanCallbacks;
+
+    // Holds the current record.
+    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+
+    // Holds the RecordId of the current record as a TypeTags::RecordId.
+    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
+    RecordId _recordId;
+
+    value::SlotAccessor* _snapshotIdAccessor{nullptr};
+    value::SlotAccessor* _indexIdentAccessor{nullptr};
+    value::SlotAccessor* _indexKeyAccessor{nullptr};
+    value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
+
+    // These members hold info about the target fields being scanned from the record.
+    //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _scanFieldNames
+    //     '_scanFieldAccessorsMap' - a map from vector index to pointer to the corresponding
+    //         accessor in '_scanFieldAccessors'
+    value::FieldAccessorMap _scanFieldAccessors;
+    value::SlotAccessorMap _scanFieldAccessorsMap;
 
     // These members are default constructed to boost::none and are initialized when 'prepare()'
     // is called. Once they are set, they are never modified again.
@@ -340,22 +418,8 @@ private:
 
     std::shared_ptr<ParallelState> _state;
 
-    const ScanCallbacks _scanCallbacks;
-
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
-    value::SlotAccessor* _snapshotIdAccessor{nullptr};
-    value::SlotAccessor* _indexIdentAccessor{nullptr};
-    value::SlotAccessor* _indexKeyAccessor{nullptr};
-    value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
-
-    value::FieldAccessorMap _fieldAccessors;
-    value::SlotAccessorMap _varAccessors;
-
     size_t _currentRange{std::numeric_limits<std::size_t>::max()};
     Range _range;
-
-    RecordId _recordId;
 
     bool _open{false};
 

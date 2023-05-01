@@ -41,16 +41,16 @@ namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * Generates an SBE plan stage sub-tree implementing an collection scan. 'fields' can be used to
+ * Generates an SBE plan stage sub-tree implementing a collection scan. 'fields' can be used to
  * specify top-level fields that should be retrieved during the scan. For each name in 'fields',
  * there will be a corresponding kField slot in the PlanStageSlots object returned with the same
  * name.
  *
  * On success, a tuple containing the following data is returned:
  *   * A slot to access a fetched document (a resultSlot)
- *   * A slot to access a recordId (a recordIdSlot)
- *   * An optional slot to access a latest oplog timestamp (oplogTsSlot), if we scan the oplog and
- *     were requested to track this data.
+ *   * A slot to access the doc's RecordId (a recordIdSlot)
+ *   * An optional slot to access the latest oplog timestamp ("ts" field) for oplog scans that were
+ *     requested to track this data or that are clustered scans ("ts" is the oplog clustering key).
  *   * A generated PlanStage sub-tree.
  *
  * In cases of an error, throws.
@@ -59,7 +59,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
-    std::vector<std::string> fields,
+    std::vector<std::string> scanFieldNames,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch);
 
