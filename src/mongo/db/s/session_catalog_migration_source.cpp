@@ -675,9 +675,13 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                 // should never get added to the opTime queue since those transactions are not
                 // retryable so there is no need to transfer their write history to the
                 // recipient.
-                invariant(!isInternalSessionForNonRetryableWrite(sessionId),
-                          "Cannot add op time for a non-retryable internal transaction to the "
-                          "session migration op time queue");
+                invariant(
+                    !isInternalSessionForNonRetryableWrite(sessionId),
+                    str::stream()
+                        << "Cannot add op time for a non-retryable internal transaction to the "
+                           "session migration op time queue - "
+                        << "session id:" << sessionId
+                        << " oplog entry: " << redact(nextNewWriteOplog.toBSONForLogging()));
 
                 if (isInternalSessionForRetryableWrite(sessionId)) {
                     // Derive retryable write oplog entries from this retryable internal
