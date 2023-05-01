@@ -281,18 +281,20 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep,
                  StringData errorHandler) {
     // DynamicAttributes doesn't allow rvalues, so make some local variables.
     auto nextStepString = errorHandlingStepToString(nextStep);
-    auto commitWCError = Status::OK();
+    std::string redactedError, redactedCommitError, redactedCommitWCError;
 
     logv2::DynamicAttributes attr;
     attr.add("nextStep", nextStepString);
     attr.add("txnInfo", txnInfo);
     attr.add("attempts", attempts);
     if (!swResult.isOK()) {
-        attr.add("error", swResult.getStatus());
+        redactedError = redact(swResult.getStatus());
+        attr.add("error", redactedError);
     } else {
-        attr.add("commitError", swResult.getValue().cmdStatus);
-        commitWCError = swResult.getValue().wcError.toStatus();
-        attr.add("commitWCError", commitWCError);
+        redactedCommitError = redact(swResult.getValue().cmdStatus);
+        attr.add("commitError", redactedCommitError);
+        redactedCommitWCError = redact(swResult.getValue().wcError.toStatus());
+        attr.add("commitWCError", redactedCommitWCError);
     }
     attr.add("errorHandler", errorHandler);
 
@@ -406,7 +408,7 @@ ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
     return _internalTxn->abort().thenRunOn(_executor).onError([this](Status abortStatus) {
         LOGV2(5875900,
               "Unable to abort internal transaction",
-              "reason"_attr = abortStatus,
+              "reason"_attr = redact(abortStatus),
               "txnInfo"_attr = _internalTxn->reportStateForLog());
     });
 }
@@ -767,8 +769,8 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
     LOGV2_DEBUG(5875905,
                 3,
                 "Internal transaction handling error",
-                "error"_attr = swResult.isOK() ? swResult.getValue().getEffectiveStatus()
-                                               : swResult.getStatus(),
+                "error"_attr = swResult.isOK() ? redact(swResult.getValue().getEffectiveStatus())
+                                               : redact(swResult.getStatus()),
                 "txnInfo"_attr = _reportStateForLog(lg),
                 "attempts"_attr = attemptCounter);
 
