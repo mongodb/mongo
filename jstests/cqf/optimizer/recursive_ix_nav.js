@@ -171,11 +171,15 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
     // Assert we have two spool producers, one for each interval for "a" ([1, 3] and [6, 6]).
     assertValueOnPlanPath(
         "SpoolProducer", res, "child.child.leftChild.child.children.0.leftChild.nodeType");
-    assertValueOnPlanPath(7, res, "child.child.leftChild.child.children.0.leftChild.id");
+    const leftNode = navigateToPlanPath(res, 'child.child.leftChild.child.children.0.leftChild');
 
     assertValueOnPlanPath(
         "SpoolProducer", res, "child.child.leftChild.child.children.1.leftChild.nodeType");
-    assertValueOnPlanPath(8, res, "child.child.leftChild.child.children.1.leftChild.id");
+    const rightNode = navigateToPlanPath(res, 'child.child.leftChild.child.children.1.leftChild');
+
+    assert.neq(leftNode.id,
+               rightNode.id,
+               `Expected different spool ids: ${tojson({leftNode, rightNode})}`);
 }
 
 {
