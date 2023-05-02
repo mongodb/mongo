@@ -148,7 +148,13 @@ public:
         _current += _increment;
         return out;
     }
-    const IWPair& current() {
+    IntWrapper nextWithDeferredValue() {
+        MONGO_UNREACHABLE;
+    }
+    IntWrapper getDeferredValue() {
+        MONGO_UNREACHABLE;
+    }
+    const IntWrapper& current() {
         MONGO_UNREACHABLE;
     }
 
@@ -166,9 +172,15 @@ public:
         return false;
     }
     Data next() {
-        verify(false);
+        MONGO_UNREACHABLE;
     }
-    const Data& current() {
+    IntWrapper nextWithDeferredValue() {
+        MONGO_UNREACHABLE;
+    }
+    IntWrapper getDeferredValue() {
+        MONGO_UNREACHABLE;
+    }
+    const IntWrapper& current() {
         MONGO_UNREACHABLE;
     }
 };
@@ -177,7 +189,7 @@ class LimitIterator : public IWIterator {
 public:
     LimitIterator(long long limit, std::shared_ptr<IWIterator> source)
         : _remaining(limit), _source(source) {
-        verify(limit > 0);
+        invariant(limit > 0);
     }
 
     void openSource() {}
@@ -187,11 +199,17 @@ public:
         return _remaining && _source->more();
     }
     Data next() {
-        verify(more());
+        invariant(more());
         _remaining--;
         return _source->next();
     }
-    const Data& current() {
+    IntWrapper nextWithDeferredValue() {
+        MONGO_UNREACHABLE;
+    }
+    IntWrapper getDeferredValue() {
+        MONGO_UNREACHABLE;
+    }
+    const IntWrapper& current() {
         MONGO_UNREACHABLE;
     }
 
@@ -271,14 +289,43 @@ std::shared_ptr<IWIterator> makeInMemIterator(const int (&array)[N]) {
     return std::make_shared<sorter::InMemIterator<IntWrapper, IntWrapper>>(vec);
 }
 
+/**
+ * Spills the contents of inputIter to a file and returns a FileIterator for reading the data back.
+ * This is needed because the MergeIterator currently requires that it is merging from sorted spill
+ * file segments (as opposed to any other kind of iterator).
+ */
+template <typename IteratorPtr>
+std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter, const unittest::TempDir& tempDir) {
+    inputIter->openSource();
+    if (!inputIter->more()) {
+        inputIter->closeSource();
+        return std::make_shared<EmptyIterator>();
+    }
+    SorterFileStats sorterFileStats(nullptr /* sorterTracker */);
+    const SortOptions opts = SortOptions().TempDir(tempDir.path());
+    auto spillFile = std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
+        opts.tempDir + "/" + nextFileName(), opts.sorterFileStats);
+    SortedFileWriter<IntWrapper, IntWrapper> writer(opts, spillFile);
+    while (inputIter->more()) {
+        auto pair = inputIter->next();
+        writer.addAlreadySorted(pair.first, pair.second);
+    }
+    auto outputIter = std::shared_ptr<IWIterator>(writer.done());
+    inputIter->closeSource();
+    return outputIter;
+}
+
 template <typename IteratorPtr, int N>
 std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
+                                           const unittest::TempDir& tempDir,
                                            Direction Dir = ASC,
                                            const SortOptions& opts = SortOptions()) {
     invariant(!opts.extSortAllowed);
     std::vector<std::shared_ptr<IWIterator>> vec;
-    for (int i = 0; i < N; i++)
-        vec.push_back(std::shared_ptr<IWIterator>(array[i]));
+    for (int i = 0; i < N; i++) {
+        // Spill iterator outputs to a file and obtain a new iterator for it.
+        vec.push_back(spillToFile(array[i], tempDir));
+    }
     return std::shared_ptr<IWIterator>(IWIterator::merge(vec, opts, IWComparator(Dir)));
 }
 
@@ -316,7 +363,13 @@ public:
                     _pos++;
                     return ret;
                 }
-                const IWPair& current() {
+                IntWrapper nextWithDeferredValue() {
+                    MONGO_UNREACHABLE;
+                }
+                IntWrapper getDeferredValue() {
+                    MONGO_UNREACHABLE;
+                }
+                const IntWrapper& current() {
                     MONGO_UNREACHABLE;
                 }
                 size_t _pos;
@@ -388,6 +441,7 @@ private:
 class MergeIteratorTests {
 public:
     void run() {
+        unittest::TempDir tempDir("mergeIteratorTests");
         {  // test empty (no inputs)
             std::vector<std::shared_ptr<IWIterator>> vec;
             std::shared_ptr<IWIterator> mergeIter(
@@ -399,7 +453,7 @@ public:
                                                        std::make_shared<EmptyIterator>(),
                                                        std::make_shared<EmptyIterator>()};
 
-            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, ASC),
+            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, tempDir, ASC),
                                         std::make_shared<EmptyIterator>());
         }
 
@@ -410,7 +464,7 @@ public:
                 std::make_shared<IntIterator>(0, 20, 2)  // 0, 2, ... 18
             };
 
-            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, ASC),
+            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, tempDir, ASC),
                                         std::make_shared<IntIterator>(0, 20, 1));
         }
 
@@ -421,7 +475,7 @@ public:
                 std::make_shared<IntIterator>(28, 0, -3),  // 28, 25, ... 1
                 std::make_shared<EmptyIterator>()};
 
-            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, DESC),
+            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, tempDir, DESC),
                                         std::make_shared<IntIterator>(30, 0, -1));
         }
         {  // test Limit
@@ -430,7 +484,7 @@ public:
                 std::make_shared<IntIterator>(0, 20, 2)};  // 0, 2, ... 18
 
             ASSERT_ITERATORS_EQUIVALENT(
-                mergeIterators(iterators, ASC, SortOptions().Limit(10)),
+                mergeIterators(iterators, tempDir, ASC, SortOptions().Limit(10)),
                 std::make_shared<LimitIterator>(10, std::make_shared<IntIterator>(0, 20, 1)));
         }
 
@@ -443,15 +497,15 @@ public:
             auto itD = std::make_shared<IntIterator>(15, 20, 1);  // 15, 16, ... 19
 
             std::shared_ptr<IWIterator> iteratorsAD[] = {itD, itA};
-            auto mergedAD = mergeIterators(iteratorsAD, ASC);
+            auto mergedAD = mergeIterators(iteratorsAD, tempDir, ASC);
             ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedAD, itFull, 5);
 
             std::shared_ptr<IWIterator> iteratorsABD[] = {mergedAD, itB};
-            auto mergedABD = mergeIterators(iteratorsABD, ASC);
+            auto mergedABD = mergeIterators(iteratorsABD, tempDir, ASC);
             ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedABD, itFull, 5);
 
             std::shared_ptr<IWIterator> iteratorsABCD[] = {itC, mergedABD};
-            auto mergedABCD = mergeIterators(iteratorsABCD, ASC);
+            auto mergedABCD = mergeIterators(iteratorsABCD, tempDir, ASC);
             ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedABCD, itFull, 5);
         }
     }
@@ -481,7 +535,7 @@ public:
                                         std::make_shared<EmptyIterator>());
         }
 
-        const auto runTests = [this, &opts](bool assertRanges) {
+        const auto runTests = [this, &opts, &tempDir](bool assertRanges) {
             {  // test all data ASC
                 std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
                 addData(sorter.get());
@@ -514,8 +568,8 @@ public:
                 std::shared_ptr<IWIterator> iters1[] = {done(sorters[0].get()),
                                                         done(sorters[1].get())};
                 std::shared_ptr<IWIterator> iters2[] = {correct(), correct()};
-                ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, ASC),
-                                            mergeIterators(iters2, ASC));
+                ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, tempDir, ASC),
+                                            mergeIterators(iters2, tempDir, ASC));
 
                 if (assertRanges) {
                     assertRangeInfo(sorters[0], opts);
@@ -533,8 +587,8 @@ public:
                 std::shared_ptr<IWIterator> iters1[] = {done(sorters[0].get()),
                                                         done(sorters[1].get())};
                 std::shared_ptr<IWIterator> iters2[] = {correctReverse(), correctReverse()};
-                ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, DESC),
-                                            mergeIterators(iters2, DESC));
+                ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, tempDir, DESC),
+                                            mergeIterators(iters2, tempDir, DESC));
 
                 if (assertRanges) {
                     assertRangeInfo(sorters[0], opts);
@@ -1002,6 +1056,36 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
         ASSERT_FALSE(iter->more());
         iter->closeSource();
     }
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+
+    IWPair pair1(1, 100);
+    IWPair pair2(2, 200);
+    auto spillFile = std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
+        opts.tempDir + "/" + nextFileName(), opts.sorterFileStats);
+    SortedFileWriter<IntWrapper, IntWrapper> writer(opts, spillFile);
+    writer.addAlreadySorted(pair1.first, pair1.second);
+    writer.addAlreadySorted(pair2.first, pair2.second);
+    auto iter = std::shared_ptr<IWIterator>(writer.done());
+    iter->openSource();
+
+    ASSERT(iter->more());
+    IntWrapper key1 = iter->nextWithDeferredValue();
+    IntWrapper value1 = iter->getDeferredValue();
+    ASSERT_EQUALS(pair1.first, key1);
+    ASSERT_EQUALS(pair1.second, value1);
+
+    ASSERT(iter->more());
+    IntWrapper key2 = iter->nextWithDeferredValue();
+    IntWrapper value2 = iter->getDeferredValue();
+    ASSERT_EQUALS(pair2.first, key2);
+    ASSERT_EQUALS(pair2.second, value2);
+
+    ASSERT_FALSE(iter->more());
+    iter->closeSource();
 }
 
 class BoundedSorterTest : public unittest::Test {

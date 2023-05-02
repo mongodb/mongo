@@ -177,7 +177,15 @@ public:
         return out;
     }
 
-    const std::pair<Key, Value>& current() override {
+    Key nextWithDeferredValue() override {
+        MONGO_UNREACHABLE;
+    }
+
+    Value getDeferredValue() override {
+        MONGO_UNREACHABLE;
+    }
+
+    const Key& current() override {
         tasserted(ErrorCodes::NotImplemented, "current() not implemented for InMemIterator");
     }
 
@@ -233,35 +241,48 @@ public:
     }
 
     bool more() {
+        invariant(!_startOfNewData);
         if (!_done)
             _fillBufferIfNeeded();  // may change _done
         return !_done;
     }
 
     Data next() {
+        Key deserializedKey = nextWithDeferredValue();
+        Value deserializedValue = getDeferredValue();
+        return Data(std::move(deserializedKey), std::move(deserializedValue));
+    }
+
+    Key nextWithDeferredValue() override {
         invariant(!_done);
+        invariant(!_startOfNewData);
         _fillBufferIfNeeded();
 
-        const char* startOfNewData = static_cast<const char*>(_bufferReader->pos());
+        _startOfNewData = static_cast<const char*>(_bufferReader->pos());
 
         // Note: calling read() on the _bufferReader buffer in the deserialize function advances the
         // buffer. Since Key comes before Value in the _bufferReader, and C++ makes no function
         // parameter evaluation order guarantees, we cannot deserialize Key and Value straight into
         // the Data constructor
-        auto first = Key::deserializeForSorter(*_bufferReader, _settings.first);
-        auto second = Value::deserializeForSorter(*_bufferReader, _settings.second);
+        return Key::deserializeForSorter(*_bufferReader, _settings.first);
+    }
+
+    Value getDeferredValue() override {
+        invariant(!_done);
+        invariant(_startOfNewData);
+        Value deserializedValue = Value::deserializeForSorter(*_bufferReader, _settings.second);
 
         // The difference of _bufferReader's position before and after reading the data
         // will provide the length of the data that was just read.
         const char* endOfNewData = static_cast<const char*>(_bufferReader->pos());
 
         _afterReadChecksum =
-            addDataToChecksum(startOfNewData, endOfNewData - startOfNewData, _afterReadChecksum);
-
-        return Data(std::move(first), std::move(second));
+            addDataToChecksum(_startOfNewData, endOfNewData - _startOfNewData, _afterReadChecksum);
+        _startOfNewData = nullptr;
+        return deserializedValue;
     }
 
-    const std::pair<Key, Value>& current() override {
+    const Key& current() override {
         tasserted(ErrorCodes::NotImplemented, "current() not implemented for FileIterator");
     }
 
@@ -366,6 +387,10 @@ private:
     std::streamoff _fileEndOffset;      // File offset at which the sorted data range ends.
     boost::optional<std::string> _dbName;
 
+    // Points to the beginning of a serialized key in the key-value pair currently being read, and
+    // used for computing the checksum value. This is set to nullptr after reading each key-value
+    // pair.
+    const char* _startOfNewData = nullptr;
     // Checksum value that is updated with each read of a data object from disk. We can compare
     // this value with _originalChecksum to check for data corruption if and only if the
     // FileIterator is exhausted.
@@ -379,8 +404,9 @@ private:
 
 /**
  * Merge-sorts results from 0 or more FileIterators, all of which should be iterating over sorted
- * ranges within the same file. This class is given the data source file name upon construction and
- * is responsible for deleting the data source file upon destruction.
+ * ranges within the same file. The input iterators must implement nextWithDeferredValue() and
+ * getDeferredValue(). This class is given the data source file name upon construction and is
+ * responsible for deleting the data source file upon destruction.
  */
 template <typename Key, typename Value, typename Comparator>
 class MergeIterator : public SortIteratorInterface<Key, Value> {
@@ -398,7 +424,8 @@ public:
         for (size_t i = 0; i < iters.size(); i++) {
             iters[i]->openSource();
             if (iters[i]->more()) {
-                _heap.push_back(std::make_shared<Stream>(i, iters[i]->next(), iters[i]));
+                _heap.push_back(
+                    std::make_shared<Stream>(i, iters[i]->nextWithDeferredValue(), iters[i]));
                 if (i > _maxFile) {
                     _maxFile = i;
                 }
@@ -431,7 +458,8 @@ public:
     void addSource(std::shared_ptr<Input> iter) {
         iter->openSource();
         if (iter->more()) {
-            _heap.push_back(std::make_shared<Stream>(++_maxFile, iter->next(), iter));
+            _heap.push_back(
+                std::make_shared<Stream>(++_maxFile, iter->nextWithDeferredValue(), iter));
             std::push_heap(_heap.begin(), _heap.end(), _greater);
 
             if (_greater(_current, _heap.front())) {
@@ -452,7 +480,7 @@ public:
         return false;
     }
 
-    const Data& current() override {
+    const Key& current() override {
         invariant(_remaining);
 
         if (!_positioned) {
@@ -464,22 +492,31 @@ public:
     }
 
     Data next() {
-        verify(_remaining);
+        invariant(_remaining);
 
         _remaining--;
 
         if (_positioned) {
             _positioned = false;
-            return _current->current();
+        } else {
+            advance();
         }
+        Key key = _current->current();
+        Value value = _current->getDeferredValue();
+        return Data(std::move(key), std::move(value));
+    }
 
-        advance();
-        return _current->current();
+    Key nextWithDeferredValue() override {
+        MONGO_UNREACHABLE;
+    }
+
+    Value getDeferredValue() override {
+        MONGO_UNREACHABLE;
     }
 
     void advance() {
         if (!_current->advance()) {
-            verify(!_heap.empty());
+            invariant(!_heap.empty());
             std::pop_heap(_heap.begin(), _heap.end(), _greater);
             _current = _heap.back();
             _heap.pop_back();
@@ -500,15 +537,18 @@ private:
      */
     class Stream {
     public:
-        Stream(size_t fileNum, const Data& first, std::shared_ptr<Input> rest)
+        Stream(size_t fileNum, const Key& first, std::shared_ptr<Input> rest)
             : fileNum(fileNum), _current(first), _rest(rest) {}
 
         ~Stream() {
             _rest->closeSource();
         }
 
-        const Data& current() const {
+        const Key& current() const {
             return _current;
+        }
+        Value getDeferredValue() {
+            return _rest->getDeferredValue();
         }
         bool more() {
             return _rest->more();
@@ -517,14 +557,14 @@ private:
             if (!_rest->more())
                 return false;
 
-            _current = _rest->next();
+            _current = _rest->nextWithDeferredValue();
             return true;
         }
 
         const size_t fileNum;
 
     private:
-        Data _current;
+        Key _current;
         std::shared_ptr<Input> _rest;
     };
 
@@ -535,8 +575,8 @@ private:
         template <typename Ptr>
         bool operator()(const Ptr& lhs, const Ptr& rhs) const {
             // first compare data
-            dassertCompIsSane(_comp, lhs->current().first, rhs->current().first);
-            int ret = _comp(lhs->current().first, rhs->current().first);
+            dassertCompIsSane(_comp, lhs->current(), rhs->current());
+            int ret = _comp(lhs->current(), rhs->current());
             if (ret)
                 return ret > 0;
 
@@ -841,7 +881,7 @@ public:
 
     LimitOneSorter(const SortOptions& opts, const Comparator& comp)
         : Sorter<Key, Value>(opts), _comp(comp), _haveData(false) {
-        verify(opts.limit == 1);
+        invariant(opts.limit == 1);
     }
 
     template <typename DataProducer>
@@ -1392,7 +1432,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
 
     std::string compressed;
     snappy::Compress(outBuffer, size, &compressed);
-    verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
+    invariant(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
 
     const bool shouldCompress = compressed.size() < (size_t(_buffer.len()) / 10 * 9);
     if (shouldCompress) {
@@ -1535,7 +1575,7 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::getState() const {
         return State::kReady;
 
     // Similarly, we can return the next element from the spilled iterator if it's < _min.
-    if (_spillIter && compare(_spillIter->current().first, *_min) < 0)
+    if (_spillIter && compare(_spillIter->current(), *_min) < 0)
         return State::kReady;
 
     // A later call to add() may improve _min. Or in the worst case, after done() is called
@@ -1568,7 +1608,7 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
     };
 
     if (!_heap.empty() && _spillIter) {
-        if (compare(_heap.top().first, _spillIter->current().first) <= 0) {
+        if (compare(_heap.top().first, _spillIter->current()) <= 0) {
             pullFromHeap();
         } else {
             pullFromSpilled();
