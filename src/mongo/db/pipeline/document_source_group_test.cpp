@@ -1135,10 +1135,16 @@ private:
 class StreamingAlternatingSpillAndNoSpillBatches : public CheckResultsAndSpills {
 public:
     StreamingAlternatingSpillAndNoSpillBatches()
-        : CheckResultsAndSpills(GroupStageType::Streaming, 3 /*expectedSpills*/) {}
+        : CheckResultsAndSpills(GroupStageType::Streaming, expectedSpills()) {}
 
 private:
     static constexpr int kCount = 12;
+
+    int expectedSpills() const {
+        // 'DocumentSourceGroup' has test-only behavior where it will spill more aggressively in
+        // debug builds.
+        return kDebugBuild ? kCount : 3;
+    }
 
     deque<DocumentSource::GetNextResult> inputData() final {
         deque<DocumentSource::GetNextResult> queue;

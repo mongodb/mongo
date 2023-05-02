@@ -16,20 +16,19 @@ function runTest(coll) {
         emit(xx.val, this.a);
     };
     const reduce = function(key, values) {
-        return {reduce: Array.sum(values) + xx.val};
+        return {reduce: xx.val + 1};
     };
     const finalize = function(key, values) {
-        values.finalize = xx.val + 1;
+        values.finalize = xx.val + 2;
         return values;
     };
     const res = assert.commandWorked(
         coll.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}, scope: {xx: {val: 9}}}));
-    assert.eq(9, res.results[0].value.reduce);
-    assert.eq(10, res.results[0].value.finalize);
+    assert.eq(res.results.length, 1, res);
+    assert.eq(res.results[0], {_id: 9, value: {reduce: 10, finalize: 11}}, res);
 }
 
-assert.commandWorked(coll.insert({a: -4}));
-assert.commandWorked(coll.insert({a: 4}));
+assert.commandWorked(coll.insert({}));
 
 // Run test when a single shard is targetted.
 runTest(coll);

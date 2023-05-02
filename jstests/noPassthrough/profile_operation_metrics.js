@@ -1193,20 +1193,24 @@ const operations = [
         },
         profileFilter: {op: 'command', 'command.aggregate': collName},
         profileAssert: (db, profileDoc) => {
-            // TODO SERVER-71684: We currently erroneously account for reads from and writes to
-            // temporary record stores used as spill tables. This test accommodates the erroneous
-            // behavior. Such accommodation is only necessary for debug builds, since we spill
-            // artificially in debug builds in order to exercise the query execution engine's
-            // spilling logic.
-            //
-            // The classic engine spills to files outside the storage engine rather than to a
-            // temporary record store, so it is not subject to SERVER-71684.
-            if (isDebugBuild(db) && checkSBEEnabled(db)) {
-                // For $group, we incorporate the number of items spilled into "keysSorted" and the
-                // number of individual spill events into "sorterSpills".
+            // In debug builds we spill artificially in order to exercise the query execution
+            // engine's spilling logic. For $group, we incorporate the number of items spilled into
+            // "keysSorted" and the number of individual spill events into "sorterSpills".
+            if (isDebugBuild(db)) {
                 assert.gt(profileDoc.keysSorted, 0);
                 assert.gt(profileDoc.sorterSpills, 0);
+            } else {
+                assert.eq(profileDoc.keysSorted, 0);
+                assert.eq(profileDoc.sorterSpills, 0);
+            }
 
+            // TODO SERVER-71684: We currently erroneously account for reads from and writes to
+            // temporary record stores used as spill tables. This test accommodates the erroneous
+            // behavior. Such accommodation is only necessary for debug builds (where we spill
+            // artificially for test purposes), and when SBE is used. The classic engine spills to
+            // files outside the storage engine rather than to a temporary record store, so it is
+            // not subject to SERVER-71684.
+            if (isDebugBuild(db) && checkSBEEnabled(db)) {
                 assert.gt(profileDoc.docBytesWritten, 0);
                 assert.gt(profileDoc.docUnitsWritten, 0);
                 assert.gt(profileDoc.totalUnitsWritten, 0);
@@ -1214,9 +1218,6 @@ const operations = [
                 assert.eq(profileDoc.docBytesRead, 29 * 100 + profileDoc.docBytesWritten);
                 assert.eq(profileDoc.docUnitsRead, 100 + profileDoc.docUnitsWritten);
             } else {
-                assert.eq(profileDoc.keysSorted, 0);
-                assert.eq(profileDoc.sorterSpills, 0);
-
                 assert.eq(profileDoc.docBytesRead, 29 * 100);
                 assert.eq(profileDoc.docUnitsRead, 100);
                 assert.eq(profileDoc.docBytesWritten, 0);
@@ -1243,20 +1244,8 @@ const operations = [
         },
         profileFilter: {op: 'command', 'command.aggregate': collName},
         profileAssert: (db, profileDoc) => {
-            if (isDebugBuild(db) && !checkSBEEnabled(db)) {
-                // In debug builds, the classic engine does some special spilling for test purposes
-                // when disk use is disabled. We spill for each of the first 20 documents, spilling
-                // less often after we reach that limit. This 26 is the sum of 20 spills of
-                // documents in groups 0 through 3 plus 6 additional items spilled for groups 4
-                // through 10.
-                assert.eq(profileDoc.keysSorted, 26);
-                // This 21 is the sum of 20 debug spills plus 1 final debug spill.
-                assert.eq(profileDoc.sorterSpills, 21);
-            } else {
-                assert.eq(profileDoc.keysSorted, 0);
-                assert.eq(profileDoc.sorterSpills, 0);
-            }
-
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docBytesRead, 29 * 100);
             assert.eq(profileDoc.docUnitsRead, 100);
             assert.eq(profileDoc.docBytesWritten, 0);

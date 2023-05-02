@@ -59,13 +59,19 @@ function runTest(testOptions) {
     },
                                           testOptions));
 
-    // In most cases we expect this to fail because it tries to insert a document that is too large.
+    // In most cases we expect this to fail because it tries to insert a document that is too large,
+    // or we see a particular error code which happens when the input is too large to reduce.
+    //
     // In some cases we may see the javascript execution interrupted because it takes longer than
     // our default time limit, so we allow that possibility.
-    assert.commandFailedWithCode(res,
-                                 [ErrorCodes.BadValue, ErrorCodes.Interrupted],
-                                 "creating a document larger than 16MB didn't fail");
-    if (res.code != ErrorCodes.Interrupted) {
+    const kCannotReduceLargeObjCode = 31392;
+    assert.commandFailedWithCode(
+        res,
+        [ErrorCodes.BadValue, ErrorCodes.Interrupted, kCannotReduceLargeObjCode],
+        "creating a document larger than 16MB didn't fail");
+    // If we see 'BadValue', make sure the message indicates it's the kind of error we were
+    // expecting.
+    if (res.code === ErrorCodes.BadValue) {
         assert.lte(
             0,
             res.errmsg.indexOf("object to insert too large"),

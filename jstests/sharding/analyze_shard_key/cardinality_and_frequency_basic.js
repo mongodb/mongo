@@ -160,7 +160,6 @@ function assertReadQueryPlans(mongodConns, dbName, collName, comment) {
                     return;
                 }
 
-                assert(!doc.usedDisk, doc);
                 if (firstStage.hasOwnProperty("$match") || firstStage.hasOwnProperty("$limit")) {
                     // This corresponds to the aggregation that the analyzeShardKey command runs
                     // to look up documents for a shard key with a unique or hashed supporting
