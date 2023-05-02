@@ -2034,50 +2034,6 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &rhel80-debug-ubsan-all-feature-flags-template
-  name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
-  display_name: "* Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-build
-  stepback: false
-  expansions:
-    toolchain_version: stable
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    lang_environment: LANG=C
-    san_options: *aubsan_options
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
-      --dbg=on
-      --opt=on
-      --sanitize=undefined
-      --ssl
-      --ocsp-stapling=off
-      --enable-free-mon=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-    compile_variant: *rhel80-debug-ubsan-all-feature-flags
-    # To force disable feature flags even on the all feature flags variant, please use this file:
-    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
-    test_flags: >-
-      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
-      --excludeWithAnyTags=incompatible_with_shard_merge
-      --additionalFeatureFlagsFile all_feature_flags.txt
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
-    scons_cache_scope: shared
-    separate_debug: off
-    large_distro_name: rhel80-build
-  tasks:
-  - name: compile_and_archive_dist_test_then_package_TG
-  - name: .concurrency !.no_txns !.repl !.kill_terminate
-  - name: disk_wiredtiger
-  - name: generate_buildid_to_debug_symbols_mapping
-
 - name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
   display_name: "* UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -2215,6 +2171,7 @@ buildvariants:
   - name: audit
   - name: .aggregation
   - name: .auth
+  - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: .config_fuzzer
   - name: .config_fuzzer_stress
   - name: cqf
@@ -2225,11 +2182,13 @@ buildvariants:
   - name: .change_streams
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
+  - name: disk_wiredtiger
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: .encrypt
   - name: free_monitoring
+  - name: generate_buildid_to_debug_symbols_mapping
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
