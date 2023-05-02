@@ -210,6 +210,8 @@ else:
     env.Library(
         target='http_client_impl',
         source=[
+            'http_client_options.idl',
+            'http_client_options.cpp',
             'http_client_winhttp.cpp' if env.TargetOSIs('windows') else 'http_client_curl.cpp',
         ],
         LIBDEPS=[
