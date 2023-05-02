@@ -1358,8 +1358,8 @@ var ShardingTest = function(params) {
             var setIsConfigSvr = false;
 
             if (isConfigShardMode && i == 0) {
-                otherParams.configOptions =
-                    Object.merge(otherParams.configOptions, {configsvr: ""});
+                otherParams.configOptions = Object.merge(
+                    otherParams.configOptions, {configsvr: "", storageEngine: "wiredTiger"});
                 rsDefaults = Object.merge(rsDefaults, otherParams.configOptions);
                 setIsConfigSvr = true;
             } else {
