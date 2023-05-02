@@ -6039,115 +6039,243 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
     return {true, objTag, objVal};
 }
 
-std::tuple<value::Array*, value::Array*, size_t, int32_t, int32_t> multiAccState(
-    value::TypeTags accTag, value::Value accVal) {
-    uassert(7548600, "The accumulator state should be an array", accTag == value::TypeTags::Array);
-    auto acc = value::getArrayView(accVal);
+std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t> multiAccState(
+    value::TypeTags stateTag, value::Value stateVal) {
+    uassert(
+        7548600, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
 
     uassert(7548601,
             "The accumulator state should have correct number of elements",
-            acc->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
+            state->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
 
-    auto [arrayTag, arrayVal] = acc->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
+    auto [arrayTag, arrayVal] = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
     uassert(7548602,
             "Internal array component is not of correct type",
             arrayTag == value::TypeTags::Array);
     auto array = value::getArrayView(arrayVal);
 
-    auto [maxSizeTag, maxSize] = acc->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
+    auto [startIndexTag, startIndexVal] =
+        state->getAt(static_cast<size_t>(AggMultiElems::kStartIdx));
+    uassert(7548700,
+            "Index component be a 64-bit integer",
+            startIndexTag == value::TypeTags::NumberInt64);
+
+    auto [maxSizeTag, maxSize] = state->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
     uassert(7548603,
             "MaxSize component should be a 64-bit integer",
             maxSizeTag == value::TypeTags::NumberInt64);
 
-    auto [memUsageTag, memUsage] = acc->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
+    auto [memUsageTag, memUsage] = state->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
     uassert(7548612,
             "MemUsage component should be a 32-bit integer",
             memUsageTag == value::TypeTags::NumberInt32);
 
-    auto [memLimitTag, memLimit] = acc->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
+    auto [memLimitTag, memLimit] = state->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
     uassert(7548613,
             "MemLimit component should be a 32-bit integer",
             memLimitTag == value::TypeTags::NumberInt32);
 
-    return {acc, array, maxSize, memUsage, memLimit};
+    return {state, array, startIndexVal, maxSize, memUsage, memLimit};
 }
 
-void checkAndUpdateMemUsage(value::Array* accArray, int32_t memUsage, int32_t memLimit) {
+int32_t updateAndCheckMemUsage(value::Array* state,
+                               int32_t memUsage,
+                               int32_t memAdded,
+                               int32_t memLimit) {
+    memUsage += memAdded;
     uassert(ErrorCodes::ExceededMemoryLimit,
             str::stream()
                 << "Accumulator used too much memory and spilling to disk cannot reduce memory "
                    "consumption any further. Memory limit: "
                 << memLimit << " bytes",
             memUsage < memLimit);
-    accArray->setAt(
+    state->setAt(
         static_cast<size_t>(AggMultiElems::kMemUsage), value::TypeTags::NumberInt32, memUsage);
+    return memUsage;
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstN(ArityType arity) {
-    auto [accTag, accVal] = moveOwnedFromStack(0);
-    auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
-    value::ValueGuard accGuard{accTag, accVal};
+size_t updateStartIdx(value::Array* state, size_t startIdx, size_t arrSize) {
+    startIdx = (startIdx + 1) % arrSize;
+    state->setAt(
+        static_cast<size_t>(AggMultiElems::kStartIdx), value::TypeTags::NumberInt64, startIdx);
+    return startIdx;
+}
+
+int32_t aggFirstN(value::Array* state,
+                  value::Array* array,
+                  size_t maxSize,
+                  int32_t memUsage,
+                  int32_t memLimit,
+                  value::TypeTags fieldTag,
+                  value::Value fieldVal) {
     value::ValueGuard fieldGuard{fieldTag, fieldVal};
-
-    auto [acc, array, maxSize, memUsage, memLimit] = multiAccState(accTag, accVal);
-
     if (array->size() < maxSize) {
-        memUsage += value::getApproximateSize(fieldTag, fieldVal);
-        checkAndUpdateMemUsage(acc, memUsage, memLimit);
+        memUsage = updateAndCheckMemUsage(
+            state, memUsage, value::getApproximateSize(fieldTag, fieldVal), memLimit);
 
         // add to array
         fieldGuard.reset();
         array->push_back(fieldTag, fieldVal);
     }
-    accGuard.reset();
-    return {true, accTag, accVal};
+    return memUsage;
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstN(ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [state, array, accStartIdx, accSize, memUsage, memLimit] =
+        multiAccState(stateTag, stateVal);
+
+    auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
+    aggFirstN(state, array, accSize, memUsage, memLimit, fieldTag, fieldVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNMerge(ArityType arity) {
-    auto [mergeAccTag, mergeAccVal] = moveOwnedFromStack(0);
-    auto [accTag, accVal] = moveOwnedFromStack(1);
-    value::ValueGuard mergeAccGuard{mergeAccTag, mergeAccVal};
-    value::ValueGuard accGuard{accTag, accVal};
+    auto [mergeStateTag, mergeStateVal] = moveOwnedFromStack(0);
+    value::ValueGuard mergeStateGuard{mergeStateTag, mergeStateVal};
 
-    auto [mergeAcc, mergeArr, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
-        multiAccState(mergeAccTag, mergeAccVal);
-    auto [acc, arr, maxSize, memUsage, memLimit] = multiAccState(accTag, accVal);
+    auto [stateTag, stateVal] = moveOwnedFromStack(1);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [mergeState, mergeArray, mergeStartIdx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        multiAccState(mergeStateTag, mergeStateVal);
+    auto [state, array, accStartIdx, accMaxSize, accMemUsage, accMemLimit] =
+        multiAccState(stateTag, stateVal);
     uassert(7548604,
             "Two arrays to merge should have the same MaxSize component",
-            maxSize == mergeMaxSize);
+            accMaxSize == mergeMaxSize);
 
-    if (mergeArr->size() < maxSize) {
-        auto mergeCount = std::min((maxSize - mergeArr->size()), arr->size());
-        for (size_t i = 0; i < mergeCount; ++i) {
-            auto [tag, val] = arr->swapAt(i, value::TypeTags::Null, 0);
-            value::ValueGuard valueGuard{tag, val};
-
-            mergeMemUsage += value::getApproximateSize(tag, val);
-            checkAndUpdateMemUsage(mergeAcc, mergeMemUsage, mergeMemLimit);
-
-            valueGuard.reset();
-            mergeArr->push_back(tag, val);
+    for (size_t i = 0; i < array->size(); ++i) {
+        if (mergeArray->size() == mergeMaxSize) {
+            break;
         }
+
+        auto [tag, val] = array->swapAt(i, value::TypeTags::Null, 0);
+        mergeMemUsage =
+            aggFirstN(mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, tag, val);
     }
 
-    mergeAccGuard.reset();
-    return {true, mergeAccTag, mergeAccVal};
+    mergeStateGuard.reset();
+    return {true, mergeStateTag, mergeStateVal};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNFinalize(ArityType arity) {
-    auto [accTag, accVal] = moveOwnedFromStack(0);
-    value::ValueGuard guard{accTag, accVal};
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard guard{stateTag, stateVal};
 
-    uassert(7548605, "expected an array", accTag == value::TypeTags::Array);
-    auto accArr = value::getArrayView(accVal);
+    uassert(7548605, "expected an array", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
 
     auto [outputTag, outputVal] =
-        accArr->swapAt(static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
+        state->swapAt(static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
     return {true, outputTag, outputVal};
 }
 
+std::pair<size_t, int32_t> aggLastN(value::Array* state,
+                                    value::Array* array,
+                                    size_t startIdx,
+                                    size_t maxSize,
+                                    int32_t memUsage,
+                                    int32_t memLimit,
+                                    value::TypeTags fieldTag,
+                                    value::Value fieldVal) {
+    value::ValueGuard guard{fieldTag, fieldVal};
+    if (array->size() < maxSize) {
+        invariant(startIdx == 0);
+        guard.reset();
+        array->push_back(fieldTag, fieldVal);
+    } else {
+        invariant(array->size() == maxSize);
+        guard.reset();
+        auto [oldFieldTag, oldFieldVal] = array->swapAt(startIdx, fieldTag, fieldVal);
+        memUsage -= value::getApproximateSize(oldFieldTag, oldFieldVal);
+        value::releaseValue(oldFieldTag, oldFieldVal);
+        startIdx = updateStartIdx(state, startIdx, maxSize);
+    }
+    memUsage = updateAndCheckMemUsage(
+        state, memUsage, value::getApproximateSize(fieldTag, fieldVal), memLimit);
+    return {startIdx, memUsage};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastN(ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
+
+    auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
+    aggLastN(state, array, startIdx, maxSize, memUsage, memLimit, fieldTag, fieldVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNMerge(ArityType arity) {
+    auto [mergeStateTag, mergeStateVal] = moveOwnedFromStack(0);
+    value::ValueGuard mergeStateGuard{mergeStateTag, mergeStateVal};
+
+    auto [stateTag, stateVal] = moveOwnedFromStack(1);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [mergeState, mergeArray, mergeStartIdx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        multiAccState(mergeStateTag, mergeStateVal);
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
+    uassert(7548703,
+            "Two arrays to merge should have the same MaxSize component",
+            maxSize == mergeMaxSize);
+
+    if (array->size() < maxSize) {
+        // add values from accArr to mergeArray
+        for (size_t i = 0; i < array->size(); ++i) {
+            auto [tag, val] = array->swapAt(i, value::TypeTags::Null, 0);
+            std::tie(mergeStartIdx, mergeMemUsage) = aggLastN(mergeState,
+                                                              mergeArray,
+                                                              mergeStartIdx,
+                                                              mergeMaxSize,
+                                                              mergeMemUsage,
+                                                              mergeMemLimit,
+                                                              tag,
+                                                              val);
+        }
+        mergeStateGuard.reset();
+        return {true, mergeStateTag, mergeStateVal};
+    } else {
+        // return accArray since it contains last n values
+        invariant(array->size() == maxSize);
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNFinalize(ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard guard{stateTag, stateVal};
+
+    auto [state, arr, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
+    if (startIdx == 0) {
+        auto [outputTag, outputVal] = state->swapAt(0, value::TypeTags::Null, 0);
+        return {true, outputTag, outputVal};
+    }
+
+    invariant(arr->size() == maxSize);
+    auto [outArrayTag, outArrayVal] = value::makeNewArray();
+    auto outArray = value::getArrayView(outArrayVal);
+    outArray->reserve(maxSize);
+    for (size_t i = 0; i < maxSize; ++i) {
+        auto srcIdx = (i + startIdx) % maxSize;
+        auto [elemTag, elemVal] = arr->swapAt(srcIdx, value::TypeTags::Null, 0);
+        outArray->push_back(elemTag, elemVal);
+    }
+    return {true, outArrayTag, outArrayVal};
+}
+
 template <typename Less>
-int32_t aggTopBottomNAdd(value::Array* acc,
+int32_t aggTopBottomNAdd(value::Array* state,
                          value::Array* array,
                          size_t maxSize,
                          int32_t memUsage,
@@ -6155,12 +6283,10 @@ int32_t aggTopBottomNAdd(value::Array* acc,
                          const value::SortSpec* sortSpec,
                          std::pair<value::TypeTags, value::Value> key,
                          std::pair<value::TypeTags, value::Value> output) {
-    auto newMemUsage = [](int32_t memUsage,
-                          std::pair<value::TypeTags, value::Value> key,
-                          std::pair<value::TypeTags, value::Value> output) {
-        memUsage += value::getApproximateSize(key.first, key.second);
-        memUsage += value::getApproximateSize(output.first, output.second);
-        return memUsage;
+    auto memAdded = [](std::pair<value::TypeTags, value::Value> key,
+                       std::pair<value::TypeTags, value::Value> output) {
+        return value::getApproximateSize(key.first, key.second) +
+            value::getApproximateSize(output.first, output.second);
     };
 
     value::ValueGuard keyGuard{key.first, key.second};
@@ -6179,8 +6305,7 @@ int32_t aggTopBottomNAdd(value::Array* acc,
         outputGuard.reset();
         pair->push_back(output.first, output.second);
 
-        memUsage = newMemUsage(memUsage, key, output);
-        checkAndUpdateMemUsage(acc, memUsage, memLimit);
+        memUsage = updateAndCheckMemUsage(state, memUsage, memAdded(key, output), memLimit);
 
         pairGuard.reset();
         array->push_back(pairTag, pairVal);
@@ -6194,8 +6319,7 @@ int32_t aggTopBottomNAdd(value::Array* acc,
         auto worst = value::getArrayView(worstVal);
         auto worstKey = worst->getAt(0);
         if (less(key, worstKey)) {
-            memUsage = newMemUsage(memUsage, key, output);
-            checkAndUpdateMemUsage(acc, memUsage, memLimit);
+            memUsage = updateAndCheckMemUsage(state, memUsage, memAdded(key, output), memLimit);
 
             std::pop_heap(heap.begin(), heap.end(), keyLess);
             keyGuard.reset();
@@ -6215,16 +6339,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomN(Ar
     tassert(5807024, "Argument must be of sortSpec type", sortSpecTag == value::TypeTags::sortSpec);
     auto sortSpec = value::getSortSpecView(sortSpecVal);
 
-    auto [accTag, accVal] = moveOwnedFromStack(0);
-    value::ValueGuard accGuard{accTag, accVal};
-    auto [acc, array, maxSize, memUsage, memLimit] = multiAccState(accTag, accVal);
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
     auto key = moveOwnedFromStack(1);
     auto output = moveOwnedFromStack(2);
 
-    aggTopBottomNAdd<Less>(acc, array, maxSize, memUsage, memLimit, sortSpec, key, output);
+    aggTopBottomNAdd<Less>(state, array, maxSize, memUsage, memLimit, sortSpec, key, output);
 
-    accGuard.reset();
-    return {true, accTag, accVal};
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
 }
 
 template <typename Less>
@@ -6234,13 +6358,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNMer
     tassert(5807025, "Argument must be of sortSpec type", sortSpecTag == value::TypeTags::sortSpec);
     auto sortSpec = value::getSortSpecView(sortSpecVal);
 
-    auto [accTag, accVal] = moveOwnedFromStack(1);
-    value::ValueGuard accGuard{accTag, accVal};
-    auto [mergeAccTag, mergeAccVal] = moveOwnedFromStack(0);
-    value::ValueGuard mergeAccGuard{mergeAccTag, mergeAccVal};
-    auto [mergeAcc, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
-        multiAccState(mergeAccTag, mergeAccVal);
-    auto [acc, array, maxSize, memUsage, memLimit] = multiAccState(accTag, accVal);
+    auto [stateTag, stateVal] = moveOwnedFromStack(1);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [mergeStateTag, mergeStateVal] = moveOwnedFromStack(0);
+    value::ValueGuard mergeStateGuard{mergeStateTag, mergeStateVal};
+    auto [mergeState, mergeArray, mergeStartIx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        multiAccState(mergeStateTag, mergeStateVal);
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
     tassert(5807008,
             "Two arrays to merge should have the same MaxSize component",
             maxSize == mergeMaxSize);
@@ -6249,7 +6373,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNMer
         auto pair = value::getArrayView(pairVal);
         auto key = pair->swapAt(0, value::TypeTags::Null, 0);
         auto output = pair->swapAt(1, value::TypeTags::Null, 0);
-        mergeMemUsage = aggTopBottomNAdd<Less>(mergeAcc,
+        mergeMemUsage = aggTopBottomNAdd<Less>(mergeState,
                                                mergeArray,
                                                mergeMaxSize,
                                                mergeMemUsage,
@@ -6259,8 +6383,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNMer
                                                output);
     }
 
-    mergeAccGuard.reset();
-    return {true, mergeAccTag, mergeAccVal};
+    mergeStateGuard.reset();
+    return {true, mergeStateTag, mergeStateVal};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNFinalize(
@@ -6269,9 +6393,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNFin
     tassert(5807026, "Argument must be of sortSpec type", sortSpecTag == value::TypeTags::sortSpec);
     auto sortSpec = value::getSortSpecView(sortSpecVal);
 
-    auto [accTag, accVal] = moveOwnedFromStack(0);
-    value::ValueGuard accGuard{accTag, accVal};
-    auto [acc, array, maxSize, memUsage, memLimit] = multiAccState(accTag, accVal);
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
 
     auto [outputArrayTag, outputArrayVal] = value::makeNewArray();
     value::ValueGuard outputArrayGuard{outputArrayTag, outputArrayVal};
@@ -6564,6 +6688,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggFirstNMerge(arity);
         case Builtin::aggFirstNFinalize:
             return builtinAggFirstNFinalize(arity);
+        case Builtin::aggLastN:
+            return builtinAggLastN(arity);
+        case Builtin::aggLastNMerge:
+            return builtinAggLastNMerge(arity);
+        case Builtin::aggLastNFinalize:
+            return builtinAggLastNFinalize(arity);
         case Builtin::aggTopN:
             return builtinAggTopBottomN<SortPatternLess>(arity);
         case Builtin::aggTopNMerge:
@@ -6854,6 +6984,12 @@ std::string builtinToString(Builtin b) {
             return "aggFirstNMerge";
         case Builtin::aggFirstNFinalize:
             return "aggFirstNFinalize";
+        case Builtin::aggLastN:
+            return "aggLastN";
+        case Builtin::aggLastNMerge:
+            return "aggLastNMerge";
+        case Builtin::aggLastNFinalize:
+            return "aggLastNFinalize";
         case Builtin::aggTopN:
             return "aggTopN";
         case Builtin::aggTopNMerge:

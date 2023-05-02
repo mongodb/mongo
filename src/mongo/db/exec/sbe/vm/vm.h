@@ -758,6 +758,9 @@ enum class Builtin : uint8_t {
     aggFirstN,
     aggFirstNMerge,
     aggFirstNFinalize,
+    aggLastN,
+    aggLastNMerge,
+    aggLastNFinalize,
     aggTopN,
     aggTopNMerge,
     aggTopNFinalize,
@@ -772,12 +775,14 @@ std::string builtinToString(Builtin b);
  * This enum defines indices into an 'Array' that store state for $AccumulatorN expressions.
  *
  * The array might contain up to four elements:
- * - The elements at indices `kInternalArr` is the array that holds the values.
+ * - The element at index `kInternalArr` is the array that holds the values.
+ * - The element at index `kStartIdx` is the logical start index in the internal array. This is
+ *   used for emulating queue behaviour.
  * - The element at index `kMaxSize` is the maximum number entries the data structure holds.
  * - The element at index `kMemUsage` holds the current memory usage
  * - The element at index `kMemLimit` holds the max memory limit allowed
  */
-enum class AggMultiElems { kInternalArr, kMaxSize, kMemUsage, kMemLimit, kSizeOfArray };
+enum class AggMultiElems { kInternalArr, kStartIdx, kMaxSize, kMemUsage, kMemLimit, kSizeOfArray };
 
 /**
  * Less than comparison based on a sort pattern.
@@ -1657,6 +1662,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstN(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLastN(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLastNMerge(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLastNFinalize(ArityType arity);
     template <typename Less>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomN(ArityType arity);
     template <typename Less>

@@ -598,6 +598,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeAccumulatorMulti(
         aggs.push_back(
             makeFunction("newArray",
                          makeFunction("newArray"),
+                         makeConstant(sbe::value::TypeTags::NumberInt64, 0),
                          makeConstant(convertTag, convertVal),
                          makeConstant(sbe::value::TypeTags::NumberInt32, 0),
                          makeConstant(sbe::value::TypeTags::NumberInt32, maxAccumulatorBytes)));
@@ -616,6 +617,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeAccumulatorMulti(
                     makeFunction(
                         "newArray",
                         makeFunction("newArray"),
+                        makeConstant(sbe::value::TypeTags::NumberInt64, 0),
                         maxSizeConvertVar.clone(),
                         makeConstant(sbe::value::TypeTags::NumberInt32, 0),
                         makeConstant(sbe::value::TypeTags::NumberInt32, maxAccumulatorBytes)),
@@ -662,6 +664,41 @@ std::unique_ptr<sbe::EExpression> buildFinalizeFirstN(StageBuilderState& state,
                           << inputSlots.size(),
             inputSlots.size() == 1);
     return makeFunction("aggFirstNFinalize", makeVariable(inputSlots[0]));
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorLastN(
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggLastN", makeFillEmptyNull(std::move(arg))));
+    return aggs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsLastN(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    uassert(7548701,
+            str::stream() << "Expected one input slot for merging $lastN, got: "
+                          << inputSlots.size(),
+            inputSlots.size() == 1);
+
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggLastNMerge", makeVariable(inputSlots[0])));
+    return aggs;
+}
+
+std::unique_ptr<sbe::EExpression> buildFinalizeLastN(StageBuilderState& state,
+                                                     const AccumulationExpression& expr,
+                                                     const sbe::value::SlotVector& inputSlots) {
+    uassert(7548702,
+            str::stream() << "Expected one input slot for finalization of $lastN, got: "
+                          << inputSlots.size(),
+            inputSlots.size() == 1);
+    return makeFunction("aggLastNFinalize", makeVariable(inputSlots[0]));
 }
 
 bool isAccumulatorTopN(const AccumulationExpression& expr) {
@@ -853,6 +890,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
         {AccumulatorStdDevPop::kName, &buildAccumulatorStdDev},
         {AccumulatorStdDevSamp::kName, &buildAccumulatorStdDev},
         {AccumulatorFirstN::kName, &buildAccumulatorFirstN},
+        {AccumulatorLastN::kName, &buildAccumulatorLastN},
     };
 
     auto accExprName = acc.expr.name;
@@ -922,6 +960,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
         {AccumulatorStdDevSamp::kName, &buildCombinePartialAggsStdDev},
         {AccumulatorSum::kName, &buildCombinePartialAggsSum},
         {AccumulatorFirstN::kName, &buildCombinePartialAggsFirstN},
+        {AccumulatorLastN::kName, &buildCombinePartialAggsLastN},
     };
 
     auto accExprName = acc.expr.name;
@@ -990,6 +1029,7 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
         {AccumulatorStdDevPop::kName, &buildFinalizeStdDevPop},
         {AccumulatorStdDevSamp::kName, &buildFinalizeStdDevSamp},
         {AccumulatorFirstN::kName, &buildFinalizeFirstN},
+        {AccumulatorLastN::kName, &buildFinalizeLastN},
     };
 
     auto accExprName = acc.expr.name;
@@ -1061,6 +1101,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
         {AccumulatorStdDevPop::kName, &emptyInitializer<1>},
         {AccumulatorStdDevSamp::kName, &emptyInitializer<1>},
         {AccumulatorFirstN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorLastN::kName, &buildInitializeAccumulatorMulti},
         {AccumulatorTopBottomN<kTop, true /* single */>::getName(),
          &buildInitializeAccumulatorMulti},
         {AccumulatorTopBottomN<kBottom, true /* single */>::getName(),

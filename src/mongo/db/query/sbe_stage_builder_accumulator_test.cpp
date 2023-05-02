@@ -1607,7 +1607,7 @@ TEST_F(SbeStageBuilderGroupTest, StdDevSampAccumulatorTranslationNonNumber) {
                             BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 0)));
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorSingleGroup) {
+TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorSingleGroup) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 22 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 33 << "b" << 3)),
@@ -1616,17 +1616,26 @@ TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorSingleGroup) {
         "{_id: null, x: {$firstN: {input: '$a', n: 3}}}",
         docs,
         BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22 << 33))));
+
+    runGroupAggregationTest(
+        "{_id: null, x: {$lastN: {input: '$a', n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(22 << 33 << 44))));
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorNotEnoughElement) {
+TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorNotEnoughElement) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 22 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 11 << "b" << 1))};
     runGroupAggregationTest("{_id: null, x: {$firstN: {input: '$a', n: 3}}}",
                             docs,
                             BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(22 << 11))));
+
+    runGroupAggregationTest("{_id: null, x: {$lastN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(22 << 11))));
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorMultiGroup) {
+TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorMultiGroup) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44 << "b" << 4 << "n" << 2)),
                                        BSON_ARRAY(BSON("a" << 77 << "b" << 7 << "n" << 4)),
                                        BSON_ARRAY(BSON("a" << 33 << "b" << 3 << "n" << 2)),
@@ -1639,9 +1648,13 @@ TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorMultiGroup) {
                             docs,
                             BSON_ARRAY(BSON("_id" << 2 << "x" << BSON_ARRAY(44 << 33 << 22))
                                        << BSON("_id" << 4 << "x" << BSON_ARRAY(77 << 88 << 66))));
+    runGroupAggregationTest("{_id: '$n', x: {$lastN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 2 << "x" << BSON_ARRAY(33 << 22 << 11))
+                                       << BSON("_id" << 4 << "x" << BSON_ARRAY(88 << 66 << 55))));
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorDynamicN) {
+TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorDynamicN) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44 << "b" << 4 << "n" << 2)),
                                        BSON_ARRAY(BSON("a" << 33 << "b" << 3 << "n" << 2)),
                                        BSON_ARRAY(BSON("a" << 22 << "b" << 2 << "n" << 2)),
@@ -1655,9 +1668,15 @@ TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorDynamicN) {
         docs,
         BSON_ARRAY(BSON("_id" << BSON("k" << 2) << "x" << BSON_ARRAY(44 << 33))
                    << BSON("_id" << BSON("k" << 4) << "x" << BSON_ARRAY(88 << 77 << 66 << 55))));
+
+    runGroupAggregationTest(
+        "{_id: {k: '$n'}, x: {$lastN: {input: '$a', n: '$k'}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSON("k" << 2) << "x" << BSON_ARRAY(22 << 11))
+                   << BSON("_id" << BSON("k" << 4) << "x" << BSON_ARRAY(88 << 77 << 66 << 55))));
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorInvalidConstantN) {
+TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorInvalidConstantN) {
     const std::vector<std::string> testCases{"'string'", "4.2", "-1", "0"};
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "b" << 1))};
     for (const auto& testCase : testCases) {
@@ -1666,9 +1685,16 @@ TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorInvalidConstantN) {
             docs,
             static_cast<ErrorCodes::Error>(7548606));
     }
+
+    for (const auto& testCase : testCases) {
+        runGroupAggregationToFail(
+            str::stream() << "{_id: null, x: {$lastN: {input: '$a', n: " << testCase << "}}}",
+            docs,
+            static_cast<ErrorCodes::Error>(7548606));
+    }
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNAccumulatorInvalidDynamicN) {
+TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorInvalidDynamicN) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "n" << 1))};
     runGroupAggregationToFail("{_id: null, x: {$firstN: {input: '$a', n: '$n'}}}",
                               docs,
@@ -2145,6 +2171,9 @@ public:
         sbe::value::ValueGuard valuesGuard{valuesTag, valuesVal};
         // Heap
         state->push_back(valuesTag, valuesVal);
+
+        // Start index
+        state->push_back(sbe::value::TypeTags::NumberInt64, 0);
 
         // Max size
         state->push_back(sbe::value::TypeTags::NumberInt64, maxSize);
@@ -2702,11 +2731,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeBothArr
     auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
 
     // Merge both arrays
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2) << 3ll << 16 << 1024);
+    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 16 << 1024);
     auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
     _aggAccessor.reset(true, accArrTag, accArrVal);
 
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 3ll << 24 << 1024);
+    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
     auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
     _inputAccessor.reset(true, inputArrTag, inputArrVal);
 
@@ -2738,11 +2767,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNNoMerge) {
     auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
 
     // No merge
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 3ll << 24 << 1024);
+    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 0ll << 3ll << 24 << 1024);
     auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
     _aggAccessor.reset(true, accArrTag, accArrVal);
 
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 3ll << 24 << 1024);
+    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
     auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
     _inputAccessor.reset(true, inputArrTag, inputArrVal);
 
@@ -2774,11 +2803,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeArrayEm
     auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
 
     // merge array empty
-    auto bsonAccArr = BSON_ARRAY(BSONArrayBuilder().arr() << 3ll << 0 << 1024);
+    auto bsonAccArr = BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024);
     auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
     _aggAccessor.reset(true, accArrTag, accArrVal);
 
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 3ll << 24 << 1024);
+    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
     auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
     _inputAccessor.reset(true, inputArrTag, inputArrVal);
 
@@ -2810,11 +2839,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNInputArrayEm
     auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
 
     // input array empty
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 3ll << 24 << 1024);
+    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
     auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
     _aggAccessor.reset(true, accArrTag, accArrVal);
 
-    auto bsonInputArr = BSON_ARRAY(BSONArrayBuilder().arr() << 3ll << 0 << 1024);
+    auto bsonInputArr = BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024);
     auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
     _inputAccessor.reset(true, inputArrTag, inputArrVal);
 
@@ -2823,6 +2852,150 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNInputArrayEm
     std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
 
     auto expectedArray = BSON_ARRAY(3 << 4 << 5);
+    auto [compareTag, compareVal] =
+        sbe::value::compareValue(resultTag,
+                                 resultVal,
+                                 sbe::value::TypeTags::bsonArray,
+                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
+
+    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
+    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+    ASSERT_EQ(compareVal, 0);
+    sbe::value::releaseValue(resultTag, resultVal);
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNMergeBothArray) {
+    auto expr =
+        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
+    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+    auto aggSlot = bindAccessor(&_aggAccessor);
+    auto finalizeExpr =
+        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
+    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
+
+    // Merge both arrays
+    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << 1ll << 3ll << 24 << 1024);
+    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
+    _aggAccessor.reset(true, accArrTag, accArrVal);
+
+    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(4 << 5) << 0ll << 3ll << 16 << 1024);
+    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
+    _inputAccessor.reset(true, inputArrTag, inputArrVal);
+
+    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+    _aggAccessor.reset(true, resultTag, resultVal);
+    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
+
+    auto expectedArray = BSON_ARRAY(1 << 4 << 5);
+    auto [compareTag, compareVal] =
+        sbe::value::compareValue(resultTag,
+                                 resultVal,
+                                 sbe::value::TypeTags::bsonArray,
+                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
+
+    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
+    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+    ASSERT_EQ(compareVal, 0);
+    sbe::value::releaseValue(resultTag, resultVal);
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNNoMerge) {
+    auto expr =
+        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
+    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+    auto aggSlot = bindAccessor(&_aggAccessor);
+    auto finalizeExpr =
+        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
+    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
+
+    // No merge
+    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 2ll << 3ll << 24 << 1024);
+    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
+    _aggAccessor.reset(true, accArrTag, accArrVal);
+
+    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 1ll << 3ll << 24 << 1024);
+    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
+    _inputAccessor.reset(true, inputArrTag, inputArrVal);
+
+    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+    _aggAccessor.reset(true, resultTag, resultVal);
+    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
+
+    auto expectedArray = BSON_ARRAY(4 << 5 << 3);
+    auto [compareTag, compareVal] =
+        sbe::value::compareValue(resultTag,
+                                 resultVal,
+                                 sbe::value::TypeTags::bsonArray,
+                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
+
+    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
+    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+    ASSERT_EQ(compareVal, 0);
+    sbe::value::releaseValue(resultTag, resultVal);
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayFull) {
+    auto expr =
+        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
+    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+    auto aggSlot = bindAccessor(&_aggAccessor);
+    auto finalizeExpr =
+        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
+    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
+
+    // merge array empty
+    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 0 << 1024);
+    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
+    _aggAccessor.reset(true, accArrTag, accArrVal);
+
+    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024);
+    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
+    _inputAccessor.reset(true, inputArrTag, inputArrVal);
+
+    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+    _aggAccessor.reset(true, resultTag, resultVal);
+    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
+
+    auto expectedArray = BSON_ARRAY(5 << 3 << 4);
+    auto [compareTag, compareVal] =
+        sbe::value::compareValue(resultTag,
+                                 resultVal,
+                                 sbe::value::TypeTags::bsonArray,
+                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
+
+    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
+    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+    ASSERT_EQ(compareVal, 0);
+    sbe::value::releaseValue(resultTag, resultVal);
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayEmpty) {
+    auto expr =
+        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
+    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+    auto aggSlot = bindAccessor(&_aggAccessor);
+    auto finalizeExpr =
+        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
+    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
+
+    // input array empty
+    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024);
+    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
+    _aggAccessor.reset(true, accArrTag, accArrVal);
+
+    auto bsonInputArr = BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024);
+    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
+    _inputAccessor.reset(true, inputArrTag, inputArrVal);
+
+    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+    _aggAccessor.reset(true, resultTag, resultVal);
+    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
+
+    auto expectedArray = BSON_ARRAY(5 << 3 << 4);
     auto [compareTag, compareVal] =
         sbe::value::compareValue(resultTag,
                                  resultVal,
@@ -2886,6 +3059,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopBottomN) {
 
         ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
         ASSERT_EQ(compareVal, 0);
+        sbe::value::releaseValue(resultTag, resultVal);
+        sbe::value::releaseValue(expectedTag, expectedVal);
     }
 }
 }  // namespace mongo

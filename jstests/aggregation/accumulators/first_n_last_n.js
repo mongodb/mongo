@@ -22,12 +22,14 @@ let expectedFirstThree = [];
 let expectedLastThree = [];
 let expectedAllResults = [];
 let expectedFirstNWithInitExpr = [];
+let expectedLastNWithInitExpr = [];
 for (const states
          of [{state: 'AZ', sales: 3}, {state: 'CA', sales: 2}, {state: 'NY', sales: kMaxSales}]) {
     let allResults = [];
     let firstThree = [];
     let lastThree = [];
-    let resultsWithInitExpr = [];
+    let firstWithInitExpr = [];
+    let lastWithInitExpr = [];
     const state = states['state'];
     const sales = states['sales'];
     for (let i = 0; i < kMaxSales; ++i) {
@@ -45,7 +47,10 @@ for (const states
             }
 
             if (i == 0 || (state == 'AZ' && i < defaultN)) {
-                resultsWithInitExpr.push(salesAmt);
+                firstWithInitExpr.push(salesAmt);
+            }
+            if (i + 1 == sales || (state == 'AZ' && i + defaultN >= sales)) {
+                lastWithInitExpr.push(salesAmt);
             }
             allResults.push(salesAmt);
         }
@@ -53,7 +58,8 @@ for (const states
     expectedFirstThree.push({_id: state, sales: firstThree});
     expectedLastThree.push({_id: state, sales: lastThree});
     expectedAllResults.push({_id: state, sales: allResults});
-    expectedFirstNWithInitExpr.push({_id: state, sales: resultsWithInitExpr});
+    expectedFirstNWithInitExpr.push({_id: state, sales: firstWithInitExpr});
+    expectedLastNWithInitExpr.push({_id: state, sales: lastWithInitExpr});
 }
 
 assert.commandWorked(coll.insert(docs));
@@ -130,6 +136,54 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
     assert(
         arrayEq(expectedLastNResults, actualLastNResults),
         () => "expected " + tojson(expectedLastNResults) + " actual " + tojson(actualLastNResults));
+
+    const lastNResultsWithInitExpr =
+        coll.aggregate([
+                {$sort: {_id: 1}},
+                {
+                    $group: {
+                        _id: {"st": "$state"},
+                        sales: {
+                            $lastN: {
+                                input: "$sales",
+                                n: {$cond: {if: {$eq: ["$st", 'AZ']}, then: defaultN, else: 1}}
+                            }
+                        }
+                    }
+                },
+            ])
+            .toArray();
+
+    expectedResult = [];
+    expectedLastNWithInitExpr.forEach(
+        i => expectedResult.push({'_id': {'st': i['_id']}, sales: i['sales']}));
+    assert(
+        arrayEq(expectedResult, lastNResultsWithInitExpr),
+        () => "expected " + tojson(expectedResult) + " actual " + tojson(lastNResultsWithInitExpr));
+
+    const lastNResultsWithInitExprAndVariableGroupId =
+        coll.aggregate([
+                {$sort: {_id: 1}},
+                {
+                    $group: {
+                        _id: "$stateObj",
+                        sales: {
+                            $lastN: {
+                                input: "$sales",
+                                n: {$cond: {if: {$eq: ["$st", 'AZ']}, then: defaultN, else: 1}}
+                            }
+                        }
+                    }
+                },
+            ])
+            .toArray();
+
+    expectedResult = [];
+    expectedLastNWithInitExpr.forEach(
+        i => expectedResult.push({'_id': {'st': i['_id']}, sales: i['sales']}));
+    assert(arrayEq(expectedResult, lastNResultsWithInitExprAndVariableGroupId),
+           () => "expected " + tojson(expectedResult) + " actual " +
+               tojson(lastNResultsWithInitExprAndVariableGroupId));
 
     function reorderBucketResults(bucketResults) {
         // Using a computed projection will put the fields out of order. As such, we re-order them
