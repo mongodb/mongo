@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+load('jstests/libs/analyze_plan.js');     // For getPlanCacheKeyFromExplain().
 
 const coll = db.plan_cache_stats_shard_and_host;
 coll.drop();
@@ -26,8 +27,20 @@ assert.commandWorked(coll.createIndex({b: 1}));
 assert.commandWorked(coll.insert({a: 2, b: 3}));
 assert.eq(1, coll.find({a: 2, b: 3}).itcount());
 
-// List the contents of the plan cache for the collection.
-let planCacheContents = planCache.list();
+const explain = coll.find({a: 2, b: 3}).explain();
+const planCacheKey = getPlanCacheKeyFromExplain(explain, db);
+
+function filterPlanCacheEntriesByKey(planCacheKey, planCacheContents) {
+    let filteredPlanCacheEntries = [];
+    for (const entry of planCacheContents) {
+        if (entry.planCacheKey === planCacheKey) {
+            filteredPlanCacheEntries.push(entry);
+        }
+    }
+    return filteredPlanCacheEntries;
+}
+
+let planCacheContents = filterPlanCacheEntriesByKey(planCacheKey, planCache.list());
 
 // We expect every shard that has a chunk for the collection to have produced a plan cache entry.
 assert.eq(
@@ -49,11 +62,16 @@ for (const entry of planCacheContents) {
 // shard/host. As a future improvement, we should return plan cache information from every host in
 // every shard. But for now, we use regular host targeting to choose a particular host in each
 // shard.
-planCacheContents = planCache.list([{$group: {_id: "$shard", count: {$sum: 1}}}]);
+planCacheContents = filterPlanCacheEntriesByKey(
+    planCacheKey, planCache.list([{$group: {_id: "$shard", count: {$sum: 1}}}]));
+
 for (const entry of planCacheContents) {
     assert.eq(entry.count, 1, entry);
 }
-planCacheContents = planCache.list([{$group: {_id: "$host", count: {$sum: 1}}}]);
+
+planCacheContents = filterPlanCacheEntriesByKey(
+    planCacheKey, planCache.list([{$group: {_id: "$host", count: {$sum: 1}}}]));
+
 for (const entry of planCacheContents) {
     assert.eq(entry.count, 1, entry);
 }
@@ -61,5 +79,5 @@ for (const entry of planCacheContents) {
 // Clear the plan cache and verify that attempting to list the plan cache now returns an empty
 // array.
 coll.getPlanCache().clear();
-assert.eq([], planCache.list());
+assert.eq([], filterPlanCacheEntriesByKey(planCacheKey, planCache.list()));
 }());
