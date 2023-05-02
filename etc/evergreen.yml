@@ -1733,35 +1733,6 @@ buildvariants:
   - name: noPassthroughHotBackups_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &ubuntu1804-container ubuntu1804-container
-  display_name: "Ubuntu 18.04 Container"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu1804-container-server
-  expansions:
-    resmoke_jobs_factor: 1
-    compile_variant: *ubuntu1804-container
-    disable_shared_scons_cache: true
-    compile_flags: >-
-      MONGO_DISTMOD=ubuntu1804
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    tooltags: ""
-    build_mongoreplay: true
-    test_flags: >-
-      --excludeWithAnyTags=requires_os_access
-  tasks:
-  - name: compile_and_archive_dist_test_then_package_TG
-    distros:
-    - ubuntu1804-build
-  - name: jsCore
-  - name: sharding_gen
-  - name: replica_sets_gen
-  - name: generate_buildid_to_debug_symbols_mapping
-    distros:
-    - ubuntu1804-build
-
 - name: &enterprise-rhel-72-s390x-compile enterprise-rhel-72-s390x-compile
   display_name: "Enterprise RHEL 7.2 s390x Compile"
   modules:
