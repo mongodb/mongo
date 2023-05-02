@@ -311,7 +311,7 @@ env.Library(
 env.Library(
     target='background_job',
     source=[
-        "background.cpp",
+        'background.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

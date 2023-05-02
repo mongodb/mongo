@@ -29,31 +29,26 @@
 
 // CHECK_LOG_REDACTION
 
-
 #include "mongo/db/curop.h"
-
-#include "mongo/util/duration.h"
-#include <iomanip>
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/json.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/telemetry.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/namespace_string_util.h"
@@ -80,6 +75,7 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
         cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(dbName)).firstElement());
     return newCmdObj;
 }
+
 }  // namespace
 
 /**

@@ -27,13 +27,13 @@ env.Library(
 )
 
 env.Library(
-    target="collator_factory_interface",
+    target='collator_factory_interface',
     source=[
-        "collator_factory_interface.cpp",
+        'collator_factory_interface.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "collator_interface",
+        '$BUILD_DIR/mongo/db/service_context',
+        'collator_interface',
     ],
 )
 

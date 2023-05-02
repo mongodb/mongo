@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/oid.h"
