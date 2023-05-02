@@ -128,7 +128,8 @@ public:
             const auto& req = request();
             auto reqObj = unparsedRequest().body;
 
-            const NamespaceString cursorNss = NamespaceString::makeBulkWriteNSS();
+            const NamespaceString cursorNss =
+                NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
             ClusterClientCursorParams params(cursorNss,
                                              APIParameters::get(opCtx),
                                              ReadPreferenceSetting::get(opCtx),

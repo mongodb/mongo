@@ -175,8 +175,8 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
         ns == kConfigsvrShardsNamespace.ns();
 }
 
-NamespaceString NamespaceString::makeBulkWriteNSS() {
-    return NamespaceString(DatabaseName::kAdmin, bulkWriteCursorCol);
+NamespaceString NamespaceString::makeBulkWriteNSS(const boost::optional<TenantId>& tenantId) {
+    return NamespaceString(DatabaseName::kAdmin.db(), bulkWriteCursorCol, tenantId);
 }
 
 NamespaceString NamespaceString::makeClusterParametersNSS(

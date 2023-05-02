@@ -337,7 +337,7 @@ public:
      * Constructs a NamespaceString representing a BulkWrite namespace. The format for this
      * namespace is admin.$cmd.bulkWrite".
      */
-    static NamespaceString makeBulkWriteNSS();
+    static NamespaceString makeBulkWriteNSS(const boost::optional<TenantId>& tenantId);
 
     /**
      * Constructs the oplog buffer NamespaceString for the given migration id for movePrimary op.

@@ -6,8 +6,6 @@
  *   assumes_against_mongod_not_mongos,
  *   not_allowed_with_security_token,
  *   command_not_supported_in_serverless,
- *   # Command is not yet compatible with tenant migration.
- *   tenant_migration_incompatible,
  *   # TODO SERVER-52419 Remove this tag.
  *   featureFlagBulkWriteCommand,
  * ]

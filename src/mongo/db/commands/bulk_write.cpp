@@ -175,19 +175,24 @@ public:
         _replies.emplace_back(replyItem);
     }
 
-    void addUpdateErrorReply(size_t currentOpIdx, const Status& status) {
+    void addUpdateErrorReply(OperationContext* opCtx, size_t currentOpIdx, const Status& status) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
         replyItem.setNModified(0);
-        addErrorReply(replyItem, status);
+        addErrorReply(opCtx, replyItem, status);
     }
 
-    void addErrorReply(size_t currentOpIdx, const Status& status) {
+    void addErrorReply(OperationContext* opCtx, size_t currentOpIdx, const Status& status) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
-        addErrorReply(replyItem, status);
+        addErrorReply(opCtx, replyItem, status);
     }
 
-    void addErrorReply(BulkWriteReplyItem& replyItem, const Status& status) {
-        replyItem.setStatus(status);
+    void addErrorReply(OperationContext* opCtx,
+                       BulkWriteReplyItem& replyItem,
+                       const Status& status) {
+        auto error =
+            write_ops_exec::generateError(opCtx, status, replyItem.getIdx(), 0 /* numErrors */);
+        invariant(error);
+        replyItem.setStatus(error.get().getStatus());
         replyItem.setOk(status.isOK() ? 1.0 : 0.0);
         replyItem.setN(0);
         _replies.emplace_back(replyItem);
@@ -524,7 +529,7 @@ bool handleInsertOp(OperationContext* opCtx,
             uassertStatusOK(fixedDoc.getStatus());
             MONGO_UNREACHABLE;
         } catch (const DBException& ex) {
-            responses.addErrorReply(currentOpIdx, ex.toStatus());
+            responses.addErrorReply(opCtx, currentOpIdx, ex.toStatus());
             write_ops_exec::WriteResult out;
             // fixDocumentForInsert can only fail for validation reasons, we only use handleError
             // here to tell us if we are able to continue processing further ops or not.
@@ -684,7 +689,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
             throw;
         }
-        responses.addUpdateErrorReply(currentOpIdx, ex.toStatus());
+        responses.addUpdateErrorReply(opCtx, currentOpIdx, ex.toStatus());
         write_ops_exec::WriteResult out;
         return write_ops_exec::handleError(
             opCtx, ex, nsInfo[idx].getNs(), req.getOrdered(), op->getMulti(), boost::none, &out);
@@ -777,7 +782,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
             throw;
         }
-        responses.addErrorReply(currentOpIdx, ex.toStatus());
+        responses.addErrorReply(opCtx, currentOpIdx, ex.toStatus());
         write_ops_exec::WriteResult out;
         return write_ops_exec::handleError(
             opCtx, ex, nsInfo[idx].getNs(), req.getOrdered(), false, boost::none, &out);
@@ -867,7 +872,8 @@ public:
                                    bulk_write::RetriedStmtIds retriedStmtIds,
                                    int numErrors) {
             auto reqObj = unparsedRequest().body;
-            const NamespaceString cursorNss = NamespaceString::makeBulkWriteNSS();
+            const NamespaceString cursorNss =
+                NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
             auto expCtx = make_intrusive<ExpressionContext>(
                 opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
 
