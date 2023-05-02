@@ -2189,6 +2189,9 @@ struct __wt_connection {
      * @config{cache_size, maximum heap memory to allocate for the cache.  A database should
      * configure either \c cache_size or \c shared_cache but not both., an integer between \c 1MB
      * and \c 10TB; default \c 100MB.}
+     * @config{cache_stuck_timeout_ms, the number of milliseconds to wait before a stuck cache times
+     * out in diagnostic mode.  Default will wait for 5 minutes\, 0 will wait forever., an integer
+     * greater than or equal to \c 0; default \c 300000.}
      * @config{checkpoint = (, periodically checkpoint the database.  Enabling the checkpoint server
      * uses a session from the configured \c session_max., a set of related configuration options
      * defined as follows.}
@@ -2933,6 +2936,9 @@ struct __wt_connection {
  * @config{cache_size, maximum heap memory to allocate for the cache.  A database should configure
  * either \c cache_size or \c shared_cache but not both., an integer between \c 1MB and \c 10TB;
  * default \c 100MB.}
+ * @config{cache_stuck_timeout_ms, the number of milliseconds to wait before a stuck cache times out
+ * in diagnostic mode.  Default will wait for 5 minutes\, 0 will wait forever., an integer greater
+ * than or equal to \c 0; default \c 300000.}
  * @config{checkpoint = (, periodically checkpoint the database.  Enabling the checkpoint server
  * uses a session from the configured \c session_max., a set of related configuration options
  * defined as follows.}

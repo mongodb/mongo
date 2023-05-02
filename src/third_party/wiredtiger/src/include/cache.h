@@ -130,9 +130,10 @@ struct __wt_cache {
                                         to during checkpoint scrubs */
     double eviction_scrub_target;      /* Current scrub target */
 
-    u_int overhead_pct;         /* Cache percent adjustment */
-    uint64_t cache_max_wait_us; /* Maximum time an operation waits for
-                                 * space in cache */
+    u_int overhead_pct;              /* Cache percent adjustment */
+    uint64_t cache_max_wait_us;      /* Maximum time an operation waits for space in cache */
+    uint64_t cache_stuck_timeout_ms; /* Maximum time the cache can be stuck for in diagnostic mode
+                                        before timing out */
 
     /*
      * Eviction thread tuning information.

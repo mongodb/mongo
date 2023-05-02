@@ -470,33 +470,35 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 
     __wt_epoch(session, &now);
 
-#define WT_CACHE_STUCK_TIMEOUT_MS (300 * WT_THOUSAND)
-    time_diff_ms = WT_TIMEDIFF_MS(now, cache->stuck_time);
-
+    /* The checks below should only be executed when a cache timeout has been set. */
+    if (cache->cache_stuck_timeout_ms > 0) {
+        time_diff_ms = WT_TIMEDIFF_MS(now, cache->stuck_time);
 #ifdef HAVE_DIAGNOSTIC
-    /* Enable extra logs 20ms before timing out. */
-    if (time_diff_ms > WT_CACHE_STUCK_TIMEOUT_MS - 20) {
-        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
-        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
-        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
-    }
-#endif
-
-    if (time_diff_ms > WT_CACHE_STUCK_TIMEOUT_MS) {
-#ifdef HAVE_DIAGNOSTIC
-        __wt_err(session, ETIMEDOUT, "Cache stuck for too long, giving up");
-        WT_RET(__wt_verbose_dump_txn(session));
-        WT_RET(__wt_verbose_dump_cache(session));
-        return (__wt_set_return(session, ETIMEDOUT));
-#else
-        if (WT_VERBOSE_ISSET(session, WT_VERB_EVICT_STUCK)) {
-            WT_RET(__wt_verbose_dump_txn(session));
-            WT_RET(__wt_verbose_dump_cache(session));
-
-            /* Reset the timer. */
-            __wt_epoch(session, &cache->stuck_time);
+        /* Enable extra logs 20ms before timing out. */
+        if (cache->cache_stuck_timeout_ms < 20 ||
+          (time_diff_ms > cache->cache_stuck_timeout_ms - 20)) {
+            WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
+            WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
+            WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
         }
 #endif
+
+        if (time_diff_ms >= cache->cache_stuck_timeout_ms) {
+#ifdef HAVE_DIAGNOSTIC
+            __wt_err(session, ETIMEDOUT, "Cache stuck for too long, giving up");
+            WT_RET(__wt_verbose_dump_txn(session));
+            WT_RET(__wt_verbose_dump_cache(session));
+            return (__wt_set_return(session, ETIMEDOUT));
+#else
+            if (WT_VERBOSE_ISSET(session, WT_VERB_EVICT_STUCK)) {
+                WT_RET(__wt_verbose_dump_txn(session));
+                WT_RET(__wt_verbose_dump_cache(session));
+
+                /* Reset the timer. */
+                __wt_epoch(session, &cache->stuck_time);
+            }
+#endif
+        }
     }
     return (0);
 }
