@@ -3628,7 +3628,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-zseries-build
+  - rhel80-zseries-build
   batchtime: 4320 # 3 days
   expansions:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
@@ -3676,10 +3676,10 @@ buildvariants:
   - name: ".stress-test-ppc-1"
   - name: ".stress-test-ppc-2"
 
-- name: ubuntu1804-zseries
-  display_name: "~ Ubuntu 18.04 zSeries"
+- name: rhel8-zseries
+  display_name: "~ RHEL8 zSeries"
   run_on:
-  - ubuntu1804-zseries-test
+  - rhel80-zseries-test
   batchtime: 120 # 2 hours
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
@@ -3706,10 +3706,10 @@ buildvariants:
   - name: ".stress-test-zseries-2"
   - name: ".stress-test-zseries-3"
 
-- name: ubuntu1804-zseries-cmake
-  display_name: "* Ubuntu 18.04 zSeries CMake"
+- name: rhel8-zseries-cmake
+  display_name: "* RHEL8 zSeries CMake"
   run_on:
-  - ubuntu1804-zseries-test
+  - rhel80-zseries-test
   batchtime: 10080 # 7 days
   expansions:
     test_env_vars:
