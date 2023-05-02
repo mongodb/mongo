@@ -23,18 +23,7 @@ function activate_venv {
   if [ "Windows_NT" = "$OS" ]; then
     export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
   else
-    python_version=$($python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    site_packages="${workdir}/venv/lib/python${python_version}/site-packages"
-    python -c "import sys; print(sys.path)"
-
-    # Check if site_packages is already in sys.path
-    in_sys_path=$($python -c "import sys; print('$site_packages' in sys.path)")
-    if [ "$in_sys_path" = "False" ]; then
-      export PYTHONPATH="${site_packages}:${PYTHONPATH}:${workdir}/src"
-    else
-      export PYTHONPATH="$PYTHONPATH:${workdir}/src"
-    fi
-    python -c "import sys; print(sys.path)"
+    export PYTHONPATH="$PYTHONPATH:${workdir}/src"
   fi
 
   echo "python set to $(which $python)"
