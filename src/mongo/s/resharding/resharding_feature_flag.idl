@@ -41,3 +41,9 @@ feature_flags:
         default: true
         version: 5.0
         shouldBeFCVGated: true
+    featureFlagReshardingImprovements:
+        description: "Feature flag for applying improvements on resharding to make it faster and 
+        support same-key resharding."
+        cpp_varname: gFeatureFlagReshardingImprovements
+        default: false
+        shouldBeFCVGated: true
