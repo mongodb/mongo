@@ -190,6 +190,15 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
         tags.push_back({edgeSet});
     }
 
+    /**
+     * Send a getQueryableEncryptionCountInfo command with query type "compact".
+     * The target of this command will perform the actual search for the next anchor
+     * position, which happens in the getEdgeCountInfoForCompact() function in fle_crypto.
+     *
+     * It is expected to return a single reply token, whose "count" field contains the
+     * next anchor position, and whose "searchedCounts" field contains the result of
+     * emuBinary.
+     */
     auto countInfoSets =
         queryImpl->getTags(escNss, tags, FLEQueryInterface::TagQueryType::kCompact);
 
@@ -207,7 +216,24 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
         7517103, "Stats cannot be empty for compacting a field value pair.", val.stats.has_value());
     stats.add(val.stats.get());
 
-    if (!val.cpos) {
+
+    // Check for the invalid case where emuBinary returned (0,0).
+    // This means that the tokens can't be trusted or the state collections are already hosed.
+    if (val.cpos.value_or(1) == 0) {
+        // apos must also be 0 if cpos is 0
+        uassert(7666501,
+                "getQueryableEncryptionCountInfo returned an invalid position for the next anchor",
+                val.apos.has_value() && val.apos.value() == 0);
+        uasserted(7666502,
+                  str::stream() << "Queryable Encryption compaction encountered invalid searched "
+                                   "ESC positions for field "
+                                << ecocDoc.fieldName
+                                << ". This may be due to invalid compaction tokens or corrupted "
+                                   "state collections.");
+    }
+
+    if (val.cpos == boost::none) {
+        // no new non-anchors since the last compact/cleanup, so don't insert a new anchor
         return;
     }
 
