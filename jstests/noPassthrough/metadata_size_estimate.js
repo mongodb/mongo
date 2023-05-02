@@ -1,4 +1,5 @@
 // Test the impact of having too many roles
+// @tags: [requires_sharding]
 
 (function() {
 'use strict';
