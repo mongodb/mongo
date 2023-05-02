@@ -234,6 +234,178 @@ private:
     boost::optional<BSONObj> _writeConcern;
 };
 
+
+// TODO SERVER-76655: Update getter names to be consistent with the names we choose for arguments in
+// bulkWrite.
+/**
+ * Provides access to information for an update operation. Used to abstract over whether a
+ * BatchItemRef is pointing to a `mongo::write_ops::UpdateOpEntry` (if it's from an `update`
+ * command) or a `mongo::BulkWriteUpdateOp` (if it's from a `bulkWrite` command).
+ */
+class UpdateRef {
+public:
+    UpdateRef() = delete;
+    UpdateRef(const mongo::write_ops::UpdateOpEntry& batchUpdateReq)
+        : _batchUpdateRequest(batchUpdateReq) {}
+    UpdateRef(const mongo::BulkWriteUpdateOp& bulkUpdateReq)
+        : _bulkWriteUpdateRequest(bulkUpdateReq) {}
+
+    /**
+     * Returns the filter for the update operation this `UpdateRef` refers to, i.e.  the `q`
+     * value for an update operation from an `update` command, or the `filter` value for an update
+     * operation from a `bulkWrite` command.
+     */
+    const BSONObj& getFilter() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->getQ();
+        } else {
+            tassert(7328100, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->getFilter();
+        }
+    }
+    /**
+     * Returns the `multi` value for the update operation this `UpdateRef` refers to.
+     */
+    bool getMulti() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->getMulti();
+        } else {
+            tassert(7328101, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->getMulti();
+        }
+    }
+
+    /**
+     * Returns the `upsert` value for the update operation this `UpdateRef` refers to.
+     */
+    bool getUpsert() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->getUpsert();
+        } else {
+            tassert(7328102, "invalid bulkWrite updat op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->getUpsert();
+        }
+    }
+
+    /**
+     * Returns the update modification for the update operation this `UpdateRef` refers to,
+     * i.e.  the `u` value for an update operation from an `update` command, or the `updateMods`
+     * value for an update operation from a `bulkWrite` command.
+     */
+    const write_ops::UpdateModification& getUpdateMods() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->getU();
+        } else {
+            tassert(7328103, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->getUpdateMods();
+        }
+    }
+
+    /**
+     * Returns the `collation` value for the update operation this `UpdateRef` refers to.
+     */
+    const boost::optional<BSONObj>& getCollation() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->getCollation();
+        } else {
+            tassert(7328104, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->getCollation();
+        }
+    }
+
+    /**
+     * Returns the BSON representation of the update operation this `UpdateRef` refers to.
+     */
+    BSONObj toBSON() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->toBSON();
+        } else {
+            tassert(7328105, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->toBSON();
+        }
+    }
+
+private:
+    /**
+     * Only one of the two of these will be present.
+     */
+    boost::optional<const mongo::write_ops::UpdateOpEntry&> _batchUpdateRequest;
+    boost::optional<const mongo::BulkWriteUpdateOp&> _bulkWriteUpdateRequest;
+};
+
+// TODO SERVER-76655: Update getter names to be consistent with the names we choose for arguments in
+// bulkWrite.
+/**
+ * Provides access to information for an update operation. Used to abstract over whether a
+ * BatchItemRef is pointing to a `mongo::write_ops::DeleteOpEntry` (if it's from a `delete`
+ * command) or a `mongo::BulkWriteDeleteOp` (if it's from a `bulkWrite` command).
+ */
+class DeleteRef {
+public:
+    DeleteRef() = delete;
+    DeleteRef(const mongo::write_ops::DeleteOpEntry& batchDeleteReq)
+        : _batchDeleteRequest(batchDeleteReq) {}
+    DeleteRef(const mongo::BulkWriteDeleteOp& bulkDeleteReq)
+        : _bulkWriteDeleteRequest(bulkDeleteReq) {}
+
+    /**
+     * Returns the filter for the delete operation this `DeleteRef` refers to, i.e.  the `q`
+     * value for a delete operation from a `delete` command, or the `filter` value for a delete
+     * operation from a `bulkWrite` command.
+     */
+    const BSONObj& getFilter() const {
+        if (_batchDeleteRequest) {
+            return _batchDeleteRequest->getQ();
+        } else {
+            tassert(7328106, "invalid bulkWrite delete op reference", _bulkWriteDeleteRequest);
+            return _bulkWriteDeleteRequest->getFilter();
+        }
+    }
+
+    /**
+     * Returns the `multi` value for the delete operation this `DeleteRef` refers to.
+     */
+    bool getMulti() const {
+        if (_batchDeleteRequest) {
+            return _batchDeleteRequest->getMulti();
+        } else {
+            tassert(7328107, "invalid bulkWrite delete op reference", _bulkWriteDeleteRequest);
+            return _bulkWriteDeleteRequest->getMulti();
+        }
+    }
+
+    /**
+     * Returns the `collation` value for the update operation this `DeleteRef` refers to.
+     */
+    const boost::optional<BSONObj>& getCollation() const {
+        if (_batchDeleteRequest) {
+            return _batchDeleteRequest->getCollation();
+        } else {
+            tassert(7328108, "invalid bulkWrite update op reference", _bulkWriteDeleteRequest);
+            return _bulkWriteDeleteRequest->getCollation();
+        }
+    }
+
+    /**
+     * Returns the BSON representation of the dekete operation this `DeleteRef` refers to.
+     */
+    BSONObj toBSON() const {
+        if (_batchDeleteRequest) {
+            return _batchDeleteRequest->toBSON();
+        } else {
+            tassert(7328109, "invalid bulkWrite delete op reference", _bulkWriteDeleteRequest);
+            return _bulkWriteDeleteRequest->toBSON();
+        }
+    }
+
+private:
+    /**
+     * Only one of the two of these will be present.
+     */
+    boost::optional<const mongo::write_ops::DeleteOpEntry&> _batchDeleteRequest;
+    boost::optional<const mongo::BulkWriteDeleteOp&> _bulkWriteDeleteRequest;
+};
+
 /**
  * Similar to above, this class wraps the write items of a command request into a generically usable
  * type. Very thin wrapper, does not own the write item itself.
@@ -262,23 +434,26 @@ public:
             return BulkWriteCRUDOp(op).getInsert()->getDocument();
         }
     }
-    const auto& getUpdate() const {
+
+    UpdateRef getUpdateRef() const {
         if (_batchedRequest) {
-            return _batchedRequest->getUpdateRequest().getUpdates()[_index];
+            return UpdateRef(_batchedRequest->getUpdateRequest().getUpdates()[_index]);
         } else {
-            // TODO(SERVER-73281): Support bulkWrite update.
             tassert(7263704, "invalid bulkWrite request reference", _bulkWriteRequest);
-            MONGO_UNIMPLEMENTED;
+            auto updateOp = BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getUpdate();
+            tassert(7328111, "bulkWrite op unexpectedly not an update", updateOp);
+            return UpdateRef(*updateOp);
         }
     }
 
-    const auto& getDelete() const {
+    DeleteRef getDeleteRef() const {
         if (_batchedRequest) {
-            return _batchedRequest->getDeleteRequest().getDeletes()[_index];
+            return DeleteRef(_batchedRequest->getDeleteRequest().getDeletes()[_index]);
         } else {
-            // TODO(SERVER-73281): Support bulkWrite delete.
             tassert(7263705, "invalid bulkWrite request reference", _bulkWriteRequest);
-            MONGO_UNIMPLEMENTED;
+            auto deleteOp = BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getDelete();
+            tassert(7328112, "bulkWrite op unexpectedly not a delete", deleteOp);
+            return DeleteRef(*deleteOp);
         }
     }
 
@@ -300,10 +475,21 @@ public:
         }
     }
 
+    /**
+     * Gets an estimate of how much space, in bytes, the referred-to write operation would add to a
+     * write command.
+     */
+    int getWriteSizeBytes() const;
+
 private:
     boost::optional<const BatchedCommandRequest&> _batchedRequest;
     boost::optional<const BulkWriteCommandRequest&> _bulkWriteRequest;
     const int _index;
+    /**
+     * If this BatchItemRef points to an op in a BatchedCommandRequest, stores the type of the
+     * entire batch. If this BatchItemRef points to an op in a BulkWriteRequest, stores the type
+     * of this individual op (the batch it belongs to may have a mix of op types.)
+     */
     BatchedCommandRequest::BatchType _batchType;
 };
 

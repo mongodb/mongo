@@ -141,18 +141,28 @@ TEST_F(BulkWriteOpTest, TargetSingleOp) {
     std::vector<std::unique_ptr<NSTargeter>> targeters;
     targeters.push_back(initTargeterFullRange(nss, endpoint));
 
-    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
-                                    {NamespaceInfoEntry(nss)});
+    auto runTest = [&](const BulkWriteCommandRequest& request) {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
 
-    BulkWriteOp bulkWriteOp(_opCtx, request);
+        TargetedBatchMap targeted;
+        ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardId);
+        ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
+        assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpoint);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    };
 
-    TargetedBatchMap targeted;
-    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardId);
-    ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpoint);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    // Insert
+    runTest(
+        BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("x" << 1))}, {NamespaceInfoEntry(nss)}));
+    // Update
+    runTest(BulkWriteCommandRequest(
+        {BulkWriteUpdateOp(0, BSON("x" << 1), BSON("$set" << BSON("y" << 2)))},
+        {NamespaceInfoEntry(nss)}));
+    // Delete
+    runTest(
+        BulkWriteCommandRequest({BulkWriteDeleteOp(0, BSON("x" << 1))}, {NamespaceInfoEntry(nss)}));
 }
 
 // Test targeting a single op with target error.
@@ -167,22 +177,32 @@ TEST_F(BulkWriteOpTest, TargetSingleOpError) {
     // an error.
     targeters.push_back(initTargeterHalfRange(nss, endpoint));
 
-    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
-                                    {NamespaceInfoEntry(nss)});
+    auto runTest = [&](const BulkWriteCommandRequest& request) {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
 
-    BulkWriteOp bulkWriteOp(_opCtx, request);
+        TargetedBatchMap targeted;
+        // target should return target error when recordTargetErrors = false.
+        ASSERT_NOT_OK(bulkWriteOp.target(targeters, false, targeted));
+        ASSERT_EQUALS(targeted.size(), 0u);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
 
-    TargetedBatchMap targeted;
-    // target should return target error when recordTargetErrors = false.
-    ASSERT_NOT_OK(bulkWriteOp.target(targeters, false, targeted));
-    ASSERT_EQUALS(targeted.size(), 0u);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
+        // target should transition the writeOp to an error state upon target errors when
+        // recordTargetErrors = true.
+        ASSERT_OK(bulkWriteOp.target(targeters, true, targeted));
+        ASSERT_EQUALS(targeted.size(), 0u);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    };
 
-    // target should transition the writeOp to an error state upon target errors when
-    // recordTargetErrors = true.
-    ASSERT_OK(bulkWriteOp.target(targeters, true, targeted));
-    ASSERT_EQUALS(targeted.size(), 0u);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    // Insert
+    runTest(
+        BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("x" << 1))}, {NamespaceInfoEntry(nss)}));
+    // Update
+    runTest(BulkWriteCommandRequest(
+        {BulkWriteUpdateOp(0, BSON("x" << 1), BSON("$set" << BSON("y" << 2)))},
+        {NamespaceInfoEntry(nss)}));
+    // Delete
+    runTest(
+        BulkWriteCommandRequest({BulkWriteDeleteOp(0, BSON("x" << 1))}, {NamespaceInfoEntry(nss)}));
 }
 
 // Test multiple ordered ops that target the same shard.
@@ -203,23 +223,40 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_SameShard) {
     targeters.push_back(initTargeterFullRange(nss0, endpoint0));
     targeters.push_back(initTargeterFullRange(nss1, endpoint1));
 
-    BulkWriteCommandRequest request(
+    auto runTest = [&](const BulkWriteCommandRequest& request) {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+
+        // Test that both writes target the same shard under two different endpoints for their
+        // namespace.
+        TargetedBatchMap targeted;
+        ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardId);
+        ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
+        assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpoint1);
+        assertEndpointsEqual(targeted.begin()->second->getWrites()[1]->endpoint, endpoint0);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    };
+
+    // Two inserts
+    runTest(BulkWriteCommandRequest(
         {BulkWriteInsertOp(1, BSON("x" << 1)), BulkWriteInsertOp(0, BSON("x" << 2))},
-        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-
-    BulkWriteOp bulkWriteOp(_opCtx, request);
-
-    // Test that both writes target the same shard under two different endpoints for their
-    // namespace.
-    TargetedBatchMap targeted;
-    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardId);
-    ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 2u);
-    assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpoint1);
-    assertEndpointsEqual(targeted.begin()->second->getWrites()[1]->endpoint, endpoint0);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
+    // Two updates
+    runTest(BulkWriteCommandRequest(
+        {BulkWriteUpdateOp(1, BSON("x" << 1), BSON("$set" << BSON("y" << 2))),
+         BulkWriteUpdateOp(0, BSON("x" << 2), BSON("$set" << BSON("y" << 2)))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
+    // Two deletes
+    runTest(BulkWriteCommandRequest(
+        {BulkWriteDeleteOp(1, BSON("x" << 1)), BulkWriteDeleteOp(0, BSON("x" << 2))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
+    // Mixed op types: update + delete
+    runTest(BulkWriteCommandRequest(
+        {BulkWriteUpdateOp(1, BSON("x" << 1), BSON("$set" << BSON("y" << 2))),
+         BulkWriteDeleteOp(0, BSON("x" << 2))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
 }
 
 // Test multiple ordered ops where one of them result in a target error.
@@ -241,36 +278,51 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_RecordTargetErrors) {
     targeters.push_back(initTargeterHalfRange(nss0, endpoint0));
     targeters.push_back(initTargeterFullRange(nss1, endpoint1));
 
-    // Only the second op would get a target error.
-    BulkWriteCommandRequest request({BulkWriteInsertOp(1, BSON("x" << 1)),
+    auto runTest = [&](const BulkWriteCommandRequest& request) {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+
+        TargetedBatchMap targeted;
+        ASSERT_OK(bulkWriteOp.target(targeters, true, targeted));
+
+        // Only the first op should be targeted as the second op encounters a target error. But this
+        // won't record the target error since there could be an error in the first op before
+        // executing the second op.
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardId);
+        ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
+        assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpoint1);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+
+        targeted.clear();
+
+        // Pretending the first op was done successfully, the target error should be recorded in the
+        // second op.
+        ASSERT_OK(bulkWriteOp.target(targeters, true, targeted));
+        ASSERT_EQUALS(targeted.size(), 0u);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    };
+
+    // Requests where only the second op would get a target error.
+
+    // Insert gets the target error
+    runTest(BulkWriteCommandRequest({BulkWriteInsertOp(1, BSON("x" << 1)),
                                      BulkWriteInsertOp(0, BSON("x" << 2)),
                                      BulkWriteInsertOp(0, BSON("x" << -1))},
-                                    {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-
-    BulkWriteOp bulkWriteOp(_opCtx, request);
-
-    TargetedBatchMap targeted;
-    ASSERT_OK(bulkWriteOp.target(targeters, true, targeted));
-
-    // Only the first op should be targeted as the second op encounters a target error. But this
-    // won't record the target error since there could be an error in the first op before executing
-    // the second op.
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardId);
-    ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
-    assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpoint1);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
-
-    targeted.clear();
-
-    // Pretending the first op was done successfully, the target error should be recorded in the
-    // second op.
-    ASSERT_OK(bulkWriteOp.target(targeters, true, targeted));
-    ASSERT_EQUALS(targeted.size(), 0u);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+                                    {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
+    // Update gets the target error
+    runTest(BulkWriteCommandRequest(
+        {BulkWriteInsertOp(1, BSON("x" << 1)),
+         BulkWriteUpdateOp(0, BSON("x" << 2), BSON("$set" << BSON("y" << 2))),
+         BulkWriteInsertOp(0, BSON("x" << -1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
+    // Delete gets the target error
+    runTest(BulkWriteCommandRequest({BulkWriteInsertOp(1, BSON("x" << 1)),
+                                     BulkWriteDeleteOp(0, BSON("x" << 2)),
+                                     BulkWriteInsertOp(0, BSON("x" << -1))},
+                                    {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
 }
 
 // Test multiple ordered ops that target two different shards.
@@ -296,10 +348,17 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_DifferentShard) {
     // ops[0] -> shardA
     // ops[1] -> shardB
     // ops[2] -> shardA
-    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << -1)),
-                                     BulkWriteInsertOp(0, BSON("x" << 1)),
-                                     BulkWriteInsertOp(1, BSON("x" << 1))},
-                                    {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    // ops[3] -> shardB
+    // ops[4] -> shardA
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteInsertOp(0, BSON("x" << -1)),
+            BulkWriteInsertOp(0, BSON("x" << 1)),
+            BulkWriteInsertOp(1, BSON("x" << 1)),
+            BulkWriteDeleteOp(0, BSON("x" << 1)),
+            BulkWriteUpdateOp(0, BSON("x" << -1), BSON("$set" << BSON("y" << 2))),
+        },
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
 
     BulkWriteOp bulkWriteOp(_opCtx, request);
 
@@ -314,6 +373,8 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_DifferentShard) {
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
 
     targeted.clear();
 
@@ -326,6 +387,8 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_DifferentShard) {
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
 
     targeted.clear();
 
@@ -338,6 +401,36 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_DifferentShard) {
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
+
+    targeted.clear();
+
+    // The resulting batch should be {shardB: [ops[3]]}.
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardIdB);
+    ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
+    assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpointB0);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
+
+    targeted.clear();
+
+    // The resulting batch should be {shardA: [ops[4]]}.
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted.begin()->second->getShardId(), shardIdA);
+    ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
+    assertEndpointsEqual(targeted.begin()->second->getWrites()[0]->endpoint, endpointA0);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Pending);
 }
 
 // TODO(SERVER-74096): Test sub-batching logic with multi-target writes.
@@ -370,34 +463,47 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered) {
     // ops[0] -> shardA
     // ops[1] -> shardB
     // ops[2] -> shardA
-    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << -1)),
-                                     BulkWriteInsertOp(0, BSON("x" << 1)),
-                                     BulkWriteInsertOp(1, BSON("x" << 1))},
-                                    {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    // ops[3] -> shardB
+    // ops[4] -> shardA
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteInsertOp(0, BSON("x" << -1)),
+            BulkWriteInsertOp(0, BSON("x" << 1)),
+            BulkWriteInsertOp(1, BSON("x" << 1)),
+            BulkWriteDeleteOp(0, BSON("x" << 1)),
+            BulkWriteUpdateOp(0, BSON("x" << -1), BSON("$set" << BSON("y" << 2))),
+        },
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     request.setOrdered(false);
 
     BulkWriteOp bulkWriteOp(_opCtx, request);
 
     // The two resulting batches should be:
-    // {shardA: [ops[0], ops[2]]}
-    // {shardB: [ops[1]]}
+    // {shardA: [ops[0], ops[2], ops[4]]}
+    // {shardB: [ops[1], ops[3]]}
     TargetedBatchMap targeted;
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
     ASSERT_EQUALS(targeted.size(), 2u);
 
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 3u);
     ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 0);
     assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointA0);
     ASSERT_EQUALS(targeted[shardIdA]->getWrites()[1]->writeOpRef.first, 2);
     assertEndpointsEqual(targeted[shardIdA]->getWrites()[1]->endpoint, endpointA1);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[2]->writeOpRef.first, 4);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[2]->endpoint, endpointA0);
 
-    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
     ASSERT_EQUALS(targeted[shardIdB]->getWrites()[0]->writeOpRef.first, 1);
     assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointB0);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites()[1]->writeOpRef.first, 3);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[1]->endpoint, endpointB0);
 
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Pending);
 }
 
 // Test multiple unordered ops where one of them result in a target error.
@@ -466,9 +572,11 @@ TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
 
     BulkWriteCommandRequest request(
         {
-            BulkWriteInsertOp(0, BSON("x" << 1)),  // to nss 0
-            BulkWriteInsertOp(1, BSON("x" << 2)),  // to nss 1
-            BulkWriteInsertOp(0, BSON("x" << 3))   // to nss 0
+            BulkWriteInsertOp(0, BSON("x" << 1)),                                  // to nss 0
+            BulkWriteInsertOp(1, BSON("x" << 2)),                                  // to nss 1
+            BulkWriteInsertOp(0, BSON("x" << 3)),                                  // to nss 0
+            BulkWriteUpdateOp(0, BSON("x" << 1), BSON("$set" << BSON("y" << 2))),  // to nss 0
+            BulkWriteDeleteOp(1, BSON("x" << 1)),
         },
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
 
@@ -495,8 +603,8 @@ TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
                   request.getBypassDocumentValidation());
 
 
-    ASSERT_EQUALS(childRequest.getOps().size(), 3u);
-    for (size_t i = 0; i < 3u; i++) {
+    ASSERT_EQUALS(childRequest.getOps().size(), 5u);
+    for (size_t i = 0; i < 5u; i++) {
         const auto& childOp = BulkWriteCRUDOp(childRequest.getOps()[i]);
         const auto& origOp = BulkWriteCRUDOp(request.getOps()[i]);
         ASSERT_BSONOBJ_EQ(childOp.toBSON(), origOp.toBSON());

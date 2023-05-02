@@ -246,7 +246,6 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     const TargetedWriteBatch& targetedBatch) const {
     BulkWriteCommandRequest request;
 
-    // TODO (SERVER-73281): Support update / delete operations on bulkWrite cmd on mongos.
     // A single bulk command request batch may contain operations of different
     // types, i.e. they may be inserts, updates or deletes.
     std::vector<
