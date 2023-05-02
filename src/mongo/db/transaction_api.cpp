@@ -274,7 +274,7 @@ ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
     return _internalTxn->abort().thenRunOn(_executor).onError([this](Status abortStatus) {
         LOGV2(5875900,
               "Unable to abort internal transaction",
-              "reason"_attr = abortStatus,
+              "reason"_attr = redact(abortStatus),
               "txnInfo"_attr = _internalTxn->reportStateForLog());
     });
 }
@@ -537,8 +537,8 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
     LOGV2_DEBUG(5875905,
                 3,
                 "Internal transaction handling error",
-                "error"_attr = swResult.isOK() ? swResult.getValue().getEffectiveStatus()
-                                               : swResult.getStatus(),
+                "error"_attr = swResult.isOK() ? redact(swResult.getValue().getEffectiveStatus())
+                                               : redact(swResult.getStatus()),
                 "hasTransientTransactionErrorLabel"_attr =
                     _latestResponseHasTransientTransactionErrorLabel,
                 "txnInfo"_attr = _reportStateForLog(lg),
