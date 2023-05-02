@@ -200,6 +200,7 @@ let testCases = {
     streams_startStreamProcessor: {skip: "internal command"},
     streams_startStreamSample: {skip: "internal command"},
     streams_stopStreamProcessor: {skip: "internal command"},
+    streams_listStreamProcessors: {skip: "internal command"},
     streams_getMoreStreamSample: {skip: "internal command"},
     streams_getStats: {skip: "internal command"},
     streams_testOnlyInsert: {skip: "internal command"},
