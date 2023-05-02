@@ -47,6 +47,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/transport_layer.h"
@@ -58,11 +59,13 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
+#include "mongo/util/net/http_client_options.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/strong_weak_finish_line.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/timer.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo {
 
@@ -217,6 +220,47 @@ long longSeconds(Seconds tm) {
     return static_cast<long>(durationCount<Seconds>(tm));
 }
 
+
+StringData enumToString(curl_infotype type) {
+    switch (type) {
+        case CURLINFO_TEXT:
+            return "TEXT"_sd;
+        case CURLINFO_HEADER_IN:
+            return "HEADER_IN"_sd;
+        case CURLINFO_HEADER_OUT:
+            return "HEADER_OUT"_sd;
+        case CURLINFO_DATA_IN:
+            return "DATA_IN"_sd;
+        case CURLINFO_DATA_OUT:
+            return "DATA_OUT"_sd;
+        case CURLINFO_SSL_DATA_IN:
+            return "SSL_DATA_IN"_sd;
+        case CURLINFO_SSL_DATA_OUT:
+            return "SSL_DATA_OUT"_sd;
+        default:
+            return "unknown"_sd;
+    }
+}
+
+int curlDebugCallback(CURL* handle, curl_infotype type, char* data, size_t size, void* clientp) {
+    switch (type) {
+        case CURLINFO_TEXT:
+        case CURLINFO_HEADER_IN:
+        case CURLINFO_HEADER_OUT:
+        case CURLINFO_DATA_IN:
+        case CURLINFO_DATA_OUT:
+            LOGV2_DEBUG(7661901,
+                        1,
+                        "Curl",
+                        "type"_attr = enumToString(type),
+                        "message"_attr = StringData(data, size));
+            [[fallthrough]];
+
+        default:
+            return 0;
+    }
+}
+
 CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
     CurlEasyHandle handle(curl_easy_init());
     uassert(ErrorCodes::InternalError, "Curl initialization failed", handle);
@@ -247,9 +291,10 @@ CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
     }
 
     // TODO: CURLOPT_EXPECT_100_TIMEOUT_MS?
-    // TODO: consider making this configurable, defaults to stderr
-    // curl_easy_setopt(handle.get(), CURLOPT_VERBOSE, 1);
-    // curl_easy_setopt(_handle.get(), CURLOPT_DEBUGFUNCTION , ???);
+    if (httpClientOptions.verboseLogging.loadRelaxed()) {
+        curl_easy_setopt(handle.get(), CURLOPT_VERBOSE, 1);
+        curl_easy_setopt(handle.get(), CURLOPT_DEBUGFUNCTION, curlDebugCallback);
+    }
 
     return handle;
 }
