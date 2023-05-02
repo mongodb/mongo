@@ -142,6 +142,10 @@ CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionSharding
     : _lock(std::move(lock)), _css(css) {}
 
 CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionShardingState(
+    CollectionShardingState* css)
+    : _lock(boost::none), _css(css) {}
+
+CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionShardingState(
     ScopedCollectionShardingState&& other)
     : _lock(std::move(other._lock)), _css(other._css) {
     other._css = nullptr;
@@ -155,11 +159,16 @@ CollectionShardingState::ScopedCollectionShardingState::acquireScopedCollectionS
     CollectionShardingStateMap::CSSAndLock* cssAndLock =
         CollectionShardingStateMap::get(opCtx->getServiceContext())->getOrCreate(nss);
 
-    // First lock the RESOURCE_MUTEX associated to this nss to guarantee stability of the
-    // CollectionShardingState* . After that, it is safe to get and store the
-    // CollectionShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-    Lock::ResourceLock lock(opCtx->lockState(), cssAndLock->cssMutex.getRid(), mode);
-    return ScopedCollectionShardingState(std::move(lock), cssAndLock->css.get());
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        // First lock the RESOURCE_MUTEX associated to this nss to guarantee stability of the
+        // CollectionShardingState* . After that, it is safe to get and store the
+        // CollectionShadingState*, as long as the RESOURCE_MUTEX is kept locked.
+        Lock::ResourceLock lock(opCtx->lockState(), cssAndLock->cssMutex.getRid(), mode);
+        return ScopedCollectionShardingState(std::move(lock), cssAndLock->css.get());
+    } else {
+        // No need to lock the CSSLock on non-shardsvrs. For performance, skip doing it.
+        return ScopedCollectionShardingState(cssAndLock->css.get());
+    }
 }
 
 CollectionShardingState::ScopedCollectionShardingState
