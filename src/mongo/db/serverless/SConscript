@@ -40,6 +40,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         'shard_split_donor_service',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands',
+    ],
 )
 
 env.Library(

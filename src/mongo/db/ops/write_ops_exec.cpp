@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/ops/write_ops_exec.h"
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -114,7 +115,6 @@ template <>
 struct BSONObjAppendFormat<write_ops_exec::Atomic64Metric> : FormatKind<NumberLong> {};
 }  // namespace mongo
 
-
 namespace mongo::write_ops_exec {
 
 /**
@@ -174,7 +174,6 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningQuery);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(failUnorderedTimeseriesInsert);
-
 
 /**
  * Metrics group for the `updateMany` and `deleteMany` operations. For each
@@ -294,11 +293,11 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     });
 }
 
-void insertDocuments(OperationContext* opCtx,
-                     const CollectionPtr& collection,
-                     std::vector<InsertStatement>::iterator begin,
-                     std::vector<InsertStatement>::iterator end,
-                     bool fromMigrate) {
+void insertDocumentsAtomically(OperationContext* opCtx,
+                               const CollectionPtr& collection,
+                               std::vector<InsertStatement>::iterator begin,
+                               std::vector<InsertStatement>::iterator end,
+                               bool fromMigrate) {
     // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
     // oversized batches.
     WriteUnitOfWork wuow(opCtx);
@@ -591,11 +590,11 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 // First try doing it all together. If all goes well, this is all we need to do.
                 // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
                 lastOpFixer->startingOp(nss);
-                insertDocuments(opCtx,
-                                collection->getCollection(),
-                                batch.begin(),
-                                batch.end(),
-                                source == OperationSource::kFromMigrate);
+                insertDocumentsAtomically(opCtx,
+                                          collection->getCollection(),
+                                          batch.begin(),
+                                          batch.end(),
+                                          source == OperationSource::kFromMigrate);
                 lastOpFixer->finishedOpSuccessfully();
                 globalOpCounters.gotInserts(batch.size());
                 ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(
@@ -631,11 +630,11 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     uassertStatusOK(
                         checkIfTransactionOnCappedColl(opCtx, collection->getCollection()));
                     lastOpFixer->startingOp(nss);
-                    insertDocuments(opCtx,
-                                    collection->getCollection(),
-                                    it,
-                                    it + 1,
-                                    source == OperationSource::kFromMigrate);
+                    insertDocumentsAtomically(opCtx,
+                                              collection->getCollection(),
+                                              it,
+                                              it + 1,
+                                              source == OperationSource::kFromMigrate);
                     lastOpFixer->finishedOpSuccessfully();
                     SingleWriteResult result;
                     result.setN(1);

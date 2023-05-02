@@ -203,6 +203,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/mongo/transport/service_executor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
     ],
 )
@@ -279,6 +280,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         '$BUILD_DIR/mongo/s/vector_clock_mongos',
+        '$BUILD_DIR/mongo/transport/service_executor',
         'cluster_commands',
         'cluster_commands_common',
     ],

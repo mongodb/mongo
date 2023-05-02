@@ -199,6 +199,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
         'fsync_locked',
@@ -652,6 +653,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
         '$BUILD_DIR/mongo/executor/inline_executor',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/mongo/util/progress_meter',
         'cluster_server_parameter_commands_invocation',
         'core',
         'create_command',
@@ -838,9 +840,10 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/db/commands/standalone',
+        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
+        'standalone',
     ],
 )
 

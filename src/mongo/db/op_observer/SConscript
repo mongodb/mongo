@@ -81,7 +81,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/db/transaction/transaction_operations',
-        '$BUILD_DIR/mongo/db/views/util',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/grid',

@@ -237,10 +237,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/update/update_driver',
         'auth',
-        'authorization_manager_global',
         'authprivilege',
         'builtin_roles',
         'user',
@@ -248,6 +246,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
