@@ -38,6 +38,11 @@ const versions = [
     {binVersion: 'latest', featureCompatibilityVersion: latestFCV, testCollection: 'latest'},
 ];
 
+// 4.0 is not working on Enterprise Windows, so exclude the upgrade test for 4.0.
+if (_isWindows() && buildInfo().modules.includes("enterprise")) {
+    versions.shift();
+}
+
 // Standalone
 // Iterate from earliest to latest versions specified in the versions list, and follow the steps
 // outlined at the top of this test file.

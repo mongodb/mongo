@@ -35,6 +35,11 @@ const versions = [
     {binVersion: '4.2', testCollection: 'four_two'}
 ];
 
+// 4.0 is not working on Enterprise Windows, so exclude the upgrade test for 4.0.
+if (_isWindows() && buildInfo().modules.includes("enterprise")) {
+    versions.shift();
+}
+
 // Iterate through versions specified in the versions list, and follow the steps outlined at
 // the top of this test file.
 for (let i = 0; i < versions.length; i++) {
