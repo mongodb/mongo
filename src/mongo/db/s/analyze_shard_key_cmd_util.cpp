@@ -496,15 +496,19 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
         }
 
         auto value = [&] {
+            if (doc.hasField(kIndexKeyFieldName)) {
+                return dotted_path_support::extractElementsBasedOnTemplate(
+                    doc.getObjectField(kIndexKeyFieldName).replaceFieldNames(shardKey), shardKey);
+            }
             if (doc.hasField(kDocFieldName)) {
                 return dotted_path_support::extractElementsBasedOnTemplate(
                     doc.getObjectField(kDocFieldName), shardKey);
-            } else if (doc.hasField(kIndexKeyFieldName)) {
-                return dotted_path_support::extractElementsBasedOnTemplate(
-                    doc.getObjectField(kIndexKeyFieldName).replaceFieldNames(shardKey), shardKey);
-            } else
-                uasserted(7588600,
-                          str::stream() << "Found a document with unexpected format " << doc);
+            }
+            uasserted(7588600,
+                      str::stream() << "Failed to look up documents for most common shard key "
+                                       "values. This is likely caused by concurrent deletions. "
+                                       "Please try running the analyzeShardKey command again. "
+                                    << doc);
         }();
         if (value.objsize() > maxSizeBytesPerValue) {
             value = truncateBSONObj(value, maxSizeBytesPerValue);

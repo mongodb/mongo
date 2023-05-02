@@ -603,6 +603,12 @@ var $config = extendWorkload($config, function($config, $super) {
                   `point documents after the TTL deletions had started. ${tojsononeline(err)}`);
             return true;
         }
+        if (err.code == 7588600) {
+            print(`Failed to analyze the shard key because the document for one of the most ` +
+                  `common shard key values got deleted while the command was running. ${
+                      tojsononeline(err)}`);
+            return err;
+        }
         return false;
     };
 
