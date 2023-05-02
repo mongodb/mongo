@@ -34,9 +34,13 @@
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
+#include <grpcpp/security/credentials.h>
 #include <grpcpp/support/byte_buffer.h>
+#include <grpcpp/support/status_code_enum.h>
+#include <grpcpp/support/sync_stream.h>
 
 #include "mongo/db/wire_version.h"
+#include "mongo/logv2/constants.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
@@ -46,9 +50,12 @@
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/service.h"
 #include "mongo/transport/grpc/test_fixtures.h"
+#include "mongo/transport/grpc/wire_version_provider.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -56,6 +63,14 @@ namespace mongo::transport::grpc {
 
 class CommandServiceTest : public unittest::Test {
 public:
+    void setUp() override {
+        _wvProvider = std::make_shared<WireVersionProvider>();
+    }
+
+    WireVersionProvider& getWireVersionProvider() {
+        return *_wvProvider;
+    }
+
     using MethodCallback =
         std::function<std::shared_ptr<CommandServiceTestFixtures::Stub::ClientStream>(
             ::grpc::ClientContext&)>;
@@ -88,6 +103,67 @@ public:
                 });
             });
     }
+
+    void runMetadataValidationTest(::grpc::StatusCode expectedStatus,
+                                   std::function<void(::grpc::ClientContext&)> makeCtx) {
+        auto serverHandler = [](IngressSession&) {
+            return ::grpc::Status::OK;
+        };
+
+        runTestWithBothMethods(serverHandler, [&](auto&, auto&, MethodCallback methodCallback) {
+            ::grpc::ClientContext ctx;
+            makeCtx(ctx);
+            auto stream = methodCallback(ctx);
+            ASSERT_EQ(stream->Finish().error_code(), expectedStatus);
+
+            // The server should always respond with the cluster's max wire version, regardless
+            // of whether metadata validation failed. The one exception is for authentication
+            // failures.
+            auto serverMetadata = ctx.GetServerInitialMetadata();
+            auto it = serverMetadata.find(CommandService::kClusterMaxWireVersionKey);
+            ASSERT_NE(it, serverMetadata.end());
+            ASSERT_EQ(it->second,
+                      std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
+        });
+    }
+
+    void runMetadataLogTest(std::function<void(::grpc::ClientContext&)> makeCtx,
+                            size_t nStreamsToCreate,
+                            size_t nExpectedLogLines,
+                            logv2::LogSeverity expectedSeverity) {
+        unittest::MinimumLoggedSeverityGuard severityGuard{
+            logv2::LogComponent::kNetwork,
+            logv2::LogSeverity::Debug(logv2::LogSeverity::kMaxDebugLevel)};
+
+        stdx::unordered_set<int> kLogMessageIds = {7401301, 7401302, 7401303};
+
+        auto serverHandler = [](IngressSession& session) {
+            return ::grpc::Status::OK;
+        };
+
+        runTestWithBothMethods(serverHandler, [&](auto&, auto& monitor, auto methodCallback) {
+            startCapturingLogMessages();
+            for (size_t i = 0; i < nStreamsToCreate; i++) {
+                ::grpc::ClientContext ctx;
+                makeCtx(ctx);
+                auto stream = methodCallback(ctx);
+                ASSERT_TRUE(stream->Finish().ok());
+            }
+            stopCapturingLogMessages();
+
+            auto logLines = getCapturedBSONFormatLogMessages();
+            auto n = std::count_if(logLines.cbegin(), logLines.cend(), [&](const BSONObj& line) {
+                return line.getStringField(logv2::constants::kSeverityFieldName) ==
+                    expectedSeverity.toStringDataCompact() &&
+                    kLogMessageIds.contains(line.getIntField(logv2::constants::kIdFieldName));
+            });
+
+            ASSERT_EQ(n, nExpectedLogLines);
+        });
+    }
+
+private:
+    std::shared_ptr<WireVersionProvider> _wvProvider;
 };
 
 TEST_F(CommandServiceTest, Echo) {
@@ -116,6 +192,40 @@ TEST_F(CommandServiceTest, Echo) {
         ASSERT_TRUE(stream->Read(&readMsg)) << stream->Finish().error_message();
         ASSERT_EQ_MSG(Message{readMsg}, message);
     });
+}
+
+TEST_F(CommandServiceTest, NewClientsAreLogged) {
+    runMetadataLogTest(
+        [clientId = UUID::gen().toString()](::grpc::ClientContext& ctx) {
+            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+            CommandServiceTestFixtures::addClientMetadataDocument(ctx);
+            ctx.AddMetadata(CommandService::kClientIdKey.toString(), clientId);
+        },
+        /* nStreamsToCreate */ 3,
+        /* nExpectedLogLines */ 1,
+        logv2::LogSeverity::Info());
+}
+
+TEST_F(CommandServiceTest, OmittedClientIdIsLogged) {
+    runMetadataLogTest(
+        [](::grpc::ClientContext& ctx) {
+            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+            CommandServiceTestFixtures::addClientMetadataDocument(ctx);
+        },
+        /* nStreamsToCreate */ 3,
+        /* nExpectedLogLines */ 3,
+        logv2::LogSeverity::Debug(2));
+}
+
+TEST_F(CommandServiceTest, NoMetadataDocumentNoLogs) {
+    runMetadataLogTest(
+        [clientId = UUID::gen().toString()](::grpc::ClientContext& ctx) {
+            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+            ctx.AddMetadata(CommandService::kClientIdKey.toString(), clientId);
+        },
+        /* nStreamsToCreate */ 3,
+        /* nExpectedLogLines */ 0,
+        logv2::LogSeverity::Info());
 }
 
 TEST_F(CommandServiceTest, ClientSendsMultipleMessages) {
@@ -198,8 +308,137 @@ TEST_F(CommandServiceTest, ServerSendsMultipleMessages) {
     });
 }
 
+TEST_F(CommandServiceTest, TooLowWireVersionIsRejected) {
+    runMetadataValidationTest(
+        ::grpc::StatusCode::FAILED_PRECONDITION, [](::grpc::ClientContext& ctx) {
+            ctx.AddMetadata(CommandService::kWireVersionKey.toString(), "-1");
+            ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
+        });
+}
+
+TEST_F(CommandServiceTest, InvalidWireVersionIsRejected) {
+    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, [](::grpc::ClientContext& ctx) {
+        ctx.AddMetadata(CommandService::kWireVersionKey.toString(), "foo");
+        ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
+    });
+}
+
+TEST_F(CommandServiceTest, InvalidClientIdIsRejected) {
+    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, [](::grpc::ClientContext& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientIdKey.toString(), "not a valid UUID");
+    });
+}
+
+TEST_F(CommandServiceTest, MissingWireVersionIsRejected) {
+    runMetadataValidationTest(
+        ::grpc::StatusCode::FAILED_PRECONDITION, [](::grpc::ClientContext& ctx) {
+            ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
+        });
+}
+
+TEST_F(CommandServiceTest, ClientMetadataDocumentIsOptional) {
+    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientIdKey.toString(), UUID::gen().toString());
+    });
+}
+
+TEST_F(CommandServiceTest, ClientIdIsOptional) {
+    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        CommandServiceTestFixtures::addClientMetadataDocument(ctx);
+    });
+}
+
+TEST_F(CommandServiceTest, InvalidMetadataDocumentBase64Encoding) {
+    // The MongoDB gRPC Protocol doesn't specify how an invalid metadata document should be handled,
+    // and since invalid metadata doesn't affect the server's ability to execute the operation, it
+    // was decided the server should just continue with the command and log a warning rather than
+    // returning an error in such cases.
+    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientMetadataKey.toString(), "notvalidbase64:l;;?");
+    });
+}
+
+TEST_F(CommandServiceTest, InvalidMetadataDocumentBSON) {
+    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientMetadataKey.toString(),
+                        base64::encode("not valid BSON"));
+    });
+}
+
+TEST_F(CommandServiceTest, UnrecognizedReservedKey) {
+    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, [](::grpc::ClientContext& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata("mongodb-not-recognized", "some value");
+    });
+}
+
+TEST_F(CommandServiceTest, MissingAuthTokenIsRejected) {
+    auto serverHandler = [](IngressSession&) {
+        return ::grpc::Status::OK;
+    };
+
+    CommandServiceTestFixtures::runWithServer(serverHandler, [&](auto&, auto&) {
+        auto stub = CommandServiceTestFixtures::makeStub();
+
+        ::grpc::ClientContext ctx;
+        ctx.AddMetadata(CommandService::kWireVersionKey.toString(),
+                        std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
+
+        auto stream = stub.authenticatedCommandStream(&ctx);
+        ASSERT_EQ(stream->Finish().error_code(), ::grpc::StatusCode::UNAUTHENTICATED);
+    });
+}
+
+TEST_F(CommandServiceTest, MissingAuthTokenIsAccepted) {
+    auto serverHandler = [](IngressSession&) {
+        return ::grpc::Status::OK;
+    };
+
+    CommandServiceTestFixtures::runWithServer(serverHandler, [&](auto&, auto&) {
+        auto stub = CommandServiceTestFixtures::makeStub();
+
+        ::grpc::ClientContext ctx;
+        ctx.AddMetadata(CommandService::kWireVersionKey.toString(),
+                        std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
+
+        auto stream = stub.unauthenticatedCommandStream(&ctx);
+        ASSERT_TRUE(stream->Finish().ok());
+    });
+}
+
+TEST_F(CommandServiceTest, ServerProvidesClusterMaxWireVersion) {
+    auto serverHandler = [](IngressSession& session) {
+        auto swMessage = session.sourceMessage();
+        ASSERT_OK(swMessage.getStatus());
+        ASSERT_OK(session.sinkMessage(swMessage.getValue()));
+        return ::grpc::Status::OK;
+    };
+
+    runTestWithBothMethods(serverHandler, [&](auto&, auto&, MethodCallback methodCallback) {
+        ::grpc::ClientContext ctx;
+        ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
+        ctx.AddMetadata(CommandService::kWireVersionKey.toString(),
+                        std::to_string(WireVersion::WIRE_VERSION_50));
+
+        auto stream = methodCallback(ctx);
+        ASSERT_TRUE(stream->Write(makeUniqueMessage().sharedBuffer()));
+        SharedBuffer m;
+        ASSERT_TRUE(stream->Read(&m));
+
+        auto serverMetadata = ctx.GetServerInitialMetadata();
+        auto it = serverMetadata.find(CommandService::kClusterMaxWireVersionKey);
+        ASSERT_NE(it, serverMetadata.end());
+        ASSERT_EQ(it->second, std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
+    });
+}
+
 TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
-    auto serverHandler = [&](IngressSession& session) {
+    auto serverHandler = [](IngressSession& session) {
         while (true) {
             auto swMsg = session.sourceMessage();
             if (!swMsg.isOK()) {
@@ -248,6 +487,58 @@ TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
                 t.join();
             }
         });
+}
+
+TEST_F(CommandServiceTest, HandleException) {
+    auto serverHandler = [](IngressSession&) -> ::grpc::Status {
+        iasserted(Status{ErrorCodes::StreamTerminated, "test error"});
+    };
+
+    auto clientThread =
+        [&](Server&, unittest::ThreadAssertionMonitor& monitor, MethodCallback methodCallback) {
+            ::grpc::ClientContext ctx;
+            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+            auto stream = methodCallback(ctx);
+            ASSERT_NE(stream->Finish().error_code(), ::grpc::StatusCode::OK);
+        };
+
+    runTestWithBothMethods(serverHandler, clientThread);
+}
+
+TEST_F(CommandServiceTest, Shutdown) {
+    Notification<void> rpcStarted;
+
+    auto serverHandler = [&rpcStarted](IngressSession& session) {
+        rpcStarted.set();
+        ASSERT_NOT_OK(session.sourceMessage());
+
+        auto ts = session.terminationStatus();
+        ASSERT_TRUE(ts);
+        ASSERT_EQ(ts->code(), ErrorCodes::ShutdownInProgress);
+
+        // This RPC is cancelled via shutdown, so the client will get an UNAVAILABLE or CANCELLED
+        // status before this OK return can happen.
+        return ::grpc::Status::OK;
+    };
+
+    auto clientThread = [&](Server& server,
+                            unittest::ThreadAssertionMonitor& monitor,
+                            MethodCallback methodCallback) {
+        auto client = monitor.spawn([&methodCallback]() {
+            ::grpc::ClientContext ctx;
+            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+            auto stream = methodCallback(ctx);
+            SharedBuffer buf;
+            ASSERT_FALSE(stream->Read(&buf));
+            ASSERT_NE(stream->Finish().error_code(), ::grpc::StatusCode::OK);
+        });
+
+        rpcStarted.get();
+        server.shutdown();
+        client.join();
+    };
+
+    runTestWithBothMethods(serverHandler, clientThread);
 }
 
 class GRPCInteropTest : public unittest::Test {};

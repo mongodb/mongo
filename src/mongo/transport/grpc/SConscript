@@ -48,6 +48,7 @@ env.CppUnitTest(
         'grpc_session_test.cpp',
         'grpc_transport_layer_test.cpp',
         'mock_server_stream_test.cpp',
+        'server_test.cpp',
         'service_test.cpp',
     ],
     LIBDEPS=[

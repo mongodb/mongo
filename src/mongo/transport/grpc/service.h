@@ -76,9 +76,9 @@ public:
     using RpcHandler = std::function<::grpc::Status(InSessionPtr)>;
 
     static constexpr const char* kAuthenticatedCommandStreamMethodName =
-        "/MongoDB/AuthenticatedCommandStream";
+        "/mongodb.CommandService/AuthenticatedCommandStream";
     static constexpr const char* kUnauthenticatedCommandStreamMethodName =
-        "/MongoDB/UnauthenticatedCommandStream";
+        "/mongodb.CommandService/UnauthenticatedCommandStream";
 
     // Client-provided metadata keys.
     static constexpr StringData kAuthenticationTokenKey = "authorization"_sd;
@@ -103,7 +103,7 @@ public:
     ~CommandService() = default;
 
     StringData name() const override {
-        return "MongoDB"_sd;
+        return "mongodb.CommandService"_sd;
     }
 
     void shutdown() override;
