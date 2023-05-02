@@ -50,7 +50,6 @@
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -69,12 +68,10 @@
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
-#include "mongo/db/views/util.h"
-#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -831,54 +828,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                           shardingWriteRouter,
                           defaultFromMigrate,
                           inMultiDocumentTransaction);
-
-    if (nss.coll() == "system.js") {
-        Scope::storedFuncMod(opCtx);
-    } else if (nss.isSystemDotViews()) {
-        try {
-            for (auto it = first; it != last; it++) {
-                view_util::validateViewDefinitionBSON(opCtx, it->doc, nss.dbName());
-
-                uassertStatusOK(CollectionCatalog::get(opCtx)->createView(
-                    opCtx,
-                    NamespaceStringUtil::deserialize(nss.dbName().tenantId(),
-                                                     it->doc.getStringField("_id")),
-                    NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                               it->doc.getStringField("viewOn")),
-                    BSONArray{it->doc.getObjectField("pipeline")},
-                    view_catalog_helpers::validatePipeline,
-                    it->doc.getObjectField("collation"),
-                    ViewsForDatabase::Durability::kAlreadyDurable));
-            }
-        } catch (const DBException&) {
-            // If a previous operation left the view catalog in an invalid state, our inserts can
-            // fail even if all the definitions are valid. Reloading may help us reset the state.
-            CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
-        }
-    } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
-        for (auto it = first; it != last; it++) {
-            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-            mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, it->doc);
-        }
-    } else if (nss == NamespaceString::kConfigSettingsNamespace) {
-        for (auto it = first; it != last; it++) {
-            ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
-                opCtx, it->doc["_id"], it->doc);
-        }
-    } else if (nss == NamespaceString::kExternalKeysCollectionNamespace) {
-        for (auto it = first; it != last; it++) {
-            auto externalKey =
-                ExternalKeysCollectionDocument::parse(IDLParserContext("externalKey"), it->doc);
-            opCtx->recoveryUnit()->onCommit(
-                [this, externalKey = std::move(externalKey)](OperationContext* opCtx,
-                                                             boost::optional<Timestamp>) mutable {
-                    auto validator = LogicalTimeValidator::get(opCtx);
-                    if (validator) {
-                        validator->cacheExternalKey(externalKey);
-                    }
-                });
-        }
-    }
 }
 
 void OpObserverImpl::onInsertGlobalIndexKey(OperationContext* opCtx,
@@ -1103,20 +1052,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                                  inMultiDocumentTransaction);
         }
     }
-
-    if (args.coll->ns().coll() == "system.js") {
-        Scope::storedFuncMod(opCtx);
-    } else if (args.coll->ns().isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, args.coll->ns().dbName());
-    } else if (args.coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
-               !opTime.writeOpTime.isNull()) {
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx,
-                                                                     args.updateArgs->updatedDoc);
-    } else if (args.coll->ns() == NamespaceString::kConfigSettingsNamespace) {
-        ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
-            opCtx, args.updateArgs->updatedDoc["_id"], args.updateArgs->updatedDoc);
-    }
 }
 
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
@@ -1262,19 +1197,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                                  shardingWriteRouter,
                                  inMultiDocumentTransaction);
         }
-    }
-
-    if (nss.coll() == "system.js") {
-        Scope::storedFuncMod(opCtx);
-    } else if (nss.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
-    } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
-               (inBatchedWrite || !opTime.writeOpTime.isNull())) {
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, documentKey.getId());
-    } else if (nss == NamespaceString::kConfigSettingsNamespace) {
-        ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
-            opCtx, documentKey.getId().firstElement(), boost::none);
     }
 }
 
@@ -1432,11 +1354,6 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     uassert(50714,
             "dropping the admin database is not allowed.",
             dbName.db() != DatabaseName::kAdmin.db());
-
-    if (dbName.db() == NamespaceString::kSessionTransactionsTableNamespace.db()) {
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->invalidateAllSessions(opCtx);
-    }
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -1478,34 +1395,6 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     uassert(50715,
             "dropping the server configuration collection (admin.system.version) is not allowed.",
             collectionName != NamespaceString::kServerConfigurationNamespace);
-
-    if (collectionName.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->clearViews(opCtx, collectionName.dbName());
-    } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
-        // Disallow this drop if there are currently prepared transactions.
-        const auto sessionCatalog = SessionCatalog::get(opCtx);
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        bool noPreparedTxns = true;
-        sessionCatalog->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
-            auto txnParticipant = TransactionParticipant::get(session);
-            if (txnParticipant.transactionIsPrepared()) {
-                noPreparedTxns = false;
-            }
-        });
-        uassert(4852500,
-                "Unable to drop transactions table (config.transactions) while prepared "
-                "transactions are present.",
-                noPreparedTxns);
-
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->invalidateAllSessions(opCtx);
-    } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
-        ReadWriteConcernDefaults::get(opCtx).invalidate();
-    } else if (collectionName.isSystemDotJavascript()) {
-        // Inform the JavaScript engine of the change to system.js.
-        Scope::storedFuncMod(opCtx);
-    }
 
     return {};
 }

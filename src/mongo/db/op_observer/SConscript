@@ -18,12 +18,14 @@ env.Library(
     target='op_observer_util',
     source=[
         'op_observer_util.cpp',
+        'batched_write_context.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/db/transaction/transaction_operations',
     ],
 )
 
@@ -52,7 +54,6 @@ env.Library(
     target='op_observer_impl',
     source=[
         'op_observer_impl.cpp',
-        'batched_write_context.cpp',
     ],
     LIBDEPS=[
         'op_observer',
@@ -77,11 +78,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
         '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/db/transaction/transaction_operations',
-        '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/grid',
         'op_observer_util',
@@ -159,5 +158,24 @@ env.CppUnitTest(
         'op_observer_util',
         'oplog_writer_impl',
         'user_write_block_mode_op_observer',
+    ],
+)
+
+env.Library(
+    target='fallback_op_observer',
+    source=[
+        'fallback_op_observer.cpp',
+    ],
+    LIBDEPS=[
+        'op_observer',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
+        '$BUILD_DIR/mongo/db/session/session_catalog',
+        '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
+        '$BUILD_DIR/mongo/db/transaction/transaction',
+        '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
+        'op_observer_util',
     ],
 )

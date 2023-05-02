@@ -2426,6 +2426,7 @@ env.Library(
         'mirror_maestro',
         'mongod_initializers',
         'mongod_options',
+        'op_observer/fallback_op_observer',
         'op_observer/fcv_op_observer',
         'op_observer/op_observer',
         'op_observer/oplog_writer_impl',

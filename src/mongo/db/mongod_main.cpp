@@ -98,6 +98,7 @@
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/fallback_op_observer.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -1301,6 +1302,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         }
     }
 
+    opObserverRegistry->addObserver(std::make_unique<FallbackOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<TimeSeriesOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
     opObserverRegistry->addObserver(
