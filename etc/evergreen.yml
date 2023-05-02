@@ -1320,11 +1320,10 @@ buildvariants:
   - name: sharding_auth_gen
   # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
   # variant will be removed when config shards become the default, so this is only temporary.
-  # TODO SERVER-76444: Enable after 7.0 picks up the new config shard terminology
-  # - name: sharding_multiversion_gen
+  - name: sharding_multiversion_gen
   - name: .sharding .txns
   # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .concurrency .sharded !.large
   - name: .concurrency .sharded .large
