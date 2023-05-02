@@ -428,8 +428,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     auto collection = collectionFactory->make(opCtx, nss, catalogId, md, std::move(rs));
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(
-            opCtx, md->options.uuid.value(), std::move(collection), /*commitTime*/ minValidTs);
+        catalog.registerCollection(opCtx, std::move(collection), /*commitTime*/ minValidTs);
     });
 }
 
@@ -1399,9 +1398,8 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, const Databa
 
     if (opCtx->isLockFreeReadsOp()) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
-        for (auto it = collectionCatalog->begin(opCtx, dbName); it != collectionCatalog->end(opCtx);
-             ++it) {
-            perCollectionWork(*it);
+        for (auto&& coll : collectionCatalog->range(dbName)) {
+            perCollectionWork(coll);
         }
     } else {
         catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);

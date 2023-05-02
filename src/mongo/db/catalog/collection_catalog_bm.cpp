@@ -80,7 +80,6 @@ void createCollections(OperationContext* opCtx, int numCollections) {
         const NamespaceString nss("collection_catalog_bm", std::to_string(i));
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(opCtx,
-                                       UUID::gen(),
                                        std::make_shared<CollectionMock>(nss),
                                        /*ts=*/boost::none);
         });
@@ -124,7 +123,127 @@ void BM_CollectionCatalogWriteBatchedWithGlobalExclusiveLock(benchmark::State& s
     }
 }
 
+void BM_CollectionCatalogCreateDropCollection(benchmark::State& state) {
+    auto serviceContext = setupServiceContext();
+    ThreadClient threadClient(serviceContext);
+    ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+
+    createCollections(opCtx.get(), state.range(0));
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+            const NamespaceString nss("collection_catalog_bm", std::to_string(state.range(0)));
+            const UUID uuid = UUID::gen();
+            catalog.registerCollection(
+                opCtx.get(), std::make_shared<CollectionMock>(uuid, nss), boost::none);
+            catalog.deregisterCollection(opCtx.get(), uuid, false, boost::none);
+        });
+    }
+}
+
+void BM_CollectionCatalogCreateNCollectionsBatched(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+
+        auto serviceContext = setupServiceContext();
+        ThreadClient threadClient(serviceContext);
+        ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
+
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        BatchedCollectionCatalogWriter batched(opCtx.get());
+
+        auto numCollections = state.range(0);
+        for (auto i = 0; i < numCollections; i++) {
+            const NamespaceString nss("collection_catalog_bm", std::to_string(i));
+            CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    opCtx.get(), std::make_shared<CollectionMock>(nss), boost::none);
+            });
+        }
+    }
+}
+
+void BM_CollectionCatalogCreateNCollections(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+
+        auto serviceContext = setupServiceContext();
+        ThreadClient threadClient(serviceContext);
+        ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+
+        auto numCollections = state.range(0);
+        for (auto i = 0; i < numCollections; i++) {
+            const NamespaceString nss("collection_catalog_bm", std::to_string(i));
+            CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    opCtx.get(), std::make_shared<CollectionMock>(nss), boost::none);
+            });
+        }
+    }
+}
+
+void BM_CollectionCatalogLookupCollectionByNamespace(benchmark::State& state) {
+    auto serviceContext = setupServiceContext();
+    ThreadClient threadClient(serviceContext);
+    ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
+
+    createCollections(opCtx.get(), state.range(0));
+    const NamespaceString nss("collection_catalog_bm", std::to_string(state.range(0) / 2));
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        auto coll =
+            CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
+        invariant(coll);
+    }
+}
+
+void BM_CollectionCatalogLookupCollectionByUUID(benchmark::State& state) {
+    auto serviceContext = setupServiceContext();
+    ThreadClient threadClient(serviceContext);
+    ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
+
+    createCollections(opCtx.get(), state.range(0));
+    const NamespaceString nss("collection_catalog_bm", std::to_string(state.range(0) / 2));
+    auto coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
+    invariant(coll->ns() == nss);
+    const UUID uuid = coll->uuid();
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        auto res = CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+        invariant(res == coll);
+    }
+}
+
+void BM_CollectionCatalogIterateCollections(benchmark::State& state) {
+    auto serviceContext = setupServiceContext();
+    ThreadClient threadClient(serviceContext);
+    ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
+
+    createCollections(opCtx.get(), state.range(0));
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        auto catalog = CollectionCatalog::get(opCtx.get());
+        auto count = 0;
+        for ([[maybe_unused]] auto&& coll : catalog->range(
+                 DatabaseName::createDatabaseName_forTest(boost::none, "collection_catalog_bm"))) {
+            benchmark::DoNotOptimize(count++);
+        }
+    }
+}
+
 BENCHMARK(BM_CollectionCatalogWrite)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_CollectionCatalogWriteBatchedWithGlobalExclusiveLock)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_CollectionCatalogCreateDropCollection)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_CollectionCatalogCreateNCollectionsBatched)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_CollectionCatalogCreateNCollections)->Ranges({{{1}, {32'768}}});
+BENCHMARK(BM_CollectionCatalogLookupCollectionByNamespace)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_CollectionCatalogLookupCollectionByUUID)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_CollectionCatalogIterateCollections)->Ranges({{{1}, {100'000}}});
 
 }  // namespace mongo

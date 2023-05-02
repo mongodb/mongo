@@ -43,6 +43,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
 #include "mongo/util/uuid.h"
@@ -51,47 +52,43 @@ namespace mongo {
 
 class CollectionCatalog {
     friend class iterator;
+    using OrderedCollectionMap =
+        immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
 
 public:
     using CollectionInfoFn = std::function<bool(const Collection* collection)>;
 
-    // Number of how many Collection references for a single Collection that is stored in the
-    // catalog. Used to determine whether there are external references (uniquely owned). Needs to
-    // be kept in sync with the data structures below.
-    static constexpr size_t kNumCollectionReferencesStored = 3;
 
     class iterator {
     public:
         using value_type = const Collection*;
 
-        iterator(OperationContext* opCtx,
-                 const DatabaseName& dbName,
-                 const CollectionCatalog& catalog);
-        iterator(OperationContext* opCtx,
-                 std::map<std::pair<DatabaseName, UUID>,
-                          std::shared_ptr<Collection>>::const_iterator mapIter,
-                 const CollectionCatalog& catalog);
+        iterator(const DatabaseName& dbName,
+                 OrderedCollectionMap::iterator it,
+                 const OrderedCollectionMap& catalog);
         value_type operator*();
         iterator operator++();
-        iterator operator++(int);
-        UUID uuid() const;
-
-        /*
-         * Equality operators == and != do not attempt to reposition the iterators being compared.
-         * The behavior for comparing invalid iterators is undefined.
-         */
         bool operator==(const iterator& other) const;
         bool operator!=(const iterator& other) const;
 
     private:
-        bool _exhausted();
+        void _skipUncommitted();
 
-        OperationContext* _opCtx;
-        DatabaseName _dbName;
-        boost::optional<UUID> _uuid;
-        std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::const_iterator
+        const OrderedCollectionMap& _map;
+        immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::iterator
             _mapIter;
-        const CollectionCatalog* _catalog;
+    };
+
+    class Range {
+    public:
+        Range(const OrderedCollectionMap&, const DatabaseName& dbName);
+        iterator begin() const;
+        iterator end() const;
+        bool empty() const;
+
+    private:
+        OrderedCollectionMap _map;
+        DatabaseName _dbName;
     };
 
     struct ProfileSettings {
@@ -308,7 +305,6 @@ public:
      * The global lock must be held in exclusive mode.
      */
     void registerCollection(OperationContext* opCtx,
-                            const UUID& uuid,
                             std::shared_ptr<Collection> collection,
                             boost::optional<Timestamp> commitTime);
 
@@ -319,7 +315,6 @@ public:
      * 'onCreateCollection' which sets up the necessary state for finishing the two-phase commit.
      */
     void registerCollectionTwoPhase(OperationContext* opCtx,
-                                    const UUID& uuid,
                                     std::shared_ptr<Collection> collection,
                                     boost::optional<Timestamp> commitTime);
 
@@ -632,8 +627,13 @@ public:
      */
     uint64_t getEpoch() const;
 
-    iterator begin(OperationContext* opCtx, const DatabaseName& dbName) const;
-    iterator end(OperationContext* opCtx) const;
+    /**
+     * Provides an iterable range for the collections belonging to the specified database.
+     *
+     * Will not observe any updates made to the catalog after the creation of the 'Range'. The
+     * 'Range' object just remain in scope for the duration of the iteration.
+     */
+    Range range(const DatabaseName& dbName) const;
 
     /**
      * Ensures we have a MODE_X lock on a collection or MODE_IX lock for newly created collections.
@@ -663,13 +663,12 @@ private:
                                                            const UUID& uuid) const;
 
     /**
-     * Register the collection with `uuid`.
+     * Register the collection.
      *
      * If 'twoPhase' is true, this call must be followed by 'onCreateCollection' which continues the
      * two-phase commit process.
      */
     void _registerCollection(OperationContext* opCtx,
-                             const UUID& uuid,
                              std::shared_ptr<Collection> collection,
                              bool twoPhase,
                              boost::optional<Timestamp> commitTime);
@@ -798,8 +797,6 @@ private:
 
     using CollectionCatalogMap =
         immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
-    using OrderedCollectionMap =
-        std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = immutable::unordered_set<NamespaceString>;
