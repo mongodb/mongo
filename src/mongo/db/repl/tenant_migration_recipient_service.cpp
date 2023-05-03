@@ -160,7 +160,6 @@ std::shared_ptr<OplogBufferCollection> createOplogBuffer(OperationContext* opCtx
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangMigrationBeforeRetryCheck);
-MONGO_FAIL_POINT_DEFINE(skipCreatingIndexDuringRebuildService);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc);
 
 namespace {
@@ -284,9 +283,6 @@ void TenantMigrationRecipientService::abortAllMigrations(OperationContext* opCtx
 ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
-               if (MONGO_unlikely(skipCreatingIndexDuringRebuildService.shouldFail())) {
-                   return;
-               }
                auto nss = getStateDocumentsNS();
 
                AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
