@@ -207,6 +207,12 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
         if (ret == ENOENT)
             ret = 0;
         else {
+            /*
+             * Continue with the error ignored if we've been told to do that.
+             */
+            if (ret != 0 &&
+              FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE))
+                ret = 0;
             WT_ERR(ret);
 
             /*

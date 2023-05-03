@@ -632,6 +632,9 @@ connection_runtime_config = [
             is intended for debugging and is informational only, that is, it is ignored during
             recovery''',
             type='boolean'),
+        Config('tiered_flush_error_continue', 'false', r'''
+            on a write to tiered storage, continue when an error occurs.''',
+            type='boolean'),
         Config('update_restore_evict', 'false', r'''
             if true, control all dirty page evictions through forcing update restore eviction.''',
             type='boolean'),
