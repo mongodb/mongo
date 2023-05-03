@@ -767,7 +767,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-    def gen_field_list_entries_declaration_struct(self, struct):  # type: (ast.Struct) -> None
+    def gen_field_list_entries_declaration_struct(self, struct):
+        # type: (ast.Struct) -> None
         """Generate the field list entries map for a generic argument or reply field list."""
         field_list_info = generic_field_list_types.get_field_list_info(struct)
         self._writer.write_line(
@@ -1754,7 +1755,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         required_constructor = struct_type_info.get_required_constructor_method()
         if len(required_constructor.args) != len(constructor.args):
-            #print(struct.name + ": "+  str(required_constructor.args))
+            # print(struct.name + ": "+  str(required_constructor.args))
             self._gen_constructor(struct, required_constructor, False)
 
     def gen_field_list_entry_lookup_methods_struct(self, struct):
@@ -2809,7 +2810,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         '%s %s%s;' % (param.cpp_vartype, param.cpp_varname, init))
 
-        blockname = 'idl_' + hashlib.sha1(header_file_name.encode()).hexdigest()
+        blockname = 'idl_' + \
+            hashlib.sha1(header_file_name.encode()).hexdigest()
         with self._block('MONGO_SERVER_PARAMETER_REGISTER(%s)(InitializerContext*) {' % (blockname),
                          '}'):
             # ServerParameter instances.
