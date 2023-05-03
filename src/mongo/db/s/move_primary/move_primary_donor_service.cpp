@@ -642,6 +642,10 @@ ExecutorFuture<Timestamp> MovePrimaryDonor::_waitUntilCurrentlyBlockingWrites() 
 }
 
 void MovePrimaryDonor::onBeganBlockingWrites(StatusWith<Timestamp> blockingWritesTimestamp) {
+    stdx::unique_lock lock(_mutex);
+    if (_currentlyBlockingWritesPromise.getFuture().isReady()) {
+        return;
+    }
     _currentlyBlockingWritesPromise.setFrom(blockingWritesTimestamp);
 }
 
