@@ -2473,7 +2473,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::run(
                   "migrationId"_attr = getMigrationUUID(),
                   "status"_attr = status);
 
-            // We should only hit here on a stepdown or shudDown errors.
+            // We should only hit here on a stepdown or shutdown errors.
             invariant(ErrorCodes::isShutdownError(status) || ErrorCodes::isNotPrimaryError(status));
 
             stdx::lock_guard lk(_mutex);

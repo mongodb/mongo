@@ -68,7 +68,6 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
-#include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_statistics.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -87,7 +86,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
-
 namespace mongo {
 namespace repl {
 namespace {
@@ -95,9 +93,6 @@ using namespace fmt;
 const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
-constexpr int kBackupCursorFileFetcherRetryAttempts = 10;
-constexpr int kCheckpointTsBackupCursorErrorCode = 6929900;
-constexpr int kCloseCursorBeforeOpenErrorCode = 50886;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString::makeGlobalConfigCollection(kOplogBufferPrefix +
@@ -322,8 +317,6 @@ void TenantMigrationRecipientService::checkIfConflictsWithOtherInstances(
 
     auto recipientStateDocument = TenantMigrationRecipientDocument::parse(
         IDLParserContext("recipientStateDoc"), initialStateDoc);
-    auto protocol = recipientStateDocument.getProtocol().value_or(
-        MigrationProtocolEnum::kMultitenantMigrations);
 
     for (auto& instance : existingInstances) {
         auto existingTypedInstance =
@@ -334,17 +327,6 @@ void TenantMigrationRecipientService::checkIfConflictsWithOtherInstances(
         if (isDone) {
             continue;
         }
-
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                "an existing shard merge is in progress",
-                existingTypedInstance->getProtocol() != MigrationProtocolEnum::kShardMerge);
-
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "cannot start "
-                              << MigrationProtocol_serializer(MigrationProtocolEnum::kShardMerge)
-                              << " migration, tenant " << existingTypedInstance->getTenantId()
-                              << " is already migrating",
-                protocol != MigrationProtocolEnum::kShardMerge);
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "tenant " << tenantId << " is already migrating",
@@ -368,8 +350,6 @@ TenantMigrationRecipientService::Instance::Instance(
       _stateDoc(
           TenantMigrationRecipientDocument::parse(IDLParserContext("recipientStateDoc"), stateDoc)),
       _tenantId(_stateDoc.getTenantId().toString()),
-      _tenantIds(_stateDoc.getTenantIds() ? *_stateDoc.getTenantIds() : std::vector<TenantId>()),
-      _protocol(_stateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations)),
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
@@ -397,9 +377,6 @@ TenantMigrationRecipientService::Instance::Instance(
               return boost::none;
           }
       }()) {
-
-    // Validate the provided tenantIds matches with the protocol
-    _validateTenantIdsForProtocol();
 }
 
 boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCurrentOp(
@@ -411,9 +388,7 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     stdx::lock_guard lk(_mutex);
     bob.append("desc", "tenant recipient migration");
     _migrationUuid.appendToBuilder(&bob, "instanceID"_sd);
-    if (getProtocol() == MigrationProtocolEnum::kMultitenantMigrations) {
-        bob.append("tenantId", _stateDoc.getTenantId());
-    }
+    bob.append("tenantId", _stateDoc.getTenantId());
     bob.append("donorConnectionString", _stateDoc.getDonorConnectionString());
     bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
     bob.append("state", TenantMigrationRecipientState_serializer(_stateDoc.getState()));
@@ -479,7 +454,7 @@ void TenantMigrationRecipientService::Instance::checkIfOptionsConflict(
 
     invariant(stateDoc.getId() == _migrationUuid);
 
-    if (stateDoc.getProtocol() != _protocol || stateDoc.getTenantId() != _tenantId ||
+    if (stateDoc.getTenantId() != _tenantId ||
         stateDoc.getDonorConnectionString() != _donorConnectionString ||
         !stateDoc.getReadPreference().equals(_readPreference) ||
         stateDoc.getRecipientCertificateForDonor() != _recipientCertificateForDonor) {
@@ -531,11 +506,6 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
         // In the event of a donor failover, it is possible that a new donor has stepped up and
         // initiated this 'recipientSyncData' cmd. Make sure the recipient is not in the middle of
         // restarting the oplog applier to retry the future chain.
-        //
-        // For shard merge protocol, we start tenant oplog applier after recipient informs donor,
-        // the data is in consistent state. So, there is a possibility, recipient might receive
-        // recipientSyncData cmd with `returnAfterReachingDonorTimestamp` from donor before the
-        // recipient has started the tenant oplog applier.
         opCtx->waitForConditionOrInterrupt(_oplogApplierReadyCondVar, lk, [&] {
             return _oplogApplierReady || _dataSyncCompletionPromise.getFuture().isReady();
         });
@@ -935,293 +905,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
         .semi();
 }
 
-SemiFuture<void> TenantMigrationRecipientService::Instance::_killBackupCursor() {
-    stdx::lock_guard lk(_mutex);
-
-    auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
-    if (donorBackupCursorInfo.cursorId <= 0) {
-        return SemiFuture<void>::makeReady();
-    }
-
-    if (_backupCursorKeepAliveFuture) {
-        _backupCursorKeepAliveCancellation.cancel();
-    }
-
-    return std::exchange(_backupCursorKeepAliveFuture, {})
-        .value_or(SemiFuture<void>::makeReady())
-        .thenRunOn(_recipientService->getInstanceCleanupExecutor())
-        .then([this, self = shared_from_this(), donorBackupCursorInfo] {
-            LOGV2_INFO(6113421,
-                       "Killing backup cursor",
-                       "migrationId"_attr = getMigrationUUID(),
-                       "cursorId"_attr = donorBackupCursorInfo.cursorId);
-
-            stdx::lock_guard lk(_mutex);
-            executor::RemoteCommandRequest request(
-                _client->getServerHostAndPort(),
-                donorBackupCursorInfo.nss.db().toString(),
-                BSON("killCursors" << donorBackupCursorInfo.nss.coll().toString() << "cursors"
-                                   << BSON_ARRAY(donorBackupCursorInfo.cursorId)),
-                nullptr);
-            request.sslMode = _donorUri.getSSLMode();
-
-            const auto scheduleResult = _scheduleKillBackupCursorWithLock(
-                lk, _recipientService->getInstanceCleanupExecutor());
-            if (!scheduleResult.isOK()) {
-                LOGV2_WARNING(6113004,
-                              "Failed to run killCursors command on backup cursor",
-                              "status"_attr = scheduleResult.getStatus());
-            }
-        })
-        .semi();
-}
-
-SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursor(
-    const CancellationToken& token) {
-
-    const auto aggregateCommandRequestObj = [] {
-        AggregateCommandRequest aggRequest(
-            NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
-            {BSON("$backupCursor" << BSONObj())});
-        // We must set a writeConcern on internal commands.
-        aggRequest.setWriteConcern(WriteConcernOptions());
-        return aggRequest.toBSON(BSONObj());
-    }();
-
-    stdx::lock_guard lk(_mutex);
-    LOGV2_DEBUG(6113000,
-                1,
-                "Trying to open backup cursor on donor primary",
-                "migrationId"_attr = _stateDoc.getId(),
-                "donorConnectionString"_attr = _stateDoc.getDonorConnectionString());
-
-    const auto startMigrationDonorTimestamp = _stateDoc.getStartMigrationDonorTimestamp();
-
-    auto fetchStatus = std::make_shared<boost::optional<Status>>();
-    auto uniqueMetadataInfo = std::make_unique<boost::optional<shard_merge_utils::MetadataInfo>>();
-    const auto fetcherCallback = [this,
-                                  self = shared_from_this(),
-                                  fetchStatus,
-                                  metadataInfoPtr = uniqueMetadataInfo.get(),
-                                  token,
-                                  startMigrationDonorTimestamp](
-                                     const Fetcher::QueryResponseStatus& dataStatus,
-                                     Fetcher::NextAction* nextAction,
-                                     BSONObjBuilder* getMoreBob) noexcept {
-        try {
-            uassertStatusOK(dataStatus);
-            uassert(ErrorCodes::CallbackCanceled, "backup cursor interrupted", !token.isCanceled());
-
-            const auto uniqueOpCtx = cc().makeOperationContext();
-            const auto opCtx = uniqueOpCtx.get();
-
-            const auto& data = dataStatus.getValue();
-            for (const BSONObj& doc : data.documents) {
-                if (doc["metadata"]) {
-                    // First batch must contain the metadata.
-                    const auto& metadata = doc["metadata"].Obj();
-                    auto checkpointTimestamp = metadata["checkpointTimestamp"].timestamp();
-
-                    LOGV2_INFO(6113001,
-                               "Opened backup cursor on donor",
-                               "migrationId"_attr = getMigrationUUID(),
-                               "backupCursorId"_attr = data.cursorId,
-                               "backupCursorCheckpointTimestamp"_attr = checkpointTimestamp);
-
-                    {
-                        stdx::lock_guard lk(_mutex);
-                        stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
-                        _sharedData->setDonorBackupCursorInfo(
-                            sharedDatalk,
-                            BackupCursorInfo{data.cursorId, data.nss, checkpointTimestamp});
-                    }
-
-                    // This ensures that the recipient won’t receive any 2 phase index build donor
-                    // oplog entries during the migration. We also have a check in the tenant oplog
-                    // applier to detect such oplog entries. Adding a check here helps us to detect
-                    // the problem earlier.
-                    uassert(kCheckpointTsBackupCursorErrorCode,
-                            "backupCursorCheckpointTimestamp should be greater than or equal to "
-                            "startMigrationDonorTimestamp",
-                            checkpointTimestamp >= startMigrationDonorTimestamp);
-
-                    invariant(metadataInfoPtr && !*metadataInfoPtr);
-                    (*metadataInfoPtr) = shard_merge_utils::MetadataInfo::constructMetadataInfo(
-                        getMigrationUUID(), _client->getServerAddress(), metadata);
-                } else {
-                    LOGV2_DEBUG(6113002,
-                                1,
-                                "Backup cursor entry",
-                                "migrationId"_attr = getMigrationUUID(),
-                                "filename"_attr = doc["filename"].String(),
-                                "backupCursorId"_attr = data.cursorId);
-
-                    invariant(metadataInfoPtr && *metadataInfoPtr);
-                    auto docs =
-                        std::vector<mongo::BSONObj>{(*metadataInfoPtr)->toBSON(doc).getOwned()};
-
-                    // Disabling internal document validation because the fetcher batch size
-                    // can exceed the max data size limit BSONObjMaxUserSize with the
-                    // additional fields we add to documents.
-                    DisableDocumentValidation documentValidationDisabler(
-                        opCtx, DocumentValidationSettings::kDisableInternalValidation);
-
-                    write_ops::InsertCommandRequest insertOp(
-                        shard_merge_utils::getDonatedFilesNs(getMigrationUUID()));
-                    insertOp.setDocuments(std::move(docs));
-                    insertOp.setWriteCommandRequestBase([] {
-                        write_ops::WriteCommandRequestBase wcb;
-                        wcb.setOrdered(true);
-                        return wcb;
-                    }());
-
-                    auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
-                    invariant(!writeResult.results.empty());
-                    // Writes are ordered, check only the last writeOp result.
-                    uassertStatusOK(writeResult.results.back());
-                }
-            }
-
-            *fetchStatus = Status::OK();
-            if (!getMoreBob || data.documents.empty()) {
-                // Exit fetcher but keep the backupCursor alive to prevent WT on Donor from
-                // modifying file bytes. backupCursor can be closed after all Recipient nodes
-                // have copied files from Donor primary.
-                *nextAction = Fetcher::NextAction::kExitAndKeepCursorAlive;
-                return;
-            }
-
-            getMoreBob->append("getMore", data.cursorId);
-            getMoreBob->append("collection", data.nss.coll());
-        } catch (DBException& ex) {
-            LOGV2_ERROR(6409801,
-                        "Error fetching backup cursor entries",
-                        "migrationId"_attr = getMigrationUUID(),
-                        "error"_attr = ex.toString());
-            *fetchStatus = ex.toStatus();
-        }
-    };
-
-    _donorFilenameBackupCursorFileFetcher = std::make_unique<Fetcher>(
-        _backupCursorExecutor.get(),
-        _client->getServerHostAndPort(),
-        DatabaseName::kAdmin.toString(),
-        aggregateCommandRequestObj,
-        fetcherCallback,
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
-        executor::RemoteCommandRequest::kNoTimeout, /* aggregateTimeout */
-        executor::RemoteCommandRequest::kNoTimeout, /* getMoreNetworkTimeout */
-        RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-            kBackupCursorFileFetcherRetryAttempts, executor::RemoteCommandRequest::kNoTimeout),
-        transport::kGlobalSSLMode);
-
-    uassertStatusOK(_donorFilenameBackupCursorFileFetcher->schedule());
-
-    return _donorFilenameBackupCursorFileFetcher->onCompletion()
-        .thenRunOn(**_scopedExecutor)
-        .then([fetchStatus, uniqueMetadataInfo = std::move(uniqueMetadataInfo)] {
-            if (!*fetchStatus) {
-                // the callback was never invoked
-                uasserted(6113007, "Internal error running cursor callback in command");
-            }
-
-            uassertStatusOK(fetchStatus->get());
-        })
-        .semi();
-}
-
-StatusWith<executor::TaskExecutor::CallbackHandle>
-TenantMigrationRecipientService::Instance::_scheduleKillBackupCursorWithLock(
-    WithLock lk, std::shared_ptr<executor::TaskExecutor> executor) {
-    auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
-    executor::RemoteCommandRequest killCursorsRequest(
-        _client->getServerHostAndPort(),
-        donorBackupCursorInfo.nss.db().toString(),
-        BSON("killCursors" << donorBackupCursorInfo.nss.coll().toString() << "cursors"
-                           << BSON_ARRAY(donorBackupCursorInfo.cursorId)),
-        nullptr);
-    killCursorsRequest.sslMode = _donorUri.getSSLMode();
-
-    return executor->scheduleRemoteCommand(
-        killCursorsRequest, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            if (!args.response.isOK()) {
-                LOGV2_WARNING(6113005,
-                              "killCursors command task failed",
-                              "error"_attr = redact(args.response.status));
-                return;
-            }
-            auto status = getStatusFromCommandResult(args.response.data);
-            if (status.isOK()) {
-                LOGV2_INFO(6113415, "Killed backup cursor");
-            } else {
-                LOGV2_WARNING(6113006, "killCursors command failed", "error"_attr = redact(status));
-            }
-        });
-}
-
-SemiFuture<void> TenantMigrationRecipientService::Instance::_openBackupCursorWithRetry(
-    const CancellationToken& token) {
-    return AsyncTry([this, self = shared_from_this(), token] { return _openBackupCursor(token); })
-        .until([this, self = shared_from_this()](Status status) {
-            if (status == ErrorCodes::BackupCursorOpenConflictWithCheckpoint) {
-                LOGV2_INFO(6113008,
-                           "Retrying backup cursor creation after transient error",
-                           "migrationId"_attr = getMigrationUUID(),
-                           "status"_attr = status);
-
-                return false;
-            } else if (status.code() == kCheckpointTsBackupCursorErrorCode ||
-                       status.code() == kCloseCursorBeforeOpenErrorCode) {
-                LOGV2_INFO(6955100,
-                           "Closing backup cursor and retrying after getting retryable error",
-                           "migrationId"_attr = getMigrationUUID(),
-                           "status"_attr = status);
-
-                stdx::lock_guard lk(_mutex);
-                const auto scheduleResult =
-                    _scheduleKillBackupCursorWithLock(lk, _backupCursorExecutor);
-                uassertStatusOK(scheduleResult);
-
-                return false;
-            }
-
-            return true;
-        })
-        .on(**_scopedExecutor, token)
-        .semi();
-}
-
-const BackupCursorInfo& TenantMigrationRecipientService::Instance::_getDonorBackupCursorInfo(
-    WithLock) const {
-    stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
-    return _sharedData->getDonorBackupCursorInfo(sharedDatalk);
-}
-
-void TenantMigrationRecipientService::Instance::_keepBackupCursorAlive(
-    const CancellationToken& token) {
-    LOGV2_DEBUG(6113200,
-                1,
-                "Starting periodic 'getMore' requests to keep "
-                "backup cursor alive.",
-                "migrationId"_attr = getMigrationUUID());
-
-    stdx::lock_guard lk(_mutex);
-    _backupCursorKeepAliveCancellation = CancellationSource(token);
-    auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
-    _backupCursorKeepAliveFuture =
-        shard_merge_utils::keepBackupCursorAlive(_backupCursorKeepAliveCancellation,
-                                                 _backupCursorExecutor,
-                                                 _client->getServerHostAndPort(),
-                                                 donorBackupCursorInfo.cursorId,
-                                                 donorBackupCursorInfo.nss);
-}
-
-SemiFuture<void> TenantMigrationRecipientService::Instance::_enterLearnedFilenamesState() {
-    stdx::lock_guard lk(_mutex);
-    _stateDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
-    return _updateStateDocForMajority(lk);
-}
-
 boost::optional<OpTime> TenantMigrationRecipientService::Instance::_getOldestActiveTransactionAt(
     Timestamp ReadTimestamp) {
     const auto preparedState = DurableTxnState_serializer(DurableTxnStateEnum::kPrepared);
@@ -1264,7 +947,6 @@ boost::optional<OpTime> TenantMigrationRecipientService::Instance::_getOldestAct
 }
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor() {
-    OpTime startApplyingDonorOpTime;
     stdx::unique_lock lk(_mutex);
     // Get the last oplog entry at the read concern majority optime in the remote oplog. It
     // does not matter which tenant it is for.
@@ -1273,20 +955,14 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_getStartOpTimesFrom
         return SemiFuture<void>::makeReady();
     }
 
-    if (getProtocol() == MigrationProtocolEnum::kShardMerge) {
-        startApplyingDonorOpTime =
-            OpTime(_getDonorBackupCursorInfo(lk).checkpointTimestamp, OpTime::kUninitializedTerm);
-        lk.unlock();
-    } else {
-        lk.unlock();
-        startApplyingDonorOpTime = _getDonorMajorityOpTime(_client);
-        LOGV2_DEBUG(4880600,
-                    2,
-                    "Found last oplog entry at read concern majority optime on remote node",
-                    "migrationId"_attr = getMigrationUUID(),
-                    "tenantId"_attr = _stateDoc.getTenantId(),
-                    "lastOplogEntry"_attr = startApplyingDonorOpTime.toBSON());
-    }
+    lk.unlock();
+    const auto startApplyingDonorOpTime = _getDonorMajorityOpTime(_client);
+    LOGV2_DEBUG(4880600,
+                2,
+                "Found last oplog entry at read concern majority optime on remote node",
+                "migrationId"_attr = getMigrationUUID(),
+                "tenantId"_attr = _stateDoc.getTenantId(),
+                "lastOplogEntry"_attr = startApplyingDonorOpTime.toBSON());
 
     auto oldestActiveTxnOpTime =
         _getOldestActiveTransactionAt(startApplyingDonorOpTime.getTimestamp());
@@ -1405,30 +1081,13 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);
 
-    auto tenantNss = [&] {
-        if (_protocol == MigrationProtocolEnum::kShardMerge) {
-            // For shard merge, we must set an empty NamespaceString because nss is non-optional in
-            // the oplog entry idl definition.
-            return NamespaceString();
-        }
-
-        return NamespaceString(getTenantId() + "_", "");
-    }();
-
+    auto tenantNss = NamespaceString(getTenantId() + "_", "");
     noopEntry.setNss(tenantNss);
 
     // Write a fake applyOps with the tenantId as the namespace so that this will be picked
     // up by the committed transaction prefetch pipeline in subsequent migrations.
-    //
-    // Unlike MTM, shard merge copies all tenants from the donor. This means that merge does
-    // not need to filter prefetched committed transactions by tenantId. As a result, setting
-    // a nss containing the tenantId for the fake transaction applyOps entry isn't necessary.
-    if (_protocol == MigrationProtocolEnum::kShardMerge) {
-        noopEntry.setObject({});
-    } else {
-        noopEntry.setObject(
-            BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName << tenantNss.ns()))));
-    }
+    noopEntry.setObject(
+        BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName << tenantNss.ns()))));
 
     noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
     noopEntry.setSessionId(sessionId);
@@ -1492,12 +1151,7 @@ TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStar
         }
     }
 
-    std::unique_ptr<DBClientCursor> cursor;
-    if (_protocol == MigrationProtocolEnum::kShardMerge) {
-        cursor = _openCommittedTransactionsFindCursor();
-    } else {
-        cursor = _openCommittedTransactionsAggregationCursor();
-    }
+    auto cursor = _openCommittedTransactionsAggregationCursor();
 
     while (cursor->more()) {
         auto transactionEntry = cursor->next();
@@ -1522,27 +1176,6 @@ TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStar
 }
 
 std::unique_ptr<DBClientCursor>
-TenantMigrationRecipientService::Instance::_openCommittedTransactionsFindCursor() {
-    Timestamp startApplyingDonorTimestamp;
-    {
-        stdx::lock_guard lk(_mutex);
-        invariant(_stateDoc.getStartApplyingDonorOpTime());
-        startApplyingDonorTimestamp = _stateDoc.getStartApplyingDonorOpTime()->getTimestamp();
-    }
-
-    FindCommandRequest findCommandRequest{NamespaceString::kSessionTransactionsTableNamespace};
-    findCommandRequest.setFilter(BSON("state"
-                                      << "committed"
-                                      << "lastWriteOpTime.ts"
-                                      << BSON("$lte" << startApplyingDonorTimestamp)));
-    findCommandRequest.setReadConcern(
-        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
-    findCommandRequest.setHint(BSON("$natural" << 1));
-
-    return _client->find(std::move(findCommandRequest), _readPreference, ExhaustMode::kOn);
-}
-
-std::unique_ptr<DBClientCursor>
 TenantMigrationRecipientService::Instance::_openCommittedTransactionsAggregationCursor() {
     auto aggRequest = _makeCommittedTransactionsAggregation();
 
@@ -1556,23 +1189,6 @@ TenantMigrationRecipientService::Instance::_openCommittedTransactionsAggregation
     }
 
     return std::move(statusWith.getValue());
-}
-
-void TenantMigrationRecipientService::Instance::_validateTenantIdsForProtocol() {
-    switch (_protocol) {
-        case MigrationProtocolEnum::kMultitenantMigrations:
-            uassert(ErrorCodes::InvalidOptions,
-                    "The field 'tenantIds' must not be set for protocol 'multitenant migration'",
-                    _tenantIds.empty() && !_tenantId.empty());
-            break;
-        case MigrationProtocolEnum::kShardMerge:
-            uassert(ErrorCodes::InvalidOptions,
-                    "The field 'tenantIds' must be set and non-empty for protocol 'shard merge'",
-                    _tenantId.empty() && !_tenantIds.empty());
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
 }
 
 SemiFuture<void>
@@ -1629,17 +1245,9 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
                 "migrationId"_attr = getMigrationUUID());
 
     // Fetch the oplog chains of all retryable writes that occurred before startFetchingTimestamp.
-    std::vector<BSONObj> serializedPipeline;
-    if (MigrationProtocolEnum::kShardMerge == getProtocol()) {
-        serializedPipeline =
-            tenant_migration_util::createRetryableWritesOplogFetchingPipelineForAllTenants(
-                expCtx, startFetchingTimestamp)
-                ->serializeToBson();
-    } else {
-        serializedPipeline = tenant_migration_util::createRetryableWritesOplogFetchingPipeline(
-                                 expCtx, startFetchingTimestamp, getTenantId())
-                                 ->serializeToBson();
-    }
+    auto serializedPipeline = tenant_migration_util::createRetryableWritesOplogFetchingPipeline(
+                                  expCtx, startFetchingTimestamp, getTenantId())
+                                  ->serializeToBson();
 
     AggregateCommandRequest aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
                                        std::move(serializedPipeline));
@@ -1798,11 +1406,8 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource,
         true /* forTenantMigration */);
 
-    // Fetch all oplog entries for shard merge protocol.
-    if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
-        oplogFetcherConfig.queryFilter = _getOplogFetcherFilter();
-        oplogFetcherConfig.requestResumeToken = true;
-    }
+    oplogFetcherConfig.queryFilter = _getOplogFetcherFilter();
+    oplogFetcherConfig.requestResumeToken = true;
 
     oplogFetcherConfig.queryReadConcern =
         ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
@@ -1848,12 +1453,6 @@ Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
 
         // Buffer docs for later application.
         donorOplogBuffer->push(opCtx.get(), begin, end);
-    }
-
-    if (_protocol == MigrationProtocolEnum::kShardMerge) {
-        // Shard merge does not need to write no-op oplog entries since it fetches all oplog
-        // entries.
-        return Status::OK();
     }
 
     if (info.resumeToken.isNull()) {
@@ -2067,58 +1666,6 @@ Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseC
     return std::move(startClonerFuture);
 }
 
-SemiFuture<void>
-TenantMigrationRecipientService::Instance::_advanceMajorityCommitTsToBkpCursorCheckpointTs(
-    const CancellationToken& token) {
-    auto uniqueOpCtx = cc().makeOperationContext();
-    auto opCtx = uniqueOpCtx.get();
-
-    Timestamp donorBkpCursorCkptTs;
-    {
-        stdx::lock_guard lk(_mutex);
-        donorBkpCursorCkptTs = _getDonorBackupCursorInfo(lk).checkpointTimestamp;
-    }
-
-    if (opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() >=
-        donorBkpCursorCkptTs) {
-        return SemiFuture<void>::makeReady();
-    }
-
-    LOGV2(
-        6114000,
-        "Advancing recipient's majority commit timestamp to be at least the donor's backup cursor "
-        "checkpoint timestamp",
-        "migrationId"_attr = getMigrationUUID(),
-        "tenantId"_attr = getTenantId(),
-        "donorBackupCursorCheckpointTimestamp"_attr = donorBkpCursorCkptTs);
-
-    _stopOrHangOnFailPoint(&fpBeforeAdvancingStableTimestamp, opCtx);
-
-    // Advance the cluster time to the donorBkpCursorCkptTs so that we ensure we
-    // write the no-op entry below at ts > donorBkpCursorCkptTs.
-    VectorClockMutable::get(_serviceContext)->tickClusterTimeTo(LogicalTime(donorBkpCursorCkptTs));
-
-    writeConflictRetry(opCtx,
-                       "mergeRecipientWriteNoopToAdvanceStableTimestamp",
-                       NamespaceString::kRsOplogNamespace.ns(),
-                       [&] {
-                           if (token.isCanceled()) {
-                               return;
-                           }
-                           AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-                           WriteUnitOfWork wuow(opCtx);
-                           const std::string msg = str::stream()
-                               << "Merge recipient advancing stable timestamp";
-                           opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-                               opCtx, BSON("msg" << msg));
-                           wuow.commit();
-                       });
-
-    // Get the timestamp of the no-op. This will have ts > donorBkpCursorCkptTs.
-    auto noOpTs = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    return WaitForMajorityService::get(opCtx->getServiceContext()).waitUntilMajority(noOpTs, token);
-}
-
 SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
     _stopOrHangOnFailPoint(&fpBeforeMarkingCloneSuccess);
     stdx::lock_guard lk(_mutex);
@@ -2128,7 +1675,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
         return SemiFuture<void>::makeReady();
     }
 
-    if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+    {
         stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
         auto lastVisibleMajorityCommittedDonorOpTime =
             _sharedData->getLastVisibleOpTime(sharedDatalk);
@@ -2176,17 +1723,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_enterConsistentStat
             _stopOrHangOnFailPoint(&fpBeforeFulfillingDataConsistentPromise);
             stdx::lock_guard lk(_mutex);
 
-            auto donorConsistentOpTime = [&]() {
-                switch (_protocol) {
-                    case MigrationProtocolEnum::kMultitenantMigrations:
-                        return _stateDoc.getDataConsistentStopDonorOpTime();
-                    case MigrationProtocolEnum::kShardMerge:
-                        return _stateDoc.getStartApplyingDonorOpTime();
-                    default:
-                        MONGO_UNREACHABLE;
-                }
-                boost::optional<repl::OpTime>();
-            }();
+            auto donorConsistentOpTime = _stateDoc.getDataConsistentStopDonorOpTime();
             invariant(donorConsistentOpTime && !donorConsistentOpTime->isNull());
 
             LOGV2_DEBUG(4881101,
@@ -2252,45 +1789,6 @@ void setPromiseValueIfNotReady(WithLock lk, Promise& promise, Value& value) {
 }
 
 }  // namespace
-
-void TenantMigrationRecipientService::Instance::onMemberImportedFiles(
-    const HostAndPort& host, bool success, const boost::optional<StringData>& reason) {
-    stdx::lock_guard lk(_mutex);
-    if (!_waitingForMembersToImportFiles) {
-        LOGV2_WARNING(8423343,
-                      "Ignoring delayed recipientVoteImportedFiles",
-                      "host"_attr = host.toString(),
-                      "migrationId"_attr = _migrationUuid);
-        return;
-    }
-
-    auto state = _stateDoc.getState();
-    uassert(8423341,
-            "The migration is at the wrong stage for recipientVoteImportedFiles: {}"_format(
-                TenantMigrationRecipientState_serializer(state)),
-            state == TenantMigrationRecipientStateEnum::kLearnedFilenames);
-
-    if (!success) {
-        _importedFilesPromise.setError(
-            {ErrorCodes::OperationFailed,
-             "Migration failed on {}, error: {}"_format(host, reason.value_or("null"))});
-        _waitingForMembersToImportFiles = false;
-        return;
-    }
-
-    _membersWhoHaveImportedFiles.insert(host);
-    // Not reconfig-safe, we must not do a reconfig concurrent with a migration.
-    if (static_cast<int>(_membersWhoHaveImportedFiles.size()) ==
-        repl::ReplicationCoordinator::get(_serviceContext)
-            ->getConfig()
-            .getNumDataBearingMembers()) {
-        LOGV2_INFO(6112809,
-                   "All members finished importing donated files",
-                   "migrationId"_attr = _migrationUuid);
-        _importedFilesPromise.emplaceValue();
-        _waitingForMembersToImportFiles = false;
-    }
-}
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarbageCollectable() {
     _stopOrHangOnFailPoint(&fpAfterReceivingRecipientForgetMigration);
@@ -2441,10 +1939,6 @@ void TenantMigrationRecipientService::Instance::_interrupt(Status status,
 
     _cancelRemainingWork(lk);
 
-    if (_donorFilenameBackupCursorFileFetcher) {
-        _donorFilenameBackupCursorFileFetcher->shutdown();
-    }
-
     // If the task is running, then setting promise result will be taken care by the main task
     // continuation chain.
     if (_taskState.isNotStarted()) {
@@ -2478,19 +1972,7 @@ void TenantMigrationRecipientService::Instance::cancelMigration() {
 
 void TenantMigrationRecipientService::Instance::onReceiveRecipientForgetMigration(
     OperationContext* opCtx, const TenantMigrationRecipientStateEnum& nextState) {
-
-    switch (_protocol) {
-        case MigrationProtocolEnum::kMultitenantMigrations:
-            invariant(nextState == TenantMigrationRecipientStateEnum::kDone);
-            break;
-        case MigrationProtocolEnum::kShardMerge:
-            invariant(nextState == TenantMigrationRecipientStateEnum::kAborted ||
-                      nextState == TenantMigrationRecipientStateEnum::kCommitted);
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-
+    invariant(nextState == TenantMigrationRecipientStateEnum::kDone);
     LOGV2(4881400,
           "Forgetting migration due to recipientForgetMigration command",
           "migrationId"_attr = getMigrationUUID(),
@@ -2520,17 +2002,10 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
     std::unique_ptr<OplogFetcher> savedDonorOplogFetcher;
     std::shared_ptr<TenantOplogApplier> savedTenantOplogApplier;
     std::unique_ptr<ThreadPool> savedWriterPool;
-    std::unique_ptr<Fetcher> savedDonorFilenameBackupCursorFileFetcher;
     {
         stdx::lock_guard lk(_mutex);
         _cancelRemainingWork(lk);
 
-        _backupCursorKeepAliveCancellation = {};
-        _backupCursorKeepAliveFuture = boost::none;
-
-        if (_donorFilenameBackupCursorFileFetcher) {
-            shutdownTarget(lk, _donorFilenameBackupCursorFileFetcher);
-        }
         shutdownTarget(lk, _donorOplogFetcher);
         shutdownTargetWithOpCtx(lk, _donorOplogBuffer, opCtx.get());
 
@@ -2549,14 +2024,8 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
         swap(savedDonorOplogFetcher, _donorOplogFetcher);
         swap(savedTenantOplogApplier, _tenantOplogApplier);
         swap(savedWriterPool, _writerPool);
-        swap(savedDonorFilenameBackupCursorFileFetcher, _donorFilenameBackupCursorFileFetcher);
     }
 
-    // Perform join outside the lock to avoid deadlocks.
-    if (savedDonorFilenameBackupCursorFileFetcher) {
-        invariantStatusOK(
-            savedDonorFilenameBackupCursorFileFetcher->join(Interruptible::notInterruptible()));
-    }
     joinTarget(savedDonorOplogFetcher);
     joinTarget(savedTenantOplogApplier);
     if (savedWriterPool) {
@@ -2701,9 +2170,8 @@ void TenantMigrationRecipientService::Instance::_startOplogApplier() {
 
     _tenantOplogApplier = std::make_shared<TenantOplogApplier>(
         _migrationUuid,
-        _protocol,
-        (_protocol != MigrationProtocolEnum::kShardMerge) ? boost::make_optional(_tenantId)
-                                                          : boost::none,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        _tenantId,
         (!resumeOpTime.isNull()) ? std::max(resumeOpTime, *startApplyingDonorOpTime)
                                  : *startApplyingDonorOpTime,
         _donorOplogBuffer.get(),
@@ -2796,8 +2264,7 @@ TenantMigrationRecipientService::Instance::_waitForOplogApplierToStop() {
     return _tenantOplogApplier->getNotificationForOpTime(OpTime::max());
 }
 
-SemiFuture<TenantOplogApplier::OpTimePair>
-TenantMigrationRecipientService::Instance::_migrateUsingMTMProtocol(
+SemiFuture<TenantOplogApplier::OpTimePair> TenantMigrationRecipientService::Instance::_migrate(
     const CancellationToken& token) {
     return ExecutorFuture(**_scopedExecutor)
         .then([this, self = shared_from_this()] { return _getStartOpTimesFromDonor(); })
@@ -2826,50 +2293,15 @@ TenantMigrationRecipientService::Instance::_migrateUsingMTMProtocol(
         .semi();
 }
 
-SemiFuture<TenantOplogApplier::OpTimePair>
-TenantMigrationRecipientService::Instance::_migrateUsingShardMergeProtocol(
-    const CancellationToken& token) {
-    return ExecutorFuture(**_scopedExecutor)
-        .then(
-            [this, self = shared_from_this(), token] { return _openBackupCursorWithRetry(token); })
-        .then([this, self = shared_from_this(), token] { _keepBackupCursorAlive(token); })
-        .then([this, self = shared_from_this(), token] {
-            return _advanceMajorityCommitTsToBkpCursorCheckpointTs(token);
-        })
-        .then([this, self = shared_from_this()] { return _enterLearnedFilenamesState(); })
-        .then([this, self = shared_from_this()]() { return _getStartOpTimesFromDonor(); })
-        .then([this, self = shared_from_this()] {
-            return _fetchRetryableWritesOplogBeforeStartOpTime();
-        })
-        .then([this, self = shared_from_this()] { _startOplogFetcher(); })
-        .then([this, self = shared_from_this()] {
-            LOGV2_INFO(6113402, "Waiting for all nodes to call recipientVoteImportedFiles");
-            return _importedFilesPromise.getFuture().semi();
-        })
-        .then([this, self = shared_from_this()] { return _killBackupCursor(); })
-        .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
-        .then([this, self = shared_from_this()] { return _enterConsistentState(); })
-        .then([this, self = shared_from_this()] {
-            return _fetchCommittedTransactionsBeforeStartOpTime();
-        })
-        .then([this, self = shared_from_this()] { return _startOplogApplier(); })
-        .then([this, self = shared_from_this()] { return _waitForOplogApplierToStop(); })
-        .semi();
-}
-
 void TenantMigrationRecipientService::Instance::_dropTempCollections() {
     _stopOrHangOnFailPoint(&fpBeforeDroppingTempCollections);
 
     auto opCtx = cc().makeOperationContext();
     auto storageInterface = StorageInterface::get(opCtx.get());
 
-    // The donated files and oplog buffer collections can be safely dropped at this
-    // point. In case either collection does not exist, dropping will be a no-op.
-    // It isn't necessary that a given drop is majority-committed. A new primary will
-    // attempt to drop the collection anyway.
-    uassertStatusOK(storageInterface->dropCollection(
-        opCtx.get(), shard_merge_utils::getDonatedFilesNs(getMigrationUUID())));
-
+    // The oplog buffer collection can be safely dropped at this point. In case either collection
+    // does not exist, dropping will be a no-op. It isn't necessary that a given drop is
+    // majority-committed. A new primary will attempt to drop the collection anyway.
     uassertStatusOK(
         storageInterface->dropCollection(opCtx.get(), getOplogBufferNs(getMigrationUUID())));
 }
@@ -2878,14 +2310,12 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     _scopedExecutor = executor;
-    _backupCursorExecutor = **_scopedExecutor;
     auto scopedOutstandingMigrationCounter =
         TenantMigrationStatistics::get(_serviceContext)->getScopedOutstandingReceivingCount();
 
     LOGV2(4879607,
           "Starting tenant migration recipient instance: ",
           "migrationId"_attr = getMigrationUUID(),
-          "protocol"_attr = MigrationProtocol_serializer(getProtocol()),
           "tenantId"_attr = getTenantId(),
           "connectionString"_attr = _donorConnectionString,
           "readPreference"_attr = _readPreference);
@@ -2939,49 +2369,46 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
                        pauseAfterRunTenantMigrationRecipientInstance.pauseWhileSet();
 
-                       if (_protocol != MigrationProtocolEnum::kShardMerge) {
-                           TenantId tid = TenantId::parseFromString(_stateDoc.getTenantId());
-                           auto mtab =
-                               TenantMigrationAccessBlockerRegistry::get(_serviceContext)
-                                   .getTenantMigrationAccessBlockerForTenantId(
-                                       tid, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-                           if (mtab && mtab->getMigrationId() != _migrationUuid) {
-                               // There is a conflicting migration. If its state doc has already
-                               // been marked as garbage collectable, this instance must correspond
-                               // to a retry and we can delete immediately to allow the migration to
-                               // restart. Otherwise, there is a real conflict so we should throw
-                               // ConflictingInProgress.
-                               lk.unlock();
+                       TenantId tid = TenantId::parseFromString(_stateDoc.getTenantId());
+                       auto mtab =
+                           TenantMigrationAccessBlockerRegistry::get(_serviceContext)
+                               .getTenantMigrationAccessBlockerForTenantId(
+                                   tid, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+                       if (mtab && mtab->getMigrationId() != _migrationUuid) {
+                           // There is a conflicting migration. If its state doc has already
+                           // been marked as garbage collectable, this instance must correspond
+                           // to a retry and we can delete immediately to allow the migration to
+                           // restart. Otherwise, there is a real conflict so we should throw
+                           // ConflictingInProgress.
+                           lk.unlock();
 
-                               auto existingStateDoc =
-                                   tenantMigrationRecipientEntryHelpers::getStateDoc(
-                                       opCtx.get(), mtab->getMigrationId());
-                               uassertStatusOK(existingStateDoc.getStatus());
+                           auto existingStateDoc =
+                               tenantMigrationRecipientEntryHelpers::getStateDoc(
+                                   opCtx.get(), mtab->getMigrationId());
+                           uassertStatusOK(existingStateDoc.getStatus());
 
-                               uassert(ErrorCodes::ConflictingOperationInProgress,
-                                       str::stream()
-                                           << "Found active migration for tenantId \"" << _tenantId
-                                           << "\" with migration id " << mtab->getMigrationId(),
-                                       existingStateDoc.getValue().getExpireAt());
+                           uassert(ErrorCodes::ConflictingOperationInProgress,
+                                   str::stream()
+                                       << "Found active migration for tenantId \"" << _tenantId
+                                       << "\" with migration id " << mtab->getMigrationId(),
+                                   existingStateDoc.getValue().getExpireAt());
 
-                               pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc
-                                   .pauseWhileSet();
+                           pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc
+                               .pauseWhileSet();
 
-                               auto deleted =
-                                   uassertStatusOK(tenantMigrationRecipientEntryHelpers::
-                                                       deleteStateDocIfMarkedAsGarbageCollectable(
-                                                           opCtx.get(), _tenantId));
-                               // The doc has an expireAt but was deleted before we had time to
-                               // delete it above therefore it's safe to pursue since it has been
-                               // cleaned up.
-                               if (!deleted) {
-                                   LOGV2_WARNING(
-                                       6792601,
-                                       "Existing state document was deleted before we could "
-                                       "delete it ourselves.");
-                               }
-                               lk.lock();
+                           auto deleted =
+                               uassertStatusOK(tenantMigrationRecipientEntryHelpers::
+                                                   deleteStateDocIfMarkedAsGarbageCollectable(
+                                                       opCtx.get(), _tenantId));
+                           // The doc has an expireAt but was deleted before we had time to
+                           // delete it above therefore it's safe to pursue since it has been
+                           // cleaned up.
+                           if (!deleted) {
+                               LOGV2_WARNING(6792601,
+                                             "Existing state document was deleted before we could "
+                                             "delete it ourselves.");
                            }
+                           lk.lock();
                        }
 
                        if (_stateDoc.getState() !=
@@ -3053,27 +2480,13 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        // Sets up internal state to begin migration.
                        _setup();
                    })
-                   .then([this, self = shared_from_this(), token] {
-                       switch (_protocol) {
-                           case MigrationProtocolEnum::kMultitenantMigrations:
-                               return _migrateUsingMTMProtocol(token);
-                           case MigrationProtocolEnum::kShardMerge:
-                               return _migrateUsingShardMergeProtocol(token);
-                           default:
-                               MONGO_UNREACHABLE;
-                       }
-                   });
+                   .then([this, self = shared_from_this(), token] { return _migrate(token); });
            })
         .until([this, self = shared_from_this()](
                    StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
             hangMigrationBeforeRetryCheck.pauseWhileSet();
 
             auto shouldRetryMigration = [&](WithLock, Status status) -> bool {
-                // Shard merge is not resumable for any replica set state transitions or network
-                // errors.
-                if (getProtocol() == MigrationProtocolEnum::kShardMerge)
-                    return false;
-
                 // We shouldn't retry migration after receiving the recipientForgetMigration command
                 // or on stepDown/shutDown.
                 if (_receivedRecipientForgetMigrationPromise.getFuture().isReady())
@@ -3177,9 +2590,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 auto state = _stateDoc.getState();
                 setPromiseValueIfNotReady(lk, _receivedRecipientForgetMigrationPromise, state);
             } else if (status.code() == ErrorCodes::ConflictingServerlessOperation) {
-                auto state = _protocol == MigrationProtocolEnum::kShardMerge
-                    ? TenantMigrationRecipientStateEnum::kAborted
-                    : TenantMigrationRecipientStateEnum::kDone;
+                auto state = TenantMigrationRecipientStateEnum::kDone;
                 setPromiseValueIfNotReady(lk, _receivedRecipientForgetMigrationPromise, state);
             } else if (MONGO_unlikely(autoRecipientForgetMigration.shouldFail())) {
                 auto state = _getTerminalStateFromFailpoint(&autoRecipientForgetMigration);
@@ -3319,10 +2730,6 @@ const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const 
 
 const std::string& TenantMigrationRecipientService::Instance::getTenantId() const {
     return _tenantId;
-}
-
-const MigrationProtocolEnum& TenantMigrationRecipientService::Instance::getProtocol() const {
-    return _protocol;
 }
 
 TenantMigrationRecipientDocument TenantMigrationRecipientService::Instance::getState() const {

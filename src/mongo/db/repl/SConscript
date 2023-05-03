@@ -1761,6 +1761,7 @@ if wiredtiger:
             'rollback_impl_test.cpp',
             'scatter_gather_test.cpp',
             'shard_merge_recipient_op_observer_test.cpp',
+            'shard_merge_recipient_service_test.cpp',
             'speculative_majority_read_info_test.cpp',
             'split_horizon_test.cpp',
             'split_prepare_session_manager_test.cpp',
@@ -1778,7 +1779,6 @@ if wiredtiger:
             'tenant_migration_recipient_access_blocker_test.cpp',
             'tenant_migration_recipient_entry_helpers_test.cpp',
             'tenant_migration_recipient_service_test.cpp',
-            'tenant_migration_recipient_service_shard_merge_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -1846,6 +1846,7 @@ if wiredtiger:
             'primary_only_service_test_fixture',
             'repl_coordinator_impl',
             'repl_server_parameters',
+            'replica_set_aware_service',
             'replica_set_messages',
             'replication_consistency_markers_impl',
             'replication_process',
