@@ -3,16 +3,15 @@ Import("env")
 
 env = env.Clone()
 
-env.Append(CPPDEFINES=[
-    'BSON_COMPILATION',
-])
-env.Append(CPPPATH=["dist/src/common"])
+env.Append(
+    CPPDEFINES=['BSON_COMPILATION'],
+    CPPPATH=["dist/src/common"],
+)
 
-# Libbson is not warning clean
-env['CCFLAGS_WERROR'] = []
-env['CXXFLAGS_WERROR'] = []
-
-additional_sources = []
+if env.ToolchainIs('msvc'):
+    env.Append(CCFLAGS=['/wd4388', '/wd4389', '/wd4146', '/wd4018'])  # msvc sign-compare warnings
+else:
+    env.Append(CCFLAGS=['-Wno-sign-compare'])
 
 env.Library(
     target="libbson",
@@ -42,7 +41,7 @@ env.Library(
         'dist/src/libbson/src/bson/bson-version-functions.c',
         'dist/src/libbson/src/bson/bson-writer.c',
         'dist/src/libbson/src/jsonsl/jsonsl.c',
-    ] + additional_sources,
+    ],
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',
     ],
