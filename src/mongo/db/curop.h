@@ -814,8 +814,11 @@ public:
         auto start = _waitForWriteConcernStart.load();
         if (start != 0) {
             _waitForWriteConcernEnd = _tickSource->getTicks();
-            debug().waitForWriteConcernDurationMillis += duration_cast<Milliseconds>(
+            auto duration = duration_cast<Milliseconds>(
                 computeElapsedTimeTotal(start, _waitForWriteConcernEnd.load()));
+            _atomicWaitForWriteConcernDurationMillis =
+                _atomicWaitForWriteConcernDurationMillis.load() + duration;
+            debug().waitForWriteConcernDurationMillis = _atomicWaitForWriteConcernDurationMillis;
             _waitForWriteConcernStart = 0;
         }
     }
@@ -1040,6 +1043,10 @@ private:
     // These values are used to calculate the amount of time spent waiting for write concern.
     std::atomic<TickSource::Tick> _waitForWriteConcernStart{0};  // NOLINT
     std::atomic<TickSource::Tick> _waitForWriteConcernEnd{0};    // NOLINT
+    // This metric is the same value as debug().waitForWriteConcernDurationMillis.
+    // We cannot use std::atomic in OpDebug since it is not copy assignable, but using a non-atomic
+    // allows for a data race between stopWaitForWriteConcernTimer and curop::reportState.
+    std::atomic<Milliseconds> _atomicWaitForWriteConcernDurationMillis{Milliseconds{0}};  // NOLINT
 };
 
 }  // namespace mongo

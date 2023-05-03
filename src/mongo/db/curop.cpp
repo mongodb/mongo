@@ -806,9 +806,8 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
 
     if (auto start = _waitForWriteConcernStart.load(); start > 0) {
         auto end = _waitForWriteConcernEnd.load();
-        auto elapsedTimeTotal =
-            duration_cast<Microseconds>(debug().waitForWriteConcernDurationMillis);
-        elapsedTimeTotal += computeElapsedTimeTotal(start, end);
+        auto elapsedTimeTotal = _atomicWaitForWriteConcernDurationMillis.load();
+        elapsedTimeTotal += duration_cast<Milliseconds>(computeElapsedTimeTotal(start, end));
         builder->append("waitForWriteConcernDurationMillis",
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }
