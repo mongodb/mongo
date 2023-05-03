@@ -628,33 +628,41 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
 {
     WT_BTREE *btree;
     WT_CURSOR_BTREE *cbt;
+    WT_DECL_RET;
     WT_UPDATE *upd;
 
-    *updp = NULL;
-
+    *updp = upd = NULL; /* -Wuninitialized */
     cbt = (WT_CURSOR_BTREE *)cursor;
     btree = CUR2BT(cbt);
-    upd = NULL; /* -Wuninitialized */
 
     /*
-     * Not calling the cursor initialization functions, we don't want to be tapped for eviction nor
-     * do we want other standard cursor semantics like snapshots, just discard the hazard pointer
-     * from the last operation. This also depends on the fact we're not setting the cursor's active
-     * flag, this is really a special chunk of code and not to be modified without careful thought.
+     * Set the key only flag to indicate to the search that we don't want to check visibility we
+     * just want to position on a key. This short circuits validity checking.
      */
-    WT_RET(__cursor_reset(cbt));
-
-    WT_RET(btree->type == BTREE_ROW ? __cursor_row_search(cbt, false, NULL, NULL) :
-                                      __cursor_col_search(cbt, NULL, NULL));
-
+    F_SET(&cbt->iface, WT_CURSTD_KEY_ONLY);
     /*
-     * Ideally an exact match will be found, as this transaction is searching for updates done by
-     * itself. But, we cannot be sure of finding one, as pre-processing of the updates could have
-     * happened as part of resolving earlier transaction operations.
+     * The search logic searches the pinned page first, which would be the previously resolved
+     * update chain's page. If that doesn't find the key we want it searches from the root.
      */
-    if (cbt->compare != 0)
-        return (0);
-
+    ret = __wt_btcur_search(cbt);
+    F_CLR(&cbt->iface, WT_CURSTD_KEY_ONLY);
+    /*
+     * The following assertion relies on the fact that for every prepared update there must be an
+     * associated key. However this is only true if we pin the page to prevent eviction. By calling
+     * into the standard search function we avoid releasing our hazard pointer between update chain
+     * resolutions. It also depends on sorting the transaction modifications by key, if we didn't do
+     * that we would unpin the page between searches and later come back to the same key. We rely on
+     * resolving all updates for a single key in sequence.
+     *
+     * This is a complex scenario, suppose we have two updates to the same key by our transaction,
+     * and are resolving the prepared updates. The first pass resolves the update chain, now if we
+     * let eviction run it could evict the page and it will treat the update chain as a regular non
+     * prepared update chain. If we were rolling back the transaction the key may not exist after
+     * eviction, similarly if we wrote a globally visible tombstone. Thus our second attempt at
+     * resolution would fail as it wouldn't find a key.
+     */
+    WT_ASSERT_ALWAYS(
+      CUR2S(cursor), ret == 0, "A valid key must exist when resolving prepared updates.");
     /* Get any uncommitted update from the in-memory page. */
     switch (btree->type) {
     case BTREE_ROW:
