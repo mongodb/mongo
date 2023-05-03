@@ -133,11 +133,12 @@ ERROR_ID_INVALID_ARRAY_VARIANT = "ID0093"
 ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL = "ID0094"
 ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL = "ID0095"
 ERROR_ID_INVALID_TYPE_FOR_SHAPIFY = "ID0096"
-ERROR_ID_CANNOT_BE_LITERAL_AND_FIELDPATH = "ID0097"
-ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE = "ID0098"
+ERROR_ID_QUERY_SHAPE_PROPERTIES_MUTUALLY_EXCLUSIVE = "ID0097"
+ERROR_ID_QUERY_SHAPE_PROPERTY_CANNOT_BE_FALSE = "ID0098"
 ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0099"
 ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0100"
 ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION = "ID0101"
+ERROR_ID_QUERY_SHAPE_INVALID_VALUE = "ID0102"
 
 
 class IDLError(Exception):
@@ -980,15 +981,9 @@ class ParserContext(object):
             f"In order for {field_name} to be marked as a query shape fieldpath, it must have a string type, not {field_type}."
         )
 
-    def add_field_cannot_be_literal_and_fieldpath(self, location, field_name):
-        self._add_error(
-            location, ERROR_ID_CANNOT_BE_LITERAL_AND_FIELDPATH,
-            f"{field_name} cannot be marked as both a query shape literal and query shape fieldpath."
-        )
-
-    def add_field_cannot_have_query_shape_anonymize_false(self, location):
-        self._add_error(location, ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE,
-                        "'query_shape_anonymize' cannot be defined as false if it is set.")
+    def add_invalid_query_shape_value(self, location, query_shape_value):
+        self._add_error(location, ERROR_ID_QUERY_SHAPE_INVALID_VALUE,
+                        f"'{query_shape_value}' is not a valid value for 'query_shape'.")
 
     def add_strict_and_disable_check_not_allowed(self, location):
         self._add_error(

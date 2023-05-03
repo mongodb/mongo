@@ -84,7 +84,7 @@ public:
      *   2. write_ops::UpdateModification - either the new document we want to upsert or insert into
      *      the collection (i.e. a 'classic' replacement update), or the pipeline to run to compute
      *      the new document.
-     *   3. boost::optional<BSONObj> - for pipeline-style updated, specifies variables that can be
+     *   3. boost::optional<BSONObj> - for pipeline-style updates, specifies variables that can be
      *      referred to in the pipeline performing the custom update.
      */
     using BatchObject =

@@ -406,10 +406,8 @@ def _parse_field(ctxt, name, node):
                 _RuleDesc('bool_scalar'),
             "forward_from_shards":
                 _RuleDesc('bool_scalar'),
-            "query_shape_literal":
-                _RuleDesc('required_bool_scalar'),
-            "query_shape_anonymize":
-                _RuleDesc('required_bool_scalar'),
+            "query_shape":
+                _RuleDesc('scalar'),
         })
 
     return field

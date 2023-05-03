@@ -599,7 +599,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                                "hello",
                                {1, 2, 3, 4},
                                "field.path",
-                               {"field.path.1", "fieldpath2"});
+                               {"field.path.1", "fieldpath2"},
+                               NamespaceString{"db", "coll"},
+                               NamespaceString{"db", "coll"});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "stringField": "value",
@@ -616,7 +618,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
             "fieldpathList": [
                 "field.path.1",
                 "fieldpath2"
-            ]
+            ],
+            "nss": "db.coll",
+            "plainNss": "db.coll"
         })",
         nested.toBSON());
 
@@ -631,7 +635,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
             "fieldpathList": [
                 "HASH<field>.HASH<path>.HASH<1>",
                 "HASH<fieldpath2>"
-            ]
+            ],
+            "nss": "HASH<db.coll>",
+            "plainNss": "db.coll"
         })",
         nested.toBSON(options));
 
@@ -654,7 +660,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "field.path.1",
                     "fieldpath2"
-                ]
+                ],
+                "nss": "db.coll",
+                "plainNss": "db.coll"
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -671,7 +679,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "field.path.1",
                     "fieldpath2"
-                ]
+                ],
+                "nss": "db.coll",
+                "plainNss": "db.coll"
             }
         })",
         parent.toBSON());
@@ -688,7 +698,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "HASH<field>.HASH<path>.HASH<1>",
                     "HASH<fieldpath2>"
-                ]
+                ],
+                "nss": "HASH<db.coll>",
+                "plainNss": "db.coll"
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -705,7 +717,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "field.path.1",
                     "fieldpath2"
-                ]
+                ],
+                "nss": "db.coll",
+                "plainNss": "db.coll"
             }
         })",
         parent.toBSON(options));

@@ -535,11 +535,6 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distr
 
 Value DocumentSourceMerge::serialize(SerializationOptions opts) const {
     auto explain = opts.verbosity;
-    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
-        // TODO: SERVER-76208 support query shapification for IDL types with custom serializers.
-        MONGO_UNIMPLEMENTED_TASSERT(7484324);
-    }
-
     DocumentSourceMergeSpec spec;
     spec.setTargetNss(_outputNs);
     spec.setLet([&]() -> boost::optional<BSONObj> {
@@ -553,7 +548,23 @@ Value DocumentSourceMerge::serialize(SerializationOptions opts) const {
         }
         return bob.obj();
     }());
-    spec.setWhenMatched(MergeWhenMatchedPolicy{_descriptor.mode.first, _pipeline});
+    spec.setWhenMatched(MergeWhenMatchedPolicy{
+        _descriptor.mode.first, [&]() -> boost::optional<std::vector<BSONObj>> {
+            if (!_pipeline.has_value()) {
+                return boost::none;
+            }
+            auto expCtxWithLetVariables = pExpCtx->copyWith(pExpCtx->ns);
+            if (spec.getLet()) {
+                BSONObjBuilder cleanLetSpecBuilder;
+                for (auto& elt : spec.getLet().value()) {
+                    cleanLetSpecBuilder.append(elt.fieldNameStringData(), BSONObj{});
+                }
+                expCtxWithLetVariables->variables.seedVariablesWithLetParameters(
+                    expCtxWithLetVariables.get(), cleanLetSpecBuilder.obj());
+            }
+            return Pipeline::parse(_pipeline.value(), expCtxWithLetVariables)
+                ->serializeToBson(opts);
+        }()});
     spec.setWhenNotMatched(_descriptor.mode.second);
     spec.setOn([&]() {
         std::vector<std::string> mergeOnFields;
