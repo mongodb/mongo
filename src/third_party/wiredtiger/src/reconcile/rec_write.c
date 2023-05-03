@@ -112,21 +112,26 @@ err:
      * (it's just a statistic).
      */
     session->reconcile_timeline.reconcile_finish = __wt_clock(session);
-    if (WT_CLOCKDIFF_SEC(session->reconcile_timeline.hs_wrapup_finish,
-          session->reconcile_timeline.hs_wrapup_start) > conn->rec_maximum_hs_wrapup_seconds)
-        conn->rec_maximum_hs_wrapup_seconds =
-          WT_CLOCKDIFF_SEC(session->reconcile_timeline.hs_wrapup_finish,
+    if (WT_CLOCKDIFF_MS(session->reconcile_timeline.hs_wrapup_finish,
+          session->reconcile_timeline.hs_wrapup_start) > conn->rec_maximum_hs_wrapup_milliseconds)
+        conn->rec_maximum_hs_wrapup_milliseconds =
+          WT_CLOCKDIFF_MS(session->reconcile_timeline.hs_wrapup_finish,
             session->reconcile_timeline.hs_wrapup_start);
-    if (WT_CLOCKDIFF_SEC(session->reconcile_timeline.image_build_finish,
-          session->reconcile_timeline.image_build_start) > conn->rec_maximum_image_build_seconds)
-        conn->rec_maximum_image_build_seconds =
-          WT_CLOCKDIFF_SEC(session->reconcile_timeline.image_build_finish,
+    if (WT_CLOCKDIFF_MS(session->reconcile_timeline.image_build_finish,
+          session->reconcile_timeline.image_build_start) >
+      conn->rec_maximum_image_build_milliseconds)
+        conn->rec_maximum_image_build_milliseconds =
+          WT_CLOCKDIFF_MS(session->reconcile_timeline.image_build_finish,
             session->reconcile_timeline.image_build_start);
     if (WT_CLOCKDIFF_SEC(session->reconcile_timeline.reconcile_finish,
-          session->reconcile_timeline.reconcile_start) > conn->rec_maximum_seconds)
-        conn->rec_maximum_seconds = WT_CLOCKDIFF_SEC(session->reconcile_timeline.reconcile_finish,
-          session->reconcile_timeline.reconcile_start);
-
+          session->reconcile_timeline.reconcile_start) > conn->rec_maximum_milliseconds)
+        conn->rec_maximum_milliseconds =
+          WT_CLOCKDIFF_MS(session->reconcile_timeline.reconcile_finish,
+            session->reconcile_timeline.reconcile_start);
+    if (session->reconcile_timeline.total_reentry_hs_eviction_time >
+      conn->cache->reentry_hs_eviction_ms)
+        conn->cache->reentry_hs_eviction_ms =
+          session->reconcile_timeline.total_reentry_hs_eviction_time;
     return (ret);
 }
 
@@ -253,7 +258,9 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     WT_RET(__rec_init(session, ref, flags, salvage, &session->reconcile));
     r = session->reconcile;
 
-    session->reconcile_timeline.image_build_start = __wt_clock(session);
+    /* Only update if we are in the first entry into eviction. */
+    if (!session->evict_timeline.reentry_hs_eviction)
+        session->reconcile_timeline.image_build_start = __wt_clock(session);
 
     /* Reconcile the page. */
     switch (page->type) {
@@ -282,7 +289,8 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
         break;
     }
 
-    session->reconcile_timeline.image_build_finish = __wt_clock(session);
+    if (!session->evict_timeline.reentry_hs_eviction)
+        session->reconcile_timeline.image_build_finish = __wt_clock(session);
 
     /*
      * If we failed, don't bail out yet; we still need to update stats and tidy up.

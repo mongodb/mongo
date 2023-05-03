@@ -416,10 +416,11 @@ struct __wt_connection_impl {
     uint32_t stat_flags; /* Options declared in flags.py */
 
     /* Connection statistics */
+    uint64_t rec_maximum_hs_wrapup_milliseconds; /* Maximum milliseconds moving updates to history
+                                                    store took. */
     uint64_t
-      rec_maximum_hs_wrapup_seconds; /* Maximum seconds moving updates to history store took. */
-    uint64_t rec_maximum_image_build_seconds; /* Maximum seconds building disk image took. */
-    uint64_t rec_maximum_seconds;             /* Maximum seconds reconciliation took. */
+      rec_maximum_image_build_milliseconds; /* Maximum milliseconds building disk image took. */
+    uint64_t rec_maximum_milliseconds;      /* Maximum milliseconds reconciliation took. */
     WT_CONNECTION_STATS *stats[WT_COUNTER_SLOTS];
     WT_CONNECTION_STATS *stat_array;
 

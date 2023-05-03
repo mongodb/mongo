@@ -97,9 +97,10 @@ struct __wt_cache {
     uint64_t app_waits;  /* User threads waited for cache */
     uint64_t app_evicts; /* Pages evicted by user threads */
 
-    uint64_t evict_max_page_size; /* Largest page seen at eviction */
-    uint64_t evict_max_seconds;   /* Longest seconds spent at a single eviction */
-    struct timespec stuck_time;   /* Stuck time */
+    uint64_t evict_max_page_size;    /* Largest page seen at eviction */
+    uint64_t evict_max_ms;           /* Longest milliseconds spent at a single eviction */
+    uint64_t reentry_hs_eviction_ms; /* Total milliseconds spent inside a nested eviction */
+    struct timespec stuck_time;      /* Stuck time */
 
     /*
      * Read information.

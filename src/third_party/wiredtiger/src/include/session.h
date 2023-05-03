@@ -151,6 +151,7 @@ struct __wt_session_impl {
         uint64_t hs_wrapup_start;
         uint64_t hs_wrapup_finish;
         uint64_t reconcile_finish;
+        uint64_t total_reentry_hs_eviction_time;
     } reconcile_timeline;
 
     /*
@@ -159,7 +160,10 @@ struct __wt_session_impl {
      */
     struct __wt_evict_timeline {
         uint64_t evict_start;
+        uint64_t reentry_hs_evict_start;
+        uint64_t reentry_hs_evict_finish;
         uint64_t evict_finish;
+        bool reentry_hs_eviction;
     } evict_timeline;
 
     WT_ITEM err; /* Error buffer */
