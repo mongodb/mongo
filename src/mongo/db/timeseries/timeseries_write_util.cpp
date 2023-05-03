@@ -163,14 +163,40 @@ std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
     return insertOps;
 }
 
-Status performAtomicWrites(OperationContext* opCtx,
-                           const CollectionPtr& coll,
-                           const RecordId& recordId,
-                           const stdx::variant<write_ops::UpdateCommandRequest,
-                                               write_ops::DeleteCommandRequest>& modificationOp,
-                           const std::vector<write_ops::InsertCommandRequest>& insertOps,
-                           bool fromMigrate,
-                           StmtId stmtId) try {
+stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
+    const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements) {
+    if (measurements.empty()) {
+        write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
+        write_ops::DeleteCommandRequest op(coll->ns(), {deleteEntry});
+        return op;
+    }
+    auto timeseriesOptions = coll->getTimeseriesOptions();
+    auto metaFieldName = timeseriesOptions->getMetaField();
+    auto metadata = [&] {
+        if (!metaFieldName) {  // Collection has no metadata field.
+            return BSONObj();
+        }
+        // Look for the metadata field on this bucket and return it if present.
+        auto metaField = measurements[0].getField(*metaFieldName);
+        return metaField ? metaField.wrap() : BSONObj();
+    }();
+    auto replaceBucket = timeseries::makeNewDocumentForWrite(
+        bucketId, measurements, metadata, timeseriesOptions, coll->getDefaultCollator());
+
+    write_ops::UpdateModification u(replaceBucket);
+    write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
+    write_ops::UpdateCommandRequest op(coll->ns(), {updateEntry});
+    return op;
+}
+
+void performAtomicWrites(OperationContext* opCtx,
+                         const CollectionPtr& coll,
+                         const RecordId& recordId,
+                         const stdx::variant<write_ops::UpdateCommandRequest,
+                                             write_ops::DeleteCommandRequest>& modificationOp,
+                         const std::vector<write_ops::InsertCommandRequest>& insertOps,
+                         bool fromMigrate,
+                         StmtId stmtId) {
     NamespaceString ns = coll->ns();
 
     DisableDocumentValidation disableDocumentValidation{opCtx};
@@ -242,20 +268,13 @@ Status performAtomicWrites(OperationContext* opCtx,
             invariant(op.getDocuments().size() == 1);
             insertStatements.emplace_back(op.getDocuments().front());
         }
-        auto status = collection_internal::insertDocuments(
-            opCtx, coll, insertStatements.begin(), insertStatements.end(), &curOp->debug());
-        if (!status.isOK()) {
-            return status;
-        }
+        uassertStatusOK(collection_internal::insertDocuments(
+            opCtx, coll, insertStatements.begin(), insertStatements.end(), &curOp->debug()));
     }
 
     wuow.commit();
 
     lastOpFixer.finishedOpSuccessfully();
-
-    return Status::OK();
-} catch (const DBException& ex) {
-    return ex.toStatus();
 }
 
 }  // namespace mongo::timeseries

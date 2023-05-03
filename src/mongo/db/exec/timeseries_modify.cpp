@@ -141,55 +141,47 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
 
     auto recordId = _ws->get(bucketWsmId)->recordId;
 
-    auto yieldAndRetry = [&](unsigned logId, Status status) {
-        LOGV2_DEBUG(logId,
-                    5,
-                    "Retrying bucket due to conflict attempting to write out changes",
-                    "bucket_rid"_attr = recordId,
-                    "status"_attr = status);
-        // We need to retry the bucket, so we should not free the current bucket.
-        bucketFreer.dismiss();
-        _retryBucket(bucketWsmId);
-        return PlanStage::NEED_YIELD;
-    };
-
     OID bucketId = record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID();
-    if (unchangedMeasurements.empty()) {
-        write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
-        write_ops::DeleteCommandRequest op(collection()->ns(), {deleteEntry});
-
-        auto result = timeseries::performAtomicWrites(
-            opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params.stmtId);
-        if (!result.isOK()) {
-            return {false, yieldAndRetry(7309300, result)};
+    auto modificationOp =
+        timeseries::makeModificationOp(bucketId, collection(), unchangedMeasurements);
+    try {
+        const auto modificationRet = handlePlanStageYield(
+            expCtx(),
+            "TimeseriesModifyStage modifyBucket",
+            collection()->ns().ns(),
+            [&] {
+                timeseries::performAtomicWrites(opCtx(),
+                                                collection(),
+                                                recordId,
+                                                modificationOp,
+                                                {},
+                                                bucketFromMigrate,
+                                                _params.stmtId);
+                return PlanStage::NEED_TIME;
+            },
+            [&] {
+                // yieldHandler
+                // We need to retry the bucket, so we should not free the current bucket.
+                bucketFreer.dismiss();
+                _retryBucket(bucketWsmId);
+            });
+        if (modificationRet != PlanStage::NEED_TIME) {
+            return {false, PlanStage::NEED_YIELD};
         }
-    } else {
-        auto timeseriesOptions = collection()->getTimeseriesOptions();
-        auto metaFieldName = timeseriesOptions->getMetaField();
-        auto metadata = [&] {
-            if (!metaFieldName) {  // Collection has no metadata field.
-                return BSONObj();
-            }
-            // Look for the metadata field on this bucket and return it if present.
-            auto metaField = unchangedMeasurements[0].getField(*metaFieldName);
-            return metaField ? metaField.wrap() : BSONObj();
-        }();
-        auto replaceBucket =
-            timeseries::makeNewDocumentForWrite(bucketId,
-                                                unchangedMeasurements,
-                                                metadata,
-                                                timeseriesOptions,
-                                                collection()->getDefaultCollator());
-
-        write_ops::UpdateModification u(replaceBucket);
-        write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
-        write_ops::UpdateCommandRequest op(collection()->ns(), {updateEntry});
-
-        auto result = timeseries::performAtomicWrites(
-            opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params.stmtId);
-        if (!result.isOK()) {
-            return {false, yieldAndRetry(7309301, result)};
+    } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+        if (ShardVersion::isPlacementVersionIgnored(ex->getVersionReceived()) &&
+            ex->getCriticalSectionSignal()) {
+            // If the placement version is IGNORED and we encountered a critical section, then
+            // yield, wait for the critical section to finish and then we'll resume the write
+            // from the point we had left. We do this to prevent large multi-writes from
+            // repeatedly failing due to StaleConfig and exhausting the mongos retry attempts.
+            planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
+            // We need to retry the bucket, so we should not free the current bucket.
+            bucketFreer.dismiss();
+            _retryBucket(bucketWsmId);
+            return {false, PlanStage::NEED_YIELD};
         }
+        throw;
     }
     _specificStats.nMeasurementsMatched += modifiedMeasurements.size();
     _specificStats.nMeasurementsModified += modifiedMeasurements.size();
