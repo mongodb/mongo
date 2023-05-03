@@ -1681,6 +1681,12 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
             const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
             AutoGetCollection autoColl(opCtx, dbAndUUID, MODE_IX);
 
+            // The index build hasn't yet completed its initial setup, and persisted state like
+            // commit quorum information is absent. There's nothing to do here.
+            if (replState->isSettingUp()) {
+                return;
+            }
+
             // The index build might have committed or aborted while looping and not holding the
             // collection lock. Re-checking if it is still active after taking locks would not solve
             // the issue, as build can still be registered as active, even if it is in an aborted or
@@ -2654,10 +2660,15 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     if (!opCtx->isKillPending() &&
         feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        if (ErrorCodes::NotWritablePrimary == status && !replState->isAbortCleanUpRequired()) {
-            // Clean up if the error happens due to stepdown before 'startIndexBuild' oplog entry is
-            // replicated. Other nodes will not be aware of this index build, so trying to signal
-            // for abort to the new primary cannot succeed.
+        if (!replState->isAbortCleanUpRequired()) {
+            // The index build aborted at an early stage before the 'startIndexBuild' oplog entry is
+            // replicated: members replicating from this sync source are not aware of this index
+            // build, nor has any build state been persisted locally. Unregister the index build
+            // locally without voting to abort the build.
+            LOGV2(7564400,
+                  "Index build: unregistering without voting for abort",
+                  "buildUUD"_attr = replState->buildUUID,
+                  "error"_attr = status);
             activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
             return;
         }
