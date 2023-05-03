@@ -429,8 +429,9 @@ public:
 
             auto it = col.begin();
             for (auto elem : expected) {
-                BSONElement other = *(it++);
+                BSONElement other = *it;
                 ASSERT(elem.binaryEqualValues(other));
+                ++it;
             }
         }
 
@@ -440,8 +441,9 @@ public:
 
             auto it = col.begin();
             for (auto elem : expected) {
-                BSONElement other = *(it++);
+                BSONElement other = *it;
                 ASSERT(elem.binaryEqualValues(other));
+                ++it;
             }
         }
 
@@ -486,10 +488,26 @@ public:
 
             for (; it1 != itEnd && it2 != itEnd; ++it1, ++it2) {
                 ASSERT(it1->binaryEqualValues(*it2));
-                ASSERT_EQ(&*it1, &*it2);  // Iterators should point to same reference
             }
 
             ASSERT(it1 == it2);
+        }
+
+        // Verify iterator equality operator
+        {
+            BSONColumn col(columnElement);
+
+            auto iIt = col.begin();
+            for (size_t i = 0; i < expected.size(); ++i, ++iIt) {
+                auto jIt = col.begin();
+                for (size_t j = 0; j < expected.size(); ++j, ++jIt) {
+                    if (i == j) {
+                        ASSERT(iIt == jIt);
+                    } else {
+                        ASSERT(iIt != jIt);
+                    }
+                }
+            }
         }
     }
 

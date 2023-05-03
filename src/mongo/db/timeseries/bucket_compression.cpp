@@ -212,7 +212,7 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
             if (!validateDecompression)
                 return true;
 
-            BSONColumn col(binary, ""_sd);
+            BSONColumn col(binary);
             auto measurementEnd = measurements.end();
             auto columnEnd = col.end();
 
