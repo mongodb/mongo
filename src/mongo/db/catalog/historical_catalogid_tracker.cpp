@@ -146,7 +146,7 @@ HistoricalCatalogIdTracker::LookupResult HistoricalCatalogIdTracker::lookup(
 
 void HistoricalCatalogIdTracker::create(const NamespaceString& nss,
                                         const UUID& uuid,
-                                        RecordId catalogId,
+                                        const RecordId& catalogId,
                                         boost::optional<Timestamp> ts) {
 
     if (!ts) {
@@ -199,7 +199,7 @@ bool HistoricalCatalogIdTracker::canRecordNonExisting(const UUID& uuid) const {
 
 void HistoricalCatalogIdTracker::recordExistingAtTime(const NamespaceString& nss,
                                                       const UUID& uuid,
-                                                      RecordId catalogId,
+                                                      const RecordId& catalogId,
                                                       Timestamp ts) {
 
     // Helper lambda to perform the operation on both namespace and UUID
@@ -497,7 +497,7 @@ void HistoricalCatalogIdTracker::_recordCleanupTime(Timestamp ts) {
 
 void HistoricalCatalogIdTracker::_createTimestamp(const NamespaceString& nss,
                                                   const UUID& uuid,
-                                                  RecordId catalogId,
+                                                  const RecordId& catalogId,
                                                   Timestamp ts) {
     // Helper lambda to perform the operation on both namespace and UUID
     auto doCreate = [&catalogId, &ts](auto& idsContainer, const auto& key) {
@@ -534,18 +534,21 @@ void HistoricalCatalogIdTracker::_createTimestamp(const NamespaceString& nss,
 
 void HistoricalCatalogIdTracker::_createNoTimestamp(const NamespaceString& nss,
                                                     const UUID& uuid,
-                                                    RecordId catalogId) {
+                                                    const RecordId& catalogId) {
     // Make sure untimestamped writes have a single entry in mapping. If we're mixing
     // timestamped with untimestamped (such as repair). Ignore the untimestamped writes
     // as an untimestamped deregister will correspond with an untimestamped register. We
     // should leave the mapping as-is in this case.
 
-    auto doCreate = [&catalogId](auto& idsContainer, const auto& key) {
+    auto doCreate = [&catalogId](auto& idsContainer, auto& changesContainer, const auto& key) {
         const std::vector<TimestampedCatalogId>* ids = idsContainer.find(key);
         if (!ids) {
             // This namespace or UUID was added due to an untimestamped write, add an entry
             // with min timestamp
             idsContainer = idsContainer.set(key, {{catalogId, Timestamp::min()}});
+
+            // Nothing to cleanup after untimestamped write
+            changesContainer = changesContainer.erase(key);
             return;
         }
 
@@ -559,12 +562,15 @@ void HistoricalCatalogIdTracker::_createNoTimestamp(const NamespaceString& nss,
             invariant(!ids->back().ts.isNull());
 
             idsContainer = idsContainer.set(key, {{catalogId, Timestamp::min()}});
+
+            // Nothing to cleanup after untimestamped write
+            changesContainer = changesContainer.erase(key);
         }
     };
 
     // Create on both namespace and uuid containers.
-    doCreate(_nss, nss);
-    doCreate(_uuid, uuid);
+    doCreate(_nss, _nssChanges, nss);
+    doCreate(_uuid, _uuidChanges, uuid);
 }
 
 void HistoricalCatalogIdTracker::_dropTimestamp(const NamespaceString& nss,
@@ -619,17 +625,20 @@ void HistoricalCatalogIdTracker::_dropNoTimestamp(const NamespaceString& nss, co
     // an untimestamped deregister will correspond with an untimestamped register. We should
     // leave the mapping as-is in this case.
 
-    auto doDrop = [](auto& idsContainer, const auto& key) {
+    auto doDrop = [](auto& idsContainer, auto& changesContainer, const auto& key) {
         const std::vector<TimestampedCatalogId>* ids = idsContainer.find(key);
         if (ids && ids->size() == 1) {
             // This namespace or UUID was removed due to an untimestamped write, clear entries.
             idsContainer = idsContainer.erase(key);
+
+            // Nothing to cleanup after untimestamped write
+            changesContainer = changesContainer.erase(key);
         }
     };
 
     // Drop on both namespace and uuid containers
-    doDrop(_nss, nss);
-    doDrop(_uuid, uuid);
+    doDrop(_nss, _nssChanges, nss);
+    doDrop(_uuid, _uuidChanges, uuid);
 }
 
 void HistoricalCatalogIdTracker::_renameTimestamp(const NamespaceString& from,

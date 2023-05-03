@@ -89,7 +89,7 @@ public:
      */
     void create(const NamespaceString& nss,
                 const UUID& uuid,
-                RecordId catalogId,
+                const RecordId& catalogId,
                 boost::optional<Timestamp> ts);
 
     /**
@@ -113,7 +113,7 @@ public:
      */
     void recordExistingAtTime(const NamespaceString& nss,
                               const UUID& uuid,
-                              RecordId catalogId,
+                              const RecordId& catalogId,
                               Timestamp ts);
 
     /**
@@ -150,9 +150,11 @@ private:
 
     void _createTimestamp(const NamespaceString& nss,
                           const UUID& uuid,
-                          RecordId catalogId,
+                          const RecordId& catalogId,
                           Timestamp ts);
-    void _createNoTimestamp(const NamespaceString& nss, const UUID& uuid, RecordId catalogId);
+    void _createNoTimestamp(const NamespaceString& nss,
+                            const UUID& uuid,
+                            const RecordId& catalogId);
     void _dropTimestamp(const NamespaceString& nss, const UUID& uuid, Timestamp ts);
     void _dropNoTimestamp(const NamespaceString& nss, const UUID& uuid);
     void _renameTimestamp(const NamespaceString& from, const NamespaceString& to, Timestamp ts);

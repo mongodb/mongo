@@ -1014,5 +1014,56 @@ TEST(HistoricalCatalogIdTrackerTest, NoTimestampRenameDropTarget) {
               HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists);
 }
 
+TEST(HistoricalCatalogIdTrackerTest, CleanupAfterMixedMode1) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    UUID uuid1 = UUID::gen();
+    RecordId rid1{1};
+    UUID uuid2 = UUID::gen();
+    RecordId rid2{2};
+
+    // Initialize the oldest timestamp to (1, 1)
+    HistoricalCatalogIdTracker tracker(Timestamp(1, 1));
+
+    // Create and drop collection with timestamp, this leaves a history that may be cleaned up at
+    // the drop timestamp
+    tracker.create(nss, uuid1, rid1, Timestamp(1, 2));
+    tracker.drop(nss, uuid1, Timestamp(1, 3));
+
+    // Re-create and drop without timestamp
+    tracker.create(nss, uuid2, rid2, boost::none);
+    tracker.drop(nss, uuid2, boost::none);
+
+    // Try and cleanup for the namespace that was previously marked for needing cleanup
+    tracker.cleanup(Timestamp(1, 2));
+}
+
+TEST(HistoricalCatalogIdTrackerTest, CleanupAfterMixedMode2) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    UUID uuid1 = UUID::gen();
+    RecordId rid1{1};
+    UUID uuid2 = UUID::gen();
+    RecordId rid2{2};
+    UUID uuid3 = UUID::gen();
+    RecordId rid3{3};
+
+    // Initialize the oldest timestamp to (1, 1)
+    HistoricalCatalogIdTracker tracker(Timestamp(1, 1));
+
+    // Create and drop collection with timestamp, this leaves a history that may be cleaned up at
+    // the drop timestamp
+    tracker.create(nss, uuid1, rid1, Timestamp(1, 2));
+    tracker.drop(nss, uuid1, Timestamp(1, 3));
+
+    // Re-create and drop without timestamp
+    tracker.create(nss, uuid2, rid2, boost::none);
+    tracker.drop(nss, uuid2, boost::none);
+
+    // Create namespace again, will have a single entry and must therefore not require cleanup
+    tracker.create(nss, uuid3, rid3, Timestamp(1, 5));
+
+    // Try and cleanup for the namespace that was previously marked for needing cleanup
+    tracker.cleanup(Timestamp(1, 2));
+}
+
 }  // namespace
 }  // namespace mongo
