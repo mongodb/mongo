@@ -92,6 +92,11 @@ public:
     Status checkIfCanBuildIndex() final;
 
     /**
+     * Checks if opening a new change stream should block.
+     */
+    Status checkIfCanOpenChangeStream() final;
+
+    /**
      * Returns error status if "getMore" command of a change stream should fail.
      */
     Status checkIfCanGetMoreChangeStream() final;

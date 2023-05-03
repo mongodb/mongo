@@ -127,6 +127,12 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  * to be rejected if it is possible that some writes have been accepted by the recipient (i.e. the
  * migration has committed).
  *
+ * When opening new change streams without a resume token the server needs to pick a start time to
+ * avoid reprocessing events that happened before the change stream was opened. This is usually the
+ * optime of the last committed write in the oplog. However, while in the kBlockingWrites and
+ * kBlockingWritesAndReads states, the latest global oplog time might wind up after the
+ * blockTimestamp, so we to delay these commands by calling assertCanOpenChangeStream.
+ *
  * Change stream getMore commands call assertCanGetMoreChangeStream. After a commit normal getMores
  * are allowed to proceed and drain the cursors, but change stream cursors are infinite and can't be
  * fully drained. We added this special check for change streams specifically to signal that they
@@ -202,6 +208,11 @@ public:
     // after registering the build.
     //
     Status checkIfCanBuildIndex() final;
+
+    /**
+     * Checks if opening change streams should fail.
+     */
+    Status checkIfCanOpenChangeStream() final;
 
     /**
      * Returns error status if "getMore" command of a change stream should fail.

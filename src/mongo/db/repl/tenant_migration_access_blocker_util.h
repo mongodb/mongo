@@ -93,6 +93,11 @@ void checkIfCanWriteOrThrow(OperationContext* opCtx, const DatabaseName& dbName,
 Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName);
 
 /**
+ * Asserts if opening a new change stream should block.
+ */
+void assertCanOpenChangeStream(OperationContext* opCtx, const DatabaseName& dbName);
+
+/**
  * Asserts if getMores for change streams should fail.
  */
 void assertCanGetMoreChangeStream(OperationContext* opCtx, const DatabaseName& dbName);

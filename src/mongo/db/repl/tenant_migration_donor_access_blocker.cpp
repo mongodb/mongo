@@ -224,6 +224,25 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanBuildIndex() {
     MONGO_UNREACHABLE;
 }
 
+Status TenantMigrationDonorAccessBlocker::checkIfCanOpenChangeStream() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    switch (_state.getState()) {
+        case BlockerState::State::kAllow:
+            return Status::OK();
+        case BlockerState::State::kBlockWrites:
+        case BlockerState::State::kBlockWritesAndReads:
+            return {TenantMigrationConflictInfo(getMigrationId(), shared_from_this()),
+                    "Change stream must wait for commit or abort to get a safe start time"};
+        case BlockerState::State::kReject:
+            // At this point checkIfCanReadOrBlock should have blocked this at the command level.
+            return {ErrorCodes::TenantMigrationCommitted,
+                    "Change stream must be resumed on the new owner of this tenant"};
+        case BlockerState::State::kAborted:
+            return Status::OK();
+    }
+    MONGO_UNREACHABLE;
+}
+
 Status TenantMigrationDonorAccessBlocker::checkIfCanGetMoreChangeStream() {
     stdx::lock_guard<Latch> lg(_mutex);
     switch (_state.getState()) {

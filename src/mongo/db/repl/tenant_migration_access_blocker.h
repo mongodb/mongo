@@ -73,6 +73,11 @@ public:
     virtual Status checkIfCanBuildIndex() = 0;
 
     /**
+     * Checks if opening a new change stream should block.
+     */
+    virtual Status checkIfCanOpenChangeStream() = 0;
+
+    /**
      * Checks if getMores for change streams should fail.
      */
     virtual Status checkIfCanGetMoreChangeStream() = 0;

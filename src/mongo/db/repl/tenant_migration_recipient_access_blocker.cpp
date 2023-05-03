@@ -158,6 +158,10 @@ Status TenantMigrationRecipientAccessBlocker::checkIfCanBuildIndex() {
     return Status::OK();
 }
 
+Status TenantMigrationRecipientAccessBlocker::checkIfCanOpenChangeStream() {
+    return Status::OK();
+}
+
 Status TenantMigrationRecipientAccessBlocker::checkIfCanGetMoreChangeStream() {
     return Status::OK();
 }

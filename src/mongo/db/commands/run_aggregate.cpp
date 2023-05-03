@@ -81,6 +81,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
@@ -1009,6 +1010,18 @@ Status runAggregate(OperationContext* opCtx,
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         curOp->beginQueryPlanningTimer();
         expCtx->stopExpressionCounters();
+
+        // This prevents opening a new change stream in the critical section of a serverless shard
+        // split or merge operation to prevent resuming on the recipient with a resume token higher
+        // than that operation's blockTimestamp.
+        //
+        // If we do this check before picking a startTime for a change stream then the primary could
+        // go into a blocking state between the check and getting the timestamp resulting in a
+        // startTime greater than blockTimestamp. Therefore we must do this check here, after the
+        // pipeline has been parsed and startTime has been initialized.
+        if (liteParsedPipeline.hasChangeStream()) {
+            tenant_migration_access_blocker::assertCanOpenChangeStream(expCtx->opCtx, nss.dbName());
+        }
 
         // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
         // $$USER_ROLES for the aggregation.
