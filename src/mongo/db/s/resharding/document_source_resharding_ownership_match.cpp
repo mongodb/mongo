@@ -93,7 +93,7 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
 }
 
 Value DocumentSourceReshardingOwnershipMatch::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
         // TODO: SERVER-76208 support query shapification for IDL types like KeyPattern with custom
         // serializers.
         MONGO_UNIMPLEMENTED_TASSERT(7484302);

@@ -61,7 +61,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFro
 }
 
 Value DocumentSourceListSampledQueries::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(6876002);
     }
 

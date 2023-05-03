@@ -40,7 +40,7 @@ namespace {
 /**
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -51,8 +51,8 @@ TEST(ExpressionFunction, SerializeAndRedactArgs) {
     std::string replacementChar = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementChar;
-    options.redactIdentifiers = true;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.applyHmacToIdentifiers = true;
+    options.identifierHmacPolicy = applyHmacForTest;
 
     auto expCtx = ExpressionContextForTest();
     auto expr = BSON("$function" << BSON("body"

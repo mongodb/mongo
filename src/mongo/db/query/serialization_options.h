@@ -42,7 +42,7 @@
 namespace mongo {
 namespace {
 // Should never be called, throw to ensure we catch this in tests.
-std::string defaultRedactionStrategy(StringData s) {
+std::string defaultHmacStrategy(StringData s) {
     MONGO_UNREACHABLE_TASSERT(7332410);
 }
 }  // namespace
@@ -83,38 +83,38 @@ struct SerializationOptions {
 
     SerializationOptions(ExplainOptions::Verbosity verbosity_) : verbosity(verbosity_) {}
 
-    SerializationOptions(std::function<std::string(StringData)> identifierRedactionPolicy_,
+    SerializationOptions(std::function<std::string(StringData)> identifierHmacPolicy_,
                          boost::optional<StringData> replacementForLiteralArgs_)
         : replacementForLiteralArgs(replacementForLiteralArgs_),
-          redactIdentifiers(identifierRedactionPolicy_),
-          identifierRedactionPolicy(identifierRedactionPolicy_) {}
+          applyHmacToIdentifiers(identifierHmacPolicy_),
+          identifierHmacPolicy(identifierHmacPolicy_) {}
 
-    SerializationOptions(std::function<std::string(StringData)> redactFieldNamesStrategy_,
+    SerializationOptions(std::function<std::string(StringData)> fieldNamesHmacPolicy_,
                          LiteralSerializationPolicy policy)
         : literalPolicy(policy),
-          redactIdentifiers(redactFieldNamesStrategy_),
-          identifierRedactionPolicy(redactFieldNamesStrategy_) {}
+          applyHmacToIdentifiers(fieldNamesHmacPolicy_),
+          identifierHmacPolicy(fieldNamesHmacPolicy_) {}
 
-    // Helper function for redacting identifiable information (like collection/db names).
-    // Note: serializeFieldPath/serializeFieldPathFromString should be used for redacting field
+    // Helper function for removing identifiable information (like collection/db names).
+    // Note: serializeFieldPath/serializeFieldPathFromString should be used for field
     // names.
     std::string serializeIdentifier(StringData str) const {
-        if (redactIdentifiers) {
-            return identifierRedactionPolicy(str);
+        if (applyHmacToIdentifiers) {
+            return identifierHmacPolicy(str);
         }
         return str.toString();
     }
 
     std::string serializeFieldPath(FieldPath path) const {
-        if (redactIdentifiers) {
-            std::stringstream redacted;
+        if (applyHmacToIdentifiers) {
+            std::stringstream hmaced;
             for (size_t i = 0; i < path.getPathLength(); ++i) {
                 if (i > 0) {
-                    redacted << ".";
+                    hmaced << ".";
                 }
-                redacted << identifierRedactionPolicy(path.getFieldName(i));
+                hmaced << identifierHmacPolicy(path.getFieldName(i));
             }
-            return redacted.str();
+            return hmaced.str();
         }
         return path.fullPath();
     }
@@ -143,17 +143,17 @@ struct SerializationOptions {
         return ImplicitValue(n);
     }
 
-    // Helper functions for redacting BSONObj. Does not take into account anything to do with MQL
-    // semantics, redacts all field names and literals in the passed in obj.
-    void redactArrayToBuilder(BSONArrayBuilder* bab, std::vector<BSONElement> array) {
+    // Helper functions for applying hmac to BSONObj. Does not take into account anything to do with
+    // MQL semantics, removes all field names and literals in the passed in obj.
+    void addHmacedArrayToBuilder(BSONArrayBuilder* bab, std::vector<BSONElement> array) {
         for (const auto& elem : array) {
             if (elem.type() == BSONType::Object) {
                 BSONObjBuilder subObj(bab->subobjStart());
-                redactObjToBuilder(&subObj, elem.Obj());
+                addHmacedObjToBuilder(&subObj, elem.Obj());
                 subObj.done();
             } else if (elem.type() == BSONType::Array) {
                 BSONArrayBuilder subArr(bab->subarrayStart());
-                redactArrayToBuilder(&subArr, elem.Array());
+                addHmacedArrayToBuilder(&subArr, elem.Array());
                 subArr.done();
             } else {
                 *bab << serializeLiteral(elem);
@@ -161,16 +161,16 @@ struct SerializationOptions {
         }
     }
 
-    void redactObjToBuilder(BSONObjBuilder* bob, BSONObj objToRedact) {
-        for (const auto& elem : objToRedact) {
+    void addHmacedObjToBuilder(BSONObjBuilder* bob, BSONObj objToHmac) {
+        for (const auto& elem : objToHmac) {
             auto fieldName = serializeFieldPath(elem.fieldName());
             if (elem.type() == BSONType::Object) {
                 BSONObjBuilder subObj(bob->subobjStart(fieldName));
-                redactObjToBuilder(&subObj, elem.Obj());
+                addHmacedObjToBuilder(&subObj, elem.Obj());
                 subObj.done();
             } else if (elem.type() == BSONType::Array) {
                 BSONArrayBuilder subArr(bob->subarrayStart(fieldName));
-                redactArrayToBuilder(&subArr, elem.Array());
+                addHmacedArrayToBuilder(&subArr, elem.Array());
                 subArr.done();
             } else {
                 appendLiteral(bob, fieldName, elem);
@@ -235,11 +235,11 @@ struct SerializationOptions {
     // so the serialization expected would be {$and: [{a: {$gt: '?'}}, {b: {$lt: '?'}}]}.
     LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged;
 
-    // If true the caller must set identifierRedactionPolicy. 'redactIdentifiers' if set along with
+    // If true the caller must set identifierHmacPolicy. 'applyHmacToIdentifiers' if set along with
     // a strategy the redaction strategy will be called on any personal identifiable information
     // (e.g., field paths/names, collection names) encountered before serializing them.
-    bool redactIdentifiers = false;
-    std::function<std::string(StringData)> identifierRedactionPolicy = defaultRedactionStrategy;
+    bool applyHmacToIdentifiers = false;
+    std::function<std::string(StringData)> identifierHmacPolicy = defaultHmacStrategy;
 
     // If set, serializes without including the path. For example {a: {$gt: 2}} would serialize
     // as just {$gt: 2}.

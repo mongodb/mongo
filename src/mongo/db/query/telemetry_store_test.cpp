@@ -121,9 +121,9 @@ TEST_F(TelemetryStoreTest, EvictEntries) {
 }
 
 /**
- * A default redaction strategy that generates easy to check results for testing purposes.
+ * A default hmac application strategy that generates easy to check results for testing purposes.
  */
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
@@ -136,10 +136,10 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.redactIdentifiers = true;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.applyHmacToIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
 
-    auto redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    auto hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -156,11 +156,11 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add sort.
     fcr.setSort(BSON("sortVal" << 1 << "otherSort" << -1));
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -180,11 +180,11 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add inclusion projection.
     fcr.setProjection(BSON("e" << true << "f" << true));
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -209,14 +209,14 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add let.
     fcr.setLet(BSON("var1"
                     << "$a"
                     << "var2"
                     << "const1"));
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -245,13 +245,13 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add hinting fields.
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -290,7 +290,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add the literal redaction fields.
     fcr.setLimit(5);
@@ -299,7 +299,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setMaxTimeMS(1000);
     fcr.setNoCursorTimeout(false);
 
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -342,9 +342,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "maxTimeMS": "?number"
             }
         })",
-        redacted);
+        hmacApplied);
 
-    // Add the fields that shouldn't be redacted.
+    // Add the fields that shouldn't be hmacApplied.
     fcr.setSingleBatch(true);
     fcr.setAllowDiskUse(false);
     fcr.setAllowPartialResults(true);
@@ -352,7 +352,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setShowRecordId(true);
     fcr.setAwaitData(false);
     fcr.setMirrored(true);
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -401,7 +401,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "mirrored": "?bool"
             }
         })",
-        redacted);
+        hmacApplied);
 }
 
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
@@ -413,10 +413,10 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     fcr.setProjection(BSONObj());
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.redactIdentifiers = true;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.applyHmacToIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
 
-    auto redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    auto hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -428,7 +428,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
                 "filter": {}
             }
         })",
-        redacted);  // NOLINT (test auto-update)
+        hmacApplied);  // NOLINT (test auto-update)
 }
 
 TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
@@ -445,7 +445,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
 
-    auto redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    auto hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -472,13 +472,13 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
     // Test with a string hint. Note that this is the internal representation of the string hint
     // generated at parse time.
     fcr.setHint(BSON("$hint"
                      << "z"));
 
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -503,14 +503,14 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     fcr.setHint(BSON("z" << 1 << "c" << 1));
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
-    opts.redactIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.applyHmacToIdentifiers = true;
     opts.replacementForLiteralArgs = boost::none;
     opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -536,12 +536,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -567,11 +567,11 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Test that $natural comes through unmodified.
     fcr.setHint(BSON("$natural" << -1));
-    redacted = findShapifier.makeTelemetryKey(opts, expCtx);
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -596,12 +596,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 }
 
 TEST_F(TelemetryStoreTest, DefinesLetVariables) {
-    // Test that the expression context we use to redact will understand the 'let' part of the find
-    // command while parsing the other pieces of the command.
+    // Test that the expression context we use to apply hmac will understand the 'let' part of the
+    // find command while parsing the other pieces of the command.
 
     // Note that this ExpressionContext will not have the let variables defined - we expect the
     // 'makeTelemetryKey' call to do that.
@@ -615,9 +615,10 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
                                         << "testDB"));
     TelemetryMetrics testMetrics{cmdObj, boost::none, fcr.getNamespaceOrUUID()};
 
-    bool redactIdentifiers = false;
-    auto redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
-    // As the query never moves through registerFindRequest and redaction is not enabled,
+    bool applyHmacToIdentifiers = false;
+    auto hmacApplied =
+        testMetrics.applyHmacToKey(cmdObj, applyHmacToIdentifiers, std::string{}, opCtx.get());
+    // As the query never moves through registerFindRequest and hmac is not enabled,
     // makeTelemetryKey() never gets called and consequently the query never gets shapified.
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -640,12 +641,13 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
             },
             "$db": "testDB"
         })",
-        redacted);
+        hmacApplied);
 
-    // Now be sure the variable names are redacted. We don't currently expose a different
-    // way to do the hashing, so we'll just stick with the big long strings here for now.
-    redactIdentifiers = true;
-    redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
+    // Now be sure hmac is applied to variable names. We don't currently expose a different way to
+    // do the hashing, so we'll just stick with the big long strings here for now.
+    applyHmacToIdentifiers = true;
+    hmacApplied =
+        testMetrics.applyHmacToKey(cmdObj, applyHmacToIdentifiers, std::string{}, opCtx.get());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -673,7 +675,7 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 }
 
 TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimplePipeline) {
@@ -702,8 +704,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimpl
 
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
-    opts.redactIdentifiers = false;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.applyHmacToIdentifiers = false;
+    opts.identifierHmacPolicy = applyHmacForTest;
 
     auto shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -763,7 +765,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimpl
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.redactIdentifiers = true;
+    opts.applyHmacToIdentifiers = true;
     shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1058,8 +1060,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) {
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.redactIdentifiers = true;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.applyHmacToIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
 
     auto shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

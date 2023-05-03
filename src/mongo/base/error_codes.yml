@@ -505,7 +505,7 @@ error_codes:
 
     - {code: 386, name: DuplicateKeyId}
 
-    - {code: 387, name: EncounteredFLEPayloadWhileRedacting}
+    - {code: 387, name: EncounteredFLEPayloadWhileApplyingHmac}
 
     - {code: 388, name: TransactionTooLargeForCache}
     - {code: 389, name: LibmongocryptError}

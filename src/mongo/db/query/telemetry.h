@@ -128,10 +128,10 @@ public:
     /**
      * Redact a given telemetry key and set _keySize.
      */
-    BSONObj redactKey(const BSONObj& key,
-                      bool redactIdentifiers,
-                      std::string redactionKey,
-                      OperationContext* opCtx) const;
+    BSONObj applyHmacToKey(const BSONObj& key,
+                           bool applyHmacToIdentifiers,
+                           std::string hmacKey,
+                           OperationContext* opCtx) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -153,7 +153,7 @@ public:
     AggregatedMetric docsReturned;
 
     /**
-     * A representative command for a given telemetry key. This is used to derive the redacted
+     * A representative command for a given telemetry key. This is used to derive the hmac applied
      * telemetry key at read-time.
      */
     BSONObj cmdObj;
@@ -168,9 +168,9 @@ public:
 
 private:
     /**
-     * We cache the redacted key the first time it's computed.
+     * We cache the hmac applied key the first time it's computed.
      */
-    mutable boost::optional<BSONObj> _redactedKey;
+    mutable boost::optional<BSONObj> _hmacAppliedKey;
 };
 
 struct TelemetryPartitioner {
@@ -230,7 +230,7 @@ void writeTelemetry(OperationContext* opCtx,
 
 /**
  * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
- * with all field names and literals redacted.
+ * with hmac applied to all field names and literals.
  */
 BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
                          const SerializationOptions& opts,

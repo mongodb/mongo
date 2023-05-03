@@ -1,5 +1,5 @@
 /**
- * Test that $telemetry properly redacts find commands, on mongod and mongos.
+ * Test that $telemetry properly applies hmac to find commands, on mongod and mongos.
  */
 load("jstests/libs/telemetry_utils.js");
 (function() {
