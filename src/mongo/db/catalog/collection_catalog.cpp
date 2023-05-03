@@ -2218,9 +2218,11 @@ void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
                 // This namespace or UUID was added due to an untimestamped write, add an entry
                 // with min timestamp
                 ids.push_back(TimestampedCatalogId{catalogId, Timestamp::min()});
+                catalogIdChangesContainer = catalogIdChangesContainer.erase(key);
             } else if (ids.size() == 1 && !catalogId) {
                 // This namespace or UUID was removed due to an untimestamped write, clear entries.
                 ids.clear();
+                catalogIdChangesContainer = catalogIdChangesContainer.erase(key);
             } else if (ids.size() > 1 && catalogId && !storageGlobalParams.repair) {
                 // This namespace or UUID was added due to an untimestamped write. But this
                 // namespace or UUID already had some timestamped writes performed. In this case, we
@@ -2232,6 +2234,7 @@ void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
 
                 ids.clear();
                 ids.push_back(TimestampedCatalogId{catalogId, Timestamp::min()});
+                catalogIdChangesContainer = catalogIdChangesContainer.erase(key);
             }
 
             return;
