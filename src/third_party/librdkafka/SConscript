@@ -17,11 +17,11 @@ else:
     env.FatalError("Unsupported platform for librdkafka builds.")
 
 # Suppress some warnings in librdkafka builds.
-env.Append(CCFLAGS=['-Wno-unused-variable'])
+env.Append(CCFLAGS=['-Wno-error=unused-variable'])
 if env.ToolchainIs('clang'):
-    env.Append(CCFLAGS=['-Wno-uninitialized'])
+    env.Append(CCFLAGS=['-Wno-error=uninitialized'])
 else:
-    env.Append(CCFLAGS=['-Wno-maybe-uninitialized'])
+    env.Append(CCFLAGS=['-Wno-error=maybe-uninitialized'])
 
 
 def remove_define(env, define_to_remove):
