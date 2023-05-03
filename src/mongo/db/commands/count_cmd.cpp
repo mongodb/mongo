@@ -189,7 +189,8 @@ public:
                 nss,
                 viewAggCmd,
                 verbosity,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                APIParameters::get(opCtx).getAPIStrict().value_or(false),
+                request.getSerializationContext());
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.

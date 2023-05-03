@@ -268,6 +268,12 @@ public:
             // Parse the command BSON to a FindCommandRequest.
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
 
+            // check validated tenantId and correct the serialization context object on the request
+            auto reqSerializationContext = findCommand->getSerializationContext();
+            reqSerializationContext.setTenantIdSource(_request.getValidatedTenantId() !=
+                                                      boost::none);
+            findCommand->setSerializationContext(reqSerializationContext);
+
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
 
@@ -312,7 +318,8 @@ public:
                     nss,
                     viewAggCmd,
                     verbosity,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                    APIParameters::get(opCtx).getAPIStrict().value_or(false),
+                    reqSerializationContext);
 
                 try {
                     // An empty PrivilegeVector is acceptable because these privileges are only
@@ -368,6 +375,16 @@ public:
             const bool isExplain = false;
             const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, cmdObj);
+
+            // check validated tenantId and correct the serialization context object on the request
+            auto reqSerializationContext = findCommand->getSerializationContext();
+            reqSerializationContext.setTenantIdSource(_request.getValidatedTenantId() !=
+                                                      boost::none);
+            findCommand->setSerializationContext(reqSerializationContext);
+
+            auto respSerializationContext =
+                SerializationContext::stateCommandReply(reqSerializationContext);
+
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // Only allow speculative majority for internal commands that specify the correct flag.
@@ -572,10 +589,6 @@ public:
                 }
             }
 
-            // We need to copy the serialization context from the request to the reply object before
-            // the request object goes out of scope
-            const auto serializationContext = cq->getFindCommandRequest().getSerializationContext();
-
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
@@ -732,7 +745,7 @@ public:
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(nss.ns(), docUnitsReturned);
             query_request_helper::validateCursorResponse(
-                result->getBodyBuilder().asTempObj(), nss.tenantId(), serializationContext);
+                result->getBodyBuilder().asTempObj(), nss.tenantId(), respSerializationContext);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

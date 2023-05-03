@@ -58,8 +58,10 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
                                       const DatabaseName& dbName,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict) {
-    return parseFromBSON(opCtx, parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
+                                      bool apiStrict,
+                                      const SerializationContext& serializationContext) {
+    return parseFromBSON(
+        opCtx, parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict, serializationContext);
 }
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
@@ -68,7 +70,8 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
-        return parseFromBSON(/*opCtx=*/nullptr, nss, cmdObj, explainVerbosity, apiStrict);
+        return parseFromBSON(
+            /*opCtx=*/nullptr, nss, cmdObj, explainVerbosity, apiStrict, SerializationContext());
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
@@ -80,8 +83,9 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
+        // TODO SERVER-75930: pass serializationContext in
         return parseFromBSON(
-            /*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict);
+            /*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict, SerializationContext());
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
@@ -91,7 +95,8 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
                                       NamespaceString nss,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict) {
+                                      bool apiStrict,
+                                      const SerializationContext& serializationContext) {
 
     // if the command object lacks field 'aggregate' or '$db', we will use the namespace in 'nss'.
     bool cmdObjChanged = false;
@@ -104,9 +109,11 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
     }
 
     AggregateCommandRequest request(nss);
-    request =
-        AggregateCommandRequest::parse(IDLParserContext("aggregate", apiStrict, nss.tenantId()),
-                                       cmdObjChanged ? cmdObjBob.obj() : cmdObj);
+    // TODO SERVER-75930: tenantId in VTS isn't properly detected by call to parse(IDLParseContext&,
+    // BSONObj&)
+    request = AggregateCommandRequest::parse(
+        IDLParserContext("aggregate", apiStrict, nss.tenantId(), serializationContext),
+        cmdObjChanged ? cmdObjBob.obj() : cmdObj);
 
     if (explainVerbosity) {
         uassert(ErrorCodes::FailedToParse,
