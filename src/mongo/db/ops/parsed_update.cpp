@@ -188,11 +188,12 @@ void ParsedUpdate::parseUpdate() {
     _driver.setCollator(_expCtx->getCollator());
     _driver.setLogOp(true);
     _driver.setFromOplogApplication(_request->isFromOplogApplication());
-
+    _expCtx->isParsingPipelineUpdate = true;
     _driver.parse(_request->getUpdateModification(),
                   _arrayFilters,
                   _request->getUpdateConstants(),
                   _request->isMulti());
+    _expCtx->isParsingPipelineUpdate = false;
 }
 
 PlanYieldPolicy::YieldPolicy ParsedUpdate::yieldPolicy() const {
