@@ -73,7 +73,7 @@ using ce::SamplingEstimator;
 using cost_model::CostEstimatorImpl;
 using cost_model::CostModelManager;
 
-static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpecsOptimizer(
+static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     OperationContext* opCtx,
     const CollectionPtr& collection,
@@ -88,28 +88,31 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
         return {};
     }
 
+    std::pair<IndexDefinitions, MultikeynessTrie> result;
     std::string indexHintName;
+    bool skipAllIndexes = false;
     if (indexHint) {
         const BSONElement element = indexHint->firstElement();
         const StringData fieldName = element.fieldNameStringData();
         if (fieldName == "$natural"_sd) {
             // Do not add indexes.
-            return {};
+            skipAllIndexes = true;
         } else if (fieldName == "$hint"_sd && element.type() == BSONType::String) {
             indexHintName = element.valueStringData().toString();
         }
 
-        disableScan = true;
+        disableScan = !skipAllIndexes;
     }
 
     const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
-    opt::unordered_map<std::string, IndexDefinition> result;
+
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
 
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();
         const IndexDescriptor& descriptor = *catalogEntry.descriptor();
+        bool skipIndex = false;
 
         if (descriptor.hidden()) {
             // Index is hidden; don't consider it.
@@ -127,11 +130,11 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
                 if (!SimpleBSONObjComparator::kInstance.evaluate(descriptor.keyPattern() ==
                                                                  *indexHint)) {
                     // Index key pattern does not match hint.
-                    continue;
+                    skipIndex = true;
                 }
             } else if (indexHintName != descriptor.indexName()) {
                 // Index name does not match hint.
-                continue;
+                skipIndex = true;
             }
         }
 
@@ -227,15 +230,27 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
             partialIndexReqMap = std::move(conversion->_reqMap);
         }
 
+        IndexDefinition indexDef(std::move(indexCollationSpec),
+                                 version,
+                                 orderingBits,
+                                 isMultiKey,
+                                 DistributionType::Centralized,
+                                 std::move(partialIndexReqMap));
+        // Skip partial indexes. A path could be non-multikey on a partial index (subset of the
+        // collection), but still be multikey on the overall collection.
+        if (indexDef.getPartialReqMap().isNoop()) {
+            for (const auto& component : indexDef.getCollationSpec()) {
+                result.second.add(component._path.ref());
+            }
+        }
         // For now we assume distribution is Centralized.
-        result.emplace(descriptor.indexName(),
-                       IndexDefinition(std::move(indexCollationSpec),
-                                       version,
-                                       orderingBits,
-                                       isMultiKey,
-                                       DistributionType::Centralized,
-                                       std::move(partialIndexReqMap)));
+        if (!skipIndex && !skipAllIndexes) {
+            result.first.emplace(descriptor.indexName(), std::move(indexDef));
+        }
     }
+
+    // The empty path refers to the whole document, which can't be an array.
+    result.second.isMultiKey = false;
 
     return result;
 }
@@ -378,17 +393,18 @@ static void populateAdditionalScanDefs(
         // access to the metadata so it generates a scan over just the collection name.
         const std::string scanDefName = collNameStr;
 
-        opt::unordered_map<std::string, optimizer::IndexDefinition> indexDefs;
+        IndexDefinitions indexDefs;
+        MultikeynessTrie multikeynessTrie;
         const ProjectionName& scanProjName = prefixId.getNextId("scan");
         if (collectionExists) {
-            indexDefs = buildIndexSpecsOptimizer(expCtx,
-                                                 opCtx,
-                                                 collection,
-                                                 indexHint,
-                                                 scanProjName,
-                                                 prefixId,
-                                                 disableIndexOptions,
-                                                 disableScan);
+            tie(indexDefs, multikeynessTrie) = buildIndexSpecsOptimizer(expCtx,
+                                                                        opCtx,
+                                                                        collection,
+                                                                        indexHint,
+                                                                        scanProjName,
+                                                                        prefixId,
+                                                                        disableIndexOptions,
+                                                                        disableScan);
         }
 
         // For now handle only local parallelism (no over-the-network exchanges).
@@ -403,6 +419,7 @@ static void populateAdditionalScanDefs(
                                         {"uuid", uuidStr},
                                         {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
                                        std::move(indexDefs),
+                                       std::move(multikeynessTrie),
                                        constFold,
                                        std::move(distribution),
                                        collectionExists,
@@ -504,15 +521,16 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     // Add the base collection metadata.
     opt::unordered_map<std::string, optimizer::IndexDefinition> indexDefs;
+    MultikeynessTrie multikeynessTrie;
     if (collectionExists) {
-        indexDefs = buildIndexSpecsOptimizer(expCtx,
-                                             opCtx,
-                                             collection,
-                                             indexHint,
-                                             scanProjName,
-                                             prefixId,
-                                             queryHints._disableIndexes,
-                                             queryHints._disableScan);
+        tie(indexDefs, multikeynessTrie) = buildIndexSpecsOptimizer(expCtx,
+                                                                    opCtx,
+                                                                    collection,
+                                                                    indexHint,
+                                                                    scanProjName,
+                                                                    prefixId,
+                                                                    queryHints._disableIndexes,
+                                                                    queryHints._disableScan);
     }
 
     const size_t numberOfPartitions = internalQueryDefaultDOP.load();
@@ -529,6 +547,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                                     {"uuid", uuidStr},
                                     {ScanNode::kDefaultCollectionNameSpec, nss.coll().toString()}},
                                    std::move(indexDefs),
+                                   std::move(multikeynessTrie),
                                    constFold,
                                    std::move(distribution),
                                    collectionExists,

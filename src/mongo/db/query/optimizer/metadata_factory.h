@@ -34,11 +34,20 @@
 
 namespace mongo::optimizer {
 
-ScanDefinition createScanDef(ScanDefOptions options,
-                             opt::unordered_map<std::string, IndexDefinition> indexDefs);
+MultikeynessTrie createTrie(const IndexDefinitions& indexDefs);
+
+ScanDefinition createScanDef(ScanDefOptions options, IndexDefinitions indexDefs);
 
 ScanDefinition createScanDef(ScanDefOptions options,
-                             opt::unordered_map<std::string, IndexDefinition> indexDefs,
+                             IndexDefinitions indexDefs,
+                             const ConstFoldFn& constFold,
+                             DistributionAndPaths distributionAndPaths,
+                             bool exists = true,
+                             CEType ce = CEType{-1.0});
+
+ScanDefinition createScanDef(ScanDefOptions options,
+                             IndexDefinitions indexDefs,
+                             MultikeynessTrie multikeynessTrie,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              bool exists = true,

@@ -158,6 +158,7 @@ private:
     PartialSchemaRequirements _partialReqMap;
 };
 
+using IndexDefinitions = opt::unordered_map<std::string, IndexDefinition>;
 using ScanDefOptions = opt::unordered_map<std::string, std::string>;
 
 // Used to specify parameters to scan node, such as collection name, or file where collection is
@@ -167,7 +168,7 @@ public:
     ScanDefinition();
 
     ScanDefinition(ScanDefOptions options,
-                   opt::unordered_map<std::string, IndexDefinition> indexDefs,
+                   IndexDefinitions indexDefs,
                    MultikeynessTrie multikeynessTrie,
                    DistributionAndPaths distributionAndPaths,
                    bool exists,
