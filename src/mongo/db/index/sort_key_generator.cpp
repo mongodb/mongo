@@ -77,16 +77,7 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
     _indexKeyGen = std::make_unique<BtreeKeyGenerator>(
         fieldNames, fixed, isSparse, KeyString::Version::kLatestVersion, _ordering);
 
-    {
-        // TODO SERVER-74725: Remove this.
-        std::set<std::string> fieldNameSet;
-        for (auto& fn : fieldNames) {
-            fieldNameSet.insert(fn);
-        }
-        _sortHasRepeatKey = (fieldNameSet.size() != fieldNames.size());
-    }
-
-    if (!_sortHasMeta && !_sortHasRepeatKey) {
+    if (!_sortHasMeta) {
         size_t i = 0;
         for (auto&& keyPart : _sortPattern) {
             _sortKeyTreeRoot.addSortPatternPart(&keyPart, 0, i++);
@@ -422,7 +413,6 @@ bool SortKeyGenerator::fastFillOutSortKeyPartsHelper(const BSONObj& bson,
 void SortKeyGenerator::generateSortKeyComponentVector(const BSONObj& bson,
                                                       std::vector<BSONElement>* eltsOut) {
     tassert(7103704, "Sort cannot have meta", !_sortHasMeta);
-    tassert(7103701, "Sort cannot have repeat keys", !_sortHasRepeatKey);
     tassert(7103702, "Cannot pass null as eltsOut", eltsOut);
 
     const bool fastPathSucceeded = fastFillOutSortKeyParts(bson, eltsOut);

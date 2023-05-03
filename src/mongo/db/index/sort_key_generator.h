@@ -231,8 +231,6 @@ private:
     // If we're not sorting with a $meta value we can short-cut some work.
     bool _sortHasMeta = false;
 
-    bool _sortHasRepeatKey = false;
-
     std::unique_ptr<BtreeKeyGenerator> _indexKeyGen;
 
     // Used for fastFillOutSortKeyParts()/extractSortKeyParts().
