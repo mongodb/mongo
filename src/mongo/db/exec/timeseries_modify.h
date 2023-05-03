@@ -44,6 +44,7 @@ struct TimeseriesModifyParams {
           isMulti(deleteParams->isMulti),
           fromMigrate(deleteParams->fromMigrate),
           isExplain(deleteParams->isExplain),
+          returnDeleted(deleteParams->returnDeleted),
           stmtId(deleteParams->stmtId),
           canonicalQuery(deleteParams->canonicalQuery) {}
 
@@ -73,6 +74,9 @@ struct TimeseriesModifyParams {
 
     // Are we explaining a command rather than actually executing it?
     bool isExplain;
+
+    // Should we return the deleted document?
+    bool returnDeleted = false;
 
     // The stmtId for this particular command.
     StmtId stmtId = kUninitializedStmtId;
@@ -142,8 +146,12 @@ private:
 
     /**
      * Writes the modifications to a bucket.
+     *
+     * Returns the pair of (whether the write was successful, the stage state to propagate).
      */
-    PlanStage::StageState _writeToTimeseriesBuckets(
+    template <typename F>
+    std::pair<bool, PlanStage::StageState> _writeToTimeseriesBuckets(
+        ScopeGuard<F>& bucketFreer,
         WorkingSetID bucketWsmId,
         const std::vector<BSONObj>& unchangedMeasurements,
         const std::vector<BSONObj>& modifiedMeasurements,
@@ -163,6 +171,11 @@ private:
      * Gets the next bucket to process.
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
+
+    /**
+     * Prepares returning a deleted measurement.
+     */
+    void _prepareToReturnDeletedMeasurement(WorkingSetID& out, BSONObj measurement);
 
     TimeseriesModifyParams _params;
 
@@ -194,5 +207,9 @@ private:
     // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
     // established. This can be set when a write fails or when a fetch fails.
     WorkingSetID _retryBucketId = WorkingSet::INVALID_ID;
+
+    // Stores the deleted document when a deleteOne with returnDeleted: true is requested and we
+    // need to yield.
+    boost::optional<BSONObj> _deletedMeasurementToReturn = boost::none;
 };
 }  //  namespace mongo

@@ -162,7 +162,7 @@ BSONObj createAggregateCmdObj(
         }
         pipeline.emplace_back(BSON(DocumentSourceMatch::kStageName << parsedInfo.query));
         if (parsedInfo.sort) {
-            // TODO (SERVER-73083): skip the sort option for 'findAndModify' calls on time-series
+            // TODO (SERVER-76530): skip the sort option for 'findAndModify' calls on time-series
             // collections.
             pipeline.emplace_back(BSON(DocumentSourceSort::kStageName << *parsedInfo.sort));
         }

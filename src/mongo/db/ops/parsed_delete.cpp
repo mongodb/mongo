@@ -135,7 +135,7 @@ Status ParsedDelete::parseQueryToCQ() {
         // TODO: Due to the complexity which is related to the efficient sort support, we don't
         // support yet findAndModify with a query and sort but it should not be impossible.
         // This code assumes that in findAndModify code path, the parsed delete constructor should
-        // be called with source == kTimeseriesDelete for a time-series collection.
+        // be called with isTimeseriesDelete = true for a time-series collection.
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform a findAndModify with a query and sort on a time-series collection.",
                 !_timeseriesDeleteQueryExprs);

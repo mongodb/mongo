@@ -64,6 +64,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -349,7 +350,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     }();
     auto request = requestAndMsg.first;
 
-    const NamespaceString& nss = request.getNamespace();
+    auto [isTimeseries, nss] = timeseries::isTimeseries(opCtx, request);
+
     uassertStatusOK(userAllowedWriteNS(opCtx, nss));
     auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
@@ -372,7 +374,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
-        ParsedDelete parsedDelete(opCtx, &deleteRequest, collection.getCollectionPtr());
+        ParsedDelete parsedDelete(
+            opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseries);
         uassertStatusOK(parsedDelete.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)

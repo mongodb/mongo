@@ -806,7 +806,7 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
 }
 
 long long writeConflictRetryRemove(OperationContext* opCtx,
-                                   const NamespaceString& nsString,
+                                   const NamespaceString& nss,
                                    DeleteRequest* deleteRequest,
                                    CurOp* curOp,
                                    OpDebug* opDebug,
@@ -815,13 +815,25 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
 
     invariant(deleteRequest);
 
+    auto [isTimeseriesDelete, nsString] = timeseries::isTimeseries(opCtx, *deleteRequest);
+    if (isTimeseriesDelete) {
+        // TODO SERVER-76583: Remove this check.
+        uassert(7308305,
+                "Retryable findAndModify on a timeseries is not supported",
+                !opCtx->isRetryableWrite());
+
+        if (nss != nsString) {
+            deleteRequest->setNsString(nsString);
+        }
+    }
+
     const auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
         MODE_IX);
     const auto& collectionPtr = collection.getCollectionPtr();
 
-    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr);
+    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
     {

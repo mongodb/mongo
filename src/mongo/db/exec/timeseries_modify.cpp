@@ -57,6 +57,9 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
     tassert(7308200,
             "Multi deletes must have a residual predicate",
             _isSingletonWrite() || _residualPredicate || _params.isUpdate);
+    tassert(7308300,
+            "Can return the deleted measurement only if deleting one",
+            !_params.returnDeleted || _isSingletonWrite());
     _children.emplace_back(std::move(child));
 
     // These three properties are only used for the queryPlanner explain and will not change while
@@ -86,7 +89,9 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
 
 bool TimeseriesModifyStage::isEOF() {
     if (_isSingletonWrite() && _specificStats.nMeasurementsModified > 0) {
-        return true;
+        // If we have a measurement to return, we should not return EOF so that we can get a chance
+        // to get called again and return the measurement.
+        return !_deletedMeasurementToReturn;
     }
     return child()->isEOF() && _retryBucketId == WorkingSet::INVALID_ID;
 }
@@ -101,20 +106,24 @@ std::unique_ptr<PlanStageStats> TimeseriesModifyStage::getStats() {
     return ret;
 }
 
-PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
+template <typename F>
+std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseriesBuckets(
+    ScopeGuard<F>& bucketFreer,
     WorkingSetID bucketWsmId,
     const std::vector<BSONObj>& unchangedMeasurements,
     const std::vector<BSONObj>& modifiedMeasurements,
     bool bucketFromMigrate) {
+    // No measurements needed to be deleted from the bucket document.
+    if (modifiedMeasurements.empty()) {
+        return {false, PlanStage::NEED_TIME};
+    }
+
+    // We don't actually write anything if we are in explain mode but we still need to update the
+    // stats and let the caller think as if the write succeeded if there's any deleted measurement.
     if (_params.isExplain) {
         _specificStats.nMeasurementsModified += modifiedMeasurements.size();
         _specificStats.nMeasurementsMatched += modifiedMeasurements.size();
-        return PlanStage::NEED_TIME;
-    }
-
-    // No measurements needed to be updated or deleted from the bucket document.
-    if (modifiedMeasurements.empty()) {
-        return PlanStage::NEED_TIME;
+        return {true, PlanStage::NEED_TIME};
     }
 
     handlePlanStageYield(
@@ -138,6 +147,8 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
                     "Retrying bucket due to conflict attempting to write out changes",
                     "bucket_rid"_attr = recordId,
                     "status"_attr = status);
+        // We need to retry the bucket, so we should not free the current bucket.
+        bucketFreer.dismiss();
         _retryBucket(bucketWsmId);
         return PlanStage::NEED_YIELD;
     };
@@ -150,7 +161,7 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
         auto result = timeseries::performAtomicWrites(
             opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params.stmtId);
         if (!result.isOK()) {
-            return yieldAndRetry(7309300, result);
+            return {false, yieldAndRetry(7309300, result)};
         }
     } else {
         auto timeseriesOptions = collection()->getTimeseriesOptions();
@@ -177,7 +188,7 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
         auto result = timeseries::performAtomicWrites(
             opCtx(), collection(), recordId, op, {}, bucketFromMigrate, _params.stmtId);
         if (!result.isOK()) {
-            return yieldAndRetry(7309301, result);
+            return {false, yieldAndRetry(7309301, result)};
         }
     }
     _specificStats.nMeasurementsMatched += modifiedMeasurements.size();
@@ -186,7 +197,7 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
     // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
     // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
     // outside of the WriteUnitOfWork.
-    return handlePlanStageYield(
+    auto status = handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage restoreState",
         collection()->ns().ns(),
@@ -196,9 +207,12 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
         },
         // yieldHandler
         // Note we don't need to retry anything in this case since the write already was committed.
-        // However, we still need to return the affected document (if it was requested).
-        // TODO SERVER-73089 for findAndModify we need to return the affected doc.
+        // However, we still need to return the affected measurement (if it was requested). We don't
+        // need to rely on the storage engine to return the affected document since we already have
+        // it in memory.
         [&] { /* noop */ });
+
+    return {true, status};
 }
 
 template <typename F>
@@ -270,9 +284,28 @@ void TimeseriesModifyStage::_retryBucket(WorkingSetID bucketId) {
     _retryBucketId = bucketId;
 }
 
+void TimeseriesModifyStage::_prepareToReturnDeletedMeasurement(WorkingSetID& out,
+                                                               BSONObj measurement) {
+    out = _ws->allocate();
+    auto member = _ws->get(out);
+    // The measurement does not have record id.
+    member->recordId = RecordId{};
+    member->doc.value() = Document{std::move(measurement)};
+    _ws->transitionToOwnedObj(out);
+}
+
 PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
+    }
+
+    if (_deletedMeasurementToReturn) {
+        // If we fall into this case, then we were asked to return the deleted measurement but we
+        // were not able to do so in the previous call to doWork() because we needed to yield. Now
+        // that we are back, we can return the deleted measurement.
+        _prepareToReturnDeletedMeasurement(*out, *_deletedMeasurementToReturn);
+        _deletedMeasurementToReturn.reset();
+        return PlanStage::ADVANCED;
     }
 
     tassert(7495500,
@@ -329,11 +362,25 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
         }
     }
 
-    status = _writeToTimeseriesBuckets(
-        id, unchangedMeasurements, modifiedMeasurements, bucketFromMigrate);
+    auto isWriteSuccessful = false;
+    std::tie(isWriteSuccessful, status) = _writeToTimeseriesBuckets(
+        bucketFreer, id, unchangedMeasurements, modifiedMeasurements, bucketFromMigrate);
     if (status != PlanStage::NEED_TIME) {
         *out = WorkingSet::INVALID_ID;
-        bucketFreer.dismiss();
+        if (_params.returnDeleted && isWriteSuccessful) {
+            // If asked to return the deleted measurement and the write was successful but we need
+            // to yield, we need to save the deleted measurement to return it later. See isEOF() for
+            // more info.
+            tassert(7308301,
+                    "Can return only one deleted measurement",
+                    modifiedMeasurements.size() == 1);
+            _deletedMeasurementToReturn = std::move(modifiedMeasurements[0]);
+        }
+    } else if (_params.returnDeleted && isWriteSuccessful) {
+        // If the write was successful and if asked to return the deleted measurement, we return it
+        // immediately.
+        _prepareToReturnDeletedMeasurement(*out, modifiedMeasurements[0]);
+        status = PlanStage::ADVANCED;
     }
     return status;
 }

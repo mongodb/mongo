@@ -70,6 +70,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -110,33 +111,6 @@ bool shouldSkipOutput(OperationContext* opCtx) {
     return writeConcern.isUnacknowledged() &&
         (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE ||
          writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET);
-}
-
-/**
- * Returns true if 'ns' is a time-series collection. That is, this namespace is backed by a
- * time-series buckets collection.
- */
-template <class Request>
-bool isTimeseries(OperationContext* opCtx, const Request& request) {
-    uassert(5916400,
-            "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
-            "system.buckets namespace",
-            !request.getIsTimeseriesNamespace() ||
-                request.getNamespace().isTimeseriesBucketsCollection());
-    const auto bucketNss = request.getIsTimeseriesNamespace()
-        ? request.getNamespace()
-        : request.getNamespace().makeTimeseriesBucketsNamespace();
-
-    // If the buckets collection exists now, the time-series insert path will check for the
-    // existence of the buckets collection later on with a lock.
-    // If this check is concurrent with the creation of a time-series collection and the buckets
-    // collection does not yet exist, this check may return false unnecessarily. As a result, an
-    // insert attempt into the time-series namespace will either succeed or fail, depending on who
-    // wins the race.
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-    return (coll && coll->getTimeseriesOptions());
 }
 
 /**
@@ -298,7 +272,7 @@ public:
                 }
             }
 
-            if (isTimeseries(opCtx, request())) {
+            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
@@ -467,7 +441,7 @@ public:
                 }
             }
 
-            if (isTimeseries(opCtx, request())) {
+            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
                 uassert(ErrorCodes::OperationNotSupportedInTransaction,
                         str::stream() << "Cannot perform a multi-document transaction on a "
                                          "time-series collection: "
@@ -558,15 +532,7 @@ public:
                     "explained write batches must be of size 1",
                     request().getUpdates().size() == 1);
 
-            auto isRequestToTimeseries = isTimeseries(opCtx, request());
-            auto nss = [&] {
-                auto nss = request().getNamespace();
-                if (!isRequestToTimeseries) {
-                    return nss;
-                }
-                return nss.isTimeseriesBucketsCollection() ? nss
-                                                           : nss.makeTimeseriesBucketsNamespace();
-            }();
+            auto [isRequestToTimeseries, nss] = timeseries::isTimeseries(opCtx, request());
 
             UpdateRequest updateRequest(request().getUpdates()[0]);
             updateRequest.setNamespaceString(nss);
@@ -712,7 +678,7 @@ public:
                 }
             }
 
-            if (isTimeseries(opCtx, request())) {
+            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
                 source = OperationSource::kTimeseriesDelete;
             }
 
@@ -756,15 +722,7 @@ public:
                     request().getDeletes().size() == 1);
 
             auto deleteRequest = DeleteRequest{};
-            auto isRequestToTimeseries = isTimeseries(opCtx, request());
-            auto nss = [&] {
-                auto nss = request().getNamespace();
-                if (!isRequestToTimeseries) {
-                    return nss;
-                }
-                return nss.isTimeseriesBucketsCollection() ? nss
-                                                           : nss.makeTimeseriesBucketsNamespace();
-            }();
+            auto [isRequestToTimeseries, nss] = timeseries::isTimeseries(opCtx, request());
             deleteRequest.setNsString(nss);
             deleteRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
