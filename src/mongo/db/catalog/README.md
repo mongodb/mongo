@@ -1631,7 +1631,7 @@ Flow Control is only concerned whether an operation is 'immediate' priority and 
 * `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate' priority.
 * `kLow` - It's of low importance that the operation acquires a ticket in Execution Admission Control. Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Admission Control.
 
-Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/db/concurrency/lock_state.h#L428) RAII.
+Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L747) RAII.
 
 ### Developer Guidelines for Declaring Low Admission Priority
 Developers must evaluate the consequences of each low priority operation from falling too far behind, and implement safeguards to avoid any undesirable behaviors for excessive delays in low priority operations.
@@ -1730,7 +1730,7 @@ by another configurable constant (the ticket "multiplier" constant). This produc
 of tickets to be assigned in the next period.
 
 When the Flow Control mechanism is disabled, the ticket refresher mechanism always allows one
-billion flow control ticket acquisitions per second. The Flow Control mechanism can be disabled via 
+billion flow control ticket acquisitions per second. The Flow Control mechanism can be disabled via
 a server parameter. Additionally, the mechanism is disabled on nodes that cannot accept writes.
 
 Criteria #2 and #3 are determined using a sampling mechanism that periodically stores the necessary
