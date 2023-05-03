@@ -341,14 +341,14 @@ class GetMongoDecoration(gdb.Command):
     """
     Search for a decoration on an object by typename and print it e.g.
 
-    (gdb) mongo-decoration opCtx ReadConcernArgs
+    (gdb) mongodb-decoration opCtx ReadConcernArgs
 
     would print out a decoration on opCtx whose type name contains the string "ReadConcernArgs".
     """
 
     def __init__(self):
         """Initialize GetMongoDecoration."""
-        RegisterMongoCommand.register(self, "mongo-decoration", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "mongodb-decoration", gdb.COMMAND_DATA)
 
     def invoke(self, args, _from_tty):
         """Invoke GetMongoDecoration."""
