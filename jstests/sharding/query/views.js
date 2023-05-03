@@ -14,23 +14,46 @@ load("jstests/libs/sbe_util.js");
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
+// Legal values for the verifyExplainResult() 'optimizedAwayPipeline' argument.
+const kOptFalse = 0;
+const kOptTrue = 1;
+const kOptEither = 2;
+
 // Given sharded explain output in 'shardedExplain', verifies that the explain mode 'verbosity'
 // affected the output verbosity appropriately, and that the response has the expected format.
-// Set 'optimizedAwayPipeline' to true if the pipeline is expected to be optimized away.
+// Set 'optimizedAwayPipeline' to:
+//   kOptTrue if the pipeline is expected to be optimized away
+//   kOptFalse if the pipeline is expected to be present
+//   kOptEither if the call does not know so must accept either of the prior two cases
 function verifyExplainResult(
-    {shardedExplain = null, verbosity = "", optimizedAwayPipeline = false} = {}) {
+    {shardedExplain = null, verbosity = "", optimizedAwayPipeline = kOptFalse} = {}) {
     assert.commandWorked(shardedExplain);
     assert(shardedExplain.hasOwnProperty("shards"), tojson(shardedExplain));
     for (let elem in shardedExplain.shards) {
         let shard = shardedExplain.shards[elem];
         let root;
-        if (optimizedAwayPipeline) {
+
+        // Resolve 'kOptEither' to 'kOptTrue' or 'kOptFalse'. If 'shard' has a "queryPlanner"
+        // property, this means the pipeline has been optimized away. (When the pipeline is present,
+        // "queryPlanner" is instead a property of shard.stages[0].$cursor.)
+        if (optimizedAwayPipeline == kOptEither) {
+            if (shard.hasOwnProperty("queryPlanner")) {
+                optimizedAwayPipeline = kOptTrue;
+            } else {
+                optimizedAwayPipeline = kOptFalse;
+            }
+        }
+
+        // Verify the explain output.
+        if (optimizedAwayPipeline == kOptTrue) {
             assert(shard.hasOwnProperty("queryPlanner"), tojson(shardedExplain));
             root = shard;
-        } else {
+        } else if (optimizedAwayPipeline == kOptFalse) {
             assert(shard.stages[0].hasOwnProperty("$cursor"), tojson(shardedExplain));
             assert(shard.stages[0].$cursor.hasOwnProperty("queryPlanner"), tojson(shardedExplain));
             root = shard.stages[0].$cursor;
+        } else {
+            assert(false, `Unsupported 'optimizedAwayPipeline' value ${optimizedAwayPipeline}`);
         }
         if (verbosity === "queryPlanner") {
             assert(!root.hasOwnProperty("executionStats"), tojson(shardedExplain));
@@ -81,11 +104,11 @@ assert.eq(5, view.find({a: {$lte: 8}}).itcount());
 
 let result = db.runCommand({explain: {find: "view", filter: {a: {$lte: 7}}}});
 verifyExplainResult(
-    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: true});
+    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptTrue});
 for (let verbosity of explainVerbosities) {
     result = db.runCommand({explain: {find: "view", filter: {a: {$lte: 7}}}, verbosity: verbosity});
     verifyExplainResult(
-        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: true});
+        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptTrue});
 }
 
 //
@@ -96,19 +119,19 @@ assert.eq(5, view.aggregate([{$match: {a: {$lte: 8}}}]).itcount());
 // Test that the explain:true flag for the aggregate command results in queryPlanner verbosity.
 result = db.runCommand({aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], explain: true});
 verifyExplainResult(
-    {shardedExplain: result, verbosity: "queryPlanner", optimizedAwayPipeline: true});
+    {shardedExplain: result, verbosity: "queryPlanner", optimizedAwayPipeline: kOptTrue});
 
 result =
     db.runCommand({explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}}});
 verifyExplainResult(
-    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: true});
+    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptTrue});
 for (let verbosity of explainVerbosities) {
     result = db.runCommand({
         explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}},
         verbosity: verbosity
     });
     verifyExplainResult(
-        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: true});
+        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptTrue});
 }
 
 //
@@ -116,25 +139,18 @@ for (let verbosity of explainVerbosities) {
 //
 assert.eq(5, view.count({a: {$lte: 8}}));
 
-// If SBE is enabled on all nodes, then validate the explain results for a count command. We could
-// validate the explain results when the classic engine is enabled, but doing so is complicated for
-// multiversion scenarios (e.g. in the multiversion passthrough on the classic engine build variant
-// only some shards have SBE enabled, so the expected results differ across shards).
-if (checkSBEEnabled(db, [], true /*checkAllNodes*/)) {
-    result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
-    // Allow success whether or not the pipeline is optimized away, as it differs based on test
-    // environment and execution engine used.
-    verifyExplainResult({
-        shardedExplain: result,
-        verbosity: "allPlansExecution",
-        optimizedAwayPipeline: !isClustered
-    });
-    for (let verbosity of explainVerbosities) {
-        result =
-            db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}, verbosity: verbosity});
-        verifyExplainResult(
-            {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: !isClustered});
-    }
+// "count" on a view that is a $match will produce different explain output on Classic vs SBE, as
+// the query will be rewriten as a $group, but only SBE has a $group pushdown feature, which
+// optimizes away the pipeline. Depending on build variant and engine selection flags, as well as
+// specific configurations of individual nodes in multiversion clusters, we may get either the
+// Classic or SBE explain variant, so here we accept either one ('kOptEither').
+result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
+verifyExplainResult(
+    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptEither});
+for (let verbosity of explainVerbosities) {
+    result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}, verbosity: verbosity});
+    verifyExplainResult(
+        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptEither});
 }
 
 //
