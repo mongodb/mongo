@@ -3530,7 +3530,9 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
     onPrimaryTransactionalWrite.execute([&](const BSONObj& data) {
         const auto closeConnectionElem = data["closeConnection"];
         if (closeConnectionElem.eoo() || closeConnectionElem.Bool()) {
-            opCtx->getClient()->session()->end();
+            if (auto session = opCtx->getClient()->session()) {
+                session->end();
+            }
         }
 
         const auto failBeforeCommitExceptionElem = data["failBeforeCommitExceptionCode"];

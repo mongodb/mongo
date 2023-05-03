@@ -329,12 +329,6 @@ function runFailpointTests(mainConn, priConn) {
     var lsid = UUID();
     var testDb = mainConn.getDB('TestDB');
 
-    if (TestData.configShard) {
-        // TODO SERVER-75821: Workaround for crash when executing the fail point while implicitly
-        // creating a collection in a transaction on the config server.
-        assert.commandWorked(testDb.createCollection("user"));
-    }
-
     // Test connection close (default behaviour). The connection will get closed, but the
     // inserts must succeed
     assert.commandWorked(priConn.adminCommand(
