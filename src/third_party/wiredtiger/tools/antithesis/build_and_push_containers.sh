@@ -3,9 +3,9 @@
 set -o errexit
 set -o verbose
 
-tag="evergreen-latest"
+tag="${task_name}-latest"
 if [ "${is_patch}" = "true" ]; then
-    tag="evergreen-patch"
+    tag="${task_name}-patch"
 fi
 
 if [ -n "${antithesis_image_tag:-}" ]; then

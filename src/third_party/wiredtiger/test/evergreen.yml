@@ -29,7 +29,7 @@ exec_timeout_secs: 21600 # 6 hrs
 
 functions:
 
-  "get project" :
+  "get project":
     command: git.get_project
     params:
       directory: wiredtiger
@@ -1028,6 +1028,15 @@ functions:
         for i in $(seq ${times|15}); do
             ${test_env_vars|} ${python_binary|python3} split_stress.py
         done
+
+  "build and push antithesis container":
+    command: subprocess.exec
+    params:
+      working_dir: wiredtiger/tools/antithesis
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "./build_and_push_containers.sh"
 
 #######################################
 #               Variables             #
@@ -5237,18 +5246,22 @@ tasks:
 #     Antithesis Integration          #
 #######################################
 
-  - name: build-and-push-antithesis-containers
+  - name: debug-have-diagnostic
     tags: ["antithesis"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
-      - command: subprocess.exec
-        params:
-          working_dir: wiredtiger/tools/antithesis
-          binary: bash
-          add_expansions_to_env: true
-          args:
-          - "./build_and_push_containers.sh"
+      - func: "build and push antithesis container"
+
+  - name: release-with-debug-have-diagnostic
+    tags: ["antithesis"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=1
+      - func: "build and push antithesis container"
 
 #######################################
 #            Buildvariants            #
@@ -5861,6 +5874,6 @@ buildvariants:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     make_command: ninja
   tasks:
-    - name: build-and-push-antithesis-containers
+    - name: ".antithesis"
       cron: 0 0 * * 4 # once a week (Thursday midnight UTC)
       patchable: false
