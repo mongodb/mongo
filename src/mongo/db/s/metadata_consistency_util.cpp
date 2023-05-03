@@ -214,7 +214,13 @@ CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
         firstBatch.push_back(std::move(nextDoc));
     }
 
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    opDebug.additiveMetrics.nBatches = 1;
+    opDebug.additiveMetrics.nreturned = firstBatch.size();
+
     if (exec->isEOF()) {
+        opDebug.cursorExhausted = true;
+
         CursorInitialReply resp;
         InitialResponseCursor initRespCursor{std::move(firstBatch)};
         initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
@@ -232,8 +238,13 @@ CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
 
     CursorInitialReply resp;
     InitialResponseCursor initRespCursor{std::move(firstBatch)};
-    initRespCursor.setResponseCursorBase({pinnedCursor.getCursor()->cursorid(), nss});
+    const auto cursorId = pinnedCursor.getCursor()->cursorid();
+    initRespCursor.setResponseCursorBase({cursorId, nss});
     resp.setCursor(std::move(initRespCursor));
+
+    // Record the cursorID in CurOp.
+    opDebug.cursorid = cursorId;
+
     return resp;
 }
 

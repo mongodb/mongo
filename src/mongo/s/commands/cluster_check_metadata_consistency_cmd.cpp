@@ -238,7 +238,14 @@ public:
 
             ccc->detachFromOperationContext();
 
+            auto&& opDebug = CurOp::get(opCtx)->debug();
+            opDebug.nShards = ccc->getNumRemotes();
+            opDebug.additiveMetrics.nBatches = 1;
+            opDebug.additiveMetrics.nreturned = firstBatch.size();
+
             if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
+                opDebug.cursorExhausted = true;
+
                 CursorInitialReply resp;
                 InitialResponseCursor initRespCursor{std::move(firstBatch)};
                 initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
@@ -266,6 +273,9 @@ public:
                     cursorType,
                     ClusterCursorManager::CursorLifetime::Mortal,
                     authUser));
+
+            // Record the cursorID in CurOp.
+            opDebug.cursorid = clusterCursorId;
 
             CursorInitialReply resp;
             InitialResponseCursor initRespCursor{std::move(firstBatch)};
