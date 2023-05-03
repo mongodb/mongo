@@ -40,3 +40,11 @@ env.CppUnitTest(
         "geoparser",
     ],
 )
+
+env.Benchmark(
+    target='hash_bm',
+    source=[
+        'hash_bm.cpp',
+    ],
+    LIBDEPS=['geometry'],
+)

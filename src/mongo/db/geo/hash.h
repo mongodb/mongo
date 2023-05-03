@@ -141,10 +141,6 @@ public:
     // closest (in particular, level == kMaxBits is not allowed).
     void appendVertexNeighbors(unsigned level, std::vector<GeoHash>* output) const;
 
-    // public but only for the purpose of testing
-    void unhash_fast(unsigned* x, unsigned* y) const;
-    void unhash_slow(unsigned* x, unsigned* y) const;
-
 private:
     // Create a hash from the provided string.  Used by the std::string and char* cons.
     void initFromString(const char* s);
