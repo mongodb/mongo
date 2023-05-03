@@ -122,11 +122,12 @@ void endQueryOp(OperationContext* opCtx,
     auto&& explainer = exec.getPlanExplainer();
     explainer.getSummaryStats(&summaryStats);
     curOp->debug().setPlanSummaryMetrics(summaryStats);
+    curOp->setEndOfOpMetrics(numResults);
 
     if (cursor) {
-        collectTelemetryMongod(opCtx, *cursor, numResults);
+        collectTelemetryMongod(opCtx, *cursor);
     } else {
-        collectTelemetryMongod(opCtx, cmdObj, numResults);
+        collectTelemetryMongod(opCtx, cmdObj);
     }
 
     if (collection) {

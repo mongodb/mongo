@@ -236,12 +236,5 @@ BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
                          const SerializationOptions& opts,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          boost::optional<const TelemetryMetrics&> existingMetrics = boost::none);
-
-/**
- * Collects metrics for telemetry from the current operation onto OpDebug. This must be called prior
- * to incrementing metrics on cursors (either ClientCursor or ClusterClientCursor) since cursor
- * metric aggregation happens via OpDebug::AdditiveMetrics.
- */
-void collectMetricsOnOpDebug(CurOp* curOp, long long nreturned);
 }  // namespace telemetry
 }  // namespace mongo

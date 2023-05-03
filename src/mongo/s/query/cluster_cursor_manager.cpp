@@ -591,12 +591,7 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     return std::move(cursor);
 }
 
-void collectTelemetryMongos(OperationContext* opCtx,
-                            const BSONObj& originatingCommand,
-                            long long nreturned) {
-    auto curOp = CurOp::get(opCtx);
-    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
-
+void collectTelemetryMongos(OperationContext* opCtx, const BSONObj& originatingCommand) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
     auto&& opDebug = CurOp::get(opCtx)->debug();
@@ -608,20 +603,12 @@ void collectTelemetryMongos(OperationContext* opCtx,
         opDebug.additiveMetrics.nreturned.value_or(0));
 }
 
-void collectTelemetryMongos(OperationContext* opCtx,
-                            ClusterClientCursorGuard& cursor,
-                            long long nreturned) {
-    auto curOp = CurOp::get(opCtx);
-    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
-    cursor->incrementCursorMetrics(curOp->debug().additiveMetrics);
+void collectTelemetryMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
+    cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
-void collectTelemetryMongos(OperationContext* opCtx,
-                            ClusterCursorManager::PinnedCursor& cursor,
-                            long long nreturned) {
-    auto curOp = CurOp::get(opCtx);
-    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
-    cursor->incrementCursorMetrics(curOp->debug().additiveMetrics);
+void collectTelemetryMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
+    cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
 }  // namespace mongo

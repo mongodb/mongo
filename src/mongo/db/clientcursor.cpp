@@ -393,23 +393,14 @@ void startClientCursorMonitor() {
     getClientCursorMonitor(getGlobalServiceContext()).go();
 }
 
-void collectTelemetryMongod(OperationContext* opCtx,
-                            ClientCursorPin& pinnedCursor,
-                            long long nreturned) {
-    auto curOp = CurOp::get(opCtx);
-    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
-    pinnedCursor->incrementCursorMetrics(curOp->debug().additiveMetrics);
+void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
+    pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
-void collectTelemetryMongod(OperationContext* opCtx,
-                            const BSONObj& originatingCommand,
-                            long long nreturned) {
-    auto curOp = CurOp::get(opCtx);
-    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
-
+void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
-    auto& opDebug = curOp->debug();
+    auto& opDebug = CurOp::get(opCtx)->debug();
     telemetry::writeTelemetry(
         opCtx,
         opDebug.telemetryStoreKey,

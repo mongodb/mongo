@@ -594,14 +594,5 @@ void writeTelemetry(OperationContext* opCtx,
     metrics->queryExecMicros.aggregate(queryExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
 }
-
-void collectMetricsOnOpDebug(CurOp* curOp, long long nreturned) {
-    auto&& opDebug = curOp->debug();
-    opDebug.additiveMetrics.nreturned = nreturned;
-    // executionTime is set with the final executionTime in CurOp::completeAndLogOperation, but for
-    // telemetry collection we want it set before incrementing cursor metrics using AdditiveMetrics.
-    // The value set here will be overwritten later in CurOp::completeAndLogOperation.
-    opDebug.additiveMetrics.executionTime = curOp->elapsedTimeExcludingPauses();
-}
 }  // namespace telemetry
 }  // namespace mongo

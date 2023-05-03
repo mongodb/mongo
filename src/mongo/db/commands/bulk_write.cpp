@@ -926,9 +926,9 @@ public:
                 numRepliesInFirstBatch++;
                 responseSizeTracker.add(nextDoc);
             }
+            CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
             if (exec->isEOF()) {
                 invariant(numRepliesInFirstBatch == replies.size());
-                collectTelemetryMongod(opCtx, reqObj, numRepliesInFirstBatch);
                 auto reply = BulkWriteCommandReply(
                     BulkWriteCommandResponseCursor(
                         0, std::vector<BulkWriteReplyItem>(std::move(replies))),
@@ -957,7 +957,6 @@ public:
 
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(replies.size());
-            collectTelemetryMongod(opCtx, pinnedCursor, numRepliesInFirstBatch);
 
             replies.resize(numRepliesInFirstBatch);
             auto reply = BulkWriteCommandReply(

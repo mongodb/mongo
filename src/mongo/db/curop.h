@@ -470,6 +470,13 @@ public:
                                     NetworkOp op);
 
     /**
+     * Sets metrics collected at the end of an operation onto curOp's OpDebug instance. Note that
+     * this is used in tandem with OpDebug::setPlanSummaryMetrics so should not repeat any metrics
+     * collected there.
+     */
+    void setEndOfOpMetrics(long long nreturned);
+
+    /**
      * Marks the operation end time, records the length of the client response if a valid response
      * exists, and then - subject to the current values of slowMs and sampleRate - logs this CurOp
      * to file under the given LogComponent. Returns 'true' if, in addition to being logged, this
@@ -944,16 +951,6 @@ public:
     void setTickSource_forTest(TickSource* tickSource) {
         _tickSource = tickSource;
     }
-
-    /**
-     * Merge match counters from the current operation into the global map and stop counting.
-     */
-    void stopMatchExprCounter();
-
-    /**
-     * Increment the counter for the match expression with given name in the current operation.
-     */
-    void incrementMatchExprCounter(StringData name);
 
 private:
     class CurOpStack;

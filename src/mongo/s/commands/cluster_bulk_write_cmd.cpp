@@ -171,8 +171,8 @@ public:
                 numRepliesInFirstBatch++;
                 responseSizeTracker.add(nextObj);
             }
+            CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
             if (numRepliesInFirstBatch == replyItems.size()) {
-                collectTelemetryMongos(opCtx, reqObj, numRepliesInFirstBatch);
                 return BulkWriteCommandReply(
                     BulkWriteCommandResponseCursor(
                         0, std::vector<BulkWriteReplyItem>(std::move(replyItems))),
@@ -181,7 +181,6 @@ public:
 
             ccc->detachFromOperationContext();
             ccc->incNBatches();
-            collectTelemetryMongos(opCtx, ccc, numRepliesInFirstBatch);
 
             auto authUser =
                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();

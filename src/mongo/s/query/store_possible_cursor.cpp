@@ -94,12 +94,11 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     // a split aggregation pipeline, and the shards half of that pipeline may have targeted multiple
     // shards. In that case, leave the current value as-is.
     opDebug.nShards = std::max(opDebug.nShards, 1);
+    CurOp::get(opCtx)->setEndOfOpMetrics(incomingCursorResponse.getValue().getBatch().size());
 
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
         opDebug.cursorExhausted = true;
-        collectTelemetryMongos(opCtx,
-                               CurOp::get(opCtx)->opDescription(),
-                               incomingCursorResponse.getValue().getBatch().size());
+        collectTelemetryMongos(opCtx, CurOp::get(opCtx)->opDescription());
         return cmdResult;
     }
 
@@ -131,7 +130,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     }
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));
-    collectTelemetryMongos(opCtx, ccc, incomingCursorResponse.getValue().getBatch().size());
+    collectTelemetryMongos(opCtx, ccc);
     // We don't expect to use this cursor until a subsequent getMore, so detach from the current
     // OperationContext until then.
     ccc->detachFromOperationContext();

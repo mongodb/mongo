@@ -435,6 +435,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         *partialResultsReturned = ccc->partialResultsReturned();
     }
 
+    CurOp::get(opCtx)->setEndOfOpMetrics(results->size());
     // If the cursor is exhausted, then there are no more results to return and we don't need to
     // allocate a cursor id.
     if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
@@ -443,7 +444,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         if (shardIds.size() > 0) {
             updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
         }
-        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand(), results->size());
+        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand());
         return CursorId(0);
     }
 
@@ -454,7 +455,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         ? ClusterCursorManager::CursorLifetime::Immortal
         : ClusterCursorManager::CursorLifetime::Mortal;
     auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
-    collectTelemetryMongos(opCtx, ccc, results->size());
+    collectTelemetryMongos(opCtx, ccc);
 
     auto cursorId = uassertStatusOK(cursorManager->registerCursor(
         opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUser));
@@ -918,10 +919,11 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     // Set nReturned and whether the cursor has been exhausted.
     opDebug.cursorExhausted = (idToReturn == 0);
     opDebug.additiveMetrics.nBatches = 1;
+    CurOp::get(opCtx)->setEndOfOpMetrics(batch.size());
 
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
     pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-    collectTelemetryMongos(opCtx, pinnedCursor.getValue(), batch.size());
+    collectTelemetryMongos(opCtx, pinnedCursor.getValue());
 
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.
