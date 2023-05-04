@@ -178,7 +178,6 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
     dbLockOptions.skipRSTLLock = canSkipRSTLLock(nsOrUUID);
     dbLockOptions.skipFlowControlTicket = canSkipFlowControlTicket(nsOrUUID);
 
-    // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
     return AutoGetDb(opCtx,
                      nsOrUUID.dbName(),
                      isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
