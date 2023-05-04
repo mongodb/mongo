@@ -1488,7 +1488,7 @@ struct ExploreConvert<SargableNode> {
 
                 // Pre-compute if a requirement's interval may contain nulls, and also has an output
                 // binding. Do use constant folding if we do not have to.
-                const bool mayReturnNull = !hints._fastIndexNullHandling && !isIndex &&
+                const bool mayReturnNull = !hints._fastIndexNullHandling &&
                     PSRExpr::any(conjunct, [&](const PartialSchemaEntry& entry) {
                         return entry.second.mayReturnNull(ctx.getConstFold());
                     });
