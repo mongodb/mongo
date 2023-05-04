@@ -111,7 +111,12 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     auto namespaces =
         uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));
 
+    // Acquire exclusive lock on the associated 'ecoc.lock' namespace to serialize calls
+    // to cleanup and compact on the same EDC namespace
+    Lock::CollectionLock compactionLock(opCtx, namespaces.ecocLockNss, MODE_X);
+
     // Step 1: rename the ECOC collection if it exists
+    catalog = CollectionCatalog::get(opCtx);
     auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
     auto ecocRename = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss);
 

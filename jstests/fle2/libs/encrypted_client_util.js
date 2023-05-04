@@ -244,7 +244,7 @@ var EncryptedClient = class {
 
         const actualEcoc = countDocuments(sessionDB, ef.ecocCollection, tenantId);
         assert.eq(actualEcoc,
-                  this.ecocCountMatchesEscCount ? expectedEsc : expectedEcoc,
+                  expectedEcoc,
                   `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`);
     }
 
@@ -259,6 +259,23 @@ var EncryptedClient = class {
     assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc, tenantId) {
         this.assertEncryptedCollectionCountsByObject(
             this._db, name, expectedEdc, expectedEsc, expectedEcoc, tenantId);
+    }
+
+    /**
+     * Assert the number of non-anchor documents in the ESC associated with the given EDC
+     * collection name matches the expected.
+     *
+     * @param {string} name Name of EDC
+     * @param {number} expectedCount Number of non-anchors expected in ESC
+     */
+    assertESCNonAnchorCount(name, expectedCount) {
+        const escName = this.getStateCollectionNamespaces(name).esc;
+        const actualCount =
+            this._edb.getCollection(escName).countDocuments({"value": {"$exists": false}});
+        assert.eq(
+            actualCount,
+            expectedCount,
+            `ESC non-anchor count is wrong: Actual ${actualCount} vs Expected ${expectedCount}`);
     }
 
     /**
@@ -371,7 +388,10 @@ var EncryptedClient = class {
         assert.docEq(docs, onDiskDocs);
     }
 
-    assertStateCollectionsAfterCompact(collName, ecocExists, ecocTempExists = false) {
+    assertStateCollectionsAfterCompact(collName,
+                                       ecocExists,
+                                       ecocTempExists = false,
+                                       escDeletesExists = false) {
         const baseCollInfos = this._edb.getCollectionInfos({"name": collName});
         assert.eq(baseCollInfos.length, 1);
         const baseCollInfo = baseCollInfos[0];
@@ -380,10 +400,11 @@ var EncryptedClient = class {
         const checkMap = {};
 
         // Always expect the ESC collection, optionally expect ECOC.
-        // ECOC is not expected in sharded clusters.
         checkMap[baseCollInfo.options.encryptedFields.escCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = ecocTempExists;
+        checkMap[baseCollInfo.options.encryptedFields.escCollection + ".deletes"] =
+            escDeletesExists;
 
         const edb = this._edb;
         Object.keys(checkMap).forEach(function(coll) {
@@ -420,6 +441,13 @@ function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallbac
  */
 function isFLE2ReplicationEnabled() {
     return typeof (testingReplication) == "undefined" || testingReplication === true;
+}
+
+/**
+ * @returns Returns true if featureFlagFLE2CleanupCommand is enabled
+ */
+function isFLE2CleanupEnabled(db) {
+    return FeatureFlagUtil.isEnabled(db, "FLE2CleanupCommand");
 }
 
 /**
