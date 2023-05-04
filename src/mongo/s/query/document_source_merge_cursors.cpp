@@ -117,7 +117,13 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
 Value DocumentSourceMergeCursors::serialize(SerializationOptions opts) const {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
-    return Value(Document{{kStageName, _armParams->toBSON(opts)}});
+    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
+        // TODO: SERVER-76208 support query shapification for IDL types like namespacestring with
+        // custom serializers.
+        MONGO_UNIMPLEMENTED_TASSERT(7484301);
+    }
+
+    return Value(Document{{kStageName, _armParams->toBSON()}});
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(

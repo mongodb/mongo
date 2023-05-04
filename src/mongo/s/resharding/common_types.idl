@@ -271,13 +271,10 @@ structs:
         description: "A struct representing the information needed for a resharding pipeline to
                       determine which documents belong to a particular shard."
         strict: true
-        query_shape_component: true
         fields:
             recipientShardId:
                 type: shard_id
                 description: "The id of the recipient shard."
-                query_shape: anonymize
             reshardingKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
-                query_shape: custom

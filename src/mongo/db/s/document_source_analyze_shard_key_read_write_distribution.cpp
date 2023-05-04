@@ -314,7 +314,13 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(
 
 Value DocumentSourceAnalyzeShardKeyReadWriteDistribution::serialize(
     SerializationOptions opts) const {
-    return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
+    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
+        // TODO: SERVER-76208 support query shapification for IDL types like KeyPattern with custom
+        // serializers.
+        MONGO_UNIMPLEMENTED_TASSERT(7484305);
+    }
+
+    return Value(Document{{getSourceName(), _spec.toBSON()}});
 }
 
 DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution::doGetNext() {

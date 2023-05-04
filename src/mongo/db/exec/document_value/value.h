@@ -97,9 +97,6 @@ public:
     explicit Value(bool value) : _storage(Bool, value) {}
     explicit Value(int value) : _storage(NumberInt, value) {}
     explicit Value(long long value) : _storage(NumberLong, value) {}
-#if !defined(_WIN32)
-    explicit Value(int64_t value) : _storage(NumberLong, (long long)value) {}
-#endif
     explicit Value(double value) : _storage(NumberDouble, value) {}
     explicit Value(const Decimal128& value) : _storage(NumberDecimal, value) {}
     explicit Value(const Timestamp& value) : _storage(bsonTimestamp, value) {}

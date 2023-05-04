@@ -38,5 +38,5 @@ types:
         bson_serialization_type: object
         description: An expression describing a transformation of a document into a document key.
         cpp_type: KeyPattern
-        serializer: KeyPattern::serializeForIDL
+        serializer: KeyPattern::toBSON
         deserializer: KeyPattern::fromBSON

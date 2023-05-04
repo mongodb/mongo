@@ -115,7 +115,7 @@ structs:
                               datetime type (0x9)"
                 type: string
                 stability: stable
-                query_shape: anonymize
+                query_shape_anonymize: true
             metaField:
                 description: "The name of the top-level field describing the series. This field is
                               used to group related data and may be of any BSON type. This may not 
@@ -123,13 +123,13 @@ structs:
                 type: string
                 optional: true
                 stability: stable
-                query_shape: anonymize
+                query_shape_anonymize: true
             granularity:
                 description: "Describes the expected interval between subsequent measurements"
                 type: BucketGranularity
                 optional: true
                 stability: stable
-                query_shape: parameter
+                query_shape_literal: false
             bucketRoundingSeconds:
                 description: "Used to determine the minimum time boundary when opening a new bucket 
                               by rounding the first timestamp down to the next multiple of this 
@@ -138,14 +138,14 @@ structs:
                 optional: true
                 validator: { gte: 1, lte: 31536000 }
                 stability: stable
-                query_shape: literal
+                query_shape_literal: true
             bucketMaxSpanSeconds:
                 description: "The maximum range of time values for a bucket, in seconds"
                 type: safeInt
                 optional: true
                 validator: { gte: 1, lte: 31536000 }
                 stability: stable
-                query_shape: literal
+                query_shape_literal: true
 
     CollModTimeseries:
         description: "A type representing the adjustable options on timeseries collections"

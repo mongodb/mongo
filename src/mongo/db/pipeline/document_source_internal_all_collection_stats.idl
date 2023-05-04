@@ -46,4 +46,4 @@ structs:
         description: Specification for a $collStats stage.
         type: DocumentSourceCollStatsSpec
         optional: true
-        query_shape: literal
+        query_shape_literal: true

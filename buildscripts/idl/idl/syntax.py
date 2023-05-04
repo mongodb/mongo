@@ -493,7 +493,8 @@ class Field(common.SourceLocation):
         self.serialize_op_msg_request_only = False  # type: bool
         self.constructed = False  # type: bool
 
-        self.query_shape = None  # type: Optional[str]
+        self.query_shape_literal = None  # type: Optional[bool]
+        self.query_shape_anonymize = None  # type: Optional[bool]
 
         self.hidden = False  # type: bool
 

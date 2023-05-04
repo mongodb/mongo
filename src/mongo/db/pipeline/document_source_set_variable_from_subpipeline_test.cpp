@@ -158,41 +158,6 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
                                Value((BSON("d" << 1))),
                                nullptr) == 0);
 }
-TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
-    const auto inputDocs =
-        std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
-    auto expCtx = getExpCtx();
-    const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
-    const auto mockSourceForSubPipeline =
-        DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
-    auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
-        expCtx,
-        Pipeline::create({DocumentSourceMatch::create(BSON("d" << 1), ctxForSubPipeline)},
-                         ctxForSubPipeline),
-        Variables::kSearchMetaId);
 
-    setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
-    setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$setVariableFromSubPipeline": {
-                "setVariable": "HASH<$$SEARCH_META>",
-                "pipeline": [
-                    {
-                        "mock": {}
-                    },
-                    {
-                        "$match": {
-                            "HASH<d>": {
-                                "$eq": "?number"
-                            }
-                        }
-                    }
-                ]
-            }
-        })",
-        redact(*setVariableFromSubPipeline));
-}
 }  // namespace
 }  // namespace mongo

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/serialization_context.h"
 
@@ -58,8 +57,7 @@ public:
      * eg. serialize(NamespaceString(boost::none, "foo.bar")) -> "foo.bar"
      */
     static std::string serialize(const NamespaceString& ns,
-                                 const SerializationContext& context = SerializationContext(),
-                                 const SerializationOptions& = {});
+                                 const SerializationContext& context = SerializationContext());
 
     // TODO SERVER-74284: Privatize the worker functions
     static std::string serializeForStorage(

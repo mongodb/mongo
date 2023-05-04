@@ -47,34 +47,28 @@ structs:
         description: ""
         fields: 
             stringField:
-                query_shape: literal
+                query_shape_literal: true
                 type: string
             enumField:
-                query_shape: parameter
+                query_shape_literal: false
                 type: ExampleEnum
             stringIntVariant:
-                query_shape: literal
+                query_shape_literal: true
                 type:
                     variant: [string, int]
             stringIntVariantEnum:
-                query_shape: parameter
+                query_shape_literal: false
                 type:
                     variant: [string, int]
             arrayOfInts:
-                query_shape: literal
+                query_shape_literal: true
                 type: array<int>
             fieldpath:
-                query_shape: anonymize
+                query_shape_anonymize: true
                 type: string
             fieldpathList:
-                query_shape: anonymize
+                query_shape_anonymize: true
                 type: array<string>
-            nss:
-                query_shape: custom
-                type: namespacestring
-            plainNss:
-                query_shape: parameter
-                type: namespacestring
 
     ParentStruct:
         query_shape_component: true
@@ -82,8 +76,8 @@ structs:
         description: ""
         fields:
             nested_shape:
-                query_shape: literal
+                query_shape_literal: true
                 type: NestedStruct
             nested_no_shape:
-                query_shape: parameter
+                query_shape_literal: false
                 type: NestedStruct

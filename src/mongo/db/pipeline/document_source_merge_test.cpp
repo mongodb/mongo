@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/unittest/bson_test_util.h"
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
@@ -795,12 +794,12 @@ TEST_F(DocumentSourceMergeTest, SerializeDefaultLetVariable) {
 
 // Test the behaviour of 'let' serialization for each whenNotMatched mode.
 TEST_F(DocumentSourceMergeTest, SerializeLetVariables) {
-    auto pipeline = BSON_ARRAY(BSON("$project" << BSON("_id" << true << "x"
-                                                             << "$$v1"
-                                                             << "y"
-                                                             << "$$v2"
-                                                             << "z"
-                                                             << "$$v3")));
+    auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
+                                                       << "$$v1"
+                                                       << "y"
+                                                       << "$$v2"
+                                                       << "z"
+                                                       << "$$v3")));
 
     const auto createAndSerializeMergeStage = [this, &pipeline](StringData whenNotMatched) {
         auto spec = BSON("$merge" << BSON("into"
@@ -846,8 +845,8 @@ TEST_F(DocumentSourceMergeTest, SerializeLetVariables) {
 
 TEST_F(DocumentSourceMergeTest, SerializeLetArrayVariable) {
     for (auto&& whenNotMatched : {"insert", "fail", "discard"}) {
-        auto pipeline = BSON_ARRAY(BSON("$project" << BSON("_id" << true << "x"
-                                                                 << "$$v1")));
+        auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
+                                                           << "$$v1")));
         auto spec = BSON(
             "$merge" << BSON("into"
                              << "target_collection"
@@ -875,9 +874,8 @@ TEST_F(DocumentSourceMergeTest, SerializeLetArrayVariable) {
 // SERVER-41272, this test should be updated to accordingly.
 TEST_F(DocumentSourceMergeTest, SerializeNullLetVariablesAsDefault) {
     for (auto&& whenNotMatched : {"insert", "fail", "discard"}) {
-        auto pipeline = BSON_ARRAY(BSON("$project" << BSON("_id" << true << "x"
-                                                                 << BSON("$const"
-                                                                         << "1"))));
+        auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
+                                                           << "1")));
         auto spec = BSON("$merge" << BSON("into"
                                           << "target_collection"
                                           << "let" << BSONNULL << "whenMatched" << pipeline
@@ -894,9 +892,8 @@ TEST_F(DocumentSourceMergeTest, SerializeNullLetVariablesAsDefault) {
 
 TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariables) {
     for (auto&& whenNotMatched : {"insert", "fail", "discard"}) {
-        auto pipeline = BSON_ARRAY(BSON("$project" << BSON("_id" << true << "x"
-                                                                 << BSON("$const"
-                                                                         << "1"))));
+        auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
+                                                           << "1")));
         auto spec = BSON("$merge" << BSON("into"
                                           << "target_collection"
                                           << "let" << BSONObj() << "whenMatched" << pipeline
@@ -910,41 +907,6 @@ TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariables) {
                                                        : Value(BSONObj())));
         ASSERT_VALUE_EQ(serialized["$merge"]["whenMatched"], Value(pipeline));
     }
-}
-
-TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariableMentionNew) {
-    auto pipeline = BSON_ARRAY(fromjson("{$project: {_id: true, x: '$$new'}}"));
-    auto spec =
-        BSON("$merge" << BSON("into"
-                              << "target_collection"
-                              << "let" << BSONObj() << "whenMatched" << pipeline << "whenNotMatched"
-                              << "insert"));
-    auto mergeStage = createMergeStage(spec);
-    ASSERT(mergeStage);
-    auto serialized = mergeStage->serialize().getDocument();
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$merge": {
-                "into": {
-                    "db": "unittests",
-                    "coll": "target_collection"
-                },
-                "on": "_id",
-                "let": {
-                    "new": "$$ROOT"
-                },
-                "whenMatched": [
-                    {
-                        "$project": {
-                            "_id": true,
-                            "x": "$$new"
-                        }
-                    }
-                ],
-                "whenNotMatched": "insert"
-            }
-        })",
-        serialized.toBson());
 }
 
 TEST_F(DocumentSourceMergeTest, OnlyObjectCanBeUsedAsLetVariables) {
@@ -1176,41 +1138,6 @@ TEST_F(DocumentSourceMergeServerlessTest,
     ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
 }
 
-TEST_F(DocumentSourceMergeTest, QueryShape) {
-    auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
-                                                       << "1")));
-    auto spec =
-        BSON("$merge" << BSON("into"
-                              << "target_collection"
-                              << "let" << BSONObj() << "whenMatched" << pipeline << "whenNotMatched"
-                              << "insert"));
-    auto mergeStage = createMergeStage(spec);
-    ASSERT(mergeStage);
-    auto serialized = mergeStage->serialize().getDocument();
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$merge": {
-                "into": {
-                    "db": "unittests",
-                    "coll": "target_collection"
-                },
-                "on": "_id",
-                "let": {
-                    "new": "$$ROOT"
-                },
-                "whenMatched": [
-                    {
-                        "$project": {
-                            "HASH<_id>": true,
-                            "HASH<x>": "?string"
-                        }
-                    }
-                ],
-                "whenNotMatched": "insert"
-            }
-        })",
-        redact(*mergeStage));
-}
 
 }  // namespace
 }  // namespace mongo
