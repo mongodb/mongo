@@ -671,17 +671,14 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                           repl::OplogEntry::CommandType::kApplyOps);
                 const auto sessionId = *nextNewWriteOplog.getSessionId();
 
-                // The opTimes for transactions inside internal sessions for non-retryable writes
-                // should never get added to the opTime queue since those transactions are not
-                // retryable so there is no need to transfer their write history to the
-                // recipient.
-                invariant(
-                    !isInternalSessionForNonRetryableWrite(sessionId),
-                    str::stream()
-                        << "Cannot add op time for a non-retryable internal transaction to the "
-                           "session migration op time queue - "
-                        << "session id:" << sessionId
-                        << " oplog entry: " << redact(nextNewWriteOplog.toBSONForLogging()));
+                if (isInternalSessionForNonRetryableWrite(sessionId)) {
+                    // Transactions inside internal sessions for non-retryable writes are not
+                    // retryable so there is no need to transfer their write history to the
+                    // recipient.
+                    _newWriteOpTimeList.pop_front();
+                    lk.unlock();
+                    return _fetchNextNewWriteOplog(opCtx);
+                }
 
                 if (isInternalSessionForRetryableWrite(sessionId)) {
                     // Derive retryable write oplog entries from this retryable internal
