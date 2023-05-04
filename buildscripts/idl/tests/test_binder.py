@@ -2717,11 +2717,11 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_literal: true
+                            query_shape: literal
                             type: string
                         field2:
                             type: bool
-                            query_shape_literal: false
+                            query_shape: parameter
         """))
 
         self.assert_bind_fail(
@@ -2736,7 +2736,7 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                         field2:
                             type: bool
-                            query_shape_literal: false
+                            query_shape: parameter
         """), idl.errors.ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL)
 
         self.assert_bind_fail(
@@ -2750,7 +2750,7 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                         field2:
                             type: bool
-                            query_shape_literal: false
+                            query_shape: parameter
         """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
         # Validating query_shape_anonymize relies on std::string
@@ -2780,10 +2780,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: string
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """))
 
@@ -2795,10 +2795,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: array<string>
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """))
 
@@ -2806,17 +2806,13 @@ class TestBinder(testcase.IDLTestcase):
             basic_types + textwrap.dedent("""
             structs:
                 struct1:
-                    query_shape_component: true
                     strict: true
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: false
+                            query_shape: blah
                             type: string
-                        field2:
-                            query_shape_literal: false
-                            type: bool
-        """), idl.errors.ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE)
+        """), idl.errors.ERROR_ID_QUERY_SHAPE_INVALID_VALUE)
 
         self.assert_bind_fail(
             basic_types + textwrap.dedent("""
@@ -2827,10 +2823,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: bool
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """), idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY)
 
@@ -2843,29 +2839,12 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: array<bool>
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """), idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY)
-
-        self.assert_bind_fail(
-            basic_types + textwrap.dedent("""
-            structs:
-                struct1:
-                    query_shape_component: true
-                    strict: true
-                    description: ""
-                    fields:
-                        field1:
-                            query_shape_anonymize: true
-                            query_shape_literal: true
-                            type: string
-                        field2:
-                            query_shape_literal: false
-                            type: bool
-        """), idl.errors.ERROR_ID_CANNOT_BE_LITERAL_AND_FIELDPATH)
 
         self.assert_bind_fail(
             basic_types + textwrap.dedent("""
@@ -2875,7 +2854,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_literal: true
+                            query_shape: literal
                             type: string
             """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
@@ -2896,7 +2875,7 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             type: StructZero
                             description: ""
-                            query_shape_literal: true
+                            query_shape: literal
             """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
     # pylint: disable=invalid-name

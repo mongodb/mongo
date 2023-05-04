@@ -143,6 +143,13 @@ struct SerializationOptions {
         return ImplicitValue(n);
     }
 
+    Value serializeLiteralValue(int64_t n) const {
+        if (replacementForLiteralArgs) {
+            return Value(*replacementForLiteralArgs);
+        }
+        return Value((long long)n);
+    }
+
     // Helper functions for applying hmac to BSONObj. Does not take into account anything to do with
     // MQL semantics, removes all field names and literals in the passed in obj.
     void addHmacedArrayToBuilder(BSONArrayBuilder* bab, std::vector<BSONElement> array) {
@@ -178,13 +185,6 @@ struct SerializationOptions {
         }
     }
 
-    template <class T>
-    Value serializeLiteralValue(T n) {
-        if (replacementForLiteralArgs) {
-            return Value(*replacementForLiteralArgs);
-        }
-        return ImplicitValue(n);
-    }
 
     /**
      * Helper method to call 'serializeLiteral()' on 'e' and append the resulting value to 'bob'

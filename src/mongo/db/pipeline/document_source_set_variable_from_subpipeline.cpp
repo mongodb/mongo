@@ -54,16 +54,10 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(setVariableFromSubPipeline,
                                   true);
 
 Value DocumentSourceSetVariableFromSubPipeline::serialize(SerializationOptions opts) const {
-    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
-        // TODO: SERVER-76208 support query shapification for IDL types like pipeline with custom
-        // serializers.
-        MONGO_UNIMPLEMENTED_TASSERT(7484314);
-    }
-
     const auto var = "$$" + Variables::getBuiltinVariableName(_variableID);
     SetVariableFromSubPipelineSpec spec;
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);
-    spec.setSetVariable(var);
+    spec.setSetVariable(opts.serializeIdentifier(var));
     spec.setPipeline(_subPipeline->serializeToBson(opts));
     return Value(DOC(getSourceName() << spec.toBSON()));
 }

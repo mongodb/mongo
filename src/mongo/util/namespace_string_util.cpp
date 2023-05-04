@@ -37,9 +37,10 @@
 namespace mongo {
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
-                                           const SerializationContext& context) {
+                                           const SerializationContext& context,
+                                           const SerializationOptions& options) {
     if (!gMultitenancySupport)
-        return ns.toString();
+        return options.serializeIdentifier(ns.toString());
 
     // TODO SERVER-74284: uncomment to redirect command-sepcific serialization requests
     // if (context.getSource() == SerializationContext::Source::Command &&
@@ -47,7 +48,7 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
     //     return serializeForCommands(ns, context);
 
     // if we're not serializing a Command Reply, use the default serializing rules
-    return serializeForStorage(ns, context);
+    return options.serializeIdentifier(serializeForStorage(ns, context));
 }
 
 std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
