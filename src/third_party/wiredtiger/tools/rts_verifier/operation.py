@@ -50,6 +50,7 @@ class OpType(Enum):
     STABLE_UPDATE_FOUND = 41
     TREE_OBJECT_LOG = 42
     UPDATE_CHAIN_VERIFY = 43
+    SKIP_DEL = 44
 
 class Operation:
     def __init__(self, line):
@@ -96,7 +97,7 @@ class Operation:
             matches = re.search(f'{prefix}=(0x[A-Za-z0-9]+)', line)
 
         if matches is None:
-            raise Exception("failed to parse address string")
+            raise Exception(f"failed to parse address string with prefix '{prefix}' in '{line}'")
 
         return int(matches.group(1), 16)
 
@@ -249,6 +250,11 @@ class Operation:
 
         matches = re.search('txnid=(\d+)', line)
         self.txnid = int(matches.group(1))
+
+    def __init_skip_del(self, line):
+        self.type = OpType.SKIP_DEL
+        self.file = self.__extract_file(line)
+        self.ref = self.__extract_pointer('ref', line)
 
     def __init_skip_del_null(self, line):
         self.type = OpType.SKIP_DEL_NULL

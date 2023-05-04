@@ -145,6 +145,10 @@ class Checker:
         # TODO expand this out
         pass
 
+    def __apply_check_skip_del(self, operation):
+        # TODO expand this out
+        pass
+
     def __apply_check_skip_del_null(self, operation):
         # TODO expand this out
         pass
