@@ -332,6 +332,7 @@ def test_install_is_complete(test_args: TestArgs):
 
     required_dirs = [
         pathlib.Path('/run/mongodb'),
+        pathlib.Path('/var/run/mongodb'),
         pathlib.Path(test_args['mongo_work_dir']),
     ]  # type: List[pathlib.Path]
 
