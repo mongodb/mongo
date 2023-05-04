@@ -319,6 +319,9 @@ public:
             boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
             invariant(nss);
 
+            // TODO:SERVER-75848 Make this lock-free
+            Lock::CollectionLock clk(opCtx, *nss, MODE_IS);
+
             const Collection* coll = nullptr;
             if (nss->isGlobalIndex()) {
                 // TODO SERVER-74209: Reading earlier than the minimum valid snapshot is not
@@ -341,8 +344,6 @@ public:
                             !minSnapshot || *readTimestamp >= *minSnapshot);
                 }
             } else {
-                // TODO:SERVER-75848 Make this lock-free
-                Lock::CollectionLock clk(opCtx, *nss, MODE_IS);
                 coll = catalog->establishConsistentCollection(
                     opCtx,
                     {dbName, uuid},
