@@ -180,6 +180,30 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesDefaultCollationOfView) {
                            << "fr_CA"));
 }
 
+TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
+
+    AggregateCommandRequest requestOnViewDefault{viewNss, emptyPipeline};
+
+    auto resultDefault = resolvedView.asExpandedViewAggregation(requestOnViewDefault);
+    ASSERT_TRUE(resultDefault.getSerializationContext() ==
+                SerializationContext::stateCommandRequest());
+
+    SerializationContext scCommand = SerializationContext::stateCommandRequest();
+    scCommand.setTenantIdSource(true);
+    scCommand.setPrefixState(true);
+    AggregateCommandRequest requestOnViewCommand{viewNss, emptyPipeline, scCommand};
+
+    auto resultCommand = resolvedView.asExpandedViewAggregation(requestOnViewCommand);
+    ASSERT_EQ(resultCommand.getSerializationContext().getSource(),
+              SerializationContext::Source::Command);
+    ASSERT_EQ(resultCommand.getSerializationContext().getCallerType(),
+              SerializationContext::CallerType::Request);
+    ASSERT_TRUE(resultCommand.getSerializationContext().receivedNonPrefixedTenantId());
+    ASSERT_EQ(resultCommand.getSerializationContext().getPrefix(),
+              SerializationContext::Prefix::IncludePrefix);
+}
+
 TEST(ResolvedViewTest, FromBSONFailsIfMissingResolvedView) {
     BSONObj badCmdResponse = BSON("x" << 1);
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40248);

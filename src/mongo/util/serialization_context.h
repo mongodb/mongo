@@ -31,6 +31,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -140,6 +141,24 @@ struct SerializationContext {
         return _nonPrefixedTenantId;
     }
 
+    std::string toString() const {
+        auto stream = str::stream();
+        stream << "Source: "
+               << (_source == Source::Command
+                       ? "Command"
+                       : (_source == Source::Storage ? "Storage" : "Default"));
+        stream << ", CallerType: "
+               << (_callerType == CallerType::Request
+                       ? "Request"
+                       : (_callerType == CallerType::Reply ? "Reply" : "None"));
+        stream << ", PrefixState: "
+               << (_prefixState == Prefix::IncludePrefix
+                       ? "Include"
+                       : (_prefixState == Prefix::ExcludePrefix ? "Exclude" : "Missing"));
+        stream << ", non-prefixed tid: " << (_nonPrefixedTenantId ? "true" : "false");
+        return stream;
+    }
+
     friend bool operator==(const SerializationContext& lhs, const SerializationContext& rhs) {
         return (lhs._prefixState == rhs._prefixState) && (lhs._callerType == rhs._callerType) &&
             (lhs._source == rhs._source);
@@ -155,13 +174,18 @@ private:
     Prefix _prefixState;
 
     /**
-     * This flag is set/produced at command parsing before the deserializer is called, and consumed
-     * by the serializer.  It indicates whether the tenantId was sourced from the $tenant field or
-     * security token (ie. true), or if it was sourced from parsing the db string prefix (ie.
-     * false).  This is important as the serializer uses this flag to determine whether the reponse
-     * should contain a prefixed tenantId when serializing for commands.
+     * This flag is set/produced at command parsing before the deserializer is called, and
+     * consumed by the serializer.  It indicates whether the tenantId was sourced from the
+     * $tenant field or security token (ie. true), or if it was sourced from parsing the db
+     * string prefix (ie. false).  This is important as the serializer uses this flag to
+     * determine whether the reponse should contain a prefixed tenantId when serializing for
+     * commands.
      */
     bool _nonPrefixedTenantId;
 };
+
+inline std::ostream& operator<<(std::ostream& os, const SerializationContext& sc) {
+    return os << sc.toString();
+}
 
 }  // namespace mongo
