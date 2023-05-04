@@ -318,8 +318,8 @@ class SymbolizerService:
         """
 
         symbolizer_args = [
-            "python",
-            "buildscripts/mongosymb.py",
+            "db-contrib-tool",
+            "symbolize",
             "--client-secret",
             _config.SYMBOLIZER_CLIENT_SECRET,
             "--client-id",
