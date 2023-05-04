@@ -1,5 +1,7 @@
 // The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   # Step-down can cause mapReduce to fail.
+//   does_not_support_stepdowns,
 //   not_allowed_with_security_token,
 //   # Uses mapReduce command.
 //   requires_scripting,
