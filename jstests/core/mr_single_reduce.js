@@ -1,3 +1,7 @@
+// @tags: [
+//   # Step-down can cause mapReduce to fail.
+//   does_not_support_stepdowns,
+// ]
 (function() {
 "use strict";
 const coll = db.bar;
