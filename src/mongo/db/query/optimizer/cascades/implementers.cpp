@@ -92,7 +92,17 @@ static bool canReturnSortedOutput(const CompoundIntervalReqExpr::Node& intervals
 }
 
 /**
- * Implement physical nodes based on existing logical nodes.
+ * Takes a logical node and required physical properties, and creates zero or more physical subtrees
+ * that can implement that logical node while satisfying those properties.
+ *
+ * The input logical node is expected to come from a Memo, which means its immediate children are
+ * 'MemoLogicalDelegator' nodes (because each logical node lives in a separate Group).
+ *
+ * The physical plans are output by adding 'PhysRewriteEntry' entries to '_queue'. Each entry must
+ * contain:
+ * - a tree of physical nodes, with logical(!) delegator nodes as the leaves.
+ * - a cardinality estimate for each physical node.
+ * - the physical properties that we require for each logical leaf.
  */
 class ImplementationVisitor {
 public:
@@ -977,9 +987,133 @@ public:
         }
     }
 
+
     void operator()(const ABT& /*n*/, const RIDUnionNode& node) {
-        // TODO SERVER-75587 should implement this.
-        return;
+        const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(_logicalProps);
+        const std::string& scanDefName = indexingAvailability.getScanDefName();
+        {
+            const auto& scanDef = _metadata._scanDefs.at(scanDefName);
+            if (scanDef.getIndexDefs().empty()) {
+                // Reject if we do not have any indexes.
+                return;
+            }
+        }
+        const auto& ridProjName = _ridProjections.at(scanDefName);
+
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // Cannot satisfy limit-skip.
+            return;
+        }
+
+        const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
+        const bool dedupRID = requirements.getDedupRID();
+        const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
+        if (indexReqTarget != IndexReqTarget::Index) {
+            // We only allow index target.
+            return;
+        }
+
+        const GroupIdType leftGroupId =
+            node.getLeftChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+        const GroupIdType rightGroupId =
+            node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+
+        const LogicalProps& leftLogicalProps = _memo.getLogicalProps(leftGroupId);
+        const LogicalProps& rightLogicalProps = _memo.getLogicalProps(rightGroupId);
+
+        const bool hasProperIntervalLeft =
+            getPropertyConst<IndexingAvailability>(leftLogicalProps).hasProperInterval();
+        const bool hasProperIntervalRight =
+            getPropertyConst<IndexingAvailability>(rightLogicalProps).hasProperInterval();
+
+        if (!hasProperIntervalLeft || !hasProperIntervalRight) {
+            // We need to have proper intervals on both sides.
+            return;
+        }
+
+        const auto& distribRequirement = getPropertyConst<DistributionRequirement>(_physProps);
+        const auto& distrAndProjections = distribRequirement.getDistributionAndProjections();
+        if (distrAndProjections._type != DistributionType::Centralized) {
+            // For now we allow only centralized distribution.
+            return;
+        }
+
+        const auto& required = getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+        if (required.getVector().size() != 1 || !required.find(ridProjName)) {
+            // For now we can only satisfy requirement for ridProjection.
+            return;
+        }
+
+        ProjectionNameOrderPreservingSet leftChildProjections;
+        leftChildProjections.emplace_back(ridProjName);
+
+        ProjectionNameOrderPreservingSet rightChildProjections;
+        rightChildProjections.emplace_back(ridProjName);
+
+        if (hasProperty<CollationRequirement>(_physProps)) {
+            // For now we cannot satisfy collation requirement.
+            return;
+        }
+
+        // We are propagating the distribution requirements to both sides.
+        PhysProps leftPhysProps = _physProps;
+        PhysProps rightPhysProps = _physProps;
+
+        getProperty<DistributionRequirement>(leftPhysProps).setDisableExchanges(false);
+        getProperty<DistributionRequirement>(rightPhysProps).setDisableExchanges(false);
+
+        // Propagate IndexingRequirement, but don't require children to provide deduped RIDs:
+        // if the consumer needs deduped RIDs, then we construct a Unique node anyway, to handle any
+        // RIDs that appear in both children.
+        setPropertyOverwrite<IndexingRequirement>(
+            leftPhysProps,
+            {IndexReqTarget::Index,
+             false /*dedupRID*/,
+             requirements.getSatisfiedPartialIndexesGroupId()});
+        setPropertyOverwrite<IndexingRequirement>(
+            rightPhysProps,
+            {IndexReqTarget::Index,
+             false /*dedupRID*/,
+             requirements.getSatisfiedPartialIndexesGroupId()});
+
+        setPropertyOverwrite<ProjectionRequirement>(leftPhysProps, std::move(leftChildProjections));
+        setPropertyOverwrite<ProjectionRequirement>(rightPhysProps,
+                                                    std::move(rightChildProjections));
+
+        ABT physicalUnion = make<UnionNode>(required.getVector(),
+                                            makeSeq(node.getLeftChild(), node.getRightChild()));
+        UnionNode& n = *physicalUnion.cast<UnionNode>();
+
+        ChildPropsType childProps;
+        childProps.emplace_back(&n.nodes().at(0), std::move(leftPhysProps));
+        childProps.emplace_back(&n.nodes().at(1), std::move(rightPhysProps));
+
+        if (dedupRID) {
+            ABT unique =
+                make<UniqueNode>(ProjectionNameVector{{ridProjName}}, std::move(physicalUnion));
+
+            // To estimate the physical Union node, we can add the estimates of the left and right
+            // child. This makes sense because physical Union does not do anything about duplicates:
+            // it's a bag-union. That's different than the overall CE of the current group, which
+            // should estimate the cardinality we have after duplicates are removed.
+            CEType overallCE = getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate();
+            CEType leftCE = getPropertyConst<CardinalityEstimate>(leftLogicalProps).getEstimate();
+            CEType rightCE = getPropertyConst<CardinalityEstimate>(rightLogicalProps).getEstimate();
+            NodeCEMap ceMap{
+                {unique.cast<Node>(), overallCE},
+                {unique.cast<UniqueNode>()->getChild().cast<Node>(), leftCE + rightCE},
+            };
+            optimizeChildrenNoAssert(_queue,
+                                     kDefaultPriority,
+                                     PhysicalRewriteType::RIDUnionUnique,
+                                     std::move(unique),
+                                     std::move(childProps),
+                                     std::move(ceMap));
+        } else {
+            // The consumer doesn't require unique row IDs, so we don't need any Unique stage.
+            optimizeChildren<UnionNode, PhysicalRewriteType::RIDUnion>(
+                _queue, kDefaultPriority, std::move(physicalUnion), std::move(childProps));
+        }
     }
 
     void operator()(const ABT& n, const BinaryJoinNode& node) {

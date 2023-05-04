@@ -479,10 +479,10 @@ struct Collector {
         return result;
     }
 
-    template <class T>
-    CollectedInfo handleRIDNodeReferences(const T& node,
-                                          CollectedInfo leftChildResult,
-                                          CollectedInfo rightChildResult) {
+    CollectedInfo transport(const ABT& n,
+                            const RIDIntersectNode& node,
+                            CollectedInfo leftChildResult,
+                            CollectedInfo rightChildResult) {
         CollectedInfo result{};
 
         // This is a special case where both children of 'node' have a definition for the scan
@@ -499,20 +499,28 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n,
-                            const RIDIntersectNode& node,
-                            CollectedInfo leftChildResult,
-                            CollectedInfo rightChildResult) {
-        return handleRIDNodeReferences(
-            node, std::move(leftChildResult), std::move(rightChildResult));
-    }
-
-    CollectedInfo transport(const ABT& n,
                             const RIDUnionNode& node,
                             CollectedInfo leftChildResult,
                             CollectedInfo rightChildResult) {
-        // TODO SERVER-75587 should determine how the reference tracker for RIDUnionNode will work.
-        return handleRIDNodeReferences(
-            node, std::move(leftChildResult), std::move(rightChildResult));
+        CollectedInfo result{};
+
+        // For simplicity, don't provide any projections. In principle we could preserve any
+        // projections that are common to both the left and right children, but for now we don't
+        // need this because we don't support covered index union plans.
+        //
+        // The only projection we preserve is the scanDef projection name.
+        const auto& scanProjName = node.getScanProjectionName();
+        auto preservedDef = std::move(leftChildResult.defs.at(scanProjName));
+        rightChildResult.defs.clear();
+        leftChildResult.defs.clear();
+        leftChildResult.defs.emplace(scanProjName, std::move(preservedDef));
+
+        result.merge(std::move(leftChildResult));
+        result.merge<false /*resolveFreeVarsWithOther*/>(std::move(rightChildResult));
+
+        result.nodeDefs[&node] = result.defs;
+
+        return result;
     }
 
     template <class T>

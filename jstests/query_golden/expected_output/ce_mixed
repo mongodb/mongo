@@ -3385,11 +3385,39 @@ Heuristic explain:  {
 	"nodeType" : "Root",
 	"logicalCE" : 14.800368851048507,
 	"child" : {
-		"nodeType" : "Filter",
+		"nodeType" : "NestedLoopJoin",
 		"logicalCE" : 14.800368851048507,
-		"child" : {
-			"nodeType" : "PhysicalScan",
-			"logicalCE" : 14.800368851048507
+		"leftChild" : {
+			"nodeType" : "Unique",
+			"logicalCE" : 25.602073215185506,
+			"child" : {
+				"nodeType" : "Union",
+				"logicalCE" : 25.602073215185506,
+				"children" : [
+					{
+						"nodeType" : "IndexScan",
+						"logicalCE" : 17.32050807568877,
+						"interval" : "[ false, false ]"
+					},
+					{
+						"nodeType" : "IndexScan",
+						"logicalCE" : 17.32050807568877,
+						"interval" : "[ true, true ]"
+					}
+				]
+			}
+		},
+		"rightChild" : {
+			"nodeType" : "Filter",
+			"logicalCE" : 14.800368851048507,
+			"child" : {
+				"nodeType" : "LimitSkip",
+				"logicalCE" : 14.800368851048507,
+				"child" : {
+					"nodeType" : "Seek",
+					"logicalCE" : 14.800368851048507
+				}
+			}
 		}
 	}
 }

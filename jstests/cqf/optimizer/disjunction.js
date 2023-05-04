@@ -14,13 +14,17 @@ const coll = db.cqf_disjunction;
 coll.drop();
 
 let docs = [];
+// Generate 100 documents with different pairs of a,b values.
 for (let i = 0; i < 10; ++i) {
-    // Generate enough documents for an index to be preferable.
     for (let a = 0; a < 10; ++a) {
         for (let b = 0; b < 10; ++b) {
             docs.push({a, b});
         }
     }
+}
+// Generate extra non-matching documents to discourage collection scan.
+for (let i = 0; i < 1000; ++i) {
+    docs.push({});
 }
 assert.commandWorked(coll.insert(docs));
 
@@ -35,10 +39,40 @@ assert.commandWorked(coll.createIndexes([
     {b: 1},
 ]));
 
-result = coll.find({$or: [{a: 2}, {b: 3}]}).toArray();
-assert.eq(result.length, 190, result);
-for (const doc of result) {
-    assert(doc.a === 2 || doc.b === 3, "Query returned a doc not matching the predicate: ${doc}");
+{
+    const query = {$or: [{a: 2}, {b: 3}]};
+
+    // Check the plan and count.
+    const res = runWithParams(
+        [
+            {key: 'internalCascadesOptimizerExplainVersion', value: "v2"},
+            {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true}
+        ],
+        () => coll.explain("executionStats").find(query).finish());
+    assert.eq(190, res.executionStats.nReturned);
+
+    // We should get a union of two indexes {a:1} and {b:1}.
+    const expectedStr =
+        `Root [{scan_0}]
+NestedLoopJoin [joinType: Inner, {rid_1}]
+|   |   Const [true]
+|   LimitSkip [limit: 1, skip: 0]
+|   Seek [ridProjection: rid_1, {'<root>': scan_0}, cqf_disjunction_]
+Unique [{rid_1}]
+Union [{rid_1}]
+|   IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: b_1, interval: {=Const [3]}]
+IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: a_1, interval: {=Const [2]}]
+`;
+    const actualStr = removeUUIDsFromExplain(db, res);
+    assert.eq(expectedStr, actualStr);
+
+    // Check the full result.
+    const result = coll.find(query).toArray();
+    assert.eq(result.length, 190, result);
+    for (const doc of result) {
+        assert(doc.a === 2 || doc.b === 3,
+               "Query returned a doc not matching the predicate: ${doc}");
+    }
 }
 
 // At time of writing, queries that compare to literal array or MinKey/MaxKey are translated to
@@ -230,5 +264,46 @@ PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0, 'b': evalTemp_1}, cqf_disjunct
                             .finish());
     assert.eq(360, res.executionStats.nReturned);
     assert.eq(expectedStr, actualStr);
+}
+
+// Test a union involving multikey indexes.
+// First make {a:1} and {b:1} multikey.
+assert.commandWorked(coll.insert({a: ['asdf'], b: ['qwer']}));
+{
+    const query = {$or: [{a: 2}, {b: 3}]};
+
+    // Check the plan and count.
+    const res = runWithParams(
+        [
+            {key: 'internalCascadesOptimizerExplainVersion', value: "v2"},
+            {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true}
+        ],
+        () => coll.explain("executionStats").find(query).finish());
+    assert.eq(190, res.executionStats.nReturned);
+
+    // We should get a union of two indexes {a:1} and {b:1}.
+    // Neither one needs its own Unique stage, because we have to have a Unique after the Union
+    // anyway.
+    const expectedStr =
+        `Root [{scan_0}]
+NestedLoopJoin [joinType: Inner, {rid_1}]
+|   |   Const [true]
+|   LimitSkip [limit: 1, skip: 0]
+|   Seek [ridProjection: rid_1, {'<root>': scan_0}, cqf_disjunction_]
+Unique [{rid_1}]
+Union [{rid_1}]
+|   IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: b_1, interval: {=Const [3]}]
+IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: a_1, interval: {=Const [2]}]
+`;
+    const actualStr = removeUUIDsFromExplain(db, res);
+    assert.eq(expectedStr, actualStr);
+
+    // Check the full result.
+    const result = coll.find(query).toArray();
+    assert.eq(result.length, 190, result);
+    for (const doc of result) {
+        assert(doc.a === 2 || doc.b === 3,
+               "Query returned a doc not matching the predicate: ${doc}");
+    }
 }
 }());

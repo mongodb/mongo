@@ -455,25 +455,9 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
     builder.pushDisj().pushConj().atom({makeKey("g"), req}).pop();
     auto reqs3 = PartialSchemaRequirements(builder.finish().get());
 
-    // During logical optimization, the SargableNodes not directly above the Scan will first be
-    // lowered to Filter nodes based on their requirements. The SargableNode immediately above the
-    // Scan will be lowered later based on its residual requirements.
-    ResidualRequirements::Builder residReqs;
-    residReqs.pushDisj()
-        .pushConj()
-        .atom({makeKey("a"), req, 0})
-        .atom({makeKey("b"), req, 1})
-        .pop()
-        .pushConj()
-        .atom({makeKey("c"), req, 2})
-        .atom({makeKey("d"), req, 3})
-        .pop();
-    ScanParams scanParams;
-    scanParams._residualRequirements = residReqs.finish();
-
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT sargableNode1 = make<SargableNode>(
-        reqs1, CandidateIndexes(), scanParams, IndexReqTarget::Complete, std::move(scanNode));
+        reqs1, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(scanNode));
     ABT sargableNode2 = make<SargableNode>(
         reqs2, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(sargableNode1));
     ABT sargableNode3 = make<SargableNode>(
@@ -481,13 +465,12 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
                                   std::move(sargableNode3));
 
-    // Show that the optimization of the SargableNode does not throw, and that all three
-    // SargableNodes are correctly lowered to FilterNodes.
     auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {
-            OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase,
-            // OptPhase::MemoImplementationPhase,
+            OptPhase::MemoSubstitutionPhase,
+            OptPhase::MemoExplorationPhase,
+            OptPhase::MemoImplementationPhase,
         },
         prefixId,
         {{{"test",
@@ -518,10 +501,6 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
     phaseManager.optimize(rootNode);
 
     // We should get an index union between 'ab' and 'cd'.
-    // TODO SERVER-75587 In the logical plan, we get an alternative where 'ab' and 'cd' are each
-    // satisfied by an intersection. Instead we should get a single scan of the compound indexes
-    // 'ab' and 'cd'. Hopefully that will work out once we enable the physical phase, which makes it
-    // possible to cost the alternatives.
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "Root [{ptest}]\n"
         "Filter []\n"
@@ -536,55 +515,103 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
         "|   EvalFilter []\n"
         "|   |   Variable [ptest]\n"
         "|   PathGet [e] PathCompare [Eq] Const [1]\n"
-        "RIDIntersect [ptest]\n"
-        "|   Scan [test, {ptest}]\n"
-        "RIDUnion [ptest]\n"
-        "|   RIDIntersect [ptest]\n"
-        "|   |   Sargable [Index]\n"
-        "|   |   |   |   |   requirements: \n"
-        "|   |   |   |   |       {{{ptest, 'PathGet [d] PathIdentity []', {{{=Const [1]}}}}}}\n"
-        "|   |   |   |   candidateIndexes: \n"
-        "|   |   |   |       candidateId: 1, cd, {'<indexKey> 1': evalTemp_49}, {Unbound, "
-        "Unbound}, {{{<fully open>}}}\n"
-        "|   |   |   |           residualReqs: \n"
-        "|   |   |   |               {{{evalTemp_49, 'PathIdentity []', {{{=Const [1]}}}, "
-        "entryIndex: 0}}}\n"
-        "|   |   |   scanParams: \n"
-        "|   |   |       {'d': evalTemp_50}\n"
-        "|   |   |           residualReqs: \n"
-        "|   |   |               {{{evalTemp_50, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: "
-        "0}}}\n"
-        "|   |   Scan [test, {ptest}]\n"
-        "|   Sargable [Index]\n"
-        "|   |   |   |   requirements: \n"
-        "|   |   |   |       {{{ptest, 'PathGet [c] PathIdentity []', {{{=Const [1]}}}}}}\n"
-        "|   |   |   candidateIndexes: \n"
-        "|   |   |       candidateId: 1, cd, {}, {SimpleEquality, Unbound}, {{{[Const [1 | "
-        "minKey], Const [1 | maxKey]]}}}\n"
-        "|   |   scanParams: \n"
-        "|   |       {'c': evalTemp_44}\n"
-        "|   |           residualReqs: \n"
-        "|   |               {{{evalTemp_44, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: "
-        "0}}}\n"
-        "|   Scan [test, {ptest}]\n"
-        "RIDIntersect [ptest]\n"
-        "|   Sargable [Index]\n"
-        "|   |   |   requirements: \n"
-        "|   |   |       {{{ptest, 'PathGet [b] PathIdentity []', {{{=Const [1]}}}}}}\n"
-        "|   |   candidateIndexes: \n"
-        "|   |       candidateId: 1, ab, {'<indexKey> 1': evalTemp_45}, {Unbound, Unbound}, "
-        "{{{<fully open>}}}\n"
-        "|   |           residualReqs: \n"
-        "|   |               {{{evalTemp_45, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: "
-        "0}}}\n"
-        "|   Scan [test, {ptest}]\n"
-        "Sargable [Index]\n"
-        "|   |   requirements: \n"
-        "|   |       {{{ptest, 'PathGet [a] PathIdentity []', {{{=Const [1]}}}}}}\n"
-        "|   candidateIndexes: \n"
-        "|       candidateId: 1, ab, {}, {SimpleEquality, Unbound}, {{{[Const [1 | minKey], Const "
-        "[1 | maxKey]]}}}\n"
-        "Scan [test, {ptest}]\n",
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': ptest}, test]\n"
+        "Unique [{rid_0}]\n"
+        "Union [{rid_0}]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: cd, interval: {=Const "
+        "[1 | 1]}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: ab, interval: {=Const [1 | "
+        "1]}]\n",
+        rootNode);
+}
+
+TEST(PhysRewriter, ThreeWayIndexUnion) {
+    auto req =
+        PartialSchemaRequirement(boost::none,
+                                 _disj(_conj(_interval(_incl("1"_cint32), _incl("1"_cint32)))),
+                                 false /*perfOnly*/);
+
+    auto makeKey = [](std::string pathName) {
+        return PartialSchemaKey("ptest",
+                                make<PathGet>(FieldNameType{pathName}, make<PathIdentity>()));
+    };
+
+    // Create three SargableNodes with a 3-argument disjunction.
+    PSRExpr::Builder builder;
+    builder.pushDisj()
+        .pushConj()
+        .atom({makeKey("a"), req})
+        .pop()
+        .pushConj()
+        .atom({makeKey("b"), req})
+        .pop()
+        .pushConj()
+        .atom({makeKey("c"), req})
+        .pop();
+    auto reqs = PartialSchemaRequirements(builder.finish().get());
+
+    ABT scanNode = make<ScanNode>("ptest", "test");
+    ABT sargableNode = make<SargableNode>(
+        reqs, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(scanNode));
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
+                                  std::move(sargableNode));
+
+    // Show that the optimization of the SargableNode does not throw, and that all three
+    // SargableNodes are correctly lowered to FilterNodes.
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager(
+        {
+            OptPhase::MemoSubstitutionPhase,
+            OptPhase::MemoExplorationPhase,
+            OptPhase::MemoImplementationPhase,
+        },
+        prefixId,
+        {{{"test",
+           createScanDef(
+               {},
+               {
+                   {"a",
+                    IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
+                   {"b",
+                    IndexDefinition{{{makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
+                   {"c",
+                    IndexDefinition{{{makeNonMultikeyIndexPath("c"), CollationOp::Ascending}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
+               })}}},
+        boost::none /*costModel*/,
+        DebugInfo::kDefaultForTests,
+        QueryHints{
+            ._disableScan = true,
+        });
+    phaseManager.optimize(rootNode);
+
+    // We should get a union of three index scans.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{ptest}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': ptest}, test]\n"
+        "Unique [{rid_0}]\n"
+        "Union [{rid_0}]\n"
+        "|   Union [{rid_0}]\n"
+        "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: c, interval: "
+        "{=Const [1]}]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: b, interval: {=Const "
+        "[1]}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: a, interval: {=Const "
+        "[1]}]\n",
         rootNode);
 }
 

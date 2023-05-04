@@ -115,6 +115,8 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(LogicalRewriterTypeEnum,
     F(RIDIntersectMergeJoin)      \
     F(RIDIntersectHashJoin)       \
     F(RIDIntersectGroupBy)        \
+    F(RIDUnion)                   \
+    F(RIDUnionUnique)             \
     F(IndexFetch)
 
 MAKE_PRINTABLE_ENUM(PhysicalRewriteType, PHYSICALREWRITER_NAMES);
