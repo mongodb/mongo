@@ -2,9 +2,7 @@
  * Tests running time-series multi-update commands that spill to disk.
  *
  * @tags: [
- *   featureFlagTimeseriesUpdatesSupport,
- *   # TODO (SERVER-73454): Re-enable the tests.
- *   __TEMPORARILY_DISABLED__,
+ *   featureFlagTimeseriesUpdatesSupport
  * ]
  */
 

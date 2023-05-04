@@ -337,27 +337,29 @@ function testCaseNoMetaFieldQueryUpdateFails({testUpdate}) {
 }
 
 function testCaseIllegalMetaFieldUpdateFails({testUpdate}) {
-    if (!arbitraryUpdatesEnabled) {
-        // Query on the metaField and modify a field that is not the metaField.
-        testUpdate({
-            updates: [{
-                q: {[metaField]: {c: "C", d: 2}},
-                u: {$set: {f2: "f2"}},
-                multi: true,
-            }]
-        },
-                   expectFailedUpdate([doc2]));
-
-        // Query on the metaField and modify the metaField and fields that are not the metaField.
-        testUpdate({
-            updates: [{
-                q: {[metaField]: {c: "C", d: 2}},
-                u: {$set: {[metaField]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}},
-                multi: true,
-            }]
-        },
-                   expectFailedUpdate([doc2]));
+    if (arbitraryUpdatesEnabled) {
+        return;
     }
+
+    // Query on the metaField and modify a field that is not the metaField.
+    testUpdate({
+        updates: [{
+            q: {[metaField]: {c: "C", d: 2}},
+            u: {$set: {f2: "f2"}},
+            multi: true,
+        }]
+    },
+               expectFailedUpdate([doc2]));
+
+    // Query on the metaField and modify the metaField and fields that are not the metaField.
+    testUpdate({
+        updates: [{
+            q: {[metaField]: {c: "C", d: 2}},
+            u: {$set: {[metaField]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}},
+            multi: true,
+        }]
+    },
+               expectFailedUpdate([doc2]));
 
     // Rename the metaField.
     testUpdate({

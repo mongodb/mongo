@@ -125,7 +125,7 @@ public:
     PlanStage::StageState doWork(WorkingSetID* id);
 
     bool containsDotsAndDollarsField() const {
-        return _params.isMulti && _params.updateDriver->containsDotsAndDollarsField();
+        return _params.isUpdate && _params.updateDriver->containsDotsAndDollarsField();
     }
 
 protected:
@@ -145,6 +145,13 @@ private:
     }
 
     /**
+     * Builds insert requests based on the measurements needing to be updated.
+     */
+    std::pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>> _buildInsertOps(
+        const std::vector<BSONObj>& matchedMeasurements,
+        std::vector<BSONObj>& unchangedMeasurements);
+
+    /**
      * Writes the modifications to a bucket.
      *
      * Returns the pair of (whether the write was successful, the stage state to propagate).
@@ -153,7 +160,7 @@ private:
     std::pair<bool, PlanStage::StageState> _writeToTimeseriesBuckets(
         ScopeGuard<F>& bucketFreer,
         WorkingSetID bucketWsmId,
-        const std::vector<BSONObj>& unchangedMeasurements,
+        std::vector<BSONObj>&& unchangedMeasurements,
         const std::vector<BSONObj>& modifiedMeasurements,
         bool bucketFromMigrate);
 

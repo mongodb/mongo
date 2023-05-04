@@ -559,11 +559,11 @@ public:
 
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
-            const auto collection = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest::fromOpCtx(
-                    opCtx, request().getNamespace(), AcquisitionPrerequisites::kWrite),
-                MODE_IX);
+            const auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
             if (isRequestToTimeseries) {
                 uassert(ErrorCodes::NamespaceNotFound,
@@ -582,8 +582,12 @@ public:
                 }
             }
 
-            ParsedUpdate parsedUpdate(
-                opCtx, &updateRequest, extensionsCallback, collection.getCollectionPtr());
+            ParsedUpdate parsedUpdate(opCtx,
+                                      &updateRequest,
+                                      extensionsCallback,
+                                      collection.getCollectionPtr(),
+                                      false /* forgoOpCounterIncrements */,
+                                      isRequestToTimeseries);
             uassertStatusOK(parsedUpdate.parseRequest());
 
             auto exec = uassertStatusOK(getExecutorUpdate(

@@ -352,17 +352,19 @@ TimeseriesTest.run((insert) => {
     });
 
     // Rename the metaField.
-    testUpdate({
-        initialDocList: [doc1, doc2, doc4],
-        updateList: [{
-            q: {[metaFieldName + ".a"]: "A"},
-            u: {$rename: {[metaFieldName]: "Z"}},
-            multi: true,
-        }],
-        resultDocList: [doc1, doc2, doc4],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, doc2, doc4],
+            updateList: [{
+                q: {[metaFieldName + ".a"]: "A"},
+                u: {$rename: {[metaFieldName]: "Z"}},
+                multi: true,
+            }],
+            resultDocList: [doc1, doc2, doc4],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Rename a subfield of the metaField.
     testUpdate({
@@ -378,17 +380,19 @@ TimeseriesTest.run((insert) => {
     });
 
     // Rename a subfield of the metaField to something not in the metaField.
-    testUpdate({
-        initialDocList: [doc1, doc2, doc4],
-        updateList: [{
-            q: {[metaFieldName + ".a"]: "A"},
-            u: {$rename: {[metaFieldName + ".a"]: "notMetaField.a"}},
-            multi: true,
-        }],
-        resultDocList: [doc1, doc2, doc4],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, doc2, doc4],
+            updateList: [{
+                q: {[metaFieldName + ".a"]: "A"},
+                u: {$rename: {[metaFieldName + ".a"]: "notMetaField.a"}},
+                multi: true,
+            }],
+            resultDocList: [doc1, doc2, doc4],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // For all documents that have at least one 2 in its metaField array, update the first 2
     // to be 100 using the positional $ operator.

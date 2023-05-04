@@ -1,14 +1,13 @@
 /**
  * Tests running the multi:true update command on a time-series collection.
+ * TODO SERVER-73454 Remove this file.
  *
  * @tags: [
  *   # Specifically testing multi-updates.
  *   requires_multi_updates,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagTimeseriesUpdatesSupport,
- *   # TODO (SERVER-73454): Re-enable the tests.
- *   __TEMPORARILY_DISABLED__,
+ *   featureFlagTimeseriesUpdatesSupport
  * ]
  */
 
@@ -22,7 +21,8 @@ const dateTimeUpdated = ISODate("2023-01-27T16:00:00Z");
 const collNamePrefix = "timeseries_update_multi_";
 let count = 0;
 
-const testDB = db.getSiblingDB(jsTestName());
+const conn = MongoRunner.runMongod({});
+const testDB = conn.getDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 /**
@@ -509,75 +509,79 @@ const doc_id_8_array_meta = {
  * Tests pipeline-style updates
  */
 // Add a field of the sum of an array field using aggregation pipeline.
-testUpdate({
-    initialDocList: [doc_id_5_a_c_array_metric, doc_id_6_a_c_array_metric],
-    updateList: [{
-        q: {[metaFieldName]: {a: "A", c: "C"}},
-        u: [{$set: {sumF: {$sum: "$f"}}}],
-        multi: true,
-    }],
-    resultDocList: [
-        {
-            _id: 5,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {a: "A", c: "C"},
-            f: [2, 3],
-            sumF: 5,
-        },
-        {
-            _id: 6,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {a: "A", c: "C"},
-            f: [1, 10],
-            sumF: 11,
-        },
-    ],
-    nMatched: 2,
-});
+// TODO SERVER-73143 Enable these tests.
+// testUpdate({
+//     initialDocList: [doc_id_5_a_c_array_metric, doc_id_6_a_c_array_metric],
+//     updateList: [{
+//         q: {[metaFieldName]: {a: "A", c: "C"}},
+//         u: [{$set: {sumF: {$sum: "$f"}}}],
+//         multi: true,
+//     }],
+//     resultDocList: [
+//         {
+//             _id: 5,
+//             [timeFieldName]: dateTime,
+//             [metaFieldName]: {a: "A", c: "C"},
+//             f: [2, 3],
+//             sumF: 5,
+//         },
+//         {
+//             _id: 6,
+//             [timeFieldName]: dateTime,
+//             [metaFieldName]: {a: "A", c: "C"},
+//             f: [1, 10],
+//             sumF: 11,
+//         },
+//     ],
+//     nMatched: 2,
+// });
 
 // Add a new field for all measurements.
-testUpdate({
-    initialDocList: [doc_id_4_no_meta_string_metric, doc_id_7_no_meta_int_metric],
-    createCollectionWithMetaField: false,
-    updateList: [{
-        q: {},
-        u: [{$set: {newField: true}}],
-        multi: true,
-    }],
-    resultDocList: [
-        {
-            _id: 4,
-            [timeFieldName]: dateTime,
-            f: "F",
-            newField: true,
-        },
-        {
-            _id: 7,
-            [timeFieldName]: dateTime,
-            g: 1,
-            newField: true,
-        },
-    ],
-    nMatched: 2,
-});
+// testUpdate({
+//     initialDocList: [doc_id_4_no_meta_string_metric, doc_id_7_no_meta_int_metric],
+//     createCollectionWithMetaField: false,
+//     updateList: [{
+//         q: {},
+//         u: [{$set: {newField: true}}],
+//         multi: true,
+//     }],
+//     resultDocList: [
+//         {
+//             _id: 4,
+//             [timeFieldName]: dateTime,
+//             f: "F",
+//             newField: true,
+//         },
+//         {
+//             _id: 7,
+//             [timeFieldName]: dateTime,
+//             g: 1,
+//             newField: true,
+//         },
+//     ],
+//     nMatched: 2,
+// });
 
 /**
  * Tests upsert with multi:true.
  */
-testUpdate({
-    initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-    updateList: [{
-        q: {[metaFieldName]: {z: "Z"}},
-        u: {$set: {[timeFieldName]: dateTime}},
-        upsert: true,
-        multi: true,
-    }],
-    resultDocList: [
-        doc_id_1_a_b_no_metrics,
-        doc_id_2_a_b_array_metric,
-        {[timeFieldName]: dateTime},
-    ],
-    nMatched: 1,
-    nModified: 0,
-});
+// TODO SERVER-76551 Enable this test.
+// testUpdate({
+//     initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+//     updateList: [{
+//         q: {[metaFieldName]: {z: "Z"}},
+//         u: {$set: {[timeFieldName]: dateTime}},
+//         upsert: true,
+//         multi: true,
+//     }],
+//     resultDocList: [
+//         doc_id_1_a_b_no_metrics,
+//         doc_id_2_a_b_array_metric,
+//         {[timeFieldName]: dateTime},
+//     ],
+//     nMatched: 1,
+//     nModified: 0,
+// });
+
+MongoRunner.stopMongod(conn);
 })();

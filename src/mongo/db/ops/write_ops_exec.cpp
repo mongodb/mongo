@@ -1194,7 +1194,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                               updateRequest,
                               extensionsCallback,
                               collection.getCollectionPtr(),
-                              forgoOpCounterIncrements);
+                              forgoOpCounterIncrements,
+                              updateRequest->source() == OperationSource::kTimeseriesUpdate);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(

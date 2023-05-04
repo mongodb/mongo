@@ -46,7 +46,8 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const UpdateRequest* request,
                            const ExtensionsCallback& extensionsCallback,
                            const CollectionPtr& collection,
-                           bool forgoOpCounterIncrements)
+                           bool forgoOpCounterIncrements,
+                           bool isRequestToTimeseries)
     : _opCtx(opCtx),
       _request(request),
       _expCtx(make_intrusive<ExpressionContext>(
@@ -65,7 +66,7 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
       _canonicalQuery(),
       _extensionsCallback(extensionsCallback),
       _collection(collection),
-      _timeseriesUpdateQueryExprs(request->source() == OperationSource::kTimeseriesUpdate
+      _timeseriesUpdateQueryExprs(isRequestToTimeseries
                                       ? createTimeseriesWritesQueryExprsIfNecessary(
                                             feature_flags::gTimeseriesUpdatesSupport.isEnabled(
                                                 serverGlobalParams.featureCompatibility),

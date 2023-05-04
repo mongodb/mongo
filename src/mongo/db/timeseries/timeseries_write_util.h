@@ -57,7 +57,6 @@ BSONObj makeNewDocumentForWrite(
 std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
     const std::vector<BSONObj>& measurements,
     const NamespaceString& nss,
-    const BSONObj& metadata,
     const TimeseriesOptions& options,
     const StringData::ComparatorInterface* comparator);
 

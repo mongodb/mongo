@@ -71,7 +71,8 @@ public:
                  const UpdateRequest* request,
                  const ExtensionsCallback& extensionsCallback,
                  const CollectionPtr& collection,
-                 bool forgoOpCounterIncrements = false);
+                 bool forgoOpCounterIncrements = false,
+                 bool isRequestToTimeseries = false);
 
     /**
      * Parses the update request to a canonical query and an update driver. On success, the

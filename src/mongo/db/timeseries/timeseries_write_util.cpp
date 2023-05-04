@@ -147,18 +147,18 @@ BSONObj makeNewDocumentForWrite(
 std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
     const std::vector<BSONObj>& measurements,
     const NamespaceString& nss,
-    const BSONObj& metadata,
     const TimeseriesOptions& options,
     const StringData::ComparatorInterface* comparator) {
     std::vector<write_ops::InsertCommandRequest> insertOps;
     for (const auto& measurement : measurements) {
-        auto res = bucket_catalog::internal::extractBucketingParameters(
-            nss, comparator, options, measurement);
-        uassertStatusOK(res);
-        auto time = res.getValue().second;
+        auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
+            nss, comparator, options, measurement));
+        auto time = res.second;
         auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
         insertOps.push_back(
-            {nss, {makeNewDocumentForWrite(oid, {measurement}, metadata, options, comparator)}});
+            {nss,
+             {makeNewDocumentForWrite(
+                 oid, {measurement}, res.first.metadata.toBSON(), options, comparator)}});
     }
     return insertOps;
 }
