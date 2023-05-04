@@ -311,22 +311,22 @@ public:
             return true;
         };
 
-        for (auto&& coll : catalog->range(dbName)) {
-            UUID uuid = coll->uuid();
+        for (auto it = catalog->begin(opCtx, dbName); it != catalog->end(opCtx); ++it) {
+            UUID uuid = it.uuid();
 
             // The namespace must be found as the UUID is fetched from the same
             // CollectionCatalog instance.
             boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
             invariant(nss);
 
-            const Collection* collection = nullptr;
+            const Collection* coll = nullptr;
             if (nss->isGlobalIndex()) {
                 // TODO SERVER-74209: Reading earlier than the minimum valid snapshot is not
                 // supported for global indexes. It appears that the primary and secondaries apply
                 // operations differently resulting in hash mismatches. This requires further
                 // investigation. In the meantime, global indexes use the behaviour prior to
                 // point-in-time lookups.
-                collection = coll;
+                coll = *it;
 
                 if (auto readTimestamp =
                         opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx)) {
@@ -343,18 +343,18 @@ public:
             } else {
                 // TODO:SERVER-75848 Make this lock-free
                 Lock::CollectionLock clk(opCtx, *nss, MODE_IS);
-                collection = catalog->establishConsistentCollection(
+                coll = catalog->establishConsistentCollection(
                     opCtx,
                     {dbName, uuid},
                     opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
 
-                if (!collection) {
+                if (!coll) {
                     // The collection did not exist at the read timestamp with the given UUID.
                     continue;
                 }
             }
 
-            (void)checkAndHashCollection(collection);
+            (void)checkAndHashCollection(coll);
         }
 
         BSONObjBuilder bb(result.subobjStart("collections"));

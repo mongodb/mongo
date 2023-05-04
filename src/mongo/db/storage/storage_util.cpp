@@ -59,7 +59,8 @@ auto removeEmptyDirectory =
         auto collectionCatalog = CollectionCatalog::latest(svcCtx);
         const DatabaseName& dbName = ns.dbName();
         if (!storageEngine->isUsingDirectoryPerDb() ||
-            (storageEngine->supportsPendingDrops() && !collectionCatalog->range(dbName).empty())) {
+            (storageEngine->supportsPendingDrops() &&
+             collectionCatalog->begin(nullptr, dbName) != collectionCatalog->end(nullptr))) {
             return;
         }
 
@@ -68,7 +69,7 @@ auto removeEmptyDirectory =
 
         if (!ec) {
             LOGV2(4888200, "Removed empty database directory", logAttrs(dbName));
-        } else if (collectionCatalog->range(dbName).empty()) {
+        } else if (collectionCatalog->begin(nullptr, dbName) == collectionCatalog->end(nullptr)) {
             // It is possible for a new collection to be created in the database between when we
             // check whether the database is empty and actually attempting to remove the directory.
             // In this case, don't log that the removal failed because it is expected. However,

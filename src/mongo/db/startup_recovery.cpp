@@ -212,7 +212,8 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   EnsureIndexPolicy ensureIndexPolicy) {
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto&& coll : catalog->range(dbName)) {
+    for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
+        auto coll = *collIt;
         if (!coll) {
             break;
         }
@@ -232,7 +233,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                   logAttrs(*coll));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
                 auto writableCollection =
-                    catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, coll->uuid());
+                    catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, collIt.uuid());
                 auto status = buildMissingIdIndex(opCtx, writableCollection);
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,

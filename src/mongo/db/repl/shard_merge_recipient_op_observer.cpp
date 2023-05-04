@@ -97,7 +97,9 @@ void deleteTenantDataWhenMergeAborts(OperationContext* opCtx,
             IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(db->name());
 
             auto catalog = CollectionCatalog::get(opCtx);
-            for (auto&& collection : catalog->range(db->name())) {
+            for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx);
+                 ++collIt) {
+                auto collection = *collIt;
                 if (!collection) {
                     break;
                 }

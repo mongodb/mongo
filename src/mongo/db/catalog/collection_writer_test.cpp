@@ -59,8 +59,9 @@ protected:
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(kNss);
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
+            auto uuid = collection->uuid();
             catalog.registerCollection(
-                operationContext(), std::move(collection), /*ts=*/boost::none);
+                operationContext(), uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -254,6 +255,7 @@ public:
             for (size_t i = 0; i < NumCollections; ++i) {
                 catalog.registerCollection(
                     operationContext(),
+                    UUID::gen(),
                     std::make_shared<CollectionMock>(NamespaceString::createNamespaceString_forTest(
                         "many", fmt::format("coll{}", i))),
                     /*ts=*/boost::none);

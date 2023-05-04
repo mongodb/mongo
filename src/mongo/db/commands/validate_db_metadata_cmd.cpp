@@ -149,10 +149,12 @@ public:
                         return _validateView(opCtx, view);
                     });
 
-                for (auto&& coll : collectionCatalog->range(dbName)) {
+                for (auto collIt = collectionCatalog->begin(opCtx, dbName);
+                     collIt != collectionCatalog->end(opCtx);
+                     ++collIt) {
                     if (!_validateNamespace(
                             opCtx,
-                            collectionCatalog->lookupNSSByUUID(opCtx, coll->uuid()).value())) {
+                            collectionCatalog->lookupNSSByUUID(opCtx, collIt.uuid()).value())) {
                         return;
                     }
                 }

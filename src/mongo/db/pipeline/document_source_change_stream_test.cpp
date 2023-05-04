@@ -496,7 +496,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
         Lock::GlobalWrite lk(expCtx->opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(expCtx->opCtx, std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(
+                expCtx->opCtx, testUuid(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -522,7 +523,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
         Lock::GlobalWrite lk(opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(
+                opCtx, testUuid(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -553,7 +555,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterO
         Lock::GlobalWrite lk(opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(
+                opCtx, testUuid(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -579,7 +582,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID)
         Lock::GlobalWrite lk(opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(
+                opCtx, testUuid(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -2763,10 +2767,10 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldIn
 
     {
         Lock::GlobalWrite lk(getExpCtx()->opCtx);
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -2810,10 +2814,10 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldUseO2FieldInOplog) {
 
     {
         Lock::GlobalWrite lk(getExpCtx()->opCtx);
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -2853,13 +2857,14 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldUseO2FieldInOplog) {
 
 TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
     const Timestamp ts(3, 45);
+    const auto uuid = testUuid();
 
     {
         Lock::GlobalWrite lk(getExpCtx()->opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -2926,7 +2931,7 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, testUuid(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -3418,10 +3423,10 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2Field
 
     {
         Lock::GlobalWrite lk(getExpCtx()->opCtx);
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -3460,10 +3465,10 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldUseO2FieldInOplog) {
 
     {
         Lock::GlobalWrite lk(getExpCtx()->opCtx);
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -3505,7 +3510,7 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, testUuid(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -3530,10 +3535,10 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
 
     {
         Lock::GlobalWrite lk(getExpCtx()->opCtx);
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -3568,10 +3573,10 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
 
     {
         Lock::GlobalWrite lk(getExpCtx()->opCtx);
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->opCtx, uuid, std::move(collection), /*ts=*/boost::none);
         });
     }
 

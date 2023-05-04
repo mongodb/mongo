@@ -119,6 +119,7 @@ public:
 
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(operationContext(),
+                                       options.uuid.value(),
                                        std::move(collection),
                                        /*ts=*/boost::none);
         });

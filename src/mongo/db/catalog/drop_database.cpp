@@ -273,7 +273,9 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
         catalog = CollectionCatalog::get(opCtx);
 
         std::vector<NamespaceString> collectionsToDrop;
-        for (auto&& collection : catalog->range(db->name())) {
+        for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx);
+             ++collIt) {
+            auto collection = *collIt;
             if (!collection) {
                 break;
             }

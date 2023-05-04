@@ -440,8 +440,10 @@ public:
                         // needing to yield as we don't take any locks.
                         if (opCtx->isLockFreeReadsOp()) {
                             auto collectionCatalog = CollectionCatalog::get(opCtx);
-                            for (auto&& coll : collectionCatalog->range(dbName)) {
-                                perCollectionWork(coll);
+                            for (auto it = collectionCatalog->begin(opCtx, dbName);
+                                 it != collectionCatalog->end(opCtx);
+                                 ++it) {
+                                perCollectionWork(*it);
                             }
                         } else {
                             mongo::catalog::forEachCollectionFromDb(

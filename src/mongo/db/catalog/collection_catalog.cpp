@@ -64,7 +64,6 @@ const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
 // batched write is ongoing without having to take locks.
 std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
 AtomicWord<bool> ongoingBatchedWrite{false};
-absl::flat_hash_set<Collection*> batchedCatalogClonedCollections;
 
 const RecoveryUnit::Snapshot::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
     RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
@@ -159,7 +158,7 @@ public:
         catalog._collections = catalog._collections.set(collection->ns(), collection);
         catalog._catalog = catalog._catalog.set(collection->uuid(), collection);
         auto dbIdPair = std::make_pair(collection->ns().dbName(), collection->uuid());
-        catalog._orderedCollections = catalog._orderedCollections.set(dbIdPair, collection);
+        catalog._orderedCollections[dbIdPair] = collection;
 
         catalog._pendingCommitNamespaces = catalog._pendingCommitNamespaces.erase(collection->ns());
         catalog._pendingCommitUUIDs = catalog._pendingCommitUUIDs.erase(collection->uuid());
@@ -261,6 +260,7 @@ public:
                                          commitTime](CollectionCatalog& catalog) {
                         // Override existing Collection on this namespace
                         catalog._registerCollection(opCtx,
+                                                    uuid,
                                                     std::move(collection),
                                                     /*twoPhase=*/false,
                                                     /*ts=*/commitTime);
@@ -370,64 +370,83 @@ private:
     UncommittedCatalogUpdates& _uncommittedCatalogUpdates;
 };
 
-CollectionCatalog::iterator::iterator(const DatabaseName& dbName,
-                                      OrderedCollectionMap::iterator it,
-                                      const OrderedCollectionMap& map)
-    : _map{map}, _mapIter{it} {
-    _skipUncommitted();
+CollectionCatalog::iterator::iterator(OperationContext* opCtx,
+                                      const DatabaseName& dbName,
+                                      const CollectionCatalog& catalog)
+    : _opCtx(opCtx), _dbName(dbName), _catalog(&catalog) {
+
+    _mapIter = _catalog->_orderedCollections.lower_bound(std::make_pair(_dbName, minUuid));
+
+    // Start with the first collection that is visible outside of its transaction.
+    while (!_exhausted() && !_mapIter->second->isCommitted()) {
+        _mapIter++;
+    }
+
+    if (!_exhausted()) {
+        _uuid = _mapIter->first.second;
+    }
 }
 
+CollectionCatalog::iterator::iterator(
+    OperationContext* opCtx,
+    std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::const_iterator mapIter,
+    const CollectionCatalog& catalog)
+    : _opCtx(opCtx), _mapIter(mapIter), _catalog(&catalog) {}
+
 CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
-    if (_mapIter == _map.end()) {
+    if (_exhausted()) {
         return nullptr;
     }
+
     return _mapIter->second.get();
 }
 
+UUID CollectionCatalog::iterator::uuid() const {
+    invariant(_uuid);
+    return *_uuid;
+}
+
 CollectionCatalog::iterator CollectionCatalog::iterator::operator++() {
-    invariant(_mapIter != _map.end());
     _mapIter++;
-    _skipUncommitted();
+
+    // Skip any collections that are not yet visible outside of their respective transactions.
+    while (!_exhausted() && !_mapIter->second->isCommitted()) {
+        _mapIter++;
+    }
+
+    if (_exhausted()) {
+        // If the iterator is at the end of the map or now points to an entry that does not
+        // correspond to the correct database.
+        _mapIter = _catalog->_orderedCollections.end();
+        _uuid = boost::none;
+        return *this;
+    }
+
+    _uuid = _mapIter->first.second;
     return *this;
 }
 
-bool CollectionCatalog::iterator::operator==(const iterator& other) const {
-    invariant(_map == other._map);
+CollectionCatalog::iterator CollectionCatalog::iterator::operator++(int) {
+    auto oldPosition = *this;
+    ++(*this);
+    return oldPosition;
+}
 
-    if (other._mapIter == other._map.end()) {
-        return _mapIter == _map.end();
-    } else if (_mapIter == _map.end()) {
-        return other._mapIter == other._map.end();
+bool CollectionCatalog::iterator::operator==(const iterator& other) const {
+    invariant(_catalog == other._catalog);
+    if (other._mapIter == _catalog->_orderedCollections.end()) {
+        return _uuid == boost::none;
     }
 
-    return _mapIter->first.second == other._mapIter->first.second;
+    return _uuid == other._uuid;
 }
 
 bool CollectionCatalog::iterator::operator!=(const iterator& other) const {
     return !(*this == other);
 }
 
-void CollectionCatalog::iterator::_skipUncommitted() {
-    // Advance to the next collection that is visible outside of its transaction.
-    auto end = _map.end();
-    while (_mapIter != end && !_mapIter->second->isCommitted()) {
-        ++_mapIter;
-    }
-}
-
-CollectionCatalog::Range::Range(const OrderedCollectionMap& map, const DatabaseName& dbName)
-    : _map{map}, _dbName{dbName} {}
-
-CollectionCatalog::iterator CollectionCatalog::Range::begin() const {
-    return {_dbName, _map.lower_bound(std::make_pair(_dbName, minUuid)), _map};
-}
-
-CollectionCatalog::iterator CollectionCatalog::Range::end() const {
-    return {_dbName, _map.upper_bound(std::make_pair(_dbName, maxUuid)), _map};
-}
-
-bool CollectionCatalog::Range::empty() const {
-    return begin() == end();
+bool CollectionCatalog::iterator::_exhausted() {
+    return _mapIter == _catalog->_orderedCollections.end() || _mapIter->first.first != _dbName;
 }
 
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(ServiceContext* svcCtx) {
@@ -1321,10 +1340,6 @@ uint64_t CollectionCatalog::getEpoch() const {
     return _epoch;
 }
 
-CollectionCatalog::Range CollectionCatalog::range(const DatabaseName& dbName) const {
-    return {_orderedCollections, dbName};
-}
-
 std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByUUID(OperationContext* opCtx,
                                                                           const UUID& uuid) const {
     // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
@@ -1387,7 +1402,6 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     // on the thread doing the batch write and it would trigger the regular path where we do a
     // copy-on-write on the catalog when committing.
     if (_isCatalogBatchWriter()) {
-        batchedCatalogClonedCollections.emplace(cloned.get());
         // Do not update min valid timestamp in batched write as the write is not corresponding to
         // an oplog entry. If the write require an update to this timestamp it is the responsibility
         // of the user.
@@ -1516,7 +1530,6 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     // on the thread doing the batch write and it would trigger the regular path where we do a
     // copy-on-write on the catalog when committing.
     if (_isCatalogBatchWriter()) {
-        batchedCatalogClonedCollections.emplace(cloned.get());
         // Do not update min valid timestamp in batched write as the write is not corresponding to
         // an oplog entry. If the write require an update to this timestamp it is the responsibility
         // of the user.
@@ -1885,24 +1898,26 @@ CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames(
 }
 
 void CollectionCatalog::registerCollection(OperationContext* opCtx,
+                                           const UUID& uuid,
                                            std::shared_ptr<Collection> coll,
                                            boost::optional<Timestamp> commitTime) {
     invariant(opCtx->lockState()->isW());
-    _registerCollection(opCtx, std::move(coll), /*twoPhase=*/false, commitTime);
+    _registerCollection(opCtx, uuid, std::move(coll), /*twoPhase=*/false, commitTime);
 }
 
 void CollectionCatalog::registerCollectionTwoPhase(OperationContext* opCtx,
+                                                   const UUID& uuid,
                                                    std::shared_ptr<Collection> coll,
                                                    boost::optional<Timestamp> commitTime) {
-    _registerCollection(opCtx, std::move(coll), /*twoPhase=*/true, commitTime);
+    _registerCollection(opCtx, uuid, std::move(coll), /*twoPhase=*/true, commitTime);
 }
 
 void CollectionCatalog::_registerCollection(OperationContext* opCtx,
+                                            const UUID& uuid,
                                             std::shared_ptr<Collection> coll,
                                             bool twoPhase,
                                             boost::optional<Timestamp> commitTime) {
     auto nss = coll->ns();
-    auto uuid = coll->uuid();
     _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kAll);
 
     LOGV2_DEBUG(20280,
@@ -1920,7 +1935,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
 
     _catalog = _catalog.set(uuid, coll);
     _collections = _collections.set(nss, coll);
-    _orderedCollections = _orderedCollections.set(dbIdPair, coll);
+    _orderedCollections[dbIdPair] = coll;
     if (twoPhase) {
         _pendingCommitNamespaces = _pendingCommitNamespaces.set(nss, coll);
         _pendingCommitUUIDs = _pendingCommitUUIDs.set(uuid, coll);
@@ -2000,7 +2015,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
         }
     }
 
-    _orderedCollections = _orderedCollections.erase(dbIdPair);
+    _orderedCollections.erase(dbIdPair);
     _collections = _collections.erase(ns);
     _catalog = _catalog.erase(uuid);
     _pendingCommitNamespaces = _pendingCommitNamespaces.erase(ns);
@@ -2099,7 +2114,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     }
 
     _collections = {};
-    _orderedCollections = {};
+    _orderedCollections.clear();
     _catalog = {};
     _viewsForDatabase = {};
     _dropPendingCollection = {};
@@ -2149,6 +2164,15 @@ void CollectionCatalog::notifyIdentDropped(const std::string& ident) {
 
     _dropPendingCollection = _dropPendingCollection.erase(ident);
     _dropPendingIndex = _dropPendingIndex.erase(ident);
+}
+
+CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx,
+                                                     const DatabaseName& dbName) const {
+    return iterator(opCtx, dbName, *this);
+}
+
+CollectionCatalog::iterator CollectionCatalog::end(OperationContext* opCtx) const {
+    return iterator(opCtx, _orderedCollections.end(), *this);
 }
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
@@ -2202,16 +2226,22 @@ bool CollectionCatalog::_isCatalogBatchWriter() const {
 
 bool CollectionCatalog::_alreadyClonedForBatchedWriter(
     const std::shared_ptr<Collection>& collection) const {
-    // We may skip cloning the Collection instance if and only if have already cloned it for write
-    // use in this batch writer.
-    return _isCatalogBatchWriter() && batchedCatalogClonedCollections.contains(collection.get());
+    // We may skip cloning the Collection instance if and only if we are currently in a batched
+    // catalog write and all references to this Collection is owned by the cloned CollectionCatalog
+    // instance owned by the batch writer. i.e. the Collection is uniquely owned by the batch
+    // writer. When the batch writer initially clones the catalog, all collections will have a
+    // 'use_count' of at least kNumCollectionReferencesStored*2 (because there are at least 2
+    // catalog instances). To check for uniquely owned we need to check that the reference count is
+    // exactly kNumCollectionReferencesStored (owned by a single catalog) while also account for the
+    // instance that is extracted from the catalog and provided as a parameter to this function, we
+    // therefore need to add 1.
+    return _isCatalogBatchWriter() && collection.use_count() == kNumCollectionReferencesStored + 1;
 }
 
 BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext* opCtx)
     : _opCtx(opCtx) {
     invariant(_opCtx->lockState()->isW());
     invariant(!batchedCatalogWriteInstance);
-    invariant(batchedCatalogClonedCollections.empty());
 
     auto& storage = getCatalog(_opCtx->getServiceContext());
     // hold onto base so if we need to delete it we can do it outside of the lock
@@ -2236,7 +2266,6 @@ BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
     ongoingBatchedWrite.store(false);
     _batchedInstance = nullptr;
     batchedCatalogWriteInstance = nullptr;
-    batchedCatalogClonedCollections.clear();
 }
 
 }  // namespace mongo
