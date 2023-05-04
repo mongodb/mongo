@@ -80,6 +80,7 @@ iamEnv.Library(
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/shard_role_api_stor_ex',
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',

@@ -827,9 +827,21 @@ env.Library(
 )
 
 env.Library(
-    target='shard_role_api',
+    target='shard_role_api_stor_ex',
     source=[
         'catalog/collection.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/grid',
+        'catalog/clustered_collection_options',
+        'catalog/index_catalog',
+        'server_base',
+    ],
+)
+
+env.Library(
+    target='shard_role_api',
+    source=[
         'catalog/collection_operation_source.cpp',
         's/collection_metadata.cpp',
         's/collection_sharding_state.cpp',
@@ -850,12 +862,11 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/grid',
-        'catalog/index_catalog',
         'concurrency/lock_manager',
         'index/index_access_method',
+        'shard_role_api_stor_ex',
     ],
     LIBDEPS_PRIVATE=[
-        'catalog/clustered_collection_options',
         'server_base',
         'write_block_bypass',
     ],
