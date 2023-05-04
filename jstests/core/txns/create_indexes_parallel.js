@@ -95,7 +95,8 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     // TODO SERVER-67289: Remove feature flag check.
     if (FeatureFlagUtil.getStatus(
-            db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true)) {
+            db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true) ==
+        FeatureFlagUtil.FlagStatus.kEnabled) {
         // createIndexes cannot observe the index created in the other transaction so the command
         // will succeed and we will instead throw WCE when trying to commit the transaction.
         retryOnceOnTransientAndRestartTxnOnMongos(session, () => {

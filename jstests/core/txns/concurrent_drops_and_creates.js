@@ -67,7 +67,8 @@ assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "maj
 // enabled no command will succeed.
 // TODO SERVER-67289: Remove feature flag check.
 if (FeatureFlagUtil.getStatus(
-        db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true) &&
+        db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true) ==
+        FeatureFlagUtil.FlagStatus.kEnabled &&
     !session.getClient().isMongos()) {
     // We can perform reads on the dropped collection as it existed when we started the transaction.
     assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));
@@ -115,7 +116,8 @@ assert.commandWorked(testDB2.runCommand({create: collNameB}));
 
 // TODO SERVER-67289: Remove feature flag check.
 if (FeatureFlagUtil.getStatus(
-        db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true)) {
+        db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true) ==
+    FeatureFlagUtil.FlagStatus.kEnabled) {
     // We can insert to collection B in the transaction as the transaction does not have a
     // collection on this namespace (even as it exist at latest). A collection will be implicitly
     // created and we will fail to commit this transaction with a WriteConflict error.
