@@ -30,6 +30,7 @@
 #include "mongo/db/concurrency/resource_catalog.h"
 
 #include "mongo/db/service_context.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace {
@@ -42,7 +43,7 @@ ResourceCatalog& ResourceCatalog::get(ServiceContext* svcCtx) {
 
 void ResourceCatalog::add(ResourceId id, const NamespaceString& ns) {
     invariant(id.getType() == RESOURCE_COLLECTION);
-    _add(id, ns.toStringWithTenantId());
+    _add(id, NamespaceStringUtil::serializeForCatalog(ns));
 }
 
 void ResourceCatalog::add(ResourceId id, const DatabaseName& dbName) {
@@ -57,7 +58,7 @@ void ResourceCatalog::_add(ResourceId id, std::string name) {
 
 void ResourceCatalog::remove(ResourceId id, const NamespaceString& ns) {
     invariant(id.getType() == RESOURCE_COLLECTION);
-    _remove(id, ns.toStringWithTenantId());
+    _remove(id, NamespaceStringUtil::serializeForCatalog(ns));
 }
 
 void ResourceCatalog::remove(ResourceId id, const DatabaseName& dbName) {

@@ -440,13 +440,20 @@ public:
         return ns().toString();
     }
 
-    std::string toStringWithTenantId() const {
-        if (_hasTenantId()) {
-            auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
-            return str::stream() << tenantId.toString() << "_" << ns();
-        }
+    /**
+     * Gets a namespace string with tenant id.
+     *
+     * MUST only be used for tests.
+     */
+    std::string toStringWithTenantId_forTest() const {
+        return toStringWithTenantId();
+    }
 
-        return ns().toString();
+    /**
+     * This function should only be used when creating a resouce id for nss.
+     */
+    std::string toStringForResourceId() const {
+        return toStringWithTenantId();
     }
 
     /**
@@ -882,6 +889,15 @@ private:
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
         : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
+
+    std::string toStringWithTenantId() const {
+        if (_hasTenantId()) {
+            auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
+            return str::stream() << tenantId.toString() << "_" << ns();
+        }
+
+        return ns().toString();
+    }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);
     static constexpr uint8_t kTenantIdMask = 0x80;

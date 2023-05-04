@@ -720,9 +720,10 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
     ASSERT_FALSE(oplogEntry.getTid());
     ASSERT_EQUALS(sourceNss.getCommandNS(), oplogEntry.getNss());
 
-    auto oExpected = BSON("renameCollection" << sourceNss.toStringWithTenantId() << "to"
-                                             << targetNss.toStringWithTenantId() << "stayTemp"
-                                             << stayTemp << "dropTarget" << dropTargetUuid);
+    auto oExpected =
+        BSON("renameCollection" << sourceNss.toStringWithTenantId_forTest() << "to"
+                                << targetNss.toStringWithTenantId_forTest() << "stayTemp"
+                                << stayTemp << "dropTarget" << dropTargetUuid);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntry.getObject());
 }
 

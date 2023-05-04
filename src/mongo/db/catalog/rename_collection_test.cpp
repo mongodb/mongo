@@ -1266,8 +1266,8 @@ TEST_F(RenameCollectionTestMultitenancy,
     ASSERT_NOT_EQUALS(otherSourceNssTid, targetNssTid);
 
     // A tid field supersedes tenantIds maintained in source or target. See above.
-    auto cmd = BSON("renameCollection" << otherSourceNssTid.toStringWithTenantId() << "to"
-                                       << targetNssTid.toStringWithTenantId());
+    auto cmd = BSON("renameCollection" << otherSourceNssTid.toStringWithTenantId_forTest() << "to"
+                                       << targetNssTid.toStringWithTenantId_forTest());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   renameCollectionForApplyOps(_opCtx.get(), boost::none, boost::none, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNssTid));
@@ -1283,8 +1283,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsRequireTenan
         NamespaceString::createNamespaceString_forTest(_tenantId, _otherNs);
     ASSERT_NOT_EQUALS(_sourceNssTid, targetNssTid);
 
-    auto cmd = BSON("renameCollection" << _sourceNssTid.toStringWithTenantId() << "to"
-                                       << targetNssTid.toStringWithTenantId());
+    auto cmd = BSON("renameCollection" << _sourceNssTid.toStringWithTenantId_forTest() << "to"
+                                       << targetNssTid.toStringWithTenantId_forTest());
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), boost::none, boost::none, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), targetNssTid));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNssTid));
@@ -1304,8 +1304,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSameNSRequir
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
 
-    auto cmd = BSON("renameCollection" << _sourceNssTid.toStringWithTenantId() << "to"
-                                       << _sourceNssTid.toStringWithTenantId());
+    auto cmd = BSON("renameCollection" << _sourceNssTid.toStringWithTenantId_forTest() << "to"
+                                       << _sourceNssTid.toStringWithTenantId_forTest());
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), boost::none, boost::none, cmd, {}));
 }
 
@@ -1319,8 +1319,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsAcrossTenant
 
     // This test is valid during the transition period, before featureFlagRequireTenantID is
     // enforced, and will prefix the tenantIds onto the ns fields.
-    auto cmd = BSON("renameCollection" << _sourceNssTid.toStringWithTenantId() << "to"
-                                       << targetNssTid.toStringWithTenantId());
+    auto cmd = BSON("renameCollection" << _sourceNssTid.toStringWithTenantId_forTest() << "to"
+                                       << targetNssTid.toStringWithTenantId_forTest());
     ASSERT_THROWS_CODE(renameCollectionForApplyOps(_opCtx.get(), boost::none, boost::none, cmd, {}),
                        AssertionException,
                        ErrorCodes::IllegalOperation);

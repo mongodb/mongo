@@ -285,7 +285,7 @@ TEST_F(CollectionCatalogResourceTest, LookupCollectionResource) {
     auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
 
     ASSERT(ridStr);
-    ASSERT(ridStr->find(collNs.toStringWithTenantId()) != std::string::npos);
+    ASSERT(ridStr->find(collNs.toStringWithTenantId_forTest()) != std::string::npos);
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {

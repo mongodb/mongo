@@ -342,7 +342,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(nss.size(), 7);
         ASSERT_EQ(nss.ns(), "foo.bar");
         ASSERT_EQ(nss.toString(), "foo.bar");
-        ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss.db(), "foo");
         ASSERT_EQ(nss.coll(), "bar");
         ASSERT_EQ(nss.dbName().db(), "foo");
@@ -359,7 +359,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(nss.size(), 3);
         ASSERT_EQ(nss.ns(), "foo");
         ASSERT_EQ(nss.toString(), "foo");
-        ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss.db(), "foo");
         ASSERT_EQ(nss.coll(), "");
         ASSERT_EQ(nss.dbName().db(), "foo");
@@ -377,7 +377,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(nss2.size(), 7);
         ASSERT_EQ(nss2.ns(), "foo.bar");
         ASSERT_EQ(nss2.toString(), "foo.bar");
-        ASSERT_EQ(nss2.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss2.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss2.db(), "foo");
         ASSERT_EQ(nss2.coll(), "bar");
         ASSERT_EQ(nss2.dbName().db(), "foo");
@@ -393,7 +393,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(nss3.size(), 7);
         ASSERT_EQ(nss3.ns(), "foo.bar");
         ASSERT_EQ(nss3.toString(), "foo.bar");
-        ASSERT_EQ(nss3.toStringWithTenantId(), tenantNsStr);
+        ASSERT_EQ(nss3.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss3.db(), "foo");
         ASSERT_EQ(nss3.coll(), "bar");
         ASSERT_EQ(nss3.dbName().db(), "foo");
@@ -409,7 +409,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(nss4.size(), 3);
         ASSERT_EQ(nss4.ns(), "foo");
         ASSERT_EQ(nss4.toString(), "foo");
-        ASSERT_EQ(nss4.toStringWithTenantId(), "{}_foo"_format(tenantId.toString()));
+        ASSERT_EQ(nss4.toStringWithTenantId_forTest(), "{}_foo"_format(tenantId.toString()));
         ASSERT_EQ(nss4.db(), "foo");
         ASSERT_EQ(nss4.coll(), "");
         ASSERT_EQ(nss4.dbName().db(), "foo");
@@ -425,7 +425,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(multiNss.size(), 31);
         ASSERT_EQ(multiNss.ns(), "config.system.change_collection");
         ASSERT_EQ(multiNss.toString(), "config.system.change_collection");
-        ASSERT_EQ(multiNss.toStringWithTenantId(),
+        ASSERT_EQ(multiNss.toStringWithTenantId_forTest(),
                   "{}_config.system.change_collection"_format(tenantId.toString()));
         ASSERT_EQ(multiNss.db(), "config");
         ASSERT_EQ(multiNss.coll(), "system.change_collection");
@@ -443,7 +443,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(empty.coll(), "");
         ASSERT_EQ(empty.tenantId(), boost::none);
         ASSERT_EQ(empty.toString(), "");
-        ASSERT_EQ(empty.toStringWithTenantId(), "");
+        ASSERT_EQ(empty.toStringWithTenantId_forTest(), "");
         ASSERT_EQ(empty.dbName().db(), "");
         ASSERT_EQ(empty.dbName().tenantId(), boost::none);
         ASSERT_EQ(empty.dbName().toString(), "");
@@ -458,7 +458,8 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT(emptyWithTenant.tenantId());
         ASSERT_EQ(*emptyWithTenant.tenantId(), tenantId);
         ASSERT_EQ(emptyWithTenant.toString(), "");
-        ASSERT_EQ(emptyWithTenant.toStringWithTenantId(), "{}_"_format(tenantId.toString()));
+        ASSERT_EQ(emptyWithTenant.toStringWithTenantId_forTest(),
+                  "{}_"_format(tenantId.toString()));
         ASSERT_EQ(emptyWithTenant.dbName().db(), "");
         ASSERT(emptyWithTenant.dbName().tenantId());
         ASSERT_EQ(emptyWithTenant.dbName().tenantId(), tenantId);
@@ -474,7 +475,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(dbWithoutColl.coll(), "");
         ASSERT_FALSE(dbWithoutColl.tenantId());
         ASSERT_EQ(dbWithoutColl.toString(), "foo");
-        ASSERT_EQ(dbWithoutColl.toStringWithTenantId(), "foo");
+        ASSERT_EQ(dbWithoutColl.toStringWithTenantId_forTest(), "foo");
         ASSERT_EQ(dbWithoutColl.dbName().db(), "foo");
         ASSERT_FALSE(dbWithoutColl.dbName().tenantId());
         ASSERT_EQ(dbWithoutColl.dbName().toString(), "foo");
@@ -489,7 +490,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT(dbWithoutCollWithTenant.tenantId());
         ASSERT_EQ(*dbWithoutCollWithTenant.tenantId(), tenantId);
         ASSERT_EQ(dbWithoutCollWithTenant.toString(), "foo");
-        ASSERT_EQ(dbWithoutCollWithTenant.toStringWithTenantId(),
+        ASSERT_EQ(dbWithoutCollWithTenant.toStringWithTenantId_forTest(),
                   fmt::format("{}_foo", tenantId.toString()));
         ASSERT_EQ(dbWithoutCollWithTenant.dbName().db(), "foo");
         ASSERT(dbWithoutCollWithTenant.dbName().tenantId());
@@ -507,7 +508,7 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo");
     ASSERT_EQ(nss.ns(), "foo");
     ASSERT_EQ(nss.toString(), "foo");
-    ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
+    ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
@@ -530,7 +531,7 @@ TEST(NamespaceStringTest, ParseNSSWithTenantId) {
     NamespaceString nss =
         NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(tenantNsStr);
     ASSERT_EQ(nss.ns(), "foo.bar");
-    ASSERT_EQ(nss.toStringWithTenantId(), tenantNsStr);
+    ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 }

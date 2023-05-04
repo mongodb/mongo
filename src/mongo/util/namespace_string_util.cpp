@@ -51,6 +51,10 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
     return options.serializeIdentifier(serializeForStorage(ns, context));
 }
 
+std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) {
+    return ns.toStringWithTenantId();
+}
+
 std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
                                                      const SerializationContext& context) {
     if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {

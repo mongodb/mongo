@@ -35,6 +35,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 
@@ -217,7 +218,7 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
 
 BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) const {
     BSONObjBuilder b;
-    b.append("ns", nss.toStringWithTenantId());
+    b.append("ns", NamespaceStringUtil::serializeForCatalog(nss));
     b.append("options", options.toBSON());
     {
         BSONArrayBuilder arr(b.subarrayStart("indexes"));

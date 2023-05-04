@@ -56,10 +56,22 @@ public:
      *
      * If multitenancySupport is disabled, the tenantID is not set in the NamespaceString Object.
      * eg. serialize(NamespaceString(boost::none, "foo.bar")) -> "foo.bar"
+     *
+     * Do not use this function when serializing a NamespaceString object for catalog.
      */
     static std::string serialize(const NamespaceString& ns,
                                  const SerializationContext& context = SerializationContext(),
                                  const SerializationOptions& = {});
+
+    /**
+     * Serializes a NamespaceString object for catalog.
+     *
+     * Always includes the tenantId prefix for the catalog serialization.
+     * eg. serializeForCatalog(NamespaceString(tenantID, "foo.bar")) -> "tenantID_foo.bar"
+     *
+     * MUST only be used for serializing a NamespaceString object for catalog.
+     */
+    static std::string serializeForCatalog(const NamespaceString& ns);
 
     // TODO SERVER-74284: Privatize the worker functions
     static std::string serializeForStorage(
