@@ -69,10 +69,15 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         else:
             self.session.drop(uri, "force=true")
 
-    def test_remove_shared(self):
+    def test_tiered_overwrite(self):
         uri_a = "table:tiereda"
         uri_b = "table:tieredb"
         uri_b_local_file1 = 'tieredb-0000000001.wtobj'
+
+        # We should be able to do this test for any tiered scenario, not just dir_store.
+        # Remove this 'if' and comment when FIXME-WT-11004 is finished.
+        if self.is_tiered_scenario() and not self.is_local_storage:
+            self.skipTest('Some storage sources do not yet guard against overwrite.')
 
         # For any scenario, we should be able to fully drop and then recreate a table.
         for i in range(0, 3):
@@ -81,7 +86,7 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         # For tiered scenarios only, we have specific tests that deal with files that
         # have been shared to the bucket.
         if not self.is_tiered_scenario():
-            return
+            self.skipTest('Tiered storage is required for this test.')
 
         # We should be able to drop locally (not removing shared), and then
         # we should get an error if we create again.  Having an error protects us
@@ -141,15 +146,12 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
             self.assertTrue(os.path.exists(uri_b_shared_file1))
             self.assertTrue(filecmp.cmp(uri_b_local_file1, uri_b_shared_file1))
 
-        # We should be able to do this part of the test for any tiered scenario,
-        # not just dir_store.  Remove this 'if' and comment when FIXME-WT-11004 is finished.
-        if self.is_local_storage:
-            # The second flush from the other "system" should detect the conflict.
-            # Normally such a failure would crash Python, but we've changed our
-            # configuration such that we continue after the fail to write.
-            # We'll check for the error message we expect in the error output.
-            with self.expectedStderrPattern(expected_errno):
-                session2.checkpoint('flush_tier=(enabled,force=true)')
+        # The second flush from the other "system" should detect the conflict.
+        # Normally such a failure would crash Python, but we've changed our
+        # configuration such that we continue after the fail to write.
+        # We'll check for the error message we expect in the error output.
+        with self.expectedStderrPattern(expected_errno):
+            session2.checkpoint('flush_tier=(enabled,force=true)')
 
         # At this point, in dir_store, we can verify that the original copy
         # is still in place, and that the version from the second directory
