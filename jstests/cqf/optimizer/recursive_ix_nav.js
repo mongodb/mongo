@@ -152,7 +152,11 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
         [
             {key: "internalCascadesOptimizerMinIndexEqPrefixes", value: 2},
             {key: "internalCascadesOptimizerMaxIndexEqPrefixes", value: 2},
-            {key: "internalCascadesOptimizerDisableScan", value: true}
+            {key: "internalCascadesOptimizerDisableScan", value: true},
+            // Make Seek very expensive to discourage plans where we satisfy some predicates after
+            // the fetch. We want to test the plan where a,c,e predicates are all satisfied on the
+            // index side: a,c as equality prefixes and e as residual.
+            {key: 'internalCostModelCoefficients', value: {"seekStartupCost": 1e6 + 0.1}}
         ],
         () => t.explain("executionStats").aggregate([
             {
@@ -170,12 +174,14 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
 
     // Assert we have two spool producers, one for each interval for "a" ([1, 3] and [6, 6]).
     assertValueOnPlanPath(
-        "SpoolProducer", res, "child.child.leftChild.child.children.0.leftChild.nodeType");
-    const leftNode = navigateToPlanPath(res, 'child.child.leftChild.child.children.0.leftChild');
+        "SpoolProducer", res, "child.child.child.children.0.child.children.0.leftChild.nodeType");
+    const leftNode =
+        navigateToPlanPath(res, 'child.child.child.children.0.child.children.0.leftChild');
 
     assertValueOnPlanPath(
-        "SpoolProducer", res, "child.child.leftChild.child.children.1.leftChild.nodeType");
-    const rightNode = navigateToPlanPath(res, 'child.child.leftChild.child.children.1.leftChild');
+        "SpoolProducer", res, "child.child.child.children.0.child.children.1.leftChild.nodeType");
+    const rightNode =
+        navigateToPlanPath(res, 'child.child.child.children.0.child.children.1.leftChild');
 
     assert.neq(leftNode.id,
                rightNode.id,
