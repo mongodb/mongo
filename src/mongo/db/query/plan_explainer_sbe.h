@@ -78,8 +78,6 @@ public:
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
-    std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
-                                                     ExplainOptions::Verbosity) const final;
 
 private:
     static boost::optional<BSONObj> buildExecPlanDebugInfo(

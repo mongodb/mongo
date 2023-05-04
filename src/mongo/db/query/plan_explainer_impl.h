@@ -58,7 +58,7 @@ public:
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
     std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
-                                                     ExplainOptions::Verbosity) const final;
+                                                     ExplainOptions::Verbosity) const;
 
 private:
     PlanStage* const _root;
@@ -69,6 +69,12 @@ private:
  * found.
  */
 PlanStage* getStageByType(PlanStage* root, StageType type);
+
+/**
+ * Returns filtered plan stats from the debugInfo object for different verbosity levels.
+ */
+std::vector<PlanExplainer::PlanStatsDetails> getCachedPlanStats(
+    const plan_cache_debug_info::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity);
 
 /**
  * Adds the path-level multikey information to the explain output in a field called "multiKeyPaths".

@@ -94,10 +94,4 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getRejectedP
     // Multi-planning is not supported for aggregation pipelines.
     return {};
 }
-
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getCachedPlanStats(
-    const plan_cache_debug_info::DebugInfo&, ExplainOptions::Verbosity) const {
-    // Pipelines are not cached, so we should never try to rebuild the stats from a cached entry.
-    MONGO_UNREACHABLE;
-}
 }  // namespace mongo
