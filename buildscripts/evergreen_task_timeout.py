@@ -57,7 +57,10 @@ SPECIFIC_TASK_OVERRIDES = {
     "linux-64-repeated-execution": {UNITTEST_TASK: 10 * UNITTESTS_TIMEOUT},
     # some of the a/ub/t san variants need a little extra time
     "enterprise-ubuntu2004-debug-tsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
-    "ubuntu1804-asan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
+    "ubuntu1804-asan": {
+        UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT,
+        "aggregation_timeseries_fuzzer": timedelta(hours=2, minutes=30),
+    },
     "ubuntu1804-ubsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
     "ubuntu1804-debug-asan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
     "ubuntu1804-debug-aubsan-lite": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
