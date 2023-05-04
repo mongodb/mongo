@@ -113,7 +113,7 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: gQueryAnalysisSamplerConfigurationRefreshSecs
-        default: 5
+        default: 10
         validator:
             gt: 0
     queryAnalysisSamplerBurstMultiplier:
