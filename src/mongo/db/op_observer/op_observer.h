@@ -334,15 +334,8 @@ public:
                                           const NamespaceString& collectionName,
                                           const UUID& uuid,
                                           std::uint64_t numRecords,
-                                          CollectionDropType dropType) = 0;
-    virtual repl::OpTime onDropCollection(OperationContext* opCtx,
-                                          const NamespaceString& collectionName,
-                                          const UUID& uuid,
-                                          std::uint64_t numRecords,
                                           CollectionDropType dropType,
-                                          bool markFromMigrate) {
-        return onDropCollection(opCtx, collectionName, uuid, numRecords, dropType);
-    }
+                                          bool markFromMigrate) = 0;
 
 
     /**

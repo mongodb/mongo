@@ -610,8 +610,12 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onDropCollection(
-            opCtx.get(), nss, uuid, 0U, OpObserver::CollectionDropType::kTwoPhase);
+        opObserver.onDropCollection(opCtx.get(),
+                                    nss,
+                                    uuid,
+                                    0U,
+                                    OpObserver::CollectionDropType::kTwoPhase,
+                                    /*markFromMigrate=*/false);
         dropOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -643,8 +647,12 @@ TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onDropCollection(
-            opCtx.get(), nss, uuid, 0U, OpObserver::CollectionDropType::kTwoPhase);
+        opObserver.onDropCollection(opCtx.get(),
+                                    nss,
+                                    uuid,
+                                    0U,
+                                    OpObserver::CollectionDropType::kTwoPhase,
+                                    /*markFromMigrate=*/false);
         wunit.commit();
     }
 

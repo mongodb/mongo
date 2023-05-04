@@ -745,7 +745,8 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                      const NamespaceString& collectionName,
                                                      const UUID& uuid,
                                                      std::uint64_t numRecords,
-                                                     const CollectionDropType dropType) {
+                                                     const CollectionDropType dropType,
+                                                     bool markFromMigrate) {
     if (collectionName == NamespaceString::kServerConfigurationNamespace) {
         // Dropping system collections is not allowed for end users
         invariant(!opCtx->writesAreReplicated());

@@ -441,7 +441,8 @@ repl::OpTime ShardSplitDonorOpObserver::onDropCollection(OperationContext* opCtx
                                                          const NamespaceString& collectionName,
                                                          const UUID& uuid,
                                                          std::uint64_t numRecords,
-                                                         const CollectionDropType dropType) {
+                                                         const CollectionDropType dropType,
+                                                         bool markFromMigrate) {
     if (collectionName == NamespaceString::kShardSplitDonorsNamespace) {
         opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())

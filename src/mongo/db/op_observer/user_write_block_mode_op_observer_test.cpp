@@ -159,7 +159,8 @@ protected:
                     nss,
                     uuid,
                     0,
-                    UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase);
+                    UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase,
+                    /*markFromMigrate=*/false);
                 opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj());
                 // For renames, make sure we check both from and to for the given namespace
                 opObserver.preRenameCollection(opCtx, nss, adminNss, uuid, boost::none, 0, false);
@@ -188,7 +189,8 @@ protected:
                               nss,
                               uuid,
                               0,
-                              UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase),
+                              UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase,
+                              /*markFromMigrate=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj()),
                           AssertionException);

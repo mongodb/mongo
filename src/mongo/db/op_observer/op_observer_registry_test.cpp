@@ -53,12 +53,12 @@ struct TestObserver : public OpObserverNoop {
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
         drops++;
     }
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType) override {
+                                  const CollectionDropType dropType,
+                                  bool markFromMigrate) override {
         drops++;
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
@@ -182,8 +182,12 @@ TEST_F(OpObserverRegistryTest, OnDropCollectionObserverResultReturnsRightTime) {
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::make_unique<OpObserverNoop>());
     auto op = [&]() -> repl::OpTime {
-        return registry.onDropCollection(
-            &opCtx, testNss, UUID::gen(), 0U, OpObserver::CollectionDropType::kOnePhase);
+        return registry.onDropCollection(&opCtx,
+                                         testNss,
+                                         UUID::gen(),
+                                         0U,
+                                         OpObserver::CollectionDropType::kOnePhase,
+                                         /*markFromMigrate=*/false);
     };
     checkConsistentOpTime(op);
 }
@@ -206,8 +210,12 @@ DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "i
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
     auto op = [&]() -> repl::OpTime {
-        return registry.onDropCollection(
-            &opCtx, testNss, UUID::gen(), 0U, OpObserver::CollectionDropType::kOnePhase);
+        return registry.onDropCollection(&opCtx,
+                                         testNss,
+                                         UUID::gen(),
+                                         0U,
+                                         OpObserver::CollectionDropType::kOnePhase,
+                                         /*markFromMigrate=*/false);
     };
     checkInconsistentOpTime(op);
 }

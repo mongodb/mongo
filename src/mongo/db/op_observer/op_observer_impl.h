@@ -155,11 +155,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) final;
-    repl::OpTime onDropCollection(OperationContext* opCtx,
-                                  const NamespaceString& collectionName,
-                                  const UUID& uuid,
-                                  std::uint64_t numRecords,
                                   CollectionDropType dropType,
                                   bool markFromMigrate) final;
     void onDropIndex(OperationContext* opCtx,

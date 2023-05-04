@@ -152,12 +152,12 @@ public:
 
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override {}
 
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) override;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) override;
 
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,

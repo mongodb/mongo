@@ -213,7 +213,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                 coll->ns(),
                 coll->uuid(),
                 coll->numRecords(opCtx),
-                OpObserver::CollectionDropType::kOnePhase);
+                OpObserver::CollectionDropType::kOnePhase,
+                /*markFromMigrate=*/false);
         }
 
         Top::get(serviceContext).collectionDropped(coll->ns());

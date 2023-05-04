@@ -134,12 +134,12 @@ public:
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) override {}
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override {}
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType) override {
+                                  const CollectionDropType dropType,
+                                  bool markFromMigrate) override {
         return {};
     }
     void onDropIndex(OperationContext* opCtx,

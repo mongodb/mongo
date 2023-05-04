@@ -1360,15 +1360,6 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              CollectionDropType dropType) {
-    return onDropCollection(
-        opCtx, collectionName, uuid, numRecords, dropType, false /* markFromMigrate */);
-}
-
-repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
-                                              const NamespaceString& collectionName,
-                                              const UUID& uuid,
-                                              std::uint64_t numRecords,
                                               const CollectionDropType dropType,
                                               bool markFromMigrate) {
     if (!collectionName.isSystemDotProfile() && opCtx->writesAreReplicated()) {

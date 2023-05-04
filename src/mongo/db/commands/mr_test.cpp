@@ -279,12 +279,12 @@ public:
                             const OplogSlot& createOpTime,
                             bool fromMigrate) override;
 
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) override;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) override;
 
     // Hook for onInserts. Defaults to a no-op function but may be overridden to inject exceptions
     // while mapReduce inserts its results into the temporary output collection.
@@ -346,7 +346,8 @@ repl::OpTime MapReduceOpObserver::onDropCollection(OperationContext* opCtx,
                                                    const NamespaceString& collectionName,
                                                    const UUID& uuid,
                                                    std::uint64_t numRecords,
-                                                   const CollectionDropType dropType) {
+                                                   const CollectionDropType dropType,
+                                                   bool markFromMigrate) {
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {

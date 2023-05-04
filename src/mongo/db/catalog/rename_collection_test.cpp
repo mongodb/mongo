@@ -116,12 +116,12 @@ public:
                             const OplogSlot& createOpTime,
                             bool fromMigrate) override;
 
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) override;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) override;
 
     using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
@@ -243,15 +243,16 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              const CollectionDropType dropType) {
+                                              const CollectionDropType dropType,
+                                              bool markFromMigrate) {
     _logOp(opCtx, collectionName, "drop");
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
     }
-    auto noopOptime =
-        OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, numRecords, dropType);
+    auto noopOptime = OpObserverNoop::onDropCollection(
+        opCtx, collectionName, uuid, numRecords, dropType, markFromMigrate);
     invariant(noopOptime.isNull());
     return {};
 }

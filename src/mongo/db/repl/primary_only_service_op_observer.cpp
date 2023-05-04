@@ -83,7 +83,8 @@ repl::OpTime PrimaryOnlyServiceOpObserver::onDropCollection(OperationContext* op
                                                             const NamespaceString& collectionName,
                                                             const UUID& uuid,
                                                             std::uint64_t numRecords,
-                                                            const CollectionDropType dropType) {
+                                                            const CollectionDropType dropType,
+                                                            bool markFromMigrate) {
     auto service = _registry->lookupServiceByNamespace(collectionName);
     if (service) {
         opCtx->recoveryUnit()->onCommit(

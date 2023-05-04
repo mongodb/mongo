@@ -76,12 +76,12 @@ public:
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) final;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) final;
 
 private:
     void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;

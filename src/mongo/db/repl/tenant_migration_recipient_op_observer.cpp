@@ -246,7 +246,8 @@ repl::OpTime TenantMigrationRecipientOpObserver::onDropCollection(
     const NamespaceString& collectionName,
     const UUID& uuid,
     std::uint64_t numRecords,
-    const CollectionDropType dropType) {
+    const CollectionDropType dropType,
+    bool markFromMigrate) {
     if (collectionName == NamespaceString::kTenantMigrationRecipientsNamespace) {
         opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())

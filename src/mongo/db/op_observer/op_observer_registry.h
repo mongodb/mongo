@@ -266,15 +266,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType) override {
-        return onDropCollection(
-            opCtx, collectionName, uuid, numRecords, dropType, false /* markFromMigrate*/);
-    }
-
-    repl::OpTime onDropCollection(OperationContext* const opCtx,
-                                  const NamespaceString& collectionName,
-                                  const UUID& uuid,
-                                  std::uint64_t numRecords,
                                   const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         ReservedTimes times{opCtx};
