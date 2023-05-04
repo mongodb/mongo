@@ -864,14 +864,9 @@ LockManager::Partition* LockManager::_getPartition(LockRequest* request) const {
     return &_partitions[request->locker->getId() % _numPartitions];
 }
 
-bool LockManager::hasConflictingRequests(const LockRequest* request) const {
-    auto lock = request->lock;
-    if (!lock) {
-        return false;
-    }
-
-    stdx::lock_guard<SimpleMutex> lk(_getBucket(lock->resourceId)->mutex);
-    return !lock->conflictList.empty();
+bool LockManager::hasConflictingRequests(ResourceId resId, const LockRequest* request) const {
+    stdx::lock_guard<SimpleMutex> lk(_getBucket(resId)->mutex);
+    return request->lock ? !request->lock->conflictList.empty() : false;
 }
 
 void LockManager::dump() const {

@@ -374,7 +374,7 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
                                 "conflict for resource {}",
                                 _modeForTicket,
                                 it.key().toString()),
-                    !getGlobalLockManager()->hasConflictingRequests(it.objAddr()));
+                    !getGlobalLockManager()->hasConflictingRequests(it.key(), it.objAddr()));
         }
     } while (!_acquireTicket(opCtx, _modeForTicket, Date_t::now() + Milliseconds{100}));
 }
