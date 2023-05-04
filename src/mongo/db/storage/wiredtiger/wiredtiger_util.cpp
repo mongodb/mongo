@@ -191,13 +191,13 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
 
         if (reasonWasCachePressure) {
             if (txnTooLargeEnabled && isCacheInsufficientForTransaction(session, cacheThreshold)) {
-                auto s = generateContextStrStream(WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE);
-                throwTransactionTooLargeForCache(s);
+                throwTransactionTooLargeForCache(
+                    generateContextStrStream(WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE));
             }
 
             if (temporarilyUnavailableEnabled) {
-                auto s = generateContextStrStream(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
-                throwTemporarilyUnavailableException(s);
+                throwTemporarilyUnavailableException(
+                    generateContextStrStream(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION));
             }
         }
 
