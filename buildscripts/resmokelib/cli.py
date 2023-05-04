@@ -18,6 +18,6 @@ def main(argv):
         usage="Resmoke is MongoDB's correctness testing orchestrator.\n"
         "For more information, see the help message for each subcommand.\n"
         "For example: resmoke.py run -h\n"
-        "Note: bisect and setup-multiversion subcommands have been moved to db-contrib-tool (https://github.com/10gen/db-contrib-tool#readme).\n"
+        "Note: bisect, setup-multiversion and symbolize subcommands have been moved to db-contrib-tool (https://github.com/10gen/db-contrib-tool#readme).\n"
     )
     subcommand.execute()

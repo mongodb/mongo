@@ -14,6 +14,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
 
   # activate the virtualenv if it has been set up
   activate_venv
+  setup_db_contrib_tool
 
   if [[ -f "patch_test_tags.tgz" ]]; then
     tags_build_variant="${build_variant}"
