@@ -3,7 +3,7 @@
  * The cluster has a mongoq, a config server with 3 nodes and 2 shards. Each shard has 3 nodes.
  * The X509 authentication is disabled in the cluster.
  */
-class ServerlessTest {
+export class ShardedServerlessTest {
     constructor() {
         let numShards = 2;
 
@@ -22,7 +22,8 @@ class ServerlessTest {
         };
 
         jsTest.log("Going to create and start config server.");
-        this.configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
+        this.configRS =
+            new ReplSetTest({name: "configRS", serverless: true, nodes: 3, useHostName: true});
         this.configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
 
         jsTest.log("Initiate config server before starting mongoq.");
@@ -37,8 +38,12 @@ class ServerlessTest {
         jsTest.log("Going to add replica sets.");
         let adminDB = this.q.getDB('admin');
         for (let i = 0; i < numShards; i++) {
-            let rs =
-                new ReplSetTest({name: "testShard-rs-" + i, nodes: 3, nodeOptions: {shardsvr: ""}});
+            let rs = new ReplSetTest({
+                name: "testShard-rs-" + i,
+                nodes: 3,
+                serverless: true,
+                nodeOptions: {shardsvr: ""}
+            });
             rs.startSet({setParameter: {tenantMigrationDisableX509Auth: true}});
             rs.initiate();
             this["rs" + i] = rs;
@@ -57,7 +62,7 @@ class ServerlessTest {
         }
 
         this.q0 = this.q;
-        jsTest.log("ServerlessTest is created.");
+        jsTest.log("ShardedServerlessTest is created.");
     }
 
     /**

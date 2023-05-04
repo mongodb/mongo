@@ -84,6 +84,13 @@ namespace {
 constexpr std::int32_t stopFailPointErrorCode = 4880402;
 const Timestamp kDefaultStartMigrationTimestamp(1, 1);
 
+repl::ReplSettings createReplSettingsForServerlessTest() {
+    repl::ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setServerlessMode();
+    return settings;
+}
+
 OplogEntry makeOplogEntry(OpTime opTime,
                           OpTypeEnum opType,
                           NamespaceString nss,
@@ -193,7 +200,8 @@ public:
                            << "done"));
         {
             auto opCtx = cc().makeOperationContext();
-            auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
+            auto replCoord = std::make_unique<ReplicationCoordinatorMock>(
+                serviceContext, createReplSettingsForServerlessTest());
             ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
             repl::createOplog(opCtx.get());

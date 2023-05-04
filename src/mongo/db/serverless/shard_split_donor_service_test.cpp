@@ -87,6 +87,14 @@ namespace mongo {
  * Returns 'NoMatchingDocument' error code if no document with 'shardSplitId' is found.
  */
 namespace {
+
+repl::ReplSettings createReplSettingsForServerlessTest() {
+    repl::ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setServerlessMode();
+    return settings;
+}
+
 StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
                                                      const UUID& shardSplitId) {
     // Use kLastApplied so that we can read the state document as a secondary.
@@ -376,6 +384,11 @@ public:
         repl::PrimaryOnlyServiceMongoDTest::tearDown();
     }
 
+    std::unique_ptr<repl::ReplicationCoordinator> makeReplicationCoordinator() override {
+        return std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(),
+                                                                  _replSettings);
+    }
+
 protected:
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<ShardSplitDonorService>(serviceContext);
@@ -437,6 +450,7 @@ protected:
         _net->exitNetwork();
     }
 
+    const repl::ReplSettings _replSettings = createReplSettingsForServerlessTest();
     UUID _uuid = UUID::gen();
     MockReplicaSet _replSet{
         "donorSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};

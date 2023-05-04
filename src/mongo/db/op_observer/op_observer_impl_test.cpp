@@ -2104,7 +2104,18 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
     ASSERT_FALSE(oplogEntryObj.getBoolField("prepare"));
 }
 
-TEST_F(OpObserverTransactionTest,
+class OpObserverServerlessTransactionTest : public OpObserverTransactionTest {
+private:
+    // Needs to override to set serverless mode.
+    repl::ReplSettings createReplSettings() override {
+        repl::ReplSettings settings;
+        settings.setOplogSizeBytes(5 * 1024 * 1024);
+        settings.setServerlessMode();
+        return settings;
+    }
+};
+
+TEST_F(OpObserverServerlessTransactionTest,
        OnUnpreparedTransactionCommitChecksIfTenantMigrationIsBlockingWrites) {
     // Add a tenant migration access blocker on donor for blocking writes.
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid);
@@ -4330,7 +4341,18 @@ TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
     ASSERT_EQ(Date_t::fromMillisSinceEpoch(5678), *newCachedDefaults.getUpdateWallClockTime());
 }
 
-TEST_F(OpObserverTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
+class OpObserverServerlessTest : public OpObserverTest {
+private:
+    // Need to set serverless.
+    repl::ReplSettings createReplSettings() override {
+        repl::ReplSettings settings;
+        settings.setOplogSizeBytes(5 * 1024 * 1024);
+        settings.setServerlessMode();
+        return settings;
+    }
+};
+
+TEST_F(OpObserverServerlessTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
     auto opCtx = cc().makeOperationContext();
 
     // Add a tenant migration access blocker on donor for blocking writes.

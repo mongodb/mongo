@@ -385,19 +385,21 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
-        services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-        services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
         services.push_back(std::make_unique<MovePrimaryDonorService>(serviceContext));
         services.push_back(std::make_unique<MovePrimaryRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
+            services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
+            services.push_back(
+                std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
             services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
         }
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-        services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
+            services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
+            services.push_back(
+                std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
             services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
             services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
         }
@@ -1284,11 +1286,12 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
-        opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
-        opObserverRegistry->addObserver(
-            std::make_unique<repl::TenantMigrationRecipientOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
         if (getGlobalReplSettings().isServerless()) {
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationDonorOpObserver>());
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationRecipientOpObserver>());
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
@@ -1308,11 +1311,12 @@ void setUpObservers(ServiceContext* serviceContext) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         opObserverRegistry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
-        opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
-        opObserverRegistry->addObserver(
-            std::make_unique<repl::TenantMigrationRecipientOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
         if (getGlobalReplSettings().isServerless()) {
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationDonorOpObserver>());
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationRecipientOpObserver>());
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());

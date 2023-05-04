@@ -72,6 +72,10 @@ public:
                 "donorStartMigration not available while upgrading or downgrading the donor FCV",
                 !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are only available if --serverless is enabled",
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
+
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
             const auto& tenantId = cmd.getTenantId();
@@ -183,6 +187,10 @@ public:
                     "tenant migrations are not available on config servers",
                     !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are only available if --serverless is enabled",
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
+
             const auto& cmd = request();
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -257,6 +265,10 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are not available on config servers",
                     !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are only available if --serverless is enabled",
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
 
             const RequestType& cmd = request();
 

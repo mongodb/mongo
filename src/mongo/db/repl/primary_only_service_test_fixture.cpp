@@ -53,7 +53,7 @@ void PrimaryOnlyServiceMongoDTest::setUp() {
 
     {
         auto opCtx = makeOperationContext();
-        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
+        auto replCoord = makeReplicationCoordinator();
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
         repl::createOplog(opCtx.get());
@@ -109,6 +109,11 @@ void PrimaryOnlyServiceMongoDTest::stepUp(OperationContext* opCtx) {
 
 void PrimaryOnlyServiceMongoDTest::stepDown() {
     repl::stepDown(getServiceContext(), _registry);
+}
+
+std::unique_ptr<repl::ReplicationCoordinator>
+PrimaryOnlyServiceMongoDTest::makeReplicationCoordinator() {
+    return std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
 }
 
 void stepUp(OperationContext* opCtx,

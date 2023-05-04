@@ -335,6 +335,10 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
 SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
                                              const DatabaseName& dbName,
                                              const OpMsgRequest& request) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+        return Status::OK();
+    }
+
     // We need to check both donor and recipient access blockers in the case where two
     // migrations happen back-to-back before the old recipient state (from the first
     // migration) is garbage collected.
@@ -444,6 +448,10 @@ SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
 }
 
 void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, const DatabaseName& dbName) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+        return;
+    }
+
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kLinearizableReadConcern) {
         // Only the donor access blocker will block linearizable reads.
@@ -459,6 +467,10 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, const Dat
 void checkIfCanWriteOrThrow(OperationContext* opCtx,
                             const DatabaseName& dbName,
                             Timestamp writeTs) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+        return;
+    }
+
     // The migration protocol guarantees the recipient will not get writes until the migration
     // is committed.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
@@ -472,6 +484,10 @@ void checkIfCanWriteOrThrow(OperationContext* opCtx,
 }
 
 Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+        return Status::OK();
+    }
+
     // We only block index builds on the donor.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor);
@@ -505,6 +521,10 @@ void assertCanOpenChangeStream(OperationContext* opCtx, const DatabaseName& dbNa
 }
 
 void assertCanGetMoreChangeStream(OperationContext* opCtx, const DatabaseName& dbName) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+        return;
+    }
+
     // We only block change stream getMores on the donor.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor);
@@ -517,6 +537,10 @@ void assertCanGetMoreChangeStream(OperationContext* opCtx, const DatabaseName& d
 
 bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbName) {
     if (dbName.db().empty()) {
+        return false;
+    }
+
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
         return false;
     }
 

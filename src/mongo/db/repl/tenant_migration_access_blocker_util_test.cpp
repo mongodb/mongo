@@ -53,6 +53,13 @@ static const std::string kDefaultRecipientConnStr = "recipient-rs/localhost:5678
 static const std::string kDefaultEmptyTenantStr = "";
 static const UUID kMigrationId = UUID::gen();
 
+repl::ReplSettings createReplSettingsForServerlessTest() {
+    repl::ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setServerlessMode();
+    return settings;
+}
+
 }  // namespace
 
 class TenantMigrationAccessBlockerUtilTest : public ServiceContextTest {
@@ -63,6 +70,12 @@ public:
 
     void setUp() {
         _opCtx = makeOperationContext();
+        auto service = getServiceContext();
+
+        repl::ReplicationCoordinator::set(service,
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              service, createReplSettingsForServerlessTest()));
+
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).startup();
     }
 
@@ -76,6 +89,7 @@ public:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
+    const repl::ReplSettings _replSettings = createReplSettingsForServerlessTest();
 };
 
 
@@ -284,7 +298,8 @@ public:
         // Need real (non-mock) storage to insert state doc.
         repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
 
-        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
+        auto replCoord =
+            std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext, _replSettings);
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
         _replMock = replCoord.get();
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
@@ -315,6 +330,11 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
+    const repl::ReplSettings _replSettings = []() {
+        repl::ReplSettings settings;
+        settings.setServerlessMode();
+        return settings;
+    }();
 };
 
 TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientBlockerStarted) {

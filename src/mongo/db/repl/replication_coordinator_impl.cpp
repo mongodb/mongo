@@ -540,7 +540,9 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
                   "Throwing exception.");
     }
 
-    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    if (_settings.isServerless()) {
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    }
     ServerlessOperationLockRegistry::recoverLocks(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx,

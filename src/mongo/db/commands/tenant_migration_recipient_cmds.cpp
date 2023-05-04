@@ -66,6 +66,10 @@ public:
                     "tenant migrations are not available on config servers",
                     !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are only available if --serverless is enabled",
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
+
             // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
             uassert(
                 5356101,
@@ -229,6 +233,10 @@ public:
             uassertStatusOK(
                 repl::ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result));
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are only available if --serverless is enabled",
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
+
             const auto& cmd = request();
             LOGV2(6112805,
                   "Received RecipientVoteImportedFiles request",
@@ -290,6 +298,10 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are not available on config servers",
                     !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are only available if --serverless is enabled",
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
 
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);

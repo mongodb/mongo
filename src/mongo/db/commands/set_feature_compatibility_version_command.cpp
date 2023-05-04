@@ -614,7 +614,9 @@ private:
                                   const multiversion::FeatureCompatibilityVersion requestedVersion,
                                   boost::optional<Timestamp> changeTimestamp) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-            _cancelServerlessMigrations(opCtx);
+            if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+                _cancelServerlessMigrations(opCtx);
+            }
             _maybeMigrateAuditConfig(opCtx, requestedVersion, changeTimestamp);
             return;
         }
@@ -955,7 +957,8 @@ private:
     // This helper function is for any actions that should be done before taking the FCV full
     // transition lock in S mode.
     void _prepareToDowngradeActions(OperationContext* opCtx) {
-        if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
+            repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
             _cancelServerlessMigrations(opCtx);
             return;
         }
@@ -1358,35 +1361,33 @@ private:
 
     /**
      * Abort all serverless migrations active on this node, for both donors and recipients.
-     * Called after reaching an upgrading or downgrading state.
+     * Called after reaching an upgrading or downgrading state for nodes with ClusterRole::None.
+     * Must only be called in serverless mode.
      */
     void _cancelServerlessMigrations(OperationContext* opCtx) {
+        invariant(repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
-        if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-            auto donorService = checked_cast<TenantMigrationDonorService*>(
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
-            donorService->abortAllMigrations(opCtx);
+        auto donorService = checked_cast<TenantMigrationDonorService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
+        donorService->abortAllMigrations(opCtx);
 
-            auto recipientService = checked_cast<repl::TenantMigrationRecipientService*>(
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
-                                              kTenantMigrationRecipientServiceName));
-            recipientService->abortAllMigrations(opCtx);
+        auto recipientService = checked_cast<repl::TenantMigrationRecipientService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(
+                    repl::TenantMigrationRecipientService::kTenantMigrationRecipientServiceName));
+        recipientService->abortAllMigrations(opCtx);
 
-            if (getGlobalReplSettings().isServerless()) {
-                auto splitDonorService = checked_cast<ShardSplitDonorService*>(
-                    repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                        ->lookupServiceByName(ShardSplitDonorService::kServiceName));
-                splitDonorService->abortAllSplits(opCtx);
+        auto splitDonorService = checked_cast<ShardSplitDonorService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(ShardSplitDonorService::kServiceName));
+        splitDonorService->abortAllSplits(opCtx);
 
-                auto mergeRecipientService = checked_cast<repl::ShardMergeRecipientService*>(
-                    repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                        ->lookupServiceByName(
-                            repl::ShardMergeRecipientService::kShardMergeRecipientServiceName));
-                mergeRecipientService->abortAllMigrations(opCtx);
-            }
-        }
+        auto mergeRecipientService = checked_cast<repl::ShardMergeRecipientService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(
+                    repl::ShardMergeRecipientService::kShardMergeRecipientServiceName));
+        mergeRecipientService->abortAllMigrations(opCtx);
     }
 
     /**

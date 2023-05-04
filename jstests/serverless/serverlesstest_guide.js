@@ -1,12 +1,13 @@
 /*
  * @tags: [serverless]
  */
+
+import {ShardedServerlessTest} from "jstests/serverless/libs/sharded_serverless_test.js";
+
 (function() {
 "use strict";
 
-load("jstests/serverless/serverlesstest.js");
-
-let st = new ServerlessTest();
+let st = new ShardedServerlessTest();
 
 (() => {
     jsTest.log("Test adding and removing tenants to/from config.tenants");

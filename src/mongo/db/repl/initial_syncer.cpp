@@ -577,7 +577,9 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     const bool orderedCommit = true;
     _storage->oplogDiskLocRegister(opCtx, initialDataTimestamp, orderedCommit);
 
-    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    if (ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    }
     ServerlessOperationLockRegistry::recoverLocks(opCtx);
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 

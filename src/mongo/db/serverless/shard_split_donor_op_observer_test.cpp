@@ -45,6 +45,12 @@
 namespace mongo {
 namespace {
 
+repl::ReplSettings createReplSettingsForServerlessTest() {
+    repl::ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setServerlessMode();
+    return settings;
+}
 
 class ShardSplitDonorOpObserverTest : public ServiceContextMongoDTest {
 public:
@@ -57,8 +63,8 @@ public:
             repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
 
             // Set up ReplicationCoordinator and create oplog.
-            auto coordinatorMock =
-                std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings());
+            auto coordinatorMock = std::make_unique<repl::ReplicationCoordinatorMock>(
+                service, createReplSettingsForServerlessTest());
             _replicationCoordinatorMock = coordinatorMock.get();
 
             repl::ReplicationCoordinator::set(service, std::move(coordinatorMock));
@@ -201,14 +207,6 @@ private:
         TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
             .removeAccessBlockersForMigration(_uuid,
                                               TenantMigrationAccessBlocker::BlockerType::kDonor);
-    }
-    // Creates a reasonable set of ReplSettings for most tests.  We need to be able to
-    // override this to create a larger oplog.
-    virtual repl::ReplSettings createReplSettings() {
-        repl::ReplSettings settings;
-        settings.setOplogSizeBytes(5 * 1024 * 1024);
-        settings.setReplSetString("mySet/node1:12345");
-        return settings;
     }
 };
 

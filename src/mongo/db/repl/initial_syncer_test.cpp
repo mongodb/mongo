@@ -52,6 +52,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/reporter.h"
@@ -361,6 +362,15 @@ protected:
         };
 
         auto* service = getGlobalServiceContext();
+
+        auto replSettings = []() {
+            repl::ReplSettings settings;
+            settings.setServerlessMode();
+            return settings;
+        }();
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings);
+        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+
         service->setFastClockSource(std::make_unique<ClockSourceMock>());
         service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         ThreadPool::Options dbThreadPoolOptions;

@@ -109,7 +109,7 @@ bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbNam
 
 /**
  * Scan config.tenantMigrationDonors and creates the necessary TenantMigrationAccessBlockers for
- * unfinished migrations.
+ * unfinished migrations. Must only be called in --serverless mode.
  */
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx);
 

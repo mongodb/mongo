@@ -67,6 +67,8 @@ protected:
     virtual std::unique_ptr<repl::PrimaryOnlyService> makeService(
         ServiceContext* serviceContext) = 0;
 
+    virtual std::unique_ptr<repl::ReplicationCoordinator> makeReplicationCoordinator();
+
     /**
      * Used to add your own op observer to the op observer registry during setUp prior to running
      * your tests.

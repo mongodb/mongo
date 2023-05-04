@@ -5,11 +5,12 @@
  * @tags: [requires_fcv_52, serverless]
  */
 
+import {ShardedServerlessTest} from "jstests/serverless/libs/sharded_serverless_test.js";
+
 (function() {
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/serverlesstest.js");
 load('jstests/concurrency/fsm_libs/worker_thread.js');
 
 // A function, not a constant, to ensure unique UUIDs.
@@ -25,7 +26,7 @@ function donorStartMigrationCmd(tenantID, realConnUrl) {
 
 let createIndexesCmd = {createIndexes: "foo", indexes: [{key: {x: 1}, name: "x_1"}]};
 
-let st = new ServerlessTest();
+let st = new ShardedServerlessTest();
 let donor = st.rs0;
 let recipient = st.rs1;
 let mongoq = st.q0;

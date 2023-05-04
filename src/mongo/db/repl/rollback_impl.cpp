@@ -668,7 +668,9 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // rollback.
     _correctRecordStoreCounts(opCtx);
 
-    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    if (_replicationCoordinator->getSettings().isServerless()) {
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    }
     ServerlessOperationLockRegistry::recoverLocks(opCtx);
 
     // Reconstruct prepared transactions after counts have been adjusted. Since prepared
