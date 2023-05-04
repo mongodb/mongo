@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_44,
+ *   does_not_support_stepdowns,
  *   multiversion_incompatible,
  * ]
  */
