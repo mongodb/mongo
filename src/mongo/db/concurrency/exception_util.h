@@ -67,17 +67,26 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
                                                 StringData ns,
                                                 const TransactionTooLargeForCacheException& e);
 
+namespace error_details {
+/**
+ * A faster alternative to `iasserted`, designed to throw exceptions for unexceptional events on the
+ * critical execution path (e.g., `WriteConflict`).
+ */
+template <ErrorCodes::Error ec>
+[[noreturn]] void throwExceptionFor(std::string reason) {
+    throw ExceptionFor<ec>({ec, std::move(reason)});
+}
+}  // namespace error_details
+
 /**
  * A `WriteConflictException` is thrown if during a write, two or more operations conflict with each
  * other. For example if two operations get the same version of a document, and then both try to
  * modify that document, this exception will get thrown by one of them.
  */
 [[noreturn]] inline void throwWriteConflictException(StringData context) {
-    Status status{
-        ErrorCodes::WriteConflict,
-        str::stream() << "Caused by :: "_sd << context
-                      << " :: Please retry your operation or multi-document transaction."_sd};
-    iasserted(status);
+    error_details::throwExceptionFor<ErrorCodes::WriteConflict>(
+        "Caused by :: {} :: Please retry your operation or multi-document transaction."_format(
+            context));
 }
 
 /**
@@ -86,8 +95,8 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
  * be retried internally by the `writeConflictRetry` helper a finite number of times before
  * eventually being returned.
  */
-[[noreturn]] inline void throwTemporarilyUnavailableException(StringData context) {
-    iasserted({ErrorCodes::TemporarilyUnavailable, context});
+[[noreturn]] inline void throwTemporarilyUnavailableException(std::string context) {
+    error_details::throwExceptionFor<ErrorCodes::TemporarilyUnavailable>(std::move(context));
 }
 
 /**
@@ -96,8 +105,8 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
  * transaction state. This helps to avoid retrying, maybe indefinitely, a transaction which would
  * never be able to complete.
  */
-[[noreturn]] inline void throwTransactionTooLargeForCache(StringData context) {
-    iasserted({ErrorCodes::TransactionTooLargeForCache, context});
+[[noreturn]] inline void throwTransactionTooLargeForCache(std::string context) {
+    error_details::throwExceptionFor<ErrorCodes::TransactionTooLargeForCache>(std::move(context));
 }
 
 /**
