@@ -879,11 +879,16 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // passed Operation context. We opt for creating a new one to avoid any possible side
     // effects.
     auto newClient = opCtx->getServiceContext()->makeClient("ShardingCatalogTransaction");
+
     AuthorizationSession::get(newClient.get())->grantInternalAuthorization(newClient.get());
     AlternativeClientRegion acr(newClient);
 
+    auto newOpCtxHolder = cc().makeOperationContext();
+    auto newOpCtx = newOpCtxHolder.get();
+    newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     // if executor is provided, use it, otherwise use the fixed executor
-    const auto& executor = [&inputExecutor, ctx = opCtx]() {
+    const auto& executor = [&inputExecutor, ctx = newOpCtx]() {
         if (inputExecutor)
             return inputExecutor;
 
@@ -893,19 +898,6 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    // if osi is provided, use it. Otherwise, use the one from the opCtx.
-    auto newOpCtxHolder = cc().makeOperationContext();
-    auto newOpCtx = newOpCtxHolder.get();
-    newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-    if (osi.getSessionId()) {
-        newOpCtx->setLogicalSessionId(*osi.getSessionId());
-        newOpCtx->setTxnNumber(*osi.getTxnNumber());
-    } else if (opCtx->getLogicalSessionId()) {
-        newOpCtx->setLogicalSessionId(*opCtx->getLogicalSessionId());
-        newOpCtx->setTxnNumber(*opCtx->getTxnNumber());
-    }
-    newOpCtx->setWriteConcern(writeConcern);
     // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
     // routed to the CSRS.
     auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
@@ -924,6 +916,13 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
             std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
                 newOpCtx->getServiceContext()));
     }();
+
+    if (osi.getSessionId()) {
+        newOpCtx->setLogicalSessionId(*osi.getSessionId());
+        newOpCtx->setTxnNumber(*osi.getTxnNumber());
+    }
+
+    newOpCtx->setWriteConcern(writeConcern);
 
     txn_api::SyncTransactionWithRetries txn(newOpCtx,
                                             sleepInlineExecutor,
