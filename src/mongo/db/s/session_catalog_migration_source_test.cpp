@@ -995,9 +995,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
     ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
 }
 
-DEATH_TEST_F(SessionCatalogMigrationSourceTest,
-             ThrowUponSeeingNewCommittedForInternalTransactionForNonRetryableWrite,
-             "Cannot add op time for a non-retryable internal transaction") {
+TEST_F(SessionCatalogMigrationSourceTest,
+       DiscardOplogEntriesForNewCommittedInternalTransactionForNonRetryableWrite) {
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     migrationSource.init(opCtx());
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
