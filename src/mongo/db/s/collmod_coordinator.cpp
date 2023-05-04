@@ -78,6 +78,20 @@ bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
     return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
 }
 
+std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShards(
+    OperationContext* opCtx,
+    StringData dbName,
+    const BSONObj& command,
+    const std::vector<ShardId>& shardIds,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const OperationSessionInfo& osi,
+    WriteConcernOptions wc = WriteConcernOptions()) {
+    command.addFields(osi.toBSON());
+    const auto commandWithWc = CommandHelpers::appendMajorityWriteConcern(command, wc);
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, dbName, commandWithWc, shardIds, executor);
+}
+
 }  // namespace
 
 CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
@@ -246,11 +260,16 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         _updateStateDocument(opCtx, std::move(newDoc));
                     }
 
+                    _updateSession(opCtx);
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
-                    const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                        blockCRUDOperationsRequest.toBSON({}));
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx, nss().db(), cmdObj, _shardingInfo->shardsOwningChunks, **executor);
+                    blockCRUDOperationsRequest.setBlockType(
+                        CriticalSectionBlockTypeEnum::kReadsAndWrites);
+                    sendAuthenticatedCommandWithOsiToShards(opCtx,
+                                                            nss().db(),
+                                                            blockCRUDOperationsRequest.toBSON({}),
+                                                            _shardingInfo->shardsOwningChunks,
+                                                            **executor,
+                                                            getCurrentSession());
                 }
             }))
         .then(_buildPhaseHandler(
@@ -348,27 +367,29 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         // A view definition will only be present on the primary shard. So we pass
                         // an addition 'performViewChange' flag only to the primary shard.
                         if (primaryShardOwningChunk != shardsOwningChunks.end()) {
+                            _updateSession(opCtx);
                             request.setPerformViewChange(true);
-                            const auto& primaryResponse =
-                                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                                    opCtx,
-                                    nss().db(),
-                                    CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-                                    {_shardingInfo->primaryShard},
-                                    **executor);
+                            const auto& primaryResponse = sendAuthenticatedCommandWithOsiToShards(
+                                opCtx,
+                                nss().db(),
+                                request.toBSON({}),
+                                {_shardingInfo->primaryShard},
+                                **executor,
+                                getCurrentSession());
                             responses.insert(
                                 responses.end(), primaryResponse.begin(), primaryResponse.end());
                             shardsOwningChunks.erase(primaryShardOwningChunk);
                         }
 
+                        _updateSession(opCtx);
                         request.setPerformViewChange(false);
                         const auto& secondaryResponses =
-                            sharding_ddl_util::sendAuthenticatedCommandToShards(
-                                opCtx,
-                                nss().db(),
-                                CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-                                shardsOwningChunks,
-                                **executor);
+                            sendAuthenticatedCommandWithOsiToShards(opCtx,
+                                                                    nss().db(),
+                                                                    request.toBSON({}),
+                                                                    shardsOwningChunks,
+                                                                    **executor,
+                                                                    getCurrentSession());
                         responses.insert(
                             responses.end(), secondaryResponses.begin(), secondaryResponses.end());
 
