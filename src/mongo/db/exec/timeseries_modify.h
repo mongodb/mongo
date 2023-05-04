@@ -85,11 +85,11 @@ struct TimeseriesModifyParams {
     CanonicalQuery* canonicalQuery;
 
     // True if this command was triggered by the application of an oplog entry.
-    bool isFromOplogApplication;
+    bool isFromOplogApplication = false;
 
     // Contains the logic for applying mods to documents. Only present for updates. Not owned. Must
     // outlive the TimeseriesModifyStage.
-    UpdateDriver* updateDriver;
+    UpdateDriver* updateDriver = nullptr;
 };
 
 /**
