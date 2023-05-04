@@ -416,7 +416,7 @@ BSONObj TelemetryMetrics::applyHmacToKey(const BSONObj& key,
 
         // TODO SERVER-76557 call makeTelemetryKey thru FindRequestShapifier kept in telemetry store
         auto key = makeTelemetryKey(*findCommand, serializationOpts, expCtx, *this);
-        // TODO: SERVER-76526 as part of this ticket, no form of the key (hmac applied or not) will
+        // TODO: SERVER-75512 as part of this ticket, no form of the key (hmac applied or not) will
         // be cached with TelemetryMetrics.
         if (applyHmacToIdentifiers) {
             _hmacAppliedKey = key;
