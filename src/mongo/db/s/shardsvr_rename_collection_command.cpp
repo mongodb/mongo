@@ -99,9 +99,9 @@ public:
                 // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
                 coordinatorDoc.setShardingDDLCoordinatorMetadata(
                     {{fromNss,
-                      feature_flags::gGlobalIndexesShardingCatalog.isEnabled(*fixedFcvRegion)
+                      feature_flags::gRenameCommitInTransaction.isEnabled(*fixedFcvRegion)
                           ? DDLCoordinatorTypeEnum::kRenameCollection
-                          : DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible}});
+                          : DDLCoordinatorTypeEnum::kRenameCollectionPre70Compatible}});
                 coordinatorDoc.setAllowEncryptedCollectionRename(
                     req.getAllowEncryptedCollectionRename().value_or(false));
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);

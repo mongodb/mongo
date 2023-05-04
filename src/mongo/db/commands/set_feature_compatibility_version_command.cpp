@@ -329,13 +329,13 @@ public:
             // the FCV but encountered failover afterwards.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
-            // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
             if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-                feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+                feature_flags::gRenameCommitInTransaction.isEnabledOnVersion(requestedVersion)) {
                 ShardingDDLCoordinatorService::getService(opCtx)
                     ->waitForCoordinatorsOfGivenTypeToComplete(
-                        opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
+                        opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre70Compatible);
             }
+
             // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
             if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
                 feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
@@ -548,14 +548,13 @@ public:
                 false /* setIsCleaningServerMetadata */);
         }
 
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
             requestedVersion > actualVersion &&
-            feature_flags::gGlobalIndexesShardingCatalog
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
+            feature_flags::gRenameCommitInTransaction.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, actualVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
+                    opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre70Compatible);
         }
 
         // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
@@ -631,10 +630,9 @@ private:
                 ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
         }
 
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
         if (isDowngrading &&
-            feature_flags::gGlobalIndexesShardingCatalog
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            feature_flags::gRenameCommitInTransaction.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollection);

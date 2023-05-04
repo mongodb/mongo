@@ -57,6 +57,11 @@ feature_flags:
     cpp_varname: feature_flags::gHistoricalPlacementShardingCatalog
     default: true
     version: 7.0
+  featureRenameCommitInTransaction:
+    description: "Feature flag for enabling the usage of a remote transaction for the commit phase of the rename collection"
+    cpp_varname: feature_flags::gRenameCommitInTransaction
+    default: true
+    version: 7.0
   featureFlagImplicitDDLTimeseriesNssTranslation:
     description: "When enabled, the logic to evaluate whether a DDL is targeting a Timeseries operation
                   will always be executed by the DDL Coordinator (VS doing the evaluation when the command is received by the primary shard).

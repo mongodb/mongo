@@ -237,7 +237,7 @@ BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const Nam
 
 /**
  * Runs the given transaction chain on the catalog. Transaction will be remote if called by a shard.
- * Important: StmtsIds must be set in the transactionChain if the OperationSessionId is not empty
+ * Important: StmtsIds must be set in the transactionChain if the OperationSessionInfo is not empty
  * since we are spawning a transaction on behalf of a retryable operation.
  */
 void runTransactionOnShardingCatalog(
