@@ -244,6 +244,11 @@ selector:
   # TODO (SERVER-76157): ClusterServerParameterRefresher can result in dangling internal
   # transactions on the config server.
   - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
+  # This test verifies that the number of queries that each mongos or shardsvr mongod samples is
+  # proportional to the number of queries it routes. This is enforced via the sample rate assignment
+  # by the configsvr primary based on the traffic distribution information it has in memory. So the
+  # test doesn't pass reliably when there is continuous stepdown on the config server.
+  - jstests/sharding/analyze_shard_key/sample_rates_sharded.js
 
   exclude_with_any_tags:
   - does_not_support_stepdowns
