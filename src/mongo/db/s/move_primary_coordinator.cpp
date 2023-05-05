@@ -61,6 +61,7 @@ bool useOnlineCloner() {
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
+MONGO_FAIL_POINT_DEFINE(movePrimaryCoordinatorHangBeforeCleaningUp);
 
 MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* service,
                                                const BSONObj& initialState)
@@ -348,8 +349,16 @@ bool MovePrimaryCoordinator::onlineClonerAllowedToBeMissing() const {
 }
 
 void MovePrimaryCoordinator::recoverOnlineCloner(OperationContext* opCtx) {
+    if (_onlineCloner) {
+        return;
+    }
     _onlineCloner = MovePrimaryDonor::get(opCtx, _dbName, _doc.getToShardId());
     if (_onlineCloner) {
+        LOGV2(7687200,
+              "MovePrimaryCoordinator found existing online cloner",
+              "migrationId"_attr = _onlineCloner->getMetadata().getMigrationId(),
+              logAttrs(_dbName),
+              "to"_attr = _doc.getToShardId());
         return;
     }
     invariant(onlineClonerAllowedToBeMissing());
@@ -358,6 +367,11 @@ void MovePrimaryCoordinator::recoverOnlineCloner(OperationContext* opCtx) {
 void MovePrimaryCoordinator::createOnlineCloner(OperationContext* opCtx) {
     invariant(onlineClonerPossiblyNeverCreated());
     _onlineCloner = MovePrimaryDonor::create(opCtx, _dbName, _doc.getToShardId());
+    LOGV2(7687201,
+          "MovePrimaryCoordinator created new online cloner",
+          "migrationId"_attr = _onlineCloner->getMetadata().getMigrationId(),
+          logAttrs(_dbName),
+          "to"_attr = _doc.getToShardId());
 }
 
 void MovePrimaryCoordinator::cloneDataUntilReadyForCatchup(OperationContext* opCtx,
@@ -396,6 +410,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             const auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
+
+            if (MONGO_unlikely(movePrimaryCoordinatorHangBeforeCleaningUp.shouldFail())) {
+                LOGV2(7687202, "Hit movePrimaryCoordinatorHangBeforeCleaningUp");
+                movePrimaryCoordinatorHangBeforeCleaningUp.pauseWhileSet(opCtx);
+            }
 
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                 opCtx, getNewSession(opCtx), **executor);
@@ -464,6 +483,7 @@ void MovePrimaryCoordinator::cleanupOnAbortWithOnlineCloner(OperationContext* op
                                                             const CancellationToken& token,
                                                             const Status& status) {
     unblockReadsAndWrites(opCtx);
+    recoverOnlineCloner(opCtx);
     if (!_onlineCloner) {
         return;
     }

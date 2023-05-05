@@ -383,6 +383,8 @@ last-continuous:
     ticket: SERVER-74806
   - test_file: jstests/sharding/resharding_with_multi_deletes_reduced_ticket_pool_size.js
     ticket: SERVER-77097
+  - test_file: jstests/sharding/move_primary_donor_cleaned_up_if_coordinator_steps_up_aborted.js
+    ticket: SERVER-76872
   suites: null
 last-lts:
   all:
@@ -850,4 +852,6 @@ last-lts:
     ticket: SERVER-74806
   - test_file: jstests/sharding/resharding_with_multi_deletes_reduced_ticket_pool_size.js
     ticket: SERVER-77097
+  - test_file: jstests/sharding/move_primary_donor_cleaned_up_if_coordinator_steps_up_aborted.js
+    ticket: SERVER-76872
   suites: null
