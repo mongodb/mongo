@@ -23,6 +23,14 @@ const rst = new ReplSetTest({
             },
             slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
         },
+        {
+            // The arbiter prevents the primary from stepping down due to lack of majority in the
+            // case where the secondary is restarting due to the (expected) unclean shutdown. Note
+            // that the arbiter doesn't participate in the commitQuorum.
+            rsConfig: {
+                arbiterOnly: true,
+            },
+        },
     ]
 });
 rst.startSet();
