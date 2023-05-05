@@ -27,9 +27,9 @@ const rst = new ReplSetTest({
             slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
         },
         {
-            // The arbiter prevents the primary from stepping down in the case where the secondary
-            // is restarting due to the (expected) unclean shutdown. Note that the arbiter doesn't
-            // participate in the commitQuorum.
+            // The arbiter prevents the primary from stepping down due to lack of majority in the
+            // case where the secondary is restarting due to the (expected) unclean shutdown. Note
+            // that the arbiter doesn't participate in the commitQuorum.
             rsConfig: {
                 arbiterOnly: true,
             },
@@ -58,7 +58,8 @@ const createIdx = (gracefulIndexBuildFlag)
 
 // When the index build starts, find its op id.
 let secondaryDB = secondary.getDB(primaryDB.getName());
-const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+const opId =
+    IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, primaryColl.getName(), "a_1");
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
     jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
@@ -88,6 +89,7 @@ if (!gracefulIndexBuildFlag) {
 }
 
 primary = rst.getPrimary();
+rst.awaitSecondaryNodes();
 primaryDB = primary.getDB('test');
 primaryColl = primaryDB.getCollection('test');
 

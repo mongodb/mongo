@@ -13,7 +13,7 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/feature_flag_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
-const rst = new ReplSetTest({nodes: 2});
+const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
 rst.initiate();
 
@@ -84,11 +84,11 @@ if (!gracefulIndexBuildFlag) {
     rst.stop(
         primary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
     rst.start(primary.nodeId, undefined, true /* restart */);
-} else {
-    primary = rst.waitForPrimary();
 }
 
-// Wait for the index build to complete.
+// Wait for primary and secondaries to reach goal state, and for the index build to complete.
+primary = rst.waitForPrimary();
+rst.awaitSecondaryNodes();
 rst.awaitReplication();
 
 if (gracefulIndexBuildFlag) {
@@ -104,9 +104,6 @@ if (gracefulIndexBuildFlag) {
         rst.getSecondary().getDB('test').getCollection('test'), 1, ['_id_']);
 
 } else {
-    // Wait for the index build to complete.
-    rst.awaitReplication();
-
     // Verify that the stepped up node completed the index build.
     IndexBuildTest.assertIndexes(
         rst.getPrimary().getDB('test').getCollection('test'), 2, ['_id_', 'a_1']);
