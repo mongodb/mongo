@@ -367,18 +367,9 @@ public:
                                              const UUID& uuid,
                                              const boost::optional<UUID>& dropTargetUUID,
                                              std::uint64_t numRecords,
-                                             bool stayTemp) = 0;
-    virtual repl::OpTime preRenameCollection(OperationContext* opCtx,
-                                             const NamespaceString& fromCollection,
-                                             const NamespaceString& toCollection,
-                                             const UUID& uuid,
-                                             const boost::optional<UUID>& dropTargetUUID,
-                                             std::uint64_t numRecords,
                                              bool stayTemp,
-                                             bool markFromMigrate) {
-        return preRenameCollection(
-            opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
-    }
+                                             bool markFromMigrate) = 0;
+
     /**
      * This function performs all op observer handling for a 'renameCollection' command except for
      * logging the oplog entry. It should be used specifically in instances where the optime is

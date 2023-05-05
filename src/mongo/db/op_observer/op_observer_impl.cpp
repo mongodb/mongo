@@ -1421,23 +1421,6 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  const UUID& uuid,
                                                  const boost::optional<UUID>& dropTargetUUID,
                                                  std::uint64_t numRecords,
-                                                 bool stayTemp) {
-    return preRenameCollection(opCtx,
-                               fromCollection,
-                               toCollection,
-                               uuid,
-                               dropTargetUUID,
-                               numRecords,
-                               stayTemp,
-                               false /* markFromMigrate */);
-}
-
-repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
-                                                 const NamespaceString& fromCollection,
-                                                 const NamespaceString& toCollection,
-                                                 const UUID& uuid,
-                                                 const boost::optional<UUID>& dropTargetUUID,
-                                                 std::uint64_t numRecords,
                                                  bool stayTemp,
                                                  bool markFromMigrate) {
     BSONObjBuilder builder;

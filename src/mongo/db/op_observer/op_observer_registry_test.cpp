@@ -71,19 +71,25 @@ struct TestObserver : public OpObserverNoop {
                             std::uint64_t numRecords,
                             bool stayTemp,
                             bool markFromMigrate) {
-        preRenameCollection(
-            opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+        preRenameCollection(opCtx,
+                            fromCollection,
+                            toCollection,
+                            uuid,
+                            dropTargetUUID,
+                            numRecords,
+                            stayTemp,
+                            markFromMigrate);
         postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     }
 
-    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
-                                     bool stayTemp) override {
+                                     bool stayTemp,
+                                     bool markFromMigrate) override {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
@@ -198,7 +204,8 @@ TEST_F(OpObserverRegistryTest, PreRenameCollectionObserverResultReturnsRightTime
     registry.addObserver(std::make_unique<OpObserverNoop>());
     auto op = [&]() -> repl::OpTime {
         UUID uuid = UUID::gen();
-        auto opTime = registry.preRenameCollection(&opCtx, testNss, testNss, uuid, {}, 0U, false);
+        auto opTime = registry.preRenameCollection(
+            &opCtx, testNss, testNss, uuid, {}, 0U, /*stayTemp=*/false, /*markFromMigrate=*/false);
         registry.postRenameCollection(&opCtx, testNss, testNss, uuid, {}, false);
         return opTime;
     };
@@ -226,7 +233,8 @@ DEATH_TEST_F(OpObserverRegistryTest, PreRenameCollectionReturnsInconsistentTime,
     registry.addObserver(std::move(unique2));
     auto op = [&]() -> repl::OpTime {
         UUID uuid = UUID::gen();
-        auto opTime = registry.preRenameCollection(&opCtx, testNss, testNss, uuid, {}, 0U, false);
+        auto opTime = registry.preRenameCollection(
+            &opCtx, testNss, testNss, uuid, {}, 0U, /*stayTemp=*/false, /*markFromMigrate=*/false);
         registry.postRenameCollection(&opCtx, testNss, testNss, uuid, {}, false);
         return opTime;
     };

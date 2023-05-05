@@ -129,14 +129,14 @@ public:
 
     // onRenameCollection is only for renaming to a nonexistent target NS, so we need
     // preRenameCollection too.
-    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
-                                     bool stayTemp) final;
+                                     bool stayTemp,
+                                     bool markFromMigrate) final;
 
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,

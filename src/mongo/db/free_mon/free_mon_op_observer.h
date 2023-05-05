@@ -183,14 +183,14 @@ public:
                             const BSONObj& storageMetadata,
                             bool isDryRun) final {}
 
-    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
-                                     bool stayTemp) final {
+                                     bool stayTemp,
+                                     bool markFromMigrate) final {
         return repl::OpTime();
     }
     void postRenameCollection(OperationContext* opCtx,

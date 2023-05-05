@@ -132,20 +132,22 @@ public:
                             bool stayTemp,
                             bool markFromMigrate) override;
 
-    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
-                                     bool stayTemp) override;
+                                     bool stayTemp,
+                                     bool markFromMigrate) override;
+
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
                               const UUID& uuid,
                               const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) override;
+
     // Operations written to the oplog. These are operations for which
     // ReplicationCoordinator::isOplogDisabled() returns false.
     std::vector<std::string> oplogEntries;
@@ -265,8 +267,14 @@ void OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                         std::uint64_t numRecords,
                                         bool stayTemp,
                                         bool markFromMigrate) {
-    preRenameCollection(
-        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    preRenameCollection(opCtx,
+                        fromCollection,
+                        toCollection,
+                        uuid,
+                        dropTargetUUID,
+                        numRecords,
+                        stayTemp,
+                        markFromMigrate);
     OpObserverNoop::onRenameCollection(opCtx,
                                        fromCollection,
                                        toCollection,
@@ -297,11 +305,18 @@ repl::OpTime OpObserverMock::preRenameCollection(OperationContext* opCtx,
                                                  const UUID& uuid,
                                                  const boost::optional<UUID>& dropTargetUUID,
                                                  std::uint64_t numRecords,
-                                                 bool stayTemp) {
+                                                 bool stayTemp,
+                                                 bool markFromMigrate) {
     _logOp(opCtx, fromCollection, "rename");
     OpObserver::Times::get(opCtx).reservedOpTimes.push_back(renameOpTime);
-    OpObserverNoop::preRenameCollection(
-        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    OpObserverNoop::preRenameCollection(opCtx,
+                                        fromCollection,
+                                        toCollection,
+                                        uuid,
+                                        dropTargetUUID,
+                                        numRecords,
+                                        stayTemp,
+                                        /*markFromMigrate=*/false);
     return {};
 }
 
