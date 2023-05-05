@@ -431,8 +431,10 @@ public:
             for (auto elem : expected) {
                 BSONElement other = *it;
                 ASSERT(elem.binaryEqualValues(other));
+                ASSERT_TRUE(it.more());
                 ++it;
             }
+            ASSERT_FALSE(it.more());
         }
 
         // Verify that we can traverse BSONColumn and extract values on the first pass

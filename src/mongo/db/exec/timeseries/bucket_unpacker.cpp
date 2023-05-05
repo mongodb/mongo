@@ -303,13 +303,11 @@ private:
         ColumnStore(BSONElement elem)
             : column(elem),
               it(column.begin()),
-              end(column.end()),
               fieldName(elem.fieldNameStringData(), FieldNameHasher{}(elem.fieldNameStringData())) {
         }
 
         BSONColumn column;
         BSONColumn::Iterator it;
-        BSONColumn::Iterator end;
         HashedFieldName fieldName;
     };
 
@@ -359,7 +357,7 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
     for (auto& fieldColumn : _fieldColumns) {
         uassert(6067601,
                 "Bucket unexpectedly contained fewer values than count",
-                fieldColumn.it != fieldColumn.end);
+                fieldColumn.it.more());
         const BSONElement& elem = *fieldColumn.it;
         // EOO represents missing field
         if (!elem.eoo()) {
@@ -368,7 +366,7 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
         ++fieldColumn.it;
     }
 
-    return _timeColumn.it != _timeColumn.end;
+    return _timeColumn.it.more();
 }
 
 bool BucketUnpackerV2::getNext(BSONObjBuilder& builder,
@@ -391,7 +389,7 @@ bool BucketUnpackerV2::getNext(BSONObjBuilder& builder,
     for (auto& fieldColumn : _fieldColumns) {
         uassert(7026803,
                 "Bucket unexpectedly contained fewer values than count",
-                fieldColumn.it != fieldColumn.end);
+                fieldColumn.it.more());
         const BSONElement& elem = *fieldColumn.it;
         // EOO represents missing field
         if (!elem.eoo()) {
@@ -400,7 +398,7 @@ bool BucketUnpackerV2::getNext(BSONObjBuilder& builder,
         ++fieldColumn.it;
     }
 
-    return _timeColumn.it != _timeColumn.end;
+    return _timeColumn.it.more();
 }
 
 void BucketUnpackerV2::extractSingleMeasurement(

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/simple8b.h"
+#include "mongo/stdx/variant.h"
 
 #include <deque>
 #include <memory>
@@ -82,6 +83,9 @@ public:
      * A default-constructed BSONElement (EOO type) represents a missing value. Returned
      * BSONElements are owned by the BSONColumn instance and should not be kept after the BSONColumn
      * instance goes out of scope.
+     *
+     * Iterator can be used either as an STL iterator with begin() and end() or as a non-STL
+     * iterator via begin() and incrementing until more() returns false.
      */
     class Iterator {
     public:
@@ -114,6 +118,14 @@ public:
             return !operator==(rhs);
         }
 
+        /**
+         * Returns true if iterator may be incremented. Equivalent to comparing not equal with the
+         * end iterator.
+         */
+        bool more() const {
+            return _control != _end;
+        }
+
     private:
         // Constructs a begin iterator
         Iterator(boost::intrusive_ptr<ElementStorage> allocator, const char* pos, const char* end);
@@ -121,10 +133,6 @@ public:
         // Initialize sub-object interleaving from current control byte position. Must be on a
         // interleaved start byte.
         void _initializeInterleaving();
-
-        // Helpers to increment the iterator in regular and interleaved mode.
-        void _incrementRegular();
-        void _incrementInterleaved();
 
         // Handles EOO when in regular mode. Iterator is set to end.
         void _handleEOO();
@@ -156,75 +164,84 @@ public:
         // Allocator to use when materializing elements
         boost::intrusive_ptr<ElementStorage> _allocator;
 
-        // Helper to create Simple8b decoding iterators for 64bit and 128bit value types.
-        // previousValue is used in case the first Simple8b block is RLE and this value will then be
-        // used for the RLE repeat.
-        template <typename T>
-        struct Decoder {
-            Decoder(const char* buf, size_t size, const boost::optional<T>& previousValue)
-                : s8b(buf, size, previousValue), pos(s8b.begin()), end(s8b.end()) {}
-
-            Simple8b<T> s8b;
-            typename Simple8b<T>::Iterator pos;
-            typename Simple8b<T>::Iterator end;
-        };
-
         /**
          * Decoding state for decoding compressed binary into BSONElement. It is detached from the
          * actual binary to allow interleaving where control bytes corresponds to separate decoding
          * states.
          */
         struct DecodingState {
+            /**
+             * Internal decoding state for types using 64bit aritmetic
+             */
+            struct Decoder64 {
+                Simple8b<uint64_t>::Iterator pos;
+                int64_t lastEncodedValue = 0;
+                int64_t lastEncodedValueForDeltaOfDelta = 0;
+                uint8_t scaleIndex;
+                bool deltaOfDelta;
+            };
+
+            /**
+             * Internal decoding state for types using 128bit aritmetic
+             */
+            struct Decoder128 {
+                Simple8b<uint128_t>::Iterator pos;
+                int128_t lastEncodedValue = 0;
+            };
+
             struct LoadControlResult {
                 BSONElement element;
                 int size;
             };
 
             // Loads a literal
-            void _loadLiteral(const BSONElement& elem);
+            void loadUncompressed(const BSONElement& elem);
 
             // Loads current control byte
-            LoadControlResult _loadControl(ElementStorage& allocator,
-                                           const char* buffer,
-                                           const char* end);
+            LoadControlResult loadControl(ElementStorage& allocator,
+                                          const char* buffer,
+                                          const char* end);
 
             // Loads delta value
-            BSONElement _loadDelta(ElementStorage& allocator,
-                                   const boost::optional<uint64_t>& delta);
-            BSONElement _loadDelta(ElementStorage& allocator,
-                                   const boost::optional<uint128_t>& delta);
-
-            // Decoders, only one should be instantiated at a time.
-            boost::optional<Decoder<uint64_t>> _decoder64;
-            boost::optional<Decoder<uint128_t>> _decoder128;
+            BSONElement loadDelta(ElementStorage& allocator, Decoder64& decoder);
+            BSONElement loadDelta(ElementStorage& allocator, Decoder128& decoder);
 
             // Last encoded values used to calculate delta and delta-of-delta
-            BSONType _lastType;
-            bool _deltaOfDelta;
-            BSONElement _lastValue;
-            int64_t _lastEncodedValue64 = 0;
-            int64_t _lastEncodedValueForDeltaOfDelta = 0;
-            int128_t _lastEncodedValue128 = 0;
-
-            // Current scale index
-            uint8_t _scaleIndex;
+            BSONElement lastValue;
+            stdx::variant<Decoder64, Decoder128> decoder = Decoder64{};
         };
 
-        // Decoding states. Interleaved mode is active when '_states' is not empty. When in regular
-        // mode we use '_state'.
-        DecodingState _state;
-        std::vector<DecodingState> _states;
+        /**
+         * Internal state for regular decoding mode (decoding of scalars)
+         */
+        struct Regular {
+            DecodingState state;
+        };
 
-        // Interleaving reference object read when encountered the interleaving start control byte.
-        // We setup a decoding state for each scalar field in this object. The object hierarchy is
-        // used to re-construct with full objects with the correct hierachy to the user.
-        BSONObj _interleavedReferenceObj;
+        /**
+         * Internal state for interleaved decoding mode (decoding of objects/arrays)
+         */
+        struct Interleaved {
+            std::vector<DecodingState> states;
 
-        // Indicates if decoding states should be opened when encountering arrays
-        bool _interleavedArrays;
+            // Interleaving reference object read when encountered the interleaving start control
+            // byte. We setup a decoding state for each scalar field in this object. The object
+            // hierarchy is used to re-construct with full objects with the correct hierachy to the
+            // user.
+            BSONObj referenceObj;
 
-        // Type for root object/reference object. May be Object or Array.
-        BSONType _interleavedRootType;
+            // Indicates if decoding states should be opened when encountering arrays
+            bool arrays;
+
+            // Type for root object/reference object. May be Object or Array.
+            BSONType rootType;
+        };
+
+        // Helpers to increment the iterator in regular and interleaved mode.
+        void _incrementRegular(Regular& regular);
+        void _incrementInterleaved(Interleaved& interleaved);
+
+        stdx::variant<Regular, Interleaved> _mode = Regular{};
     };
 
     /**
