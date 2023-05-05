@@ -22,8 +22,6 @@ if [ "$bypass_prelude" != "yes" ]; then
   src="src"
 fi
 
-set -o xtrace
-
 if [ "$hostname" == "" ]; then
   hostname="$(tr -d '"[]{}' < "$workdir"/$src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')"
 fi
@@ -52,10 +50,12 @@ connection_attempts=50
 # Check for remote connectivity
 set +o errexit
 ssh_options="-i $ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
-while ! ssh $ssh_options -o ConnectTimeout=10 "$host" echo "I am working"; do
-  if [ "$attempts" -ge "$connection_attempts" ]; then exit 1; fi
+while ! ssh -q $ssh_options -o ConnectTimeout=10 "$host" echo "I am working"; do
+  if [ "$attempts" -ge "$connection_attempts" ]; then
+    printf "SSH connection attempt failed after %d attempts.\n" "$attempts"
+    exit 1
+  fi
   ((attempts++))
-  printf "SSH connection attempt %d/%d failed. Retrying...\n" "$attempts" "$connection_attempts"
   sleep 10
 done
 

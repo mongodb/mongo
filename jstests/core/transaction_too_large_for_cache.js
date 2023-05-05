@@ -7,6 +7,7 @@
  *   requires_persistence,
  *   requires_non_retryable_writes,
  *   requires_wiredtiger,
+ *   no_selinux
  * ]
  */
 
