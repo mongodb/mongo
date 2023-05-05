@@ -192,11 +192,6 @@ selector:
   - jstests/sharding/merge_requires_unique_index.js
   - jstests/sharding/query/merge_stale_on_fields.js
   - jstests/sharding/query/out_fails_to_replace_sharded_collection.js
-  # In this suite the cluster may end up in a state where each shard believes the
-  # collection is sharded and the mongos believes it is unsharded. $merge is not
-  # prepared to work correctly in this situation. This should be fixed by a future
-  # improvement in sharding infrastructure, and can be undenylisted by SERVER-40172.
-  - jstests/sharding/query/merge_to_existing.js
   # Sets a failpoint on find commands which can lead to a hang when a config steps down.
   - jstests/sharding/sharding_statistics_server_status.js
   # setShardVersion is not robust during config server stepdown.
