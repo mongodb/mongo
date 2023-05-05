@@ -5878,9 +5878,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinObjectToArray(Ar
 
         objectEnumerator.advance();
     }
-    if (objOwned) {
-        value::releaseValue(objTag, objVal);
-    }
     arrGuard.reset();
     return {true, arrTag, arrVal};
 }
@@ -5903,9 +5900,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
 
     // return empty object for empty array
     if (arrayEnumerator.atEnd()) {
-        if (arrOwned) {
-            value::releaseValue(arrTag, arrVal);
-        }
         objGuard.reset();
         return {true, objTag, objVal};
     }
@@ -5965,8 +5959,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
             auto [valueCopyTag, valueCopyVal] = value::copyValue(valueTag, valueVal);
             if (keyMap.contains(keyStringData)) {
                 auto idx = keyMap[keyStringData];
-                auto oldVal = object->getAt(idx);
-                value::ValueGuard guard{oldVal};
                 object->setAt(idx, valueCopyTag, valueCopyVal);
             } else {
                 keyMap[keyStringData] = object->size();
@@ -6022,8 +6014,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
             auto [valueCopyTag, valueCopyVal] = value::copyValue(valueTag, valueVal);
             if (keyMap.contains(keyStringData)) {
                 auto idx = keyMap[keyStringData];
-                auto oldVal = object->getAt(idx);
-                value::ValueGuard guard{oldVal};
                 object->setAt(idx, valueCopyTag, valueCopyVal);
             } else {
                 keyMap[keyStringData] = object->size();
@@ -6031,9 +6021,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
             }
         }
         arrayEnumerator.advance();
-    }
-    if (arrOwned) {
-        value::releaseValue(arrTag, arrVal);
     }
     objGuard.reset();
     return {true, objTag, objVal};
