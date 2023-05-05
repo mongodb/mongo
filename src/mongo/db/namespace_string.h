@@ -839,15 +839,14 @@ private:
                 ns.find('\0') == std::string::npos);
 
         auto dotIndex = ns.find('.');
+        uint8_t dbNameSize = dotIndex != std::string::npos ? dotIndex : ns.size();
         uassert(ErrorCodes::InvalidNamespace,
                 fmt::format("db name must be at most {} characters, found: {}",
                             DatabaseName::kMaxDatabaseNameLength,
-                            dotIndex),
-                (dotIndex != std::string::npos ? dotIndex : ns.size()) <=
-                    DatabaseName::kMaxDatabaseNameLength);
+                            dbNameSize),
+                dbNameSize <= DatabaseName::kMaxDatabaseNameLength);
 
-        uint8_t details =
-            (dotIndex != std::string::npos ? dotIndex : ns.size()) & kDatabaseNameOffsetEndMask;
+        uint8_t details = dbNameSize & kDatabaseNameOffsetEndMask;
         size_t dbStartIndex = kDataOffset;
         if (tenantId) {
             dbStartIndex += OID::kOIDSize;
