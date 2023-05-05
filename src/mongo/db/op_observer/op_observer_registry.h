@@ -293,23 +293,6 @@ public:
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) override {
-        onRenameCollection(opCtx,
-                           fromCollection,
-                           toCollection,
-                           uuid,
-                           dropTargetUUID,
-                           numRecords,
-                           stayTemp,
-                           false /* markFromMigrate */);
-    }
-
-    void onRenameCollection(OperationContext* const opCtx,
-                            const NamespaceString& fromCollection,
-                            const NamespaceString& toCollection,
-                            const UUID& uuid,
-                            const boost::optional<UUID>& dropTargetUUID,
-                            std::uint64_t numRecords,
                             bool stayTemp,
                             bool markFromMigrate) override {
         ReservedTimes times{opCtx};

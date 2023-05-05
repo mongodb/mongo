@@ -123,14 +123,14 @@ public:
                                   CollectionDropType dropType,
                                   bool markFromMigrate) override;
 
-    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) override;
+                            bool stayTemp,
+                            bool markFromMigrate) override;
 
     using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
@@ -263,11 +263,18 @@ void OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                         const UUID& uuid,
                                         const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
-                                        bool stayTemp) {
+                                        bool stayTemp,
+                                        bool markFromMigrate) {
     preRenameCollection(
         opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
-    OpObserverNoop::onRenameCollection(
-        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    OpObserverNoop::onRenameCollection(opCtx,
+                                       fromCollection,
+                                       toCollection,
+                                       uuid,
+                                       dropTargetUUID,
+                                       numRecords,
+                                       stayTemp,
+                                       markFromMigrate);
     onRenameCollectionCalled = true;
     onRenameCollectionDropTarget = dropTargetUUID;
 }

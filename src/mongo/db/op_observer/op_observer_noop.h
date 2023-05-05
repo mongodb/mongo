@@ -147,14 +147,14 @@ public:
                      const UUID& uuid,
                      const std::string& indexName,
                      const BSONObj& idxDescriptor) override {}
-    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) override {}
+                            bool stayTemp,
+                            bool markFromMigrate) override {}
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
                             const NamespaceString& nss,

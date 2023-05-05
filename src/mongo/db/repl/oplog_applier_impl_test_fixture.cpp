@@ -112,12 +112,19 @@ void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
                                                     const UUID& uuid,
                                                     const boost::optional<UUID>& dropTargetUUID,
                                                     std::uint64_t numRecords,
-                                                    bool stayTemp) {
+                                                    bool stayTemp,
+                                                    bool markFromMigrate) {
     if (!onRenameCollectionFn) {
         return;
     }
-    onRenameCollectionFn(
-        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    onRenameCollectionFn(opCtx,
+                         fromCollection,
+                         toCollection,
+                         uuid,
+                         dropTargetUUID,
+                         numRecords,
+                         stayTemp,
+                         markFromMigrate);
 }
 
 void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,

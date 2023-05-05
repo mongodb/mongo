@@ -191,14 +191,14 @@ public:
         return repl::OpTime();
     }
 
-    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) final {}
+                            bool stayTemp,
+                            bool markFromMigrate) final {}
 
     void onApplyOps(OperationContext* opCtx,
                     const DatabaseName& dbName,

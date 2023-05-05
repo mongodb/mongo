@@ -847,7 +847,8 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    uuid,
                                                    /*dropTargetUUID*/ {},
                                                    /*numRecords*/ 0U,
-                                                   stayTemp);
+                                                   stayTemp,
+                                                   /*markFromMigrate=*/false);
 
                     wuow.commit();
                     // Re-fetch collection after commit to get a valid pointer
@@ -896,7 +897,8 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                uuid,
                                                /*dropTargetUUID*/ {},
                                                /*numRecords*/ 0U,
-                                               stayTemp);
+                                               stayTemp,
+                                               /*markFromMigrate=*/false);
 
                 wuow.commit();
                 return Status::OK();

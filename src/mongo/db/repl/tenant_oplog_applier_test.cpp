@@ -976,7 +976,8 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
                                             const boost::optional<UUID>& uuid,
                                             const boost::optional<UUID>& dropTargetUUID,
                                             std::uint64_t numRecords,
-                                            bool stayTemp) {
+                                            bool stayTemp,
+                                            bool markFromMigrate) {
         applyCmdCalled = true;
     };
     auto entry = OplogEntry(op);

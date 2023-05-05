@@ -166,14 +166,14 @@ public:
                      const std::string& indexName,
                      const BSONObj& indexInfo) final {}
 
-    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) final {}
+                            bool stayTemp,
+                            bool markFromMigrate) final {}
 
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,

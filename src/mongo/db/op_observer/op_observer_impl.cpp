@@ -1490,23 +1490,6 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                                         const UUID& uuid,
                                         const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
-                                        bool stayTemp) {
-    onRenameCollection(opCtx,
-                       fromCollection,
-                       toCollection,
-                       uuid,
-                       dropTargetUUID,
-                       numRecords,
-                       stayTemp,
-                       false /* markFromMigrate */);
-}
-
-void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
-                                        const NamespaceString& fromCollection,
-                                        const NamespaceString& toCollection,
-                                        const UUID& uuid,
-                                        const boost::optional<UUID>& dropTargetUUID,
-                                        std::uint64_t numRecords,
                                         bool stayTemp,
                                         bool markFromMigrate) {
     preRenameCollection(opCtx,

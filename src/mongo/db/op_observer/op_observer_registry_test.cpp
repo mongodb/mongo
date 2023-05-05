@@ -63,14 +63,14 @@ struct TestObserver : public OpObserverNoop {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
-    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) {
+                            bool stayTemp,
+                            bool markFromMigrate) {
         preRenameCollection(
             opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
         postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);

@@ -266,7 +266,8 @@ void UserWriteBlockModeOpObserver::onRenameCollection(OperationContext* opCtx,
                                                       const UUID& uuid,
                                                       const boost::optional<UUID>& dropTargetUUID,
                                                       std::uint64_t numRecords,
-                                                      bool stayTemp) {
+                                                      bool stayTemp,
+                                                      bool markFromMigrate) {
     _checkWriteAllowed(opCtx, fromCollection);
     _checkWriteAllowed(opCtx, toCollection);
 }

@@ -192,7 +192,8 @@ void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
                                         const UUID& uuid,
                                         const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
-                                        bool stayTemp) {
+                                        bool stayTemp,
+                                        bool markFromMigrate) {
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 

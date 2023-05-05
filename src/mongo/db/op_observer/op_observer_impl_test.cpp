@@ -678,8 +678,14 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onRenameCollection(
-            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
+        opObserver.onRenameCollection(opCtx.get(),
+                                      sourceNss,
+                                      targetNss,
+                                      uuid,
+                                      dropTargetUuid,
+                                      0U,
+                                      stayTemp,
+                                      /*markFromMigrate=*/false);
         renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -715,8 +721,14 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onRenameCollection(
-            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
+        opObserver.onRenameCollection(opCtx.get(),
+                                      sourceNss,
+                                      targetNss,
+                                      uuid,
+                                      dropTargetUuid,
+                                      0U,
+                                      stayTemp,
+                                      /*markFromMigrate=*/false);
         wunit.commit();
     }
 
@@ -752,8 +764,14 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onRenameCollection(
-            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
+        opObserver.onRenameCollection(opCtx.get(),
+                                      sourceNss,
+                                      targetNss,
+                                      uuid,
+                                      dropTargetUuid,
+                                      0U,
+                                      stayTemp,
+                                      /*markFromMigrate=*/false);
         wunit.commit();
     }
 
@@ -786,7 +804,8 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onRenameCollection(opCtx.get(), sourceNss, targetNss, uuid, {}, 0U, stayTemp);
+        opObserver.onRenameCollection(
+            opCtx.get(), sourceNss, targetNss, uuid, {}, 0U, stayTemp, /*markFromMigrate=*/false);
         wunit.commit();
     }
 
