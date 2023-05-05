@@ -237,7 +237,7 @@ public:
      *
      * NOTE: Waiting threads can be signaled by calling kill or notify* methods.
      */
-    void waitUntil(uint64_t prevVersion, Date_t deadline) const;
+    void waitUntil(OperationContext* opCtx, uint64_t prevVersion, Date_t deadline) const;
 
     /**
      * Returns the version for use as an additional wake condition when used above.
