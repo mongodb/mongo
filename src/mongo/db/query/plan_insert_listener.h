@@ -65,7 +65,7 @@ public:
 
     void waitUntil(OperationContext* opCtx, Date_t deadline) final {
         auto currentVersion = _notifier->getVersion();
-        _notifier->waitUntil(_lastEOFVersion, deadline);
+        _notifier->waitUntil(opCtx, _lastEOFVersion, deadline);
         _lastEOFVersion = currentVersion;
     }
 
