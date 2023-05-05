@@ -616,6 +616,13 @@ add_option(
     help="Specify variables files to load.",
 )
 
+add_option(
+    'streams-release-build',
+    default=False,
+    action='store_true',
+    help='If set, will include the enterprise streams module in a release build.',
+)
+
 link_model_choices = ['auto', 'object', 'static', 'dynamic', 'dynamic-strict', 'dynamic-sdk']
 add_option(
     'link-model',
@@ -6021,6 +6028,24 @@ env.AddPackageNameAlias(
 )
 
 env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'
+
+
+def isSupportedStreamsPlatform(thisEnv):
+    # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+    return thisEnv.TargetOSIs(
+        'linux') and thisEnv['TARGET_ARCH'] == 'x86_64' and ssl_provider == 'openssl'
+
+
+def shouldBuildStreams(thisEnv):
+    if releaseBuild:
+        # The streaming enterprise module and dependencies are only included in release builds.
+        # when streams-release-build is set.
+        return get_option('streams-release-build') and isSupportedStreamsPlatform(thisEnv)
+    else:
+        return isSupportedStreamsPlatform(thisEnv)
+
+
+env.AddMethod(shouldBuildStreams, 'ShouldBuildStreams')
 
 
 def prefix_libdir_rpath_generator(env, source, target, for_signature):

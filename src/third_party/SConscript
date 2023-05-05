@@ -279,16 +279,6 @@ def injectThirdParty(thisEnv, libraries=[], parts=[]):
 
 env.AddMethod(injectThirdParty, 'InjectThirdParty')
 
-
-def shouldBuildStreams(thisEnv):
-    # TODO https://jira.mongodb.org/browse/SERVER-74963: Streams release builds.
-    # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
-    return not releaseBuild and thisEnv.TargetOSIs(
-        'linux') and thisEnv['TARGET_ARCH'] == 'x86_64' and ssl_provider == 'openssl'
-
-
-env.AddMethod(shouldBuildStreams, 'ShouldBuildStreams')
-
 env = env.Clone()
 
 # Construct an empty object file that we can use to produce the

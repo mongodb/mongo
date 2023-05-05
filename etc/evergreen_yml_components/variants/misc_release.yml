@@ -2787,3 +2787,39 @@ buildvariants:
     - name: compile_test_and_package_parallel_unittest_stream_TG
     - name: compile_test_and_package_parallel_core_stream_TG
     - name: compile_test_and_package_parallel_dbtest_stream_TG
+
+- name: enterprise-amazon2-streams
+  display_name: "Amazon Linux 2 enterprise build with streams"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-test
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-amazon2-streams
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --streams-release-build
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise-streams
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    compile_variant: enterprise-amazon2-streams
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - amazon2-build
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
