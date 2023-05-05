@@ -492,7 +492,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
                 CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
                 writeConflictsInARow++;
-                logWriteConflictAndBackoff(writeConflictsInARow, "plan execution", _nss.ns());
+                logWriteConflictAndBackoff(
+                    writeConflictsInARow, "plan execution", ""_sd, _nss.ns());
             }
 
             // Yield next time through the loop.

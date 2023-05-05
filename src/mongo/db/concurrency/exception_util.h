@@ -45,7 +45,10 @@ extern FailPoint skipWriteConflictRetries;
  * @param attempt - what attempt is this, 1 based
  * @param operation - e.g. "update"
  */
-void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns);
+void logWriteConflictAndBackoff(int attempt,
+                                StringData operation,
+                                StringData reason,
+                                StringData ns);
 
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            int attempts,
@@ -149,9 +152,9 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
     while (true) {
         try {
             return f();
-        } catch (WriteConflictException const&) {
+        } catch (WriteConflictException const& e) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            logWriteConflictAndBackoff(writeConflictAttempts, opStr, ns);
+            logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), ns);
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
         } catch (TemporarilyUnavailableException const& e) {
