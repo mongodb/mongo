@@ -35,12 +35,23 @@
 #include "mongo/db/query/query_shape.h"
 
 namespace mongo::telemetry {
+BSONObj FindRequestShapifier::makeTelemetryKey(const SerializationOptions& opts,
+                                               OperationContext* opCtx) const {
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, _request, nullptr /* collator doesn't matter here.*/, false /* mayDbProfile */);
+    expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
+    // Expression counters are reported in serverStatus to indicate how often clients use certain
+    // expressions/stages, so it's a side effect tied to parsing. We must stop expression counters
+    // before re-parsing to avoid adding to the counters more than once per a given query.
+    expCtx->stopExpressionCounters();
+    return makeTelemetryKey(opts, expCtx);
+}
+
 BSONObj FindRequestShapifier::makeTelemetryKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     BSONObjBuilder bob;
 
     bob.append("queryShape", query_shape::extractQueryShape(_request, opts, expCtx));
-
 
     if (auto optObj = _request.getReadConcern()) {
         // Read concern should not be considered a literal.

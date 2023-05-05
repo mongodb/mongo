@@ -39,8 +39,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/find_command_gen.h"
-// TODO SERVER-76557 remove include of find_request_shapifier
-#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
@@ -78,36 +76,6 @@ boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
     return boost::none;
 }
 }  // namespace
-
-// TODO SERVER-76557 can remove this makeTelemetryKey
-BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
-                         const SerializationOptions& opts,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         boost::optional<const TelemetryMetrics&> existingMetrics) {
-
-    BSONObjBuilder bob;
-    bob.append("queryShape", query_shape::extractQueryShape(findCommand, opts, expCtx));
-    if (auto optObj = findCommand.getReadConcern()) {
-        // Read concern should not be considered a literal.
-        bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
-    }
-    auto appName = [&]() -> boost::optional<std::string> {
-        if (existingMetrics.has_value()) {
-            if (existingMetrics->applicationName.has_value()) {
-                return existingMetrics->applicationName;
-            }
-        } else {
-            if (auto appName = getApplicationName(expCtx->opCtx)) {
-                return appName.value();
-            }
-        }
-        return boost::none;
-    }();
-    if (appName.has_value()) {
-        bob.append("applicationName", opts.serializeIdentifier(appName.value()));
-    }
-    return bob.obj();
-}
 
 CounterMetric telemetryStoreSizeEstimateBytesMetric("telemetry.telemetryStoreSizeEstimateBytes");
 
@@ -234,7 +202,7 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
         // That is, the number of cpu cores.
         size_t numPartitions = ProcessInfo::getNumCores();
         size_t partitionBytes = size / numPartitions;
-        size_t metricsSize = sizeof(TelemetryMetrics);
+        size_t metricsSize = sizeof(TelemetryEntry);
         if (partitionBytes < metricsSize * 10) {
             numPartitions = size / metricsSize;
             if (numPartitions < 1) {
@@ -319,7 +287,7 @@ void throwIfEncounteringFLEPayload(const BSONElement& e) {
 
 /**
  * Upon reading telemetry data, we apply hmac to some keys. This is the list. See
- * TelemetryMetrics::applyHmacToKey().
+ * TelemetryEntry::makeTelemetryKey().
  */
 const stdx::unordered_set<std::string> kKeysToApplyHmac = {"pipeline", "find"};
 
@@ -371,7 +339,7 @@ static const StringData replacementForLiteralArgs = "?"_sd;
 
 }  // namespace
 
-BSONObj TelemetryMetrics::applyHmacToKey(const BSONObj& key,
+BSONObj TelemetryEntry::makeTelemetryKey(const BSONObj& key,
                                          bool applyHmacToIdentifiers,
                                          std::string hmacKey,
                                          OperationContext* opCtx) const {
@@ -394,37 +362,20 @@ BSONObj TelemetryMetrics::applyHmacToKey(const BSONObj& key,
     // }
     // queryShape may include additional fields, eg hint, limit sort, etc, depending on the original
     // query.
-    if (cmdObj.hasField(FindCommandRequest::kCommandName)) {
-        tassert(7198600, "Find command must have a namespace string.", this->nss.nss().has_value());
-        auto findCommand =
-            query_request_helper::makeFromFindCommand(cmdObj, this->nss.nss().value(), false);
-        auto nss = findCommand->getNamespaceOrUUID().nss();
-        uassert(7349400, "Namespace must be defined", nss.has_value());
 
+    // TODO SERVER-73152 incorporate aggregation request into same path so that nullptr check is
+    // unnecessary
+    if (requestShapifier != nullptr) {
         auto serializationOpts = applyHmacToIdentifiers
             ? SerializationOptions(
                   [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); },
                   LiteralSerializationPolicy::kToDebugTypeString)
             : SerializationOptions(false);
 
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                        *findCommand,
-                                                        nullptr /* collator doesn't matter here.*/,
-                                                        false /* mayDbProfile */);
-        expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
-        expCtx->stopExpressionCounters();
-
-        // TODO SERVER-76557 call makeTelemetryKey thru FindRequestShapifier kept in telemetry store
-        auto key = makeTelemetryKey(*findCommand, serializationOpts, expCtx, *this);
-        // TODO: SERVER-75512 as part of this ticket, no form of the key (hmac applied or not) will
-        // be cached with TelemetryMetrics.
-        if (applyHmacToIdentifiers) {
-            _hmacAppliedKey = key;
-            return *_hmacAppliedKey;
-        }
-        return key;
+        return requestShapifier->makeTelemetryKey(serializationOpts, opCtx);
     }
 
+    // TODO SERVER-73152 remove all special aggregation logic below
     // The telemetry key for agg queries is of the following form:
     // { "agg": {...}, "namespace": "...", "applicationName": "...", ... }
     //
@@ -521,7 +472,7 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
 }
 
-void registerRequest(const RequestShapifier& requestShapifier,
+void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
                      const NamespaceString& collection,
                      OperationContext* opCtx,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -542,7 +493,8 @@ void registerRequest(const RequestShapifier& requestShapifier,
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
     CurOp::get(opCtx)->debug().telemetryStoreKey =
-        requestShapifier.makeTelemetryKey(options, expCtx);
+        requestShapifier->makeTelemetryKey(options, expCtx);
+    CurOp::get(opCtx)->debug().telemetryRequestShapifier = std::move(requestShapifier);
 }
 
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
@@ -555,7 +507,7 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
 
 void writeTelemetry(OperationContext* opCtx,
                     boost::optional<BSONObj> telemetryKey,
-                    const BSONObj& cmdObj,
+                    std::unique_ptr<RequestShapifier> requestShapifier,
                     const uint64_t queryExecMicros,
                     const uint64_t docsReturned) {
     if (!telemetryKey) {
@@ -563,14 +515,14 @@ void writeTelemetry(OperationContext* opCtx,
     }
     auto&& telemetryStore = getTelemetryStore(opCtx);
     auto&& [statusWithMetrics, partitionLock] = telemetryStore.getWithPartitionLock(*telemetryKey);
-    std::shared_ptr<TelemetryMetrics> metrics;
+    std::shared_ptr<TelemetryEntry> metrics;
     if (statusWithMetrics.isOK()) {
         metrics = *statusWithMetrics.getValue();
     } else {
         size_t numEvicted =
             telemetryStore.put(*telemetryKey,
-                               std::make_shared<TelemetryMetrics>(
-                                   cmdObj, getApplicationName(opCtx), CurOp::get(opCtx)->getNSS()),
+                               std::make_shared<TelemetryEntry>(std::move(requestShapifier),
+                                                                CurOp::get(opCtx)->getNSS()),
                                partitionLock);
         telemetryEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*telemetryKey);

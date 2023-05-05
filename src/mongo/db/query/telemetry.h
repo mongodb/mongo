@@ -97,26 +97,21 @@ struct AggregatedMetric {
 
 extern CounterMetric telemetryStoreSizeEstimateBytesMetric;
 // Used to aggregate the metrics for one telemetry key over all its executions.
-class TelemetryMetrics {
+class TelemetryEntry {
 public:
-    TelemetryMetrics(const BSONObj& cmdObj,
-                     boost::optional<std::string> applicationName,
-                     NamespaceStringOrUUID nss)
+    TelemetryEntry(std::unique_ptr<RequestShapifier> requestShapifier, NamespaceStringOrUUID nss)
         : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0),
-          cmdObj(cmdObj.copy()),
-          applicationName(applicationName),
+          requestShapifier(std::move(requestShapifier)),
           nss(nss) {
-        telemetryStoreSizeEstimateBytesMetric.increment(sizeof(TelemetryMetrics) + sizeof(BSONObj) +
-                                                        cmdObj.objsize());
+        telemetryStoreSizeEstimateBytesMetric.increment(sizeof(TelemetryEntry) + sizeof(BSONObj));
     }
 
-    ~TelemetryMetrics() {
-        telemetryStoreSizeEstimateBytesMetric.decrement(sizeof(TelemetryMetrics) + sizeof(BSONObj) +
-                                                        cmdObj.objsize());
+    ~TelemetryEntry() {
+        telemetryStoreSizeEstimateBytesMetric.decrement(sizeof(TelemetryEntry) + sizeof(BSONObj));
     }
 
     BSONObj toBSON() const {
-        BSONObjBuilder builder{sizeof(TelemetryMetrics) + 100};
+        BSONObjBuilder builder{sizeof(TelemetryEntry) + 100};
         builder.append("lastExecutionMicros", (BSONNumeric)lastExecutionMicros);
         builder.append("execCount", (BSONNumeric)execCount);
         queryExecMicros.appendTo(builder, "queryExecMicros");
@@ -128,10 +123,10 @@ public:
     /**
      * Redact a given telemetry key and set _keySize.
      */
-    BSONObj applyHmacToKey(const BSONObj& key,
-                           bool applyHmacToIdentifiers,
-                           std::string hmacKey,
-                           OperationContext* opCtx) const;
+    BSONObj makeTelemetryKey(const BSONObj& key,
+                             bool applyHmacToIdentifiers,
+                             std::string hmacKey,
+                             OperationContext* opCtx) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -152,17 +147,7 @@ public:
 
     AggregatedMetric docsReturned;
 
-    /**
-     * A representative command for a given telemetry key. This is used to derive the hmac applied
-     * telemetry key at read-time.
-     */
-    BSONObj cmdObj;
-
-    /**
-     * The application name that is a part of the query shape. It is necessary to store this
-     * separately from the telemetry key since it exists on the OpCtx, not the cmdObj.
-     */
-    boost::optional<std::string> applicationName;
+    std::unique_ptr<RequestShapifier> requestShapifier;
 
     NamespaceStringOrUUID nss;
 
@@ -181,16 +166,16 @@ struct TelemetryPartitioner {
 };
 
 struct TelemetryStoreEntryBudgetor {
-    size_t operator()(const BSONObj& key, const std::shared_ptr<TelemetryMetrics>& value) {
+    size_t operator()(const BSONObj& key, const std::shared_ptr<TelemetryEntry>& value) {
         // The buget estimator for <key,value> pair in LRU cache accounts for size of value
-        // (TelemetryMetrics) size of the key, and size of the key's underlying data struture
+        // (TelemetryEntry) size of the key, and size of the key's underlying data struture
         // (BSONObj).
-        return sizeof(TelemetryMetrics) + sizeof(BSONObj) + key.objsize();
+        return sizeof(TelemetryEntry) + sizeof(BSONObj) + key.objsize();
     }
 };
 
 using TelemetryStore = PartitionedCache<BSONObj,
-                                        std::shared_ptr<TelemetryMetrics>,
+                                        std::shared_ptr<TelemetryEntry>,
                                         TelemetryStoreEntryBudgetor,
                                         TelemetryPartitioner,
                                         SimpleBSONObjComparator::Hasher,
@@ -211,10 +196,10 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx);
  *
  * Note that calling this affects internal state. It should be called once for each request for
  * which telemetry may be collected.
- * TODO SERVER-76557 remove request-specific registers, leave only registerRequest
+ * TODO SERVER-73152 remove request-specific registers, leave only registerRequest
  */
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx);
-void registerRequest(const RequestShapifier&,
+void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
                      const NamespaceString& collection,
                      OperationContext* opCtx,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -224,7 +209,7 @@ void registerRequest(const RequestShapifier&,
  */
 void writeTelemetry(OperationContext* opCtx,
                     boost::optional<BSONObj> telemetryKey,
-                    const BSONObj& cmdObj,
+                    std::unique_ptr<RequestShapifier> requestShapifier,
                     uint64_t queryExecMicros,
                     uint64_t docsReturned);
 
@@ -235,6 +220,6 @@ void writeTelemetry(OperationContext* opCtx,
 BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
                          const SerializationOptions& opts,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         boost::optional<const TelemetryMetrics&> existingMetrics = boost::none);
+                         boost::optional<const TelemetryEntry&> existingMetrics = boost::none);
 }  // namespace telemetry
 }  // namespace mongo

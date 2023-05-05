@@ -610,7 +610,8 @@ private:
  * Currently, telemetry is only collected for find and aggregate requests (and their subsequent
  * getMore requests), so these should only be called from those request paths.
  */
-void collectTelemetryMongos(OperationContext* opCtx, const BSONObj& originatingCommand);
+void collectTelemetryMongos(OperationContext* opCtx,
+                            std::unique_ptr<telemetry::RequestShapifier> requestShapifier);
 void collectTelemetryMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor);
 void collectTelemetryMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor);
 

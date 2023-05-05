@@ -444,7 +444,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         if (shardIds.size() > 0) {
             updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
         }
-        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand());
+        collectTelemetryMongos(opCtx, ccc->getRequestShapifier());
         return CursorId(0);
     }
 

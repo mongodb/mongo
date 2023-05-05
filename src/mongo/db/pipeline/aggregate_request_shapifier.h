@@ -50,6 +50,8 @@ public:
 
     virtual ~AggregateRequestShapifier() = default;
 
+    BSONObj makeTelemetryKey(const SerializationOptions& opts, OperationContext* opCtx) const final;
+
     BSONObj makeTelemetryKey(const SerializationOptions& opts,
                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 

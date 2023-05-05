@@ -125,6 +125,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _telemetryStoreKey(CurOp::get(operationUsingCursor)->debug().telemetryStoreKey),
+      _telemetryRequestShapifier(
+          std::move(CurOp::get(operationUsingCursor)->debug().telemetryRequestShapifier)),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->debug().shouldOmitDiagnosticInformation),
       _opKey(operationUsingCursor->getOperationKey()) {
@@ -161,7 +163,7 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     if (_telemetryStoreKey && opCtx) {
         telemetry::writeTelemetry(opCtx,
                                   _telemetryStoreKey,
-                                  getOriginatingCommandObj(),
+                                  std::move(_telemetryRequestShapifier),
                                   _metrics.executionTime.value_or(Microseconds{0}).count(),
                                   _metrics.nreturned.value_or(0));
     }
@@ -397,14 +399,15 @@ void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& pinnedCurs
     pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
-void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand) {
+void collectTelemetryMongod(OperationContext* opCtx,
+                            std::unique_ptr<telemetry::RequestShapifier> requestShapifier) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
     auto& opDebug = CurOp::get(opCtx)->debug();
     telemetry::writeTelemetry(
         opCtx,
         opDebug.telemetryStoreKey,
-        originatingCommand,
+        std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
         opDebug.additiveMetrics.nreturned.value_or(0));
 }

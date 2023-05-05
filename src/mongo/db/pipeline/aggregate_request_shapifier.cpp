@@ -33,11 +33,22 @@
 
 namespace mongo::telemetry {
 
+BSONObj AggregateRequestShapifier::makeTelemetryKey(const SerializationOptions& opts,
+                                                    OperationContext* opCtx) const {
+    // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
+    // to mongot.
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, _request.getNamespace());
+    expCtx->variables.setDefaultRuntimeConstants(opCtx);
+    expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
+    expCtx->stopExpressionCounters();
+    return makeTelemetryKey(opts, expCtx);
+}
+
 BSONObj AggregateRequestShapifier::makeTelemetryKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     BSONObjBuilder bob;
 
-    // TODO SERVER-76557 move actually pipeline serialization into query_shape
+    // TODO SERVER-73152 move pipeline serialization into query_shape::extractQueryShape
     auto serializedPipeline = _pipeline.serializeToBson(opts);
     bob.append("queryShape",
                query_shape::extractQueryShape(_request, serializedPipeline, opts, expCtx));

@@ -563,11 +563,11 @@ public:
             if (collection) {
                 // Collect telemetry. Exclude queries against collections with encrypted fields.
                 if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
-                    telemetry::registerRequest(
-                        telemetry::FindRequestShapifier(cq->getFindCommandRequest(), opCtx),
-                        collection.get()->ns(),
-                        opCtx,
-                        cq->getExpCtx());
+                    telemetry::registerRequest(std::make_unique<telemetry::FindRequestShapifier>(
+                                                   cq->getFindCommandRequest(), opCtx),
+                                               collection.get()->ns(),
+                                               opCtx,
+                                               cq->getExpCtx());
                 }
             }
 

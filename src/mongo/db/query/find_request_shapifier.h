@@ -39,17 +39,22 @@ namespace mongo::telemetry {
  */
 class FindRequestShapifier final : public RequestShapifier {
 public:
-    FindRequestShapifier(const FindCommandRequest& request,
-                         OperationContext* opCtx,
-                         const boost::optional<std::string> applicationName = boost::none)
-        : RequestShapifier(opCtx, applicationName), _request(request) {}
+    FindRequestShapifier(
+        FindCommandRequest request,  // We pass FindCommandRequest by value in order to make a copy
+                                     // since this instance may outlive the original request once
+                                     // the RequestShapifier is moved to the telemetry store.
+        OperationContext* opCtx,
+        const boost::optional<std::string> applicationName = boost::none)
+        : RequestShapifier(opCtx, applicationName), _request(std::move(request)) {}
 
     virtual ~FindRequestShapifier() = default;
+
+    BSONObj makeTelemetryKey(const SerializationOptions& opts, OperationContext* opCtx) const final;
 
     BSONObj makeTelemetryKey(const SerializationOptions& opts,
                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 
 private:
-    const FindCommandRequest& _request;
+    FindCommandRequest _request;
 };
 }  // namespace mongo::telemetry

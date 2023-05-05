@@ -40,6 +40,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
+#include "mongo/db/query/request_shapifier.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/write_concern_options.h"
@@ -294,6 +295,9 @@ public:
     // The shape of the original query serialized with readConcern, application name, and namespace.
     // If boost::none, telemetry should not be collected for this operation.
     boost::optional<BSONObj> telemetryStoreKey;
+    // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
+    // store key.
+    std::unique_ptr<telemetry::RequestShapifier> telemetryRequestShapifier;
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};

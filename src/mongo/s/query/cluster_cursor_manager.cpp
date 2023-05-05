@@ -591,14 +591,15 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     return std::move(cursor);
 }
 
-void collectTelemetryMongos(OperationContext* opCtx, const BSONObj& originatingCommand) {
+void collectTelemetryMongos(OperationContext* opCtx,
+                            std::unique_ptr<telemetry::RequestShapifier> requestShapifier) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
     auto&& opDebug = CurOp::get(opCtx)->debug();
     telemetry::writeTelemetry(
         opCtx,
         opDebug.telemetryStoreKey,
-        originatingCommand,
+        std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
         opDebug.additiveMetrics.nreturned.value_or(0));
 }

@@ -225,11 +225,11 @@ public:
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
             if (!_didDoFLERewrite) {
-                telemetry::registerRequest(
-                    telemetry::FindRequestShapifier(cq->getFindCommandRequest(), opCtx),
-                    cq->nss(),
-                    opCtx,
-                    cq->getExpCtx());
+                telemetry::registerRequest(std::make_unique<telemetry::FindRequestShapifier>(
+                                               cq->getFindCommandRequest(), opCtx),
+                                           cq->nss(),
+                                           opCtx,
+                                           cq->getExpCtx());
             }
 
             try {

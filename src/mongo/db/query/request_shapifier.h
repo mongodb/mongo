@@ -44,6 +44,16 @@ namespace mongo::telemetry {
 class RequestShapifier {
 public:
     virtual ~RequestShapifier() = default;
+
+    /**
+     * makeTelemetryKey generates the telemetry key representative of the specific request's
+     * payload. If there exists an ExpressionContext set up to parse and evaluate the request,
+     * makeTelemetryKey should be called with that ExpressionContext. If not, you can call the
+     * overload that accepts the OperationContext and will construct a minimally-acceptable
+     * ExpressionContext for the sake of generating the key.
+     */
+    virtual BSONObj makeTelemetryKey(const SerializationOptions& opts,
+                                     OperationContext* opCtx) const = 0;
     virtual BSONObj makeTelemetryKey(
         const SerializationOptions& opts,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;

@@ -75,7 +75,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation),
-      _telemetryStoreKey(CurOp::get(opCtx)->debug().telemetryStoreKey) {
+      _telemetryStoreKey(CurOp::get(opCtx)->debug().telemetryStoreKey),
+      _telemetryRequestShapifier(std::move(CurOp::get(opCtx)->debug().telemetryRequestShapifier)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -138,7 +139,7 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     if (_telemetryStoreKey && opCtx) {
         telemetry::writeTelemetry(opCtx,
                                   _telemetryStoreKey,
-                                  getOriginatingCommand(),
+                                  std::move(_telemetryRequestShapifier),
                                   _metrics.executionTime.value_or(Microseconds{0}).count(),
                                   _metrics.nreturned.value_or(0));
     }
@@ -280,6 +281,10 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
 
 bool ClusterClientCursorImpl::shouldOmitDiagnosticInformation() const {
     return _shouldOmitDiagnosticInformation;
+}
+
+std::unique_ptr<telemetry::RequestShapifier> ClusterClientCursorImpl::getRequestShapifier() {
+    return std::move(_telemetryRequestShapifier);
 }
 
 }  // namespace mongo

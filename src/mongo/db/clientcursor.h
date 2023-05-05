@@ -453,6 +453,9 @@ private:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like telemetry.
     OpDebug::AdditiveMetrics _metrics;
+    // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
+    // store key.
+    std::unique_ptr<telemetry::RequestShapifier> _telemetryRequestShapifier;
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};
@@ -595,6 +598,6 @@ void startClientCursorMonitor();
  * getMore requests), so these should only be called from those request paths.
  */
 void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor);
-void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand);
-
+void collectTelemetryMongod(OperationContext* opCtx,
+                            std::unique_ptr<telemetry::RequestShapifier> requestShapifier);
 }  // namespace mongo

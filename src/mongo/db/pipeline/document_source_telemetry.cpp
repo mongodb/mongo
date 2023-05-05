@@ -190,8 +190,8 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
             try {
-                auto hmacKey =
-                    metrics->applyHmacToKey(key, _applyHmacToIdentifiers, _hmacKey, pExpCtx->opCtx);
+                auto hmacKey = metrics->makeTelemetryKey(
+                    key, _applyHmacToIdentifiers, _hmacKey, pExpCtx->opCtx);
                 _materializedPartition.push_back({{"key", std::move(hmacKey)},
                                                   {"metrics", metrics->toBSON()},
                                                   {"asOf", partitionReadTime}});

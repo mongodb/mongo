@@ -127,7 +127,7 @@ void endQueryOp(OperationContext* opCtx,
     if (cursor) {
         collectTelemetryMongod(opCtx, *cursor);
     } else {
-        collectTelemetryMongod(opCtx, cmdObj);
+        collectTelemetryMongod(opCtx, std::move(curOp->debug().telemetryRequestShapifier));
     }
 
     if (collection) {

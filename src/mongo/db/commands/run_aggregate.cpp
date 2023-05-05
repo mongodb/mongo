@@ -1226,7 +1226,7 @@ Status runAggregate(OperationContext* opCtx,
         if (keepCursor) {
             collectTelemetryMongod(opCtx, pins[0]);
         } else {
-            collectTelemetryMongod(opCtx, cmdObj);
+            collectTelemetryMongod(opCtx, std::move(curOp->debug().telemetryRequestShapifier));
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
