@@ -5108,7 +5108,7 @@ tasks:
 
 - <<: *gen_task_template
   name: config_fuzzer_concurrency_sharded_replication_gen
-  tags: ["config_fuzzer", "large"]
+  tags: ["config_fuzzer", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:

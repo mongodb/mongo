@@ -571,7 +571,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .config_fuzzer !.large !.linux_only
-  - name: .config_fuzzer .large !.linux_only
+  - name: .config_fuzzer .large !.linux_only !.sharded
     distros:
     - windows-vsCurrent-large
   - name: disk_wiredtiger
