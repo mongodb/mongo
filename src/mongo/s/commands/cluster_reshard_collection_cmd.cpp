@@ -71,6 +71,15 @@ public:
             reshardCollectionRequest.setNumInitialChunks(request().getNumInitialChunks());
             reshardCollectionRequest.setCollectionUUID(request().getCollectionUUID());
 
+            if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, reject shardDistribution parameter",
+                    !request().getShardDistribution().has_value());
+            }
+            reshardCollectionRequest.setShardDistribution(request().getShardDistribution());
+
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));
 
