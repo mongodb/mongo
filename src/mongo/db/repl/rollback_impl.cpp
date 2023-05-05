@@ -1356,7 +1356,15 @@ Status RollbackImpl::_triggerOpObserver(OperationContext* opCtx) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
     LOGV2(21610, "Triggering the rollback op observer");
-    opCtx->getServiceContext()->getOpObserver()->onReplicationRollback(opCtx, _observerInfo);
+
+    // Any exceptions thrown from onReplicationRollback() indicates a rollback failure that may
+    // have led us to some inconsistent on-disk or memory state, so we crash instead.
+    try {
+        opCtx->getServiceContext()->getOpObserver()->onReplicationRollback(opCtx, _observerInfo);
+    } catch (const DBException& ex) {
+        fassert(6050902, ex.toStatus());
+    }
+
     return Status::OK();
 }
 

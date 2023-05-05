@@ -584,18 +584,9 @@ public:
      *
      * This method is only applicable to the "rollback to a stable timestamp" algorithm, and is not
      * called when using any other rollback algorithm i.e "rollback via refetch".
-     *
-     * This function will call the private virtual '_onReplicationRollback' method. Any exceptions
-     * thrown indicates rollback failure that may have led us to some inconsistent on-disk or memory
-     * state, so we crash instead.
      */
-    void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) noexcept {
-        try {
-            _onReplicationRollback(opCtx, rbInfo);
-        } catch (const DBException& ex) {
-            fassert(6050902, ex.toStatus());
-        }
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) {
+        _onReplicationRollback(opCtx, rbInfo);
     };
 
     /**
