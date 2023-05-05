@@ -3716,15 +3716,6 @@ def doConfigure(myenv):
         # only) flag that turns it on.
         myenv.AddToCXXFLAGSIfSupported("-Wunused-exception-parameter")
 
-        # TODO(SERVER-60151): Avoid the dilemma identified in
-        # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100493. Unfortunately,
-        # we don't have a more targeted warning suppression we can use
-        # other than disabling all deprecation warnings. We will
-        # revisit this once we are fully on C++20 and can commit the
-        # C++20 style code.
-        if get_option('cxx-std') == "20":
-            myenv.AddToCXXFLAGSIfSupported('-Wno-deprecated')
-
         # TODO SERVER-58675 - Remove this suppression after abseil is upgraded
         myenv.AddToCXXFLAGSIfSupported("-Wno-deprecated-builtins")
 

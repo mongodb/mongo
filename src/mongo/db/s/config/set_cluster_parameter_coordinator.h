@@ -79,7 +79,7 @@ private:
 
     template <typename Func>
     auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn) {
-        return [=] {
+        return [=, this] {
             const auto& currPhase = _doc.getPhase();
 
             if (currPhase > newPhase) {

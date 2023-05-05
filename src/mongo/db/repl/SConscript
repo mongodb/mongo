@@ -2031,8 +2031,13 @@ env.Library(
         'hello_command',
     ],
 )
-
-env.Library(
+wait_for_majority_service_env = env.Clone()
+# TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+wait_for_majority_service_env.Append(
+    CXXFLAGS=[] if wait_for_majority_service_env.TargetOSIs('windows') else [
+        '-Wno-deprecated',
+    ], )
+wait_for_majority_service_env.Library(
     target='wait_for_majority_service',
     source=[
         'wait_for_majority_service.cpp',

@@ -84,7 +84,7 @@ Status MultiApplier::startup() noexcept {
     }
 
     auto scheduleResult = _executor->scheduleWork(
-        [=](const executor::TaskExecutor::CallbackArgs& cbd) { return _callback(cbd); });
+        [=, this](const executor::TaskExecutor::CallbackArgs& cbd) { return _callback(cbd); });
     if (!scheduleResult.isOK()) {
         _state = State::kComplete;
         return scheduleResult.getStatus();
