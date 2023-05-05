@@ -77,6 +77,7 @@ enums:
            createDatabase :  "createDatabase"  # ID only
            createIndex :  "createIndex"     # ID only
            createRole :  "createRole"
+           createSearchIndexes : "createSearchIndexes"
            createUser :  "createUser"
            dbCheck :  "dbCheck"
            dbHash :  "dbHash"
@@ -87,6 +88,7 @@ enums:
            dropConnections :  "dropConnections"
            dropDatabase :  "dropDatabase"
            dropIndex :  "dropIndex"
+           dropSearchIndex : "dropSearchIndex"
            dropRole :  "dropRole"
            dropUser :  "dropUser"
            emptycapped :  "emptycapped"
@@ -126,6 +128,7 @@ enums:
            listCursors :  "listCursors"
            listDatabases :  "listDatabases"
            listIndexes :  "listIndexes"
+           listSearchIndexes :  "listSearchIndexes"
            listSessions :  "listSessions"
            listShards :  "listShards"
            logRotate :  "logRotate"
@@ -182,6 +185,7 @@ enums:
            useUUID :  "useUUID"
            update :  "update"
            updateRole :  "updateRole"  # ID only
+           updateSearchIndex : "updateSearchIndex"
            updateUser :  "updateUser"  # ID only
            validate :  "validate"
            viewRole :  "viewRole"
@@ -229,11 +233,13 @@ enums:
                         - convertToCapped
                         - createCollection
                         - createIndex
+                        - createSearchIndexes
                         - dbCheck
                         - dbHash
                         - dbStats
                         - dropCollection
                         - dropIndex
+                        - dropSearchIndex
                         - exportCollection
                         - find
                         - importCollection
@@ -242,12 +248,14 @@ enums:
                         - killCursors
                         - listCollections
                         - listIndexes
+                        - listSearchIndexes
                         - planCacheRead
                         - reIndex
                         - remove
                         - renameCollection
                         - renameCollectionSameDB
                         - update
+                        - updateSearchIndex
                         - validate
 
             # resource: { db: 'exact', collection: '' }
@@ -267,11 +275,13 @@ enums:
                         - convertToCapped
                         - createCollection
                         - createIndex
+                        - createSearchIndexes
                         - dbCheck
                         - dbHash
                         - dbStats
                         - dropCollection
                         - dropIndex
+                        - dropSearchIndex
                         - exportCollection
                         - find
                         - importCollection
@@ -280,12 +290,14 @@ enums:
                         - killCursors
                         - listCollections
                         - listIndexes
+                        - listSearchIndexes
                         - planCacheRead
                         - reIndex
                         - remove
                         - renameCollection
                         - renameCollectionSameDB
                         - update
+                        - updateSearchIndex
                         - validate
 
                         # Actions specific to the database match types.

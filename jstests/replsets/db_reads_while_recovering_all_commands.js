@@ -160,6 +160,7 @@ const allCommands = {
     create: {skip: isPrimaryOnly},
     createIndexes: {skip: isPrimaryOnly},
     createRole: {skip: isPrimaryOnly},
+    createSearchIndexes: {skip: isNotAUserDataRead},
     createUser: {skip: isPrimaryOnly},
     currentOp: {skip: isNotAUserDataRead},
     dataSize: {
@@ -197,6 +198,7 @@ const allCommands = {
     dropDatabase: {skip: isPrimaryOnly},
     dropIndexes: {skip: isPrimaryOnly},
     dropRole: {skip: isPrimaryOnly},
+    dropSearchIndex: {skip: isNotAUserDataRead},
     dropUser: {skip: isPrimaryOnly},
     echo: {skip: isNotAUserDataRead},
     emptycapped: {skip: isPrimaryOnly},
@@ -271,6 +273,7 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary
     },
+    listSearchIndexes: {skip: isNotAUserDataRead},
     lockInfo: {skip: isPrimaryOnly},
     logApplicationMessage: {skip: isNotAUserDataRead},
     logMessage: {skip: isNotAUserDataRead},
@@ -363,6 +366,7 @@ const allCommands = {
     top: {skip: isNotAUserDataRead},
     update: {skip: isPrimaryOnly},
     updateRole: {skip: isPrimaryOnly},
+    updateSearchIndex: {skip: isNotAUserDataRead},
     updateUser: {skip: isPrimaryOnly},
     usersInfo: {skip: isPrimaryOnly},
     validate: {skip: isNotAUserDataRead},

@@ -281,6 +281,7 @@ let viewsCommandTests = {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
         }
     },
+    createSearchIndexes: {skip: isUnrelated},
     createUser: {
         command: {createUser: "testuser", pwd: "testpass", roles: []},
         setup: function(conn) {
@@ -346,6 +347,7 @@ let viewsCommandTests = {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
         }
     },
+    dropSearchIndex: {skip: isUnrelated},
     dropUser: {skip: isUnrelated},
     echo: {skip: isUnrelated},
     emptycapped: {
@@ -475,6 +477,7 @@ let viewsCommandTests = {
     listCommands: {skip: isUnrelated},
     listDatabases: {skip: isUnrelated},
     listIndexes: {command: {listIndexes: "view"}, expectFailure: true},
+    listSearchIndexes: {skip: isUnrelated},
     listShards: {skip: isUnrelated},
     lockInfo: {skip: isUnrelated},
     logApplicationMessage: {skip: isUnrelated},
@@ -687,6 +690,7 @@ let viewsCommandTests = {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
         }
     },
+    updateSearchIndex: {skip: isUnrelated},
     updateUser: {skip: isUnrelated},
     updateZoneKeyRange: {skip: isUnrelated},
     usersInfo: {skip: isUnrelated},

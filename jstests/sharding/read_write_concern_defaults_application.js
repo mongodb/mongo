@@ -340,6 +340,7 @@ let testCases = {
         shardedTargetsConfigServer: true,
         useLogs: true,
     },
+    createSearchIndexes: {skip: "does not accept read or write concern"},
     createUser: {
         command: {createUser: "foo", pwd: "bar", roles: []},
         checkReadConcern: false,
@@ -440,6 +441,7 @@ let testCases = {
         shardedTargetsConfigServer: true,
         useLogs: true,
     },
+    dropSearchIndex: {skip: "does not accept read or write concern"},
     dropUser: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand(
@@ -562,6 +564,7 @@ let testCases = {
     listCommands: {skip: "does not accept read or write concern"},
     listDatabases: {skip: "does not accept read or write concern"},
     listIndexes: {skip: "does not accept read or write concern"},
+    listSearchIndexes: {skip: "does not accept read or write concern"},
     listShards: {skip: "does not accept read or write concern"},
     lockInfo: {skip: "does not accept read or write concern"},
     logApplicationMessage: {skip: "does not accept read or write concern"},
@@ -744,6 +747,7 @@ let testCases = {
         shardedTargetsConfigServer: true,
         useLogs: true,
     },
+    updateSearchIndex: {skip: "does not accept read or write concern"},
     updateUser: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand(

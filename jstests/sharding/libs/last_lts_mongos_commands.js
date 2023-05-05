@@ -18,7 +18,10 @@ const commandsAddedToMongosSinceLastLTS = [
     "commitReshardCollection",
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",
+    "createSearchIndexes",
+    "dropSearchIndex",
     "getClusterParameter",
+    "listSearchIndexes",
     "moveRange",
     "reshardCollection",
     "rotateCertificates",
@@ -32,4 +35,5 @@ const commandsAddedToMongosSinceLastLTS = [
     "testRemoval",
     "testVersions1And2",
     "testVersion2",
+    "updateSearchIndex",
 ];

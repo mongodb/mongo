@@ -108,6 +108,7 @@ TEST(BuiltinRoles, addPrivilegesForBuiltinRole) {
         ActionType::killCursors,
         ActionType::listCollections,
         ActionType::listIndexes,
+        ActionType::listSearchIndexes,
         ActionType::planCacheRead,
     });
     const auto adminDB = ResourcePattern::forDatabaseName("admin");

@@ -3436,6 +3436,33 @@ var authCommandsLib = {
           }]
         },
         {
+          testname: "createSearchIndexes",
+          command: {
+              createSearchIndexes: "x",
+              indexes: [{'definition': {'mappings': {'dynamic': true}}}],
+          },
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
+          testcases: [{
+              runOnDb: firstDbName,
+              roles: Object.extend({
+                  readWrite: 1,
+                  readWriteAnyDatabase: 1,
+                  dbAdmin: 1,
+                  dbAdminAnyDatabase: 1,
+                  dbOwner: 1,
+                  restore: 1,
+                  root: 1,
+                  __system: 1
+              }),
+              privileges:
+                  [{resource: {db: firstDbName, collection: "x"}, actions: ["createSearchIndexes"]}],
+              expectFail: true,
+          }]
+        },
+        {
           testname: "currentOp_$ownOps_false",
           command: {currentOp: 1, $all: true, $ownOps: false},
           testcases: [
@@ -3779,6 +3806,33 @@ var authCommandsLib = {
                 privileges:
                     [{resource: {db: secondDbName, collection: "x"}, actions: ["dropIndex"]}]
               }
+          ]
+        },
+        {
+          testname: "dropSearchIndex",
+          command: {
+              dropSearchIndex: "x",
+              name: 'indexName',
+          },
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
+          testcases: [
+            {
+              runOnDb: firstDbName,
+              roles: roles_writeDbAdmin,
+              privileges:
+                  [{resource: {db: firstDbName, collection: "x"}, actions: ["dropSearchIndex"]}],
+              expectFail: true,
+            },
+            {
+              runOnDb: secondDbName,
+              roles: roles_writeDbAdminAny,
+              privileges:
+                  [{resource: {db: secondDbName, collection: "x"}, actions: ["dropSearchIndex"]}],
+              expectFail: true,
+            }
           ]
         },
         {
@@ -4876,7 +4930,32 @@ var authCommandsLib = {
               ]
           }]
         },
-
+        {
+          testname: "listSearchIndexes",
+          command: {listSearchIndexes: "x"},
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
+          testcases: [{
+              runOnDb: firstDbName,
+              roles: {
+                  read: 1,
+                  readAnyDatabase: 1,
+                  readWrite: 1,
+                  readWriteAnyDatabase: 1,
+                  dbAdmin: 1,
+                  dbAdminAnyDatabase: 1,
+                  dbOwner: 1,
+                  backup: 1,
+                  root: 1,
+                  __system: 1,
+              },
+              privileges:
+                  [{resource: {db: firstDbName, collection: ""}, actions: ["listSearchIndexes"]}],
+              expectFail: true,
+          }]
+        },
         {
           testname: "listShards",
           command: {listShards: 1},
@@ -5982,6 +6061,34 @@ var authCommandsLib = {
               }
 
           ],
+        },
+        {
+          testname: "updateSearchIndex",
+          command: {
+              updateSearchIndex: "foo",
+              id: 'index-ID-number',
+              definition: {"textBlob": "blob"},
+          },
+          // Only enterprise knows of this command.
+          skipTest: (conn) => {
+              return !getBuildInfo().modules.includes("enterprise");
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["updateSearchIndex"]}],
+                expectFail: true,
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges:
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["updateSearchIndex"]}],
+                expectFail: true,
+              }
+          ]
         },
         {
           testname: "updateUser_authenticationRestrictions",
