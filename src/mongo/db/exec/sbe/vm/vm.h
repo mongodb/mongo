@@ -767,6 +767,12 @@ enum class Builtin : uint8_t {
     aggBottomN,
     aggBottomNMerge,
     aggBottomNFinalize,
+    aggMaxN,
+    aggMaxNMerge,
+    aggMaxNFinalize,
+    aggMinN,
+    aggMinNMerge,
+    aggMinNFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -840,6 +846,26 @@ struct PairKeyComp {
 
 private:
     const Comp _comp;
+};
+
+template <bool less>
+struct ValueCompare {
+    ValueCompare(const CollatorInterface* collator) : _collator(collator) {}
+
+    bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
+                    const std::pair<value::TypeTags, value::Value>& rhs) const {
+        auto [tag, val] =
+            value::compareValue(lhs.first, lhs.second, rhs.first, rhs.second, _collator);
+        uassert(7548805, "Invalid comparison result", tag == value::TypeTags::NumberInt32);
+        if constexpr (less) {
+            return value::bitcastTo<int>(val) < 0;
+        } else {
+            return value::bitcastTo<int>(val) > 0;
+        }
+    }
+
+private:
+    const CollatorInterface* _collator;
 };
 
 /**
@@ -1670,6 +1696,12 @@ private:
     template <typename Less>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNFinalize(ArityType arity);
+    template <bool less>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxN(ArityType arity);
+    template <bool less>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNMerge(ArityType arity);
+    template <bool less>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

@@ -800,6 +800,16 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggBottomNMerge, true}},
     {"aggBottomNFinalize",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggBottomNFinalize, false}},
+    {"aggMaxN", BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMaxN, true}},
+    {"aggMaxNMerge",
+     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMaxNMerge, true}},
+    {"aggMaxNFinalize",
+     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMaxNFinalize, false}},
+    {"aggMinN", BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMinN, true}},
+    {"aggMinNMerge",
+     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMinNMerge, true}},
+    {"aggMinNFinalize",
+     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMinNFinalize, false}},
 };
 
 /**

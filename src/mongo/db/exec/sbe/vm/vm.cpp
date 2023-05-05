@@ -6306,7 +6306,11 @@ int32_t aggTopBottomNAdd(value::Array* state,
         auto worst = value::getArrayView(worstVal);
         auto worstKey = worst->getAt(0);
         if (less(key, worstKey)) {
-            memUsage = updateAndCheckMemUsage(state, memUsage, memAdded(key, output), memLimit);
+            memUsage = updateAndCheckMemUsage(state,
+                                              memUsage,
+                                              -memAdded(worst->getAt(0), worst->getAt(1)) +
+                                                  memAdded(key, output),
+                                              memLimit);
 
             std::pop_heap(heap.begin(), heap.end(), keyLess);
             keyGuard.reset();
@@ -6401,6 +6405,136 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNFin
 
     outputArrayGuard.reset();
     return {true, outputArrayTag, outputArrayVal};
+}
+
+template <bool less>
+int32_t aggMinMaxN(value::Array* state,
+                   value::Array* array,
+                   size_t maxSize,
+                   int32_t memUsage,
+                   int32_t memLimit,
+                   const CollatorInterface* collator,
+                   value::TypeTags fieldTag,
+                   value::Value fieldVal) {
+    value::ValueGuard guard{fieldTag, fieldVal};
+    auto& heap = array->values();
+    ValueCompare<less> comp{collator};
+
+    if (array->size() < maxSize) {
+        memUsage = updateAndCheckMemUsage(
+            state, memUsage, value::getApproximateSize(fieldTag, fieldVal), memLimit);
+        guard.reset();
+
+        array->push_back(fieldTag, fieldVal);
+        std::push_heap(heap.begin(), heap.end(), comp);
+    } else {
+        uassert(7548800,
+                "Heap should contain same number of elements as MaxSize",
+                array->size() == maxSize);
+
+        auto heapRoot = heap.front();
+        if (comp({fieldTag, fieldVal}, heapRoot)) {
+            memUsage =
+                updateAndCheckMemUsage(state,
+                                       memUsage,
+                                       -value::getApproximateSize(heapRoot.first, heapRoot.second) +
+                                           value::getApproximateSize(fieldTag, fieldVal),
+                                       memLimit);
+            std::pop_heap(heap.begin(), heap.end(), comp);
+            guard.reset();
+            array->setAt(maxSize - 1, fieldTag, fieldVal);
+            std::push_heap(heap.begin(), heap.end(), comp);
+        }
+    }
+
+    return memUsage;
+}
+
+template <bool less>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxN(ArityType arity) {
+    invariant(arity == 2 || arity == 3);
+
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
+    value::ValueGuard fieldGuard{fieldTag, fieldVal};
+
+    if (value::isNullish(fieldTag)) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
+
+    CollatorInterface* collator = nullptr;
+    if (arity == 3) {
+        auto [collOwned, collTag, collVal] = getFromStack(2);
+        uassert(7548802, "expected a collator argument", collTag == value::TypeTags::collator);
+        collator = value::getCollatorView(collVal);
+    }
+    fieldGuard.reset();
+    aggMinMaxN<less>(state, array, maxSize, memUsage, memLimit, collator, fieldTag, fieldVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+template <bool less>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNMerge(ArityType arity) {
+    invariant(arity == 2 || arity == 3);
+
+    auto [mergeStateTag, mergeStateVal] = moveOwnedFromStack(0);
+    value::ValueGuard mergeStateGuard{mergeStateTag, mergeStateVal};
+
+    auto [stateTag, stateVal] = moveOwnedFromStack(1);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [mergeState, mergeArray, mergeStartIdx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        multiAccState(mergeStateTag, mergeStateVal);
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
+    uassert(7548801,
+            "Two arrays to merge should have the same MaxSize component",
+            maxSize == mergeMaxSize);
+
+    CollatorInterface* collator = nullptr;
+    if (arity == 3) {
+        auto [collOwned, collTag, collVal] = getFromStack(2);
+        uassert(7548803, "expected a collator argument", collTag == value::TypeTags::collator);
+        collator = value::getCollatorView(collVal);
+    }
+
+    for (size_t i = 0; i < array->size(); ++i) {
+        auto [tag, val] = array->swapAt(i, value::TypeTags::Null, 0);
+        mergeMemUsage = aggMinMaxN<less>(
+            mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, collator, tag, val);
+    }
+
+    mergeStateGuard.reset();
+    return {true, mergeStateTag, mergeStateVal};
+}
+
+template <bool less>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNFinalize(
+    ArityType arity) {
+    invariant(arity == 2 || arity == 1);
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
+
+    CollatorInterface* collator = nullptr;
+    if (arity == 2) {
+        auto [collOwned, collTag, collVal] = getFromStack(1);
+        uassert(7548804, "expected a collator argument", collTag == value::TypeTags::collator);
+        collator = value::getCollatorView(collVal);
+    }
+
+    ValueCompare<less> comp{collator};
+    std::sort(array->values().begin(), array->values().end(), comp);
+    auto [arrayTag, arrayVal] =
+        state->swapAt(static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
+    return {true, arrayTag, arrayVal};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
@@ -6693,6 +6827,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggTopBottomNMerge<SortPatternGreater>(arity);
         case Builtin::aggBottomNFinalize:
             return builtinAggTopBottomNFinalize(arity);
+        case Builtin::aggMaxN:
+            return builtinAggMinMaxN<false /* less */>(arity);
+        case Builtin::aggMaxNMerge:
+            return builtinAggMinMaxNMerge<false /* less */>(arity);
+        case Builtin::aggMaxNFinalize:
+            return builtinAggMinMaxNFinalize<false /* less */>(arity);
+        case Builtin::aggMinN:
+            return builtinAggMinMaxN<true /* less */>(arity);
+        case Builtin::aggMinNMerge:
+            return builtinAggMinMaxNMerge<true /* less */>(arity);
+        case Builtin::aggMinNFinalize:
+            return builtinAggMinMaxNFinalize<true /* less */>(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -6989,6 +7135,18 @@ std::string builtinToString(Builtin b) {
             return "aggBottomNMerge";
         case Builtin::aggBottomNFinalize:
             return "aggBottomNFinalize";
+        case Builtin::aggMaxN:
+            return "aggMaxN";
+        case Builtin::aggMaxNMerge:
+            return "aggMaxNMerge";
+        case Builtin::aggMaxNFinalize:
+            return "aggMaxNFinalize";
+        case Builtin::aggMinN:
+            return "aggMinN";
+        case Builtin::aggMinNMerge:
+            return "aggMinNMerge";
+        case Builtin::aggMinNFinalize:
+            return "aggMinNFinalize";
         default:
             MONGO_UNREACHABLE;
     }

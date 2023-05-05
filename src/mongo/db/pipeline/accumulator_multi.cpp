@@ -168,7 +168,8 @@ template <MinMaxSense s>
 AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->sbeGroupCompatibility =
+        std::min(expCtx->sbeGroupCompatibility, SbeCompatibility::flagGuarded);
     auto name = [] {
         if constexpr (s == MinMaxSense::kMin) {
             return AccumulatorMinN::getName();

@@ -86,7 +86,9 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsMin(
 
 std::unique_ptr<sbe::EExpression> buildFinalizeMin(StageBuilderState& state,
                                                    const AccumulationExpression& expr,
-                                                   const sbe::value::SlotVector& minSlots) {
+                                                   const sbe::value::SlotVector& minSlots,
+                                                   boost::optional<sbe::value::SlotId> collatorSlot,
+                                                   sbe::value::FrameIdGenerator& frameIdGenerator) {
     // We can get away with not building a project stage since there's no finalize step but we
     // will stick the slot into an EVariable in case a $min is one of many group clauses and it
     // can be combined into a final project stage.
@@ -127,7 +129,9 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsMax(
 
 std::unique_ptr<sbe::EExpression> buildFinalizeMax(StageBuilderState& state,
                                                    const AccumulationExpression& expr,
-                                                   const sbe::value::SlotVector& maxSlots) {
+                                                   const sbe::value::SlotVector& maxSlots,
+                                                   boost::optional<sbe::value::SlotId> collatorSlot,
+                                                   sbe::value::FrameIdGenerator& frameIdGenerator) {
     tassert(5755100,
             str::stream() << "Expected one input slot for finalization of max, got: "
                           << maxSlots.size(),
@@ -224,7 +228,9 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsAvg(
 
 std::unique_ptr<sbe::EExpression> buildFinalizeAvg(StageBuilderState& state,
                                                    const AccumulationExpression& expr,
-                                                   const sbe::value::SlotVector& aggSlots) {
+                                                   const sbe::value::SlotVector& aggSlots,
+                                                   boost::optional<sbe::value::SlotId> collatorSlot,
+                                                   sbe::value::FrameIdGenerator& frameIdGenerator) {
     // Slot 0 contains the accumulated sum, and slot 1 contains the count of summed items.
     tassert(5754703,
             str::stream() << "Expected two slots to finalize avg, got: " << aggSlots.size(),
@@ -333,7 +339,9 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsSum(
 
 std::unique_ptr<sbe::EExpression> buildFinalizeSum(StageBuilderState& state,
                                                    const AccumulationExpression& expr,
-                                                   const sbe::value::SlotVector& sumSlots) {
+                                                   const sbe::value::SlotVector& sumSlots,
+                                                   boost::optional<sbe::value::SlotId> collatorSlot,
+                                                   sbe::value::FrameIdGenerator& frameIdGenerator) {
     tassert(5755300,
             str::stream() << "Expected one input slot for finalization of sum, got: "
                           << sumSlots.size(),
@@ -411,7 +419,9 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsAddToSet(
 std::unique_ptr<sbe::EExpression> buildFinalizeCappedAccumulator(
     StageBuilderState& state,
     const AccumulationExpression& expr,
-    const sbe::value::SlotVector& accSlots) {
+    const sbe::value::SlotVector& accSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
     tassert(6526500,
             str::stream() << "Expected one input slot for finalization of capped accumulator, got: "
                           << accSlots.size(),
@@ -515,7 +525,9 @@ std::unique_ptr<sbe::EExpression> buildFinalizePartialStdDev(sbe::value::SlotId 
 std::unique_ptr<sbe::EExpression> buildFinalizeStdDevPop(
     StageBuilderState& state,
     const AccumulationExpression& expr,
-    const sbe::value::SlotVector& stdDevSlots) {
+    const sbe::value::SlotVector& stdDevSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
     tassert(5755204,
             str::stream() << "Expected one input slot for finalization of stdDevPop, got: "
                           << stdDevSlots.size(),
@@ -532,7 +544,9 @@ std::unique_ptr<sbe::EExpression> buildFinalizeStdDevPop(
 std::unique_ptr<sbe::EExpression> buildFinalizeStdDevSamp(
     StageBuilderState& state,
     const AccumulationExpression& expr,
-    const sbe::value::SlotVector& stdDevSlots) {
+    const sbe::value::SlotVector& stdDevSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
     tassert(5755209,
             str::stream() << "Expected one input slot for finalization of stdDevSamp, got: "
                           << stdDevSlots.size(),
@@ -656,9 +670,12 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsFirstN(
     return aggs;
 }
 
-std::unique_ptr<sbe::EExpression> buildFinalizeFirstN(StageBuilderState& state,
-                                                      const AccumulationExpression& expr,
-                                                      const sbe::value::SlotVector& inputSlots) {
+std::unique_ptr<sbe::EExpression> buildFinalizeFirstN(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
     uassert(7548609,
             str::stream() << "Expected one input slot for finalization of $firstN, got: "
                           << inputSlots.size(),
@@ -691,9 +708,12 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsLastN(
     return aggs;
 }
 
-std::unique_ptr<sbe::EExpression> buildFinalizeLastN(StageBuilderState& state,
-                                                     const AccumulationExpression& expr,
-                                                     const sbe::value::SlotVector& inputSlots) {
+std::unique_ptr<sbe::EExpression> buildFinalizeLastN(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
     uassert(7548702,
             str::stream() << "Expected one input slot for finalization of $lastN, got: "
                           << inputSlots.size(),
@@ -859,6 +879,61 @@ std::unique_ptr<sbe::EExpression> buildFinalizeTopBottom(
                                        true /* single */);
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorMinMaxN(
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    auto aggExprName = expr.name == AccumulatorMaxN::kName ? "aggMaxN" : "aggMinN";
+    if (collatorSlot) {
+        aggs.push_back(
+            makeFunction(std::move(aggExprName), std::move(arg), makeVariable(*collatorSlot)));
+
+    } else {
+        aggs.push_back(makeFunction(std::move(aggExprName), std::move(arg)));
+    }
+    return aggs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsMinMaxN(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    uassert(7548808,
+            str::stream() << "Expected one input slot for merging, got: " << inputSlots.size(),
+            inputSlots.size() == 1);
+
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    auto aggExprName = expr.name == AccumulatorMaxN::kName ? "aggMaxNMerge" : "aggMinNMerge";
+    if (collatorSlot) {
+        aggs.push_back(makeFunction(
+            std::move(aggExprName), makeVariable(inputSlots[0]), makeVariable(*collatorSlot)));
+    } else {
+        aggs.push_back(makeFunction(std::move(aggExprName), makeVariable(inputSlots[0])));
+    }
+    return aggs;
+}
+
+std::unique_ptr<sbe::EExpression> buildFinalizeMinMaxN(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    uassert(7548809,
+            str::stream() << "Expected one input slot for finalization, got: " << inputSlots.size(),
+            inputSlots.size() == 1);
+    auto aggExprName = expr.name == AccumulatorMaxN::kName ? "aggMaxNFinalize" : "aggMinNFinalize";
+    if (collatorSlot) {
+        return makeFunction(
+            std::move(aggExprName), makeVariable(inputSlots[0]), makeVariable(*collatorSlot));
+    } else {
+        return makeFunction(std::move(aggExprName), makeVariable(inputSlots[0]));
+    }
+}
+
 template <int N>
 std::vector<std::unique_ptr<sbe::EExpression>> emptyInitializer(
     std::unique_ptr<sbe::EExpression> maxSizeExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {
@@ -891,6 +966,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
         {AccumulatorStdDevSamp::kName, &buildAccumulatorStdDev},
         {AccumulatorFirstN::kName, &buildAccumulatorFirstN},
         {AccumulatorLastN::kName, &buildAccumulatorLastN},
+        {AccumulatorMaxN::kName, &buildAccumulatorMinMaxN},
+        {AccumulatorMinN::kName, &buildAccumulatorMinMaxN},
     };
 
     auto accExprName = acc.expr.name;
@@ -961,6 +1038,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
         {AccumulatorSum::kName, &buildCombinePartialAggsSum},
         {AccumulatorFirstN::kName, &buildCombinePartialAggsFirstN},
         {AccumulatorLastN::kName, &buildCombinePartialAggsLastN},
+        {AccumulatorMaxN::kName, &buildCombinePartialAggsMinMaxN},
+        {AccumulatorMinN::kName, &buildCombinePartialAggsMinMaxN},
     };
 
     auto accExprName = acc.expr.name;
@@ -1013,8 +1092,12 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
                                                 const sbe::value::SlotVector& aggSlots,
                                                 boost::optional<sbe::value::SlotId> collatorSlot,
                                                 sbe::value::FrameIdGenerator& frameIdGenerator) {
-    using BuildFinalizeFn = std::function<std::unique_ptr<sbe::EExpression>(
-        StageBuilderState&, const AccumulationExpression&, sbe::value::SlotVector)>;
+    using BuildFinalizeFn =
+        std::function<std::unique_ptr<sbe::EExpression>(StageBuilderState&,
+                                                        const AccumulationExpression&,
+                                                        sbe::value::SlotVector,
+                                                        boost::optional<sbe::value::SlotId>,
+                                                        sbe::value::FrameIdGenerator&)>;
 
     static const StringDataMap<BuildFinalizeFn> kAccumulatorBuilders = {
         {AccumulatorMin::kName, &buildFinalizeMin},
@@ -1030,6 +1113,8 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
         {AccumulatorStdDevSamp::kName, &buildFinalizeStdDevSamp},
         {AccumulatorFirstN::kName, &buildFinalizeFirstN},
         {AccumulatorLastN::kName, &buildFinalizeLastN},
+        {AccumulatorMaxN::kName, &buildFinalizeMinMaxN},
+        {AccumulatorMinN::kName, &buildFinalizeMinMaxN},
     };
 
     auto accExprName = acc.expr.name;
@@ -1038,7 +1123,7 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
             kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
 
     if (auto fn = kAccumulatorBuilders.at(accExprName); fn) {
-        return std::invoke(fn, state, acc.expr, aggSlots);
+        return std::invoke(fn, state, acc.expr, aggSlots, collatorSlot, frameIdGenerator);
     } else {
         // nullptr for 'EExpression' signifies that no final project is necessary.
         return nullptr;
@@ -1110,6 +1195,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
          &buildInitializeAccumulatorMulti},
         {AccumulatorTopBottomN<kBottom, false /* single */>::getName(),
          &buildInitializeAccumulatorMulti},
+        {AccumulatorMaxN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorMinN::kName, &buildInitializeAccumulatorMulti},
     };
 
     auto accExprName = acc.expr.name;

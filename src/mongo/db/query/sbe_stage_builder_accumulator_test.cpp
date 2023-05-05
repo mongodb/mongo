@@ -1676,33 +1676,71 @@ TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorDynamicN) {
                    << BSON("_id" << BSON("k" << 4) << "x" << BSON_ARRAY(88 << 77 << 66 << 55))));
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorInvalidConstantN) {
+TEST_F(SbeStageBuilderGroupTest, MultiAccumulatorInvalidConstantN) {
+    const std::vector<std::string> inputFieldMultiAccumulators{
+        "$firstN", "$lastN", "$maxN", "$minN"};
+    const std::vector<std::string> outputFieldMultiAccumulators{"$topN", "$bottomN"};
     const std::vector<std::string> testCases{"'string'", "4.2", "-1", "0"};
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "b" << 1))};
-    for (const auto& testCase : testCases) {
-        runGroupAggregationToFail(
-            str::stream() << "{_id: null, x: {$firstN: {input: '$a', n: " << testCase << "}}}",
-            docs,
-            static_cast<ErrorCodes::Error>(7548606));
+    for (const auto& acc : inputFieldMultiAccumulators) {
+        for (const auto& testCase : testCases) {
+            runGroupAggregationToFail(str::stream() << "{_id: null, x: {" << acc
+                                                    << ": {input: '$a', n: " << testCase << "}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548606));
+        }
     }
-
-    for (const auto& testCase : testCases) {
-        runGroupAggregationToFail(
-            str::stream() << "{_id: null, x: {$lastN: {input: '$a', n: " << testCase << "}}}",
-            docs,
-            static_cast<ErrorCodes::Error>(7548606));
+    for (const auto& acc : outputFieldMultiAccumulators) {
+        for (const auto& testCase : testCases) {
+            runGroupAggregationToFail(str::stream() << "{_id: null, x: {" << acc
+                                                    << ": {output: '$a', sortBy: {s: 1}, n: "
+                                                    << testCase << "}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548606));
+        }
     }
 }
 
-TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorInvalidDynamicN) {
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "n" << 1))};
-    runGroupAggregationToFail("{_id: null, x: {$firstN: {input: '$a', n: '$n'}}}",
-                              docs,
-                              static_cast<ErrorCodes::Error>(7548607));
+TEST_F(SbeStageBuilderGroupTest, MultiAccumulatorInvalidDynamicN) {
+    const std::vector<std::string> inputFieldMultiAccumulators{
+        "$firstN", "$lastN", "$maxN", "$minN"};
+    const std::vector<std::string> outputFieldMultiAccumulators{"$topN", "$bottomN"};
+    const std::vector<BSONObj> testCases{BSON("n"
+                                              << "string"),
+                                         BSON("n" << 4.2),
+                                         BSON("n" << -1),
+                                         BSON("n" << 0)};
+    for (const auto& acc : inputFieldMultiAccumulators) {
+        for (const auto& testCase : testCases) {
+            auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "n1" << testCase))};
 
-    runGroupAggregationToFail("{_id: {k: '$n'}, x: {$firstN: {input: '$a', n: '$v'}}}",
-                              docs,
-                              static_cast<ErrorCodes::Error>(7548607));
+            runGroupAggregationToFail(str::stream() << "{_id: null, x: {" << acc
+                                                    << ": {input: '$a', n: '$n'}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548607));
+            runGroupAggregationToFail(str::stream() << "{_id: {n: '$n1.n'}, x: {" << acc
+                                                    << ": {input: '$a', n: '$n'}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548607));
+        }
+    }
+    for (const auto& acc : outputFieldMultiAccumulators) {
+        for (const auto& testCase : testCases) {
+            auto docs =
+                std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "s" << 1 << "n1" << testCase))};
+
+            runGroupAggregationToFail(str::stream()
+                                          << "{_id: null, x: {" << acc
+                                          << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548607));
+            runGroupAggregationToFail(str::stream()
+                                          << "{_id: {n: '$n1.n'}, x: {" << acc
+                                          << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
+                                      docs,
+                                      static_cast<ErrorCodes::Error>(7548607));
+        }
+    }
 }
 
 TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorSingleGroup) {
@@ -1837,45 +1875,136 @@ TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorDynamicN) {
                    << BSON("_id" << BSON("n1" << 3) << "x" << BSON_ARRAY(66 << 77 << 88))));
 }
 
-TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorInvalidConstantN) {
-    const std::vector<std::string> accumulators{"$topN", "$bottomN"};
-    const std::vector<std::string> testCases{"'string'", "4.2", "-1", "0"};
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "s" << 1))};
-    for (const auto& acc : accumulators) {
-        for (const auto& testCase : testCases) {
-            runGroupAggregationToFail(str::stream() << "{_id: null, x: {" << acc
-                                                    << ": {output: '$a', sortBy: {s: 1}, n: "
-                                                    << testCase << "}}}",
-                                      docs,
-                                      static_cast<ErrorCodes::Error>(7548606));
-        }
-    }
+TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorSingleGroup) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44)),
+                                       BSON_ARRAY(BSON("a" << 33)),
+                                       BSON_ARRAY(BSON("a" << 22)),
+                                       BSON_ARRAY(BSON("a" << 11)),
+                                       BSON_ARRAY(BSONObjBuilder().obj())};
+    runGroupAggregationTest(
+        "{_id: null, x: {$minN: {input: '$a', n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22 << 33))));
+    runGroupAggregationTest(
+        "{_id: null, x: {$maxN: {input: '$a', n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(44 << 33 << 22))));
 }
 
-TEST_F(SbeStageBuilderGroupTest, TopBottomNAccumulatorInvalidDynamicN) {
-    const std::vector<std::string> accumulators{"$topN", "$bottomN"};
-    const std::vector<BSONObj> testCases{BSON("n"
-                                              << "string"),
-                                         BSON("n" << 4.2),
-                                         BSON("n" << -1),
-                                         BSON("n" << 0)};
-    for (const auto& acc : accumulators) {
-        for (const auto& testCase : testCases) {
-            auto docs =
-                std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "s" << 1 << "n1" << testCase))};
+TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorWithDifferentNumericTypes) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11ll)),
+                                       BSON_ARRAY(BSON("a" << 12)),
+                                       BSON_ARRAY(BSON("a" << 13.12)),
+                                       BSON_ARRAY(BSON("a" << 14.0f)),
+                                       BSON_ARRAY(BSON("a" << 15ll))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$maxN: {input: '$a', n: 4}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(15ll << 14.0f << 13.12 << 12))));
+    runGroupAggregationTest(
+        "{_id: null, x: {$minN: {input: '$a', n: 4}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11ll << 12 << 13.12 << 14.0f))));
+}
 
-            runGroupAggregationToFail(str::stream()
-                                          << "{_id: null, x: {" << acc
-                                          << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
-                                      docs,
-                                      static_cast<ErrorCodes::Error>(7548607));
-            runGroupAggregationToFail(str::stream()
-                                          << "{_id: {n: '$n1.n'}, x: {" << acc
-                                          << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
-                                      docs,
-                                      static_cast<ErrorCodes::Error>(7548607));
-        }
-    }
+TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorWithStrings) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a"
+                                                       << "az")),
+                                       BSON_ARRAY(BSON("a"
+                                                       << "by")),
+                                       BSON_ARRAY(BSON("a"
+                                                       << "cx")),
+                                       BSON_ARRAY(BSON("a"
+                                                       << "dw"))};
+    runGroupAggregationTest("{_id: null, x: {$maxN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                                                  << BSON_ARRAY("dw"
+                                                                << "cx"
+                                                                << "by"))));
+    runGroupAggregationTest("{_id: null, x: {$minN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                                                  << BSON_ARRAY("az"
+                                                                << "by"
+                                                                << "cx"))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorCollation) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a"
+                                                       << "az")),
+                                       BSON_ARRAY(BSON("a"
+                                                       << "by")),
+                                       BSON_ARRAY(BSON("a"
+                                                       << "cx")),
+                                       BSON_ARRAY(BSON("a"
+                                                       << "dw"))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$maxN: {input: '$a', n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << BSON_ARRAY("az"
+                                            << "by"
+                                            << "cx"))),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    runGroupAggregationTest(
+        "{_id: null, x: {$minN: {input: '$a', n: 3}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << BSON_ARRAY("dw"
+                                            << "cx"
+                                            << "by"))),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorNotEnoughElement) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 22)), BSON_ARRAY(BSON("a" << 11))};
+    runGroupAggregationTest("{_id: null, x: {$maxN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(22 << 11))));
+    runGroupAggregationTest("{_id: null, x: {$minN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorMultiGroup) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 33 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 22 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 11 << "n" << 1)),
+                                       BSON_ARRAY(BSON("a" << 88 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 77 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 66 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 55 << "n" << 2))};
+    runGroupAggregationTest("{_id: '$n', x: {$minN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 1 << "x" << BSON_ARRAY(11 << 22 << 33))
+                                       << BSON("_id" << 2 << "x" << BSON_ARRAY(55 << 66 << 77))));
+    runGroupAggregationTest("{_id: '$n', x: {$maxN: {input: '$a', n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 1 << "x" << BSON_ARRAY(44 << 33 << 22))
+                                       << BSON("_id" << 2 << "x" << BSON_ARRAY(88 << 77 << 66))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorDynamicN) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 44 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 33 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 22 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 11 << "n" << 2)),
+                                       BSON_ARRAY(BSON("a" << 88 << "n" << 3)),
+                                       BSON_ARRAY(BSON("a" << 77 << "n" << 3)),
+                                       BSON_ARRAY(BSON("a" << 66 << "n" << 3)),
+                                       BSON_ARRAY(BSON("a" << 55 << "n" << 3))};
+    runGroupAggregationTest(
+        "{_id: {n1: '$n'}, x: {$minN: {input: '$a', n: '$n1'}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSON("n1" << 2) << "x" << BSON_ARRAY(11 << 22))
+                   << BSON("_id" << BSON("n1" << 3) << "x" << BSON_ARRAY(55 << 66 << 77))));
+    runGroupAggregationTest(
+        "{_id: {n1: '$n'}, x: {$maxN: {input: '$a', n: '$n1'}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSON("n1" << 2) << "x" << BSON_ARRAY(44 << 33))
+                   << BSON("_id" << BSON("n1" << 3) << "x" << BSON_ARRAY(88 << 77 << 66))));
 }
 
 class AccumulatorSBEIncompatible final : public AccumulatorState {
@@ -2159,37 +2288,6 @@ public:
     }
 
     /**
-     * Create an accumulator state for $topN/$bottomN, given heap in the format of BSONArray.
-     */
-    std::pair<sbe::value::TypeTags, sbe::value::Value> makeTopBottomNAccumulatorState(
-        BSONArray valuesBson, long maxSize, const sbe::value::SortSpec* sortSpec) {
-        auto [stateTag, stateVal] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard stateGuard{stateTag, stateVal};
-        auto state = sbe::value::getArrayView(stateVal);
-
-        auto [valuesTag, valuesVal] = bsonArrayToSbe(valuesBson);
-        sbe::value::ValueGuard valuesGuard{valuesTag, valuesVal};
-        // Heap
-        state->push_back(valuesTag, valuesVal);
-
-        // Start index
-        state->push_back(sbe::value::TypeTags::NumberInt64, 0);
-
-        // Max size
-        state->push_back(sbe::value::TypeTags::NumberInt64, maxSize);
-
-        // Memory usage
-        state->push_back(sbe::value::TypeTags::NumberInt32, 0);
-
-        // Memory limit
-        state->push_back(sbe::value::TypeTags::NumberInt32, INT_MAX);
-
-        valuesGuard.reset();
-        stateGuard.reset();
-        return {stateTag, stateVal};
-    }
-
-    /**
      * Given the name of an SBE agg function ('aggFuncName') and an array of values expressed as a
      * BSON array, aggregates the values inside the array and returns the resulting SBE value.
      */
@@ -2265,6 +2363,107 @@ public:
             arrView->push_back(tag, val);
         }
         return {arrTag, arrVal};
+    }
+
+    template <bool Collation>
+    void testCombinePartialAggsMultiAccumulator(std::string aggExpr,
+                                                BSONArray mergeState,
+                                                BSONArray inputState,
+                                                BSONArray expArr) {
+        CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kReverseString};
+        auto aggSlot = bindAccessor(&_aggAccessor);
+        auto [expr, finalizeExpr] = [&]()
+            -> std::pair<std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::EExpression>> {
+            if constexpr (Collation) {
+                auto expr =
+                    stage_builder::makeFunction(aggExpr + "Merge",
+                                                stage_builder::makeVariable(_inputSlotId),
+                                                stage_builder::makeVariable(_collatorSlotId));
+                auto finalizeExpr =
+                    stage_builder::makeFunction(aggExpr + "Finalize",
+                                                stage_builder::makeVariable(aggSlot),
+                                                stage_builder::makeVariable(_collatorSlotId));
+
+                _collatorAccessor.reset(
+                    false,
+                    sbe::value::TypeTags::collator,
+                    sbe::value::bitcastFrom<const CollatorInterface*>(&collator));
+                return {std::move(expr), std::move(finalizeExpr)};
+            } else {
+                auto expr = stage_builder::makeFunction(aggExpr + "Merge",
+                                                        stage_builder::makeVariable(_inputSlotId));
+                auto finalizeExpr = stage_builder::makeFunction(
+                    aggExpr + "Finalize", stage_builder::makeVariable(aggSlot));
+                return {std::move(expr), std::move(finalizeExpr)};
+            }
+        }();
+
+        auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+        auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
+
+        auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
+        _aggAccessor.reset(true, mergeStateTag, mergeStateVal);
+
+        auto [inputStateTag, inputStateVal] = convertFromBSONArray(inputState);
+        _inputAccessor.reset(true, inputStateTag, inputStateVal);
+
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        _aggAccessor.reset(true, resultTag, resultVal);
+        std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
+
+        auto [compareTag, compareVal] =
+            sbe::value::compareValue(resultTag,
+                                     resultVal,
+                                     sbe::value::TypeTags::bsonArray,
+                                     sbe::value::bitcastFrom<const char*>(expArr.objdata()));
+
+        ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
+        ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+        ASSERT_EQ(compareVal, 0);
+        sbe::value::releaseValue(resultTag, resultVal);
+    }
+
+    void testCombinePartialAggsMultiAccumulatorWithSortPattern(std::string aggExpr,
+                                                               BSONArray mergeState,
+                                                               BSONArray inputState,
+                                                               sbe::value::SortSpec* sortSpec,
+                                                               BSONArray expected) {
+        auto sortSpecConstant =
+            stage_builder::makeConstant(sbe::value::TypeTags::sortSpec,
+                                        sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec));
+
+        auto expr = stage_builder::makeFunction(aggExpr + "Merge",
+                                                stage_builder::makeVariable(_inputSlotId),
+                                                sortSpecConstant->clone());
+
+        auto aggSlot = bindAccessor(&_aggAccessor);
+        auto finalExpr = stage_builder::makeFunction(aggExpr + "Finalize",
+                                                     stage_builder::makeVariable(aggSlot),
+                                                     std::move(sortSpecConstant));
+
+        auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
+        _aggAccessor.reset(true, mergeStateTag, mergeStateVal);
+
+        auto [inputStateTag, inputStateVal] = convertFromBSONArray(inputState);
+        _inputAccessor.reset(true, inputStateTag, inputStateVal);
+
+        auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+        auto [newAccTag, newAccVal] = runCompiledExpression(compiledExpr.get());
+        _aggAccessor.reset(true, newAccTag, newAccVal);
+
+        auto compiledFinalExpr = compileExpression(*finalExpr);
+
+        auto [resultTag, resultVal] = runCompiledExpression(compiledFinalExpr.get());
+
+        auto [expectedTag, expectedVal] = bsonArrayToSbe(expected);
+        auto [compareTag, compareVal] =
+            sbe::value::compareValue(resultTag, resultVal, expectedTag, expectedVal);
+
+        ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+        ASSERT_EQ(compareVal, 0);
+        sbe::value::releaseValue(resultTag, resultVal);
+        sbe::value::releaseValue(expectedTag, expectedVal);
     }
 
 protected:
@@ -2721,346 +2920,134 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeBothArray) {
-    auto expr =
-        stage_builder::makeFunction("aggFirstNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggFirstNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // Merge both arrays
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 16 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(1 << 2 << 3);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggFirstN",
+        BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 16 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(1 << 2 << 3));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNNoMerge) {
-    auto expr =
-        stage_builder::makeFunction("aggFirstNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggFirstNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // No merge
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 0ll << 3ll << 24 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(1 << 2 << 6);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggFirstN",
+        BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(1 << 2 << 6));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeArrayEmpty) {
-    auto expr =
-        stage_builder::makeFunction("aggFirstNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggFirstNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // merge array empty
-    auto bsonAccArr = BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(3 << 4 << 5);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggFirstN",
+        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(3 << 4 << 5));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNInputArrayEmpty) {
-    auto expr =
-        stage_builder::makeFunction("aggFirstNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggFirstNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // input array empty
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(3 << 4 << 5);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggFirstN",
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024),
+        BSON_ARRAY(3 << 4 << 5));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNMergeBothArray) {
-    auto expr =
-        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // Merge both arrays
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << 1ll << 3ll << 24 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(4 << 5) << 0ll << 3ll << 16 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(1 << 4 << 5);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggLastN",
+        BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << 1ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(4 << 5) << 0ll << 3ll << 16 << 1024),
+        BSON_ARRAY(1 << 4 << 5));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNNoMerge) {
-    auto expr =
-        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // No merge
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 2ll << 3ll << 24 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 1ll << 3ll << 24 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(4 << 5 << 3);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggLastN",
+        BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 2ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 1ll << 3ll << 24 << 1024),
+        BSON_ARRAY(4 << 5 << 3));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayFull) {
-    auto expr =
-        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // merge array empty
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 0 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(5 << 3 << 4);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggLastN",
+        BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 0 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024),
+        BSON_ARRAY(5 << 3 << 4));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayEmpty) {
-    auto expr =
-        stage_builder::makeFunction("aggLastNMerge", stage_builder::makeVariable(_inputSlotId));
-    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto finalizeExpr =
-        stage_builder::makeFunction("aggLastNFinalize", stage_builder::makeVariable(aggSlot));
-    auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
-
-    // input array empty
-    auto bsonAccArr = BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024);
-    auto [accArrTag, accArrVal] = convertFromBSONArray(bsonAccArr);
-    _aggAccessor.reset(true, accArrTag, accArrVal);
-
-    auto bsonInputArr = BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024);
-    auto [inputArrTag, inputArrVal] = convertFromBSONArray(bsonInputArr);
-    _inputAccessor.reset(true, inputArrTag, inputArrVal);
-
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    _aggAccessor.reset(true, resultTag, resultVal);
-    std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
-
-    auto expectedArray = BSON_ARRAY(5 << 3 << 4);
-    auto [compareTag, compareVal] =
-        sbe::value::compareValue(resultTag,
-                                 resultVal,
-                                 sbe::value::TypeTags::bsonArray,
-                                 sbe::value::bitcastFrom<const char*>(expectedArray.objdata()));
-
-    ASSERT_EQ(resultTag, sbe::value::TypeTags::Array);
-    ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-    ASSERT_EQ(compareVal, 0);
-    sbe::value::releaseValue(resultTag, resultVal);
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggLastN",
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024),
+        BSON_ARRAY(5 << 3 << 4));
 }
 
-TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopBottomN) {
-    auto sortPattern = BSON("x" << 1);
-    auto sortSpec = new sbe::value::SortSpec(sortPattern);
-    auto sortSpecConstant = stage_builder::makeConstant(
-        sbe::value::TypeTags::sortSpec, sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec));
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopN) {
+    testCombinePartialAggsMultiAccumulatorWithSortPattern(
+        "aggTopN",
+        BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(5 << 5) << BSON_ARRAY(3 << 3) << BSON_ARRAY(1 << 1))
+                   << 0ll << 3ll << 0 << INT_MAX),
+        BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(6 << 6) << BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2))
+                   << 0ll << 3ll << 0 << INT_MAX),
+        new sbe::value::SortSpec(BSON("x" << 1)),
+        BSON_ARRAY(1 << 2 << 3));
+}
 
-    auto topNExpr = stage_builder::makeFunction(
-        "aggTopNMerge", stage_builder::makeVariable(_inputSlotId), sortSpecConstant->clone());
-    auto bottomNExpr = stage_builder::makeFunction(
-        "aggBottomNMerge", stage_builder::makeVariable(_inputSlotId), sortSpecConstant->clone());
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsBottomN) {
+    testCombinePartialAggsMultiAccumulatorWithSortPattern(
+        "aggBottomN",
+        BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3) << BSON_ARRAY(5 << 5))
+                   << 0ll << 3ll << 0 << INT_MAX),
+        BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4) << BSON_ARRAY(6 << 6))
+                   << 0ll << 3ll << 0 << INT_MAX),
+        new sbe::value::SortSpec(BSON("x" << 1)),
+        BSON_ARRAY(4 << 5 << 6));
+}
 
-    auto aggSlot = bindAccessor(&_aggAccessor);
-    auto topNFinalExpr = stage_builder::makeFunction(
-        "aggTopNFinalize", stage_builder::makeVariable(aggSlot), sortSpecConstant->clone());
-    auto bottomNFinalExpr = stage_builder::makeFunction(
-        "aggBottomNFinalize", stage_builder::makeVariable(aggSlot), sortSpecConstant->clone());
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinN) {
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggMinN",
+        BSON_ARRAY(BSON_ARRAY(5 << 3 << 1) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(6 << 4 << 2) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(1 << 2 << 3));
+}
 
-    std::vector<std::tuple<sbe::EExpression*, sbe::EExpression*, BSONArray, BSONArray, BSONArray>>
-        testCases{{topNExpr.get(),
-                   topNFinalExpr.get(),
-                   BSON_ARRAY(BSON_ARRAY(5 << 5) << BSON_ARRAY(3 << 3) << BSON_ARRAY(1 << 1)),
-                   BSON_ARRAY(BSON_ARRAY(6 << 6) << BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2)),
-                   BSON_ARRAY(1 << 2 << 3)},
-                  {bottomNExpr.get(),
-                   bottomNFinalExpr.get(),
-                   BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3) << BSON_ARRAY(5 << 5)),
-                   BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4) << BSON_ARRAY(6 << 6)),
-                   BSON_ARRAY(4 << 5 << 6)}};
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxN) {
+    testCombinePartialAggsMultiAccumulator<false>(
+        "aggMaxN",
+        BSON_ARRAY(BSON_ARRAY(1 << 3 << 5) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(2 << 4 << 6) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(6 << 5 << 4));
+}
 
-    for (auto& [expr, finalExpr, heapMerge, heapIncoming, expected] : testCases) {
-        auto [accTag, accVal] = makeTopBottomNAccumulatorState(heapMerge, 3, sortSpec);
-        _aggAccessor.reset(true, accTag, accVal);
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinNCollator) {
+    testCombinePartialAggsMultiAccumulator<true>("aggMinN",
+                                                 BSON_ARRAY(BSON_ARRAY("az"
+                                                                       << "cx"
+                                                                       << "ev")
+                                                            << 0ll << 3ll << 24 << 1024),
+                                                 BSON_ARRAY(BSON_ARRAY("by"
+                                                                       << "dw"
+                                                                       << "fu")
+                                                            << 0ll << 3ll << 24 << 1024),
+                                                 BSON_ARRAY("fu"
+                                                            << "ev"
+                                                            << "dw"));
+}
 
-        auto [inputTag, inputVal] = makeTopBottomNAccumulatorState(heapIncoming, 3, sortSpec);
-        _inputAccessor.reset(true, inputTag, inputVal);
-
-        auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
-
-        auto [newAccTag, newAccVal] = runCompiledExpression(compiledExpr.get());
-        _aggAccessor.reset(true, newAccTag, newAccVal);
-
-        auto compiledFinalExpr = compileExpression(*finalExpr);
-
-        auto [resultTag, resultVal] = runCompiledExpression(compiledFinalExpr.get());
-
-        auto [expectedTag, expectedVal] = bsonArrayToSbe(expected);
-        auto [compareTag, compareVal] =
-            sbe::value::compareValue(resultTag, resultVal, expectedTag, expectedVal);
-
-        ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
-        ASSERT_EQ(compareVal, 0);
-        sbe::value::releaseValue(resultTag, resultVal);
-        sbe::value::releaseValue(expectedTag, expectedVal);
-    }
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxNCollator) {
+    testCombinePartialAggsMultiAccumulator<true>("aggMaxN",
+                                                 BSON_ARRAY(BSON_ARRAY("ev"
+                                                                       << "cx"
+                                                                       << "az")
+                                                            << 0ll << 3ll << 24 << 1024),
+                                                 BSON_ARRAY(BSON_ARRAY("fu"
+                                                                       << "dw"
+                                                                       << "by")
+                                                            << 0ll << 3ll << 24 << 1024),
+                                                 BSON_ARRAY("az"
+                                                            << "by"
+                                                            << "cx"));
 }
 }  // namespace mongo
