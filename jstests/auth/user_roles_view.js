@@ -1,6 +1,6 @@
 // Tests that $$USER_ROLES works as expected in view creation and queries on the view (on both a
 // standalone mongod and a sharded cluster).
-// @tags: [featureFlagUserRoles, requires_fcv_70]
+// @tags: [requires_fcv_70]
 
 (function() {
 "use strict";

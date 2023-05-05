@@ -13,7 +13,7 @@ const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = ["featureFlagUserRoles"];
+const featureFlagsToEnable = [];
 
 // These arrays should be populated with aggregation pipelines that use
 // aggregation features in new versions of mongod. This test ensures that a view
@@ -83,16 +83,12 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
 
     // Read against an existing view using new query features should not fail.
     testCases.forEach((pipe, i) => {
-        // The $$USER_ROLES value will be evaluated every time the view is queried, so the
-        // following query would fail since we are running an older FCV.
         assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
                              `Failed to query view with pipeline ${tojson(pipe)}`);
     });
 
     // Trying to create a new view in the same database as existing invalid view should fail,
     // even if the new view doesn't use any new query features.
-    // Since the $$USER_ROLES variable won't be evaluated during this view creation, the view
-    // creation will succeed even though we are on an older FCV.
     assert.commandFailedWithCode(
         testDB.createView("newViewOldFeatures", "coll", [{$project: {_id: 1}}]),
         ErrorCodes.QueryFeatureNotAllowed,
@@ -154,8 +150,6 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
 
     // Read against an existing view using new query features should not fail.
     testCases.forEach((pipe, i) => {
-        // The view is evaluated on the fly, and the FCV is still set to the last version so the
-        // evaluation of $$USER_ROLES will cause this to fail.
         assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
                              `Failed to query view with pipeline ${tojson(pipe)}`);
     });
@@ -197,9 +191,6 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     testDB = conn.getDB(testName);
 
     testCases.forEach(function(pipe, i) {
-        // In this case, using $$USER_ROLES on the last FCV version will cause the view
-        // creation to fail during parsing because the necessary feature flag will not have been
-        // enabled due to the older FCV.
         // Even though the feature compatibility version is the last version, we should still be
         // able to create a view using new query features, because
         // internalValidateFeaturesAsPrimary is false.

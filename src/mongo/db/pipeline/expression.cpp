@@ -2446,23 +2446,6 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
         variableValidation::validateNameForUserRead(varName);
         auto varId = vps.getVariable(varName);
 
-        bool queryFeatureAllowedUserRoles = varId == Variables::kUserRolesId
-            ? (!expCtx->maxFeatureCompatibilityVersion ||
-               feature_flags::gFeatureFlagUserRoles.isEnabledOnVersion(
-                   *expCtx->maxFeatureCompatibilityVersion))
-            : true;
-
-        uassert(
-            ErrorCodes::QueryFeatureNotAllowed,
-            // We would like to include the current version and the required minimum version in this
-            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
-            // dependency cycle (see SERVER-31968).
-            str::stream()
-                << "$$USER_ROLES is not allowed in the current feature compatibility version. See "
-                << feature_compatibility_version_documentation::kCompatibilityLink
-                << " for more information.",
-            queryFeatureAllowedUserRoles);
-
         // If the variable we are parsing is a system variable, then indicate that we have seen it.
         if (!Variables::isUserDefinedVariable(varId)) {
             expCtx->setSystemVarReferencedInQuery(varId);

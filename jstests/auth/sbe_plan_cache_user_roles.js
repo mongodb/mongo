@@ -2,7 +2,6 @@
  * Test $$USER_ROLES works correctly with the SBE plan cache. The same query should return the
  * updated user role info when a different user logs in.
  * @tags: [
- *   featureFlagUserRoles,
  *   # Multiple servers can mess up the plan cache list.
  *   assumes_standalone_mongod,
  * ]

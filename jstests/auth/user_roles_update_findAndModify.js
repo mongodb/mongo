@@ -1,5 +1,5 @@
 // Tests that $$USER_ROLES is able to be used in an "update" and "findAndModify" commands.
-// @tags: [featureFlagUserRoles, requires_fcv_70]
+// @tags: [requires_fcv_70]
 
 (function() {
 "use strict";
