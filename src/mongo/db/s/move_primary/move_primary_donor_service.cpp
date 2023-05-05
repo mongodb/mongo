@@ -42,8 +42,8 @@ namespace {
 // Both of these failpoints have the same implementation. A single failpoint can't be active
 // multiple times with different arguments, but setting up more complex scenarios sometimes requires
 // multiple failpoints.
-MONGO_FAIL_POINT_DEFINE(pauseDuringMovePrimaryDonorStateEnumTransition);
-MONGO_FAIL_POINT_DEFINE(pauseDuringMovePrimaryDonorStateEnumTransitionAlternate);
+MONGO_FAIL_POINT_DEFINE(pauseDuringMovePrimaryDonorStateTransition);
+MONGO_FAIL_POINT_DEFINE(pauseDuringMovePrimaryDonorStateTransitionAlternate);
 
 MONGO_FAIL_POINT_DEFINE(pauseBeforeBeginningMovePrimaryDonorWorkflow);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeMovePrimaryDonorPersistsBlockTimestamp);
@@ -74,7 +74,7 @@ boost::optional<StateTransitionProgress> readProgressArgument(const BSONObj& dat
 boost::optional<MovePrimaryDonorStateEnum> readStateArgument(const BSONObj& data) {
     try {
         auto arg = data.getStringField("state");
-        IDLParserContext ectx("pauseDuringMovePrimaryDonorStateEnumTransition::readStateArgument");
+        IDLParserContext ectx("pauseDuringMovePrimaryDonorStateTransition::readStateArgument");
         return MovePrimaryDonorState_parse(ectx, arg);
     } catch (...) {
         return boost::none;
@@ -91,7 +91,7 @@ void evaluatePauseDuringStateTransitionFailpoint(StateTransitionProgress progres
             auto desiredState = readStateArgument(data);
             if (!desiredProgress.has_value() || !desiredState.has_value()) {
                 LOGV2(7306200,
-                      "pauseDuringMovePrimaryDonorStateEnumTransition failpoint data must contain "
+                      "pauseDuringMovePrimaryDonorStateTransition failpoint data must contain "
                       "progress and state arguments",
                       "failpoint"_attr = failpoint.getName(),
                       "data"_attr = data);
@@ -103,8 +103,8 @@ void evaluatePauseDuringStateTransitionFailpoint(StateTransitionProgress progres
 
 void evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress progress,
                                                   MovePrimaryDonorStateEnum newState) {
-    const auto fps = {std::ref(pauseDuringMovePrimaryDonorStateEnumTransition),
-                      std::ref(pauseDuringMovePrimaryDonorStateEnumTransitionAlternate)};
+    const auto fps = {std::ref(pauseDuringMovePrimaryDonorStateTransition),
+                      std::ref(pauseDuringMovePrimaryDonorStateTransitionAlternate)};
     for (auto& fp : fps) {
         evaluatePauseDuringStateTransitionFailpoint(progress, newState, fp);
     }
@@ -306,7 +306,8 @@ void MovePrimaryDonorExternalState::_runCommandOnRecipient(OperationContext* opC
                                DatabaseName::kAdmin.toString(),
                                command,
                                Shard::RetryPolicy::kNoRetry);
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+    uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(response),
+                               "Received error from remote MovePrimaryRecipient");
 }
 
 MovePrimaryDonorExternalStateImpl::MovePrimaryDonorExternalStateImpl(
