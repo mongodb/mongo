@@ -6,6 +6,10 @@ function isLinux() {
     return getBuildInfo().buildEnvironment.target_os == "linux";
 }
 
+function isMacOS() {
+    return getBuildInfo().buildEnvironment.target_os == "macOS";
+}
+
 // See "man 5 os-release" for documentation
 function readOsRelease() {
     try {
