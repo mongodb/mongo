@@ -31,7 +31,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_find_and_modify_cmd.h"
@@ -46,6 +48,48 @@
 
 namespace mongo {
 namespace {
+
+// Returns true if the update or projection in the query requires information from the original
+// query.
+bool requiresOriginalQuery(OperationContext* opCtx,
+                           const boost::optional<UpdateRequest>& updateRequest,
+                           const boost::optional<NamespaceString> nss = boost::none,
+                           const boost::optional<BSONObj>& query = boost::none,
+                           const boost::optional<BSONObj>& projection = boost::none) {
+    if (updateRequest) {
+        ParsedUpdate parsedUpdate(
+            opCtx, &updateRequest.get(), ExtensionsCallbackNoop(), CollectionPtr::null);
+        uassertStatusOK(parsedUpdate.parseRequest());
+        if (parsedUpdate.getDriver()->needMatchDetails()) {
+            return true;
+        }
+    }
+
+    // Only findAndModify can specify a projection for the pre/post image via the 'fields'
+    // parameter.
+    if (projection && !projection->isEmpty()) {
+        auto findCommand = FindCommandRequest(*nss);
+        findCommand.setFilter(*query);
+        findCommand.setProjection(*projection);
+
+        // We can ignore the collation for this check since we're only checking if the field name in
+        // the projection requires extra information from the query.
+        auto expCtx =
+            make_intrusive<ExpressionContext>(opCtx, findCommand, nullptr /* collator */, false);
+        auto res = MatchExpressionParser::parse(findCommand.getFilter(),
+                                                expCtx,
+                                                ExtensionsCallbackNoop(),
+                                                MatchExpressionParser::kAllowAllSpecialFeatures);
+        auto proj = projection_ast::parseAndAnalyze(expCtx,
+                                                    *projection,
+                                                    res.getValue().get(),
+                                                    *query,
+                                                    ProjectionPolicies::findProjectionPolicies(),
+                                                    false /* shouldOptimize */);
+        return proj.requiresMatchDetails();
+    }
+    return false;
+}
 
 BSONObj _createCmdObj(OperationContext* opCtx,
                       const ShardId& shardId,
@@ -73,11 +117,6 @@ BSONObj _createCmdObj(OperationContext* opCtx,
         auto updateRequest = write_ops::UpdateCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
 
-        // The targeted query constructed should contain the targetDocId and the original query in
-        // case the original query has importance in terms of the operation being applied, such as
-        // using the positional operator ($) to modify an inner array element.
-        queryBuilder.appendElementsUnique(updateRequest.getUpdates().front().getQ());
-
         // The original query and collation are sent along with the modified command for the
         // purposes of query sampling.
         if (updateRequest.getUpdates().front().getSampleId()) {
@@ -88,6 +127,19 @@ BSONObj _createCmdObj(OperationContext* opCtx,
                 updateRequest.getUpdates().front().getCollation());
             updateRequest.setWriteCommandRequestBase(writeCommandRequestBase);
         }
+
+        // If the original query contains either a positional operator ($) or targets a time-series
+        // collection, include the original query alongside the target doc.
+        auto updateOpWithNamespace = UpdateRequest(updateRequest.getUpdates().front());
+        updateOpWithNamespace.setNamespaceString(updateRequest.getNamespace());
+        if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
+            nss.isTimeseriesBucketsCollection()) {
+            queryBuilder.appendElementsUnique(updateRequest.getUpdates().front().getQ());
+        } else {
+            // Unset the collation because targeting by _id uses default collation.
+            updateRequest.getUpdates().front().setCollation(boost::none);
+        }
+
         updateRequest.getUpdates().front().setQ(queryBuilder.obj());
 
         auto batchedCommandRequest = BatchedCommandRequest(updateRequest);
@@ -96,11 +148,6 @@ BSONObj _createCmdObj(OperationContext* opCtx,
     } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
         auto deleteRequest = write_ops::DeleteCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), opMsgRequest.body);
-
-        // The targeted query constructed should contain the targetDocId and the original query in
-        // case the original query has importance in terms of the operation being applied, such as
-        // using the positional operator ($) to modify an inner array element.
-        queryBuilder.appendElementsUnique(deleteRequest.getDeletes().front().getQ());
 
         // The original query and collation are sent along with the modified command for the
         // purposes of query sampling.
@@ -113,8 +160,16 @@ BSONObj _createCmdObj(OperationContext* opCtx,
             deleteRequest.setWriteCommandRequestBase(writeCommandRequestBase);
         }
 
-        deleteRequest.getDeletes().front().setQ(queryBuilder.obj());
+        // If the query targets a time-series collection, include the original query alongside the
+        // target doc.
+        if (nss.isTimeseriesBucketsCollection()) {
+            queryBuilder.appendElementsUnique(deleteRequest.getDeletes().front().getQ());
+        } else {
+            // Unset the collation because targeting by _id uses default collation.
+            deleteRequest.getDeletes().front().setCollation(boost::none);
+        }
 
+        deleteRequest.getDeletes().front().setQ(queryBuilder.obj());
 
         auto batchedCommandRequest = BatchedCommandRequest(deleteRequest);
         batchedCommandRequest.setShardVersion(shardVersion);
@@ -124,17 +179,47 @@ BSONObj _createCmdObj(OperationContext* opCtx,
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"), opMsgRequest.body);
 
-        // The targeted query constructed should contain the targetDocId and the original query in
-        // case the original query has importance in terms of the operation being applied, such as
-        // using the positional operator ($) to modify an inner array element.
-        queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
-
         // The original query and collation are sent along with the modified command for the
         // purposes of query sampling.
         if (findAndModifyRequest.getSampleId()) {
             findAndModifyRequest.setOriginalQuery(findAndModifyRequest.getQuery());
             findAndModifyRequest.setOriginalCollation(findAndModifyRequest.getCollation());
         }
+
+        if (findAndModifyRequest.getUpdate()) {
+            auto updateRequest = UpdateRequest{};
+            updateRequest.setNamespaceString(findAndModifyRequest.getNamespace());
+            update::makeUpdateRequest(opCtx, findAndModifyRequest, boost::none, &updateRequest);
+
+            // If the original query contains either a positional operator ($) or targets a
+            // time-series collection, include the original query alongside the target doc.
+            if (requiresOriginalQuery(opCtx,
+                                      updateRequest,
+                                      findAndModifyRequest.getNamespace(),
+                                      findAndModifyRequest.getQuery(),
+                                      findAndModifyRequest.getFields().value_or(BSONObj())) ||
+                nss.isTimeseriesBucketsCollection()) {
+                queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
+            } else {
+                // Unset the collation because targeting by _id uses default collation.
+                findAndModifyRequest.setCollation(boost::none);
+            }
+        } else {
+            // If the original query includes a positional operator ($) or targets a time-series
+            // collection, include the original query alongside the target doc.
+            if (requiresOriginalQuery(opCtx,
+                                      boost::none,
+                                      findAndModifyRequest.getNamespace(),
+                                      findAndModifyRequest.getQuery(),
+                                      findAndModifyRequest.getFields().value_or(BSONObj())) ||
+                nss.isTimeseriesBucketsCollection()) {
+                queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
+            } else {
+                // Unset the collation because targeting by _id uses default collation.
+                findAndModifyRequest.setCollation(boost::none);
+            }
+        }
+
         findAndModifyRequest.setQuery(queryBuilder.obj());
 
         // Drop the writeConcern as it cannot be specified for commands run in internal
@@ -233,9 +318,9 @@ public:
 
     // In the current implementation of the Stable API, sub-operations run under a command in the
     // Stable API where a client specifies {apiStrict: true} are expected to also be Stable API
-    // compliant, when they technically should not be. To satisfy this requirement,
-    // this command is marked as part of the Stable API, but is not truly a part of
-    // it, since it is an internal-only command.
+    // compliant, when they technically should not be. To satisfy this requirement, this command is
+    // marked as part of the Stable API, but is not truly a part of it, since it is an internal-only
+    // command.
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
     }

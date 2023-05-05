@@ -679,5 +679,19 @@ TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentAlwaysAffectsIndex) {
     ASSERT_EQ(_modifiedPaths, "{}");
 }
 
+TEST_F(ModifiedPathsTestFixture, NeedsMatchDetailsIsTrueForPositionalUpdate) {
+    BSONObj spec = fromjson("{$set: {'a.$': 1}}");
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
+    runUpdate(&doc, makeUpdateMod(spec), "0"_sd);
+    ASSERT_EQ(true, _driver->needMatchDetails());
+}
+
+TEST_F(ModifiedPathsTestFixture, NeedsMatchDetailsIsFalseForNonPositionalUpdate) {
+    BSONObj spec = fromjson("{$set: {a: 1}}");
+    mutablebson::Document doc(fromjson("{a: 0}"));
+    runUpdate(&doc, makeUpdateMod(spec));
+    ASSERT_EQ(false, _driver->needMatchDetails());
+}
+
 }  // namespace
 }  // namespace mongo
