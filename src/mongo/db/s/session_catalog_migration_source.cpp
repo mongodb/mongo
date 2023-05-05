@@ -216,7 +216,10 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
       _chunkRange(std::move(chunk)),
       _keyPattern(shardKey) {}
 
-void SessionCatalogMigrationSource::init(OperationContext* opCtx) {
+void SessionCatalogMigrationSource::init(OperationContext* opCtx,
+                                         const LogicalSessionId& migrationLsid) {
+    const auto migrationLsidWithoutTxnNumber = castToParentSessionId(migrationLsid);
+
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     // Skip internal sessions for retryable writes with aborted or in progress transactions since
@@ -254,6 +257,16 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx) {
             // txnNumber.
             continue;
         }
+
+        if (parentSessionId == migrationLsidWithoutTxnNumber) {
+            // Skip session id matching the migration lsid as they are only for used for rejecting
+            // old migration source from initiating range deleter on the destination. Sending
+            // these sessions to the other side has a potential to deadlock as the destination
+            // will also try to checkout the same session for almost the entire duration of
+            // the migration.
+            continue;
+        }
+
         lastTxnSession = LastTxnSession{parentSessionId, parentTxnNumber};
 
         if (!txnRecord.getLastWriteOpTime().isNull()) {
