@@ -2161,10 +2161,10 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, WT_ITEM
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
     /*
-     * FIXME WT-10887: Allow performing truncate operation without a timestamp on non logged tables
-     * for non standalone builds (MongoDB). MongoDB do perform truncate operation only on a table
-     * that do not have historical versions to avoid the problem. Remove this standalone build
-     * specific code when a proper solution is implemented.
+     * Allow performing truncate operation without a timestamp on non logged tables for non
+     * standalone builds (MongoDB). MongoDB does perform truncate operation only on a table that
+     * does not have historical versions to avoid the problem. Remove this standalone build specific
+     * code when MongoDB switches to perform truncate operation with timestamps.
      */
 #ifdef WT_STANDALONE_BUILD
     /*
