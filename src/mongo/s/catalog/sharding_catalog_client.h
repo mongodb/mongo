@@ -349,24 +349,35 @@ public:
                                          boost::optional<BSONObj> hint = boost::none) = 0;
 
     /**
-     * Returns the list of active shards that still contains data for the specified collection or
-     * that used to contain data for the specified collection at clusterTime >= input clusterTime
-     * based on placementHistory
+     * Returns shard-placement information for collection named 'collName' at the requested point in
+     * time 'clusterTime'.
+     * - When an exact response may be computed, this will be composed by the shards hosting data of
+     *   collName + the primary shard of the parent db.
+     * - Otherwise, an approximated response is generated based on a past snapshot of config.shards.
+     * References to shards that aren't currently part of the cluster may be included in the
+     * response.
      */
     virtual HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(
         OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) = 0;
 
     /**
-     * Returns the list of active shards that still contains data for the specified database or
-     * that used to contain data for the specified database at clusterTime >= input clusterTime
-     * based on placementHistory
+     * Returns shard-placement information for database named 'dbName' at the requested point in
+     * time 'clusterTime'.
+     * When no exact response may be computed, an approximated one is generated based on a past
+     * snapshot of config.shards.
+     * References to shards that aren't currently part of the cluster may be included in the
+     * response.
      */
     virtual HistoricalPlacement getShardsThatOwnDataForDbAtClusterTime(
         OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) = 0;
 
     /**
-     * Returns the list of active shards that still contains data or that used to contain data
-     * at clusterTime >= input clusterTime based on placementHistory
+     * Returns shard-placement information for the whole cluster at the requested point in time
+     * 'clusterTime'.
+     * When no exact response may be computed, an approximated one is generated based on a past
+     * snapshot of config.shards.
+     * References to shards that aren't currently part of the cluster may be included in the
+     * response.
      */
     virtual HistoricalPlacement getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
                                                                   const Timestamp& clusterTime) = 0;
