@@ -21,39 +21,48 @@
 load("jstests/libs/fixture_helpers.js");
 load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
 
-var cmdRes;
-var cursorId;
-var defaultBatchSize = 101;
-var collName = 'await_data';
-var coll = db[collName];
+let collName = 'await_data_non_capped';
+let coll = db[collName];
 
 // Create a non-capped collection with 10 documents.
+jsTestLog('Create a non-capped collection with 10 documents.');
 coll.drop();
-for (var i = 0; i < 10; i++) {
-    assert.commandWorked(coll.insert({a: i}));
+let docs = [];
+for (let i = 0; i < 10; i++) {
+    docs.push({a: i});
 }
+assert.commandWorked(coll.insert(docs));
 
 // Find with tailable flag set should fail for a non-capped collection.
-cmdRes = db.runCommand({find: collName, tailable: true});
+jsTestLog('Find with tailable flag set should fail for a non-capped collection.');
+let cmdRes = db.runCommand({find: collName, tailable: true});
 assert.commandFailed(cmdRes);
 
 // Should also fail in the non-capped case if both the tailable and awaitData flags are set.
+jsTestLog(
+    'Should also fail in the non-capped case if both the tailable and awaitData flags are set.');
 cmdRes = db.runCommand({find: collName, tailable: true, awaitData: true});
 assert.commandFailed(cmdRes);
 
 // With a non-existent collection, should succeed but return no data and a closed cursor.
+jsTestLog('With a non-existent collection, should succeed but return no data and a closed cursor.');
+collName = 'await_data_missing';
+coll = db[collName];
 coll.drop();
 cmdRes = assert.commandWorked(db.runCommand({find: collName, tailable: true}));
 assert.eq(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.firstBatch.length, 0);
 
 // Create a capped collection with 10 documents.
+jsTestLog('Create a capped collection with 10 documents.');
+collName = 'await_data';  // collection name must match parallel shell task.
+coll = db[collName];
+coll.drop();
 assert.commandWorked(db.createCollection(collName, {capped: true, size: 2048}));
-for (var i = 0; i < 10; i++) {
-    assert.commandWorked(coll.insert({a: i}));
-}
+assert.commandWorked(coll.insert(docs));
 
 // GetMore should succeed if query has awaitData but no maxTimeMS is supplied.
+jsTestLog('getMore should succeed if query has awaitData but no maxTimeMS is supplied.');
 cmdRes = db.runCommand({find: collName, batchSize: 2, awaitData: true, tailable: true});
 assert.commandWorked(cmdRes);
 assert.gt(cmdRes.cursor.id, NumberLong(0));
@@ -65,6 +74,7 @@ assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 
 // Should also succeed if maxTimeMS is supplied on the original find.
+jsTestLog('Should also succeed if maxTimeMS is supplied on the original find.');
 const sixtyMinutes = 60 * 60 * 1000;
 cmdRes = db.runCommand(
     {find: collName, batchSize: 2, awaitData: true, tailable: true, maxTimeMS: sixtyMinutes});
@@ -78,6 +88,7 @@ assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 
 // Check that we can set up a tailable cursor over the capped collection.
+jsTestLog('Check that we can set up a tailable cursor over the capped collection.');
 cmdRes = db.runCommand({find: collName, batchSize: 5, awaitData: true, tailable: true});
 assert.commandWorked(cmdRes);
 assert.gt(cmdRes.cursor.id, NumberLong(0));
@@ -86,6 +97,8 @@ assert.eq(cmdRes.cursor.firstBatch.length, 5);
 
 // Check that tailing the capped collection with awaitData eventually ends up returning an empty
 // batch after hitting the timeout.
+jsTestLog('Check that tailing the capped collection with awaitData eventually ends up returning ' +
+          'an empty batch after hitting the timeout.');
 cmdRes = db.runCommand({find: collName, batchSize: 2, awaitData: true, tailable: true});
 assert.commandWorked(cmdRes);
 assert.gt(cmdRes.cursor.id, NumberLong(0));
@@ -93,6 +106,7 @@ assert.eq(cmdRes.cursor.ns, coll.getFullName());
 assert.eq(cmdRes.cursor.firstBatch.length, 2);
 
 // Issue getMore until we get an empty batch of results.
+jsTestLog('Issue getMore until we get an empty batch of results.');
 cmdRes = db.runCommand({
     getMore: cmdRes.cursor.id,
     collection: coll.getName(),
@@ -104,8 +118,10 @@ assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 
 // Keep issuing getMore until we get an empty batch after the timeout expires.
+jsTestLog('Keep issuing getMore until we get an empty batch after the timeout expires.');
+let now;
 while (cmdRes.cursor.nextBatch.length > 0) {
-    var now = new Date();
+    now = new Date();
     cmdRes = db.runCommand({
         getMore: cmdRes.cursor.id,
         collection: coll.getName(),
@@ -113,6 +129,7 @@ while (cmdRes.cursor.nextBatch.length > 0) {
         maxTimeMS: 4000
     });
     assert.commandWorked(cmdRes);
+    jsTestLog('capped collection tailing cursor getMore: ' + now + ': ' + tojson(cmdRes));
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
 }
@@ -120,28 +137,37 @@ assert.gte((new Date()) - now, 2000);
 
 // Repeat the test, this time tailing the oplog rather than a user-created capped collection.
 // The oplog tailing in not possible on mongos.
+jsTestLog(
+    'Repeat the test, this time tailing the oplog rather than a user-created capped collection.');
 if (FixtureHelpers.isReplSet(db)) {
-    var localDB = db.getSiblingDB("local");
-    var oplogColl = localDB.oplog.rs;
+    const localDB = db.getSiblingDB("local");
+    const oplogColl = localDB.oplog.rs;
 
+    jsTestLog('Check that tailing the oplog with awaitData eventually ends up returning ' +
+              'an empty batch after hitting the timeout.');
     cmdRes = localDB.runCommand(
         {find: oplogColl.getName(), batchSize: 2, awaitData: true, tailable: true});
     assert.commandWorked(cmdRes);
+    jsTestLog('Oplog tailing result: ' + tojson(cmdRes));
     if (cmdRes.cursor.id > NumberLong(0)) {
         assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
         assert.eq(cmdRes.cursor.firstBatch.length, 2);
 
+        jsTestLog('Issue getMore on the oplog until we get an empty batch of results.');
         cmdRes = localDB.runCommand(
             {getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 1000});
         assert.commandWorked(cmdRes);
         assert.gt(cmdRes.cursor.id, NumberLong(0));
         assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
 
+        jsTestLog('Keep issuing getMore on the oplog until we get an empty batch after the ' +
+                  'timeout expires.');
         while (cmdRes.cursor.nextBatch.length > 0) {
             now = new Date();
             cmdRes = localDB.runCommand(
                 {getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 4000});
             assert.commandWorked(cmdRes);
+            jsTestLog('oplog tailing cursor getMore: ' + now + ': ' + tojson(cmdRes));
             assert.gt(cmdRes.cursor.id, NumberLong(0));
             assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
         }
@@ -149,9 +175,11 @@ if (FixtureHelpers.isReplSet(db)) {
     }
 }
 
-let originalCmdLogLevel = assert.commandWorked(db.setLogLevel(5, 'command')).was.command.verbosity;
-let originalQueryLogLevel = assert.commandWorked(db.setLogLevel(5, 'query')).was.query.verbosity;
+const originalCmdLogLevel =
+    assert.commandWorked(db.setLogLevel(5, 'command')).was.command.verbosity;
+const originalQueryLogLevel = assert.commandWorked(db.setLogLevel(5, 'query')).was.query.verbosity;
 
+jsTestLog('Test filtered inserts while writing to a capped collection.');
 try {
     // Test filtered inserts while writing to a capped collection.
     // Find with a filter which doesn't match any documents in the collection.
