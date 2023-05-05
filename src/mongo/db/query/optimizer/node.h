@@ -269,9 +269,6 @@ private:
  * 'ridProjectionName' parameter designates the incoming rid which is the starting point of the
  * seek. 'fieldProjectionMap' may choose to include an outgoing rid which will contain the
  * successive (if we do not have a following limit) document ids.
- *
- * TODO SERVER-68936: Can we let it advance with a limit based on upper rid limit in case of primary
- * index?
  */
 class SeekNode final : public ABTOpFixedArity<2>, public ExclusivelyPhysicalNode {
     using Base = ABTOpFixedArity<2>;
@@ -458,14 +455,31 @@ private:
  * This is a logical node which represents special kinds of (simple) evaluations and filters which
  * are amenable to being used in indexing or covered scans.
  *
- * It collects a conjunction of predicates in the following form:
- *    <path, inputProjection> -> <interval, outputProjection>
-
- * For example to encode a conjunction which encodes filtering with array traversal on "a"
- ($match(a: {$gt, 1}} combined with a retrieval of the field "b" (without restrictions on its
- value).
- *      PathGet "a" Traverse Id | scan_0     ->  [1, +inf], <none>
- *      PathGet "b" Id          | scan_0      -> (-inf, +inf),  "pb"
+ * These evaluations and filters are tracked via PartialSchemaRequirements in DNF. For example, a
+ * SargableNode which encodes a disjunction of three predicates, {a: {$eq: 1}},
+ * {b: {$eq: 2}}, and {c: {$gt: 3}} may have the following PartialSchemaEntries:
+ *      entry1: {<PathGet "a" Traverse Id, scan_0>,    <[1, 1],     <none>>}
+ *      entry2: {<PathGet "b" Traverse Id, scan_0>,    <[2, 2],     <none>>}
+ *      entry3: {<PathGet "c" Traverse Id, scan_0>,    <[3, +inf],  <none>>}
+ * These entries would then be composed in DNF: OR( AND( entry1 ), AND( entry2 ), AND( entry3 )).
+ *
+ * The partial schema requirements should be simplified before constructing a SargableNode. There
+ * should be at least 1 and at most kMaxPartialSchemaReqs entries in the requirements. Also, within
+ * a conjunction of PartialSchemaEntries, only one instance of a path without Traverse elements
+ * (non-multikey) is allowed. By contrast several instances of paths with Traverse elements
+ * (multikey) are allowed. For example: Get "a" Get "b" Id is allowed just once while Get "a"
+ * Traverse Get "b" Id is allowed multiple times.
+ *
+ * The SargableNode also tracks some precomputed information such as which indexes are suitable
+ * for satisfying the requirements.
+ *
+ * Finally, each SargableNode has an IndexReqTarget used to control SargableNode splitting
+ * optimizations. During optimization, SargableNodes are first introduced with a Complete target.
+ * A Complete target indicates that the SargableNode is responsible for satisfying
+ * the entire set of predicates extracted from the original query (that is, all predicates
+ * identified pre-splitting). During SargableNode splitting, Index and Seek targets may be
+ * introduced. An Index target indicates the SargableNode need only produce index keys, whereas a
+ * Seek target indicates the SargableNode should produce documents given RIDs.
  */
 class SargableNode final : public ABTOpFixedArity<3>, public ExclusivelyLogicalNode {
     using Base = ABTOpFixedArity<3>;

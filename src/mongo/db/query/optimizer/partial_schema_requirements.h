@@ -39,12 +39,26 @@ using PSRExpr = BoolExpr<PartialSchemaEntry>;
 using PSRExprBuilder = PSRExpr::Builder<false /*simplifyEmptyOrSingular*/, false /*removeDups*/>;
 
 /**
- * Represents a set of predicates and projections. Cannot represent all predicates/projections:
- * only those that can typically be answered efficiently with an index.
+ * Represents a set of predicates and projections composed in a boolean expression in CNF or DNF.
+ * Cannot represent all predicates/projections, only those that can typically be answered
+ * efficiently with an index.
  *
- * Only one instance of a path without Traverse elements (non-multikey) is allowed. By contrast
- * several instances of paths with Traverse elements (multikey) are allowed. For example: Get "a"
- * Get "b" Id is allowed just once while Get "a" Traverse Get "b" Id is allowed multiple times.
+ * The predicates take the following form, represented by type PartialSchemaEntry:
+ *    {<path, inputProjection>, <interval, outputProjection>}
+ *
+ * For example, suppose there is a ScanNode which creates a binding 'scan_0' representing the
+ * documents in a collection. To represent a conjunction which encodes filtering with array
+ * traversal on "a" {$match: {a: {$gt, 1}} combined with a retrieval of the field "b" (without
+ * restrictions on its value), the PartialSchemaEntries would look like:
+ *      entry1: {<PathGet "a" Traverse Id, scan_0>,    <[1, +inf],     <none>>}
+ *      entry2: {<PathGet "b" Id,          scan_0>,    <(-inf, +inf),  "pb">}.
+ *
+ * These entries could be composed in DNF: OR( AND( entry1, entry2 )). In this case we have a
+ * trivial disjunction, where the top-level disjunction only has one child. Or, they could be
+ * composed in CNF: AND( OR( entry1 ), OR( entry2 )).
+ *
+ * When representing a non-trivial disjunction, the PartialSchemaRequirements must not have any
+ * output bindings.
  *
  * The default / empty state represents a conjunction of zero predicates, which means always true.
  */

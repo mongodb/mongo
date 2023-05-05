@@ -186,8 +186,13 @@ public:
 // Unions and conjunctions of individual compound intervals.
 using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
 
+/**
+ * An input binding and a path to be applied over the input binding. Used in conjunction with a
+ * PartialSchemaRequirement to indicate which values a requirement should be applied to. The path
+ * should only contain Get, Traverse, and Id path elements.
+ */
 struct PartialSchemaKey {
-    // The default construct sets the path to PathIdentity and the projectionName to boost::none.
+    // The default constructor sets the path to PathIdentity and the projectionName to boost::none.
     PartialSchemaKey();
 
     PartialSchemaKey(ABT path);
@@ -199,13 +204,19 @@ struct PartialSchemaKey {
         return !(*this == other);
     }
 
-    // Referred, or input projection name.
+    // Referred, or input projection name. May be boost::none while constructing
+    // PartialSchemaRequirements, before it is known which projection the path should be applied to.
     boost::optional<ProjectionName> _projectionName;
 
     // (Partially determined) path.
     ABT _path;
 };
 
+/**
+ * Represents a constraint on the schema in the collection. Used in conjunction with a
+ * PartialSchemKey to apply an interval constraint to some value and optionally bind the
+ * output to a projection.
+ */
 class PartialSchemaRequirement {
 public:
     PartialSchemaRequirement(boost::optional<ProjectionName> boundProjectionName,
