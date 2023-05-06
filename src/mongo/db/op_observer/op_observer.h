@@ -585,9 +585,8 @@ public:
      * This method is only applicable to the "rollback to a stable timestamp" algorithm, and is not
      * called when using any other rollback algorithm i.e "rollback via refetch".
      */
-    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) {
-        _onReplicationRollback(opCtx, rbInfo);
-    };
+    virtual void onReplicationRollback(OperationContext* opCtx,
+                                       const RollbackObserverInfo& rbInfo) = 0;
 
     /**
      * Called when the majority commit point is updated by replication.
@@ -600,10 +599,6 @@ public:
                                              const repl::OpTime& newCommitPoint) = 0;
 
     struct Times;
-
-private:
-    virtual void _onReplicationRollback(OperationContext* opCtx,
-                                        const RollbackObserverInfo& rbInfo) = 0;
 
 protected:
     class ReservedTimes;

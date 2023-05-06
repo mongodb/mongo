@@ -70,8 +70,7 @@ public:
                                   CollectionDropType dropType,
                                   bool markFromMigrate) final;
 
-private:
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo);
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
 }  // namespace mongo

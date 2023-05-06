@@ -174,8 +174,8 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void UserWriteBlockModeOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                                          const RollbackObserverInfo& rbInfo) {
+void UserWriteBlockModeOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                         const RollbackObserverInfo& rbInfo) {
     if (rbInfo.rollbackNamespaces.find(NamespaceString::kUserWritesCriticalSectionsNamespace) !=
         rbInfo.rollbackNamespaces.end()) {
         UserWritesRecoverableCriticalSectionService::get(opCtx)->recoverRecoverableCriticalSections(

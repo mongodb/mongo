@@ -125,8 +125,8 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-void TimeSeriesOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                                  const RollbackObserverInfo& rbInfo) {
+void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                 const RollbackObserverInfo& rbInfo) {
     stdx::unordered_set<NamespaceString> timeseriesNamespaces;
     for (const auto& ns : rbInfo.rollbackNamespaces) {
         if (ns.isTimeseriesBucketsCollection()) {

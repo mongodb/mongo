@@ -231,6 +231,7 @@ public:
 
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
@@ -267,7 +268,6 @@ private:
         OperationContext* opCtx,
         const std::vector<repl::OplogEntry>& stmts,
         const repl::OpTime& prepareOrCommitOptime) {}
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 
     std::unique_ptr<OplogWriter> _oplogWriter;
 };

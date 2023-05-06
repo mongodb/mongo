@@ -156,8 +156,8 @@ void FreeMonOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void FreeMonOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                               const RollbackObserverInfo& rbInfo) {
+void FreeMonOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                              const RollbackObserverInfo& rbInfo) {
     // Invalidate any in-memory auth data if necessary.
     const auto& rollbackNamespaces = rbInfo.rollbackNamespaces;
     if (rollbackNamespaces.count(NamespaceString::kServerConfigurationNamespace) == 1) {

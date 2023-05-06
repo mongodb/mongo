@@ -83,8 +83,7 @@ public:
                                   CollectionDropType dropType,
                                   bool markFromMigrate) final;
 
-private:
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 
 public:
     // Remainder of operations are ignorable.

@@ -272,12 +272,12 @@ public:
 
     void onBatchedWriteAbort(OperationContext* opCtx) final {}
 
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
 private:
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
-
     // uasserts that a write to the given namespace is allowed under the current user write blocking
     // setting.
     void _checkWriteAllowed(OperationContext* opCtx, const NamespaceString& nss);

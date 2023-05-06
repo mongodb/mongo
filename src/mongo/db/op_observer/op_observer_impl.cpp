@@ -2208,8 +2208,8 @@ void OpObserverImpl::onModifyCollectionShardingIndexCatalog(OperationContext* op
     logOperation(opCtx, &oplogEntry, true, _oplogWriter.get());
 }
 
-void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
-                                            const RollbackObserverInfo& rbInfo) {
+void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
+                                           const RollbackObserverInfo& rbInfo) {
     // Reset the key manager cache.
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator) {

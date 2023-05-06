@@ -159,8 +159,8 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
     return {};
 }
 
-void ClusterServerParameterOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                                              const RollbackObserverInfo& rbInfo) {
+void ClusterServerParameterOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                             const RollbackObserverInfo& rbInfo) {
     for (const auto& nss : rbInfo.rollbackNamespaces) {
         if (isConfigNamespace(nss)) {
             // We can call resynchronize directly because onReplicationRollback is guaranteed to be

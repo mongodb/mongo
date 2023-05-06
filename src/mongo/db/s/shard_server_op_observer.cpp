@@ -808,8 +808,8 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
     abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
-void ShardServerOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                                   const RollbackObserverInfo& rbInfo) {
+void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                  const RollbackObserverInfo& rbInfo) {
     ShardingRecoveryService::get(opCtx)->recoverStates(opCtx, rbInfo.rollbackNamespaces);
 }
 

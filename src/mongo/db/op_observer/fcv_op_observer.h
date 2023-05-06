@@ -79,6 +79,8 @@ public:
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+
     // Noop overrides.
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,
@@ -262,8 +264,6 @@ private:
      * document and on commit, updates the server parameter.
      */
     static void _onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
-
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
 }  // namespace mongo

@@ -248,12 +248,10 @@ public:
 
     void onBatchedWriteAbort(OperationContext* opCtx) final {}
 
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final {}
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final;
-
-private:
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final {
-    }
 };
 
 }  // namespace repl

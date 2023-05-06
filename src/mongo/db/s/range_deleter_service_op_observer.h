@@ -79,7 +79,6 @@ public:
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override;
 
-private:
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,
@@ -254,11 +253,11 @@ private:
 
     void onBatchedWriteAbort(OperationContext* opCtx) final {}
 
+    void onReplicationRollback(OperationContext* opCtx,
+                               const RollbackObserverInfo& rbInfo) override {}
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {}
-
-    void _onReplicationRollback(OperationContext* opCtx,
-                                const RollbackObserverInfo& rbInfo) override{};
 };
 
 }  // namespace mongo

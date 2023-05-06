@@ -270,12 +270,11 @@ public:
 
     void onBatchedWriteAbort(OperationContext* opCtx) final {}
 
+    void onReplicationRollback(OperationContext* opCtx,
+                               const RollbackObserverInfo& rbInfo) override {}
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {}
-
-private:
-    void _onReplicationRollback(OperationContext* opCtx,
-                                const RollbackObserverInfo& rbInfo) override {}
 };
 
 }  // namespace mongo
