@@ -1,5 +1,5 @@
 
-t = db.date1;
+let t = db.date1;
 
 function go(d, msg) {
     t.drop();

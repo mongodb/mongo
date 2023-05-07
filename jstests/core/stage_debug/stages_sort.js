@@ -3,7 +3,7 @@
 // @tags: [not_allowed_with_security_token]
 
 if (false) {
-    t = db.stages_sort;
+    let t = db.stages_sort;
     t.drop();
 
     var N = 50;
@@ -14,7 +14,7 @@ if (false) {
     t.createIndex({foo: 1});
 
     // Foo <= 20, descending.
-    ixscan1 = {
+    let ixscan1 = {
         ixscan: {
             args: {
                 name: "stages_sort",
@@ -29,8 +29,8 @@ if (false) {
     };
 
     // Sort with foo ascending.
-    sort1 = {sort: {args: {node: ixscan1, pattern: {foo: 1}}}};
-    res = db.runCommand({stageDebug: sort1});
+    let sort1 = {sort: {args: {node: ixscan1, pattern: {foo: 1}}}};
+    let res = db.runCommand({stageDebug: sort1});
     assert.eq(res.ok, 1);
     assert.eq(res.results.length, 21);
     assert.eq(res.results[0].foo, 0);

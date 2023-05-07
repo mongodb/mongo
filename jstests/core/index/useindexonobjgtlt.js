@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.factories;
+let t = db.factories;
 t.drop();
 t.insert({name: "xyz", metro: {city: "New York", state: "NY"}});
 t.createIndex({metro: 1});

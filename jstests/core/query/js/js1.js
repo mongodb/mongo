@@ -4,7 +4,7 @@
 //   requires_scripting,
 // ]
 
-t = db.jstests_js1;
+let t = db.jstests_js1;
 t.remove({});
 
 t.save({z: 1});

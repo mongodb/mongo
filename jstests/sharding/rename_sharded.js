@@ -202,7 +202,7 @@ const mongos = st.s0;
     toTags.forEach(deleteDifferentTagFields);
 
     // Compare field by field because keys can potentially be in different order
-    for (field in Object.keys(fromTags[0])) {
+    for (let field in Object.keys(fromTags[0])) {
         assert.eq(fromTags[0][field],
                   toTags[0][field],
                   "Expected source tags to be passed to target collection");

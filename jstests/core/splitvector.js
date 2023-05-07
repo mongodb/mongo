@@ -26,14 +26,14 @@
 //        e.g. 20000
 // @param maxChunkSize is in MBs.
 //
-assertChunkSizes = function(splitVec, numDocs, maxChunkSize, msg) {
+let assertChunkSizes = function(splitVec, numDocs, maxChunkSize, msg) {
     splitVec = [{x: -1}].concat(splitVec);
     splitVec.push({x: numDocs + 1});
-    for (i = 0; i < splitVec.length - 1; i++) {
-        min = splitVec[i];
-        max = splitVec[i + 1];
+    for (let i = 0; i < splitVec.length - 1; i++) {
+        let min = splitVec[i];
+        let max = splitVec[i + 1];
         var avgObjSize = db.jstests_splitvector.stats().avgObjSize;
-        size = db.runCommand({datasize: "test.jstests_splitvector", min: min, max: max}).size;
+        let size = db.runCommand({datasize: "test.jstests_splitvector", min: min, max: max}).size;
 
         // It is okay for the last chunk to be  smaller. A collection's size does not
         // need to be exactly a multiple of maxChunkSize.
@@ -90,7 +90,7 @@ let bulkInsertDocsFixedX = function(coll, numDocs, filler, xVal) {
 // -------------------------
 //  TESTS START HERE
 // -------------------------
-f = db.jstests_splitvector;
+let f = db.jstests_splitvector;
 resetCollection();
 
 // -------------------------
@@ -125,29 +125,30 @@ assert.eq(
 resetCollection();
 f.createIndex({x: 1});
 
+let filler;
 var case4 = function() {
     // Get baseline document size
     filler = "";
     while (filler.length < 500)
         filler += "a";
     f.save({x: 0, y: filler});
-    docSize = db.runCommand({datasize: "test.jstests_splitvector"}).size;
+    let docSize = db.runCommand({datasize: "test.jstests_splitvector"}).size;
     assert.gt(docSize, 500, "4a");
 
     // Fill collection and get split vector for 1MB maxChunkSize
     let numDocs = 4500;
     bulkInsertDocs(f, numDocs - 1, filler);  // 1 document was already inserted.
-    res = db.runCommand(
+    let res = db.runCommand(
         {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
     // splitVector aims at getting half-full chunks after split
-    factor = 0.5;
+    let factor = 0.5;
 
     assert.eq(true, res.ok, "4b");
     assert.close(
         numDocs * docSize / ((1 << 20) * factor), res.splitKeys.length, "num split keys", -1);
     assertChunkSizes(res.splitKeys, numDocs, (1 << 20) * factor, "4d");
-    for (i = 0; i < res.splitKeys.length; i++) {
+    for (let i = 0; i < res.splitKeys.length; i++) {
         assertFieldNamesMatch(res.splitKeys[i], {x: 1});
     }
 };
@@ -162,7 +163,7 @@ f.createIndex({x: 1});
 var case5 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 4499, filler);
-    res = db.runCommand({
+    let res = db.runCommand({
         splitVector: "test.jstests_splitvector",
         keyPattern: {x: 1},
         maxChunkSize: 1,
@@ -171,7 +172,7 @@ var case5 = function() {
 
     assert.eq(true, res.ok, "5a");
     assert.eq(1, res.splitKeys.length, "5b");
-    for (i = 0; i < res.splitKeys.length; i++) {
+    for (let i = 0; i < res.splitKeys.length; i++) {
         assertFieldNamesMatch(res.splitKeys[i], {x: 1});
     }
 };
@@ -186,7 +187,7 @@ f.createIndex({x: 1});
 var case6 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 1999, filler);
-    res = db.runCommand({
+    let res = db.runCommand({
         splitVector: "test.jstests_splitvector",
         keyPattern: {x: 1},
         maxChunkSize: 1,
@@ -195,7 +196,7 @@ var case6 = function() {
 
     assert.eq(true, res.ok, "6a");
     assert.eq(3, res.splitKeys.length, "6b");
-    for (i = 0; i < res.splitKeys.length; i++) {
+    for (let i = 0; i < res.splitKeys.length; i++) {
         assertFieldNamesMatch(res.splitKeys[i], {x: 1});
     }
 };
@@ -212,12 +213,12 @@ var case7 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocsFixedX(f, 2099, filler, 1);
     bulkInsertDocsFixedX(f, 9, filler, 2);
-    res = db.runCommand(
+    let res = db.runCommand(
         {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
     assert.eq(true, res.ok, "7a");
     assert.eq(2, res.splitKeys[0].x, "7b");
-    for (i = 0; i < res.splitKeys.length; i++) {
+    for (let i = 0; i < res.splitKeys.length; i++) {
         assertFieldNamesMatch(res.splitKeys[i], {x: 1});
     }
 };
@@ -234,14 +235,14 @@ var case8 = function() {
     bulkInsertDocsFixedX(f, 9, filler, 1);
     bulkInsertDocsFixedX(f, 2099, filler, 2);
     bulkInsertDocsFixedX(f, 9, filler, 3);
-    res = db.runCommand(
+    let res = db.runCommand(
         {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
     assert.eq(true, res.ok, "8a");
     assert.eq(2, res.splitKeys.length, "8b");
     assert.eq(2, res.splitKeys[0].x, "8c");
     assert.eq(3, res.splitKeys[1].x, "8d");
-    for (i = 0; i < res.splitKeys.length; i++) {
+    for (let i = 0; i < res.splitKeys.length; i++) {
         assertFieldNamesMatch(res.splitKeys[i], {x: 1});
     }
 };
@@ -262,7 +263,7 @@ var case9 = function() {
     assert.eq(3, f.count());
     print(f.getFullName());
 
-    res = db.runCommand({splitVector: f.getFullName(), keyPattern: {x: 1}, force: true});
+    let res = db.runCommand({splitVector: f.getFullName(), keyPattern: {x: 1}, force: true});
 
     assert.eq(true, res.ok, "9a");
     assert.eq(1, res.splitKeys.length, "9b");
@@ -275,7 +276,7 @@ var case9 = function() {
         assert.eq(true, res.ok, "9a: " + tojson(res));
         assert.eq(1, res.splitKeys.length, "9b: " + tojson(res));
         assert.eq(2, res.splitKeys[0].x, "9c: " + tojson(res));
-        for (i = 0; i < res.splitKeys.length; i++) {
+        for (let i = 0; i < res.splitKeys.length; i++) {
             assertFieldNamesMatch(res.splitKeys[i], {x: 1});
         }
     }

@@ -5,7 +5,7 @@ var mongod = MongoRunner.runMongod({});
 
 // get db and collection, then perform a trivial insert
 db = mongod.getDB("test");
-col = db.getCollection("single_server_majority");
+let col = db.getCollection("single_server_majority");
 col.drop();
 
 // see if we can get a majority write on this single server

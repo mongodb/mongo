@@ -6,9 +6,9 @@
  * ]
  */
 
-tn = "capped5";
+let tn = "capped5";
 
-t = db[tn];
+let t = db[tn];
 t.drop();
 
 db.createCollection(tn, {capped: true, size: 1024 * 1024 * 1});

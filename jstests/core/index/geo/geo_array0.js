@@ -5,7 +5,7 @@
 // ]
 
 // Make sure the very basics of geo arrays are sane by creating a few multi location docs
-t = db.geoarray;
+let t = db.geoarray;
 
 function test(index) {
     t.drop();

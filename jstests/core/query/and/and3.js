@@ -6,7 +6,7 @@
 //   assumes_read_concern_local,
 // ]
 
-t = db.jstests_and3;
+let t = db.jstests_and3;
 t.drop();
 
 t.save({a: 1});

@@ -1,6 +1,6 @@
 // ensure strings containing null characters dont end at that null
 
-c = db.s6556;
+let c = db.s6556;
 c.drop();
 
 c.save({foo: "as\0df"});

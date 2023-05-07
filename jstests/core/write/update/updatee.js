@@ -5,7 +5,7 @@
 
 // big numeric updates (used to overflow)
 
-t = db.updatee;
+let t = db.updatee;
 t.drop();
 
 var o = {

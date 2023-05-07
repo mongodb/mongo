@@ -1,7 +1,7 @@
 // @tags: [requires_non_retryable_writes]
 
 // test that or duplicates are dropped in certain special cases
-t = db.jstests_orc;
+let t = db.jstests_orc;
 t.drop();
 
 // The goal here will be to ensure the full range of valid values is scanned for each or clause, in

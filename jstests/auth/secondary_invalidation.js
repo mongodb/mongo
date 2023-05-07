@@ -20,7 +20,7 @@ admin.auth('admin', 'password');
 
 primary.getDB('foo').createUser({user: 'foo', pwd: 'foopwd', roles: []}, {w: NUM_NODES});
 
-secondaryFoo = secondary.getDB('foo');
+let secondaryFoo = secondary.getDB('foo');
 secondaryFoo.auth('foo', 'foopwd');
 assert.throws(function() {
     secondaryFoo.col.findOne();

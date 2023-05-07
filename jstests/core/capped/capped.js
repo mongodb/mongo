@@ -9,7 +9,7 @@
 db.jstests_capped.drop();
 db.createCollection("jstests_capped", {capped: true, size: 30000});
 
-t = db.jstests_capped;
+let t = db.jstests_capped;
 assert.eq(1, t.getIndexes().length, "expected a count of one index for new capped collection");
 
 t.save({x: 1});

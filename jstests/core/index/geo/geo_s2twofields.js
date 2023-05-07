@@ -33,7 +33,7 @@ for (var i = 0; i < maxPoints; ++i) {
     arr.push(
         {from: {type: "Point", coordinates: fromCoord}, to: {type: "Point", coordinates: toCoord}});
 }
-res = t.insert(arr);
+let res = t.insert(arr);
 assert.commandWorked(res);
 assert.eq(t.count(), maxPoints);
 

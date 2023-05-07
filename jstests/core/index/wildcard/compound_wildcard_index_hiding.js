@@ -51,17 +51,6 @@ const cwiList = [
     },
 ];
 
-function validateIndex(coll, indexSpec) {
-    const index = findIndex(coll, indexSpec);
-    assert.neq(null, index);
-
-    if (indexSpec.hidden) {
-        assert.eq(true, index.hidden);
-    } else {
-        assert.neq(true, index.hidden);
-    }
-}
-
 function setIndexVisibilityByKeyPattern(collectionName, keyPattern, hidden) {
     assert.commandWorked(db.runCommand({collMod: collectionName, index: {keyPattern, hidden}}));
 }

@@ -27,7 +27,7 @@ var parallelInsert = startParallelShell(
     "    db.jstests_geo_update_btree.insert(doc);" +
     "}");
 
-for (i = 0; i < 1000; i++) {
+for (let i = 0; i < 1000; i++) {
     coll.update({
         loc: {$within: {$center: [[Random.rand() * 180, Random.rand() * 180], Random.rand() * 50]}}
     },

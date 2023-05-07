@@ -3,17 +3,10 @@
 //   requires_scripting,
 // ]
 
-t = db.jstests_js4;
+let t = db.jstests_js4;
 t.drop();
 
-real = {
-    a: 1,
-    b: "abc",
-    c: /abc/i,
-    d: new Date(111911100111),
-    e: null,
-    f: true
-};
+let real = {a: 1, b: "abc", c: /abc/i, d: new Date(111911100111), e: null, f: true};
 
 t.save(real);
 

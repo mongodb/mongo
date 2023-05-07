@@ -1,6 +1,6 @@
-a = db.dbref2a;
-b = db.dbref2b;
-c = db.dbref2c;
+let a = db.dbref2a;
+let b = db.dbref2b;
+let c = db.dbref2c;
 
 a.drop();
 b.drop();

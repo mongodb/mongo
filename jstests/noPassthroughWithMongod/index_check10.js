@@ -3,7 +3,7 @@
 
 Random.setRandomSeed();
 
-t = db.test_index_check10;
+let t = db.test_index_check10;
 
 function doIt() {
     t.drop();
@@ -17,7 +17,7 @@ function doIt() {
     }
 
     var fields = ['a', 'b', 'c', 'd', 'e'];
-    n = Random.randInt(5) + 1;
+    let n = Random.randInt(5) + 1;
     var idx = sort();
 
     var chars = "abcdefghijklmnopqrstuvwxyz";
@@ -32,7 +32,7 @@ function doIt() {
 
     function r() {
         var len = Random.randInt(700 / n);
-        buf = "";
+        let buf = "";
         for (var i = 0; i < len; ++i) {
             buf += chars.charAt(Random.randInt(chars.length));
         }
@@ -73,9 +73,9 @@ function doIt() {
             }
         }
         s = sort();
-        c1 = t.find(spec, {_id: null}).sort(s).hint(idx).toArray();
+        let c1 = t.find(spec, {_id: null}).sort(s).hint(idx).toArray();
         try {
-            c3 = t.find(spec, {_id: null}).sort(s).hint({$natural: 1}).toArray();
+            var c3 = t.find(spec, {_id: null}).sort(s).hint({$natural: 1}).toArray();
         } catch (e) {
             // may assert if too much data for in memory sort
             print("retrying check...");

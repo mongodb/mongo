@@ -70,7 +70,7 @@ replTest.restart(replTest.getNodeId(secondary), {}, /*wait=*/ true);
 // wait for the secondary to achieve secondary status
 assert.soon(function() {
     try {
-        res = secondary.getDB("admin").runCommand({replSetGetStatus: 1});
+        let res = secondary.getDB("admin").runCommand({replSetGetStatus: 1});
         return res.myState == 2;
     } catch (e) {
         return false;

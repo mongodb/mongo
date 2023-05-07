@@ -1,27 +1,27 @@
 // @tags: [assumes_balancer_off, requires_multi_updates, requires_non_retryable_writes]
 
-NUM = 20;
-M = 5;
+let NUM = 20;
+let M = 5;
 
-t = db.jstests_arr2;
+let t = db.jstests_arr2;
 
 function test(withIndex) {
     t.drop();
 
     // insert a bunch of items to force queries to use the index.
-    newObject = {_id: 1, a: [{b: {c: 1}}]};
+    let newObject = {_id: 1, a: [{b: {c: 1}}]};
 
-    now = (new Date()).getTime() / 1000;
-    for (created = now - NUM; created <= now; created++) {
+    let now = (new Date()).getTime() / 1000;
+    for (let created = now - NUM; created <= now; created++) {
         newObject['created'] = created;
         t.insert(newObject);
         newObject['_id']++;
     }
 
     // change the last M items.
-    query = {'created': {'$gte': now - M}};
+    let query = {'created': {'$gte': now - M}};
 
-    Z = t.find(query).count();
+    let Z = t.find(query).count();
 
     if (withIndex) {
         // t.createIndex( { 'a.b.c' : 1, 'created' : -1 } )
@@ -35,7 +35,7 @@ function test(withIndex) {
     // now see how many were actually updated.
     query['a.b.c'] = 0;
 
-    count = t.count(query);
+    let count = t.count(query);
 
     assert.eq(Z, count, "count after withIndex:" + withIndex);
 }

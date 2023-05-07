@@ -88,7 +88,7 @@ function considerParameter(paramName, conn) {
     // A dictionary of 'setParameters' that should be validated while considering the current CWSP.
     function validateSetParameter(cp) {
         if (cp.setParameters) {
-            for ([param, value] of Object.entries(cp.setParameters)) {
+            for (let [param, value] of Object.entries(cp.setParameters)) {
                 const resp = conn.getDB("admin").runCommand({getParameter: 1, param: 1});
                 const hasParam = resp.hasOwnProperty(param) && resp[param] === value;
                 if (!hasParam) {

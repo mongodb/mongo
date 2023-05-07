@@ -1,16 +1,10 @@
 // @tags: [requires_fastcount]
 
-t = db.ref2;
+let t = db.ref2;
 t.drop();
 
-a = {
-    $ref: "foo",
-    $id: 1
-};
-b = {
-    $ref: "foo",
-    $id: 2
-};
+let a = {$ref: "foo", $id: 1};
+let b = {$ref: "foo", $id: 2};
 
 t.save({name: "a", r: a});
 t.save({name: "b", r: b});

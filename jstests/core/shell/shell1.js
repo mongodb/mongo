@@ -1,4 +1,4 @@
-x = 1;
+let x = 1;
 
 shellHelper("show", "tables;");
 shellHelper("show", "tables");

@@ -4,10 +4,10 @@
 //   requires_fastcount,
 // ]
 
-t = db.remove8;
+let t = db.remove8;
 t.drop();
 
-N = 1000;
+let N = 1000;
 
 function fill() {
     for (var i = 0; i < N; i++) {

@@ -6,7 +6,7 @@
 //   no_selinux,
 // ]
 
-t = db.stages_and_sorted;
+let t = db.stages_and_sorted;
 t.drop();
 var collname = "stages_and_sorted";
 
@@ -31,7 +31,7 @@ t.createIndex({bar: 1});
 t.createIndex({baz: 1});
 
 // Scan foo == 1
-ixscan1 = {
+let ixscan1 = {
     ixscan: {
         args: {
             name: "stages_and_sorted",
@@ -46,7 +46,7 @@ ixscan1 = {
 };
 
 // Scan bar == 1
-ixscan2 = {
+let ixscan2 = {
     ixscan: {
         args: {
             name: "stages_and_sorted",
@@ -61,7 +61,7 @@ ixscan2 = {
 };
 
 // Scan baz == 12
-ixscan3 = {
+let ixscan3 = {
     ixscan: {
         args: {
             name: "stages_and_sorted",
@@ -76,18 +76,14 @@ ixscan3 = {
 };
 
 // Intersect foo==1 with bar==1 with baz==12.
-andix1ix2 = {
-    andSorted: {args: {nodes: [ixscan1, ixscan2, ixscan3]}}
-};
-res = db.runCommand({stageDebug: {collection: collname, plan: andix1ix2}});
+let andix1ix2 = {andSorted: {args: {nodes: [ixscan1, ixscan2, ixscan3]}}};
+let res = db.runCommand({stageDebug: {collection: collname, plan: andix1ix2}});
 printjson(res);
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, N);
 
 // Might as well make sure that hashed does the same thing.
-andix1ix2hash = {
-    andHash: {args: {nodes: [ixscan1, ixscan2, ixscan3]}}
-};
+let andix1ix2hash = {andHash: {args: {nodes: [ixscan1, ixscan2, ixscan3]}}};
 res = db.runCommand({stageDebug: {collection: collname, plan: andix1ix2hash}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, N);

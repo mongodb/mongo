@@ -2,13 +2,13 @@
 
 // Check that $nin is the opposite of $in SERVER-3264
 
-t = db.jstests_nin2;
+let t = db.jstests_nin2;
 t.drop();
 
 // Check various operator types.
 function checkOperators(array, inMatches) {
-    inCount = inMatches ? 1 : 0;
-    notInCount = 1 - inCount;
+    let inCount = inMatches ? 1 : 0;
+    let notInCount = 1 - inCount;
     assert.eq(inCount, t.count({foo: {$in: array}}));
     assert.eq(notInCount, t.count({foo: {$not: {$in: array}}}));
     assert.eq(notInCount, t.count({foo: {$nin: array}}));

@@ -238,7 +238,7 @@ function runCorrectnessTests(conn) {
     })();
 
     (function testGlobalFilterUnsetOverridesDatabaseSpecificSettings() {
-        result = assert.commandWorked(db.getSiblingDB("db1").runCommand(
+        let result = assert.commandWorked(db.getSiblingDB("db1").runCommand(
             {profile: isMongos ? 0 : 1, filter: profileFilter1.filter}));
         assert.eq(result.filter, profileFilter2.filter);
         result = assert.commandWorked(db.getSiblingDB("db3").runCommand(

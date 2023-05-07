@@ -2,7 +2,7 @@
 
 // SERVER-2831 Demonstration of sparse index matching semantics in a multi index $or query.
 
-t = db.jstests_orh;
+let t = db.jstests_orh;
 t.drop();
 
 t.createIndex({a: 1}, {sparse: true});

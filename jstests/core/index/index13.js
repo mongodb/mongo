@@ -21,7 +21,7 @@
 // SERVER-3104 implementation, the index constraints become [3,3] on the 'a.b' field _and_ [3,3] on
 // the 'a.c' field.
 
-t = db.jstests_index13;
+let t = db.jstests_index13;
 t.drop();
 
 function assertConsistentResults(query) {
@@ -30,16 +30,13 @@ function assertConsistentResults(query) {
 }
 
 function assertResults(query) {
-    explain = t.find(query).hint(index).explain();
+    let explain = t.find(query).hint(index).explain();
     // printjson( explain ); // debug
     assertConsistentResults(query);
 }
 
 // Cases with single dotted index fied names.
-index = {
-    'a.b': 1,
-    'a.c': 1
-};
+let index = {'a.b': 1, 'a.c': 1};
 t.createIndex(index);
 t.save({a: [{b: 1}, {c: 1}]});
 t.save({a: [{b: 1, c: 1}]});

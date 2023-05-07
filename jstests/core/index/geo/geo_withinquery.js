@@ -3,13 +3,13 @@
 // ]
 
 // SERVER-7343: allow $within without a geo index.
-t = db.geo_withinquery;
+let t = db.geo_withinquery;
 t.drop();
 
-num = 0;
-for (x = 0; x <= 20; x++) {
-    for (y = 0; y <= 20; y++) {
-        o = {_id: num++, loc: [x, y]};
+let num = 0;
+for (let x = 0; x <= 20; x++) {
+    for (let y = 0; y <= 20; y++) {
+        let o = {_id: num++, loc: [x, y]};
         t.save(o);
     }
 }

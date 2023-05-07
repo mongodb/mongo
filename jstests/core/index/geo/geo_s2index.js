@@ -1,56 +1,36 @@
-t = db.geo_s2index;
+let t = db.geo_s2index;
 t.drop();
 
 // We internally drop adjacent duplicate points in lines.
-someline = {
-    "type": "LineString",
-    "coordinates": [[40, 5], [40, 5], [40, 5], [41, 6], [41, 6]]
-};
+let someline = {"type": "LineString", "coordinates": [[40, 5], [40, 5], [40, 5], [41, 6], [41, 6]]};
 t.insert({geo: someline, nonGeo: "someline"});
 t.createIndex({geo: "2dsphere"});
-foo = t.find({geo: {$geoIntersects: {$geometry: {type: "Point", coordinates: [40, 5]}}}}).next();
+let foo =
+    t.find({geo: {$geoIntersects: {$geometry: {type: "Point", coordinates: [40, 5]}}}}).next();
 assert.eq(foo.geo, someline);
 t.dropIndex({geo: "2dsphere"});
 
-pointA = {
-    "type": "Point",
-    "coordinates": [40, 5]
-};
+let pointA = {"type": "Point", "coordinates": [40, 5]};
 t.insert({geo: pointA, nonGeo: "pointA"});
 
-pointD = {
-    "type": "Point",
-    "coordinates": [41.001, 6.001]
-};
+let pointD = {"type": "Point", "coordinates": [41.001, 6.001]};
 t.insert({geo: pointD, nonGeo: "pointD"});
 
-pointB = {
-    "type": "Point",
-    "coordinates": [41, 6]
-};
+let pointB = {"type": "Point", "coordinates": [41, 6]};
 t.insert({geo: pointB, nonGeo: "pointB"});
 
-pointC = {
-    "type": "Point",
-    "coordinates": [41, 6]
-};
+let pointC = {"type": "Point", "coordinates": [41, 6]};
 t.insert({geo: pointC});
 
 // Add a point within the polygon but not on the border.  Don't want to be on
 // the path of the polyline.
-pointE = {
-    "type": "Point",
-    "coordinates": [40.6, 5.4]
-};
+let pointE = {"type": "Point", "coordinates": [40.6, 5.4]};
 t.insert({geo: pointE});
 
 // Make sure we can index this without error.
 t.insert({nonGeo: "noGeoField!"});
 
-somepoly = {
-    "type": "Polygon",
-    "coordinates": [[[40, 5], [40, 6], [41, 6], [41, 5], [40, 5]]]
-};
+let somepoly = {"type": "Polygon", "coordinates": [[[40, 5], [40, 6], [41, 6], [41, 5], [40, 5]]]};
 t.insert({geo: somepoly, nonGeo: "somepoly"});
 
 var res = t.createIndex({geo: "2dsphere", nonGeo: 1});

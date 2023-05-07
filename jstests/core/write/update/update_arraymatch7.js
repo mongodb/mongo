@@ -6,7 +6,7 @@
 // Check that the positional operator works properly when an index only match is used for the update
 // query spec.  SERVER-5067
 
-t = db.jstests_update_arraymatch7;
+let t = db.jstests_update_arraymatch7;
 t.drop();
 
 function testPositionalInc() {

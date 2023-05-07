@@ -1,6 +1,6 @@
 // SERVER-1089 Test and/or/nor nesting
 
-t = db.jstests_andor;
+let t = db.jstests_andor;
 t.drop();
 
 // not ok
@@ -10,7 +10,7 @@ function ok(q) {
 
 t.save({a: 1});
 
-test = function() {
+let test = function() {
     ok({a: 1});
 
     ok({$and: [{a: 1}]});

@@ -1,5 +1,5 @@
 // confirm that undefined no longer counts as 0 in $avg
-c = db.c;
+let c = db.c;
 c.drop();
 c.save({a: 1});
 c.save({a: 4});

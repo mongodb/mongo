@@ -11,10 +11,10 @@ var s = new ShardingTest({name: name, shards: 2, mongos: 2});
 var mongosA = s.s0;
 var mongosB = s.s1;
 
-ns = "test.coll";
-ns2 = "test.coll2";
+let ns = "test.coll";
+let ns2 = "test.coll2";
 
-adminSA = mongosA.getDB("admin");
+let adminSA = mongosA.getDB("admin");
 adminSA.runCommand({enableSharding: "test"});
 
 adminSA.runCommand({moveprimary: "test", to: "s.shard0.shardName"});
@@ -34,7 +34,7 @@ var db = mongosA.getDB("test");
 var coll = db.coll;
 var coll2 = db.coll2;
 
-numDocs = 10;
+let numDocs = 10;
 for (var i = 1; i < numDocs; i++) {
     coll.insert({_id: i, control: 0});
     coll2.insert({_id: i, control: 0});

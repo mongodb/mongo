@@ -13,9 +13,9 @@
  * ]
  */
 
-a = db.jstests_rename_a;
-b = db.jstests_rename_b;
-c = db.jstests_rename_c;
+let a = db.jstests_rename_a;
+let b = db.jstests_rename_b;
+let c = db.jstests_rename_c;
 
 a.drop();
 b.drop();
@@ -26,14 +26,14 @@ c.drop();
 // note we use floats to make sure numbers are represented as doubles for SpiderMonkey, since test
 // relies on record size
 db.createCollection("jstests_rename_a", {capped: true, size: 10000});
-for (i = 0.1; i < 10; ++i) {
+for (let i = 0.1; i < 10; ++i) {
     a.save({i: i});
 }
 assert.commandWorked(
     db.adminCommand({renameCollection: "test.jstests_rename_a", to: "test.jstests_rename_b"}));
 assert.eq(1, b.countDocuments({i: 9.1}));
 printjson(b.stats());
-for (i = 10.1; i < 1000; ++i) {
+for (var i = 10.1; i < 1000; ++i) {
     b.save({i: i});
 }
 printjson(b.stats());

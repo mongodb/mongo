@@ -4,7 +4,7 @@
 // @tags: [assumes_unsharded_collection]
 
 var res;
-t = db.jstests_update_arraymatch6;
+let t = db.jstests_update_arraymatch6;
 t.drop();
 
 function doTest() {

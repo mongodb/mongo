@@ -1,6 +1,6 @@
 // index6.js Test indexes on array subelements.
 
-r = db.ed.db.index6;
+let r = db.ed.db.index6;
 r.drop();
 
 r.save({comments: [{name: "eliot", foo: 1}]});

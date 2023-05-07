@@ -18,8 +18,8 @@ function computexscandist(y, maxDistDegrees) {
 }
 
 function pointIsOK(startPoint, radius) {
-    yscandist = rad2deg(radius) + 0.01;
-    xscandist = computexscandist(startPoint[1], yscandist);
+    let yscandist = rad2deg(radius) + 0.01;
+    let xscandist = computexscandist(startPoint[1], yscandist);
     return (startPoint[0] + xscandist < 180) && (startPoint[0] - xscandist > -180) &&
         (startPoint[1] + yscandist < 90) && (startPoint[1] - yscandist > -90);
 }

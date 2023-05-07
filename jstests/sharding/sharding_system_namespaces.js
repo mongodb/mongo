@@ -41,7 +41,7 @@ if (Array.contains(storageEngines, "wiredTiger")) {
     st.printShardingStatus();
 
     var primaryShard = st.getPrimaryShard("test");
-    anotherShard = st.getOther(primaryShard);
+    let anotherShard = st.getOther(primaryShard);
     assert.commandWorked(
         db.adminCommand({movechunk: coll + '', find: {x: 5}, to: anotherShard.name}));
 

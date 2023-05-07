@@ -5,13 +5,10 @@
 //   requires_fastcount,
 // ]
 
-t = db.geo1;
+let t = db.geo1;
 t.drop();
 
-idx = {
-    loc: "2d",
-    zip: 1
-};
+let idx = {loc: "2d", zip: 1};
 
 t.insert({zip: "06525", loc: [41.352964, 73.01212]});
 t.insert({zip: "10024", loc: [40.786387, 73.97709]});
@@ -31,7 +28,7 @@ assert.eq(3, t.count(), "B3");
 
 // test normal access
 
-wb = t.findOne({zip: "06525"});
+let wb = t.findOne({zip: "06525"});
 assert(wb, "C1");
 
 assert.eq("06525", t.find({loc: wb.loc}).hint({"$natural": 1})[0].zip, "C2");

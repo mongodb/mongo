@@ -1,13 +1,9 @@
 // @tags: [requires_multi_updates, requires_non_retryable_writes]
 
-t = db.update_arraymatch3;
+let t = db.update_arraymatch3;
 t.drop();
 
-o = {
-    _id: 1,
-    title: "ABC",
-    comments: [{"by": "joe", "votes": 3}, {"by": "jane", "votes": 7}]
-};
+let o = {_id: 1, title: "ABC", comments: [{"by": "joe", "votes": 3}, {"by": "jane", "votes": 7}]};
 
 t.save(o);
 assert.eq(o, t.findOne(), "A1");

@@ -1,5 +1,5 @@
 // See SERVER-7794.
-t = db.geo_s2nopoints;
+let t = db.geo_s2nopoints;
 t.drop();
 
 t.createIndex({loc: "2dsphere", x: 1});

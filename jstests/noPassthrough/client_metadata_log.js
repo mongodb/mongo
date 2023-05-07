@@ -8,7 +8,7 @@
 (function() {
 'use strict';
 
-let checkLog = function(conn) {
+let checkLogForMetadata = function(conn) {
     let coll = conn.getCollection("test.foo");
     assert.commandWorked(coll.insert({_id: 1}));
 
@@ -30,7 +30,7 @@ let testMongoD = function() {
     let conn = MongoRunner.runMongod({useLogFiles: true});
     assert.neq(null, conn, 'mongod was unable to start up');
 
-    checkLog(conn);
+    checkLogForMetadata(conn);
 
     MongoRunner.stopMongod(conn);
 };
@@ -43,7 +43,7 @@ let testMongoS = function() {
 
     let st = new ShardingTest({shards: 1, mongos: 1, other: options});
 
-    checkLog(st.s0);
+    checkLogForMetadata(st.s0);
 
     // Validate db.currentOp() contains mongos information
     let curOp = st.s0.adminCommand({currentOp: 1});

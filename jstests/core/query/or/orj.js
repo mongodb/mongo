@@ -1,6 +1,6 @@
 // Test nested $or clauses SERVER-2585 SERVER-3192
 
-t = db.jstests_orj;
+let t = db.jstests_orj;
 t.drop();
 
 t.save({a: 1, b: 2});

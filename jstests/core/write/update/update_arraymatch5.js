@@ -4,7 +4,7 @@
 //   requires_non_retryable_writes,
 // ]
 
-t = db.update_arraymatch5;
+let t = db.update_arraymatch5;
 t.drop();
 
 t.insert({abc: {visible: true}, testarray: [{foobar_id: 316, visible: true, xxx: 1}]});

@@ -1,11 +1,9 @@
 // @tags: [does_not_support_stepdowns]
 
-t = db.getCollection("basic1");
+let t = db.getCollection("basic1");
 t.drop();
 
-o = {
-    a: 1
-};
+let o = {a: 1};
 t.save(o);
 
 assert.eq(1, t.findOne().a, "first");

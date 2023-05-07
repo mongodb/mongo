@@ -35,7 +35,8 @@ const mongosForMove = st.s1;
 const mongosDB = mongosForAgg.getDB(jsTestName());
 const mongosColl = mongosDB.test;
 
-const shard0DB = primaryShardDB = st.shard0.getDB(jsTestName());
+const shard0DB = st.shard0.getDB(jsTestName());
+const primaryShardDB = shard0DB;
 const shard1DB = st.shard1.getDB(jsTestName());
 
 // Turn off best-effort recipient metadata refresh post-migration commit on both shards because

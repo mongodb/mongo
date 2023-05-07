@@ -1,4 +1,4 @@
-t = db.fts_partition_no_multikey;
+let t = db.fts_partition_no_multikey;
 t.drop();
 
 t.createIndex({x: 1, y: "text"});

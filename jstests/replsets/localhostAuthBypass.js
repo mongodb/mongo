@@ -107,7 +107,7 @@ var authenticate = function(mongo) {
 };
 
 var start = function(useHostName) {
-    var rs = new ReplSetTest(
+    const rs = new ReplSetTest(
         {name: replSetName, nodes: 3, keyFile: keyfile, auth: "", useHostName: useHostName});
 
     rs.startSet();
@@ -126,7 +126,7 @@ var runTest = function(useHostName) {
     print("=====================");
     print("starting replica set: useHostName=" + useHostName);
     print("=====================");
-    var rs = start(useHostName);
+    const rs = start(useHostName);
     var port = rs.getPort(rs.getPrimary());
     var host = "localhost:" + port;
     var secHosts = [];
@@ -190,7 +190,7 @@ var runNonlocalTest = function(ipAddr) {
     print("starting mongod: non-local host access " + ipAddr);
     print("==========================");
 
-    var rs = start(false);
+    const rs = start(false);
     var port = rs.getPort(rs.getPrimary());
     var host = ipAddr + ":" + port;
     var secHosts = [];

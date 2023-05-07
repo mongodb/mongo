@@ -43,7 +43,7 @@ function testWithGoodTimeZoneDir(tz_good_path) {
     // changes from the slim-format files. This was fixed in the timelib 2021 series.
     const corner_coll = testDB.parse_zone_info_corner_cases;
 
-    test_dates = [
+    let test_dates = [
         {
             test_date: "2020-10-20T19:49:47.634Z",
             test_date_parts: {

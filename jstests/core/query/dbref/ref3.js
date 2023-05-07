@@ -8,7 +8,7 @@ var other = {s: "other thing", n: 1};
 db.otherthings3.save(other);
 
 db.things3.save({name: "abc"});
-x = db.things3.findOne();
+let x = db.things3.findOne();
 x.o = new DBRef("otherthings3", other._id);
 db.things3.save(x);
 

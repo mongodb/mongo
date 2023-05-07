@@ -5,7 +5,7 @@
  * @tags: [requires_fcv_63]
  */
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/feature_flag_util.js");
 
 (function() {

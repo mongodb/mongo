@@ -1,6 +1,6 @@
 // Check that it's possible to compare a Date to a Timestamp, but they are never equal - SERVER-3304
 
-t = db.jstests_date2;
+let t = db.jstests_date2;
 t.drop();
 
 t.createIndex({a: 1});

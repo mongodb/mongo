@@ -1,5 +1,5 @@
 
-t = db.indexf;
+let t = db.indexf;
 t.drop();
 
 t.createIndex({x: 1});

@@ -4,19 +4,19 @@
 //   assumes_read_concern_local,
 // ]
 
-testNum = 1;
+let testNum = 1;
 
 function checkResults(expected, cursor, testNum) {
     assert.eq(expected.length,
               cursor.count(),
               "testNum: " + testNum + " A : " + tojson(cursor.toArray()) + " " +
                   tojson(cursor.explain()));
-    for (i = 0; i < expected.length; ++i) {
+    for (let i = 0; i < expected.length; ++i) {
         assert.eq(expected[i], cursor[i]["a"], "testNum: " + testNum + " B");
     }
 }
 
-t = db.cursor3;
+let t = db.cursor3;
 t.drop();
 
 t.save({a: 0});

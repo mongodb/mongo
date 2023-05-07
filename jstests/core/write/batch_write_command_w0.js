@@ -33,12 +33,8 @@ coll.drop();
 //
 // Single document insert, w:0 write concern specified, missing ordered
 coll.drop();
-request = {
-    insert: coll.getName(),
-    documents: [{a: 1}],
-    writeConcern: {w: 0}
-};
-result = coll.runCommand(request);
+let request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 0}};
+let result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
 countEventually(coll, 1);
 

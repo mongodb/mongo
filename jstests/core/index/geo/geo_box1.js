@@ -2,32 +2,32 @@
 //   requires_getmore,
 // ]
 
-t = db.geo_box1;
+let t = db.geo_box1;
 t.drop();
 
-num = 0;
-for (x = 0; x <= 20; x++) {
-    for (y = 0; y <= 20; y++) {
-        o = {_id: num++, loc: [x, y]};
+let num = 0;
+for (let x = 0; x <= 20; x++) {
+    for (let y = 0; y <= 20; y++) {
+        let o = {_id: num++, loc: [x, y]};
         t.save(o);
     }
 }
 
 t.createIndex({loc: "2d"});
 
-searches = [
+let searches = [
     [[1, 2], [4, 5]],
     [[1, 1], [2, 2]],
     [[0, 2], [4, 5]],
     [[1, 1], [2, 8]],
 ];
 
-for (i = 0; i < searches.length; i++) {
-    b = searches[i];
+for (let i = 0; i < searches.length; i++) {
+    let b = searches[i];
     // printjson( b );
 
-    q = {loc: {$within: {$box: b}}};
-    numWanetd = (1 + b[1][0] - b[0][0]) * (1 + b[1][1] - b[0][1]);
+    let q = {loc: {$within: {$box: b}}};
+    let numWanetd = (1 + b[1][0] - b[0][0]) * (1 + b[1][1] - b[0][1]);
     assert.eq(numWanetd, t.find(q).itcount(), "itcount: " + tojson(q));
     printjson(t.find(q).explain());
 }

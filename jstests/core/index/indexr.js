@@ -4,7 +4,7 @@
 
 // Check multikey index cases with parallel nested fields SERVER-958.
 
-t = db.jstests_indexr;
+let t = db.jstests_indexr;
 t.drop();
 
 // Check without indexes.

@@ -63,7 +63,7 @@ print("starting updating phase");
 // Update a bunch of data
 var toUpdate = toInsert;
 bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < toUpdate; i++) {
+for (let i = 0; i < toUpdate; i++) {
     var id = coll.findOne({insert: i})._id;
     bulk.find({insert: i, _id: id}).update({$inc: {counter: 1}});
 }
@@ -74,7 +74,7 @@ print("starting deletion");
 // Remove a bunch of data
 var toDelete = toInsert / 2;
 bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < toDelete; i++) {
+for (let i = 0; i < toDelete; i++) {
     bulk.find({insert: i}).removeOne();
 }
 assert.commandWorked(bulk.execute());

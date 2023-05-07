@@ -1,7 +1,7 @@
 // verify that index direction is considered when deduping based on an earlier
 // index
 
-t = db.jstests_ore;
+let t = db.jstests_ore;
 t.drop();
 
 t.createIndex({a: -1});

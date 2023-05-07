@@ -4,10 +4,10 @@
 
 // Tests where the QueryOptimizerCursor enters takeover mode during a query rather than a get more.
 
-t = db.jstests_finda;
+let t = db.jstests_finda;
 t.drop();
 
-numDocs = 200;
+let numDocs = 200;
 
 function clearQueryPlanCache() {
     t.createIndex({c: 1});
@@ -16,12 +16,12 @@ function clearQueryPlanCache() {
 
 function assertAllFound(matches) {
     //    printjson( matches );
-    found = new Array(numDocs);
+    let found = new Array(numDocs);
     for (var i = 0; i < numDocs; ++i) {
         found[i] = false;
     }
     for (var i in matches) {
-        m = matches[i];
+        let m = matches[i];
         found[m._id] = true;
     }
     for (var i = 0; i < numDocs; ++i) {
@@ -34,7 +34,7 @@ function makeCursor(query, projection, sort, batchSize, returnKey) {
     printjson(query);
     print("proj:");
     printjson(projection);
-    cursor = t.find(query, projection);
+    let cursor = t.find(query, projection);
     if (sort) {
         cursor.sort(sort);
         print("sort:");
@@ -53,7 +53,7 @@ function makeCursor(query, projection, sort, batchSize, returnKey) {
 function checkCursorWithBatchSizeProjection(
     query, projection, sort, batchSize, expectedLeftInBatch) {
     clearQueryPlanCache();
-    cursor = makeCursor(query, projection, sort, batchSize);
+    let cursor = makeCursor(query, projection, sort, batchSize);
     if (TestData.batchSize && batchSize == null) {
         expectedLeftInBatch = Math.min(TestData.batchSize, expectedLeftInBatch);
     }
@@ -71,10 +71,10 @@ function checkCursorWithBatchSize(query, sort, batchSize, expectedLeftInBatch) {
     // from the a,_id index.
     clearQueryPlanCache();
     if (expectedLeftInBatch > 110) {
-        cursor = makeCursor(query, {}, sort, batchSize, true);
-        lastNonAIndexResult = -1;
+        let cursor = makeCursor(query, {}, sort, batchSize, true);
+        let lastNonAIndexResult = -1;
         for (var i = 0; i < expectedLeftInBatch; ++i) {
-            next = cursor.next();
+            let next = cursor.next();
             // Identify the query plan used by checking the fields of a returnKey query.
             if (!friendlyEqual(['a', '_id'], Object.keySet(next))) {
                 lastNonAIndexResult = i;

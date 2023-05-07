@@ -1,10 +1,10 @@
 // @tags: [requires_fastcount]
 
-t = db.basic8;
+let t = db.basic8;
 t.drop();
 
 t.save({a: 1});
-o = t.findOne();
+let o = t.findOne();
 o.b = 2;
 t.save(o);
 

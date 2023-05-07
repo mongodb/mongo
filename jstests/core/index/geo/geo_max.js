@@ -16,10 +16,10 @@ test.t.insert({loc: [-180, 0]});
 test.t.insert({loc: [179.999, 0]});
 test.t.insert({loc: [-179.999, 0]});
 
-assertXIsNegative = function(obj) {
+let assertXIsNegative = function(obj) {
     assert.lt(obj.loc[0], 0);
 };
-assertXIsPositive = function(obj) {
+let assertXIsPositive = function(obj) {
     assert.gt(obj.loc[0], 0);
 };
 

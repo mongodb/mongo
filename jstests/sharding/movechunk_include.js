@@ -41,7 +41,7 @@ function setupMoveChunkTest(shardOptions) {
 
     var stats = st.chunkCounts("foo");
     var to = "";
-    for (shard in stats) {
+    for (let shard in stats) {
         if (stats[shard] == 0) {
             to = shard;
             break;

@@ -248,7 +248,7 @@ function testUpdateOne({initialDocList, updateQuery, updateObj, resultDocList, n
     while (batchNum < 4) {
         let batch = [];
         for (let i = 0; i < 30; i++) {
-            const doc = {_id: i, [timeField]: ISODate(), value: "a".repeat(1000)};
+            const doc = {_id: i, [timeFieldName]: ISODate(), value: "a".repeat(1000)};
             batch.push(doc);
         }
 
@@ -257,7 +257,7 @@ function testUpdateOne({initialDocList, updateQuery, updateObj, resultDocList, n
     }
 
     // Update any of the measurements with a document which will exceed the 128000 byte threshold.
-    const chunkyDoc = {_id: 128000, [timeField]: ISODate(), value: "a".repeat(10000)};
+    const chunkyDoc = {_id: 128000, [timeFieldName]: ISODate(), value: "a".repeat(10000)};
     testUpdateOne({
         // initialDocList: We manually inserted measurements.
         updateQuery: {},

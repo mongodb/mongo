@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-f = db.ed_db_update2;
+let f = db.ed_db_update2;
 
 f.drop();
 f.save({a: 4});

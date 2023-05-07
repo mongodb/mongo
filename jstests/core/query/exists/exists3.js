@@ -1,6 +1,6 @@
 // Check exists with non empty document, based on SERVER-2470 example.
 
-t = db.jstests_exists3;
+let t = db.jstests_exists3;
 t.drop();
 
 t.insert({a: 1, b: 2});

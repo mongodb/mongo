@@ -2,21 +2,21 @@
 
 function checkResults(expected, cursor) {
     assert.eq(expected.length, cursor.count());
-    for (i = 0; i < expected.length; ++i) {
+    for (let i = 0; i < expected.length; ++i) {
         assert.eq(expected[i].a, cursor[i].a);
         assert.eq(expected[i].b, cursor[i].b);
     }
 }
 
 function testMultipleInequalities(db) {
-    r = db.ed_db_cursor_mi;
+    let r = db.ed_db_cursor_mi;
     r.drop();
 
-    z = [{a: 1, b: 2}, {a: 3, b: 4}, {a: 5, b: 6}, {a: 7, b: 8}];
-    for (i = 0; i < z.length; ++i)
+    let z = [{a: 1, b: 2}, {a: 3, b: 4}, {a: 5, b: 6}, {a: 7, b: 8}];
+    for (let i = 0; i < z.length; ++i)
         r.save(z[i]);
-    idx = {a: 1, b: 1};
-    rIdx = {a: -1, b: -1};
+    let idx = {a: 1, b: 1};
+    let rIdx = {a: -1, b: -1};
     r.createIndex(idx);
 
     checkResults([z[2], z[3]], r.find({a: {$gt: 3}}).sort(idx).hint(idx));

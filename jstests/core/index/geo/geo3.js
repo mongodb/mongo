@@ -4,11 +4,11 @@
 // ]
 
 (function() {
-t = db.geo3;
+let t = db.geo3;
 t.drop();
 
-n = 1;
-arr = [];
+let n = 1;
+let arr = [];
 for (var x = -100; x < 100; x += 2) {
     for (var y = -100; y < 100; y += 2) {
         arr.push({_id: n++, loc: [x, y], a: Math.abs(x) % 5, b: Math.abs(y) % 5});
@@ -67,9 +67,7 @@ assert.commandWorked(t.createIndex({loc: "2d", b: 1}));
 
 testFiltering("loc and b");
 
-q = {
-    loc: {$near: [50, 50]}
-};
+let q = {loc: {$near: [50, 50]}};
 assert.eq(100, t.find(q).limit(100).itcount(), "D1");
 assert.eq(100, t.find(q).limit(100).size(), "D2");
 

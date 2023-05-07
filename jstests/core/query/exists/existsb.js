@@ -20,7 +20,7 @@
 //   everything but {} will have an index entry.
 // Let's make sure we handle this properly!
 
-t = db.jstests_existsb;
+let t = db.jstests_existsb;
 t.drop();
 
 t.save({});

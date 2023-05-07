@@ -55,7 +55,7 @@ const runRepairTest = function runRepairTestOnMongoDInstance(
     // Ensure the orphaned collection is valid and the document is preserved.
     const orphanedImportantCollName = "orphan." + testCollUri.replace(/-/g, "_");
     const localDb = mongod.getDB("local");
-    orphanedCollection = localDb[orphanedImportantCollName];
+    let orphanedCollection = localDb[orphanedImportantCollName];
     assert(orphanedCollection.exists());
     assert.eq(orphanedCollection.count(expectedOrphanDoc),
               1,

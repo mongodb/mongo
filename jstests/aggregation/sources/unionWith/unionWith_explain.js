@@ -114,8 +114,8 @@ function assertExplainEq(union, regular) {
     } else {
         assert(false,
                "Don't know how to compare following explains.\n" +
-                   "regular: " + tojson(regularExplain) + "\n" +
-                   "union: " + tojson(unionSubExplain) + "\n");
+                   "regular: " + tojson(regular) + "\n" +
+                   "union: " + tojson(union) + "\n");
     }
 }
 

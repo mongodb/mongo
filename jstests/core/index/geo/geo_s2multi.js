@@ -1,22 +1,19 @@
-t = db.geo_s2multi;
+let t = db.geo_s2multi;
 t.drop();
 
 t.createIndex({geo: "2dsphere"});
 
 // Let's try the examples in the GeoJSON spec.
-multiPointA = {
-    "type": "MultiPoint",
-    "coordinates": [[100.0, 0.0], [101.0, 1.0]]
-};
+let multiPointA = {"type": "MultiPoint", "coordinates": [[100.0, 0.0], [101.0, 1.0]]};
 assert.commandWorked(t.insert({geo: multiPointA}));
 
-multiLineStringA = {
+let multiLineStringA = {
     "type": "MultiLineString",
     "coordinates": [[[100.0, 0.0], [101.0, 1.0]], [[102.0, 2.0], [103.0, 3.0]]]
 };
 assert.commandWorked(t.insert({geo: multiLineStringA}));
 
-multiPolygonA = {
+let multiPolygonA = {
     "type": "MultiPolygon",
     "coordinates": [
         [[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]],
@@ -61,7 +58,7 @@ assert.eq(
 // Polygon contains itself and the multipoint.
 assert.eq(2, t.find({geo: {$geoWithin: {$geometry: multiPolygonA}}}).itcount());
 
-partialPolygonA = {
+let partialPolygonA = {
     "type": "Polygon",
     "coordinates": [[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]]
 };

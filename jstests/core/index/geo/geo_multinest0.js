@@ -6,7 +6,7 @@
 
 // Make sure nesting of location arrays also works.
 
-t = db.geonest;
+let t = db.geonest;
 t.drop();
 
 t.insert({zip: "10001", data: [{loc: [10, 10], type: "home"}, {loc: [50, 50], type: "work"}]});

@@ -104,7 +104,7 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
         const docsToInsert =
             [...Array(numToInsert).keys()].map(i => ({_id: `bulkRetryableWrite${i}`}));
 
-        donorConn = new Mongo(host);
+        let donorConn = new Mongo(host);
         const tenantSession4 = donorConn.startSession({retryWrites: true});
         const tenantCollection4 = tenantSession4.getDatabase(dbName)[collName];
 

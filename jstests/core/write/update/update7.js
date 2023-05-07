@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection, requires_multi_updates, requires_non_retryable_writes]
 
-t = db.update7;
+let t = db.update7;
 t.drop();
 
 function s() {
@@ -119,6 +119,7 @@ assert.eq("4,7,", s(), "E1");
 t.update({}, {$inc: {x: 1}}, false, true);
 assert.eq("5,8,1", s(), "E2");
 
+let i;
 for (i = 4; i < 8; i++)
     t.save({_id: i});
 t.save({_id: i, x: 1});

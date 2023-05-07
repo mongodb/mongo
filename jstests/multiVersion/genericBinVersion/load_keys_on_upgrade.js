@@ -3,7 +3,7 @@
 // admin.system.keys on upgrade.
 //
 
-load('./jstests/multiVersion/libs/multi_rs.js');
+load('jstests/multiVersion/libs/multi_rs.js');
 
 var oldVersion = "last-lts";
 

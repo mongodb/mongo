@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-c = db.find_and_modify_server6993;
+let c = db.find_and_modify_server6993;
 c.drop();
 
 c.insert({a: [1, 2]});

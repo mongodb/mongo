@@ -1,6 +1,6 @@
 // Test fast mode count with multikey entries.
 
-t = db.jstests_count9;
+let t = db.jstests_count9;
 t.drop();
 
 t.createIndex({a: 1});

@@ -5,13 +5,13 @@
 
 // Test new (optional) update syntax
 // SERVER-4176
-t = db.updatei;
+let t = db.updatei;
 
 // Using a multi update
 
 t.drop();
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({_id: i, k: "x", a: []});
 }
 
@@ -24,7 +24,7 @@ t.drop();
 
 // Using a single update
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({_id: i, k: "x", a: []});
 }
 
@@ -35,7 +35,7 @@ t.drop();
 
 // Using upsert, found
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({_id: i, k: "x", a: []});
 }
 
@@ -46,7 +46,7 @@ t.drop();
 
 // Using upsert + multi, found
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({_id: i, k: "x", a: []});
 }
 
@@ -59,7 +59,7 @@ t.drop();
 
 // Using upsert, not found
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({_id: i, k: "x", a: []});
 }
 
@@ -70,7 +70,7 @@ t.drop();
 
 // Without upsert, found
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({_id: i, k: "x", a: []});
 }
 
@@ -81,7 +81,7 @@ t.drop();
 
 // Without upsert, not found
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({_id: i, k: "x", a: []});
 }
 

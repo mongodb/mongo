@@ -4,7 +4,7 @@
 
 /* test using lots of indexes on one collection */
 
-t = db.many;
+let t = db.many;
 
 function f() {
     t.drop();
@@ -13,10 +13,10 @@ function f() {
     t.save({x: 9, y: 99});
     t.save({x: 19, y: 99});
 
-    x = 2;
+    let x = 2;
     var lastErr = null;
     while (x < 70) {
-        patt = {};
+        let patt = {};
         patt[x] = 1;
         if (x == 20)
             patt = {x: 1};
@@ -29,7 +29,7 @@ function f() {
     assert.commandFailed(lastErr, "should have got an error 'too many indexes'");
 
     // 40 is the limit currently
-    lim = t.getIndexes().length;
+    let lim = t.getIndexes().length;
     if (lim != 64) {
         print("# of indexes should be 64 but is : " + lim);
         return;

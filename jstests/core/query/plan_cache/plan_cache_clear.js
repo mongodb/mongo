@@ -25,6 +25,7 @@
 'use strict';
 
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/fixture_helpers.js");
 
 const coll = db.jstests_plan_cache_clear;
 coll.drop();
@@ -228,8 +229,8 @@ assert.eq(0, numPlanCacheEntries(coll), dumpPlanCacheState(coll));
 //     Run reIndex on the collection.
 //     Confirm that cache is empty.
 // (Only standalone mode supports the reIndex command.)
-const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
-const isStandalone = !isMongos && !db.runCommand({hello: 1}).hasOwnProperty('setName');
+const isStandalone =
+    !FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('setName');
 if (isStandalone) {
     assert.eq(1, coll.find({a: 1, b: 1}).itcount());
     assert.eq(1, numPlanCacheEntries(coll), dumpPlanCacheState(coll));

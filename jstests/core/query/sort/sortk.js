@@ -8,7 +8,7 @@
 //   requires_scripting,
 // ]
 
-t = db.jstests_sortk;
+let t = db.jstests_sortk;
 t.drop();
 
 function resetCollection() {
@@ -25,7 +25,7 @@ resetCollection();
 t.createIndex({a: 1, b: 1});
 
 function simpleQuery(extraFields, sort, hint) {
-    query = {a: {$in: [1, 2]}};
+    let query = {a: {$in: [1, 2]}};
     Object.extend(query, extraFields);
     sort = sort || {b: 1};
     hint = hint || {a: 1, b: 1};
@@ -67,7 +67,7 @@ assert.eq(0, simpleQuery({}, {a: -1, b: 1}).limit(-1)[0].b);
 
 // Without a hint, multiple cursors are attempted.
 assert.eq(0, t.find({a: {$in: [1, 2]}}).sort({b: 1}).limit(-1)[0].b);
-explain = t.find({a: {$in: [1, 2]}}).sort({b: 1}).limit(-1).explain(true);
+let explain = t.find({a: {$in: [1, 2]}}).sort({b: 1}).limit(-1).explain(true);
 assert.eq(1, explain.executionStats.nReturned);
 
 // The expected first result now comes from the first interval.

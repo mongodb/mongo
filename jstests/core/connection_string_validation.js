@@ -5,7 +5,7 @@
 // ]
 // Related to SERVER-8030.
 
-port = "27017";
+let port = "27017";
 
 if (db.getMongo().host.indexOf(":") >= 0) {
     var idx = db.getMongo().host.indexOf(":");

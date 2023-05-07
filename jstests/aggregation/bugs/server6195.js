@@ -3,7 +3,7 @@
 load('jstests/aggregation/extras/utils.js');
 load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
 
-c = db.s6570;
+let c = db.s6570;
 c.drop();
 c.save({v: "$", w: ".", x: "foo", y: "bar", z: "z\0z"});
 

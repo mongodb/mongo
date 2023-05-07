@@ -7,7 +7,7 @@
 // ]
 
 // Test basic OR functionality
-t = db.stages_or;
+let t = db.stages_or;
 t.drop();
 var collname = "stages_or";
 
@@ -21,7 +21,7 @@ t.createIndex({bar: 1});
 t.createIndex({baz: 1});
 
 // baz >= 40
-ixscan1 = {
+let ixscan1 = {
     ixscan: {
         args: {
             keyPattern: {baz: 1},
@@ -34,7 +34,7 @@ ixscan1 = {
     }
 };
 // foo >= 40
-ixscan2 = {
+let ixscan2 = {
     ixscan: {
         args: {
             keyPattern: {foo: 1},
@@ -48,17 +48,13 @@ ixscan2 = {
 };
 
 // OR of baz and foo.  Baz == foo and we dedup.
-orix1ix2 = {
-    or: {args: {nodes: [ixscan1, ixscan2], dedup: true}}
-};
-res = db.runCommand({stageDebug: {collection: collname, plan: orix1ix2}});
+let orix1ix2 = {or: {args: {nodes: [ixscan1, ixscan2], dedup: true}}};
+let res = db.runCommand({stageDebug: {collection: collname, plan: orix1ix2}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, 10);
 
 // No deduping, 2x the results.
-orix1ix2nodd = {
-    or: {args: {nodes: [ixscan1, ixscan2], dedup: false}}
-};
+let orix1ix2nodd = {or: {args: {nodes: [ixscan1, ixscan2], dedup: false}}};
 res = db.runCommand({stageDebug: {collection: collname, plan: orix1ix2nodd}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, 20);

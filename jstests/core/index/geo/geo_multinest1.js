@@ -6,7 +6,7 @@
 
 // Test distance queries with interleaved distances
 
-t = db.multinest;
+let t = db.multinest;
 t.drop();
 
 t.insert({zip: "10001", data: [{loc: [10, 10], type: "home"}, {loc: [29, 29], type: "work"}]});

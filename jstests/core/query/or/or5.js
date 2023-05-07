@@ -2,7 +2,7 @@
 //   requires_getmore,
 // ]
 
-t = db.jstests_or5;
+let t = db.jstests_or5;
 t.drop();
 
 t.createIndex({a: 1});
@@ -28,7 +28,7 @@ assert.eq.automsg("6", "t.find( {$or:[{a:6},{b:3},{c:4}]} ).toArray().length");
 assert.eq.automsg("6", "t.find( {$or:[{a:2},{b:6},{c:4}]} ).toArray().length");
 assert.eq.automsg("6", "t.find( {$or:[{a:2},{b:3},{c:6}]} ).toArray().length");
 
-for (i = 2; i <= 7; ++i) {
+for (var i = 2; i <= 7; ++i) {
     assert.eq.automsg("7", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( i ).toArray().length");
     assert.eq.automsg("6", "t.find( {$or:[{a:6},{b:3},{c:4}]} ).batchSize( i ).toArray().length");
     assert.eq.automsg("6", "t.find( {$or:[{a:2},{b:6},{c:4}]} ).batchSize( i ).toArray().length");

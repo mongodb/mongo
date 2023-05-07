@@ -1,6 +1,6 @@
 load("jstests/replsets/rslib.js");
 
-doTest = function(signal) {
+let doTest = function(signal) {
     // Test basic replica set functionality.
     // -- Replication
     // -- Failover
@@ -32,7 +32,7 @@ doTest = function(signal) {
     // and secondaries in the set and wait until the change has replicated.
     replTest.awaitReplication();
 
-    secondaries = replTest.getSecondaries();
+    let secondaries = replTest.getSecondaries();
     assert(secondaries.length == 2, "Expected 2 secondaries but length was " + secondaries.length);
     secondaries.forEach(function(secondary) {
         // try to read from secondary
@@ -47,10 +47,10 @@ doTest = function(signal) {
 
         print("Calling inline mr() with secondaryOk=true, must succeed");
         secondary.setSecondaryOk();
-        map = function() {
+        let map = function() {
             emit(this.a, 1);
         };
-        reduce = function(key, vals) {
+        let reduce = function(key, vals) {
             var sum = 0;
             for (var i = 0; i < vals.length; ++i) {
                 sum += vals[i];

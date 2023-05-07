@@ -3,13 +3,10 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.pull_or;
+let t = db.pull_or;
 t.drop();
 
-doc = {
-    _id: 1,
-    a: {b: [{x: 1}, {y: 'y'}, {x: 2}, {z: 'z'}]}
-};
+let doc = {_id: 1, a: {b: [{x: 1}, {y: 'y'}, {x: 2}, {z: 'z'}]}};
 
 t.insert(doc);
 

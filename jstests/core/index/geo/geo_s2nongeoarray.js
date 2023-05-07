@@ -1,8 +1,8 @@
 // Explode arrays when indexing non-geo fields in 2dsphere, and make sure that
 // we find them with queries.
-t = db.geo_s2nongeoarray;
+let t = db.geo_s2nongeoarray;
 
-oldPoint = [40, 5];
+let oldPoint = [40, 5];
 
 var data = {geo: oldPoint, nonGeo: [123, 456], otherNonGeo: [{b: [1, 2]}, {b: [3, 4]}]};
 

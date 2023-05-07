@@ -1,4 +1,4 @@
-p = db.jstests_hint1;
+let p = db.jstests_hint1;
 p.drop();
 
 p.save({ts: new Date(1), cls: "entry", verticals: "alleyinsider", live: true});

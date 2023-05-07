@@ -2,8 +2,8 @@
 // Tests upgrading a replica set
 //
 
-load('./jstests/multiVersion/libs/multi_rs.js');
-load('./jstests/libs/test_background_ops.js');
+load('jstests/multiVersion/libs/multi_rs.js');
+load('jstests/libs/test_background_ops.js');
 
 var oldVersion = "last-lts";
 

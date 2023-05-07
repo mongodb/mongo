@@ -1,6 +1,6 @@
 // @tags: [requires_non_retryable_writes]
 
-t = db.jstests_array_match2;
+let t = db.jstests_array_match2;
 t.drop();
 
 t.save({a: [{1: 4}, 5]});

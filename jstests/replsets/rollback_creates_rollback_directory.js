@@ -42,7 +42,7 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
 
     // Make sure we have an arbiter
     assert.soon(function() {
-        res = conns[2].getDB("admin").runCommand({replSetGetStatus: 1});
+        let res = conns[2].getDB("admin").runCommand({replSetGetStatus: 1});
         return res.myState == 7;
     }, "Arbiter failed to initialize.");
 

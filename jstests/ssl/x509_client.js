@@ -7,8 +7,8 @@ const CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New Yo
 const INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=invalid";
 
 function authAndTest(mongo) {
-    external = mongo.getDB("$external");
-    test = mongo.getDB("test");
+    let external = mongo.getDB("$external");
+    let test = mongo.getDB("test");
 
     // Add user using localhost exception
     external.createUser({

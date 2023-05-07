@@ -7,7 +7,7 @@
 //  test exercises such $sort clause from the shell user's perspective.
 //
 
-t = db.push_sort;
+let t = db.push_sort;
 t.drop();
 
 //

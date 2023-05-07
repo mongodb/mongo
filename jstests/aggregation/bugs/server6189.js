@@ -1,6 +1,6 @@
 // server6189 - Support date operators with dates before 1970
 
-c = db.c;
+let c = db.c;
 function test(date, testSynthetics) {
     print("testing " + date);
 

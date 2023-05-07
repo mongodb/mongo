@@ -1,6 +1,6 @@
 // Assorted $elemMatch behavior checks.
 
-t = db.jstests_arrayfind9;
+let t = db.jstests_arrayfind9;
 t.drop();
 
 // Top level field $elemMatch:$not matching
@@ -27,8 +27,8 @@ t.drop();
 t.save({a: [{b: [0, 2]}]});
 t.createIndex({a: 1});
 t.createIndex({'a.b': 1});
-plans = [{$natural: 1}, {a: 1}, {'a.b': 1}];
-for (i in plans) {
-    p = plans[i];
+let plans = [{$natural: 1}, {a: 1}, {'a.b': 1}];
+for (let i in plans) {
+    let p = plans[i];
     assert.eq(1, t.find({a: {$elemMatch: {b: {$gte: 1, $lte: 1}}}}).hint(p).itcount());
 }

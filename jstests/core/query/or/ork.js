@@ -1,6 +1,6 @@
 // SERVER-2585 Test $or clauses within indexed top level $or clauses.
 
-t = db.jstests_ork;
+let t = db.jstests_ork;
 t.drop();
 
 t.createIndex({a: 1});

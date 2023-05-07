@@ -3,6 +3,7 @@
 // @tags: [assumes_no_implicit_index_creation]
 (function() {
 'use strict';
+load("jstests/libs/fixture_helpers.js");
 
 const t = db.drop_index;
 t.drop();
@@ -51,7 +52,7 @@ assertIndexes(['b_1', 'c_1', 'd_1', 'e_1'], 'dropping {a: 1} by name');
 assert.commandWorked(t.dropIndex({b: 1}));
 assertIndexes(['c_1', 'd_1', 'e_1'], 'dropping {b: 1} by key pattern');
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
+const runningOnMongos = FixtureHelpers.isMongos(db);
 
 // Not allowed to drop _id index.
 for (const dropIndexArg of ['_id_', {_id: 1}]) {
@@ -59,7 +60,7 @@ for (const dropIndexArg of ['_id_', {_id: 1}]) {
     jsTestLog(`Reply to dropIndexes with arg ${tojson(dropIndexArg)}: ${tojson(dropIdIndexReply)}`);
     assert.commandFailedWithCode(dropIdIndexReply, ErrorCodes.InvalidOptions);
     assert(dropIdIndexReply.hasOwnProperty('errmsg'));
-    if (isMongos) {
+    if (runningOnMongos) {
         assert(dropIdIndexReply.hasOwnProperty('raw'));
     }
 }

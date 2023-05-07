@@ -1,7 +1,7 @@
 // Test handling of comparison between long longs and their double approximations in btrees -
 // SERVER-3719.
 
-t = db.jstests_numberlong4;
+let t = db.jstests_numberlong4;
 t.drop();
 
 if (0) {  // SERVER-3719
@@ -10,9 +10,9 @@ if (0) {  // SERVER-3719
 
     Random.setRandomSeed();
 
-    s = "11235399833116571";
-    for (i = 0; i < 10000; ++i) {
-        n = NumberLong(s + Random.randInt(10));
+    let s = "11235399833116571";
+    for (let i = 0; i < 10000; ++i) {
+        let n = NumberLong(s + Random.randInt(10));
         t.insert({x: (Random.randInt(2) ? n : n.floatApprox)});
     }
 

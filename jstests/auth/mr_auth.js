@@ -4,26 +4,26 @@
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence]
 
-baseName = "jstests_mr_auth";
-dbName = "test";
-out = baseName + "_out";
+let baseName = "jstests_mr_auth";
+let dbName = "test";
+let out = baseName + "_out";
 
-map = function() {
+let map = function() {
     emit(this.x, this.y);
 };
-red = function(k, vs) {
+let red = function(k, vs) {
     var s = 0;
     for (var i = 0; i < vs.length; i++)
         s += vs[i];
     return s;
 };
-red2 = function(k, vs) {
+let red2 = function(k, vs) {
     return 42;
 };
 
 // make sure writing is allowed when started without --auth enabled
 
-dbms = MongoRunner.runMongod({bind_ip: "127.0.0.1"});
+let dbms = MongoRunner.runMongod({bind_ip: "127.0.0.1"});
 var d = dbms.getDB(dbName);
 var t = d[baseName];
 

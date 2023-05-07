@@ -1,21 +1,21 @@
 // Axis aligned circles - hard-to-find precision errors possible with exact distances here
 
-t = db.axisaligned;
+let t = db.axisaligned;
 t.drop();
 
-scale = [1, 10, 1000, 10000];
-bits = [2, 3, 4, 5, 6, 7, 8, 9];
-radius = [0.0001, 0.001, 0.01, 0.1];
-center = [[5, 52], [6, 53], [7, 54], [8, 55], [9, 56]];
+let scale = [1, 10, 1000, 10000];
+let bits = [2, 3, 4, 5, 6, 7, 8, 9];
+let radius = [0.0001, 0.001, 0.01, 0.1];
+let center = [[5, 52], [6, 53], [7, 54], [8, 55], [9, 56]];
 
-bound = [];
+let bound = [];
 for (var j = 0; j < center.length; j++)
     bound.push([-180, 180]);
 
 // Scale all our values to test different sizes
-radii = [];
-centers = [];
-bounds = [];
+let radii = [];
+let centers = [];
+let bounds = [];
 
 for (var s = 0; s < scale.length; s++) {
     for (var i = 0; i < radius.length; i++) {
@@ -70,13 +70,13 @@ for (var b = 0; b < bits.length; b++) {
                 continue;
 
             print("DOING WITHIN QUERY ");
-            r = t.find({"loc": {"$within": {"$center": [center[j], radius[i]]}}});
+            let r = t.find({"loc": {"$within": {"$center": [center[j], radius[i]]}}});
 
             assert.eq(5, r.count());
 
             // FIXME: surely code like this belongs in utils.js.
-            a = r.toArray();
-            x = [];
+            let a = r.toArray();
+            let x = [];
             for (k in a)
                 x.push(a[k]["_id"]);
             x.sort();

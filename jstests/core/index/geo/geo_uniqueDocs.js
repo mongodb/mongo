@@ -1,8 +1,8 @@
 // Test uniqueDocs option for $within queries and the $geoNear aggregation stage. SERVER-3139
 // SERVER-12120 uniqueDocs is deprecated. Server always returns unique documents.
 
-collName = 'geo_uniqueDocs_test';
-t = db.geo_uniqueDocs_test;
+let collName = 'geo_uniqueDocs_test';
+let t = db.geo_uniqueDocs_test;
 t.drop();
 
 assert.commandWorked(t.save({locs: [[0, 2], [3, 4]]}));
@@ -21,7 +21,8 @@ assert.eq(2,
           t.aggregate({$geoNear: {near: [0, 0], distanceField: "dis", uniqueDocs: true}})
               .toArray()
               .length);
-results = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis"}}, {$limit: 2}]).toArray();
+let results =
+    t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis"}}, {$limit: 2}]).toArray();
 assert.eq(2, results.length);
 assert.close(2, results[0].dis);
 assert.close(10, results[1].dis);

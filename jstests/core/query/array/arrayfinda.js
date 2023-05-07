@@ -1,6 +1,6 @@
 // Assorted $elemMatch matching behavior checks.
 
-t = db.jstests_arrayfinda;
+let t = db.jstests_arrayfinda;
 t.drop();
 
 // $elemMatch only matches elements within arrays (a descriptive, not a normative test).

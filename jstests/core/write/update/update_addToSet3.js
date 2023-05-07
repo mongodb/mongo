@@ -1,6 +1,6 @@
 // Test the use of $each in $addToSet
 
-t = db.update_addToSet3;
+let t = db.update_addToSet3;
 t.drop();
 
 t.insert({_id: 1});

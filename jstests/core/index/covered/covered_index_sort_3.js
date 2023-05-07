@@ -12,7 +12,7 @@ load("jstests/libs/analyze_plan.js");
 
 var coll = db.getCollection("covered_sort_3");
 coll.drop();
-for (i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     coll.insert({a: i, b: "strvar_" + (i % 13), c: NumberInt(i % 10)});
 }
 

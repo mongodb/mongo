@@ -2,7 +2,7 @@
 // SERVER-6861
 load('jstests/aggregation/extras/utils.js');
 
-t = db.jstests_server6861;
+let t = db.jstests_server6861;
 t.drop();
 
 t.save({a: 1});

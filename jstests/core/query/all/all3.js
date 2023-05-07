@@ -2,7 +2,7 @@
 
 // Check that $all matching null is consistent with $in - SERVER-3820
 
-t = db.jstests_all3;
+let t = db.jstests_all3;
 t.drop();
 
 t.save({});

@@ -1,6 +1,6 @@
 // Test that the "appendOplogNote" command works properly
 
-var rs = new ReplSetTest({name: "oplogNoteTest", nodes: 1});
+const rs = new ReplSetTest({name: "oplogNoteTest", nodes: 1});
 rs.startSet();
 rs.initiate();
 

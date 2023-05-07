@@ -7,7 +7,7 @@
 // ]
 
 // Test basic query stage index scan functionality.
-t = db.stages_ixscan;
+let t = db.stages_ixscan;
 t.drop();
 var collname = "stages_ixscan";
 
@@ -40,7 +40,7 @@ assert.commandFailed(db.runCommand({
 }));
 
 // foo <= 20
-ixscan1 = {
+let ixscan1 = {
     ixscan: {
         args: {
             keyPattern: {foo: 1},

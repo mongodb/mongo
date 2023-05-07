@@ -1,22 +1,22 @@
-t = db.jstests_or1;
+let t = db.jstests_or1;
 t.drop();
 
-checkArrs = function(a, b) {
+let checkArrs = function(a, b) {
     assert.eq(a.length, b.length);
-    aStr = [];
-    bStr = [];
+    let aStr = [];
+    let bStr = [];
     a.forEach(function(x) {
         aStr.push(tojson(x));
     });
     b.forEach(function(x) {
         bStr.push(tojson(x));
     });
-    for (i = 0; i < aStr.length; ++i) {
+    for (let i = 0; i < aStr.length; ++i) {
         assert.neq(-1, bStr.indexOf(aStr[i]));
     }
 };
 
-doTest = function() {
+let doTest = function() {
     t.save({_id: 0, a: 1});
     t.save({_id: 1, a: 2});
     t.save({_id: 2, b: 1});
@@ -36,10 +36,10 @@ doTest = function() {
         t.find({$or: ["a"]}).toArray();
     });
 
-    a1 = t.find({$or: [{a: 1}]}).toArray();
+    let a1 = t.find({$or: [{a: 1}]}).toArray();
     checkArrs([{_id: 0, a: 1}, {_id: 4, a: 1, b: 1}, {_id: 5, a: 1, b: 2}], a1);
 
-    a1b2 = t.find({$or: [{a: 1}, {b: 2}]}).toArray();
+    let a1b2 = t.find({$or: [{a: 1}, {b: 2}]}).toArray();
     checkArrs(
         [
             {_id: 0, a: 1},

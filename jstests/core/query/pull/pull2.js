@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection, requires_fastcount]
 
-t = db.pull2;
+let t = db.pull2;
 t.drop();
 
 t.save({a: [{x: 1}, {x: 1, b: 2}]});

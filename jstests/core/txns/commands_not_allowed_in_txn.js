@@ -29,7 +29,7 @@ const sessionOptions = {
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
+const runningOnMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
 
 assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 assert.commandWorked(testDB.runCommand({
@@ -69,7 +69,7 @@ function testCommand(command) {
     assert(res.errmsg.match(errmsgRegExp), res);
 
     // Mongos has special handling for commitTransaction to support commit recovery.
-    if (!isMongos) {
+    if (!runningOnMongos) {
         assert.commandFailedWithCode(sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(txnNumber),
@@ -134,7 +134,7 @@ const commands = [
 ];
 
 // There is no applyOps command on mongos.
-if (!isMongos) {
+if (!runningOnMongos) {
     commands.push({
         applyOps: [{
             op: "u",
@@ -164,7 +164,7 @@ assert.commandFailedWithCode(sessionDb.runCommand({
                              ErrorCodes.OperationNotSupportedInTransaction);
 
 // Mongos has special handling for commitTransaction to support commit recovery.
-if (!isMongos) {
+if (!runningOnMongos) {
     // The failed find should abort the transaction so a commit should fail.
     assert.commandFailedWithCode(sessionDb.adminCommand({
         commitTransaction: 1,

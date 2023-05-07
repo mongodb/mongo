@@ -1,6 +1,6 @@
 // SERVER-1735 $type:10 matches null value, not missing value.
 
-t = db.jstests_type2;
+let t = db.jstests_type2;
 t.drop();
 
 t.save({a: null});

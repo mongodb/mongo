@@ -1,4 +1,4 @@
-t = db.ne1;
+let t = db.ne1;
 t.drop();
 
 t.save({x: 1});

@@ -38,7 +38,7 @@ var addUsersToEachShard = function(st) {
 
 var addShard = function(st, shouldPass) {
     adhocShard++;
-    var rs =
+    const rs =
         new ReplSetTest({nodes: 1, host: 'localhost', name: 'localhostAuthShard-' + adhocShard});
     rs.startSet({shardsvr: "", keyFile: keyfile, auth: ""});
     rs.initiate();

@@ -236,7 +236,7 @@ resetDbpath(dbpath);
     db = mongod.getDB(baseName);
     testColl = db[collName];
 
-    res = assert.commandWorked(testColl.validate());
+    let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 10);
     assert.eq(res.warnings.length, 1);
@@ -266,7 +266,7 @@ resetDbpath(dbpath);
     db = mongod.getDB(baseName);
     testColl = db[collName];
 
-    res = assert.commandWorked(testColl.validate());
+    let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 0);
     assert.eq(res.warnings.length, 0);

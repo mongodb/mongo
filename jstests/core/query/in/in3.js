@@ -1,6 +1,6 @@
 // SERVER-2829 Test arrays matching themselves within a $in expression.
 
-t = db.jstests_in8;
+let t = db.jstests_in8;
 t.drop();
 
 t.save({key: [1]});

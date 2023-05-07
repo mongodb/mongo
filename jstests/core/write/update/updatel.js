@@ -8,7 +8,7 @@
 // setinel ('$'), the update fails with an error.  SERVER-6669 SERVER-4713
 
 var res;
-t = db.jstests_updatel;
+let t = db.jstests_updatel;
 t.drop();
 
 // The collection is empty, forcing an upsert.  In this case the query has no array position match

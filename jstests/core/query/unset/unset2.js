@@ -5,7 +5,7 @@
 
 var res;
 
-t = db.unset2;
+let t = db.unset2;
 t.drop();
 
 t.save({a: ["a", "b", "c", "d"]});

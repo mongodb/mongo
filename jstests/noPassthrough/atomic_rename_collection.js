@@ -41,7 +41,7 @@ tests.forEach((test) => {
         dropTarget: true
     };
     assert.commandWorked(local.adminCommand(cmd), tojson(cmd));
-    ops =
+    let ops =
         local.oplog.rs.find({ts: {$gt: ts}, ns: {'$regex': dbregex}}).sort({$natural: 1}).toArray();
     assert.eq(ops.length,
               test.expectedOplogEntries,

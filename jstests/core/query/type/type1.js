@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.type1;
+let t = db.type1;
 t.drop();
 
 t.save({x: 1.1});

@@ -1,5 +1,5 @@
 
-t = db.distinct2;
+let t = db.distinct2;
 t.drop();
 
 t.save({a: null});

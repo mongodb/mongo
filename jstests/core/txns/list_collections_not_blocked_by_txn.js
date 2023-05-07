@@ -9,6 +9,7 @@
 // TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
 // For withTxnAndAutoRetryOnMongos.
 load('jstests/libs/auto_retry_transaction_in_sharding.js');
+load("jstests/libs/fixture_helpers.js");
 
 var dbName = 'list_collections_not_blocked';
 var mydb = db.getSiblingDB(dbName);
@@ -19,8 +20,7 @@ mydb.foo.drop({writeConcern: {w: "majority"}});
 
 assert.commandWorked(mydb.createCollection("foo", {writeConcern: {w: "majority"}}));
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
-if (isMongos) {
+if (FixtureHelpers.isMongos(db)) {
     // Before starting the transaction below, access the collection so it can be implicitly
     // sharded and force all shards to refresh their database versions because the refresh
     // requires an exclusive lock and would block behind the transaction.

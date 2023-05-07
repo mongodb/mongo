@@ -1,6 +1,6 @@
 // Check the semantics of near calls with multiple locations
 
-t = db.geoarray2;
+let t = db.geoarray2;
 t.drop();
 
 var numObjs = 10;
@@ -12,7 +12,7 @@ Random.setRandomSeed();
 
 for (var i = -1; i < 2; i++) {
     for (var j = -1; j < 2; j++) {
-        locObj = [];
+        let locObj = [];
 
         if (i != 0 || j != 0)
             locObj.push({x: i * 50 + Random.rand(), y: j * 50 + Random.rand()});
@@ -28,7 +28,7 @@ assert.commandWorked(t.createIndex({loc: "2d", type: 1}));
 
 print("Starting testing phase... ");
 
-for (var t = 0; t < 2; t++) {
+for (let t = 0; t < 2; t++) {
     var type = t == 0 ? "A" : "B";
 
     for (var i = -1; i < 2; i++) {

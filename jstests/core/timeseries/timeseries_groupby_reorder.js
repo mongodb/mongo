@@ -26,7 +26,7 @@ assert.commandWorked(coll.insert({_id: 0, t: t, b: 2, c: 2}));
 assert.commandWorked(coll.insert({_id: 0, t: t, b: 3, c: 3}));
 
 // Test reordering the groupby and internal unpack buckets.
-if (!isMongos(db)) {
+if (!FixtureHelpers.isMongos(db)) {
     const res = coll.explain("queryPlanner").aggregate([
         {$group: {_id: '$meta', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}
     ]);

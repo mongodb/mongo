@@ -2,7 +2,7 @@
 //
 // @tags: [requires_fastcount]
 
-t = db.jstests_count6;
+let t = db.jstests_count6;
 
 function checkCountForObject(obj) {
     t.drop();

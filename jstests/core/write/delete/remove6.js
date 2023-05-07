@@ -1,9 +1,9 @@
 // @tags: [requires_non_retryable_writes, requires_fastcount]
 
-t = db.remove6;
+let t = db.remove6;
 t.drop();
 
-N = 1000;
+let N = 1000;
 
 function pop() {
     t.drop();

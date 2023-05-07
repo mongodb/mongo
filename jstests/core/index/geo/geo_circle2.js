@@ -1,4 +1,4 @@
-t = db.geo_circle2;
+let t = db.geo_circle2;
 t.drop();
 
 t.createIndex({loc: "2d", categories: 1}, {"name": "placesIdx", "min": -100, "max": 100});

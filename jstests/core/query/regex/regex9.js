@@ -1,5 +1,5 @@
 
-t = db.regex9;
+let t = db.regex9;
 t.drop();
 
 t.insert({_id: 1, a: ["a", "b", "c"]});

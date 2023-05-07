@@ -5,7 +5,7 @@
 
 // tests to ensure fields in $and conditions are created when using the query to do upsert
 var res;
-coll = db.upsert4;
+let coll = db.upsert4;
 coll.drop();
 
 res = coll.update({_id: 1, $and: [{c: 1}, {d: 1}], a: 12}, {$inc: {y: 1}}, true);

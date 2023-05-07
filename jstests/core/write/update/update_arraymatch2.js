@@ -1,6 +1,6 @@
 // @tags: [requires_multi_updates, requires_non_retryable_writes]
 
-t = db.update_arraymatch2;
+let t = db.update_arraymatch2;
 t.drop();
 
 t.insert({});

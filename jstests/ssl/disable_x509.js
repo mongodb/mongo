@@ -16,7 +16,7 @@ if (cmdOut.ok) {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod(
         {restart: conn, setParameter: "authenticationMechanisms=MONGODB-X509"});
-    external = conn.getDB("$external");
+    let external = conn.getDB("$external");
 
     // Add user using localhost exception
     external.createUser({

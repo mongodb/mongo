@@ -2,11 +2,11 @@
 //
 // @tags: [requires_fastcount]
 
-t = db.server9385;
+let t = db.server9385;
 t.drop();
 
 t.insert({_id: 1, x: 1});
-x = t.findOne();
+let x = t.findOne();
 x._id = 2;
 t.save(x);
 

@@ -37,7 +37,7 @@ assert.eq([{_id: 1, value: 1}], outputColl.find().toArray());
 
 // The reduce function processes the expected amount of data.
 reduceFn = function(k, v) {
-    total = 0;
+    let total = 0;
     for (let i = 0; i < v.length; i++) {
         const x = v[i];
         if (typeof (x) == "number")

@@ -1,10 +1,10 @@
 load('jstests/libs/parallelTester.js');
 
-N = 1000;
-HOST = db.getMongo().host;
+const N = 1000;
+const HOST = db.getMongo().host;
 
-a = db.getSiblingDB("fooa");
-b = db.getSiblingDB("foob");
+const a = db.getSiblingDB("fooa");
+const b = db.getSiblingDB("foob");
 a.dropDatabase();
 b.dropDatabase();
 
@@ -80,17 +80,17 @@ function del2(dbname, host, max, kCursorKilledErrorCodes) {
     }
 }
 
-all = [];
+const all = [];
 
 all.push(fork(del1, "a", HOST, N, kCursorKilledErrorCodes));
 all.push(fork(del2, "a", HOST, N, kCursorKilledErrorCodes));
 all.push(fork(del1, "b", HOST, N, kCursorKilledErrorCodes));
 all.push(fork(del2, "b", HOST, N, kCursorKilledErrorCodes));
 
-for (i = 0; i < all.length; i++)
+for (let i = 0; i < all.length; i++)
     all[i].start();
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     sleep(2000);
     print("dropping");
     a.dropDatabase();
@@ -100,6 +100,6 @@ for (i = 0; i < 10; i++) {
 a.del_parallel.save({done: 1});
 b.del_parallel.save({done: 1});
 
-for (i = 0; i < all.length; i++) {
+for (let i = 0; i < all.length; i++) {
     assert.commandWorked(all[i].returnData());
 }

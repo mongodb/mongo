@@ -1,6 +1,6 @@
 // Correct skipping behavior when $skip is applied after $unwind.  SERVER-6269
 
-c = db.jstests_aggregation_server6269;
+let c = db.jstests_aggregation_server6269;
 c.drop();
 
 c.save({_id: 0, a: [1, 2, 3]});

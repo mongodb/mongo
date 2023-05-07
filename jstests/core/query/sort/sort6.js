@@ -1,4 +1,4 @@
-t = db.sort6;
+let t = db.sort6;
 
 function get(x) {
     return t.find().sort({c: x}).map(function(z) {

@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.not1;
+let t = db.not1;
 t.drop();
 
 t.insert({a: 1});

@@ -12,7 +12,7 @@ coll.drop();
 
 var upsertedResult = function(query, expr) {
     coll.drop();
-    result = coll.update(query, expr, {upsert: true});
+    let result = coll.update(query, expr, {upsert: true});
     return result;
 };
 

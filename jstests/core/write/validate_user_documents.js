@@ -10,7 +10,7 @@
 // Ensure that inserts and updates of the system.users collection validate the schema of inserted
 // documents.
 
-mydb = db.getSiblingDB("validate_user_documents");
+let mydb = db.getSiblingDB("validate_user_documents");
 
 function assertGLEOK(status) {
     assert(status.ok && status.err === null, "Expected OK status object; found " + tojson(status));

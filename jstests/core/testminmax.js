@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.minmaxtest;
+let t = db.minmaxtest;
 t.drop();
 t.insert({
     "_id": "IBM.N|00001264779918428889",

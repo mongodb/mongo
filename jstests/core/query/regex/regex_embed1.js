@@ -1,4 +1,4 @@
-t = db.regex_embed1;
+let t = db.regex_embed1;
 
 t.drop();
 

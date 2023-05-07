@@ -88,7 +88,7 @@ testCombination(NOSUBJ_NOSAN_CERT, false, false, false);
 TestData.skipCheckDBHashes = true;
 
 // 2. Initiate ReplSetTest with invalid certs
-ssl_options = {
+let ssl_options = {
     sslMode: "requireSSL",
     // SERVER_CERT has SAN=localhost. CLIENT_CERT is exact same except no SANS
     sslPEMKeyFile: CLIENT_CERT,

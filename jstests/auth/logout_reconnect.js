@@ -30,7 +30,7 @@ conn = MongoRunner.runMongod({restart: conn, noCleanData: true});
 
 // expect to fail on first attempt since the socket is no longer valid
 try {
-    val = testDB.foo.findOne();
+    testDB.foo.findOne();
 } catch (err) {
 }
 

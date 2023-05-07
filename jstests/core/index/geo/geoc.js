@@ -2,10 +2,10 @@
 //   requires_getmore,
 // ]
 
-t = db.geoc;
+let t = db.geoc;
 t.drop();
 
-N = 1000;
+let N = 1000;
 
 for (var i = 0; i < N; i++)
     t.insert({loc: [100 + Math.random(), 100 + Math.random()], z: 0});

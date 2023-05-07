@@ -1,6 +1,6 @@
 // SERVER-2902 Test indexing of numerically referenced array elements.
 
-t = db.jstests_array_match3;
+let t = db.jstests_array_match3;
 t.drop();
 
 // Test matching numericallly referenced array element.

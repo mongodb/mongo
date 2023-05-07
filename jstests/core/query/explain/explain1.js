@@ -2,16 +2,14 @@
 //   assumes_read_concern_local,
 // ]
 
-t = db.explain1;
+let t = db.explain1;
 t.drop();
 
 for (var i = 0; i < 100; i++) {
     t.save({x: i});
 }
 
-q = {
-    x: {$gt: 50}
-};
+let q = {x: {$gt: 50}};
 
 assert.eq(49, t.find(q).count(), "A");
 assert.eq(49, t.find(q).itcount(), "B");

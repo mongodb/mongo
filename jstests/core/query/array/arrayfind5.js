@@ -4,7 +4,7 @@
 //   cqf_incompatible,
 // ]
 
-t = db.jstests_arrayfind5;
+let t = db.jstests_arrayfind5;
 t.drop();
 
 function check(nullElemMatch) {

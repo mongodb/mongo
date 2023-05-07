@@ -1,14 +1,14 @@
 // test all operations in parallel
 load('jstests/libs/parallelTester.js');
 
-f = db.jstests_parallel_allops;
+let f = db.jstests_parallel_allops;
 f.drop();
 
 Random.setRandomSeed();
 
-t = new ParallelTester();
+let t = new ParallelTester();
 
-for (id = 0; id < 10; ++id) {
+for (var id = 0; id < 10; ++id) {
     var g = new EventGenerator(id, "jstests_parallel_allops", Random.randInt(20));
     for (var j = 0; j < 1000; ++j) {
         var op = Random.randInt(3);

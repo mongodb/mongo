@@ -1,6 +1,6 @@
 // Uassert when $elemMatch is attempted within $in SERVER-3545
 
-t = db.jstests_ina;
+let t = db.jstests_ina;
 t.drop();
 t.save({});
 

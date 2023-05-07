@@ -1,10 +1,10 @@
 
-t = db.update_serializability1;
+let t = db.update_serializability1;
 t.drop();
 
-N = 100000;
+let N = 100000;
 
-bulk = t.initializeUnorderedBulkOp();
+let bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < N; i++) {
     bulk.insert({_id: i, a: i, b: N - i, x: 1, y: 1});
 }
@@ -13,10 +13,11 @@ bulk.execute();
 t.createIndex({a: 1});
 t.createIndex({b: 1});
 
-s1 = startParallelShell("db.update_serializability1.update( { a : { $gte : 0 } }, { $set : { b : " +
-                        (N + 1) + ", x : 2 } }, false, true );");
-s2 = startParallelShell("db.update_serializability1.update( { b : { $lte : " + N +
-                        " } }, { $set : { a : -1, y : 2 } }, false, true );");
+let s1 = startParallelShell(
+    "db.update_serializability1.update( { a : { $gte : 0 } }, { $set : { b : " + (N + 1) +
+    ", x : 2 } }, false, true );");
+let s2 = startParallelShell("db.update_serializability1.update( { b : { $lte : " + N +
+                            " } }, { $set : { a : -1, y : 2 } }, false, true );");
 
 s1();
 s2();

@@ -1,7 +1,7 @@
 // Check $redact pipeline stage.
 load('jstests/aggregation/extras/utils.js');
 
-t = db.jstests_aggregation_redact;
+let t = db.jstests_aggregation_redact;
 t.drop();
 
 // this document will always be present but its content will change
@@ -42,15 +42,15 @@ t.save({
     level: 4,
 });
 
-a1 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 1]}, "$$DESCEND", "$$PRUNE"]}});
-a2 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 2]}, "$$DESCEND", "$$PRUNE"]}});
-a3 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 3]}, "$$DESCEND", "$$PRUNE"]}});
-a4 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 4]}, "$$DESCEND", "$$PRUNE"]}});
-a5 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 5]}, "$$DESCEND", "$$PRUNE"]}});
+let a1 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 1]}, "$$DESCEND", "$$PRUNE"]}});
+let a2 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 2]}, "$$DESCEND", "$$PRUNE"]}});
+let a3 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 3]}, "$$DESCEND", "$$PRUNE"]}});
+let a4 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 4]}, "$$DESCEND", "$$PRUNE"]}});
+let a5 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 5]}, "$$DESCEND", "$$PRUNE"]}});
 
-a1result = [{_id: 1, level: 1, l: {}, o: [], q: 14}];
+let a1result = [{_id: 1, level: 1, l: {}, o: [], q: 14}];
 
-a2result = [{
+let a2result = [{
     _id: 1,
     level: 1,
     h: {
@@ -61,7 +61,7 @@ a2result = [{
     q: 14
 }];
 
-a3result = [{
+let a3result = [{
     _id: 1,
     level: 1,
     b: {
@@ -77,7 +77,7 @@ a3result = [{
     q: 14
 }];
 
-a4result = [
+let a4result = [
     {
         _id: 1,
         level: 1,
@@ -97,7 +97,7 @@ a4result = [
     }
 ];
 
-a5result = [
+let a5result = [
     {
         _id: 1,
         level: 1,
@@ -139,13 +139,13 @@ t.drop();
 // entire document should be present at 2 and beyond
 t.save({_id: 1, level: 2, b: {level: 3, c: 2}, d: {level: 1, e: 8}, f: 9});
 
-b1 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 1]}, "$$KEEP", "$$PRUNE"]}});
-b2 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 2]}, "$$KEEP", "$$PRUNE"]}});
-b3 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 3]}, "$$KEEP", "$$PRUNE"]}});
+let b1 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 1]}, "$$KEEP", "$$PRUNE"]}});
+let b2 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 2]}, "$$KEEP", "$$PRUNE"]}});
+let b3 = t.aggregate({$redact: {$cond: [{$lte: ['$level', 3]}, "$$KEEP", "$$PRUNE"]}});
 
-b1result = [];
+let b1result = [];
 
-b23result = [{_id: 1, level: 2, b: {level: 3, c: 2}, d: {level: 1, e: 8}, f: 9}];
+let b23result = [{_id: 1, level: 2, b: {level: 3, c: 2}, d: {level: 1, e: 8}, f: 9}];
 
 assert.eq(b1.toArray(), b1result);
 assert.eq(b2.toArray(), b23result);

@@ -461,9 +461,9 @@ function nGonGenerator(N, D, clockwise, LON, LAT) {
             lat = (-D / 2);
         }
         lon = Math.sqrt((D / 2) * (D / 2) - (lat * lat));
-        newlat = lat + LAT;
-        newlon = lon + LON;
-        conjugateLon = LON - lon;
+        let newlat = lat + LAT;
+        let newlon = lon + LON;
+        let conjugateLon = LON - lon;
         pts[i] = [newlon, newlat];
         pts[N - i] = [conjugateLon, newlat];
     }

@@ -1,6 +1,6 @@
 // Check that a projection is applied after an in memory sort.
 
-t = db.jstests_sorti;
+let t = db.jstests_sorti;
 t.drop();
 
 t.save({a: 1, b: 0});
@@ -9,10 +9,10 @@ t.save({a: 2, b: 2});
 t.save({a: 4, b: 3});
 
 function checkBOrder(query) {
-    arr = query.toArray();
-    order = [];
-    for (i in arr) {
-        a = arr[i];
+    let arr = query.toArray();
+    let order = [];
+    for (let i in arr) {
+        let a = arr[i];
         order.push(a.b);
     }
     assert.eq([0, 2, 1, 3], order);

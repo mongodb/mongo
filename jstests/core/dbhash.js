@@ -3,15 +3,15 @@
 //   not_allowed_with_security_token,
 // ]
 
-a = db.dbhasha;
-b = db.dbhashb;
+let a = db.dbhasha;
+let b = db.dbhashb;
 
 a.drop();
 b.drop();
 
 // debug SERVER-761
 db.getCollectionNames().forEach(function(x) {
-    v = db[x].validate();
+    let v = db[x].validate();
     if (!v.valid) {
         print(x);
         printjson(v);
@@ -45,8 +45,8 @@ assert.neq(gh(a), gh(b), "A2");
 b.insert({_id: 5});
 assert.eq(gh(a), gh(b), "A3");
 
-dba = db.getSiblingDB("dbhasha");
-dbb = db.getSiblingDB("dbhashb");
+let dba = db.getSiblingDB("dbhasha");
+let dbb = db.getSiblingDB("dbhashb");
 
 dba.dropDatabase();
 dbb.dropDatabase();

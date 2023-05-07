@@ -2,7 +2,7 @@
 //   requires_fastcount,
 // ]
 
-t = db.arrayfind1;
+let t = db.arrayfind1;
 t.drop();
 
 t.save({a: [{x: 1}]});

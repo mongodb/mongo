@@ -1,6 +1,6 @@
 // With invalid geometry, error message should include _id
 // SERVER-8992
-t = db.geo_invalid_polygon;
+let t = db.geo_invalid_polygon;
 t.drop();
 
 // Self-intersecting polygon, triggers

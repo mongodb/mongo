@@ -3,7 +3,7 @@
 //   requires_non_retryable_writes,
 // ]
 
-t = db.geo_update2;
+let t = db.geo_update2;
 t.drop();
 
 for (var x = 0; x < 10; x++) {

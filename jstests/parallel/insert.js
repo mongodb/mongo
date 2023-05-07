@@ -1,17 +1,17 @@
 // perform inserts in parallel from several clients
 load('jstests/libs/parallelTester.js');
 
-f = db.jstests_parallel_insert;
+let f = db.jstests_parallel_insert;
 f.drop();
 f.createIndex({who: 1});
 
 Random.setRandomSeed();
 
-t = new ParallelTester();
+let t = new ParallelTester();
 
-for (id = 0; id < 10; ++id) {
+for (let id = 0; id < 10; ++id) {
     var g = new EventGenerator(id, "jstests_parallel_insert", Random.randInt(20));
-    for (j = 0; j < 1000; ++j) {
+    for (let j = 0; j < 1000; ++j) {
         if (j % 50 == 0) {
             g.addCheckCount(j, {who: id});
         }

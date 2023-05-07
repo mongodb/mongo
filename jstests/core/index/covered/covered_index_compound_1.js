@@ -12,7 +12,7 @@ load("jstests/libs/analyze_plan.js");
 
 var coll = db.getCollection("covered_compound_1");
 coll.drop();
-for (i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     coll.insert({a: i, b: "strvar_" + (i % 13), c: NumberInt(i % 10)});
 }
 coll.createIndex({a: 1, b: -1, c: 1});

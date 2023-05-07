@@ -217,7 +217,7 @@ var Cluster = function(options) {
 
             i = 0;
             while (st.rs(i)) {
-                var rs = st.rs(i++);
+                const rs = st.rs(i++);
                 this._addReplicaSetConns(rs);
                 replSets.push(rs);
             }

@@ -11,7 +11,7 @@
  * ]
  */
 
-t = db.jstests_rename_operator;
+let t = db.jstests_rename_operator;
 t.drop();
 
 function bad(f) {

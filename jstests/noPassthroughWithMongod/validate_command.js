@@ -20,7 +20,7 @@ function testValidate(output) {
 // Test to confirm that validate is working as expected.
 
 // SETUP DATA
-t = db.jstests_validate;
+let t = db.jstests_validate;
 t.drop();
 
 for (var i = 0; i < count; i++) {

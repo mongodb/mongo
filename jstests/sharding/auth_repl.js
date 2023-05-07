@@ -39,7 +39,7 @@ jsTest.log('Sending an authorized query that should be ok');
 assert.commandWorked(testColl.insert({x: 1}, {writeConcern: {w: nodeCount}}));
 
 conn.setSecondaryOk();
-doc = testColl.findOne();
+let doc = testColl.findOne();
 assert(doc != null);
 
 doc = testColl.find().readPref('secondary').next();

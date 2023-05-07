@@ -1,4 +1,4 @@
-doTest = function(signal) {
+let doTest = function(signal) {
     // Test orphaned primary steps down
     var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 

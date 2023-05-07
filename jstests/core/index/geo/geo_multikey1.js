@@ -1,11 +1,11 @@
 // Multikey geo index tests with parallel arrays.
 
-t = db.jstests_geo_multikey1;
+let t = db.jstests_geo_multikey1;
 t.drop();
 
-locArr = [];
-arr = [];
-for (i = 0; i < 10; ++i) {
+let locArr = [];
+let arr = [];
+for (let i = 0; i < 10; ++i) {
     locArr.push([i, i + 1]);
     arr.push(i);
 }

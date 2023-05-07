@@ -97,7 +97,7 @@ if (recipientDoc) {
             }
             break;
         default:
-            throw new Error(`Invalid state "${state}" from recipient doc.`);
+            throw new Error(`Invalid state "${recipientDoc.state}" from recipient doc.`);
     }
 }
 

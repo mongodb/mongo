@@ -3,7 +3,7 @@
 //     1. coll2 shard0 to shard2 -- shard0 can't send two chunks simultaneously.
 //     2. coll2 shard2 to shard1 -- shard1 can't receive two chunks simultaneously.
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 (function() {
 "use strict";

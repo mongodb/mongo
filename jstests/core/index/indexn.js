@@ -4,7 +4,7 @@
 //   assumes_read_concern_local,
 // ]
 
-t = db.jstests_indexn;
+let t = db.jstests_indexn;
 t.drop();
 
 t.save({a: 1, b: [1, 2]});

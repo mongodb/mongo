@@ -27,6 +27,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");
 load("jstests/libs/stats.js");
 var name = "operationalLatencyHistogramTest";
 
@@ -145,8 +146,7 @@ lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
 
 // Reindex (Only standalone mode supports the reIndex command.)
 const hello = db.runCommand({hello: 1});
-const isMongos = (hello.msg === "isdbgrid");
-const isStandalone = !isMongos && !hello.hasOwnProperty('setName');
+const isStandalone = !FixtureHelpers.isMongos(db) && !hello.hasOwnProperty('setName');
 if (isStandalone) {
     assert.commandWorked(testColl.reIndex());
     lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);

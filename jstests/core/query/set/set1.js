@@ -1,5 +1,5 @@
 
-t = db.set1;
+let t = db.set1;
 t.drop();
 
 t.insert({_id: 1, emb: {}});

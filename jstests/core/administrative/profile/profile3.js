@@ -14,10 +14,10 @@ var stddb = db;
 var db = db.getSiblingDB("profile3");
 
 db.dropAllUsers();
-t = db.profile3;
+let t = db.profile3;
 t.drop();
 
-profileCursor = function(query) {
+let profileCursor = function(query) {
     print("----");
     query = query || {};
     Object.extend(query, {user: username + "@" + db.getName()});
@@ -25,7 +25,7 @@ profileCursor = function(query) {
 };
 
 try {
-    username = "jstests_profile3_user";
+    var username = "jstests_profile3_user";
     db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
 
     db.logout();

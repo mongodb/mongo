@@ -1,6 +1,6 @@
 // Test some $not/$exists cases.
 
-t = db.jstests_exists5;
+let t = db.jstests_exists5;
 t.drop();
 
 t.save({a: 1});

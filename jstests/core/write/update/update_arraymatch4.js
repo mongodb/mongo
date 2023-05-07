@@ -3,13 +3,10 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.update_arraymatch4;
+let t = db.update_arraymatch4;
 t.drop();
 
-x = {
-    _id: 1,
-    arr: ["A1", "B1", "C1"]
-};
+let x = {_id: 1, arr: ["A1", "B1", "C1"]};
 t.insert(x);
 assert.eq(x, t.findOne(), "A1");
 

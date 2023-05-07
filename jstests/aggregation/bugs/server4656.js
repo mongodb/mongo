@@ -3,7 +3,7 @@
 var c = db.c;
 c.drop();
 
-NUM_OBJS = 100;
+let NUM_OBJS = 100;
 
 var randoms = {};
 function generateRandom() {

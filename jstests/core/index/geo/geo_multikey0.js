@@ -1,6 +1,6 @@
 // Multikey geo values tests - SERVER-3793.
 
-t = db.jstests_geo_multikey0;
+let t = db.jstests_geo_multikey0;
 t.drop();
 
 // Check that conflicting constraints are satisfied by parallel array elements.

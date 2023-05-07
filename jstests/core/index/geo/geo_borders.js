@@ -4,16 +4,16 @@
  * ]
  */
 
-t = db.borders;
+let t = db.borders;
 t.drop();
 
-epsilon = 0.0001;
+let epsilon = 0.0001;
 
 // For these tests, *required* that step ends exactly on max
-min = -1;
-max = 1;
-step = 1;
-numItems = 0;
+let min = -1;
+let max = 1;
+let step = 1;
+let numItems = 0;
 
 for (var x = min; x <= max; x += step) {
     for (var y = min; y <= max; y += step) {
@@ -22,8 +22,8 @@ for (var x = min; x <= max; x += step) {
     }
 }
 
-overallMin = -1;
-overallMax = 1;
+let overallMin = -1;
+let overallMax = 1;
 
 // Create a point index slightly smaller than the points we have
 var res =
@@ -113,14 +113,14 @@ assert.eq(numItems, t.find({
 // Circle tests
 // **************
 
-center = (overallMax + overallMin) / 2;
+let center = (overallMax + overallMin) / 2;
 center = [center, center];
-radius = overallMax;
+let radius = overallMax;
 
-offCenter = [center[0] + radius, center[1] + radius];
-onBounds = [offCenter[0] + epsilon, offCenter[1] + epsilon];
-offBounds = [onBounds[0] + epsilon, onBounds[1] + epsilon];
-onBoundsNeg = [-onBounds[0], -onBounds[1]];
+let offCenter = [center[0] + radius, center[1] + radius];
+let onBounds = [offCenter[0] + epsilon, offCenter[1] + epsilon];
+let offBounds = [onBounds[0] + epsilon, onBounds[1] + epsilon];
+let onBoundsNeg = [-onBounds[0], -onBounds[1]];
 
 // Make sure we can get all points when radius is exactly at full bounds
 assert.lt(0, t.find({loc: {$within: {$center: [center, radius + epsilon]}}}).count());
@@ -133,7 +133,7 @@ assert.lt(0, t.find({loc: {$within: {$center: [offCenter, radius + 2 * epsilon]}
 
 // Make sure we get correct corner point when center is in bounds
 // (x bounds wrap, so could get other corner)
-cornerPt = t.findOne({loc: {$within: {$center: [offCenter, step / 2]}}});
+let cornerPt = t.findOne({loc: {$within: {$center: [offCenter, step / 2]}}});
 assert.eq(cornerPt.loc.y, overallMax);
 
 // Make sure we get correct corner point when center is on bounds

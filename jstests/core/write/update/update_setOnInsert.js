@@ -1,5 +1,5 @@
 // This tests that $setOnInsert works and allow setting the _id
-t = db.update_setOnInsert;
+let t = db.update_setOnInsert;
 var res;
 
 function dotest(useIndex) {

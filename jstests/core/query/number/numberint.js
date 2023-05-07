@@ -1,14 +1,14 @@
 assert.eq.automsg("0", "new NumberInt()");
 
-n = new NumberInt(4);
+let n = new NumberInt(4);
 assert.eq.automsg("4", "n");
 assert.eq.automsg("4", "n.toNumber()");
 assert.eq.automsg("8", "n + 4");
 assert.eq.automsg("'NumberInt(4)'", "n.toString()");
 assert.eq.automsg("'NumberInt(4)'", "tojson( n )");
-a = {};
+let a = {};
 a.a = n;
-p = tojson(a);
+let p = tojson(a);
 assert.eq.automsg("'{ \"a\" : NumberInt(4) }'", "p");
 
 assert.eq.automsg("NumberInt(4 )", "eval( tojson( NumberInt( 4 ) ) )");
@@ -63,12 +63,10 @@ assert(NumberInt(1), "to bool a");
 // assert( ! NumberInt( 0 ) , "to bool b" );
 
 // create doc with int value in db
-t = db.getCollection("numberint");
+let t = db.getCollection("numberint");
 t.drop();
 
-o = {
-    a: NumberInt(42)
-};
+let o = {a: NumberInt(42)};
 t.save(o);
 
 assert.eq(42, t.findOne().a, "save doc 1");
@@ -76,7 +74,7 @@ assert.eq(1, t.find({a: {$type: 16}}).count(), "save doc 2");
 assert.eq(0, t.find({a: {$type: 1}}).count(), "save doc 3");
 
 // roundtripping
-mod = t.findOne({a: 42});
+let mod = t.findOne({a: 42});
 mod.a += 10;
 mod.b = "foo";
 delete mod._id;

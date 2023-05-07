@@ -10,7 +10,7 @@ assert.throws(function() {
 });
 
 db.things.save({name: "abc"});
-x = db.things.findOne();
+let x = db.things.findOne();
 x.o = new DBPointer("otherthings", other._id);
 db.things.save(x);
 

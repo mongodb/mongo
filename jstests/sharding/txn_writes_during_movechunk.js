@@ -1,5 +1,5 @@
 // @tags: [uses_transactions]
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 (function() {
 'use strict';

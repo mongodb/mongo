@@ -40,7 +40,7 @@ function checkTableLogSettings(conn, enabled) {
 
 function checkTableChecksFileRemoved(dbpath) {
     let files = listFiles(dbpath);
-    for (file of files) {
+    for (let file of files) {
         assert.eq(false, file.name.includes("_wt_table_checks"));
     }
 }

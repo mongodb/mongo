@@ -38,8 +38,6 @@ assert.commandWorked(testDB.createCollection(testName));
 const coll = testDB.getCollection(testName);
 coll.drop();
 
-const isMongos = (testDB.runCommand("hello").msg === "isdbgrid");
-
 // Test that $jsonSchema is rejected in an $elemMatch projection.
 assert.throws(function() {
     coll.find({}, {a: {$elemMatch: {$jsonSchema: {}}}}).itcount();

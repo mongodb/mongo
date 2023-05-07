@@ -5,26 +5,26 @@
 
 // Test $or query with several clauses on separate indexes.
 
-t = db.jstests_oro;
+let t = db.jstests_oro;
 t.drop();
 
-orClauses = [];
-for (idxKey = 'a'; idxKey <= 'aaaaaaaaaa'; idxKey += 'a') {
-    idx = {};
+let orClauses = [];
+for (let idxKey = 'a'; idxKey <= 'aaaaaaaaaa'; idxKey += 'a') {
+    let idx = {};
     idx[idxKey] = 1;
     t.createIndex(idx);
-    for (i = 0; i < 200; ++i) {
+    for (let i = 0; i < 200; ++i) {
         t.insert(idx);
     }
     orClauses.push(idx);
 }
 
 printjson(t.find({$or: orClauses}).explain());
-c = t.find({$or: orClauses}).batchSize(100);
-count = 0;
+let c = t.find({$or: orClauses}).batchSize(100);
+let count = 0;
 
 while (c.hasNext()) {
-    for (i = 0; i < 50 && c.hasNext(); ++i, c.next(), ++count)
+    for (let i = 0; i < 50 && c.hasNext(); ++i, c.next(), ++count)
         ;
     // Interleave with another operation.
     t.stats();

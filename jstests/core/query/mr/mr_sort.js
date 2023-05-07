@@ -11,7 +11,7 @@
 //   requires_scripting,
 // ]
 
-t = db.mr_sort;
+let t = db.mr_sort;
 t.drop();
 
 t.createIndex({x: 1});
@@ -27,15 +27,15 @@ t.insert({x: 7});
 t.insert({x: 5});
 t.insert({x: 6});
 
-m = function() {
+let m = function() {
     emit("a", this.x);
 };
 
-r = function(k, v) {
+let r = function(k, v) {
     return Array.sum(v);
 };
 
-out = db.mr_sort_out;
+let out = db.mr_sort_out;
 assert.commandWorked(t.mapReduce(m, r, out.getName()));
 assert.eq([{_id: "a", value: 55}], out.find().toArray(), "A1");
 out.drop();

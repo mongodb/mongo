@@ -4,7 +4,7 @@
 
 // Test query empty array SERVER-2258
 
-t = db.jstests_arrayfind4;
+let t = db.jstests_arrayfind4;
 t.drop();
 
 t.save({a: []});

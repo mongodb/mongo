@@ -1,6 +1,6 @@
 // Test simple regex optimization with a regex | (bar) present - SERVER-3298
 
-t = db.jstests_regexa;
+let t = db.jstests_regexa;
 t.drop();
 
 function check() {

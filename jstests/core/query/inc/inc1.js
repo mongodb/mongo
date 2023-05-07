@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.inc1;
+let t = db.inc1;
 t.drop();
 
 function test(num, name) {

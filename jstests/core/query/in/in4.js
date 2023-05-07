@@ -2,7 +2,7 @@
 
 // SERVER-2343 Test $in empty array matching.
 
-t = db.jstests_in9;
+let t = db.jstests_in9;
 t.drop();
 
 function someData() {

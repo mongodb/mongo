@@ -6,7 +6,7 @@
 //   requires_fastcount,
 // ]
 
-t = db.find_and_modify;
+let t = db.find_and_modify;
 t.drop();
 
 // fill db
@@ -15,7 +15,8 @@ for (var i = 1; i <= 10; i++) {
 }
 
 // returns old
-out = t.findAndModify({sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}});
+let out =
+    t.findAndModify({sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}});
 assert.eq(out.value, 0);
 assert.eq(out.inprogress, false);
 t.update({_id: out._id}, {$set: {inprogress: false}});
@@ -133,7 +134,7 @@ runFindAndModify(true /* shouldMatch */, false /* upsert */, false /* new */);
 //
 
 t.drop();
-cmdRes = db.runCommand(
+let cmdRes = db.runCommand(
     {findAndModify: t.getName(), query: {_id: "miss"}, update: {$inc: {y: 1}}, upsert: true});
 assert.commandWorked(cmdRes);
 assert("value" in cmdRes);

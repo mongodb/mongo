@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection, requires_non_retryable_writes, requires_fastcount]
 
-t = db.remove_justone;
+let t = db.remove_justone;
 t.drop();
 
 t.insert({x: 1});

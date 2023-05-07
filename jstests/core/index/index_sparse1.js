@@ -2,7 +2,7 @@
 // collection.
 // @tags: [assumes_no_implicit_index_creation, requires_non_retryable_writes, requires_fastcount]
 
-t = db.index_sparse1;
+let t = db.index_sparse1;
 t.drop();
 
 t.insert({_id: 1, x: 1});

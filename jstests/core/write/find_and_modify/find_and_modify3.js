@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.find_and_modify3;
+let t = db.find_and_modify3;
 t.drop();
 
 t.insert({_id: 0, other: 0, comments: [{i: 0, j: 0}, {i: 1, j: 1}]});
@@ -14,10 +14,10 @@ t.insert({
 });  // this is the only one that gets modded
 t.insert({_id: 2, other: 2, comments: [{i: 0, j: 0}, {i: 1, j: 1}]});
 
-orig0 = t.findOne({_id: 0});
-orig2 = t.findOne({_id: 2});
+let orig0 = t.findOne({_id: 0});
+let orig2 = t.findOne({_id: 2});
 
-out = t.findAndModify({
+let out = t.findAndModify({
     query: {_id: 1, 'comments.i': 0},
     update: {$set: {'comments.$.j': 2}},
     'new': true,

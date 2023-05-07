@@ -3,11 +3,11 @@
 //   requires_fastcount,
 // ]
 
-t = db.geo2;
+let t = db.geo2;
 t.drop();
 
-n = 1;
-arr = [];
+let n = 1;
+let arr = [];
 for (var x = -100; x < 100; x += 2) {
     for (var y = -100; y < 100; y += 2) {
         arr.push({_id: n++, loc: [x, y]});

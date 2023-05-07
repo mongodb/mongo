@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.set5;
+let t = db.set5;
 t.drop();
 
 function check(want, err) {

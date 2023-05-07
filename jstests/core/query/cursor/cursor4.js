@@ -2,21 +2,21 @@
 
 function checkResults(expected, cursor) {
     assert.eq(expected.length, cursor.count());
-    for (i = 0; i < expected.length; ++i) {
+    for (let i = 0; i < expected.length; ++i) {
         assert.eq(expected[i].a, cursor[i].a);
         assert.eq(expected[i].b, cursor[i].b);
     }
 }
 
 function testConstrainedFindMultiFieldSorting(db) {
-    r = db.ed_db_cursor4_cfmfs;
+    let r = db.ed_db_cursor4_cfmfs;
     r.drop();
 
-    entries = [{a: 0, b: 0}, {a: 0, b: 1}, {a: 1, b: 1}, {a: 1, b: 1}, {a: 2, b: 0}];
-    for (i = 0; i < entries.length; ++i)
+    let entries = [{a: 0, b: 0}, {a: 0, b: 1}, {a: 1, b: 1}, {a: 1, b: 1}, {a: 2, b: 0}];
+    for (let i = 0; i < entries.length; ++i)
         r.save(entries[i]);
     r.createIndex({a: 1, b: 1});
-    reverseEntries = entries.slice();
+    let reverseEntries = entries.slice();
     reverseEntries.reverse();
 
     checkResults(entries.slice(2, 4), r.find({a: 1, b: 1}).sort({a: 1, b: 1}).hint({a: 1, b: 1}));

@@ -29,7 +29,7 @@ const runTest = function() {
     (function testSingleLookupFromShard() {
         // Run a pipeline which must be merged on a shard. This should force the $lookup (on
         // the sharded collection) to be run on a mongod.
-        pipeline = [
+        let pipeline = [
                 {$_internalSplitPipeline: {mergeType: "anyShard"}},
                 {
                   $lookup: {
@@ -50,7 +50,7 @@ const runTest = function() {
 
     (function testMultipleLookupsFromShard() {
         // Run two lookups in a row (both on mongod).
-        pipeline = [
+        let pipeline = [
                 {$_internalSplitPipeline: {mergeType: "anyShard"}},
                 {
                   $lookup: {
@@ -79,7 +79,7 @@ const runTest = function() {
 
     (function testUnshardedLookupWithinShardedLookup() {
         // Pipeline with unsharded $lookup inside a sharded $lookup.
-        pipeline = [
+        let pipeline = [
                 {$_internalSplitPipeline: {mergeType: "anyShard"}},
                 {
                   $lookup: {

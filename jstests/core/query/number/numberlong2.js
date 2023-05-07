@@ -4,7 +4,7 @@
 
 // Test precision of NumberLong values with v1 index code SERVER-3717
 
-t = db.jstests_numberlong2;
+let t = db.jstests_numberlong2;
 t.drop();
 
 t.createIndex({x: 1});
@@ -24,8 +24,8 @@ chk(NumberLong("4503599627370497"));
 
 t.remove({});
 
-s = "11235399833116571";
-for (i = 99; i >= 0; --i) {
+let s = "11235399833116571";
+for (let i = 99; i >= 0; --i) {
     t.save({x: NumberLong(s + i)});
 }
 

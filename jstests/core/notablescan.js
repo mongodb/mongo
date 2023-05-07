@@ -16,7 +16,7 @@
 //   tenant_migration_incompatible,
 // ]
 
-t = db.test_notablescan;
+let t = db.test_notablescan;
 t.drop();
 
 try {

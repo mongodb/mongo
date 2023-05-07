@@ -15,7 +15,7 @@
 var mydb = db.getSiblingDB('auth1_db');
 mydb.dropAllUsers();
 
-pass = "a" + Math.random();
+let pass = "a" + Math.random();
 // print( "password [" + pass + "]" );
 
 mydb.createUser({user: "eliot", pwd: pass, roles: jsTest.basicUserRoles});
@@ -23,7 +23,7 @@ mydb.createUser({user: "eliot", pwd: pass, roles: jsTest.basicUserRoles});
 assert(mydb.auth("eliot", pass), "auth failed");
 assert(!mydb.auth("eliot", pass + "a"), "auth should have failed");
 
-pass2 = "b" + Math.random();
+let pass2 = "b" + Math.random();
 mydb.changeUserPassword("eliot", pass2);
 
 assert(!mydb.auth("eliot", pass), "failed to change password failed");

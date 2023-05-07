@@ -8,7 +8,7 @@
  * ]
  */
 
-t = db.jstests_rename5;
+let t = db.jstests_rename5;
 t.drop();
 
 t.createIndex({a: 1});

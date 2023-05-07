@@ -1,4 +1,4 @@
-t = db.regex_matches_self;
+let t = db.regex_matches_self;
 t.drop();
 
 t.insert({r: /^a/});

@@ -8,8 +8,8 @@ var t = db.show_record_id;
 t.drop();
 
 function checkResults(arr) {
-    for (i in arr) {
-        a = arr[i];
+    for (let i in arr) {
+        let a = arr[i];
         assert(a['$recordId']);
     }
 }

@@ -370,7 +370,7 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      * If the current batch has a document in it, that one will be ignored.
      */
     self.getOneChange = function(cursor, expectInvalidate = false) {
-        changes = self.getNextChanges(cursor, 1, true);
+        const changes = self.getNextChanges(cursor, 1, true);
 
         if (expectInvalidate) {
             assert(isInvalidated(changes[changes.length - 1]),

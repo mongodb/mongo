@@ -8,7 +8,7 @@
 // Test that we can update DBRefs, but not dbref fields outside a DBRef
 
 var res;
-t = db.jstests_update_dbref;
+let t = db.jstests_update_dbref;
 t.drop();
 
 res = t.save({_id: 1, a: new DBRef("a", "b")});

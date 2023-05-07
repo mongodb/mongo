@@ -5,7 +5,7 @@
 
 // Update with mods corner cases.
 
-f = db.jstests_update3;
+let f = db.jstests_update3;
 
 f.drop();
 f.save({a: 1});

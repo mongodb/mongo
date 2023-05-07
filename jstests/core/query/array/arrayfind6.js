@@ -1,6 +1,6 @@
 // Check index bound determination for $not:$elemMatch queries.  SERVER-5740
 
-t = db.jstests_arrayfind6;
+let t = db.jstests_arrayfind6;
 t.drop();
 
 t.save({a: [{b: 1, c: 2}]});

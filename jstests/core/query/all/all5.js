@@ -1,6 +1,6 @@
 // Test $all/$elemMatch/null matching - SERVER-4517
 
-t = db.jstests_all5;
+let t = db.jstests_all5;
 t.drop();
 
 function checkMatch(doc) {

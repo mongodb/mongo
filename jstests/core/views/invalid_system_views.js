@@ -18,11 +18,12 @@
  *   uses_compact,
  * ]
  */
+load("jstests/libs/fixture_helpers.js");
 
 (function() {
 "use strict";
-const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
-const isStandalone = !isMongos && !db.runCommand({hello: 1}).hasOwnProperty("setName");
+const runningOnMongos = FixtureHelpers.isMongos(db);
+const isStandalone = !runningOnMongos && !db.runCommand({hello: 1}).hasOwnProperty("setName");
 
 function runTest(badViewDefinition) {
     let viewsDB = db.getSiblingDB("invalid_system_views");
@@ -52,7 +53,7 @@ function runTest(badViewDefinition) {
             " in system.views";
     }
 
-    if (!isMongos) {
+    if (!runningOnMongos) {
         // Commands that run on existing regular collections should not be impacted by the
         // presence of invalid views. However, applyOps doesn't work on mongos.
         assert.commandWorked(
@@ -107,7 +108,7 @@ function runTest(badViewDefinition) {
     }
 
     const storageEngine = jsTest.options().storageEngine;
-    if (isMongos || storageEngine === "inMemory") {
+    if (runningOnMongos || storageEngine === "inMemory") {
         print("Not testing compact command on mongos or ephemeral storage engine");
     } else {
         assert.commandWorked(viewsDB.runCommand({compact: "collection", force: true}),

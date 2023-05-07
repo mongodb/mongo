@@ -1,6 +1,6 @@
 // Check nonoverlapping $in/$all with multikeys SERVER-2165
 
-t = db.jstests_indexl;
+let t = db.jstests_indexl;
 
 function test(t) {
     t.save({a: [1, 2]});

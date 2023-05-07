@@ -6,12 +6,13 @@
  */
 (function() {
 'use strict';
+load("jstests/libs/fixture_helpers.js");
 
 const kUnknownIDLFieldError = 40415;
-const isMongos = ("isdbgrid" == db.runCommand("hello").msg);
+const runningOnMongos = FixtureHelpers.isMongos(db);
 
 const extractResult = function(obj) {
-    if (!isMongos)
+    if (!runningOnMongos)
         return obj;
 
     // Sample mongos format:

@@ -14,7 +14,7 @@ if (ss.storageEngine.name !== "wiredTiger") {
     var admin = conn.getDB("admin");
 
     function reconfigure(str) {
-        ret = admin.runCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": str});
+        let ret = admin.runCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": str});
         print("ret: " + tojson(ret));
         return ret;
     }

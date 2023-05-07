@@ -3,13 +3,10 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.pull_remove1;
+let t = db.pull_remove1;
 t.drop();
 
-o = {
-    _id: 1,
-    a: [1, 2, 3, 4, 5, 6, 7, 8]
-};
+let o = {_id: 1, a: [1, 2, 3, 4, 5, 6, 7, 8]};
 t.insert(o);
 
 assert.eq(o, t.findOne(), "A1");

@@ -373,7 +373,7 @@ assert = (function() {
                     return;
             }
 
-            diff = (new Date()).getTime() - start.getTime();
+            const diff = (new Date()).getTime() - start.getTime();
             if (diff > timeout) {
                 msg = _buildAssertionMessage(msg, msgPrefix);
                 if (runHangAnalyzer) {

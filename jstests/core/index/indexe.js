@@ -1,11 +1,11 @@
 // @tags: [requires_getmore, requires_fastcount]
 
-t = db.indexe;
+let t = db.indexe;
 t.drop();
 
 var num = 1000;
 
-for (i = 0; i < num; i++) {
+for (let i = 0; i < num; i++) {
     t.insert({a: "b"});
 }
 

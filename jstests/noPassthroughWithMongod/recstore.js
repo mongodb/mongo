@@ -3,7 +3,7 @@
 // it is probably redundant with other tests but is a convenient starting point
 // for testing such things.
 
-t = db.storetest;
+let t = db.storetest;
 
 t.drop();
 

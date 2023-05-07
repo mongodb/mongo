@@ -1,4 +1,4 @@
-t = db.getCollection("basic5");
+let t = db.getCollection("basic5");
 t.drop();
 
 t.save({a: 1, b: [1, 2, 3]});

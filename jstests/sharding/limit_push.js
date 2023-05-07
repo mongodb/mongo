@@ -8,7 +8,7 @@ var s = new ShardingTest({name: "limit_push", shards: 2, mongos: 1});
 var db = s.getDB("test");
 
 // Create some data
-for (i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     db.limit_push.insert({_id: i, x: i});
 }
 db.limit_push.createIndex({x: 1});
@@ -34,9 +34,7 @@ assert.eq(
 
 // The query is asking for the maximum value below a given value
 // db.limit_push.find( { x : { $lt : 60} } ).sort( { x:-1} ).limit(1)
-q = {
-    x: {$lt: 60}
-};
+let q = {x: {$lt: 60}};
 
 // Make sure the basic queries are correct
 assert.eq(60, db.limit_push.find(q).count(), "Did not find 60 documents");
@@ -46,7 +44,7 @@ assert.eq(60, db.limit_push.find(q).count(), "Did not find 60 documents");
 // Now make sure that the explain shos that each shard is returning a single document as
 // indicated
 // by the "n" element for each shard
-exp = db.limit_push.find(q).sort({x: -1}).limit(1).explain("executionStats");
+let exp = db.limit_push.find(q).sort({x: -1}).limit(1).explain("executionStats");
 printjson(exp);
 
 var execStages = exp.executionStats.executionStages;

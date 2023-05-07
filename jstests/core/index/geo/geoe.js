@@ -4,7 +4,7 @@
 // the end of the btree and not reverse direction (leaving the rest of
 // the search always looking at some random non-matching point).
 
-t = db.geo_box;
+let t = db.geo_box;
 t.drop();
 
 t.insert({"_id": 1, "geo": [33, -11.1]});
@@ -24,7 +24,7 @@ t.insert({"_id": 14, "geo": [-122.289505, 37.695774]});
 
 t.createIndex({geo: "2d"});
 
-c = t.find({geo: {"$within": {"$box": [[-125.078461, 36.494473], [-120.320648, 38.905199]]}}});
+let c = t.find({geo: {"$within": {"$box": [[-125.078461, 36.494473], [-120.320648, 38.905199]]}}});
 assert.eq(11, c.count(), "A1");
 
 c = t.find({geo: {"$within": {"$box": [[-124.078461, 36.494473], [-120.320648, 38.905199]]}}});

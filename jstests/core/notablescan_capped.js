@@ -17,14 +17,14 @@
 //   tenant_migration_incompatible,
 // ]
 
-t = db.test_notablescan_capped;
+let t = db.test_notablescan_capped;
 t.drop();
 assert.commandWorked(db.createCollection(t.getName(), {capped: true, size: 100}));
 
 try {
     assert.commandWorked(db._adminCommand({setParameter: 1, notablescan: true}));
 
-    err = assert.throws(function() {
+    let err = assert.throws(function() {
         t.find({a: 1}).tailable(true).next();
     });
     assert.includes(err.toString(), "tailable");

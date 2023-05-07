@@ -14,7 +14,7 @@ var s = new ShardingTest({shards: 2, mongos: 1});
 var dbname = "testDB";
 var coll = "ttl_sharded";
 var ns = dbname + "." + coll;
-t = s.getDB(dbname).getCollection(coll);
+let t = s.getDB(dbname).getCollection(coll);
 
 // enable sharding of the collection. Only 1 chunk initially
 s.adminCommand({enablesharding: dbname});

@@ -1,6 +1,6 @@
 // Sparse indexes with arrays SERVER-3216
 
-t = db.jstests_indext;
+let t = db.jstests_indext;
 t.drop();
 
 t.createIndex({'a.b': 1}, {sparse: true});

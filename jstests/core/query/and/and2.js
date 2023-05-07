@@ -5,7 +5,7 @@
 
 // Test dollar sign operator with $and SERVER-1089
 
-t = db.jstests_and2;
+let t = db.jstests_and2;
 
 t.drop();
 t.save({a: [1, 2]});

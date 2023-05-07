@@ -114,7 +114,7 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
     testForTimezone("America/New_York");
 
     // Confirm that aggregating with a timezone which is not present in 'tzGoodInfoDir' fails.
-    timeZonePipeline = buildTimeZonePipeline("Europe/Dublin");
+    let timeZonePipeline = buildTimeZonePipeline("Europe/Dublin");
     assert.eq(assert.throws(() => mongosColl.aggregate(timeZonePipeline)).code, 40485);
 
     st.stop();

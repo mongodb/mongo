@@ -3,7 +3,7 @@
 //   requires_getmore
 // ]
 
-t = db.index_check2;
+let t = db.index_check2;
 t.drop();
 
 // Include helpers for analyzing explain output.
@@ -17,15 +17,9 @@ for (var i = 0; i < 1000; i++) {
     t.save({num: i, tags: a});
 }
 
-q1 = {
-    tags: "tag6"
-};
-q2 = {
-    tags: "tag12"
-};
-q3 = {
-    tags: {$all: ["tag6", "tag12"]}
-};
+let q1 = {tags: "tag6"};
+let q2 = {tags: "tag12"};
+let q3 = {tags: {$all: ["tag6", "tag12"]}};
 
 assert.eq(120, t.find(q1).itcount(), "q1 a");
 assert.eq(120, t.find(q2).itcount(), "q2 a");
@@ -42,9 +36,9 @@ assert(isIxscan(db, getWinningPlan(t.find(q1).explain().queryPlanner)), "e1");
 assert(isIxscan(db, getWinningPlan(t.find(q2).explain().queryPlanner)), "e2");
 assert(isIxscan(db, getWinningPlan(t.find(q3).explain().queryPlanner)), "e3");
 
-scanned1 = t.find(q1).explain("executionStats").executionStats.totalKeysExamined;
-scanned2 = t.find(q2).explain("executionStats").executionStats.totalKeysExamined;
-scanned3 = t.find(q3).explain("executionStats").executionStats.totalKeysExamined;
+let scanned1 = t.find(q1).explain("executionStats").executionStats.totalKeysExamined;
+let scanned2 = t.find(q2).explain("executionStats").executionStats.totalKeysExamined;
+let scanned3 = t.find(q3).explain("executionStats").executionStats.totalKeysExamined;
 
 // print( "scanned1: " + scanned1 + " scanned2: " + scanned2 + " scanned3: " + scanned3 );
 

@@ -4,7 +4,7 @@
  * ]
  */
 
-t = db.basic6;
+let t = db.basic6;
 
 t.findOne();
 t.a.findOne();

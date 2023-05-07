@@ -3,14 +3,11 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.pullall2;
+let t = db.pullall2;
 t.drop();
 
-o = {
-    _id: 1,
-    a: []
-};
-for (i = 0; i < 5; i++)
+let o = {_id: 1, a: []};
+for (let i = 0; i < 5; i++)
     o.a.push({x: i, y: i});
 
 t.insert(o);

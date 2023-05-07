@@ -95,7 +95,7 @@ const wTPrintPrepareConflictLogFailPoint = configureFailPoint(primary, "WTPrintP
 
 const joinReadThread = startParallelShell(() => {
     db.getMongo().setSecondaryOk();
-    oldPrimaryDB = db.getSiblingDB(TestData.dbName);
+    let oldPrimaryDB = db.getSiblingDB(TestData.dbName);
 
     assert.commandFailedWithCode(oldPrimaryDB.runCommand({
         find: TestData.collName,

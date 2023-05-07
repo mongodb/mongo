@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.jstests_pull;
+let t = db.jstests_pull;
 t.drop();
 
 t.save({a: [1, 2, 3]});

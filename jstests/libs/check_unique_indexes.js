@@ -12,7 +12,7 @@ function checkUniqueIndexFormatVersion(adminDB) {
     if (!isWiredTiger)
         return;
 
-    res = assert.commandWorked(adminDB.runCommand({"listDatabases": 1}));
+    let res = assert.commandWorked(adminDB.runCommand({"listDatabases": 1}));
     let databaseList = res.databases;
 
     databaseList.forEach(function(database) {

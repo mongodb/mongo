@@ -16,9 +16,9 @@ assert(db[Symbol.species] != 1);
 assert(db[Symbol.toPrimitive] != 1);
 
 // Exercise Symbol.toPrimitive on BSON objects
-col1 = db.jssymbol_col;
+let col1 = db.jssymbol_col;
 col1.insert({});
-a = db.getCollection("jssymbol_col").getIndexes()[0];
+let a = db.getCollection("jssymbol_col").getIndexes()[0];
 
 assert(isNaN(+a));
 assert(+a.v >= 1);

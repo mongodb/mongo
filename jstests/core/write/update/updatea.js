@@ -4,13 +4,10 @@
 // @tags: [assumes_unsharded_collection]
 
 var res;
-t = db.updatea;
+let t = db.updatea;
 t.drop();
 
-orig = {
-    _id: 1,
-    a: [{x: 1, y: 2}, {x: 10, y: 11}]
-};
+let orig = {_id: 1, a: [{x: 1, y: 2}, {x: 10, y: 11}]};
 
 res = t.save(orig);
 assert.commandWorked(res);
@@ -52,7 +49,7 @@ orig = {
     _id: 1,
     a: []
 };
-for (i = 0; i < 12; i++)
+for (let i = 0; i < 12; i++)
     orig.a.push(i);
 
 res = t.save(orig);

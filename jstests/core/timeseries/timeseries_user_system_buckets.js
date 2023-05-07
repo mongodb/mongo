@@ -13,8 +13,8 @@
  *   requires_fcv_63
  * ]
  */
-userCollSystemBuckets = db.system.buckets.coll;
-userColl = db.coll;
+let userCollSystemBuckets = db.system.buckets.coll;
+let userColl = db.coll;
 
 userCollSystemBuckets.drop();
 userColl.drop();
@@ -25,10 +25,10 @@ assert.commandWorked(userCollSystemBuckets.insert({a: 1}));
 // A user collection with the same postfix should not be considered time series collection
 assert.commandWorked(userColl.insert({a: 2}));
 
-docs = userColl.find().toArray();
+let docs = userColl.find().toArray();
 assert.eq(1, docs.length);
 
-docsSystemBuckets = userCollSystemBuckets.find().toArray();
+let docsSystemBuckets = userCollSystemBuckets.find().toArray();
 assert.eq(1, docsSystemBuckets.length);
 
 userCollSystemBuckets.drop();

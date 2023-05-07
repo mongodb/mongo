@@ -2,12 +2,12 @@
 //
 // @tags: [requires_fastcount]
 
-t = db.date3;
+let t = db.date3;
 t.drop();
 
-d1 = new Date(-1000);
-dz = new Date(0);
-d2 = new Date(1000);
+let d1 = new Date(-1000);
+let dz = new Date(0);
+let d2 = new Date(1000);
 
 t.save({x: 3, d: dz});
 t.save({x: 2, d: d2});
