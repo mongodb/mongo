@@ -188,6 +188,17 @@ public:
      */
     BSONObj getMigrationStatusReport() const;
 
+    boost::optional<UUID> getMigrationId() {
+        if (_coordinator) {
+            return _coordinator->getMigrationId();
+        }
+        return boost::none;
+    }
+
+    long long getOpTimeMillis() {
+        return _entireOpTimer.millis();
+    }
+
 private:
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
