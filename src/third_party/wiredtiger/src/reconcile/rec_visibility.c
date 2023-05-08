@@ -86,6 +86,13 @@ __rec_append_orig_value(
 
     /* Review the current update list, checking conditions that mean no work is needed. */
     for (;; upd = upd->next) {
+        if (upd->txnid == WT_TXN_ABORTED) {
+            if (upd->next == NULL)
+                break;
+            else
+                continue;
+        }
+
         /* Done if the update was restored from the data store or the history store. */
         if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS))
             return (0);
@@ -113,8 +120,7 @@ __rec_append_orig_value(
         if (WT_UPDATE_DATA_VALUE(upd) && __wt_txn_upd_visible_all(session, upd))
             return (0);
 
-        if (upd->txnid != WT_TXN_ABORTED)
-            oldest_upd = upd;
+        oldest_upd = upd;
 
         /* Leave reference pointing to the last item in the update list. */
         if (upd->next == NULL)
