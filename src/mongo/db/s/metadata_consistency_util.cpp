@@ -82,7 +82,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
 
     std::vector<MetadataInconsistencyItem> tmpInconsistencies;
 
-    // Shards that do not own any chunks do not partecipate in the creation of new indexes, so they
+    // Shards that do not own any chunks do not participate in the creation of new indexes, so they
     // could potentially miss any indexes created after they no longer own chunks. Thus we first
     // perform a check optimistically without taking collection lock, if missing indexes are found
     // we check under the collection lock if this shard currently own any chunk and re-execute again

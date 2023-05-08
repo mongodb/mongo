@@ -237,7 +237,7 @@ private:
     // May change after construction, when restoring from yield.
     NamespaceString _resolvedNss;
 
-    // Only set if _collectionPtr does not contain a nullptr and if the requested namesapce is a
+    // Only set if _collectionPtr does not contain a nullptr and if the requested namespace is a
     // view.
     //
     // May change after construction, when restoring from yield.

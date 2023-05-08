@@ -39,7 +39,7 @@
 namespace mongo {
 
 /**
- * Structure used to declare all the prerequsites that the catalog needs to meet in order for an
+ * Structure used to declare all the prerequisites that the catalog needs to meet in order for an
  * acquisition of a namespace to succeed.
  */
 struct CollectionOrViewAcquisitionRequest {
@@ -375,4 +375,28 @@ boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperat
 void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                                                    YieldedTransactionResources&& yieldedResources);
 
+namespace shard_role_details {
+class SnapshotAttempt {
+public:
+    SnapshotAttempt(OperationContext* opCtx,
+                    const std::vector<NamespaceStringOrUUID>& acquisitionRequests)
+        : _opCtx{opCtx}, _acquisitionRequests(acquisitionRequests) {}
+
+    ~SnapshotAttempt();
+
+    void snapshotInitialState();
+
+    void openStorageSnapshot();
+
+    [[nodiscard]] std::shared_ptr<const CollectionCatalog> getConsistentCatalog();
+
+private:
+    OperationContext* _opCtx;
+    const std::vector<NamespaceStringOrUUID>& _acquisitionRequests;
+    bool _openedSnapshot = false;
+    bool _successful = false;
+    boost::optional<long long> _replTermBeforeSnapshot;
+    boost::optional<std::shared_ptr<const CollectionCatalog>> _catalogBeforeSnapshot;
+};
+}  // namespace shard_role_details
 }  // namespace mongo

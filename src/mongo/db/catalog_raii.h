@@ -341,7 +341,7 @@ class ScopedLocalCatalogWriteFence;
 
 class CollectionWriter final {
 public:
-    // This constructor indicates to the shard role subsystem that the subsequent code enteres into
+    // This constructor indicates to the shard role subsystem that the subsequent code enters into
     // local DDL land and that the content of the local collection should not be trusted until it
     // goes out of scope.
     //
