@@ -58,7 +58,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  Timestamp newCollectionTimestamp);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
-                              const ReshardingCoordinatorDocument& coordinatorDoc);
+                              const ReshardingCoordinatorDocument& coordinatorDoc,
+                              TxnNumber txnNumber);
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           const ReshardingCoordinatorDocument& coordinatorDoc);
