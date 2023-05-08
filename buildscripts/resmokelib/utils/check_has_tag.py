@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CLI interface for jscomment."""
 
+import re
 import sys
 import jscomment
 
@@ -16,11 +17,21 @@ try:
         print('   3 if any error happened during check')
         print('Usage:')
         print(' check_has_tag.py <jsfile> <tag>')
+        print('Notice: <tag> is a regex, not search string')
         sys.exit(2)
     else:
         tags = jscomment.get_tags(sys.argv[1])
         print(sys.argv[1], "has tags:", tags)
-        sys.exit(0 if sys.argv[2] in tags else 1)
+
+        prog = re.compile(sys.argv[2])
+        for tag in tags:
+            if prog.match(tag):
+                print("tag matches:", tag)
+                sys.exit(0)
+
+        print("no tags match", sys.argv[2])
+        sys.exit(1)
+
 except Exception as err:  # pylint: disable=W0703
     print(err)
     sys.exit(3)

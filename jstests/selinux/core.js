@@ -40,8 +40,18 @@ class TestDefinition extends SelinuxBaseTest {
                     runNonMongoProgram(python,
                                        "buildscripts/resmokelib/utils/check_has_tag.py",
                                        t,
-                                       "no_selinux")) {
+                                       "^no_selinux$")) {
                     jsTest.log("Skipping test due to no_selinux tag: " + t);
+                    continue;
+                }
+
+                // Tests relying on featureFlagXXX will not work
+                if (HAS_TAG ==
+                    runNonMongoProgram(python,
+                                       "buildscripts/resmokelib/utils/check_has_tag.py",
+                                       t,
+                                       "^featureFlag.+$")) {
+                    jsTest.log("Skipping test due to feature flag tag: " + t);
                     continue;
                 }
 
