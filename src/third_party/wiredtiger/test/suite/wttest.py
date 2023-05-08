@@ -348,8 +348,6 @@ class WiredTigerTestCase(unittest.TestCase):
         if seedw != 0 and seedz != 0:
             WiredTigerTestCase._randomseed = True
             WiredTigerTestCase._seeds = [seedw, seedz]
-        # We don't have a lot of output, but we want to see it right away.
-        sys.stdout.reconfigure(line_buffering=True)
         WiredTigerTestCase._globalSetup = True
 
     @staticmethod
@@ -678,8 +676,6 @@ class WiredTigerTestCase(unittest.TestCase):
         os.chdir(self.testdir)
         with open('testname.txt', 'w+') as namefile:
             namefile.write(str(self) + '\n')
-        if WiredTigerTestCase._verbose >= 2:
-            print("[pid:{}]: {}: starting".format(os.getpid(), str(self)))
         self.fdSetUp()
         self._threadLocal.currentTestCase = self
         self.ignoreTearDownLogs = False
@@ -834,9 +830,6 @@ class WiredTigerTestCase(unittest.TestCase):
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         bkp_cursor.close()
 
-    def runningHook(self, name):
-        return name in WiredTigerTestCase.hook_names
-
     # Set a Python breakpoint.  When this function is called,
     # the python debugger will be called as described here:
     #   https://docs.python.org/3/library/pdb.html
@@ -988,11 +981,6 @@ class WiredTigerTestCase(unittest.TestCase):
         return '%x' % t
 
     def dropUntilSuccess(self, session, uri, config=None):
-        # Most test cases consider a drop, and especially a 'drop until success',
-        # to completely remove a file's artifacts, so that the name can be reused.
-        # For tiered storage, this means removing associated cloud objects.
-        if self.runningHook('tiered') and config == None:
-            config = 'force=true,remove_shared=true'
         while True:
             try:
                 session.drop(uri, config)

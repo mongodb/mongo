@@ -96,15 +96,15 @@ def wiredtiger_open_tiered(ignored_self, args):
     # however, we alter several other API methods that would do weird things with
     # a different tiered_storage configuration. So better to skip the test entirely.
     if 'tiered_storage=' in curconfig:
-        skipTest("cannot run tiered hook on a test that already uses tiered storage")
+        testcase.skipTest("cannot run tiered hook on a test that already uses tiered storage")
 
     # Similarly if this test is already set up to run tiered vs non-tiered scenario, let's
     # not get in the way.
     if hasattr(testcase, 'tiered_conn_config'):
-        skipTest("cannot run tiered hook on a test that already includes TieredConfigMixin")
+        testcase.skipTest("cannot run tiered hook on a test that already includes TieredConfigMixin")
 
     if 'in_memory=true' in curconfig:
-        skipTest("cannot run tiered hook on a test that is in-memory")
+        testcase.skipTest("cannot run tiered hook on a test that is in-memory")
 
     # Mark this test as readonly, but don't disallow it.  See testcase_is_readonly().
     if 'readonly=true' in curconfig:
@@ -159,10 +159,6 @@ def testcase_has_failed():
     testcase = WiredTigerTestCase.currentTestCase()
     return testcase.failed()
 
-def skipTest(comment):
-    testcase = WiredTigerTestCase.currentTestCase()
-    testcase.skipTest(comment)
-
 # Called to replace Connection.close
 # Insert a call to flush_tier before closing connection.
 def connection_close_replace(orig_connection_close, connection_self, config):
@@ -179,16 +175,9 @@ def connection_close_replace(orig_connection_close, connection_self, config):
     return ret
 
 # Called to replace Session.checkpoint.
-# We add a call to flush_tier during every checkpoint to make sure we are exercising tiered
+# We add a call to flush_tier after the checkpoint to make sure we are exercising tiered
 # functionality.
 def session_checkpoint_replace(orig_session_checkpoint, session_self, config):
-    # FIXME-WT-10771 We cannot do named checkpoints with tiered storage objects.
-    # We can't really continue the test without the name, as the name will certainly be used.
-    testcase = WiredTigerTestCase.currentTestCase()
-    if config == None:
-        config = ''
-    if 'name=' in config:
-        skipTest('named checkpoints do not work in tiered storage')
     # We cannot call flush_tier on a readonly connection.
     if not testcase_is_readonly():
         config += ',flush_tier=(enabled,force=true)'
@@ -230,9 +219,11 @@ def session_create_replace(orig_session_create, session_self, uri, config):
 # do statistics on (tiered) table data sources, as that is not yet supported.
 def session_open_cursor_replace(orig_session_open_cursor, session_self, uri, dupcursor, config):
     if uri != None and (uri.startswith("statistics:table:") or uri.startswith("statistics:file:")):
-        skipTest("statistics on tiered tables not yet implemented")
+        testcase = WiredTigerTestCase.currentTestCase()
+        testcase.skipTest("statistics on tiered tables not yet implemented")
     if uri != None and uri.startswith("backup:"):
-        skipTest("backup on tiered tables not yet implemented")
+        testcase = WiredTigerTestCase.currentTestCase()
+        testcase.skipTest("backup on tiered tables not yet implemented")
     return orig_session_open_cursor(session_self, uri, dupcursor, config)
 
 # Called to replace Session.rename
@@ -277,16 +268,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
 
         # Override some platform APIs
         self.platform_api = TieredPlatformAPI(arg)
-
-    # Our current tiered storage implementation has a slow version of truncate, and
-    # some tests are sensitive to that.
-    #
-    # FIXME-WT-11023: when we implement a fast truncate for tiered storage, we might remove
-    # this, and visit tests that are marked with @wttest.prevent(..."slow_truncate"...)
-    def uses(self, use_list):
-        if "slow_truncate" in use_list:
-            return True
-        return False
 
     # Is this test one we should skip?
     def skip_test(self, test):
@@ -355,6 +336,19 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
                 "test_rollback_to_stable36.test_rollback_to_stable",
                 "test_sweep03.test_disable_idle_timeout_drop",
                 "test_sweep03.test_disable_idle_timeout_drop_force",
+                "test_truncate01.test_truncate_cursor",
+                "test_truncate01.test_truncate_cursor_end",
+                "test_truncate01.test_truncate_timestamp",
+                "test_truncate01.test_truncate_uri",
+                "test_truncate10.test_truncate10",
+                "test_truncate12.test_truncate12",
+                "test_truncate13.test_truncate",
+                "test_truncate14.test_truncate",
+                "test_truncate16.test_truncate16",
+                "test_truncate18.test_truncate18",
+                "test_truncate15.test_truncate15",
+                "test_truncate19.test_truncate19",
+                "test_truncate20.test_truncate20",
                 "test_txn22.test_corrupt_meta",
                 "test_verbose01.test_verbose_single",
                 "test_verbose02.test_verbose_single",
@@ -379,10 +373,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
         orig_connection_close = self.Connection['close']
         self.Connection['close'] = (wthooks.HOOK_REPLACE, lambda s, config=None:
           connection_close_replace(orig_connection_close, s, config))
-
-        orig_session_checkpoint = self.Session['checkpoint']
-        self.Session['checkpoint'] =  (wthooks.HOOK_REPLACE, lambda s, config=None:
-          session_checkpoint_replace(orig_session_checkpoint, s, config))
 
         orig_session_compact = self.Session['compact']
         self.Session['compact'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
