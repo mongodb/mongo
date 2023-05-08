@@ -98,17 +98,15 @@ PlacementHistoryCleaner* PlacementHistoryCleaner::get(OperationContext* opCtx) {
 }
 
 void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistoryDocs) {
-    auto opCtx = client->makeOperationContext();
-    opCtx.get()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    auto opCtxHolder = client->makeOperationContext();
+    auto opCtx = opCtxHolder.get();
 
     try {
         // Count the number of entries in the placementHistory collection; skip cleanup if below
         // threshold.
-        const auto numPlacementHistoryDocs = [&] {
-            PersistentTaskStore<NamespacePlacementType> store(
-                NamespaceString::kConfigsvrPlacementHistoryNamespace);
-            return store.count(opCtx.get(), BSONObj());
-        }();
+        PersistentTaskStore<NamespacePlacementType> store(
+            NamespaceString::kConfigsvrPlacementHistoryNamespace);
+        const auto numPlacementHistoryDocs = store.count(opCtx, BSONObj());
 
         if (numPlacementHistoryDocs <= minPlacementHistoryDocs) {
             LOGV2_DEBUG(7068801, 3, "PlacementHistoryCleaner: nothing to be deleted on this round");
@@ -117,7 +115,7 @@ void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistory
 
         // Get the time of the oldest op entry still persisted among the cluster shards; historical
         // placement entries that precede it may be safely dropped.
-        auto earliestOplogTime = getEarliestOpLogTimestampAmongAllShards(opCtx.get());
+        auto earliestOplogTime = getEarliestOpLogTimestampAmongAllShards(opCtx);
         if (!earliestOplogTime) {
             LOGV2(7068802,
                   "Skipping cleanup of config.placementHistory - no earliestOplogTime could "
@@ -125,30 +123,73 @@ void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistory
             return;
         }
 
-        ShardingCatalogManager::get(opCtx.get())
-            ->cleanUpPlacementHistory(opCtx.get(), *earliestOplogTime);
+        // Check the latest initialization time is not greater than the earliestOpTime.
+        // The clean-up must always move the new initialization time forward.
+        const auto match =
+            BSON(NamespacePlacementType::kNssFieldName
+                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
+                 << NamespacePlacementType::kTimestampFieldName
+                 << BSON("$gte" << earliestOplogTime->toBSON()));
+
+        if (store.count(opCtx, match) > 0) {
+            return;
+        }
+
+        ShardingCatalogManager::get(opCtx)->cleanUpPlacementHistory(opCtx, *earliestOplogTime);
     } catch (const DBException& e) {
         LOGV2(7068804, "Periodic cleanup of config.placementHistory failed", "error"_attr = e);
     }
 }
 
-void PlacementHistoryCleaner::onStepUpComplete(OperationContext* opCtx, long long term) {
-    auto periodicRunner = opCtx->getServiceContext()->getPeriodicRunner();
-    invariant(periodicRunner);
-
-    PeriodicRunner::PeriodicJob placementHistoryCleanerJob(
-        "PlacementHistoryCleanUpJob",
-        [](Client* client) { runOnce(client, kminPlacementHistoryEntries); },
-        kJobExecutionPeriod,
-        // TODO(SERVER-74658): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
-
-    _anchor = periodicRunner->makeJob(std::move(placementHistoryCleanerJob));
-    _anchor.start();
-}
 void PlacementHistoryCleaner::onStepDown() {
+    _stop(true /* steppingDown*/);
+}
+
+void PlacementHistoryCleaner::onStepUpComplete(OperationContext* opCtx, long long term) {
+    _start(opCtx, true /* steppingUp*/);
+}
+
+void PlacementHistoryCleaner::pause() {
+    _stop(false /* steppingDown*/);
+}
+
+void PlacementHistoryCleaner::resume(OperationContext* opCtx) {
+    _start(opCtx, false /* steppingUp*/);
+}
+
+void PlacementHistoryCleaner::_start(OperationContext* opCtx, bool steppingUp) {
+    stdx::lock_guard<Latch> scopedLock(_mutex);
+
+    if (steppingUp) {
+        _runningAsPrimary = true;
+    }
+
+    if (_runningAsPrimary && !_anchor.isValid()) {
+        auto periodicRunner = opCtx->getServiceContext()->getPeriodicRunner();
+        invariant(periodicRunner);
+
+        PeriodicRunner::PeriodicJob placementHistoryCleanerJob(
+            "PlacementHistoryCleanUpJob",
+            [](Client* client) { runOnce(client, kminPlacementHistoryEntries); },
+            kJobExecutionPeriod,
+            // TODO(SERVER-74658): Please revisit if this periodic job could be made killable.
+            false /*isKillableByStepdown*/);
+
+        _anchor = periodicRunner->makeJob(std::move(placementHistoryCleanerJob));
+        _anchor.start();
+    }
+}
+
+void PlacementHistoryCleaner::_stop(bool steppingDown) {
+    stdx::lock_guard<Latch> scopedLock(_mutex);
+
+    if (steppingDown) {
+        _runningAsPrimary = false;
+    }
+
     if (_anchor.isValid()) {
         _anchor.stop();
     }
 }
+
 }  // namespace mongo

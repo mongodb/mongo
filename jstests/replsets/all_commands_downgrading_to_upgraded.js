@@ -67,6 +67,7 @@ const allCommands = {
     _configsvrRemoveTags: {skip: isAnInternalCommand},
     _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     _configsvrRenameCollectionMetadata: {skip: isAnInternalCommand},
+    _configsvrResetPlacementHistory: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
     _configsvrRunRestore: {skip: isAnInternalCommand},
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
@@ -1317,6 +1318,11 @@ const allCommands = {
         isReplSetOnly: true,
         isAdminCommand: true,
         command: {replSetResizeOplog: 1, minRetentionHours: 1},
+    },
+    resetPlacementHistory: {
+        command: {resetPlacementHistory: 1},
+        isShardedOnly: true,
+        isAdminCommand: true,
     },
     reshardCollection: {
         // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.

@@ -52,6 +52,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/config/index_on_config.h"
+#include "mongo/db/s/config/placement_history_cleaner.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
@@ -499,7 +500,7 @@ void setInitializationTimeOnPlacementHistory(
     std::vector<ShardId> placementResponseForPreInitQueries) {
     /*
      * The initialization metadata of config.placementHistory is composed by two special docs,
-     * identified by kConfigsvrPlacementHistoryFcvMarkerNamespace:
+     * identified by kConfigPlacementHistoryInitializationMarker:
      * - initializationTimeInfo: contains the time of the initialization and an empty set of shards.
      *   It will allow ShardingCatalogClient to serve accurate responses to historical placement
      *   queries within the [initializationTime, +inf) range.
@@ -509,13 +510,14 @@ void setInitializationTimeOnPlacementHistory(
      *   placement queries within the [-inf, initializationTime) range.
      */
     NamespacePlacementType initializationTimeInfo;
-    initializationTimeInfo.setNss(NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace);
+    initializationTimeInfo.setNss(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
     initializationTimeInfo.setTimestamp(initializationTime);
     initializationTimeInfo.setShards({});
 
     NamespacePlacementType approximatedPlacementForPreInitQueries;
     approximatedPlacementForPreInitQueries.setNss(
-        NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace);
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
     approximatedPlacementForPreInitQueries.setTimestamp(Timestamp(0, 1));
     approximatedPlacementForPreInitQueries.setShards(placementResponseForPreInitQueries);
 
@@ -530,7 +532,7 @@ void setInitializationTimeOnPlacementHistory(
         write_ops::DeleteOpEntry entryDelMarker;
         entryDelMarker.setQ(
             BSON(NamespacePlacementType::kNssFieldName
-                 << NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns()));
+                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()));
         entryDelMarker.setMulti(true);
         deleteRequest.setDeletes({entryDelMarker});
 
@@ -613,7 +615,8 @@ ShardingCatalogManager::ShardingCatalogManager(
       _localCatalogClient(std::move(localCatalogClient)),
       _kShardMembershipLock("shardMembershipLock"),
       _kChunkOpLock("chunkOpLock"),
-      _kZoneOpLock("zoneOpLock") {
+      _kZoneOpLock("zoneOpLock"),
+      _kPlacementHistoryInitializationLock("placementHistoryInitializationOpLock") {
     startup();
 }
 
@@ -1247,6 +1250,42 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
      * - incoming (or not yet materialized) DDLs will insert more recent placement information,
      *   which will have the effect of "updating" the snapshot produced by this function.
      */
+    Lock::ExclusiveLock lk(opCtx, _kPlacementHistoryInitializationLock);
+
+    // Suspend the periodic cleanup job that runs in background.
+    ScopeGuard restartHistoryCleaner(
+        [opCtx]() { PlacementHistoryCleaner::get(opCtx)->resume(opCtx); });
+
+    PlacementHistoryCleaner::get(opCtx)->pause();
+
+    // Delete any existing document that has been already majority committed.
+    {
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+
+        write_ops::DeleteCommandRequest deleteOp(
+            NamespaceString::kConfigsvrPlacementHistoryNamespace);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ({});
+            entry.setMulti(true);
+            return entry;
+        }()});
+
+        uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            NamespaceString::kConfigsvrPlacementHistoryNamespace.db().toString(),
+            deleteOp.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                 << ShardingCatalogClient::kLocalWriteConcern.toBSON())),
+            Shard::RetryPolicy::kNotIdempotent));
+
+        const auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+        auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+            opCtx, replClient.getLastOp(), ShardingCatalogClient::kMajorityWriteConcern);
+    }
+
+    // Set the time of the initialization.
     Timestamp initializationTime;
     std::vector<ShardId> shardsAtInitializationTime;
     {
@@ -1356,7 +1395,7 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
      *      },
      *      {
      *          $match : {
-     *              _id : { $ne : "kConfigsvrPlacementHistoryFcvMarkerNamespace"}
+     *              _id : { $ne : "kConfigPlacementHistoryInitializationMarker"}
      *          }
      *      }
      *  ])
@@ -1370,9 +1409,9 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
              << "$" + NamespacePlacementType::kNssFieldName << "mostRecentTimestamp"
              << BSON("$max"
                      << "$" + NamespacePlacementType::kTimestampFieldName)));
-    pipeline.addStage<DocumentSourceMatch>(
-        BSON("_id" << BSON(
-                 "$ne" << NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns())));
+    pipeline.addStage<DocumentSourceMatch>(BSON(
+        "_id" << BSON(
+            "$ne" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns())));
 
     auto aggRequest = pipeline.buildAsAggregateCommandRequest();
 

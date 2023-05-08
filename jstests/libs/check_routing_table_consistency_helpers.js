@@ -154,11 +154,12 @@ var RoutingTableConsistencyChecker = (function() {
      * and database. Results are ordered by namespace.
      */
     const getHistoricalPlacementData = (mongos, atClusterTime) => {
+        const kConfigPlacementHistoryInitializationMarker = '';
         const pipeline = [
             {
                 $match: {
                     // Skip documents containing initialization metadata
-                    nss: {$ne: "."},
+                    nss: {$ne: kConfigPlacementHistoryInitializationMarker},
                     timestamp: {$lte: atClusterTime}
                 }
             },

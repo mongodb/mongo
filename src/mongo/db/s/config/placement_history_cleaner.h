@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -47,11 +48,18 @@ public:
     static PlacementHistoryCleaner* get(ServiceContext* serviceContext);
     static PlacementHistoryCleaner* get(OperationContext* opCtx);
 
+    void pause();
+    void resume(OperationContext* opCtx);
+
 private:
     PlacementHistoryCleaner(const PlacementHistoryCleaner&) = delete;
     PlacementHistoryCleaner& operator=(const PlacementHistoryCleaner&) = delete;
 
     static void runOnce(Client* opCtx, size_t minPlacementHistoryEntries);
+
+    void _start(OperationContext* opCtx, bool steppingUp);
+
+    void _stop(bool steppingDown);
 
     /**
      * ReplicaSetAwareService entry points.
@@ -76,6 +84,10 @@ private:
         return "PlacementHistoryCleaner";
     }
 
+    Mutex _mutex = MONGO_MAKE_LATCH("PlacementHistoryCleaner::_mutex");
+
     PeriodicJobAnchor _anchor;
+
+    bool _runningAsPrimary = false;
 };
 }  // namespace mongo

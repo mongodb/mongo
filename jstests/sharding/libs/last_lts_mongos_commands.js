@@ -39,6 +39,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "moveRange",
     "oidcListKeys",
     "oidcRefreshKeys",
+    "resetPlacementHistory",  // TODO (SERVER-68217): remove item from array.
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",
