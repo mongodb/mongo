@@ -65,12 +65,6 @@ let hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint =
 
 st.rs0.stepUp(rs0Secondary);
 
-// Wait for the config server to see the new primary.
-// TODO SERVER-74177 Remove this once retry on NotWritablePrimary is implemented.
-st.forEachConfigServer((conn) => {
-    awaitRSClientHosts(conn, st.rs0.getPrimary(), {ok: true, ismaster: true});
-});
-
 joinMoveChunk1();
 migrationCommitNetworkErrorFailpoint.off();
 skipShardFilteringMetadataRefreshFailpoint.off();

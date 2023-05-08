@@ -82,11 +82,7 @@ Status processRemoteResponse(const executor::RemoteCommandResponse& remoteRespon
         return remoteResponse.status;
     }
     auto remoteStatus = getStatusFromCommandResult(remoteResponse.data);
-    return Shard::shouldErrorBePropagated(remoteStatus.code())
-        ? remoteStatus
-        : Status(ErrorCodes::OperationFailed,
-                 str::stream() << "Command request failed on source shard. "
-                               << causedBy(remoteStatus));
+    return remoteStatus.withContext("Command request failed on source shard.");
 }
 
 }  // namespace
