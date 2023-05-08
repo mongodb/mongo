@@ -92,10 +92,6 @@ public:
 
     void appendShardVersion(BSONObjBuilder* builder) const override {}
 
-    size_t numberOfRangesScheduledForDeletion() const override {
-        return 0;
-    }
-
 private:
     const NamespaceString& _nss;
 };

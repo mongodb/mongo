@@ -127,7 +127,7 @@ protected:
         }
 
         _manager = std::make_shared<MetadataManager>(
-            getServiceContext(), kNss, executor(), CollectionMetadata(cm, ShardId("0")));
+            getServiceContext(), kNss, CollectionMetadata(cm, ShardId("0")));
 
         return CollectionMetadata(std::move(cm), ShardId("0"));
     }

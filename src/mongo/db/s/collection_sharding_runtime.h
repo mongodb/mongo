@@ -51,9 +51,7 @@ class CollectionShardingRuntime final : public CollectionShardingState,
     CollectionShardingRuntime& operator=(const CollectionShardingRuntime&) = delete;
 
 public:
-    CollectionShardingRuntime(ServiceContext* service,
-                              NamespaceString nss,
-                              std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor);
+    CollectionShardingRuntime(ServiceContext* service, NamespaceString nss);
 
     /**
      * Obtains the sharding runtime for the specified collection, along with a resource lock in
@@ -143,8 +141,6 @@ public:
 
     void appendShardVersion(BSONObjBuilder* builder) const override;
 
-    size_t numberOfRangesScheduledForDeletion() const override;
-
     boost::optional<ShardingIndexesCatalogCache> getIndexesInCritSec(OperationContext* opCtx) const;
 
     /**
@@ -217,18 +213,6 @@ public:
      */
     boost::optional<SharedSemiFuture<void>> getCriticalSectionSignal(
         OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op) const;
-
-    /**
-     * Schedules documents in `range` for cleanup after any running queries that may depend on them
-     * have terminated. Does not block. Fails if range overlaps any current local shard chunk.
-     * Passed kDelayed, an additional delay (configured via server parameter orphanCleanupDelaySecs)
-     * is added to permit (most) dependent queries on secondaries to complete, too.
-     *
-     * Returns a future that will be resolved when the deletion completes or fails. If that
-     * succeeds, waitForClean can be called to ensure no other deletions are pending for the range.
-     */
-    enum CleanWhen { kNow, kDelayed };
-    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, CleanWhen when) const;
 
     /**
      * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
@@ -352,9 +336,6 @@ private:
 
     // Namespace this state belongs to.
     const NamespaceString _nss;
-
-    // The executor used for deleting ranges of orphan chunks.
-    std::shared_ptr<executor::TaskExecutor> _rangeDeleterExecutor;
 
     // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;

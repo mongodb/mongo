@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
@@ -38,20 +37,9 @@ class CollectionShardingStateFactoryShard final : public CollectionShardingState
 public:
     CollectionShardingStateFactoryShard(ServiceContext* serviceContext);
 
-    ~CollectionShardingStateFactoryShard();
-
-    void join() override;
+    void join() override{};
 
     std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) override;
-
-private:
-    std::shared_ptr<executor::TaskExecutor> _getRangeDeletionExecutor();
-
-    // Serializes the instantiation of the task executor
-    Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateFactoryShard::_mutex");
-
-    // Required to be a shared_ptr since it is used as an executor for ExecutorFutures.
-    std::shared_ptr<executor::TaskExecutor> _rangeDeletionExecutor = {nullptr};
 };
 
 }  // namespace mongo

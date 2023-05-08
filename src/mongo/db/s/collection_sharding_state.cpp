@@ -30,7 +30,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -89,25 +88,6 @@ public:
         }
 
         versionB.done();
-    }
-
-    void appendInfoForServerStatus(BSONObjBuilder* builder) {
-        // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
-        // flag is used to turn on new range deleter on startup.
-        if (!mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-            auto totalNumberOfRangesScheduledForDeletion = ([this] {
-                stdx::lock_guard lg(_mutex);
-                return std::accumulate(
-                    _collections.begin(),
-                    _collections.end(),
-                    0LL,
-                    [](long long total, const auto& coll) {
-                        return total + coll.second->css->numberOfRangesScheduledForDeletion();
-                    });
-            })();
-
-            builder->appendNumber("rangeDeleterTasks", totalNumberOfRangesScheduledForDeletion);
-        }
     }
 
     std::vector<NamespaceString> getCollectionNames() {
@@ -188,12 +168,6 @@ void CollectionShardingState::appendInfoForShardingStateCommand(OperationContext
                                                                 BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     collectionsMap->appendInfoForShardingStateCommand(builder);
-}
-
-void CollectionShardingState::appendInfoForServerStatus(OperationContext* opCtx,
-                                                        BSONObjBuilder* builder) {
-    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
-    collectionsMap->appendInfoForServerStatus(builder);
 }
 
 std::vector<NamespaceString> CollectionShardingState::getCollectionNames(OperationContext* opCtx) {

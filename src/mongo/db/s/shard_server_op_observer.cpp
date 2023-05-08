@@ -101,31 +101,6 @@ private:
 };
 
 /**
- * Used to submit a range deletion task once it is certain that the update/insert to
- * config.rangeDeletions is committed.
- */
-class SubmitRangeDeletionHandler final : public RecoveryUnit::Change {
-public:
-    SubmitRangeDeletionHandler(OperationContext* opCtx, RangeDeletionTask task)
-        : _opCtx(opCtx), _task(std::move(task)) {}
-
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
-        // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
-        // flag is used to turn on new range deleter on startup.
-        if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-            migrationutil::submitRangeDeletionTask(_opCtx, _task).getAsync([](auto) {});
-        }
-    }
-
-    void rollback(OperationContext* opCtx) override {}
-
-private:
-    OperationContext* _opCtx;
-    RangeDeletionTask _task;
-};
-
-
-/**
  * Invalidates the in-memory routing table cache when a collection is dropped, so the next caller
  * with routing information will provoke a routing table refresh and see the drop.
  *
@@ -219,11 +194,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 
             auto deletionTask =
                 RangeDeletionTask::parse(IDLParserContext("ShardServerOpObserver"), insertedDoc);
-
-            if (!deletionTask.getPending()) {
-                opCtx->recoveryUnit()->registerChange(
-                    std::make_unique<SubmitRangeDeletionHandler>(opCtx, deletionTask));
-            }
 
             const auto numOrphanDocs = deletionTask.getNumOrphanDocs();
             BalancerStatsRegistry::get(opCtx)->onRangeDeletionTaskInsertion(
@@ -369,26 +339,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
             scopedDss->clearDbInfo(opCtx);
-        }
-    }
-
-    if (needsSpecialHandling && args.coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        if (!isStandaloneOrPrimary(opCtx))
-            return;
-
-        const auto pendingFieldRemovedStatus =
-            update_oplog_entry::isFieldRemovedByUpdate(args.updateArgs->update, "pending");
-
-        if (pendingFieldRemovedStatus == update_oplog_entry::FieldRemovedStatus::kFieldRemoved) {
-            auto deletionTask = RangeDeletionTask::parse(IDLParserContext("ShardServerOpObserver"),
-                                                         args.updateArgs->updatedDoc);
-
-            if (deletionTask.getDonorShardId() != ShardingState::get(opCtx)->shardId()) {
-                // Range deletion tasks for moved away chunks are scheduled through the
-                // MigrationCoordinator, so only schedule a task for received chunks.
-                opCtx->recoveryUnit()->registerChange(
-                    std::make_unique<SubmitRangeDeletionHandler>(opCtx, deletionTask));
-            }
         }
     }
 

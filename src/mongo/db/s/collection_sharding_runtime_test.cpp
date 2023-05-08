@@ -97,7 +97,7 @@ protected:
 TEST_F(CollectionShardingRuntimeTest,
        GetCollectionDescriptionThrowsStaleConfigBeforeSetFilteringMetadataIsCalledAndNoOSSSet) {
     OperationContext* opCtx = operationContext();
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     ASSERT_FALSE(csr.getCollectionDescription(opCtx).isSharded());
     auto metadata = makeShardedMetadata(opCtx);
     ScopedSetShardRole scopedSetShardRole{
@@ -111,14 +111,14 @@ TEST_F(CollectionShardingRuntimeTest,
 TEST_F(
     CollectionShardingRuntimeTest,
     GetCollectionDescriptionReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     csr.setFilteringMetadata(operationContext(), CollectionMetadata());
     ASSERT_FALSE(csr.getCollectionDescription(operationContext()).isSharded());
 }
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCollectionDescriptionReturnsShardedAfterSetFilteringMetadataIsCalledWithShardedMetadata) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, metadata);
@@ -132,14 +132,14 @@ TEST_F(CollectionShardingRuntimeTest,
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCurrentMetadataIfKnownReturnsNoneBeforeSetFilteringMetadataIsCalled) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 
 TEST_F(
     CollectionShardingRuntimeTest,
     GetCurrentMetadataIfKnownReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     csr.setFilteringMetadata(operationContext(), CollectionMetadata());
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);
@@ -150,7 +150,7 @@ TEST_F(
 TEST_F(
     CollectionShardingRuntimeTest,
     GetCurrentMetadataIfKnownReturnsShardedAfterSetFilteringMetadataIsCalledWithShardedMetadata) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, metadata);
@@ -162,7 +162,7 @@ TEST_F(
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCurrentMetadataIfKnownReturnsNoneAfterClearFilteringMetadataIsCalled) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
     csr.setFilteringMetadata(opCtx, makeShardedMetadata(opCtx));
     csr.clearFilteringMetadata(opCtx);
@@ -170,7 +170,7 @@ TEST_F(CollectionShardingRuntimeTest,
 }
 
 TEST_F(CollectionShardingRuntimeTest, SetFilteringMetadataWithSameUUIDKeepsSameMetadataManager) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 0);
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
@@ -185,7 +185,7 @@ TEST_F(CollectionShardingRuntimeTest, SetFilteringMetadataWithSameUUIDKeepsSameM
 
 TEST_F(CollectionShardingRuntimeTest,
        SetFilteringMetadataWithDifferentUUIDReplacesPreviousMetadataManager) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, metadata);
@@ -226,7 +226,7 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
         boost::none                /* databaseVersion */
     };
 
-    CollectionShardingRuntime csr(getServiceContext(), testNss, executor());
+    CollectionShardingRuntime csr(getServiceContext(), testNss);
     auto collectionFilter = csr.getOwnershipFilter(
         opCtx, CollectionShardingRuntime::OrphanCleanupPolicy::kAllowOrphanCleanup, true);
     ASSERT_FALSE(collectionFilter.isSharded());
@@ -244,8 +244,8 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
         boost::none                                           /* databaseVersion */
     };
 
-    CollectionShardingRuntime csrLogicalSession(
-        getServiceContext(), NamespaceString::kLogicalSessionsNamespace, executor());
+    CollectionShardingRuntime csrLogicalSession(getServiceContext(),
+                                                NamespaceString::kLogicalSessionsNamespace);
     ASSERT(csrLogicalSession.getCurrentMetadataIfKnown() == boost::none);
     ASSERT_THROWS_CODE(
         csrLogicalSession.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);

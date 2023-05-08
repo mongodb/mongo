@@ -985,11 +985,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // Note, these must be done after the configOpTime is recovered via
             // ShardingStateRecovery::recover above, because they may trigger filtering metadata
             // refreshes which should use the recovered configOpTime.
-            // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern. The
-            // feature flag is used to turn on new range deleter on startup.
-            if (!mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-                migrationutil::resubmitRangeDeletionsOnStepUp(_service);
-            }
             migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
             migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 

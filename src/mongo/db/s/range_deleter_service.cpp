@@ -40,7 +40,6 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
@@ -278,10 +277,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 }
 
 void RangeDeleterService::onStartup(OperationContext* opCtx) {
-    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
-    // flag is used to turn on new range deleter on startup.
-    if (disableResumableRangeDeleter.load() ||
-        !feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
+    if (disableResumableRangeDeleter.load()) {
         return;
     }
 
@@ -291,12 +287,6 @@ void RangeDeleterService::onStartup(OperationContext* opCtx) {
 }
 
 void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long term) {
-    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
-    // flag is used to turn on new range deleter on startup.
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-        return;
-    }
-
     if (disableResumableRangeDeleter.load()) {
         LOGV2_INFO(
             6872508,

@@ -128,20 +128,14 @@ public:
 
             ShardingStatistics::get(opCtx).report(&result);
             catalogCache->report(&result);
-            // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The
-            // feature flag is used to turn on new range deleter on startup.
-            if (mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-                auto nRangeDeletions = [&]() {
-                    try {
-                        return RangeDeleterService::get(opCtx)->totalNumOfRegisteredTasks();
-                    } catch (const ExceptionFor<ErrorCodes::NotYetInitialized>&) {
-                        return 0LL;
-                    }
-                }();
-                result.appendNumber("rangeDeleterTasks", nRangeDeletions);
-            }
-
-            CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
+            auto nRangeDeletions = [&]() {
+                try {
+                    return RangeDeleterService::get(opCtx)->totalNumOfRegisteredTasks();
+                } catch (const ExceptionFor<ErrorCodes::NotYetInitialized>&) {
+                    return 0LL;
+                }
+            }();
+            result.appendNumber("rangeDeleterTasks", nRangeDeletions);
         }
 
         // To calculate the number of sharded collection we simply get the number of records from

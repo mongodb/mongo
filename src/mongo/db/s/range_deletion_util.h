@@ -43,30 +43,6 @@ namespace mongo {
 constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
 
 /**
- * DO NOT USE - only necessary for the legacy range deleter
- *
- * Deletes a range of orphaned documents for the given namespace and collection UUID. Returns a
- * future which will be resolved when the range has finished being deleted. The resulting future
- * will contain an error in cases where the range could not be deleted successfully.
- *
- * The overall algorithm is as follows:
- * 1. Wait for the all active queries which could be using the range to resolve by waiting
- *    for the waitForActiveQueriesToComplete future to resolve.
- * 2. Waits for delayForActiveQueriesOnSecondariesToComplete seconds before deleting any documents,
- *    to give queries running on secondaries a chance to finish.
- * 3. Delete documents in a series of batches with up to numDocsToRemovePerBatch documents per
- *    batch, with a delay of delayBetweenBatches milliseconds in between batches.
- */
-SharedSemiFuture<void> removeDocumentsInRange(
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    SemiFuture<void> waitForActiveQueriesToComplete,
-    const NamespaceString& nss,
-    const UUID& collectionUuid,
-    const BSONObj& keyPattern,
-    const ChunkRange& range,
-    Seconds delayForActiveQueriesOnSecondariesToComplete);
-
-/**
  * Delete the range in a sequence of batches until there are no more documents to delete or deletion
  * returns an error.
  */

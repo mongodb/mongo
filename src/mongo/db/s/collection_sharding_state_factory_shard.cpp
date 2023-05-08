@@ -27,67 +27,19 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/service_context.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 CollectionShardingStateFactoryShard::CollectionShardingStateFactoryShard(
     ServiceContext* serviceContext)
     : CollectionShardingStateFactory(serviceContext) {}
 
-CollectionShardingStateFactoryShard::~CollectionShardingStateFactoryShard() {
-    join();
-}
-
-void CollectionShardingStateFactoryShard::join() {
-    if (_rangeDeletionExecutor) {
-        _rangeDeletionExecutor->shutdown();
-        _rangeDeletionExecutor->join();
-    }
-}
-
 std::unique_ptr<CollectionShardingState> CollectionShardingStateFactoryShard::make(
     const NamespaceString& nss) {
-    return std::make_unique<CollectionShardingRuntime>(
-        _serviceContext, nss, _getRangeDeletionExecutor());
+    return std::make_unique<CollectionShardingRuntime>(_serviceContext, nss);
 }
-
-std::shared_ptr<executor::TaskExecutor>
-CollectionShardingStateFactoryShard::_getRangeDeletionExecutor() {
-    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
-    // flag is used to turn on new range deleter on startup.
-    if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-        return nullptr;
-    }
-
-    stdx::lock_guard<Latch> lg(_mutex);
-    if (!_rangeDeletionExecutor) {
-        const std::string kExecName("CollectionRangeDeleter-TaskExecutor");
-
-        // CAUTION: The safety of range deletion depends on using a task executor that schedules
-        // work on a single thread.
-        auto net = executor::makeNetworkInterface(kExecName);
-        auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
-        auto taskExecutor =
-            std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
-        taskExecutor->startup();
-
-        _rangeDeletionExecutor = std::move(taskExecutor);
-    }
-
-    return _rangeDeletionExecutor;
-}
-
 
 }  // namespace mongo

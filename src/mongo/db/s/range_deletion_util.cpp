@@ -47,7 +47,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
@@ -56,11 +55,7 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/util/cancellation.h"
-#include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
@@ -248,53 +243,6 @@ void markRangeDeletionTaskAsProcessing(OperationContext* opCtx,
     }
 }
 
-/**
- * Delete the range in a sequence of batches until there are no more documents to delete or deletion
- * returns an error.
- */
-ExecutorFuture<void> deleteRangeInBatchesWithExecutor(
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const NamespaceString& nss,
-    const UUID& collectionUuid,
-    const BSONObj& keyPattern,
-    const ChunkRange& range) {
-    return ExecutorFuture<void>(executor).then([=] {
-        return withTemporaryOperationContext(
-            [=](OperationContext* opCtx) {
-                return deleteRangeInBatches(opCtx, nss.dbName(), collectionUuid, keyPattern, range);
-            },
-            nss.dbName(),
-            collectionUuid);
-    });
-}
-
-ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const NamespaceString& nss,
-    const UUID& collectionUuid,
-    const ChunkRange& range) {
-    return withTemporaryOperationContext(
-        [=](OperationContext* opCtx) {
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-            auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-            LOGV2_DEBUG(5346202,
-                        1,
-                        "Waiting for majority replication of local deletions",
-                        logAttrs(nss),
-                        "collectionUUID"_attr = collectionUuid,
-                        "range"_attr = redact(range.toString()),
-                        "clientOpTime"_attr = clientOpTime);
-
-            // Asynchronously wait for majority write concern.
-            return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
-                .thenRunOn(executor);
-        },
-        nss.dbName(),
-        collectionUuid);
-}
-
 std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext* opCtx,
                                                                const NamespaceString& nss) {
     std::vector<RangeDeletionTask> tasks;
@@ -463,119 +411,6 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
                                         BSON(RangeDeletionTask::kNssFieldName << toNss.ns()));
 }
 
-SharedSemiFuture<void> removeDocumentsInRange(
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    SemiFuture<void> waitForActiveQueriesToComplete,
-    const NamespaceString& nss,
-    const UUID& collectionUuid,
-    const BSONObj& keyPattern,
-    const ChunkRange& range,
-    Seconds delayForActiveQueriesOnSecondariesToComplete) {
-    return std::move(waitForActiveQueriesToComplete)
-        .thenRunOn(executor)
-        .onError([&](Status s) {
-            // The code does not expect the input future to have an error set on it, so we
-            // invariant here to prevent future misuse (no pun intended).
-            invariant(s.isOK());
-        })
-        .then([=]() mutable {
-            // Wait for possibly ongoing queries on secondaries to complete.
-            return sleepUntil(executor,
-                              executor->now() + delayForActiveQueriesOnSecondariesToComplete);
-        })
-        .then([=]() mutable {
-            LOGV2_DEBUG(23772,
-                        1,
-                        "Beginning deletion of documents",
-                        logAttrs(nss),
-                        "range"_attr = redact(range.toString()));
-
-            return deleteRangeInBatchesWithExecutor(
-                       executor, nss, collectionUuid, keyPattern, range)
-                .onCompletion([=](Status s) {
-                    if (!s.isOK() &&
-                        s.code() !=
-                            ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist) {
-                        // Propagate any errors to the onCompletion() handler below.
-                        return ExecutorFuture<void>(executor, s);
-                    }
-
-                    // We wait for majority write concern even if the range deletion task document
-                    // doesn't exist to guarantee the deletion (which must have happened earlier) is
-                    // visible to the caller at non-local read concerns.
-                    return waitForDeletionsToMajorityReplicate(executor, nss, collectionUuid, range)
-                        .then([=] {
-                            LOGV2_DEBUG(5346201,
-                                        1,
-                                        "Finished waiting for majority for deleted batch",
-                                        logAttrs(nss),
-                                        "range"_attr = redact(range.toString()));
-                            // Propagate any errors to the onCompletion() handler below.
-                            return s;
-                        });
-                });
-        })
-        .onCompletion([=](Status s) {
-            if (s.isOK()) {
-                LOGV2_DEBUG(23773,
-                            1,
-                            "Completed deletion of documents in {namespace} range {range}",
-                            "Completed deletion of documents",
-                            logAttrs(nss),
-                            "range"_attr = redact(range.toString()));
-            } else {
-                LOGV2(23774,
-                      "Failed to delete documents in {namespace} range {range} due to {error}",
-                      "Failed to delete documents",
-                      logAttrs(nss),
-                      "range"_attr = redact(range.toString()),
-                      "error"_attr = redact(s));
-            }
-
-            if (s.code() == ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist) {
-                return Status::OK();
-            }
-
-            if (!s.isOK() &&
-                s.code() !=
-                    ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
-                // Propagate any errors to callers waiting on the result.
-                return s;
-            }
-
-            try {
-                withTemporaryOperationContext(
-                    [&](OperationContext* opCtx) {
-                        removePersistentRangeDeletionTask(opCtx, collectionUuid, range);
-                    },
-                    nss.dbName(),
-                    collectionUuid);
-            } catch (const DBException& e) {
-                LOGV2_ERROR(23770,
-                            "Failed to delete range deletion task for range {range} in collection "
-                            "{namespace} due to {error}",
-                            "Failed to delete range deletion task",
-                            "range"_attr = range,
-                            logAttrs(nss),
-                            "error"_attr = e.what());
-
-                return e.toStatus();
-            }
-
-            LOGV2_DEBUG(23775,
-                        1,
-                        "Completed removal of persistent range deletion task for {namespace} "
-                        "range {range}",
-                        "Completed removal of persistent range deletion task",
-                        logAttrs(nss),
-                        "range"_attr = redact(range.toString()));
-
-            // Propagate any errors to callers waiting on the result.
-            return s;
-        })
-        .semi()
-        .share();
-}
 
 void persistUpdatedNumOrphans(OperationContext* opCtx,
                               const UUID& collectionUuid,

@@ -588,7 +588,7 @@ TEST_F(RangeDeleterServiceTest, TotalNumOfRegisteredTasks) {
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterTaskWithDisableResumableRangeDeleterFlagEnabled) {
-    RAIIServerParameterControllerForTest enableFeatureFlag{"disableResumableRangeDeleter", true};
+    RAIIServerParameterControllerForTest disableRangeDeleter{"disableResumableRangeDeleter", true};
 
     auto rds = RangeDeleterService::get(opCtx);
     auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
@@ -615,7 +615,7 @@ TEST_F(RangeDeleterServiceTest,
         uuidCollA, taskWithOngoingQueries->getTask().getRange());
     ASSERT(!overlappingRangeFuture.isReady());
 
-    RAIIServerParameterControllerForTest enableFeatureFlag{"disableResumableRangeDeleter", true};
+    RAIIServerParameterControllerForTest disableRangeDeleter{"disableResumableRangeDeleter", true};
     auto overlappingRangeFutureWhenDisabled = rds->getOverlappingRangeDeletionsFuture(
         uuidCollA, taskWithOngoingQueries->getTask().getRange());
     ASSERT(overlappingRangeFutureWhenDisabled.isReady());

@@ -34,7 +34,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -49,7 +48,6 @@ class MetadataManager : public std::enable_shared_from_this<MetadataManager> {
 public:
     MetadataManager(ServiceContext* serviceContext,
                     NamespaceString nss,
-                    std::shared_ptr<executor::TaskExecutor> executor,
                     CollectionMetadata initialMetadata);
     ~MetadataManager() = default;
 
@@ -101,50 +99,6 @@ public:
     void setFilteringMetadata(CollectionMetadata newMetadata);
 
     /**
-     * Appends information on all the chunk ranges in rangesToClean to builder.
-     */
-    void append(BSONObjBuilder* builder) const;
-
-    /**
-     * Schedules documents in `range` for cleanup after any running queries that may depend on them
-     * have terminated. Does not block. Fails if the range overlaps any current local shard chunk.
-     *
-     * If shouldDelayBeforeDeletion is false, deletion is scheduled immediately after the last
-     * dependent query completes; otherwise, deletion is postponed until after
-     * orphanCleanupDelaySecs after the last dependent query completes.
-     *
-     * Returns a future that will be fulfilled when the range deletion completes or fails.
-     */
-    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, bool shouldDelayBeforeDeletion);
-
-    /**
-     * Returns the number of ranges scheduled to be cleaned, exclusive of such ranges that might
-     * still be in use by running queries.  Outside of test drivers, the actual number may vary
-     * after it returns, so this is really only useful for unit tests.
-     */
-    size_t numberOfRangesToClean() const;
-
-    /**
-     * Returns the number of ranges scheduled to be cleaned once all queries that could depend on
-     * them have terminated. The actual number may vary after it returns, so this is really only
-     * useful for unit tests.
-     */
-    size_t numberOfRangesToCleanStillInUse() const;
-
-    /**
-     * Returns the number of ranges scheduled for deletion, regardless of whether they may still be
-     * in use by running queries.
-     */
-    size_t numberOfRangesScheduledForDeletion() const;
-
-    /**
-     * Reports whether any range still scheduled for deletion overlaps the argument range. If so,
-     * returns a future that will be resolved when the newest overlapping range's deletion (possibly
-     * the one of interest) completes or fails.
-     */
-    SharedSemiFuture<void> trackOrphanedDataCleanup(ChunkRange const& orphans) const;
-
-    /**
      * Returns a future marked as ready when all the ongoing queries retaining the range complete
      */
     SharedSemiFuture<void> getOngoingQueriesCompletionFuture(ChunkRange const& range);
@@ -170,12 +124,6 @@ private:
         }
 
         boost::optional<CollectionMetadata> metadata;
-
-        /**
-         * Number of range deletion tasks waiting on this CollectionMetadataTracker to be destroyed
-         * before deleting documents.
-         */
-        uint32_t numContingentRangeDeletionTasks{0};
 
         /**
          * Promise that will be signaled when this object is destroyed.
@@ -208,24 +156,6 @@ private:
      */
     CollectionMetadataTracker* _findNewestOverlappingMetadata(WithLock, ChunkRange const& range);
 
-    /**
-     * Returns true if the specified range overlaps any chunk that is currently in use by a running
-     * query.
-     */
-
-    bool _overlapsInUseChunk(WithLock, ChunkRange const& range);
-
-    /**
-     * Schedule a task to delete the given range of documents once waitForActiveQueriesToComplete
-     * has been signaled, and store the resulting future for the task in
-     * _rangesScheduledForDeletion.
-     */
-    SharedSemiFuture<void> _submitRangeForDeletion(
-        const WithLock&,
-        SemiFuture<void> waitForActiveQueriesToComplete,
-        const ChunkRange& range,
-        Seconds delayForActiveQueriesOnSecondariesToComplete);
-
     // ServiceContext from which to obtain instances of global support objects
     ServiceContext* const _serviceContext;
 
@@ -235,9 +165,6 @@ private:
     // The UUID for the collection tracked by this manager object.
     const UUID _collectionUuid;
 
-    // The background task that deletes documents from orphaned chunk ranges.
-    std::shared_ptr<executor::TaskExecutor> const _executor;
-
     // Mutex to protect the state below
     mutable Mutex _managerLock = MONGO_MAKE_LATCH("MetadataManager::_managerLock");
 
@@ -246,9 +173,6 @@ private:
     // the most recent metadata and is what is returned to new queries. The rest are previously
     // active collection metadata instances still in use by active server operations or cursors.
     std::list<std::shared_ptr<CollectionMetadataTracker>> _metadata;
-
-    // Ranges being deleted, or scheduled to be deleted, by a background task.
-    std::list<std::pair<ChunkRange, SharedSemiFuture<void>>> _rangesScheduledForDeletion;
 };
 
 }  // namespace mongo
