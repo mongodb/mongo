@@ -207,6 +207,8 @@ private:
     StringMap<std::unique_ptr<WindowFunctionExec>> _executableOutputs;
     bool _init = false;
     bool _eof = false;
+    // Used by the failpoint to determine when to spill to disk.
+    int32_t _numDocsProcessed = 0;
 };
 
 }  // namespace mongo

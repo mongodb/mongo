@@ -51,6 +51,7 @@ using SortPatternPart = mongo::SortPattern::SortPatternPart;
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(overrideMemoryLimitForSpill);
 
 /**
  * Does a sort pattern contain a path that has been modified?
@@ -489,7 +490,13 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             throw;
         }
 
-        if (!_memoryTracker.withinMemoryLimit() && _memoryTracker._allowDiskUse) {
+        bool inMemoryLimit = _memoryTracker.withinMemoryLimit();
+        overrideMemoryLimitForSpill.execute([&](const BSONObj& data) {
+            _numDocsProcessed++;
+            inMemoryLimit = _numDocsProcessed <= data["maxDocsBeforeSpill"].numberInt();
+        });
+
+        if (!inMemoryLimit && _memoryTracker._allowDiskUse) {
             // Attempt to spill where possible.
             _iterator.spillToDisk();
         }
