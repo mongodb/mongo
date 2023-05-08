@@ -111,7 +111,7 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
         return card;
     }
 
-    CEType outCard = kInvalidCardinality;
+    boost::optional<CEType> outCard;
     for (size_t groupId = 0; groupId < memo.getGroupCount(); groupId++) {
         // We only want to return the cardinality for the memo group matching the 'nodePredicate'.
         if (const auto& node = memo.getLogicalNodes(groupId).front(); nodePredicate(node)) {
@@ -121,13 +121,13 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
         }
     }
 
-    ASSERT_NOT_EQUALS(outCard, kInvalidCardinality);
+    ASSERT_TRUE(outCard.has_value());
 
     if constexpr (kCETestLogOnly) {
-        std::cout << "CE: " << outCard << std::endl;
+        std::cout << "CE: " << *outCard << std::endl;
     }
 
-    return outCard;
+    return *outCard;
 }
 
 void CETester::optimize(OptPhaseManager& phaseManager, ABT& abt) const {
@@ -152,7 +152,7 @@ void CETester::setIndexes(opt::unordered_map<std::string, IndexDefinition> index
 }
 
 void CETester::addCollection(std::string collName,
-                             CEType numRecords,
+                             boost::optional<CEType> numRecords,
                              opt::unordered_map<std::string, IndexDefinition> indexes) {
     _metadata._scanDefs.insert_or_assign(collName,
                                          createScanDef({},

@@ -165,7 +165,7 @@ private:
     SelectivityType disjunctionSel(const SelectivityType left, const SelectivityType right) {
         // We sum the selectivities and subtract the overlapping part so that it's only counted
         // once.
-        return left + right - left * right;
+        return negateSel(negateSel(left) * negateSel(right));
     }
 };
 
@@ -173,8 +173,9 @@ class HeuristicTransport {
 public:
     CEType transport(const ScanNode& node, CEType /*bindResult*/) {
         // Default cardinality estimate.
-        const CEType metadataCE = _metadata._scanDefs.at(node.getScanDefName()).getCE();
-        return (metadataCE < 0.0) ? kDefaultCard : metadataCE;
+        const boost::optional<CEType>& metadataCE =
+            _metadata._scanDefs.at(node.getScanDefName()).getCE();
+        return metadataCE.get_value_or(kDefaultCard);
     }
 
     CEType transport(const ValueScanNode& node, CEType /*bindResult*/) {

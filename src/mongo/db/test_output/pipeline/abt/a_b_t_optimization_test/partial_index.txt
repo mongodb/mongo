@@ -28,7 +28,7 @@ metadata:
 					    {{{scan_0, 'PathGet [b] PathTraverse [1] PathIdentity []', {{{=Const [2]}}}}}}
 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 optimization phases: 
 	ConstEvalPost
 	ConstEvalPre
@@ -87,7 +87,7 @@ metadata:
 					    {{{scan_0, 'PathGet [b] PathTraverse [1] PathIdentity []', {{{=Const [2]}}}}}}
 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 optimization phases: 
 	ConstEvalPost
 	ConstEvalPre

@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/util/assert_util.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/str.h"
+#include <limits>
 
 
 namespace mongo::optimizer {
@@ -112,14 +113,11 @@ StreamType& operator<<(StreamType& stream, const StrongStringAlias<TagType>& t) 
     return stream << t.value();
 }
 
-
 /**
  * Strong double alias. Used for cardinality estimation and selectivity. The tag type is expected to
  * have a boolean field "kUnitless". It specifies if this entity is unitless (e.g. a simple ratio, a
  * percent) vs having units (e.g. documents). This effectively enables or disables multiplication
  * and division by the same alias type.
- *
- * TODO: SERVER-71801: Validation for strong double alias.
  */
 template <class TagType>
 struct StrongDoubleAlias {
@@ -132,6 +130,17 @@ struct StrongDoubleAlias {
     explicit operator double() const {
         return _value;
     }
+
+    constexpr void assertValid() const {
+        uassert(7180104, "Invalid value", _value >= TagType::kMinValue);
+        uassert(7180105, "Invalid value", _value <= TagType::kMaxValue);
+    }
+
+    constexpr StrongDoubleAlias(const double value) : _value(value) {
+        assertValid();
+    }
+
+    constexpr StrongDoubleAlias() = default;
 
     constexpr bool operator==(const StrongDoubleAlias other) const {
         return _value == other._value;

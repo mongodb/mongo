@@ -70,7 +70,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              const bool exists,
-                             const CEType ce) {
+                             boost::optional<CEType> ce) {
 
     MultikeynessTrie multikeynessTrie = createTrie(indexDefs);
 
@@ -80,7 +80,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
                          constFold,
                          std::move(distributionAndPaths),
                          exists,
-                         ce);
+                         std::move(ce));
 }
 
 ScanDefinition createScanDef(ScanDefOptions options,
@@ -89,7 +89,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              const bool exists,
-                             const CEType ce) {
+                             boost::optional<CEType> ce) {
 
     // Simplify partial filter requirements using the non-multikey paths.
     for (auto& [indexDefName, indexDef] : indexDefs) {
@@ -112,7 +112,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
             std::move(multikeynessTrie),
             std::move(distributionAndPaths),
             exists,
-            ce};
+            std::move(ce)};
 }
 
 }  // namespace mongo::optimizer

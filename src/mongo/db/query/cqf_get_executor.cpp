@@ -412,7 +412,10 @@ static void populateAdditionalScanDefs(
                                               ? DistributionType::Centralized
                                               : DistributionType::UnknownPartitioning};
 
-        const CEType collectionCE{collectionExists ? collection->numRecords(opCtx) : -1.0};
+        boost::optional<CEType> collectionCE;
+        if (collectionExists) {
+            collectionCE = collection->numRecords(opCtx);
+        }
         scanDefs.emplace(scanDefName,
                          createScanDef({{"type", "mongod"},
                                         {"database", involvedNss.db().toString()},
@@ -540,7 +543,10 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                                           : DistributionType::UnknownPartitioning};
 
     opt::unordered_map<std::string, ScanDefinition> scanDefs;
-    const int64_t numRecords = collectionExists ? collection->numRecords(opCtx) : -1;
+    boost::optional<CEType> numRecords;
+    if (collectionExists) {
+        numRecords = static_cast<double>(collection->numRecords(opCtx));
+    }
     scanDefs.emplace(scanDefName,
                      createScanDef({{"type", "mongod"},
                                     {"database", nss.db().toString()},
@@ -551,7 +557,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                                    constFold,
                                    std::move(distribution),
                                    collectionExists,
-                                   {static_cast<double>(numRecords)}));
+                                   numRecords));
 
     // Add a scan definition for all involved collections. Note that the base namespace has already
     // been accounted for above and isn't included here.

@@ -172,7 +172,7 @@ public:
                    MultikeynessTrie multikeynessTrie,
                    DistributionAndPaths distributionAndPaths,
                    bool exists,
-                   CEType ce);
+                   boost::optional<CEType> ce);
 
     const ScanDefOptions& getOptionsMap() const;
 
@@ -185,7 +185,7 @@ public:
 
     bool exists() const;
 
-    CEType getCE() const;
+    const boost::optional<CEType>& getCE() const;
 
 private:
     ScanDefOptions _options;
@@ -204,7 +204,7 @@ private:
     bool _exists;
 
     // If positive, estimated number of docs in the collection.
-    CEType _ce;
+    boost::optional<CEType> _ce;
 };
 
 struct Metadata {
