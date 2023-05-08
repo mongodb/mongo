@@ -227,8 +227,10 @@ class test_truncate_timestamp(wttest.WiredTigerTestCase):
         ('table', dict(type='table:'))
     ])
 
-    # Test truncation without a timestamp, expect errors.
-    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
+    # The next two functions assume that truncate maps to a fast truncate, which requires timestamps.
+    # Prevent these from running under a hook that is also adding timestamps to transactions.
+    # Also prevent these from running under a hook that will cause truncate to use a slow path.
+    @wttest.prevent(["timestamp", "slow_truncate"])  # prevent the use of hooks that manage timestamps
     def test_truncate_no_ts(self):
         # Truncate with no timestamps is not allowed only in standalone builds.
         if not wiredtiger.standalone_build():
@@ -245,7 +247,7 @@ class test_truncate_timestamp(wttest.WiredTigerTestCase):
             lambda: ds.truncate(uri, None, None, None), msg)
 
     # Test truncation of a logged object without a timestamp, expect success.
-    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
+    @wttest.prevent(["timestamp", "slow_truncate"])  # prevent the use of hooks that manage timestamps
     def test_truncate_log_no_ts(self):
         uri = self.type + self.name
 
@@ -426,7 +428,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                 # Insert the records that aren't skipped or inserted.
                 start = begin_skipped + begin_insert
                 stop = self.nentries - (end_skipped + end_insert)
-                cursor = self.session.open_cursor(uri, None)
+                cursor = ds.open_cursor(uri, None)
                 for i in range(start + 1, stop + 1):
                     k = ds.key(i)
                     v = ds.value(i)

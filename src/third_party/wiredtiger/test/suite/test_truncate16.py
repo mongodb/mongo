@@ -145,7 +145,11 @@ class test_truncate16(wttest.WiredTigerTestCase):
         # or running on FLCS where it isn't supported.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        if self.value_format == '8t' or self.trunc_with_remove:
+        if self.runningHook('tiered'):
+            # There's no way the test can guess whether fast delete is possible when
+            # flush_tier calls are "randomly" inserted.
+            pass
+        elif self.value_format == '8t' or self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)
@@ -168,7 +172,11 @@ class test_truncate16(wttest.WiredTigerTestCase):
         # (But not if we weren't fast-deleting.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
-        if self.value_format == '8t' or self.trunc_with_remove:
+        if self.runningHook('tiered'):
+            # There's no way the test can guess whether fast delete is possible when
+            # flush_tier calls are "randomly" inserted.
+            pass
+        elif self.value_format == '8t' or self.trunc_with_remove:
             self.assertEqual(read_deleted, 0)
         else:
             self.assertEqual(read_deleted, 1)
