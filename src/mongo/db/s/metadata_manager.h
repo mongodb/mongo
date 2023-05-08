@@ -203,14 +203,14 @@ private:
     void _setActiveMetadata(WithLock wl, CollectionMetadata newMetadata);
 
     /**
-     * Finds the most-recently pushed metadata that might depend on `range`, or nullptr if none.
-     * The result is usable until the lock is released.
+     * Finds the most-recently pushed metadata that depends on `range`, or nullptr if none. The
+     * result is usable until the lock is released.
      */
     CollectionMetadataTracker* _findNewestOverlappingMetadata(WithLock, ChunkRange const& range);
 
     /**
-     * Returns true if the specified range overlaps any chunk that might be currently in use by a
-     * running query.
+     * Returns true if the specified range overlaps any chunk that is currently in use by a running
+     * query.
      */
 
     bool _overlapsInUseChunk(WithLock, ChunkRange const& range);

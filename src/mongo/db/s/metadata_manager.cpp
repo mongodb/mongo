@@ -344,13 +344,7 @@ auto MetadataManager::_findNewestOverlappingMetadata(WithLock, ChunkRange const&
     -> CollectionMetadataTracker* {
     invariant(!_metadata.empty());
 
-    auto it = _metadata.rbegin();
-    if (metadataOverlapsRange((*it)->metadata, range)) {
-        return (*it).get();
-    }
-
-    ++it;
-    for (; it != _metadata.rend(); ++it) {
+    for (auto it = _metadata.rbegin(); it != _metadata.rend(); ++it) {
         auto& tracker = *it;
         if (tracker->usageCounter && metadataOverlapsRange(tracker->metadata, range)) {
             return tracker.get();
