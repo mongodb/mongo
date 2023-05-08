@@ -659,6 +659,14 @@ public:
         return false;
     }
 
+    /**
+     * Override to true if this command should be allowed on a direct shard connection regardless
+     * of the directShardOperations ActionType.
+     */
+    virtual bool shouldSkipDirectConnectionChecks() const {
+        return false;
+    }
+
 private:
     // The full name of the command
     const std::string _name;

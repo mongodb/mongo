@@ -457,6 +457,7 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
         setupServerConfigActionSet.addAction(ActionType::addShard);
         setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
         setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
+        setupServerConfigActionSet.addAction(ActionType::issueDirectShardOperations);
         Privilege setupServerConfigPrivilege =
             Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
 

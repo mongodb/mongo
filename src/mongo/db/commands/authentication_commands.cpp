@@ -91,6 +91,12 @@ public:
         return "de-authenticate";
     }
 
+    // We should allow users to logout even if the user does not have the direct shard roles action
+    // type.
+    bool shouldSkipDirectConnectionChecks() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
