@@ -7,7 +7,8 @@ set -o errexit
 set -o verbose
 
 activate_venv
-setup_db_contrib_tool
+
+setup_db_contrib_tool_venv
 
 export PIPX_HOME="${workdir}/pipx"
 export PIPX_BIN_DIR="${workdir}/pipx/bin"
