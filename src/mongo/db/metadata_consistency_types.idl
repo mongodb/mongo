@@ -50,6 +50,7 @@ enums:
             kRoutingTableMissingMinKey: "RoutingTableMissingMinKey"
             kRoutingTableRangeGap: "RoutingTableRangeGap"
             kRoutingTableRangeOverlap: "RoutingTableRangeOverlap"
+            kShardThinksCollectionIsUnsharded: "ShardThinksCollectionIsUnsharded"
             kZonesRangeOverlap: "ZonesRangeOverlap"
 
     MetadataInconsistencyDescription:
@@ -68,6 +69,7 @@ enums:
             kRoutingTableMissingMinKey: "Routing table has a gap because first chunk does not start from MinKey"
             kRoutingTableRangeGap: "Found a gap between two consecutive chunks"
             kRoutingTableRangeOverlap: "Found two overlapping consecutive chunks"
+            kShardThinksCollectionIsUnsharded: "Shard thinks collection is unsharded while instead is currently sharded"
             kZonesRangeOverlap: "Found two overlapping zones"
 
     MetadataConsistencyCommandLevel:
@@ -270,6 +272,21 @@ structs:
             collectionUUID:
                 type: uuid
                 description: "The UUID of the collection."
+    
+    ShardThinksCollectionIsUnshardedDetails:
+        description: "Details about shard that thinks collection is unsharded."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            shard:
+                type: shard_id
+                description: "The shard with wrong collection timestamp."
 
     ZonesRangeOverlapDetails:
         description: "Details about a zones range overlap inconsistency."

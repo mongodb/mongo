@@ -113,11 +113,14 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
         return;
     }
 
-    tassert(7531702,
-            str::stream()
-                << "Collection unexpectedly became unsharded while holding database DDL lock: "
-                << nss.toStringForErrorMsg(),
-            optCollDescr->isSharded());
+    if (!optCollDescr->isSharded()) {
+        // The collection is registered as SHARDED in the sharding catalog. This shard has the
+        // collection locally but is marked as UNSHARDED.
+        inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+            MetadataInconsistencyTypeEnum::kShardThinksCollectionIsUnsharded,
+            ShardThinksCollectionIsUnshardedDetails{localColl->ns(), localColl->uuid(), shardId}));
+        return;
+    }
 
     if (!optCollDescr->currentShardHasAnyChunks()) {
         LOGV2_DEBUG(7531703,
