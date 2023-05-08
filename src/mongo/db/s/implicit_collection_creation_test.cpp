@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -66,6 +67,26 @@ TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreate) {
     WriteUnitOfWork wuow(operationContext());
     ASSERT_OK(db->userCreateNS(operationContext(), nss, CollectionOptions{}));
     wuow.commit();
+
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(operationContext(), nss);
+    ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreateWithSetCSRAsUnknown) {
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("AllowImplicitCollectionCreateDB.TestColl");
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        operationContext(), /* forceCSRAsUnknownAfterCollectionCreation */ true);
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    auto db = autoColl.ensureDbExists(operationContext());
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_OK(db->userCreateNS(operationContext(), nss, CollectionOptions{}));
+    wuow.commit();
+
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(operationContext(), nss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
 }
 
 }  // namespace

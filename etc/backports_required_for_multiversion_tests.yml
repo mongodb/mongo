@@ -839,4 +839,6 @@ last-lts:
     ticket: SERVER-76550
   - test_file: jstests/sharding/analyze_shard_key/monotonicity_hashed_sharding_compound.js
     ticket: SERVER-76719
+  - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
+    ticket: SERVER-76489
   suites: null

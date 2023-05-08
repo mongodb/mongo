@@ -418,7 +418,8 @@ Status DefaultClonerImpl::_createCollectionsForDb(
 
             {
                 OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                    unsafeCreateCollection(opCtx);
+                    unsafeCreateCollection(opCtx,
+                                           /* forceCSRAsUnknownAfterCollectionCreation */ true);
                 Status createStatus = db->userCreateNS(
                     opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);
                 if (!createStatus.isOK()) {
