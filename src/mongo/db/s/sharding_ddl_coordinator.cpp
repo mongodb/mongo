@@ -323,7 +323,21 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             auto additionalLocks = _acquireAdditionalLocks(opCtx);
             if (!additionalLocks.empty()) {
                 invariant(additionalLocks.size() == 1);
-                return _acquireLockAsync(executor, token, additionalLocks.front());
+                const NamespaceString additionalNss(additionalLocks.front());
+
+                return ExecutorFuture<void>(**executor)
+                    .then([this, executor, token, additionalNss, anchor = shared_from_this()] {
+                        if (additionalNss.db() != originalNss().db()) {
+                            return _acquireLockAsync(executor, token, additionalNss.db());
+                        }
+                        return ExecutorFuture<void>(**executor);
+                    })
+                    .then([this, executor, token, additionalNss, anchor = shared_from_this()] {
+                        if (!additionalNss.coll().empty()) {
+                            return _acquireLockAsync(executor, token, additionalNss.ns());
+                        }
+                        return ExecutorFuture<void>(**executor);
+                    });
             }
             return ExecutorFuture<void>(**executor);
         })
