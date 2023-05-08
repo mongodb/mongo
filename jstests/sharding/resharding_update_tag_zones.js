@@ -1,5 +1,9 @@
 /**
  * Testing that config.tags are correctly updated after resharding hashed shard key with zones.
+ *
+ * @tags: [
+ *   requires_fcv_49
+ * ]
  */
 
 (function() {

@@ -502,14 +502,15 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
     ShardingCatalogManager::get(opCtx)->insertConfigDocuments(opCtx, TagsType::ConfigNS, newZones);
 }
 
-void removeTagsDocs(OperationContext* opCtx, const BSONObj& tagsQuery) {
+void removeTagsDocs(OperationContext* opCtx, const BSONObj& tagsQuery, TxnNumber txnNumber) {
     // Remove tag documents with the specified tagsQuery.
-    const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
+    auto request = BatchedCommandRequest::buildDeleteOp(TagsType::ConfigNS,
+                                                        tagsQuery,  // query
+                                                        true        // multi
+    );
 
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
-
-    uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, TagsType::ConfigNS, tagsQuery, kMajorityWriteConcern, tagDeleteOperationHint));
+    ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, TagsType::ConfigNS, request, txnNumber);
 }
 
 // Requires that there be no session information on the opCtx.
@@ -518,7 +519,11 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
                             const UUID& collUUID) {
     // Remove all chunk documents and specified tag documents.
     resharding::removeChunkDocs(opCtx, collUUID);
-    removeTagsDocs(opCtx, tagsQuery);
+
+    const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, TagsType::ConfigNS, tagsQuery, kMajorityWriteConcern, tagDeleteOperationHint));
 }
 
 /**
@@ -600,16 +605,17 @@ void writeDecisionPersistedState(OperationContext* opCtx,
 
         // Delete all of the config.tags entries for the user collection namespace.
         const auto removeTagsQuery = BSON(TagsType::ns(coordinatorDoc.getSourceNss().ns()));
-        removeTagsDocs(opCtx, removeTagsQuery);
+        removeTagsDocs(opCtx, removeTagsQuery, txnNumber);
 
         // Update all of the config.tags entries for the temporary resharding namespace
         // to refer to the user collection namespace.
-        updateTagsDocsForTempNss(opCtx, coordinatorDoc);
+        updateTagsDocsForTempNss(opCtx, coordinatorDoc, txnNumber);
     });
 }
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
-                              const ReshardingCoordinatorDocument& coordinatorDoc) {
+                              const ReshardingCoordinatorDocument& coordinatorDoc,
+                              TxnNumber txnNumber) {
     auto hint = BSON("ns" << 1 << "min" << 1);
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
@@ -622,10 +628,8 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
     // currently have 'ns' as the temporary collection namespace.
-    DBDirectClient client(opCtx);
-    BSONObj tagsRes;
-    client.runCommand(tagsRequest.getNS().db().toString(), tagsRequest.toBSON(), tagsRes);
-    uassertStatusOK(getStatusFromWriteCommandReply(tagsRes));
+    auto tagsRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, TagsType::ConfigNS, tagsRequest, txnNumber);
 }
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
@@ -724,10 +728,10 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
             updateConfigCollectionsForOriginalNss(
                 opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
 
-            // Update the config.collections entry for the temporary resharding collection. If we've
-            // already successfully committed that the operation will succeed, we've removed the
-            // entry for the temporary collection and updated the entry with original namespace to
-            // have the new shard key, UUID, and epoch
+            // Update the config.collections entry for the temporary resharding collection. If
+            // we've already successfully committed that the operation will succeed, we've
+            // removed the entry for the temporary collection and updated the entry with
+            // original namespace to have the new shard key, UUID, and epoch
             if (nextState < CoordinatorStateEnum::kCommitting) {
                 writeToConfigCollectionsForTempNss(
                     opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
@@ -739,9 +743,9 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                                              const ReshardingCoordinatorDocument& coordinatorDoc,
                                              boost::optional<Status> abortReason) {
-    // If the coordinator needs to abort and isn't in kInitializing, additional collections need to
-    // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
-    // same.
+    // If the coordinator needs to abort and isn't in kInitializing, additional collections need
+    // to be cleaned up in the final transaction. Otherwise, cleanup for abort and success are
+    // the same.
     const bool wasDecisionPersisted =
         coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting;
     invariant((wasDecisionPersisted && !abortReason) || abortReason);
