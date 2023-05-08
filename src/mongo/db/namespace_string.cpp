@@ -304,8 +304,7 @@ NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& op
 
 StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const {
     if (!isDropPendingNamespace()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Not a drop-pending namespace: " << ns());
+        return Status(ErrorCodes::BadValue, fmt::format("Not a drop-pending namespace: {}", ns()));
     }
 
     auto collectionName = coll();
@@ -318,20 +317,20 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
     auto incrementSeparatorIndex = opTimeStr.find('i');
     if (std::string::npos == incrementSeparatorIndex) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Missing 'i' separator in drop-pending namespace: " << ns());
+                      fmt::format("Missing 'i' separator in drop-pending namespace: {}", ns()));
     }
 
     auto termSeparatorIndex = opTimeStr.find('t', incrementSeparatorIndex);
     if (std::string::npos == termSeparatorIndex) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Missing 't' separator in drop-pending namespace: " << ns());
+                      fmt::format("Missing 't' separator in drop-pending namespace: {}", ns()));
     }
 
     long long seconds;
     auto status = NumberParser{}(opTimeStr.substr(0, incrementSeparatorIndex), &seconds);
     if (!status.isOK()) {
         return status.withContext(
-            str::stream() << "Invalid timestamp seconds in drop-pending namespace: " << ns());
+            fmt::format("Invalid timestamp seconds in drop-pending namespace: {}", ns()));
     }
 
     unsigned int increment;
@@ -340,14 +339,13 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
                             &increment);
     if (!status.isOK()) {
         return status.withContext(
-            str::stream() << "Invalid timestamp increment in drop-pending namespace: " << ns());
+            fmt::format("Invalid timestamp increment in drop-pending namespace: {}", ns()));
     }
 
     long long term;
     status = mongo::NumberParser{}(opTimeStr.substr(termSeparatorIndex + 1), &term);
     if (!status.isOK()) {
-        return status.withContext(str::stream()
-                                  << "Invalid term in drop-pending namespace: " << ns());
+        return status.withContext(fmt::format("Invalid term in drop-pending namespace: {}", ns()));
     }
 
     return repl::OpTime(Timestamp(Seconds(seconds), increment), term);
@@ -467,8 +465,9 @@ Status NamespaceStringOrUUID::isNssValid() const {
     }
 
     // _nss is set and not valid.
-    return {ErrorCodes::InvalidNamespace,
-            str::stream() << "Namespace " << _nss << " is not a valid collection name"};
+    return {
+        ErrorCodes::InvalidNamespace,
+        fmt::format("Namespace {} is not a valid collection name", _nss->toStringForErrorMsg())};
 }
 
 std::string NamespaceStringOrUUID::toString() const {

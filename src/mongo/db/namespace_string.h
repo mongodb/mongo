@@ -438,8 +438,7 @@ public:
 
     std::string toStringWithTenantId() const {
         if (_hasTenantId()) {
-            auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
-            return str::stream() << tenantId.toString() << "_" << ns();
+            return str::stream() << TenantId{OID::from(&_data[kDataOffset])} << "_" << ns();
         }
 
         return ns().toString();
@@ -862,13 +861,12 @@ private:
         uassert(ErrorCodes::InvalidNamespace,
                 "Collection names cannot start with '.': " + collectionName,
                 collectionName.empty() || collectionName[0] != '.');
-
-        auto ns = (str::stream() << db << '.' << collectionName).ss.str();
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
-                ns.find('\0') == std::string::npos);
+                db.find('\0') == std::string::npos &&
+                    collectionName.find('\0') == std::string::npos);
 
-        _data = dbName._data + "."_sd + collectionName;
+        _data = str::stream() << dbName._data << "." << collectionName;
     }
 
     /**
