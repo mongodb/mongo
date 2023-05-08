@@ -168,17 +168,19 @@ using ScopedAllowImplicitCollectionCreate_UNSAFE =
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE;
 
 ScopedAllowImplicitCollectionCreate_UNSAFE::ScopedAllowImplicitCollectionCreate_UNSAFE(
-    OperationContext* opCtx)
+    OperationContext* opCtx, bool forceCSRAsUnknownAfterCollectionCreation)
     : _opCtx(opCtx) {
     auto& oss = get(_opCtx);
     invariant(!oss._allowCollectionCreation);
     oss._allowCollectionCreation = true;
+    oss._forceCSRAsUnknownAfterCollectionCreation = forceCSRAsUnknownAfterCollectionCreation;
 }
 
 ScopedAllowImplicitCollectionCreate_UNSAFE::~ScopedAllowImplicitCollectionCreate_UNSAFE() {
     auto& oss = get(_opCtx);
     invariant(oss._allowCollectionCreation);
     oss._allowCollectionCreation = false;
+    oss._forceCSRAsUnknownAfterCollectionCreation = false;
 }
 
 ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,

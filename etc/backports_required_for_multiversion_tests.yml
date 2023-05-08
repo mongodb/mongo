@@ -372,6 +372,8 @@ last-continuous:
     ticket: SERVER-75356
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
+  - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
+    ticket: SERVER-76489
   suites: null
 last-lts:
   all:
@@ -829,4 +831,6 @@ last-lts:
     ticket: SERVER-76310
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
+  - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
+    ticket: SERVER-76489
   suites: null
