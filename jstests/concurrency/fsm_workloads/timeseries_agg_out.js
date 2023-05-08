@@ -24,6 +24,8 @@ var $config = extendWorkload($config, function($config, $super) {
     const metaFieldName = 'tag';
     const numDocs = 100;
     $config.data.outputCollName = 'timeseries_agg_out';
+    $config.data.shardKey = {[metaFieldName]: 1};
+
     /**
      * Runs an aggregate with a $out with time-series into '$config.data.outputCollName'.
      */
@@ -47,8 +49,11 @@ var $config = extendWorkload($config, function($config, $super) {
             ErrorCodes.CommandFailed,     // indexes of target collection changed during processing.
             ErrorCodes.IllegalOperation,  // $out is not supported to an existing *sharded* output
             // collection.
-            17152,  // namespace is capped so it can't be used for $out.
-            28769,  // $out collection cannot be sharded.
+            17152,                       // namespace is capped so it can't be used for $out.
+            28769,                       // $out collection cannot be sharded.
+            ErrorCodes.NamespaceExists,  // $out tries to create a view when a buckets collection
+                                         // already exists. This error is not caught because the
+                                         // view is being dropped by a previous thread.
         ];
         assertWhenOwnDB.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
         if (res.ok) {
@@ -70,7 +75,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         assertWhenOwnDB.commandWorkedOrFailedWithCode(
             db.runCommand({collMod: this.outputCollName, expireAfterSeconds: expireAfterSeconds}),
-            ErrorCodes.ConflictingOperationInProgress);
+            [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.NamespaceNotFound]);
     };
 
     /**
@@ -83,15 +88,6 @@ var $config = extendWorkload($config, function($config, $super) {
         assertWhenOwnDB.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
             ErrorCodes.CommandNotSupportedOnView);
-    };
-
-    /**
-     * If being run against a mongos, shards '$config.data.outputCollName'. This is never undone,
-     * and all subsequent $out's to this collection should fail.
-     */
-    $config.states.shardCollection = function shardCollection(db, unusedCollName) {
-        // TODO SERVER-76626 change this from a no-op.
-        return;
     };
 
     $config.teardown = function teardown(db) {
