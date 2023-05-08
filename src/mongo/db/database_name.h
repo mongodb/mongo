@@ -158,8 +158,7 @@ public:
 
     std::string toStringWithTenantId() const {
         if (_hasTenantId()) {
-            auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
-            return str::stream() << tenantId.toString() << "_" << db();
+            return str::stream() << TenantId{OID::from(&_data[kDataOffset])} << "_" << db();
         }
 
         return db().toString();
