@@ -57,11 +57,6 @@ MONGO_FAIL_POINT_DEFINE(fleCompactSkipECOCDropUnsharded);
 namespace mongo {
 namespace {
 
-/**
- * Ensures that only one compactStructuredEncryptionData can run at a given time.
- */
-Lock::ResourceMutex commandMutex("compactStructuredEncryptionDataCommandMutex");
-
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
 
@@ -71,9 +66,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             str::stream() << CompactStructuredEncryptionData::kCommandName
                           << " must be run through mongos in a sharded cluster",
             !ShardingState::get(opCtx)->enabled());
-
-    // Only allow one instance of compactStructuredEncryptionData to run at a time.
-    Lock::ExclusiveLock fleCompactCommandLock(opCtx, commandMutex);
 
     // Since this command holds an IX lock on the DB and the global lock throughout
     // the lifetime of this operation, setFCV should not be allowed to abort the transaction

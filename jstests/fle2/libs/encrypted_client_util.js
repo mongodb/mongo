@@ -415,7 +415,7 @@ var EncryptedClient = class {
     }
 };
 
-function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallback) {
+function runEncryptedTest(db, dbName, collNames, encryptedFields, runTestsCallback) {
     const dbTest = db.getSiblingDB(dbName);
     dbTest.dropDatabase();
 
@@ -429,8 +429,14 @@ function runEncryptedTest(db, dbName, collName, encryptedFields, runTestsCallbac
 
     let client = new EncryptedClient(db.getMongo(), dbName);
 
-    assert.commandWorked(
-        client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
+    if (typeof collNames === "string") {
+        collNames = [collNames];
+    }
+
+    for (collName of collNames) {
+        assert.commandWorked(
+            client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
+    }
 
     let edb = client.getDB();
     runTestsCallback(edb, client);
