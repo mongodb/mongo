@@ -664,13 +664,18 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
     ShardingCatalogManager::get(opCtx)->insertConfigDocuments(opCtx, TagsType::ConfigNS, newZones);
 }
 
-void removeTagsDocs(OperationContext* opCtx, const BSONObj& tagsQuery) {
+void removeTagsDocs(OperationContext* opCtx, const BSONObj& tagsQuery, TxnNumber txnNumber) {
     // Remove tag documents with the specified tagsQuery.
     const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-
-    uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, TagsType::ConfigNS, tagsQuery, kMajorityWriteConcern, tagDeleteOperationHint));
+    ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx,
+        TagsType::ConfigNS,
+        BatchedCommandRequest::buildDeleteOp(TagsType::ConfigNS,
+                                             tagsQuery,              // query
+                                             true,                   // multi
+                                             tagDeleteOperationHint  // hint
+                                             ),
+        txnNumber);
 }
 
 // Requires that there be no session information on the opCtx.
@@ -679,7 +684,11 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
                             const UUID& collUUID) {
     // Remove all chunk documents and specified tag documents.
     resharding::removeChunkDocs(opCtx, collUUID);
-    removeTagsDocs(opCtx, tagsQuery);
+
+    const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, TagsType::ConfigNS, tagsQuery, kMajorityWriteConcern, tagDeleteOperationHint));
 }
 
 /**
@@ -791,16 +800,17 @@ void writeDecisionPersistedState(OperationContext* opCtx,
             // Delete all of the config.tags entries for the user collection namespace.
             const auto removeTagsQuery =
                 BSON(TagsType::ns(coordinatorDoc.getSourceNss().ns().toString()));
-            removeTagsDocs(opCtx, removeTagsQuery);
+            removeTagsDocs(opCtx, removeTagsQuery, txnNumber);
 
             // Update all of the config.tags entries for the temporary resharding namespace
             // to refer to the user collection namespace.
-            updateTagsDocsForTempNss(opCtx, coordinatorDoc);
+            updateTagsDocsForTempNss(opCtx, coordinatorDoc, txnNumber);
         });
 }
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
-                              const ReshardingCoordinatorDocument& coordinatorDoc) {
+                              const ReshardingCoordinatorDocument& coordinatorDoc,
+                              TxnNumber txnNumber) {
     auto hint = BSON("ns" << 1 << "min" << 1);
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
@@ -813,10 +823,8 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
     // currently have 'ns' as the temporary collection namespace.
-    DBDirectClient client(opCtx);
-    BSONObj tagsRes;
-    client.runCommand(tagsRequest.getNS().dbName(), tagsRequest.toBSON(), tagsRes);
-    uassertStatusOK(getStatusFromWriteCommandReply(tagsRes));
+    auto tagsRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, TagsType::ConfigNS, tagsRequest, txnNumber);
 }
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
