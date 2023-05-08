@@ -588,6 +588,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
                                                const OplogSlot& createOpTime,
                                                bool fromMigrate) {
     // Only the shard primay nodes control the collection creation and secondaries just follow
+    // Secondaries CSR will be the defaulted one (UNKNOWN in most of the cases)
     if (!opCtx->writesAreReplicated()) {
         return;
     }
@@ -614,7 +615,9 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
     // If the check above passes, this means the collection doesn't exist and is being created and
     // that the caller will be responsible to eventially set the proper shard version
     auto* const csr = CollectionShardingRuntime::get(opCtx, collectionName);
-    if (!csr->getCurrentMetadataIfKnown()) {
+    if (oss._forceCSRAsUnknownAfterCollectionCreation) {
+        csr->clearFilteringMetadata(opCtx);
+    } else if (!csr->getCurrentMetadataIfKnown()) {
         csr->setFilteringMetadata(opCtx, CollectionMetadata());
     }
 }
