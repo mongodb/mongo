@@ -104,7 +104,7 @@ function testCommandUnshardedCollection(testCase) {
         startTransaction: true,
         autocommit: false
     };
-    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.NamespaceNotSharded);
 }
 
 function testCommandShardedCollectionOnSingleShard(testCase) {

@@ -54,6 +54,7 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeMetadataRefreshClusterQuery);
 constexpr auto kIdFieldName = "_id"_sd;
 
 struct ParsedCommandInfo {
@@ -78,9 +79,7 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
                                     NamespaceString nss,
                                     const ParsedCommandInfo& parsedInfo) {
     std::set<ShardId> allShardsContainingChunksForNs;
-    uassert(ErrorCodes::InvalidOptions,
-            "_clusterQueryWithoutShardKey can only be run against sharded collections",
-            cm.isSharded());
+    uassert(ErrorCodes::NamespaceNotSharded, "The collection was dropped.", cm.isSharded());
 
     auto query = parsedInfo.query;
     auto collation = parsedInfo.collation;
@@ -260,6 +259,8 @@ public:
             // Get all shard ids for shards that have chunks in the desired namespace.
             const NamespaceString nss(
                 CommandHelpers::parseNsCollectionRequired(ns().dbName(), request().getWriteCmd()));
+
+            hangBeforeMetadataRefreshClusterQuery.pauseWhileSet(opCtx);
             const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
 
             // Parse into OpMsgRequest to append the $db field, which is required for command
