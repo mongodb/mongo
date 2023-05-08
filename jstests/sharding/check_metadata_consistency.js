@@ -34,13 +34,6 @@ function assertNoInconsistencies() {
             return;
         }
 
-        // TODO BACKPORT-15518: re-enable config db checks once the backport is completed
-        if ((jsTest.options().shardMixedBinVersions ||
-             jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
-            dbName == 'config') {
-            return;
-        }
-
         let db = mongos.getDB(dbName);
         res = db.checkMetadataConsistency(checkOptions).toArray();
         assert.eq(0,
