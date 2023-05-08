@@ -117,7 +117,7 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             time_total = self.get_stat(stat.conn.txn_checkpoint_time_total)
             self.pr('txn_checkpoint_time_total ' + str(time_total))
 
-            self.assertEqual(num_ckpt, 2 * multiplier)
+            self.assertEqual(num_ckpt, 2)
             self.assertEqual(running, 0)
             self.assertEqual(prep_running, 0)
             # Assert if this loop continues for more than 100 iterations.
@@ -129,6 +129,9 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
                 break
             else:
                 multiplier += 1
+                # Reopen the connection to reset statistics. 
+                # We don't want stats from earlier runs to interfere with later runs.
+                self.reopen_conn()
 
 if __name__ == '__main__':
     wttest.run()
