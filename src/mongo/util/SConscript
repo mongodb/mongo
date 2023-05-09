@@ -115,16 +115,6 @@ env.Library(
 )
 
 env.Library(
-    target='intrusive_counter',
-    source=[
-        'intrusive_counter.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='log_and_backoff',
     source=[
         'log_and_backoff.cpp',
