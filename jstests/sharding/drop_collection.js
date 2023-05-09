@@ -107,10 +107,10 @@ jsTest.log("Drop sharded collection repeated.");
     }
 }
 
-jsTest.log("Drop unexistent collections also remove tags.");
+jsTest.log("Drop inexistent collections also remove tags.");
 {
     const db = getNewDb();
-    const coll = db['unexistent'];
+    const coll = db['inexistent'];
     // Create the database
     assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
     // Add a zone

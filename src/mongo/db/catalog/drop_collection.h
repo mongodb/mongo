@@ -99,4 +99,12 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
  */
 void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName);
 
+/**
+ * Checks that the namespace complies with naming restrictions and therefore can be dropped. It
+ * returns a Status with details of that evaluation.
+ *
+ * TODO (SERVER-76936): Normalize raised errors adopting a consistent approach.
+ */
+Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace mongo

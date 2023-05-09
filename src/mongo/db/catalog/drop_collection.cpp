@@ -58,6 +58,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
+MONGO_FAIL_POINT_DEFINE(allowSystemViewsDrop);
 
 /**
  * Checks that the collection has the 'expectedUUID' if given.
@@ -677,6 +678,41 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
         opCtx, dbName, MODE_X, callback, [&](const Collection* collection) {
             return collection->getCollectionOptions().temp;
         });
+}
+
+Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    if (!nss.isSystem()) {
+        return Status::OK();
+    }
+
+    auto isDroppableSystemCollection = [](const auto& nss) {
+        return nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
+            nss == NamespaceString::kKeysCollectionNamespace ||
+            nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
+            nss.isChangeStreamPreImagesCollection() ||
+            nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection() ||
+            nss.isSystemDotJavascript() || nss.isSystemStatsCollection();
+    };
+
+    if (nss.isSystemDotProfile()) {
+        if (CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()) != 0)
+            return Status(ErrorCodes::IllegalOperation,
+                          "turn off profiling before dropping system.profile collection");
+    } else if (nss.isSystemDotViews()) {
+        if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
+            const auto viewStats =
+                CollectionCatalog::get(opCtx)->getViewStatsForDatabase(opCtx, nss.dbName());
+            uassert(ErrorCodes::CommandFailed,
+                    "cannot drop collection {} when time-series collections are present"_format(
+                        nss.toStringForErrorMsg()),
+                    viewStats && viewStats->userTimeseries == 0);
+        }
+    } else if (!isDroppableSystemCollection(nss)) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "cannot drop system collection {}"_format(nss.toStringForErrorMsg()));
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo
