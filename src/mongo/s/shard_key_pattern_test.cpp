@@ -115,12 +115,18 @@ TEST_F(ShardKeyPatternTest, SingleFieldShardKeyPatternsValidityCheck) {
     ASSERT_THROWS(ShardKeyPattern(BSON("$" << 1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("$a" << 1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("$**" << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("$id" << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("$db" << 1)), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSON("$ref" << 1)), DBException);
 }
 
 TEST_F(ShardKeyPatternTest, CompositeShardKeyPatternsValidityCheck) {
     ShardKeyPattern s1(BSON("a" << 1 << "b" << 1));
     ShardKeyPattern s2(BSON("a" << 1.0f << "b" << 1.0));
     ShardKeyPattern s3(BSON("a" << 1 << "b" << 1.0 << "c" << 1.0f));
+    ShardKeyPattern s4(BSON("a.$id" << 1));
+    ShardKeyPattern s5(BSON("a.$db" << 1));
+    ShardKeyPattern s6(BSON("a.$ref" << 1));
 
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "b" << -1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << 1 << "b"

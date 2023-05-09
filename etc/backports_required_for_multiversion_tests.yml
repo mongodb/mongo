@@ -258,8 +258,6 @@ last-continuous:
   # multiversion runs with v6.0.
   - test_file: jstests/core/clustered/clustered_collection_collation.js
     ticket: SERVER-72224
-  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
-    ticket: SERVER-74124
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
@@ -282,6 +280,8 @@ last-continuous:
     ticket: SERVER-75517
   - test_file: jstests/core/command_let_variables.js
     ticket: SERVER-75356
+  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
+    ticket: SERVER-76948
   suites: null
 last-lts:
   all:
@@ -613,8 +613,6 @@ last-lts:
   # multiversion runs with v6.0.
   - test_file: jstests/core/clustered/clustered_collection_collation.js
     ticket: SERVER-72224
-  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
-    ticket: SERVER-74124
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
     ticket: SERVER-68648
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
@@ -637,4 +635,6 @@ last-lts:
     ticket: SERVER-75517
   - test_file: jstests/core/command_let_variables.js
     ticket: SERVER-75356
+  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
+    ticket: SERVER-76948
   suites: null
