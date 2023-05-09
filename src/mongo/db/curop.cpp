@@ -389,8 +389,10 @@ TickSource::Tick CurOp::startTime() {
 
 void CurOp::done() {
     _end = _tickSource->getTicks();
+}
 
-    if (_cpuTimer) {
+void CurOp::calculateCpuTime() {
+    if (_cpuTimer && _debug.cpuTime == Nanoseconds::zero()) {
         _debug.cpuTime = _cpuTimer->getElapsed();
     }
 }
@@ -467,6 +469,12 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
     if (filter) {
+        // Calculate this operation's CPU time before deciding whether logging/profiling is
+        // necessary only if it is needed for filtering.
+        if (filter->dependsOn("cpuNanos")) {
+            calculateCpuTime();
+        }
+
         bool passesFilter = filter->matches(opCtx, _debug, *this);
 
         shouldLogSlowOp = passesFilter;
@@ -480,6 +488,13 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
             opCtx, component, Milliseconds(executionTimeMillis), Milliseconds(slowMs));
 
         shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
+    }
+
+    // Defer calculating the CPU time until we know that we actually are going to write it to
+    // the logs or profiler. The CPU time may have been determined earlier if it was a dependency
+    // of 'filter' in which case this is a no-op.
+    if (forceLog || shouldLogSlowOp || _dbprofile >= 2) {
+        calculateCpuTime();
     }
 
     if (forceLog || shouldLogSlowOp) {

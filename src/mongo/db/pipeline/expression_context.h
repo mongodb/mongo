@@ -411,7 +411,7 @@ public:
     void stopExpressionCounters();
 
     bool expressionCountersAreActive() {
-        return _expressionCounters.is_initialized();
+        return static_cast<bool>(_expressionCounters);
     }
 
     /**
@@ -589,7 +589,7 @@ protected:
     bool _requiresTimeseriesExtendedRangeSupport = false;
 
 private:
-    boost::optional<ExpressionCounters> _expressionCounters = boost::none;
+    std::unique_ptr<ExpressionCounters> _expressionCounters;
     bool _gotTemporarilyUnavailableException = false;
 
     // We use this set to indicate whether or not a system variable was referenced in the query that

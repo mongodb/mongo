@@ -205,19 +205,6 @@ public:
      */
     static size_t countNodes(const MatchExpression* root, MatchExpression::MatchType type);
 
-    /**
-     * Returns true if this canonical query may have converted extensions such as $where and $text
-     * into no-ops during parsing. This will be the case if it allowed $where and $text in parsing,
-     * but parsed using an ExtensionsCallbackNoop. This does not guarantee that a $where or $text
-     * existed in the query.
-     *
-     * Queries with a no-op extension context are special because they can be parsed and planned,
-     * but they cannot be executed.
-     */
-    bool canHaveNoopMatchNodes() const {
-        return _canHaveNoopMatchNodes;
-    }
-
     bool getExplain() const {
         return _explain;
     }
@@ -304,7 +291,6 @@ private:
     Status init(OperationContext* opCtx,
                 boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<FindCommandRequest> findCommand,
-                bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
                 const ProjectionPolicies& projectionPolicies,
                 std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
@@ -332,8 +318,6 @@ private:
 
     // Keeps track of what metadata has been explicitly requested.
     QueryMetadataBitSet _metadataDeps;
-
-    bool _canHaveNoopMatchNodes = false;
 
     bool _explain = false;
 

@@ -122,7 +122,6 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotPrimaryInCommandDispatch);
-MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
@@ -498,6 +497,10 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
                                          bool isInternalClient,
                                          const repl::OpTime& lastOpBeforeRun,
                                          const repl::OpTime& lastOpAfterRun) {
+    if (!code && !wcCode) {
+        return;
+    }
+
     auto errorLabels = getErrorLabels(opCtx,
                                       sessionOptions,
                                       commandName,
@@ -1458,7 +1461,7 @@ void ExecCommandDatabase::_initiateCommand() {
         _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.value());
     }
 
-    if (isHello()) {
+    if (MONGO_unlikely(isHello())) {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
@@ -1466,21 +1469,12 @@ void ExecCommandDatabase::_initiateCommand() {
         ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem, isInternalClient);
     }
 
-    auto& apiParams = APIParameters::get(opCtx);
-    auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
     if (auto clientMetadata = ClientMetadata::get(client)) {
+        auto& apiParams = APIParameters::get(opCtx);
+        auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
         auto appName = clientMetadata->getApplicationName().toString();
         apiVersionMetrics.update(appName, apiParams);
     }
-
-    sleepMillisAfterCommandExecutionBegins.execute([&](const BSONObj& data) {
-        auto numMillis = data["millis"].numberInt();
-        auto commands = data["commands"].Obj().getFieldNames<std::set<std::string>>();
-        // Only sleep for one of the specified commands.
-        if (commands.find(command->getName()) != commands.end()) {
-            mongo::sleepmillis(numMillis);
-        }
-    });
 
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
@@ -1548,7 +1542,7 @@ void ExecCommandDatabase::_initiateCommand() {
                 topLevelFields.insert(fieldName).second);
     }
 
-    if (CommandHelpers::isHelpRequest(helpField)) {
+    if (MONGO_unlikely(CommandHelpers::isHelpRequest(helpField))) {
         CurOp::get(opCtx)->ensureStarted();
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
@@ -1647,35 +1641,39 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
-    // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on the
-    // OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a getMore
-    // command, where it is used to communicate the maximum time to wait for new inserts on tailable
-    // cursors, not as a deadline for the operation.
-    // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will require
-    // introducing a new 'max await time' parameter for getMore, and eventually banning maxTimeMS
-    // altogether on a getMore command.
-    const auto maxTimeMS = Milliseconds{uassertStatusOK(parseMaxTimeMS(cmdOptionMaxTimeMSField))};
-    const auto maxTimeMSOpOnly =
-        Milliseconds{uassertStatusOK(parseMaxTimeMS(maxTimeMSOpOnlyField))};
+    if (cmdOptionMaxTimeMSField || maxTimeMSOpOnlyField) {
+        // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
+        // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a
+        // getMore command, where it is used to communicate the maximum time to wait for new inserts
+        // on tailable cursors, not as a deadline for the operation.
+        //
+        // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
+        // require introducing a new 'max await time' parameter for getMore, and eventually banning
+        // maxTimeMS altogether on a getMore command.
+        const auto maxTimeMS =
+            Milliseconds{uassertStatusOK(parseMaxTimeMS(cmdOptionMaxTimeMSField))};
+        const auto maxTimeMSOpOnly =
+            Milliseconds{uassertStatusOK(parseMaxTimeMS(maxTimeMSOpOnlyField))};
 
-    if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
-        command->getLogicalOp() != LogicalOp::opGetMore) {
-        uassert(40119,
-                "Illegal attempt to set operation deadline within DBDirectClient",
-                !opCtx->getClient()->isInDirectClient());
+        if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
+            command->getLogicalOp() != LogicalOp::opGetMore) {
+            uassert(40119,
+                    "Illegal attempt to set operation deadline within DBDirectClient",
+                    !opCtx->getClient()->isInDirectClient());
 
-        // The "hello" command should not inherit the deadline from the user op it is operating as a
-        // part of as that can interfere with replica set monitoring and host selection.
-        const bool ignoreMaxTimeMSOpOnly = isHello();
+            // The "hello" command should not inherit the deadline from the user op it is operating
+            // as a part of as that can interfere with replica set monitoring and host selection.
+            const bool ignoreMaxTimeMSOpOnly = isHello();
 
-        if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > Milliseconds::zero() &&
-            (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS)) {
-            opCtx->storeMaxTimeMS(maxTimeMS);
-            opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMSOpOnly,
-                                     ErrorCodes::MaxTimeMSExpired);
-        } else if (maxTimeMS > Milliseconds::zero()) {
-            opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
-                                     ErrorCodes::MaxTimeMSExpired);
+            if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > Milliseconds::zero() &&
+                (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS)) {
+                opCtx->storeMaxTimeMS(maxTimeMS);
+                opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMSOpOnly,
+                                         ErrorCodes::MaxTimeMSExpired);
+            } else if (maxTimeMS > Milliseconds::zero()) {
+                opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
+                                         ErrorCodes::MaxTimeMSExpired);
+            }
         }
     }
 
@@ -1709,11 +1707,11 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (startTransaction) {
         _setLockStateForTransaction(opCtx);
-    }
 
-    // Remember whether or not this operation is starting a transaction, in case something later in
-    // the execution needs to adjust its behavior based on this.
-    opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
+        // Remember whether or not this operation is starting a transaction, in case something later
+        // in the execution needs to adjust its behavior based on this.
+        opCtx->setIsStartingMultiDocumentTransaction(true);
+    }
 
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
     enforceRequireAPIVersion(opCtx, command);
@@ -1721,16 +1719,6 @@ void ExecCommandDatabase::_initiateCommand() {
     if (!opCtx->getClient()->isInDirectClient() &&
         readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
         (iAmPrimary || (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
-        // If a timeseries collection is sharded, only the buckets collection would be sharded. We
-        // expect all versioned commands to be sent over 'system.buckets' namespace. But it is
-        // possible that a stale mongos may send the request over a view namespace. In this case, we
-        // initialize the 'OperationShardingState' with buckets namespace.
-        auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
-        // Hold reference to the catalog for collection lookup without locks to be safe.
-        auto catalog = CollectionCatalog::get(opCtx);
-        auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-        auto namespaceForSharding =
-            (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
         boost::optional<ShardVersion> shardVersion;
         if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
             shardVersion = ShardVersion::parse(shardVersionElem);
@@ -1741,8 +1729,21 @@ void ExecCommandDatabase::_initiateCommand() {
             databaseVersion = DatabaseVersion(databaseVersionElem.Obj());
         }
 
-        OperationShardingState::setShardRole(
-            opCtx, namespaceForSharding, shardVersion, databaseVersion);
+        if (shardVersion || databaseVersion) {
+            // If a timeseries collection is sharded, only the buckets collection would be sharded.
+            // We expect all versioned commands to be sent over 'system.buckets' namespace. But it
+            // is possible that a stale mongos may send the request over a view namespace. In this
+            // case, we initialize the 'OperationShardingState' with buckets namespace.
+            auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
+            // Hold reference to the catalog for collection lookup without locks to be safe.
+            auto catalog = CollectionCatalog::get(opCtx);
+            auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
+            auto namespaceForSharding =
+                (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
+
+            OperationShardingState::setShardRole(
+                opCtx, namespaceForSharding, shardVersion, databaseVersion);
+        }
     }
 
     _scoped = _execContext->behaviors->scopedOperationCompletionShardingActions(opCtx);

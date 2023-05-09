@@ -52,13 +52,6 @@
 namespace mongo {
 namespace {
 
-bool parsingCanProduceNoopMatchNodes(const ExtensionsCallback& extensionsCallback,
-                                     MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
-    return extensionsCallback.hasNoopExtensions() &&
-        (allowedFeatures & MatchExpressionParser::AllowedFeatures::kText ||
-         allowedFeatures & MatchExpressionParser::AllowedFeatures::kJavascript);
-}
-
 boost::optional<size_t> loadMaxParameterCount() {
     auto value = internalQueryAutoParameterizationMaxParameterCount.load();
     if (value > 0) {
@@ -119,38 +112,25 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     cq->setExplain(explain);
 
-    StatusWithMatchExpression statusWithMatcher = [&]() -> StatusWithMatchExpression {
-        if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
-            try {
-                return cst::parseToMatchExpression(
-                    findCommand->getFilter(), newExpCtx, extensionsCallback);
-            } catch (const DBException& ex) {
-                return ex.toStatus();
-            }
-        } else {
-            return MatchExpressionParser::parse(
-                findCommand->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
-        }
-    }();
+    auto statusWithMatcher = MatchExpressionParser::parse(
+        findCommand->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }
+
+    std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
 
     // Stop counting expressions after they have been parsed to exclude expressions created
     // during optimization and other processing steps.
     newExpCtx->stopExpressionCounters();
 
-    std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
-
-    Status initStatus =
-        cq->init(opCtx,
-                 std::move(newExpCtx),
-                 std::move(findCommand),
-                 parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
-                 std::move(me),
-                 projectionPolicies,
-                 std::move(pipeline),
-                 isCountLike);
+    Status initStatus = cq->init(opCtx,
+                                 std::move(newExpCtx),
+                                 std::move(findCommand),
+                                 std::move(me),
+                                 projectionPolicies,
+                                 std::move(pipeline),
+                                 isCountLike);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -177,7 +157,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     Status initStatus = cq->init(opCtx,
                                  baseQuery.getExpCtx(),
                                  std::move(findCommand),
-                                 baseQuery.canHaveNoopMatchNodes(),
                                  root->clone(),
                                  ProjectionPolicies::findProjectionPolicies(),
                                  {} /* an empty pipeline */,
@@ -192,7 +171,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 Status CanonicalQuery::init(OperationContext* opCtx,
                             boost::intrusive_ptr<ExpressionContext> expCtx,
                             std::unique_ptr<FindCommandRequest> findCommand,
-                            bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
                             const ProjectionPolicies& projectionPolicies,
                             std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
@@ -200,7 +178,6 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _expCtx = expCtx;
     _findCommand = std::move(findCommand);
 
-    _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
     _forceClassicEngine = ServerParameterSet::getNodeParameterSet()
                               ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
                               ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
@@ -265,7 +242,9 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     // If there is a sort, parse it and add any metadata dependencies it induces.
     try {
-        initSortPattern(unavailableMetadata);
+        if (!_findCommand->getSort().isEmpty()) {
+            initSortPattern(unavailableMetadata);
+        }
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -279,10 +258,6 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 }
 
 void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
-    if (_findCommand->getSort().isEmpty()) {
-        return;
-    }
-
     // A $natural sort is really a hint, and should be handled as such. Furthermore, the downstream
     // sort handling code may not expect a $natural sort.
     //
@@ -294,11 +269,7 @@ void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
         _findCommand->setSort(BSONObj{});
     }
 
-    if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
-        _sortPattern = cst::parseToSortPattern(_findCommand->getSort(), _expCtx);
-    } else {
-        _sortPattern = SortPattern{_findCommand->getSort(), _expCtx};
-    }
+    _sortPattern = SortPattern{_findCommand->getSort(), _expCtx};
     _metadataDeps |= _sortPattern->metadataDeps(unavailableMetadata);
 
     // If the results of this query might have to be merged on a remote node, then that node might

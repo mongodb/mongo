@@ -234,46 +234,44 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
 void ExpressionContext::startExpressionCounters() {
     if (enabledCounters && !_expressionCounters) {
-        _expressionCounters = boost::make_optional<ExpressionCounters>({});
+        _expressionCounters = std::make_unique<ExpressionCounters>();
     }
 }
 
 void ExpressionContext::incrementMatchExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().matchExprCountersMap[name];
+        ++_expressionCounters->matchExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementAggExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().aggExprCountersMap[name];
+        ++_expressionCounters->aggExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementGroupAccumulatorExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().groupAccumulatorExprCountersMap[name];
+        ++_expressionCounters->groupAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementWindowAccumulatorExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().windowAccumulatorExprCountersMap[name];
+        ++_expressionCounters->windowAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::stopExpressionCounters() {
     if (enabledCounters && _expressionCounters) {
-        operatorCountersMatchExpressions.mergeCounters(
-            _expressionCounters.value().matchExprCountersMap);
-        operatorCountersAggExpressions.mergeCounters(
-            _expressionCounters.value().aggExprCountersMap);
+        operatorCountersMatchExpressions.mergeCounters(_expressionCounters->matchExprCountersMap);
+        operatorCountersAggExpressions.mergeCounters(_expressionCounters->aggExprCountersMap);
         operatorCountersGroupAccumulatorExpressions.mergeCounters(
-            _expressionCounters.value().groupAccumulatorExprCountersMap);
+            _expressionCounters->groupAccumulatorExprCountersMap);
         operatorCountersWindowAccumulatorExpressions.mergeCounters(
-            _expressionCounters.value().windowAccumulatorExprCountersMap);
+            _expressionCounters->windowAccumulatorExprCountersMap);
     }
-    _expressionCounters = boost::none;
+    _expressionCounters.reset();
 }
 
 void ExpressionContext::setUserRoles() {
