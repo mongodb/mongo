@@ -806,7 +806,7 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                                                     std::move(resolvedNamespaces),
                                                     boost::none); /* collUUID */
 
-    expCtx->tempDir = storageGlobalParams.dbpath + "/tmp";
+    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
     return std::make_unique<PipelineDocumentSource>(
         Pipeline::makePipeline(rawPipeline, expCtx, opts), samplesPerChunk - 1);
