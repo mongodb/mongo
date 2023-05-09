@@ -598,6 +598,7 @@ void collectTelemetryMongos(OperationContext* opCtx,
     auto&& opDebug = CurOp::get(opCtx)->debug();
     telemetry::writeTelemetry(
         opCtx,
+        opDebug.telemetryStoreKeyHash,
         opDebug.telemetryStoreKey,
         std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),

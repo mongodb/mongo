@@ -95,6 +95,8 @@ struct SerializationOptions {
           applyHmacToIdentifiers(fieldNamesHmacPolicy_),
           identifierHmacPolicy(fieldNamesHmacPolicy_) {}
 
+    SerializationOptions(LiteralSerializationPolicy policy) : literalPolicy(policy) {}
+
     // Helper function for removing identifiable information (like collection/db names).
     // Note: serializeFieldPath/serializeFieldPathFromString should be used for field
     // names.

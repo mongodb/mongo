@@ -32,6 +32,7 @@
 #include <memory>
 #include <queue>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor_guard.h"
@@ -185,6 +186,8 @@ private:
     bool _shouldOmitDiagnosticInformation = false;
 
     // If boost::none, telemetry should not be collected for this cursor.
+    boost::optional<std::size_t> _telemetryStoreKeyHash;
+    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
     boost::optional<BSONObj> _telemetryStoreKey;
     // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
     // store key.
