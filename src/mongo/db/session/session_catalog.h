@@ -60,8 +60,20 @@ class SessionCatalog {
     friend class OperationContextSession;
 
 public:
+    /**
+     * Represents which role the SessionCatalog was accessed in. The participant role for actions
+     * from a data bearing node (e.g. mongod servicing a local command) and router for a routing
+     * node (e.g. a mongos command, or mongod running a mongos command).
+     */
+    enum class Provenance { kParticipant, kRouter };
+
+    using TxnNumberAndProvenance = std::pair<TxnNumber, Provenance>;
+
+    using ScanSessionsCallbackFn = std::function<void(ObservableSession&)>;
     using OnEagerlyReapedSessionsFn =
         unique_function<void(ServiceContext*, std::vector<LogicalSessionId>)>;
+    using MakeSessionWorkerFnForEagerReap =
+        unique_function<ScanSessionsCallbackFn(ServiceContext*, TxnNumber, Provenance)>;
 
     class ScopedCheckedOutSession;
     class SessionToKill;
@@ -94,8 +106,6 @@ public:
      * usage pattern.
      */
     SessionToKill checkOutSessionForKill(OperationContext* opCtx, KillToken killToken);
-
-    using ScanSessionsCallbackFn = std::function<void(ObservableSession&)>;
 
     /**
      * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
@@ -142,12 +152,15 @@ public:
     size_t size() const;
 
     /**
-     * Registers a callback to run when sessions are "eagerly" reaped from the catalog, ie without
-     * waiting for a logical session cache refresh.
+     * Registers two callbacks: one to run when sessions are "eagerly" reaped from the catalog, ie
+     * without waiting for a logical session cache refresh, and another to override the logic that
+     * determines when to eagerly reap a session.
      */
-    void setOnEagerlyReapedSessionsFn(OnEagerlyReapedSessionsFn fn) {
+    void setEagerReapSessionsFns(OnEagerlyReapedSessionsFn onEagerlyReapedSessionsFn,
+                                 MakeSessionWorkerFnForEagerReap makeWorkerFnForEagerReap) {
         invariant(!_onEagerlyReapedSessionsFn);
-        _onEagerlyReapedSessionsFn = std::move(fn);
+        _onEagerlyReapedSessionsFn = std::move(onEagerlyReapedSessionsFn);
+        _makeSessionWorkerFnForEagerReap = std::move(makeWorkerFnForEagerReap);
     }
 
 private:
@@ -189,6 +202,12 @@ private:
     using SessionRuntimeInfoMap = LogicalSessionIdMap<std::unique_ptr<SessionRuntimeInfo>>;
 
     /**
+     * Returns a callback with the default logic used to decide if a session may be reaped early.
+     */
+    static ScanSessionsCallbackFn _defaultMakeSessionWorkerFnForEagerReap(
+        ServiceContext* service, TxnNumber clientTxnNumberStarted, Provenance provenance);
+
+    /**
      * Blocking method, which checks-out the session with the given 'lsid'. Called inside
      * '_checkOutSession' and 'checkOutSessionForKill'.
      */
@@ -220,12 +239,18 @@ private:
     void _releaseSession(SessionRuntimeInfo* sri,
                          Session* session,
                          boost::optional<KillToken> killToken,
-                         boost::optional<TxnNumber> clientTxnNumberStarted);
+                         boost::optional<TxnNumberAndProvenance> clientTxnNumberStarted);
 
     // Called when sessions are reaped from memory "eagerly" ie directly by the SessionCatalog
     // without waiting for a logical session cache refresh. Note this is set at process startup
     // before multi-threading is enabled, so no synchronization is necessary.
     boost::optional<OnEagerlyReapedSessionsFn> _onEagerlyReapedSessionsFn;
+
+    // Returns a callback used to decide if a session may be "eagerly" reaped from the session
+    // catalog without waiting for typical logical session expiration. May be overwritten, but only
+    // at process startup before multi-threading is enabled, so no synchronization is necessary.
+    MakeSessionWorkerFnForEagerReap _makeSessionWorkerFnForEagerReap =
+        _defaultMakeSessionWorkerFnForEagerReap;
 
     // Protects the state below
     mutable Mutex _mutex =
@@ -253,7 +278,7 @@ public:
 
     ScopedCheckedOutSession(ScopedCheckedOutSession&& other)
         : _catalog(other._catalog),
-          _clientTxnNumberStarted(other._clientTxnNumberStarted),
+          _clientTxnNumberStartedAndProvenance(other._clientTxnNumberStartedAndProvenance),
           _sri(other._sri),
           _session(other._session),
           _killToken(std::move(other._killToken)) {
@@ -267,7 +292,7 @@ public:
     ~ScopedCheckedOutSession() {
         if (_sri) {
             _catalog._releaseSession(
-                _sri, _session, std::move(_killToken), _clientTxnNumberStarted);
+                _sri, _session, std::move(_killToken), _clientTxnNumberStartedAndProvenance);
         }
     }
 
@@ -291,8 +316,9 @@ public:
         return bool(_killToken);
     }
 
-    void observeNewClientTxnNumberStarted(TxnNumber txnNumber) {
-        _clientTxnNumberStarted = txnNumber;
+    void observeNewClientTxnNumberStarted(
+        SessionCatalog::TxnNumberAndProvenance txnNumberAndProvenance) {
+        _clientTxnNumberStartedAndProvenance = txnNumberAndProvenance;
     }
 
 private:
@@ -302,8 +328,9 @@ private:
     // If this session began a retryable write or transaction while checked out, this is set to the
     // "client txnNumber" of that transaction, which is the top-level txnNumber for a retryable
     // write or transaction sent by a client or the txnNumber in the sessionId for a retryable
-    // child transaction.
-    boost::optional<TxnNumber> _clientTxnNumberStarted;
+    // child transaction, and the "provenance" of the number, ie whether the number came from the
+    // router or participant role.
+    boost::optional<SessionCatalog::TxnNumberAndProvenance> _clientTxnNumberStartedAndProvenance;
 
     SessionCatalog::SessionRuntimeInfo* _sri;
     Session* _session;
@@ -510,9 +537,10 @@ public:
      * Notifies the session catalog when a new transaction/retryable write is begun on the operation
      * context's checked out session.
      */
-    static void observeNewTxnNumberStarted(OperationContext* opCtx,
-                                           const LogicalSessionId& lsid,
-                                           TxnNumber txnNumber);
+    static void observeNewTxnNumberStarted(
+        OperationContext* opCtx,
+        const LogicalSessionId& lsid,
+        SessionCatalog::TxnNumberAndProvenance txnNumberAndProvenance);
 
 private:
     OperationContext* const _opCtx;

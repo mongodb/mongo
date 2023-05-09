@@ -1488,17 +1488,10 @@ void TransactionRouter::Router::_resetRouterState(
         p().firstStmtId = kDefaultFirstStmtId;
     }
 
-    if (isMongos()) {
-        // This may trigger removing superseded retryable sessions from the session catalog, but the
-        // router and mongod roles share the catalog, and the mongod role makes assumptions around
-        // the validity of retryable sessions that can be violated if the router role triggers
-        // reaping them. So only early reap on a mongos, and let retryable sessions be either early
-        // reaped by the mongod role or by the session reaper periodic job.
-        //
-        // TODO SERVER-76368: Allow the router role to always trigger an early reap.
-        OperationContextSession::observeNewTxnNumberStarted(
-            opCtx, _sessionId(), txnNumberAndRetryCounter.getTxnNumber());
-    }
+    OperationContextSession::observeNewTxnNumberStarted(
+        opCtx,
+        _sessionId(),
+        {txnNumberAndRetryCounter.getTxnNumber(), SessionCatalog::Provenance::kRouter});
 };
 
 void TransactionRouter::Router::_resetRouterStateForStartTransaction(

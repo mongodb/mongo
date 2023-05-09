@@ -105,7 +105,7 @@ MongoDSessionCatalogTransactionInterface::ScanSessionsCallbackFn
 MongoDSessionCatalogTransactionInterfaceImpl::makeParentSessionWorkerFnForReap(
     TxnNumber* parentSessionActiveTxnNumber) {
     return [parentSessionActiveTxnNumber](ObservableSession& parentSession) {
-        const auto transactionSessionId = parentSession.getSessionId();
+        const auto& transactionSessionId = parentSession.getSessionId();
         const auto txnParticipant = TransactionParticipant::get(parentSession);
         const auto txnRouter = TransactionRouter::get(parentSession);
 
@@ -127,7 +127,7 @@ MongoDSessionCatalogTransactionInterface::ScanSessionsCallbackFn
 MongoDSessionCatalogTransactionInterfaceImpl::makeChildSessionWorkerFnForReap(
     const TxnNumber& parentSessionActiveTxnNumber) {
     return [&parentSessionActiveTxnNumber](ObservableSession& childSession) {
-        const auto transactionSessionId = childSession.getSessionId();
+        const auto& transactionSessionId = childSession.getSessionId();
         const auto txnParticipant = TransactionParticipant::get(childSession);
         const auto txnRouter = TransactionRouter::get(childSession);
 
@@ -183,4 +183,25 @@ MongoDSessionCatalogTransactionInterfaceImpl::makeSessionWorkerFnForStepUp(
     };
 }
 
+MongoDSessionCatalogTransactionInterface::ScanSessionsCallbackFn
+MongoDSessionCatalogTransactionInterfaceImpl::makeSessionWorkerFnForEagerReap(
+    TxnNumber clientTxnNumberStarted, SessionCatalog::Provenance provenance) {
+    return [clientTxnNumberStarted, provenance](ObservableSession& osession) {
+        const auto& transactionSessionId = osession.getSessionId();
+        const auto txnParticipant = TransactionParticipant::get(osession);
+
+        // If a retryable session has been used for a TransactionParticipant, it may be in the
+        // retryable participant catalog. A participant triggers eager reaping after clearing its
+        // participant catalog, but a router may trigger reaping before, so we can only eager reap
+        // an initialized participant if the reap came from the participant role.
+        if (provenance == SessionCatalog::Provenance::kParticipant ||
+            txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber() ==
+                kUninitializedTxnNumber) {
+            if (isInternalSessionForRetryableWrite(transactionSessionId) &&
+                *transactionSessionId.getTxnNumber() < clientTxnNumberStarted) {
+                osession.markForReap(ObservableSession::ReapMode::kExclusive);
+            }
+        }
+    };
+}
 }  // namespace mongo
