@@ -782,6 +782,7 @@ void MigrationSourceManager::_cleanup() {
             AlternativeClientRegion acr(newClient);
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
+            newOpCtx->shouldAlwaysInterruptAtStepDownOrUp();
             _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
         }
     }

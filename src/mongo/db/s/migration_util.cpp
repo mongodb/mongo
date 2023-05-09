@@ -170,6 +170,9 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
                 "Term changed while {}"_format(taskDescription),
                 initialTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm());
 
+        // Check if opCtx has been interrupted (presumably due to stepdown).
+        opCtx->checkForInterrupt();
+
         try {
             auto newClient = opCtx->getServiceContext()->makeClient(newClientName);
 
@@ -180,6 +183,12 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 
             auto newOpCtx = newClient->makeOperationContext();
             AlternativeClientRegion altClient(newClient);
+            newOpCtx->setAlwaysInterruptAtStepDownOrUp();
+
+            // Check that the parent opCtx is not interrupted, after having marked newOpCtx as
+            // interruptible. This handles the case where a stepdown happened after the previous
+            // 'checkForInterrupt' but before marking 'newOpCtx' as interruptible.
+            opCtx->checkForInterrupt();
 
             doWork(newOpCtx.get());
             break;
@@ -877,6 +886,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
             }
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             // Wait for the latest OpTime to be majority committed to ensure any decision that
             // is read is on the true branch of history. Note (Esha): I don't think this is
