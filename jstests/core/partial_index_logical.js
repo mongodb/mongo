@@ -14,6 +14,7 @@
  *  # Plan cache state is node-local and will not get migrated alongside tenant data.
  *  tenant_migration_incompatible,
  *  requires_fcv_60,
+ *  no_selinux,
  * ]
  */
 (function() {

@@ -3,6 +3,7 @@
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_fcv_60,
+//   no_selinux,
 // ]
 
 (function() {

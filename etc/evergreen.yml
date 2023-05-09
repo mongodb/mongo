@@ -189,8 +189,7 @@ variables:
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
-  # TODO: BF-24515 re-enable when build failure cause determined and resolved
-  # - name: selinux_rhel7_enterprise
+  - name: selinux_rhel7_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -1947,8 +1946,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-  # TODO: BF-24515 re-enable when build failure cause determined and resolved
-  #- name: selinux_rhel8_enterprise
+  - name: selinux_rhel8_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
 
