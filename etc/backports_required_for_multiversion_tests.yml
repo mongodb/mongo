@@ -4,19 +4,20 @@
 #
 # Usage:
 # Add the server ticket number and the path to the test file for the test you intend to denylist
-# under the appropriate suite. Any test in a (ticket, test_file) pair that appears in this file but
+# under the appropriate multiversion branch. Any test in a (ticket, test_file) pair that appears in this file but
 # not in the last-lts or last-continuous branch version of this file indicates that a commit has
 # not yet been backported to the last-lts or last-continuous branch and will be excluded from the
 # multiversion suite corresponding to the root level suite key.
 #
-# Example: To prevent 'my_test_file.js' from running in the 'replica_sets_multiversion' suite with the last-continuous binary
-# replica_sets_multiversion:
-#   - ticket: SERVER-1000
-#     test_file: jstests/core/my_test_file.js
+# Example: To prevent 'my_test_file.js' from running with the last-continuous binary
+# last-continuous:
+#   all:
+#   - test_file: jstests/core/my_test_file.js
+#     ticket: SERVER-1000
 #
 # The above example will denylist jstests/core/my_test_file.js from the
-# 'replica_sets_multiversion_gen' task until this file has been updated with the same
-# (ticket, test_file) pair on the last-lts branch.
+# last-continuous branch until this file has been updated with the same
+# (ticket, test_file) pair on the last-continuous branch.
 #
 last-continuous:
   all:
