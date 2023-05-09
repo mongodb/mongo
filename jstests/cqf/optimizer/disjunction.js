@@ -100,4 +100,135 @@ IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: a_1, i
     const actualStr = removeUUIDsFromExplain(db, res);
     assert.eq(expectedStr, actualStr);
 }
+
+// Test that an $or containing multiple predicates on the same field groups the predicates under
+// the shared field.
+{
+    const params = [
+        {key: 'internalCascadesOptimizerExplainVersion', value: "v2"},
+        {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true},
+        {key: "internalCascadesOptimizerDisableIndexes", value: true}
+    ];
+
+    //
+    // Test $or where all predicates are on the same field.
+    //
+    let res = runWithParams(
+        params,
+        () => coll.explain("executionStats").find({$or: [{a: 1}, {a: 2}, {a: 3}]}).finish());
+
+    let expectedStr =
+        `Root [{scan_0}]
+Filter []
+|   EvalFilter []
+|   |   Variable [evalTemp_0]
+|   PathTraverse [1]
+|   PathCompare [EqMember]
+|   Const [[1, 2, 3]]
+PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0}, cqf_disjunction_]
+`;
+    assert.eq(300, res.executionStats.nReturned);
+    let actualStr = removeUUIDsFromExplain(db, res);
+    assert.eq(expectedStr, actualStr);
+
+    // The same query, but with nested $ors.
+    res = runWithParams(
+        params,
+        () =>
+            coll.explain("executionStats").find({$or: [{$or: [{a: 1}, {a: 2}, {a: 3}]}]}).finish());
+    assert.eq(300, res.executionStats.nReturned);
+    assert.eq(expectedStr, actualStr);
+
+    res = runWithParams(
+        params,
+        () =>
+            coll.explain("executionStats").find({$or: [{a: 1}, {$or: [{a: 2}, {a: 3}]}]}).finish());
+    assert.eq(300, res.executionStats.nReturned);
+    assert.eq(expectedStr, actualStr);
+
+    //
+    // Test $or where two predicates are on the same field and one is on a different field.
+    //
+    res = runWithParams(
+        params,
+        () => coll.explain("executionStats").find({$or: [{a: 1}, {a: 2}, {b: 3}]}).finish());
+
+    expectedStr =
+        `Root [{scan_0}]
+Filter []
+|   BinaryOp [Or]
+|   |   EvalFilter []
+|   |   |   Variable [evalTemp_1]
+|   |   PathTraverse [1]
+|   |   PathCompare [Eq]
+|   |   Const [3]
+|   EvalFilter []
+|   |   Variable [evalTemp_0]
+|   PathTraverse [1]
+|   PathCompare [EqMember]
+|   Const [[1, 2]]
+PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0, 'b': evalTemp_1}, cqf_disjunction_]
+`;
+    assert.eq(280, res.executionStats.nReturned);
+    actualStr = removeUUIDsFromExplain(db, res);
+    assert.eq(expectedStr, actualStr);
+
+    // The same query, but with nested $ors.
+    res = runWithParams(
+        params,
+        () =>
+            coll.explain("executionStats").find({$or: [{$or: [{a: 1}, {a: 2}]}, {b: 3}]}).finish());
+    assert.eq(280, res.executionStats.nReturned);
+    assert.eq(expectedStr, actualStr);
+
+    res = runWithParams(
+        params,
+        () =>
+            coll.explain("executionStats").find({$or: [{$or: [{a: 1}, {b: 3}]}, {a: 2}]}).finish());
+    assert.eq(280, res.executionStats.nReturned);
+    assert.eq(expectedStr, actualStr);
+
+    //
+    // Test $or where two predicates are on one field and two predicates are on another.
+    //
+    res = runWithParams(
+        params,
+        () =>
+            coll.explain("executionStats").find({$or: [{a: 1}, {a: 2}, {b: 3}, {b: 4}]}).finish());
+
+    expectedStr =
+        `Root [{scan_0}]
+Filter []
+|   BinaryOp [Or]
+|   |   EvalFilter []
+|   |   |   Variable [evalTemp_1]
+|   |   PathTraverse [1]
+|   |   PathCompare [EqMember]
+|   |   Const [[3, 4]]
+|   EvalFilter []
+|   |   Variable [evalTemp_0]
+|   PathTraverse [1]
+|   PathCompare [EqMember]
+|   Const [[1, 2]]
+PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0, 'b': evalTemp_1}, cqf_disjunction_]
+`;
+    assert.eq(360, res.executionStats.nReturned);
+    actualStr = removeUUIDsFromExplain(db, res);
+    assert.eq(expectedStr, actualStr);
+
+    // The same query, but with nested $ors.
+    runWithParams(params,
+                  () => coll.explain("executionStats")
+                            .find({$or: [{$or: [{a: 1}, {a: 2}]}, {$or: [{b: 3}, {b: 4}]}]})
+                            .finish());
+    assert.eq(360, res.executionStats.nReturned);
+    assert.eq(expectedStr, actualStr);
+
+    runWithParams(params,
+                  () => coll.explain("executionStats")
+                            .find({$or: [{$or: [{a: 1}, {b: 4}]}, {$or: [{b: 3}, {a: 2}]}]})
+                            .finish());
+    assert.eq(360, res.executionStats.nReturned);
+    assert.eq(expectedStr, actualStr);
+}
 }());
