@@ -245,13 +245,6 @@ private:
     friend class DatabaseNameUtil;
 
     /**
-     * Prefer to use the constructor below.
-     * TODO SERVER-65456 Remove this constructor.
-     */
-    explicit DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
-        : DatabaseName(std::move(tenantId), dbName) {}
-
-    /**
      * Constructs a DatabaseName from the given tenantId and database name.
      * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.
