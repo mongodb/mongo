@@ -14,6 +14,9 @@
  * @tags: [
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
+ *.  # Requires replSetGetStatus support on mongos, which is not supported by previous LTS version
+ *   # v4.4.
+ *   multiversion_incompatible,
  * ]
  */
 var $config = (function() {
