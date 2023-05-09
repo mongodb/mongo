@@ -162,6 +162,7 @@ const equivalentErrorCodesList = [
     [5787902, 7548606],
     [5787903, 7548606],
     [5787908, 7548606],
+    [ErrorCodes.BadValue, 4938500],
 ];
 
 // This map is generated based on the contents of 'equivalentErrorCodesList'. This map should _not_
