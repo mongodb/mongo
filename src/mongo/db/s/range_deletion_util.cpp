@@ -112,13 +112,12 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     const auto min = extend(range.getMin());
     const auto max = extend(range.getMax());
 
-    LOGV2_DEBUG(23766,
+    LOGV2_DEBUG(6180601,
                 1,
-                "Begin removal of {min} to {max} in {namespace}",
                 "Begin removal of range",
-                "min"_attr = min,
-                "max"_attr = max,
-                logAttrs(nss));
+                logAttrs(nss),
+                "collectionUUID"_attr = collection.uuid(),
+                "range"_attr = redact(range.toString()));
 
     auto deleteStageParams = std::make_unique<DeleteStageParams>();
     deleteStageParams->fromMigrate = true;
@@ -167,13 +166,11 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
             auto&& explainer = exec->getPlanExplainer();
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-            LOGV2_WARNING(23776,
-                          "Cursor error while trying to delete {min} to {max} in {namespace}, "
-                          "stats: {stats}, error: {error}",
+            LOGV2_WARNING(6180602,
                           "Cursor error while trying to delete range",
-                          "min"_attr = redact(min),
-                          "max"_attr = redact(max),
                           logAttrs(nss),
+                          "collectionUUID"_attr = collection.uuid(),
+                          "range"_attr = redact(range.toString()),
                           "stats"_attr = redact(stats),
                           "error"_attr = redact(ex.toStatus()));
             throw;
@@ -337,7 +334,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                         "numDeleted"_attr = numDeleted,
                         logAttrs(nss),
                         "collectionUUID"_attr = collectionUuid,
-                        "range"_attr = range.toString());
+                        "range"_attr = redact(range.toString()));
 
             if (numDeleted > 0) {
                 // (SERVER-62368) The range-deleter executor is mono-threaded, so
