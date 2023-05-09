@@ -56,14 +56,14 @@ ProfileFilterImpl::ProfileFilterImpl(BSONObj expr) : _matcher(expr.getOwned(), m
             "Profile filter is not allowed to depend on metadata",
             !deps.getNeedsAnyMetadata());
 
-    // Reduce the DepsTracker down to a set of top-level fields.
-    StringSet toplevelFields;
+    // We only bother tracking top-level fields as dependencies.
     for (auto&& field : deps.fields) {
-        toplevelFields.emplace(FieldPath(std::move(field)).front());
+        _dependencies.emplace(FieldPath(std::move(field)).front());
     }
+    _needWholeDocument = deps.needWholeDocument;
 
     // Remember a list of functions we'll call whenever we need to build BSON from CurOp.
-    _makeBSON = OpDebug::appendStaged(toplevelFields, deps.needWholeDocument);
+    _makeBSON = OpDebug::appendStaged(_dependencies, _needWholeDocument);
 }
 
 bool ProfileFilterImpl::matches(OperationContext* opCtx,

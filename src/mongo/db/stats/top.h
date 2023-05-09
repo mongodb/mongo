@@ -166,7 +166,7 @@ private:
                              OperationLatencyHistogram* histogram,
                              Command::ReadWriteType readWriteType);
 
-    mutable SimpleMutex _lock;
+    Mutex _lock = MONGO_MAKE_LATCH("Top::_lock");
     OperationLatencyHistogram _globalHistogramStats;
     UsageMap _usage;
 };

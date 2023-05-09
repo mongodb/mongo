@@ -948,8 +948,8 @@ public:
         return _nss;
     }
 
-    void setNss(const NamespaceString& nss) {
-        _nss = nss;
+    void setNss(NamespaceString nss) {
+        _nss = std::move(nss);
     }
 
     const boost::optional<UUID>& uuid() const {

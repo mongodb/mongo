@@ -44,7 +44,14 @@ public:
         return _matcher.getMatchExpression()->serialize();
     }
 
+    bool dependsOn(StringData topLevelField) const override {
+        return _needWholeDocument || _dependencies.count(topLevelField) > 0;
+    }
+
 private:
+    StringSet _dependencies;
+    bool _needWholeDocument = false;
+
     Matcher _matcher;
     std::function<BSONObj(ProfileFilter::Args)> _makeBSON;
 };
