@@ -29,26 +29,29 @@ function verifyExplainResult(
     {shardedExplain = null, verbosity = "", optimizedAwayPipeline = kOptFalse} = {}) {
     assert.commandWorked(shardedExplain);
     assert(shardedExplain.hasOwnProperty("shards"), tojson(shardedExplain));
+
+    // Verifies the explain for each shard.
     for (let elem in shardedExplain.shards) {
         let shard = shardedExplain.shards[elem];
         let root;
 
-        // Resolve 'kOptEither' to 'kOptTrue' or 'kOptFalse'. If 'shard' has a "queryPlanner"
-        // property, this means the pipeline has been optimized away. (When the pipeline is present,
-        // "queryPlanner" is instead a property of shard.stages[0].$cursor.)
-        if (optimizedAwayPipeline == kOptEither) {
+        // Resolve 'kOptEither' to 'kOptTrue' or 'kOptFalse' for the current shard. If 'shard' has a
+        // "queryPlanner" property, this means the pipeline has been optimized away. (When the
+        // pipeline is present, "queryPlanner" is instead a property of shard.stages[0].$cursor.)
+        let optedAwayOnThisShard = optimizedAwayPipeline;
+        if (optedAwayOnThisShard == kOptEither) {
             if (shard.hasOwnProperty("queryPlanner")) {
-                optimizedAwayPipeline = kOptTrue;
+                optedAwayOnThisShard = kOptTrue;
             } else {
-                optimizedAwayPipeline = kOptFalse;
+                optedAwayOnThisShard = kOptFalse;
             }
         }
 
         // Verify the explain output.
-        if (optimizedAwayPipeline == kOptTrue) {
+        if (optedAwayOnThisShard == kOptTrue) {
             assert(shard.hasOwnProperty("queryPlanner"), tojson(shardedExplain));
             root = shard;
-        } else if (optimizedAwayPipeline == kOptFalse) {
+        } else if (optedAwayOnThisShard == kOptFalse) {
             assert(shard.stages[0].hasOwnProperty("$cursor"), tojson(shardedExplain));
             assert(shard.stages[0].$cursor.hasOwnProperty("queryPlanner"), tojson(shardedExplain));
             root = shard.stages[0].$cursor;
