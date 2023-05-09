@@ -215,11 +215,9 @@ void DocumentSourceCursor::recordPlanSummaryStats() {
 
 Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
     auto verbosity = opts.verbosity;
-    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484350);
-    }
-    // We never parse a DocumentSourceCursor, so we only serialize for explain.
-    if (!verbosity)
+    // We never parse a DocumentSourceCursor, so we only serialize for explain. Since it's never
+    // part of user input, there's no need to compute its query shape.
+    if (!verbosity || opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs)
         return Value();
 
     invariant(_exec);
