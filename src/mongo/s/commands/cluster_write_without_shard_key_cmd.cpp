@@ -87,7 +87,8 @@ bool requiresOriginalQuery(OperationContext* opCtx,
                                                     *query,
                                                     ProjectionPolicies::findProjectionPolicies(),
                                                     false /* shouldOptimize */);
-        return proj.requiresMatchDetails();
+        return proj.requiresMatchDetails() ||
+            proj.metadataDeps().test(DocumentMetadataFields::MetaType::kTextScore);
     }
     return false;
 }
@@ -202,8 +203,10 @@ BSONObj _createCmdObj(OperationContext* opCtx,
                 nss.isTimeseriesBucketsCollection()) {
                 queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
             } else {
-                // Unset the collation because targeting by _id uses default collation.
+                // Unset the collation and sort because targeting by _id uses default collation and
+                // we should uniquely target a single document by _id.
                 findAndModifyRequest.setCollation(boost::none);
+                findAndModifyRequest.setSort(boost::none);
             }
         } else {
             // If the original query includes a positional operator ($) or targets a time-series
@@ -216,8 +219,10 @@ BSONObj _createCmdObj(OperationContext* opCtx,
                 nss.isTimeseriesBucketsCollection()) {
                 queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
             } else {
-                // Unset the collation because targeting by _id uses default collation.
+                // Unset the collation and sort because targeting by _id uses default collation and
+                // we should uniquely target a single document by _id.
                 findAndModifyRequest.setCollation(boost::none);
+                findAndModifyRequest.setSort(boost::none);
             }
         }
 

@@ -75,6 +75,20 @@ struct AsyncRequestSenderResponseData {
         : shardId(shardId), cursorResponse(std::move(cursorResponse)) {}
 };
 
+// Computes the final sort pattern if necessary metadata is needed.
+BSONObj parseSortPattern(OperationContext* opCtx,
+                         NamespaceString nss,
+                         const ParsedCommandInfo& parsedInfo) {
+    std::unique_ptr<CollatorInterface> collator;
+    if (!parsedInfo.collation.isEmpty()) {
+        collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                       ->makeFromBSON(parsedInfo.collation));
+    }
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
+    auto sortPattern = SortPattern(parsedInfo.sort.value_or(BSONObj()), expCtx);
+    return sortPattern.serialize(SortPattern::SortKeySerialization::kForSortKeyMerging).toBson();
+}
+
 std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
                                     const ChunkManager& cm,
                                     NamespaceString nss,
@@ -284,6 +298,16 @@ public:
             auto allShardsContainingChunksForNs =
                 getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);
 
+            // If the request omits the collation use the collection default collation. If
+            // the collection just has the simple collation, we can leave the collation as
+            // an empty BSONObj.
+            if (parsedInfoFromRequest.collation.isEmpty()) {
+                if (cri.cm.getDefaultCollator()) {
+                    parsedInfoFromRequest.collation =
+                        cri.cm.getDefaultCollator()->getSpec().toBSON();
+                }
+            }
+
             const auto& timeseriesFields =
                 (cri.cm.isSharded() && cri.cm.getTimeseriesFields().has_value())
                 ? cri.cm.getTimeseriesFields()
@@ -353,7 +377,12 @@ public:
             // Return a target document. If a sort order is specified, return the first target
             // document corresponding to the sort order for a particular sort key.
             AsyncResultsMergerParams params(std::move(remoteCursors), nss);
-            params.setSort(parsedInfoFromRequest.sort);
+            if (auto sortPattern = parseSortPattern(opCtx, nss, parsedInfoFromRequest);
+                !sortPattern.isEmpty()) {
+                params.setSort(sortPattern);
+            } else {
+                params.setSort(boost::none);
+            }
 
             std::unique_ptr<RouterExecStage> root = std::make_unique<RouterStageMerge>(
                 opCtx,
@@ -362,7 +391,7 @@ public:
 
             if (parsedInfoFromRequest.sort) {
                 root = std::make_unique<RouterStageRemoveMetadataFields>(
-                    opCtx, std::move(root), StringDataSet{AsyncResultsMerger::kSortKeyField});
+                    opCtx, std::move(root), Document::allMetadataFieldNames);
             }
 
             if (auto nextResponse = uassertStatusOK(root->next()); !nextResponse.isEOF()) {
