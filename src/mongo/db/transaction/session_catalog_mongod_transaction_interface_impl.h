@@ -74,6 +74,9 @@ public:
     ScanSessionsCallbackFn makeSessionWorkerFnForStepUp(
         std::vector<SessionCatalog::KillToken>* sessionKillTokens,
         std::vector<OperationSessionInfo>* sessionsToReacquireLocks) override;
+
+    ScanSessionsCallbackFn makeSessionWorkerFnForEagerReap(
+        TxnNumber clientTxnNumberStarted, SessionCatalog::Provenance provenance) override;
 };
 
 }  // namespace mongo

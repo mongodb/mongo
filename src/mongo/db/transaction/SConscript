@@ -7,7 +7,6 @@ env = env.Clone()
 env.Library(
     target='transaction',
     source=[
-        'internal_transactions_reap_service.cpp',
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod_transaction_interface_impl.cpp',
@@ -15,7 +14,6 @@ env.Library(
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
         'transaction_participant_resource_yielder.cpp',
-        'internal_transactions_reap_service.idl',
         'transaction_participant.idl',
         'transactions_stats.idl',
     ],
@@ -92,7 +90,6 @@ env.Library(
 env.CppUnitTest(
     target='db_transaction_test',
     source=[
-        'internal_transactions_reap_service_test.cpp',
         'transaction_api_test.cpp',
         'transaction_history_iterator_test.cpp',
         'transaction_operations_test.cpp',
@@ -116,6 +113,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/stats/transaction_stats',
         '$BUILD_DIR/mongo/db/storage/storage_control',
         '$BUILD_DIR/mongo/executor/inline_executor',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         'transaction',
         'transaction_api',
         'transaction_operations',

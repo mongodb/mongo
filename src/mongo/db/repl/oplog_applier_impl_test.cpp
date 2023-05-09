@@ -3696,10 +3696,6 @@ public:
         // secondary index creation does not. We use an UnreplicatedWritesBlock to avoid
         // timestamping any of the catalog setup.
         repl::UnreplicatedWritesBlock noRep(_opCtx.get());
-        MongoDSessionCatalog::set(
-            _opCtx->getServiceContext(),
-            std::make_unique<MongoDSessionCatalog>(
-                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx.get());
         mongoDSessionCatalog->onStepUp(_opCtx.get());

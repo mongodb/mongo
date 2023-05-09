@@ -58,6 +58,8 @@
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/session_catalog_router.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -6787,6 +6789,124 @@ TEST_F(ShardTxnParticipantTest, CheckingOutEagerlyReapedSessionDoesNotCrash) {
     ASSERT_THROWS_CODE(runAndCommitTransaction(retryableChildLsid, 1),
                        AssertionException,
                        ErrorCodes::TransactionTooOld);
+}
+
+class TxnParticipantAndTxnRouterTest : public TxnParticipantTest {
+protected:
+    bool doesExistInCatalog(const LogicalSessionId& lsid, SessionCatalog* sessionCatalog) {
+        bool existsInCatalog{false};
+        sessionCatalog->scanSession(
+            lsid, [&](const ObservableSession& session) { existsInCatalog = true; });
+        return existsInCatalog;
+    }
+
+    void runRouterTransactionLeaveOpen(LogicalSessionId lsid, TxnNumber txnNumber) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            auto opCtxSession = std::make_unique<RouterOperationContextSession>(opCtx);
+
+            auto txnRouter = TransactionRouter::get(opCtx);
+            txnRouter.beginOrContinueTxn(
+                opCtx, *opCtx->getTxnNumber(), TransactionRouter::TransactionActions::kStart);
+        });
+    }
+
+    void runParticipantTransactionLeaveOpen(LogicalSessionId lsid, TxnNumber txnNumber) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            auto opCtxSession = MongoDSessionCatalog::get(opCtx)->checkOutSession(opCtx);
+
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            txnParticipant.beginOrContinue(opCtx,
+                                           {*opCtx->getTxnNumber()},
+                                           false /* autocommit */,
+                                           true /* startTransaction */);
+        });
+    }
+};
+
+TEST_F(TxnParticipantAndTxnRouterTest, SkipEagerReapingSessionUsedByParticipantFromRouter) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with two retryable children.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRouterTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runRouterTransactionLeaveOpen(retryableChildLsid, 0);
+
+    auto retryableChildLsidReapable =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runRouterTransactionLeaveOpen(retryableChildLsidReapable, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Use one retryable session with a TransactionParticipant and verify this blocks the router
+    // role from reaping it.
+
+    runParticipantTransactionLeaveOpen(retryableChildLsid, 0);
+
+    // Start a higher txnNumber client transaction in the router role and verify the child used with
+    // TransactionParticipant was not erased but the other one was.
+
+    parentTxnNumber++;
+    runRouterTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Verify the participant role can reap the child.
+
+    auto higherRetryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runParticipantTransactionLeaveOpen(higherRetryableChildLsid, 5);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Sanity check that higher txnNumbers are reaped correctly and eager reaping only applies to
+    // parent and children sessions in the same "family."
+
+    auto parentLsid2 = makeLogicalSessionIdForTest();
+    auto parentTxnNumber2 = parentTxnNumber + 11;
+    runParticipantTransactionLeaveOpen(parentLsid2, parentTxnNumber2);
+
+    auto retryableChildLsid2 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid2, parentTxnNumber2);
+    runRouterTransactionLeaveOpen(retryableChildLsid2, 12131);
+
+    ASSERT_EQ(sessionCatalog->size(), 2);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(parentLsid2, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+
+    parentTxnNumber2++;
+    runParticipantTransactionLeaveOpen(parentLsid2, parentTxnNumber2);
+
+    // The unrelated sessions still exist and the superseded child was reaped.
+    ASSERT_EQ(sessionCatalog->size(), 2);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(parentLsid2, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
 }
 
 }  // namespace

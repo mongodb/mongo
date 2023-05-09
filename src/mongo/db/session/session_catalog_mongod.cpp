@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/internal_transactions_reap_service.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -469,6 +470,16 @@ MongoDSessionCatalog* MongoDSessionCatalog::get(ServiceContext* service) {
 void MongoDSessionCatalog::set(ServiceContext* service,
                                std::unique_ptr<MongoDSessionCatalog> sessionCatalog) {
     getMongoDSessionCatalog(service) = std::move(sessionCatalog);
+
+    // Set mongod specific behaviors on the SessionCatalog.
+    SessionCatalog::get(service)->setEagerReapSessionsFns(
+        InternalTransactionsReapService::onEagerlyReapedSessions,
+        [](ServiceContext* service,
+           TxnNumber clientTxnNumberStarted,
+           SessionCatalog::Provenance provenance) {
+            return MongoDSessionCatalog::get(service)->makeSessionWorkerFnForEagerReap(
+                clientTxnNumberStarted, provenance);
+        });
 }
 
 BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
@@ -679,6 +690,11 @@ void MongoDSessionCatalog::checkInUnscopedSession(OperationContext* opCtx,
 
 void MongoDSessionCatalog::checkOutUnscopedSession(OperationContext* opCtx) {
     _checkOutUnscopedSession(opCtx, _ti.get());
+}
+
+SessionCatalog::ScanSessionsCallbackFn MongoDSessionCatalog::makeSessionWorkerFnForEagerReap(
+    TxnNumber clientTxnNumberStarted, SessionCatalog::Provenance provenance) {
+    return _ti->makeSessionWorkerFnForEagerReap(clientTxnNumberStarted, provenance);
 }
 
 MongoDOperationContextSession::MongoDOperationContextSession(

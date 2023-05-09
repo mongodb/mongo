@@ -128,6 +128,13 @@ public:
     virtual ScanSessionsCallbackFn makeSessionWorkerFnForStepUp(
         std::vector<SessionCatalog::KillToken>* sessionKillTokens,
         std::vector<OperationSessionInfo>* sessionsToReacquireLocks) = 0;
+
+    /**
+     * Returns a function that should be used to determine when a session can be eagerly reaped from
+     * the SessionCatalog on a mongod.
+     */
+    virtual ScanSessionsCallbackFn makeSessionWorkerFnForEagerReap(
+        TxnNumber clientTxnNumberStarted, SessionCatalog::Provenance provenance) = 0;
 };
 
 }  // namespace mongo

@@ -33,10 +33,10 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session/internal_transactions_reap_service.h"
+#include "mongo/db/session/internal_transactions_reap_service_gen.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/transaction/internal_transactions_reap_service.h"
-#include "mongo/db/transaction/internal_transactions_reap_service_gen.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 
 namespace mongo {

@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/transaction/internal_transactions_reap_service.h"
+#include "mongo/db/session/internal_transactions_reap_service.h"
 
+#include "mongo/db/session/internal_transactions_reap_service_gen.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/transaction/internal_transactions_reap_service_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction

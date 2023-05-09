@@ -2874,7 +2874,9 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
         // Only observe parent sessions because retryable transactions begin the same txnNumber on
         // their parent session.
         OperationContextSession::observeNewTxnNumberStarted(
-            opCtx, _sessionId(), txnNumberAndRetryCounter.getTxnNumber());
+            opCtx,
+            _sessionId(),
+            {txnNumberAndRetryCounter.getTxnNumber(), SessionCatalog::Provenance::kParticipant});
     }
 }
 
