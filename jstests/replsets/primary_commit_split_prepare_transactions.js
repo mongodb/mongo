@@ -34,27 +34,6 @@ const checkDocuments = function(docCount, testColl, expectOld, readConcern = nul
     }
 };
 
-// Verify that we can't insert in the transaction if it is in prepared/committed state.
-// Also checks the config.transactions entry.
-const checkTransaction = function(
-    sessionDB, collName, lsid, txnNumber, transactionsColl, expectedState) {
-    const expectedError = expectedState == "prepared" ? ErrorCodes.PreparedTransactionInProgress
-                                                      : ErrorCodes.TransactionCommitted;
-    assert.commandFailedWithCode(sessionDB.runCommand({
-        insert: collName,
-        documents: [{x: 2}],
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false
-    }),
-                                 expectedError);
-
-    const res = transactionsColl.find({"_id.id": lsid["id"], "txnNum": txnNumber})
-                    .readConcern("majority")
-                    .toArray();
-    assert.eq(1, res.length);
-    assert.eq(expectedState, res[0]["state"]);
-};
-
 const replTest = new ReplSetTest({
     nodes: 2,
     nodeOptions: {
@@ -79,8 +58,28 @@ const collName = jsTestName();
 let testDB = primary.getDB(dbName);
 let testColl = testDB.getCollection(collName);
 
-const config = primary.getDB("config");
-const transactionsColl = config.getCollection("transactions");
+// Verify that we can't insert in the transaction if it is in prepared/committed state.
+// Also checks the config.transactions entry.
+const checkTransaction = function(sessionDB, lsid, txnNumber, expectedState) {
+    const expectedError = expectedState == "prepared" ? ErrorCodes.PreparedTransactionInProgress
+                                                      : ErrorCodes.TransactionCommitted;
+    assert.commandFailedWithCode(sessionDB.runCommand({
+        insert: collName,
+        documents: [{x: 2}],
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }),
+                                 expectedError);
+
+    const res = replTest.getPrimary()
+                    .getDB("config")
+                    .getCollection("transactions")
+                    .find({"_id.id": lsid["id"], "txnNum": txnNumber})
+                    .readConcern("majority")
+                    .toArray();
+    assert.eq(1, res.length);
+    assert.eq(expectedState, res[0]["state"]);
+};
 
 testColl.drop({writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
@@ -130,7 +129,7 @@ assert.soon(() => {
         timestampCmp(secondaryLastStableRecoveryTimestamp, prepareTimestamp) >= 0;
 });
 
-checkTransaction(sessionDB, collName, lsid, txnNumber, transactionsColl, "prepared");
+checkTransaction(sessionDB, lsid, txnNumber, "prepared");
 
 // 2) Step up the secondary as the new primary after it applies the prepared transaction.
 jsTestLog("Forcing secondary to become primary.");
@@ -149,7 +148,7 @@ session = PrepareHelpers.createSessionWithGivenId(newPrimary, lsid);
 session.setTxnNumber_forTesting(txnNumber);
 sessionDB = session.getDatabase(dbName);
 
-checkTransaction(sessionDB, collName, lsid, txnNumber, transactionsColl, "prepared");
+checkTransaction(sessionDB, lsid, txnNumber, "prepared");
 
 // Inserts are not seen outside the transaction.
 checkDocuments(docCount, testColl, true /* expectOld */);
@@ -249,7 +248,7 @@ session = PrepareHelpers.createSessionWithGivenId(newPrimary2, lsid);
 session.setTxnNumber_forTesting(txnNumber);
 sessionDB = session.getDatabase(dbName);
 
-checkTransaction(sessionDB, collName, lsid, txnNumber, transactionsColl, "prepared");
+checkTransaction(sessionDB, lsid, txnNumber, "prepared");
 
 testDB = newPrimary2.getDB(dbName);
 testColl = testDB.getCollection(collName);
@@ -272,7 +271,7 @@ assert.commandWorked(sessionDB.adminCommand({
     autocommit: false,
 }));
 
-checkTransaction(sessionDB, collName, lsid, txnNumber, transactionsColl, "committed");
+checkTransaction(sessionDB, lsid, txnNumber, "committed");
 
 // After commit the updates become visible.
 checkDocuments(docCount, testColl, false /* expectOld */);
