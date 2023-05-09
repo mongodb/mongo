@@ -288,12 +288,16 @@ void writeToImageCollection(OperationContext* opCtx,
     // stronger lock acquisition is taken on this namespace is during step up to create the
     // collection.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    AutoGetCollection imageCollectionRaii(
-        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(NamespaceString::kConfigImagesNamespace),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     auto curOp = CurOp::get(opCtx);
     const auto existingNs = curOp->getNSS();
-    UpdateResult res =
-        Helpers::upsert(opCtx, NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
+    UpdateResult res = Helpers::upsert(opCtx, collection, imageEntry.toBSON());
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
         curOp->setNS_inlock(existingNs);

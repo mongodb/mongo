@@ -79,6 +79,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -2601,8 +2602,12 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         NamespaceString::createNamespaceString_forTest("unittests.timestampIndexBuilds");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    CollectionWriter collection(_opCtx, autoColl);
+    auto collectionAcquisition = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+
+    CollectionWriter collection(_opCtx, &collectionAcquisition);
 
     // Indexing of parallel arrays is not allowed, so these are deemed "bad".
     const auto badDoc1 = BSON("_id" << 0 << "a" << BSON_ARRAY(0 << 1) << "b" << BSON_ARRAY(0 << 1));
@@ -2710,12 +2715,15 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
 
     // Update one documents to be valid, and delete the other. These modifications are written
     // to the side writes table and must be drained.
-    Helpers::upsert(_opCtx, collection->ns(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
+    Helpers::upsert(_opCtx, collectionAcquisition, BSON("_id" << 0 << "a" << 1 << "b" << 1));
     {
         RecordId badRecord = Helpers::findOne(_opCtx, collection.get(), BSON("_id" << 1));
         WriteUnitOfWork wuow(_opCtx);
-        collection_internal::deleteDocument(
-            _opCtx, *autoColl, kUninitializedStmtId, badRecord, nullptr);
+        collection_internal::deleteDocument(_opCtx,
+                                            collectionAcquisition.getCollectionPtr(),
+                                            kUninitializedStmtId,
+                                            badRecord,
+                                            nullptr);
         wuow.commit();
     }
 

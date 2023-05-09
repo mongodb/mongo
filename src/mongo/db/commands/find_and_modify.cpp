@@ -394,25 +394,29 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         // Explain calls of the findAndModify command are read-only, but we take write
         // locks so that the timing information is more accurate.
-        AutoGetCollection collection(opCtx, nss, MODE_IX);
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+                              MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
-                collection.getDb());
+                DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
         ParsedUpdate parsedUpdate(
-            opCtx, &updateRequest, extensionsCallback, collection.getCollection());
+            opCtx, &updateRequest, extensionsCallback, collection.getCollectionPtr());
         uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
             ->checkShardVersionOrThrow(opCtx);
 
-        const auto exec = uassertStatusOK(
-            getExecutorUpdate(opDebug, &collection.getCollection(), &parsedUpdate, verbosity));
+        const auto exec =
+            uassertStatusOK(getExecutorUpdate(opDebug, collection, &parsedUpdate, verbosity));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
-            exec.get(), collection.getCollection(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
+            exec.get(), collection.getCollectionPtr(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
     }
 }
 

@@ -93,7 +93,7 @@ CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& update
 UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         const ScopedCollectionAcquisition& collection,
                          PlanStage* child)
     : UpdateStage(expCtx, params, ws, collection) {
     // We should never reach here if the request is an upsert.
@@ -105,16 +105,16 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
 UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
-                         const CollectionPtr& collection)
-    : RequiresMutableCollectionStage(kStageType.rawData(), expCtx, collection),
+                         const ScopedCollectionAcquisition& collection)
+    : RequiresMutableCollectionStage(kStageType.rawData(), expCtx, collection.getCollectionPtr()),
       _params(params),
       _ws(ws),
       _doc(params.driver->getDocument()),
-      _cachedShardingCollectionDescription(collection->ns()),
+      _cachedShardingCollectionDescription(collection.nss()),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
       _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr),
-      _preWriteFilter(opCtx(), collection->ns()) {
+      _preWriteFilter(opCtx(), collection.nss()) {
 
     // Should the modifiers validate their embedded docs via storage_validation::scanDocument()?
     // Only user updates should be checked. Any system or replication stuff should pass through.

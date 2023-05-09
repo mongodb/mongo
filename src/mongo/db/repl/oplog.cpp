@@ -360,7 +360,13 @@ void writeToImageCollection(OperationContext* opCtx,
     // stronger lock acquisition is taken on this namespace is during step up to create the
     // collection.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(NamespaceString::kConfigImagesNamespace),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     repl::ImageEntry imageEntry;
     imageEntry.set_id(sessionId);
     imageEntry.setTxnNumber(txnNum);
@@ -385,7 +391,7 @@ void writeToImageCollection(OperationContext* opCtx,
     request.setFromOplogApplication(true);
     try {
         // This code path can also be hit by things such as `applyOps` and tenant migrations.
-        ::mongo::update(opCtx, autoColl.getDb(), request);
+        ::mongo::update(opCtx, collection, request);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // We can get a duplicate key when two upserts race on inserting a document.
         *upsertConfigImage = false;
@@ -1385,8 +1391,7 @@ void logOplogConstraintViolation(OperationContext* opCtx,
 // @return failure status if an update should have happened and the document DNE.
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
-                             Database* db,
-                             const ScopedCollectionAcquisition& collectionAcquisition,
+                             ScopedCollectionAcquisition& collectionAcquisition,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
@@ -1742,7 +1747,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
                         }
 
-                        UpdateResult res = update(opCtx, db, request);
+                        UpdateResult res = update(opCtx, collectionAcquisition, request);
                         if (res.numMatched == 0 && res.upsertedId.isEmpty()) {
                             LOGV2_ERROR(21257,
                                         "No document was updated even though we got a DuplicateKey "
@@ -1869,7 +1874,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     invariant(documentFound);
                 }
 
-                UpdateResult ur = update(opCtx, db, request);
+                UpdateResult ur = update(opCtx, collectionAcquisition, request);
                 if (ur.numMatched == 0 && ur.upsertedId.isEmpty()) {
                     if (collection && collection->isCapped() &&
                         mode == OplogApplication::Mode::kSecondary) {

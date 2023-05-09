@@ -284,16 +284,6 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
             std::holds_alternative<CollectionPtr>(snapshotedServices.collectionPtrOrView);
 
         if (isCollection) {
-            const auto& collectionPtr =
-                std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView);
-            invariant(!prerequisites.uuid || prerequisites.uuid == collectionPtr->uuid());
-            if (!prerequisites.uuid && collectionPtr) {
-                // If the uuid wasn't originally set on the AcquisitionRequest, set it now on the
-                // prerequisites so that on restore from yield we can check we are restoring the
-                // same instance of the ns.
-                prerequisites.uuid = collectionPtr->uuid();
-            }
-
             shard_role_details::AcquiredCollection& acquiredCollection =
                 getOrMakeTransactionResources(opCtx).addAcquiredCollection(
                     {prerequisites,
@@ -451,11 +441,11 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
 }
 
-const UUID& ScopedCollectionAcquisition::uuid() const {
+UUID ScopedCollectionAcquisition::uuid() const {
     invariant(exists(),
               str::stream() << "Collection " << nss().toStringForErrorMsg()
                             << " doesn't exist, so its UUID cannot be obtained");
-    return *_acquiredCollection.prerequisites.uuid;
+    return _acquiredCollection.collectionPtr->uuid();
 }
 
 const ScopedCollectionDescription& ScopedCollectionAcquisition::getShardingDescription() const {
@@ -471,6 +461,13 @@ const boost::optional<ScopedCollectionFilter>& ScopedCollectionAcquisition::getS
     // using the kLocalCatalogOnlyWithPotentialDataLoss placement concern
     invariant(_acquiredCollection.collectionDescription);
     return _acquiredCollection.ownershipFilter;
+}
+
+const CollectionPtr& ScopedCollectionAcquisition::getCollectionPtr() const {
+    tassert(ErrorCodes::InternalError,
+            "Collection acquisition has been invalidated",
+            !_acquiredCollection.invalidated);
+    return _acquiredCollection.collectionPtr;
 }
 
 ScopedCollectionAcquisition::~ScopedCollectionAcquisition() {
@@ -835,11 +832,16 @@ ScopedLocalCatalogWriteFence::ScopedLocalCatalogWriteFence(OperationContext* opC
     // OnCommit, there is nothing to do because the caller is not allowed to use the collection in
     // the scope of the ScopedLocalCatalogWriteFence and the destructor will take care of updating
     // the acquisition to point to the latest changed value.
+    std::weak_ptr<shard_role_details::AcquiredCollection::SharedImpl> sharedImplWeakPtr =
+        _acquiredCollection->sharedImpl;
     opCtx->recoveryUnit()->onRollback(
-        [acquiredCollection = _acquiredCollection](OperationContext* opCtx) mutable {
+        [acquiredCollection = _acquiredCollection,
+         sharedImplWeakPtr = sharedImplWeakPtr](OperationContext* opCtx) mutable {
             // OnRollback, the acquired collection must be set to reference the previously
             // established catalog snapshot
-            _updateAcquiredLocalCollection(opCtx, acquiredCollection);
+            if (!sharedImplWeakPtr.expired()) {
+                _updateAcquiredLocalCollection(opCtx, acquiredCollection);
+            }
         });
 }
 
@@ -851,13 +853,17 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
     OperationContext* opCtx, shard_role_details::AcquiredCollection* acquiredCollection) {
     try {
         const auto catalog = CollectionCatalog::latest(opCtx);
+        const auto& nss = acquiredCollection->prerequisites.nss;
         auto collection =
             catalog->lookupCollectionByNamespace(opCtx, acquiredCollection->prerequisites.nss);
-        invariant(collection);
-
+        checkCollectionUUIDMismatch(opCtx, nss, collection, acquiredCollection->prerequisites.uuid);
         acquiredCollection->collectionPtr = CollectionPtr(collection);
-    } catch (...) {
-        fassertFailedWithStatus(737661, exceptionToStatus());
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(7653800,
+                    1,
+                    "Failed to update ScopedLocalCatalogWriteFence",
+                    "ex"_attr = redact(ex.toString()));
+        acquiredCollection->invalidated = true;
     }
 }
 
@@ -885,13 +891,20 @@ boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperat
 
     invariant(!transactionResources->yielded);
 
-    // Yielding kLocalCatalogOnlyWithPotentialDataLoss acquisitions is not allowed.
+
     for (auto& acquisition : transactionResources->acquiredCollections) {
+        // Yielding kLocalCatalogOnlyWithPotentialDataLoss acquisitions is not allowed.
         invariant(
             !stdx::holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
                 acquisition.prerequisites.placementConcern),
             str::stream() << "Collection " << acquisition.prerequisites.nss.toStringForErrorMsg()
                           << " acquired with special placement concern and cannot be yielded");
+
+        // If the uuid wasn't originally set on the prerequisites, set it now so that on restore
+        // from yield we can check we are restoring the same instance of the ns.
+        if (!acquisition.prerequisites.uuid && acquisition.collectionPtr) {
+            acquisition.prerequisites.uuid = acquisition.collectionPtr->uuid();
+        }
     }
 
     // Yielding view acquisitions is not supported.

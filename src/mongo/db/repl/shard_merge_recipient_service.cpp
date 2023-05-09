@@ -72,6 +72,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -2017,11 +2018,17 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
     OpType opType,
     const RegisterChangeCbk& registerChange) {
     const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(nss),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << nss.toStringForErrorMsg() << " does not exist",
-            collection);
+            collection.exists());
 
     writeConflictRetry(opCtx, "writeShardMergeRecipientStateDoc", nss.ns(), [&]() {
         WriteUnitOfWork wunit(opCtx);
@@ -2032,7 +2039,7 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
         const auto filter =
             BSON(TenantMigrationRecipientDocument::kIdFieldName << stateDoc.getId());
         auto updateResult = Helpers::upsert(opCtx,
-                                            nss,
+                                            collection,
                                             filter,
                                             stateDoc.toBSON(),
                                             /*fromMigrate=*/false);

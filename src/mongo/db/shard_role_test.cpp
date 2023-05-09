@@ -1423,6 +1423,64 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionIsNowAView) {
     testRestoreFailsIfCollectionIsNowAView(AcquisitionPrerequisites::kWrite);
 }
 
+TEST_F(ShardRoleTest, RestoreCollectionCreatedUnderScopedLocalCatalogWriteFence) {
+    const auto nss = NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
+    auto acquisition = acquireCollection(
+        opCtx(),
+        {nss, PlacementConcern{{}, {}}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+    ASSERT_FALSE(acquisition.exists());
+
+    // Create the collection
+    {
+        WriteUnitOfWork wuow(opCtx());
+        ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx(), &acquisition);
+        createTestCollection(opCtx(), nss);
+        wuow.commit();
+    }
+    ASSERT_TRUE(acquisition.exists());
+
+    // Yield
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
+
+    // Restore works
+    restoreTransactionResourcesToOperationContext(opCtx(), std::move(*yieldedTransactionResources));
+}
+
+TEST_F(ShardRoleTest,
+       RestoreCollectionCreatedUnderScopedLocalCatalogWriteFenceFailsIfNoLongerExists) {
+    const auto nss = NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
+    auto acquisition = acquireCollection(
+        opCtx(),
+        {nss, PlacementConcern{{}, {}}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+    ASSERT_FALSE(acquisition.exists());
+
+    // Create the collection
+    {
+        WriteUnitOfWork wuow(opCtx());
+        ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx(), &acquisition);
+        createTestCollection(opCtx(), nss);
+        wuow.commit();
+    }
+    ASSERT_TRUE(acquisition.exists());
+
+    // Yield
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
+
+    // Drop the collection
+    DBDirectClient client(opCtx());
+    client.dropCollection(nss);
+
+    // Restore should fail
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           opCtx(), std::move(*yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::CollectionUUIDMismatch);
+}
+
 // ---------------------------------------------------------------------------
 // Storage snapshot
 
@@ -1582,6 +1640,59 @@ TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceOutsideWUOURollback) {
         ASSERT(!localCatalogWriter->isTemporary());
     }
     ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackAfterAcquisitionOutOfScope) {
+    // Tests that nothing breaks if ScopedLocalCatalogWriteFence's onRollback handler is executed
+    // when the collection acquisition has already gone out of scope.
+    WriteUnitOfWork wuow1(opCtx());
+    {
+        auto acquisition = acquireCollection(opCtx(),
+                                             {nssShardedCollection1,
+                                              PlacementConcern{{}, shardVersionShardedCollection1},
+                                              repl::ReadConcernArgs(),
+                                              AcquisitionPrerequisites::kRead},
+                                             MODE_IX);
+        ScopedLocalCatalogWriteFence(opCtx(), &acquisition);
+    }
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackAfterANotherClientCreatedCollection) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
+
+    // Acquire a collection that does not exist.
+    auto acquisition = acquireCollection(
+        opCtx(),
+        {nss, PlacementConcern{{}, {}}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+    ASSERT_FALSE(acquisition.exists());
+
+    // Another client creates the collection
+    {
+        auto newClient = opCtx()->getServiceContext()->makeClient("MigrationCoordinator");
+        auto newOpCtx = newClient->makeOperationContext();
+        createTestCollection(newOpCtx.get(), nss);
+    }
+
+    // Acquisition still reflects that the collection does not exist.
+    ASSERT_FALSE(acquisition.exists());
+
+    // Original client attempts to create the collection, which will result in a WriteConflict and
+    // rollback.
+    {
+        WriteUnitOfWork wuow(opCtx());
+        ScopedLocalCatalogWriteFence localCatalogWriteFence(opCtx(), &acquisition);
+        auto db = DatabaseHolder::get(opCtx())->openDb(opCtx(), nss.dbName());
+        ASSERT_THROWS_CODE(db->createCollection(opCtx(), nss, CollectionOptions()),
+                           DBException,
+                           ErrorCodes::WriteConflict);
+        wuow.commit();
+    }
+
+    // Check that after rollback the acquisition has been updated to reflect the latest state of the
+    // catalog (i.e. the collection exists).
+    ASSERT_TRUE(acquisition.exists());
 }
 
 }  // namespace

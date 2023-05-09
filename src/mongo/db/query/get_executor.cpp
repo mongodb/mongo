@@ -1966,7 +1966,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    VariantCollectionPtrOrAcquisition coll,
+    const ScopedCollectionAcquisition& coll,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     UpdateStageParams::DocumentCounter&& documentCounter) {
@@ -1989,7 +1989,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // If there is no collection and this is an upsert, callers are supposed to create
     // the collection prior to calling this method. Explain, however, will never do
     // collection or database creation.
-    if (!collectionPtr && request->isUpsert()) {
+    if (!coll.exists() && request->isUpsert()) {
         invariant(request->explain());
     }
 
@@ -2014,7 +2014,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // should have already enforced upstream that in this case either the upsert flag is false, or
     // we are an explain. If the collection doesn't exist, we're not an explain, and the upsert flag
     // is true, we expect the caller to have created the collection already.
-    if (!collectionPtr) {
+    if (!coll.exists()) {
         LOGV2_DEBUG(20929,
                     2,
                     "Collection does not exist. Using EOF stage",
@@ -2106,7 +2106,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     const bool isUpsert = updateStageParams.request->isUpsert();
     if (isUpsert) {
         root = std::make_unique<UpsertStage>(
-            cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release());
+            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
     } else if (parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
         if (request->isMulti()) {
             // If this is a multi-update, we need to spool the data before beginning to apply
@@ -2123,7 +2123,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             parsedUpdate->releaseResidualExpr());
     } else {
         root = std::make_unique<UpdateStage>(
-            cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release());
+            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
     }
 
     if (projection) {
@@ -2136,7 +2136,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),
-                                       coll,
+                                       &coll,
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString(),

@@ -984,22 +984,24 @@ Status _updateWithQuery(OperationContext* opCtx,
 
     auto& nss = request.getNamespaceString();
     return writeConflictRetry(opCtx, "_updateWithQuery", nss.ns(), [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto collectionResult = getCollection(
-            autoColl,
-            nss,
-            str::stream() << "Unable to update documents in " << nss.toStringForErrorMsg()
-                          << " using query " << request.getQuery());
-        if (!collectionResult.isOK()) {
-            return collectionResult.getStatus();
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        if (!collection.exists()) {
+            return Status{ErrorCodes::NamespaceNotFound,
+                          str::stream()
+                              << "Collection [" << nss.toString() << "] not found. "
+                              << "Unable to update documents in " << nss.toStringForErrorMsg()
+                              << " using query " << request.getQuery()};
         }
-        const auto& collection = *collectionResult.getValue();
 
         // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
         // CanonicalQuery whose ownership will be transferred to the plan executor in
         // getExecutorUpdate().
         const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, collection);
+        ParsedUpdate parsedUpdate(
+            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;
@@ -1012,7 +1014,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         }
 
         auto planExecutorResult = mongo::getExecutorUpdate(
-            nullptr, &collection, &parsedUpdate, boost::none /* verbosity */);
+            nullptr, collection, &parsedUpdate, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1047,17 +1049,21 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
     auto query = queryResult.getValue();
 
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::upsertById", nsOrUUID.toString(), [&] {
-        AutoGetCollection autoColl(opCtx, nsOrUUID, MODE_IX);
-        auto collectionResult = getCollection(autoColl, nsOrUUID, "Unable to update document.");
-        if (!collectionResult.isOK()) {
-            return collectionResult.getStatus();
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nsOrUUID, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+        if (!collection.exists()) {
+            return Status{ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
+                                        << "Unable to update document."};
         }
-        const auto& collection = *collectionResult.getValue();
 
         // We can create an UpdateRequest now that the collection's namespace has been resolved, in
         // the event it was specified as a UUID.
         auto request = UpdateRequest();
-        request.setNamespaceString(collection->ns());
+        request.setNamespaceString(collection.nss());
         request.setQuery(query);
         request.setUpdateModification(
             write_ops::UpdateModification::parseFromClassicUpdate(update));
@@ -1069,7 +1075,8 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         // ParsedUpdate needs to be inside the write conflict retry loop because it contains
         // the UpdateDriver whose state may be modified while we are applying the update.
         const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, collection);
+        ParsedUpdate parsedUpdate(
+            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;
@@ -1077,7 +1084,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 
         // We're using the ID hack to perform the update so we have to disallow collections
         // without an _id index.
-        auto descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+        auto descriptor = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
         if (!descriptor) {
             return Status(ErrorCodes::IndexNotFound,
                           "Unable to update document in a collection without an _id index.");
@@ -1086,7 +1093,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         UpdateStageParams updateStageParams(
             parsedUpdate.getRequest(), parsedUpdate.getDriver(), nullptr);
         auto planExecutor = InternalPlanner::updateWithIdHack(opCtx,
-                                                              &collection,
+                                                              collection,
                                                               updateStageParams,
                                                               descriptor,
                                                               idKey.wrap(""),

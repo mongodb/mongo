@@ -997,15 +997,21 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
 
     writeConflictRetry(opCtx.get(), "DonorStateMachine::_updateDonorDocument", nss.toString(), [&] {
-        AutoGetCollection coll(opCtx.get(), nss, MODE_X);
+        auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString(nss),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_X);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << nss.toStringForErrorMsg() << " does not exist",
-                coll);
+                coll.exists());
 
         WriteUnitOfWork wuow(opCtx.get());
         Helpers::update(opCtx.get(),
-                        nss,
+                        coll,
                         BSON(ReshardingDonorDocument::kReshardingUUIDFieldName
                              << _metadata.getReshardingUUID()),
                         BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName

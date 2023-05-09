@@ -58,7 +58,7 @@ const FieldRef idFieldRef(idFieldName);
 UpsertStage::UpsertStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         const ScopedCollectionAcquisition& collection,
                          PlanStage* child)
     : UpdateStage(expCtx, params, ws, collection) {
     // We should never create this stage for a non-upsert request.

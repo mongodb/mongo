@@ -703,8 +703,14 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
                                       const UpdateRequest* updateRequest) {
-    AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
-    Database* db = autoColl.ensureDbExists(opCtx);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    Database* db = [&]() {
+        AutoGetDb autoDb(opCtx, nsString.dbName(), MODE_IX);
+        return autoDb.ensureDbExists(opCtx);
+    }();
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -714,43 +720,25 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, nsString);
 
-    CollectionPtr createdCollection;
-    const CollectionPtr* collectionPtr = &autoColl.getCollection();
-
     // TODO SERVER-50983: Create abstraction for creating collection when using
     // AutoGetCollection Create the collection if it does not exist when performing an upsert
     // because the update stage does not create its own collection
-    if (!*collectionPtr && upsert) {
-        assertCanWrite_inlock(opCtx, nsString);
-
-        createdCollection = CollectionPtr(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
-
-        // If someone else beat us to creating the collection, do nothing
-        if (!createdCollection) {
-            uassertStatusOK(userAllowedCreateNS(opCtx, nsString));
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
-            WriteUnitOfWork wuow(opCtx);
-            CollectionOptions defaultCollectionOptions;
-            uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
-            wuow.commit();
-
-            createdCollection = CollectionPtr(
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
-        }
-
-        invariant(createdCollection);
-        createdCollection.makeYieldable(opCtx,
-                                        LockedCollectionYieldRestore(opCtx, createdCollection));
-        collectionPtr = &createdCollection;
+    if (!collection.exists() && upsert) {
+        CollectionWriter collectionWriter(opCtx, &collection);
+        uassertStatusOK(userAllowedCreateNS(opCtx, nsString));
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx);
+        WriteUnitOfWork wuow(opCtx);
+        ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &collection);
+        CollectionOptions defaultCollectionOptions;
+        uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
+        wuow.commit();
     }
-    const auto& collection = *collectionPtr;
 
-    if (collection && collection->isCapped()) {
+    if (collection.exists() && collection.getCollectionPtr()->isCapped()) {
         uassert(
             ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Collection '" << collection->ns().toStringForErrorMsg()
+            str::stream() << "Collection '" << collection.nss().toStringForErrorMsg()
                           << "' is a capped collection. Writes in transactions are not allowed on "
                              "capped collections.",
             !inTransaction);
@@ -758,11 +746,12 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
 
-    ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback, collection);
+    ParsedUpdate parsedUpdate(
+        opCtx, updateRequest, extensionsCallback, collection.getCollectionPtr());
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const auto exec = uassertStatusOK(
-        getExecutorUpdate(opDebug, &collection, &parsedUpdate, boost::none /* verbosity */));
+        getExecutorUpdate(opDebug, collection, &parsedUpdate, boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -777,8 +766,9 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
     PlanSummaryStats summaryStats;
     auto&& explainer = exec->getPlanExplainer();
     explainer.getSummaryStats(&summaryStats);
-    if (collection) {
-        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
+    if (collection.exists()) {
+        CollectionQueryInfo::get(collection.getCollectionPtr())
+            .notifyOfQuery(opCtx, collection.getCollectionPtr(), summaryStats);
     }
     auto updateResult = exec->getUpdateResult();
     write_ops_exec::recordUpdateResultInOpDebug(updateResult, opDebug);
@@ -1220,7 +1210,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }();
 
     auto exec = uassertStatusOK(getExecutorUpdate(&curOp.debug(),
-                                                  &collection,
+                                                  collection,
                                                   &parsedUpdate,
                                                   boost::none /* verbosity */,
                                                   std::move(documentCounter)));

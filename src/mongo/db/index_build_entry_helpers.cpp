@@ -33,13 +33,13 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog/local_oplog_info.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
@@ -55,27 +55,33 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeGettingIndexBuildEntry);
 
 Status upsert(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
 
-    return writeConflictRetry(opCtx,
-                              "upsertIndexBuildEntry",
-                              NamespaceString::kIndexBuildEntryNamespace.ns(),
-                              [&]() -> Status {
-                                  AutoGetCollection collection(
-                                      opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  if (!collection) {
-                                      str::stream ss;
-                                      ss << "Collection not found: "
-                                         << NamespaceString::kIndexBuildEntryNamespace.ns();
-                                      return Status(ErrorCodes::NamespaceNotFound, ss);
-                                  }
+    return writeConflictRetry(
+        opCtx,
+        "upsertIndexBuildEntry",
+        NamespaceString::kIndexBuildEntryNamespace.ns(),
+        [&]() -> Status {
+            auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString(NamespaceString::kIndexBuildEntryNamespace),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            if (!collection.exists()) {
+                str::stream ss;
+                ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
+                return Status(ErrorCodes::NamespaceNotFound, ss);
+            }
 
-                                  WriteUnitOfWork wuow(opCtx);
-                                  Helpers::upsert(opCtx,
-                                                  NamespaceString::kIndexBuildEntryNamespace,
-                                                  indexBuildEntry.toBSON(),
-                                                  /*fromMigrate=*/false);
-                                  wuow.commit();
-                                  return Status::OK();
-                              });
+            WriteUnitOfWork wuow(opCtx);
+            Helpers::upsert(opCtx,
+                            collection,
+                            indexBuildEntry.toBSON(),
+                            /*fromMigrate=*/false);
+            wuow.commit();
+            return Status::OK();
+        });
 }
 
 std::pair<const BSONObj, const BSONObj> buildIndexBuildEntryFilterAndUpdate(
@@ -110,53 +116,68 @@ std::pair<const BSONObj, const BSONObj> buildIndexBuildEntryFilterAndUpdate(
 }
 
 Status upsert(OperationContext* opCtx, const BSONObj& filter, const BSONObj& updateMod) {
-    return writeConflictRetry(opCtx,
-                              "upsertIndexBuildEntry",
-                              NamespaceString::kIndexBuildEntryNamespace.ns(),
-                              [&]() -> Status {
-                                  AutoGetCollection collection(
-                                      opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  if (!collection) {
-                                      str::stream ss;
-                                      ss << "Collection not found: "
-                                         << NamespaceString::kIndexBuildEntryNamespace.ns();
-                                      return Status(ErrorCodes::NamespaceNotFound, ss);
-                                  }
+    return writeConflictRetry(
+        opCtx,
+        "upsertIndexBuildEntry",
+        NamespaceString::kIndexBuildEntryNamespace.ns(),
+        [&]() -> Status {
+            auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString(NamespaceString::kIndexBuildEntryNamespace),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
-                                  WriteUnitOfWork wuow(opCtx);
-                                  Helpers::upsert(opCtx,
-                                                  NamespaceString::kIndexBuildEntryNamespace,
-                                                  filter,
-                                                  updateMod,
-                                                  /*fromMigrate=*/false);
-                                  wuow.commit();
-                                  return Status::OK();
-                              });
+            if (!collection.exists()) {
+                str::stream ss;
+                ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
+                return Status(ErrorCodes::NamespaceNotFound, ss);
+            }
+
+            WriteUnitOfWork wuow(opCtx);
+            Helpers::upsert(opCtx,
+                            collection,
+                            filter,
+                            updateMod,
+                            /*fromMigrate=*/false);
+            wuow.commit();
+            return Status::OK();
+        });
 }
 
 Status update(OperationContext* opCtx, const BSONObj& filter, const BSONObj& updateMod) {
-    return writeConflictRetry(opCtx,
-                              "updateIndexBuildEntry",
-                              NamespaceString::kIndexBuildEntryNamespace.ns(),
-                              [&]() -> Status {
-                                  AutoGetCollection collection(
-                                      opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  if (!collection) {
-                                      str::stream ss;
-                                      ss << "Collection not found: "
-                                         << NamespaceString::kIndexBuildEntryNamespace.ns();
-                                      return Status(ErrorCodes::NamespaceNotFound, ss);
-                                  }
+    return writeConflictRetry(
+        opCtx,
+        "updateIndexBuildEntry",
+        NamespaceString::kIndexBuildEntryNamespace.ns(),
+        [&]() -> Status {
+            ;
+            auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString(NamespaceString::kIndexBuildEntryNamespace),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
-                                  WriteUnitOfWork wuow(opCtx);
-                                  Helpers::update(opCtx,
-                                                  NamespaceString::kIndexBuildEntryNamespace,
-                                                  filter,
-                                                  updateMod,
-                                                  /*fromMigrate=*/false);
-                                  wuow.commit();
-                                  return Status::OK();
-                              });
+            if (!collection.exists()) {
+                str::stream ss;
+                ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
+                return Status(ErrorCodes::NamespaceNotFound, ss);
+            }
+
+            WriteUnitOfWork wuow(opCtx);
+            Helpers::update(opCtx,
+                            collection,
+                            filter,
+                            updateMod,
+                            /*fromMigrate=*/false);
+            wuow.commit();
+            return Status::OK();
+        });
 }
 
 }  // namespace

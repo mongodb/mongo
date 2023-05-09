@@ -47,6 +47,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -145,38 +146,43 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
                               RecoveryDocument::ChangeType change,
                               const WriteConcernOptions& writeConcern) {
     try {
-        // Use boost::optional so we can release the locks early
-        boost::optional<AutoGetDb> autoGetDb;
-        autoGetDb.emplace(opCtx, NamespaceString::kServerConfigurationNamespace.dbName(), MODE_X);
+        {
+            auto collection = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(
+                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
+                    PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                    repl::ReadConcernArgs::get(opCtx),
+                    AcquisitionPrerequisites::kWrite),
+                MODE_X);
 
-        const auto configOpTime = [&]() {
-            const auto vcTime = VectorClock::get(opCtx)->getTime();
-            const auto vcConfigTimeTs = vcTime.configTime().asTimestamp();
-            return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
-        }();
+            const auto configOpTime = [&]() {
+                const auto vcTime = VectorClock::get(opCtx)->getTime();
+                const auto vcConfigTimeTs = vcTime.configTime().asTimestamp();
+                return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
+            }();
 
-        BSONObj updateObj = RecoveryDocument::createChangeObj(configOpTime, change);
+            BSONObj updateObj = RecoveryDocument::createChangeObj(configOpTime, change);
 
-        LOGV2_DEBUG(22083,
-                    1,
-                    "Changing sharding recovery document {update}",
-                    "Changing sharding recovery document",
-                    "update"_attr = redact(updateObj));
+            LOGV2_DEBUG(22083,
+                        1,
+                        "Changing sharding recovery document {update}",
+                        "Changing sharding recovery document",
+                        "update"_attr = redact(updateObj));
 
-        auto updateReq = UpdateRequest();
-        updateReq.setNamespaceString(NamespaceString::kServerConfigurationNamespace);
-        updateReq.setQuery(RecoveryDocument::getQuery());
-        updateReq.setUpdateModification(
-            write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
-        updateReq.setUpsert();
+            auto updateReq = UpdateRequest();
+            updateReq.setNamespaceString(NamespaceString::kServerConfigurationNamespace);
+            updateReq.setQuery(RecoveryDocument::getQuery());
+            updateReq.setUpdateModification(
+                write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
+            updateReq.setUpsert();
 
-        UpdateResult result = update(opCtx, autoGetDb->ensureDbExists(opCtx), updateReq);
-        invariant(result.numDocsModified == 1 || !result.upsertedId.isEmpty());
-        invariant(result.numMatched <= 1);
+            UpdateResult result = update(opCtx, collection, updateReq);
+            invariant(result.numDocsModified == 1 || !result.upsertedId.isEmpty());
+            invariant(result.numMatched <= 1);
+        }
 
-        // Wait until the majority write concern has been satisfied, but do it outside of lock
-        autoGetDb = boost::none;
-
+        // Wait for write concern after having released the locks.
         WriteConcernResult writeConcernResult;
         return waitForWriteConcern(opCtx,
                                    repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),

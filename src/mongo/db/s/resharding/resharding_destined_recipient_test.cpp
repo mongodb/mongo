@@ -43,6 +43,7 @@
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -277,8 +278,11 @@ protected:
                    const BSONObj& filter,
                    const BSONObj& update,
                    const ReshardingEnv& env) {
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
-        Helpers::update(opCtx, nss, filter, update);
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        Helpers::update(opCtx, coll, filter, update);
     }
 
     void deleteDoc(OperationContext* opCtx,

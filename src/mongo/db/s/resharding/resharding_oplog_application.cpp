@@ -152,7 +152,7 @@ Status ReshardingOplogApplicationRules::applyOperation(
 
             const auto outputDb = AutoGetDb(opCtx, _outputNss.dbName(), MODE_IX);
 
-            const auto outputColl =
+            auto outputColl =
                 opCtx->runWithDeadline(getDeadline(opCtx), opCtx->getTimeoutError(), [&] {
                     return acquireCollection(
                         opCtx,
@@ -167,7 +167,7 @@ Status ReshardingOplogApplicationRules::applyOperation(
                               << _outputNss.toStringForErrorMsg(),
                 outputColl.exists());
 
-            const auto stashColl =
+            auto stashColl =
                 opCtx->runWithDeadline(getDeadline(opCtx), opCtx->getTimeoutError(), [&] {
                     return acquireCollection(
                         opCtx,
@@ -185,20 +185,12 @@ Status ReshardingOplogApplicationRules::applyOperation(
             auto opType = op.getOpType();
             switch (opType) {
                 case repl::OpTypeEnum::kInsert:
-                    _applyInsert_inlock(opCtx,
-                                        outputDb.getDb(),
-                                        outputColl.getCollectionPtr(),
-                                        stashColl.getCollectionPtr(),
-                                        op);
+                    _applyInsert_inlock(opCtx, outputColl, stashColl, op);
                     _applierMetrics->onInsertApplied();
 
                     break;
                 case repl::OpTypeEnum::kUpdate:
-                    _applyUpdate_inlock(opCtx,
-                                        outputDb.getDb(),
-                                        outputColl.getCollectionPtr(),
-                                        stashColl.getCollectionPtr(),
-                                        op);
+                    _applyUpdate_inlock(opCtx, outputColl, stashColl, op);
                     _applierMetrics->onUpdateApplied();
                     break;
                 case repl::OpTypeEnum::kDelete: {
@@ -241,9 +233,8 @@ Status ReshardingOplogApplicationRules::applyOperation(
 }
 
 void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCtx,
-                                                          Database* db,
-                                                          const CollectionPtr& outputColl,
-                                                          const CollectionPtr& stashColl,
+                                                          ScopedCollectionAcquisition& outputColl,
+                                                          ScopedCollectionAcquisition& stashColl,
                                                           const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary insert operations are as follows:
@@ -276,7 +267,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and run a replacement update on the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, stashColl, idQuery);
+    auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
         request.setNamespaceString(_myStashNss);
@@ -285,7 +276,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         request.setUpsert(false);
         request.setFromOplogApplication(true);
 
-        UpdateResult ur = update(opCtx, db, request);
+        UpdateResult ur = update(opCtx, stashColl, request);
         invariant(ur.numMatched != 0);
 
         _applierMetrics->onWriteToStashCollections();
@@ -296,11 +287,12 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
     // Query the output collection for a doc with _id == [op _id]. If a doc does not exist, apply
     // rule #2 and insert this doc into the output collection.
     BSONObj outputCollDoc;
-    auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx, outputColl, idQuery, outputCollDoc);
+    auto foundDoc = Helpers::findByIdAndNoopUpdate(
+        opCtx, outputColl.getCollectionPtr(), idQuery, outputCollDoc);
 
     if (!foundDoc) {
         uassertStatusOK(collection_internal::insertDocument(opCtx,
-                                                            outputColl,
+                                                            outputColl.getCollectionPtr(),
                                                             InsertStatement(oField),
                                                             nullptr /* OpDebug */,
                                                             false /* fromMigrate */));
@@ -323,7 +315,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         request.setUpsert(false);
         request.setFromOplogApplication(true);
 
-        UpdateResult ur = update(opCtx, db, request);
+        UpdateResult ur = update(opCtx, outputColl, request);
         invariant(ur.numMatched != 0);
 
         return;
@@ -331,16 +323,18 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // The doc does not belong to '_donorShardId' under the original shard key, so apply rule #4
     // and insert the contents of 'op' to the stash collection.
-    uassertStatusOK(collection_internal::insertDocument(
-        opCtx, stashColl, InsertStatement(oField), nullptr /* OpDebug */, false /* fromMigrate */));
+    uassertStatusOK(collection_internal::insertDocument(opCtx,
+                                                        stashColl.getCollectionPtr(),
+                                                        InsertStatement(oField),
+                                                        nullptr /* OpDebug */,
+                                                        false /* fromMigrate */));
 
     _applierMetrics->onWriteToStashCollections();
 }
 
 void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCtx,
-                                                          Database* db,
-                                                          const CollectionPtr& outputColl,
-                                                          const CollectionPtr& stashColl,
+                                                          ScopedCollectionAcquisition& outputColl,
+                                                          ScopedCollectionAcquisition& stashColl,
                                                           const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary update operations are as follows:
@@ -375,7 +369,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and update the doc from the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, stashColl, idQuery);
+    auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
         request.setNamespaceString(_myStashNss);
@@ -383,7 +377,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
         request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
-        UpdateResult ur = update(opCtx, db, request);
+        UpdateResult ur = update(opCtx, stashColl, request);
 
         invariant(ur.numMatched != 0);
 
@@ -394,7 +388,8 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
 
     // Query the output collection for a doc with _id == [op _id].
     BSONObj outputCollDoc;
-    auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx, outputColl, idQuery, outputCollDoc);
+    auto foundDoc = Helpers::findByIdAndNoopUpdate(
+        opCtx, outputColl.getCollectionPtr(), idQuery, outputCollDoc);
 
     if (!foundDoc ||
         !_sourceChunkMgr.keyBelongsToShard(
@@ -416,7 +411,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
     request.setUpdateModification(std::move(updateMod));
     request.setUpsert(false);
     request.setFromOplogApplication(true);
-    UpdateResult ur = update(opCtx, db, request);
+    UpdateResult ur = update(opCtx, outputColl, request);
 
     invariant(ur.numMatched != 0);
 }

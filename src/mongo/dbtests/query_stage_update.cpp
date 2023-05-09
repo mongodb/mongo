@@ -52,6 +52,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -190,12 +191,15 @@ public:
     void run() {
         // Run the update.
         {
-            dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            ASSERT(collection.exists());
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            CollectionPtr collection = ctx.getCollection();
-            ASSERT(collection);
 
             // Collection should be empty.
             ASSERT_EQUALS(0U, count(BSONObj()));
@@ -254,7 +258,12 @@ public:
     void run() {
         // Run the update.
         {
-            dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            ASSERT(collection.exists());
 
             // Populate the collection.
             for (int i = 0; i < 10; ++i) {
@@ -265,13 +274,10 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            CollectionPtr coll(
-                CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss));
-            ASSERT(coll);
 
             // Get the RecordIds that would be returned by an in-order scan.
             vector<RecordId> recordIds;
-            getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+            getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
             auto request = UpdateRequest();
             request.setNamespaceString(nss);
@@ -304,10 +310,10 @@ public:
 
             auto ws = make_unique<WorkingSet>();
             auto cs = make_unique<CollectionScan>(
-                _expCtx.get(), coll, collScanParams, ws.get(), cq->root());
+                _expCtx.get(), collection.getCollectionPtr(), collScanParams, ws.get(), cq->root());
 
-            auto updateStage =
-                make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, cs.release());
+            auto updateStage = make_unique<UpdateStage>(
+                _expCtx.get(), updateParams, ws.get(), collection, cs.release());
 
             const UpdateStats* stats =
                 static_cast<const UpdateStats*>(updateStage->getSpecificStats());
@@ -322,10 +328,12 @@ public:
 
             // Remove recordIds[targetDocIndex];
             static_cast<PlanStage*>(updateStage.get())->saveState();
-            BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
+            BSONObj targetDoc =
+                collection.getCollectionPtr()->docFor(&_opCtx, recordIds[targetDocIndex]).value();
             ASSERT(!targetDoc.isEmpty());
             remove(targetDoc);
-            static_cast<PlanStage*>(updateStage.get())->restoreState(&coll);
+            static_cast<PlanStage*>(updateStage.get())
+                ->restoreState(&collection.getCollectionPtr());
 
             // Do the remaining updates.
             while (!updateStage->isEOF()) {
@@ -374,10 +382,12 @@ public:
         ASSERT_EQUALS(10U, count(BSONObj()));
 
         // Various variables we'll need.
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        ASSERT(collection.exists());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);
         UpdateDriver driver(_expCtx);
@@ -388,7 +398,7 @@ public:
 
         // Get the RecordIds that would be returned by an in-order scan.
         vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+        getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
         request.setQuery(query);
@@ -419,8 +429,8 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        const auto updateStage =
-            make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, qds.release());
+        const auto updateStage = make_unique<UpdateStage>(
+            _expCtx.get(), updateParams, ws.get(), collection, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;
@@ -444,7 +454,7 @@ public:
         // Should have done the update.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
         vector<BSONObj> objs;
-        getCollContents(coll, &objs);
+        getCollContents(collection.getCollectionPtr(), &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.
@@ -467,10 +477,12 @@ public:
         ASSERT_EQUALS(50U, count(BSONObj()));
 
         // Various variables we'll need.
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        ASSERT(collection.exists());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);
         UpdateDriver driver(_expCtx);
@@ -481,7 +493,7 @@ public:
 
         // Get the RecordIds that would be returned by an in-order scan.
         vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+        getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
         request.setQuery(query);
@@ -512,8 +524,8 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        auto updateStage =
-            make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, qds.release());
+        auto updateStage = make_unique<UpdateStage>(
+            _expCtx.get(), updateParams, ws.get(), collection, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;
@@ -537,7 +549,7 @@ public:
 
         // Should have done the update.
         vector<BSONObj> objs;
-        getCollContents(coll, &objs);
+        getCollContents(collection.getCollectionPtr(), &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.

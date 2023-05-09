@@ -338,7 +338,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    VariantCollectionPtrOrAcquisition collection,
+    const ScopedCollectionAcquisition& coll,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     UpdateStageParams::DocumentCounter&& documentCounter = nullptr);

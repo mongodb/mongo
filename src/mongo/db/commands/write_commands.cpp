@@ -591,7 +591,7 @@ public:
             uassertStatusOK(parsedUpdate.parseRequest());
 
             auto exec = uassertStatusOK(getExecutorUpdate(
-                &CurOp::get(opCtx)->debug(), &collection, &parsedUpdate, verbosity));
+                &CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(exec.get(),
                                    collection.getCollectionPtr(),

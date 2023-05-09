@@ -425,11 +425,18 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // Permit writing to the oplog before we step up to primary.
                                AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
                                Lock::GlobalWrite globalWrite(opCtx);
+                               auto coll = acquireCollection(
+                                   opCtx,
+                                   CollectionAcquisitionRequest(
+                                       NamespaceString(NamespaceString::kSystemReplSetNamespace),
+                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       repl::ReadConcernArgs::get(opCtx),
+                                       AcquisitionPrerequisites::kWrite),
+                                   MODE_X);
                                {
                                    // Writes to 'local.system.replset' must be untimestamped.
                                    WriteUnitOfWork wuow(opCtx);
-                                   Helpers::putSingleton(
-                                       opCtx, NamespaceString::kSystemReplSetNamespace, config);
+                                   Helpers::putSingleton(opCtx, coll, config);
                                    wuow.commit();
                                }
                                {
@@ -592,8 +599,15 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                 {
                     // Writes to 'local.system.replset' must be untimestamped.
                     WriteUnitOfWork wuow(opCtx);
-                    AutoGetCollection coll(opCtx, NamespaceString::kSystemReplSetNamespace, MODE_X);
-                    Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
+                    auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest(
+                            NamespaceString(NamespaceString::kSystemReplSetNamespace),
+                            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                            repl::ReadConcernArgs::get(opCtx),
+                            AcquisitionPrerequisites::kWrite),
+                        MODE_X);
+                    Helpers::putSingleton(opCtx, coll, config);
                     wuow.commit();
                 }
 
@@ -622,7 +636,7 @@ Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
     writeConflictRetry(
         opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
-            const auto coll =
+            auto coll =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       NamespaceString(NamespaceString::kSystemReplSetNamespace),
@@ -631,7 +645,7 @@ Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_X);
             Helpers::emptyCollection(opCtx, coll);
-            Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
+            Helpers::putSingleton(opCtx, coll, config);
             wuow.commit();
         });
     return Status::OK();
@@ -652,21 +666,26 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
 
     // Make sure there's always a last vote document.
     try {
-        writeConflictRetry(
-            opCtx,
-            "create initial replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [opCtx] {
-                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_X);
-                BSONObj result;
-                bool exists =
-                    Helpers::getSingleton(opCtx, NamespaceString::kLastVoteNamespace, result);
-                if (!exists) {
-                    LastVote lastVote{OpTime::kInitialTerm, -1};
-                    Helpers::putSingleton(
-                        opCtx, NamespaceString::kLastVoteNamespace, lastVote.toBSON());
-                }
-            });
+        writeConflictRetry(opCtx,
+                           "create initial replica set lastVote",
+                           NamespaceString::kLastVoteNamespace.toString(),
+                           [opCtx] {
+                               auto coll = acquireCollection(
+                                   opCtx,
+                                   CollectionAcquisitionRequest(
+                                       NamespaceString(NamespaceString::kLastVoteNamespace),
+                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       repl::ReadConcernArgs::get(opCtx),
+                                       AcquisitionPrerequisites::kWrite),
+                                   MODE_X);
+
+                               BSONObj result;
+                               bool exists = Helpers::getSingleton(opCtx, coll.nss(), result);
+                               if (!exists) {
+                                   LastVote lastVote{OpTime::kInitialTerm, -1};
+                                   Helpers::putSingleton(opCtx, coll, lastVote.toBSON());
+                               }
+                           });
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -730,7 +749,14 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                 ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
                     opCtx->lockState());
 
-                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_IX);
+                auto coll =
+                    acquireCollection(opCtx,
+                                      CollectionAcquisitionRequest(
+                                          NamespaceString(NamespaceString::kLastVoteNamespace),
+                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          repl::ReadConcernArgs::get(opCtx),
+                                          AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
                 WriteUnitOfWork wunit(opCtx);
 
                 // We only want to replace the last vote document if the new last vote document
@@ -747,7 +773,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                     return oldLastVoteDoc.getStatus();
                 }
                 if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
-                    Helpers::putSingleton(opCtx, NamespaceString::kLastVoteNamespace, lastVoteObj);
+                    Helpers::putSingleton(opCtx, coll, lastVoteObj);
                 }
                 wunit.commit();
                 return Status::OK();

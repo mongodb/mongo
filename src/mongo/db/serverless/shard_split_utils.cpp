@@ -154,7 +154,13 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
 
 Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc) {
     const auto nss = NamespaceString::kShardSplitDonorsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(nss),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "No longer primary while attempting to insert shard split"
@@ -166,7 +172,8 @@ Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
                                  << stateDoc.getId() << ShardSplitDonorDocument::kExpireAtFieldName
                                  << BSON("$exists" << false));
         const auto updateMod = BSON("$setOnInsert" << stateDoc.toBSON());
-        auto updateResult = Helpers::upsert(opCtx, nss, filter, updateMod, /*fromMigrate=*/false);
+        auto updateResult =
+            Helpers::upsert(opCtx, collection, filter, updateMod, /*fromMigrate=*/false);
 
         invariant(!updateResult.numDocsModified);
         if (updateResult.upsertedId.isEmpty()) {
@@ -180,15 +187,22 @@ Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
 
 Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc) {
     const auto nss = NamespaceString::kShardSplitDonorsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(nss),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
-    if (!collection) {
+    if (!collection.exists()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
 
     return writeConflictRetry(opCtx, "updateShardSplitStateDoc", nss.ns(), [&]() -> Status {
-        auto updateResult = Helpers::upsert(opCtx, nss, stateDoc.toBSON(), /*fromMigrate=*/false);
+        auto updateResult =
+            Helpers::upsert(opCtx, collection, stateDoc.toBSON(), /*fromMigrate=*/false);
         if (updateResult.numMatched == 0) {
             return {ErrorCodes::NoSuchKey,
                     str::stream() << "Existing shard split state document not found for id: "

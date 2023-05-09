@@ -150,7 +150,7 @@ Status _applyOps(OperationContext* opCtx,
                         }
                     }
 
-                    const auto collection = acquireCollection(
+                    auto collection = acquireCollection(
                         opCtx,
                         CollectionAcquisitionRequest(nss,
                                                      AcquisitionPrerequisites::kPretendUnsharded,
@@ -177,7 +177,6 @@ Status _applyOps(OperationContext* opCtx,
                     // application in the future.
                     const bool isDataConsistent = true;
                     return repl::applyOperation_inlock(opCtx,
-                                                       ctx.db(),
                                                        collection,
                                                        ApplierOperation{&entry},
                                                        alwaysUpsert,

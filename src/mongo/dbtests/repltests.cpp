@@ -244,7 +244,7 @@ protected:
                 uassertStatusOK(applyCommand_inlock(
                     &_opCtx, ApplierOperation{&entry}, getOplogApplicationMode()));
             } else {
-                const auto coll = acquireCollection(
+                auto coll = acquireCollection(
                     &_opCtx, {nss(), {}, {}, AcquisitionPrerequisites::kWrite}, MODE_IX);
                 WriteUnitOfWork wunit(&_opCtx);
                 auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
@@ -254,7 +254,6 @@ protected:
                 ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
                 const bool dataIsConsistent = true;
                 uassertStatusOK(applyOperation_inlock(&_opCtx,
-                                                      ctx.db(),
                                                       coll,
                                                       ApplierOperation{&entry},
                                                       false,

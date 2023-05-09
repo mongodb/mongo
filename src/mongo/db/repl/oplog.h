@@ -242,8 +242,7 @@ void logOplogConstraintViolation(OperationContext* opCtx,
  * Returns failure status if the op was an update that could not be applied.
  */
 Status applyOperation_inlock(OperationContext* opCtx,
-                             Database* db,
-                             const ScopedCollectionAcquisition& collectionAcquisition,
+                             ScopedCollectionAcquisition& collectionAcquisition,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,

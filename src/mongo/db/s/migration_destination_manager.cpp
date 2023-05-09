@@ -1731,11 +1731,17 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
             totalDocs++;
-            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            auto collection = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(_nss,
+                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite),
+                MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.toStringForErrorMsg()
                                   << " was dropped in the middle of the migration",
-                    autoColl.getCollection());
+                    collection.exists());
 
             BSONObj updatedDoc = i.next().Obj();
 
@@ -1765,7 +1771,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
             // We are in write lock here, so sure we aren't killing
             writeConflictRetry(opCtx, "transferModsUpdates", _nss.ns(), [&] {
-                auto res = Helpers::upsert(opCtx, _nss, updatedDoc, true);
+                auto res = Helpers::upsert(opCtx, collection, updatedDoc, true);
                 if (!res.upsertedId.isEmpty()) {
                     changeInOrphans++;
                 }

@@ -199,14 +199,14 @@ public:
      * Returns whether the acquisition found a collection or the collection didn't exist.
      */
     bool exists() const {
-        return bool(_acquiredCollection.prerequisites.uuid);
+        return bool(_acquiredCollection.collectionPtr);
     }
 
     /**
      * Returns the UUID of the acquired collection, but this operation is only allowed if the
      * collection `exists()`, otherwise this method will invariant.
      */
-    const UUID& uuid() const;
+    UUID uuid() const;
 
     // Access to services associated with the specified collection top to bottom on the hierarchical
     // stack
@@ -217,10 +217,7 @@ public:
     const boost::optional<ScopedCollectionFilter>& getShardingFilter() const;
 
     // Local catalog services
-
-    const CollectionPtr& getCollectionPtr() const {
-        return _acquiredCollection.collectionPtr;
-    }
+    const CollectionPtr& getCollectionPtr() const;
 
 private:
     friend class ScopedLocalCatalogWriteFence;

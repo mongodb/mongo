@@ -56,7 +56,13 @@ namespace tenantMigrationRecipientEntryHelpers {
 
 Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc) {
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(nss),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Sanity check
     uassert(ErrorCodes::PrimarySteppedDown,
@@ -76,7 +82,7 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
                                      << BSON("$exists" << false));
             const auto updateMod = BSON("$setOnInsert" << stateDoc.toBSON());
             auto updateResult =
-                Helpers::upsert(opCtx, nss, filter, updateMod, /*fromMigrate=*/false);
+                Helpers::upsert(opCtx, collection, filter, updateMod, /*fromMigrate=*/false);
 
             // '$setOnInsert' update operator can no way modify the existing on-disk state doc.
             invariant(!updateResult.numDocsModified);
@@ -93,9 +99,15 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
 
 Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc) {
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString(nss),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
-    if (!collection) {
+    if (!collection.exists()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
@@ -103,7 +115,7 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
     return writeConflictRetry(
         opCtx, "updateTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
             auto updateResult =
-                Helpers::upsert(opCtx, nss, stateDoc.toBSON(), /*fromMigrate=*/false);
+                Helpers::upsert(opCtx, collection, stateDoc.toBSON(), /*fromMigrate=*/false);
             if (updateResult.numMatched == 0) {
                 return {ErrorCodes::NoSuchKey,
                         str::stream()

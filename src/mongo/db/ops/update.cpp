@@ -56,51 +56,48 @@
 
 namespace mongo {
 
-UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request) {
-    invariant(db);
-
+UpdateResult update(OperationContext* opCtx,
+                    ScopedCollectionAcquisition& coll,
+                    const UpdateRequest& request) {
     // Explain should never use this helper.
     invariant(!request.explain());
 
     const NamespaceString& nsString = request.getNamespaceString();
     invariant(opCtx->lockState()->isCollectionLockedForMode(nsString, MODE_IX));
 
-    CollectionPtr collection;
-
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.
     writeConflictRetry(opCtx, "createCollection", nsString.ns(), [&] {
-        collection = CollectionPtr(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
-        if (collection || !request.isUpsert()) {
-            return;
-        }
+        if (!coll.exists() && request.isUpsert()) {
+            const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+                !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString);
 
-        const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString);
-
-        if (userInitiatedWritesAndNotPrimary) {
-            uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
-                                   str::stream()
-                                       << "Not primary while creating collection "
-                                       << nsString.toStringForErrorMsg() << " during upsert"));
+            if (userInitiatedWritesAndNotPrimary) {
+                uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
+                                       str::stream()
+                                           << "Not primary while creating collection "
+                                           << nsString.toStringForErrorMsg() << " during upsert"));
+            }
+            WriteUnitOfWork wuow(opCtx);
+            ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &coll);
+            auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, coll.nss().dbName());
+            auto newCollectionPtr = db->createCollection(opCtx, nsString, CollectionOptions());
+            invariant(newCollectionPtr);
+            wuow.commit();
         }
-        WriteUnitOfWork wuow(opCtx);
-        collection = CollectionPtr(db->createCollection(opCtx, nsString, CollectionOptions()));
-        invariant(collection);
-        wuow.commit();
     });
 
-    collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
+    // If this is an upsert, at this point the collection must exist.
+    invariant(coll.exists() || !request.isUpsert());
 
     // Parse the update, get an executor for it, run the executor, get stats out.
     const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-    ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, collection);
+    ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, coll.getCollectionPtr());
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;
     auto exec = uassertStatusOK(
-        getExecutorUpdate(nullOpDebug, &collection, &parsedUpdate, boost::none /* verbosity */));
+        getExecutorUpdate(nullOpDebug, coll, &parsedUpdate, boost::none /* verbosity */));
 
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     BSONObj image;

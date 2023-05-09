@@ -79,16 +79,14 @@ public:
 private:
     // Applies an insert operation
     void _applyInsert_inlock(OperationContext* opCtx,
-                             Database* db,
-                             const CollectionPtr& outputColl,
-                             const CollectionPtr& stashColl,
+                             ScopedCollectionAcquisition& outputColl,
+                             ScopedCollectionAcquisition& stashColl,
                              const repl::OplogEntry& op) const;
 
     // Applies an update operation
     void _applyUpdate_inlock(OperationContext* opCtx,
-                             Database* db,
-                             const CollectionPtr& outputColl,
-                             const CollectionPtr& stashColl,
+                             ScopedCollectionAcquisition& outputColl,
+                             ScopedCollectionAcquisition& stashColl,
                              const repl::OplogEntry& op) const;
 
     // Applies a delete operation

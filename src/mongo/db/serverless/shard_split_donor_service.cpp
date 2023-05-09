@@ -43,6 +43,7 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/serverless/shard_split_statistics.h"
 #include "mongo/db/serverless/shard_split_utils.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/executor/cancelable_executor.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -881,13 +882,20 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
                auto opCtx = opCtxHolder.get();
 
-               AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
+               auto collection =
+                   acquireCollection(opCtx,
+                                     CollectionAcquisitionRequest(
+                                         _stateDocumentsNS,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite),
+                                     MODE_IX);
 
                if (!isInsert) {
                    uassert(ErrorCodes::NamespaceNotFound,
                            str::stream()
                                << _stateDocumentsNS.toStringForErrorMsg() << " does not exist",
-                           collection);
+                           collection.exists());
                }
 
                writeConflictRetry(
@@ -951,7 +959,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                                const auto filter =
                                    BSON(ShardSplitDonorDocument::kIdFieldName << uuid);
                                auto updateResult = Helpers::upsert(opCtx,
-                                                                   _stateDocumentsNS,
+                                                                   collection,
                                                                    filter,
                                                                    updatedStateDocBson,
                                                                    /*fromMigrate=*/false);
@@ -967,7 +975,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
 
                            const auto originalRecordId =
                                Helpers::findOne(opCtx,
-                                                collection.getCollection(),
+                                                collection.getCollectionPtr(),
                                                 BSON("_id" << originalStateDocBson["_id"]));
                            const auto originalSnapshot = Snapshotted<BSONObj>(
                                opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
@@ -980,7 +988,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
 
                            collection_internal::updateDocument(
                                opCtx,
-                               *collection,
+                               collection.getCollectionPtr(),
                                originalRecordId,
                                originalSnapshot,
                                updatedStateDocBson,

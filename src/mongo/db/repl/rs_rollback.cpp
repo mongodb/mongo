@@ -1778,7 +1778,7 @@ void syncFixUp(OperationContext* opCtx,
                     request.setGod();
                     request.setUpsert();
 
-                    update(opCtx, ctx.db(), request);
+                    update(opCtx, collection, request);
                 }
             } catch (const DBException& e) {
                 LOGV2(21713,

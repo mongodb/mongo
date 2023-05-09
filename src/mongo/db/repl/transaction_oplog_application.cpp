@@ -124,20 +124,15 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             // Presently, it is not allowed to run a prepared transaction with a command
             // inside. TODO(SERVER-46105)
             invariant(!op.isCommand());
-            const auto coll = acquireCollection(
+            auto coll = acquireCollection(
                 opCtx,
                 CollectionAcquisitionRequest(op.getNss(),
                                              AcquisitionPrerequisites::kPretendUnsharded,
                                              repl::ReadConcernArgs::get(opCtx),
                                              AcquisitionPrerequisites::kWrite),
                 MODE_IX);
-            const auto db = [opCtx, &coll]() {
-                AutoGetDb autoDb(opCtx, coll.nss().dbName(), MODE_IX);
-                return autoDb.getDb();
-            }();
             const bool isDataConsistent = true;
             auto status = repl::applyOperation_inlock(opCtx,
-                                                      db,
                                                       coll,
                                                       ApplierOperation{&op},
                                                       false /*alwaysUpsert*/,

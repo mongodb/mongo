@@ -531,13 +531,21 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
         const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
         writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss.ns(), [&] {
             opCtx->recoveryUnit()->allowOneUntimestampedWrite();
-            AutoGetCollection collection(opCtx, nss, MODE_IX);
+            auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString(nss),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
             auto filter = BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON());
             UnreplicatedWritesBlock uwb(opCtx);
             // Perform an untimestamped write so that it will not be rolled back on recovering
             // to the 'stableTimestamp' if we were to crash. This is safe because this update is
             // meant to be consistent with the 'stableTimestamp' and not the common point.
-            Helpers::upsert(opCtx, nss, filter, sessionTxnRecord.toBSON(), /*fromMigrate=*/false);
+            Helpers::upsert(
+                opCtx, collection, filter, sessionTxnRecord.toBSON(), /*fromMigrate=*/false);
         });
     }
     // Take a stable checkpoint so that writes to the 'config.transactions' table are

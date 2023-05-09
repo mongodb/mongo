@@ -96,6 +96,21 @@ struct AcquisitionPrerequisites {
 namespace shard_role_details {
 
 struct AcquiredCollection {
+    AcquiredCollection(AcquisitionPrerequisites prerequisites,
+                       std::shared_ptr<Lock::DBLock> dbLock,
+                       boost::optional<Lock::CollectionLock> collectionLock,
+                       boost::optional<ScopedCollectionDescription> collectionDescription,
+                       boost::optional<ScopedCollectionFilter> ownershipFilter,
+                       CollectionPtr collectionPtr)
+        : prerequisites(std::move(prerequisites)),
+          dbLock(std::move(dbLock)),
+          collectionLock(std::move(collectionLock)),
+          collectionDescription(std::move(collectionDescription)),
+          ownershipFilter(std::move(ownershipFilter)),
+          collectionPtr(std::move(collectionPtr)),
+          invalidated(false),
+          sharedImpl(std::make_shared<SharedImpl>()) {}
+
     AcquisitionPrerequisites prerequisites;
 
     std::shared_ptr<Lock::DBLock> dbLock;
@@ -105,6 +120,18 @@ struct AcquiredCollection {
     boost::optional<ScopedCollectionFilter> ownershipFilter;
 
     CollectionPtr collectionPtr;
+
+    // Indicates whether this acquisition has been invalidated after a ScopedLocalCatalogWriteFence
+    // was unable to restore it on rollback.
+    bool invalidated;
+
+    // Used by the ScopedLocalCatalogWriteFence to track the lifetime of AcquiredCollection.
+    // ScopedLocalCatalogWriteFence will hold a weak_ptr pointing to 'sharedImpl'. The 'onRollback'
+    // handler it installs will use that weak_ptr to determine if the AcquiredCollection is still
+    // alive.
+    // TODO: (jordist) SERVER-XXXXX Rework this.
+    struct SharedImpl {};
+    std::shared_ptr<SharedImpl> sharedImpl;
 };
 
 struct AcquiredView {

@@ -122,7 +122,9 @@ struct Helpers {
      * Performs an upsert of "obj" into the collection "ns", with an empty update predicate.
      * Callers must have "ns" locked.
      */
-    static void putSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj obj);
+    static void putSingleton(OperationContext* opCtx,
+                             ScopedCollectionAcquisition& coll,
+                             BSONObj obj);
 
     /**
      * Callers are expected to hold the collection lock.
@@ -130,7 +132,7 @@ struct Helpers {
      * o has to have an _id field or will assert
      */
     static UpdateResult upsert(OperationContext* opCtx,
-                               const NamespaceString& nss,
+                               ScopedCollectionAcquisition& coll,
                                const BSONObj& o,
                                bool fromMigrate = false);
 
@@ -141,7 +143,7 @@ struct Helpers {
      * on the same storage snapshot.
      */
     static UpdateResult upsert(OperationContext* opCtx,
-                               const NamespaceString& nss,
+                               ScopedCollectionAcquisition& coll,
                                const BSONObj& filter,
                                const BSONObj& updateMod,
                                bool fromMigrate = false);
@@ -153,7 +155,7 @@ struct Helpers {
      * on the same storage snapshot.
      */
     static void update(OperationContext* opCtx,
-                       const NamespaceString& nss,
+                       ScopedCollectionAcquisition& coll,
                        const BSONObj& filter,
                        const BSONObj& updateMod,
                        bool fromMigrate = false);

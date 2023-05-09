@@ -466,7 +466,6 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                     bool shouldAlwaysUpsert = !oplogApplicationEnforcesSteadyStateConstraints &&
                         oplogApplicationMode == OplogApplication::Mode::kSecondary;
                     Status status = applyOperation_inlock(opCtx,
-                                                          db,
                                                           *coll,
                                                           entryOrGroupedInserts,
                                                           shouldAlwaysUpsert,

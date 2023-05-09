@@ -49,6 +49,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
@@ -6230,9 +6231,11 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     // Update `2` to increment its `value` to 2. This must be done in the same split session as the
     // insert.
     callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
-        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
-        Helpers::update(
-            opCtx, userColl->ns(), BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
+        auto userColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        Helpers::update(opCtx, userColl, BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
     });
 
     // Mimic the methods to call for a secondary performing a split prepare. Those are called inside

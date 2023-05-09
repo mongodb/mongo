@@ -95,7 +95,7 @@ public:
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
-                const CollectionPtr& collection,
+                const ScopedCollectionAcquisition& collection,
                 PlanStage* child);
 
     bool isEOF() override;
@@ -117,7 +117,7 @@ protected:
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
-                const CollectionPtr& collection);
+                const ScopedCollectionAcquisition& collection);
 
     void doSaveStateRequiresCollection() final {
         _preWriteFilter.saveState();
