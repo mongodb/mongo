@@ -225,7 +225,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         }
 
         invariant(PlanExecutor::ADVANCED == state);
-        ShardingStatistics::get(opCtx).countDocsDeletedOnDonor.addAndFetch(1);
+        ShardingStatistics::get(opCtx).countDocsDeletedByRangeDeleter.addAndFetch(1);
 
     } while (++numDeleted < numDocsToRemovePerBatch);
 

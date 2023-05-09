@@ -18,7 +18,7 @@ function ShardStat() {
     this.countRecipientMoveChunkStarted = 0;
     this.countDocsClonedOnRecipient = 0;
     this.countDocsClonedOnDonor = 0;
-    this.countDocsDeletedOnDonor = 0;
+    this.countDocsDeletedByRangeDeleter = 0;
 }
 
 function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
@@ -26,11 +26,14 @@ function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
     donor.countDocsClonedOnDonor += numDocs;
     ++recipient.countRecipientMoveChunkStarted;
     recipient.countDocsClonedOnRecipient += numDocs;
-    donor.countDocsDeletedOnDonor += numDocs;
+    donor.countDocsDeletedByRangeDeleter += numDocs;
     const statsFromServerStatus = shardArr.map(function(shardVal) {
         return shardVal.getDB('admin').runCommand({serverStatus: 1}).shardingStatistics;
     });
     for (let i = 0; i < shardArr.length; ++i) {
+        let countDocsDeleted = statsFromServerStatus[i].hasOwnProperty('countDocsDeletedOnDonor')
+            ? statsFromServerStatus[i].countDocsDeletedOnDonor
+            : statsFromServerStatus[i].countDocsDeletedByRangeDeleter;
         assert(statsFromServerStatus[i]);
         assert(statsFromServerStatus[i].countStaleConfigErrors);
         assert(statsFromServerStatus[i].totalCriticalSectionCommitTimeMillis);
@@ -43,8 +46,7 @@ function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
         assert.eq(stats[i].countDocsClonedOnRecipient,
                   statsFromServerStatus[i].countDocsClonedOnRecipient);
         assert.eq(stats[i].countDocsClonedOnDonor, statsFromServerStatus[i].countDocsClonedOnDonor);
-        assert.eq(stats[i].countDocsDeletedOnDonor,
-                  statsFromServerStatus[i].countDocsDeletedOnDonor);
+        assert.eq(stats[i].countDocsDeletedByRangeDeleter, countDocsDeleted);
         assert.eq(stats[i].countRecipientMoveChunkStarted,
                   statsFromServerStatus[i].countRecipientMoveChunkStarted);
     }
