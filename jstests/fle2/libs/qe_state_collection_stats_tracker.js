@@ -148,4 +148,92 @@ class QEStateCollectionStatsTracker {
 
         return totals;
     }
+
+    _calculateEstimatedEmuBinaryReads(nAnchors, nNonAnchors, hasNullAnchor, escSize) {
+        let total = 0;
+
+        // anchor binary hops
+        //
+        total += 1;  // null anchor read for lambda
+        let rho = 2;
+        if (nAnchors > 0) {
+            rho = Math.pow(2, Math.floor(Math.log2(nAnchors)) + 1);
+        }
+        total += Math.log2(rho);           // # reads to find rho
+        total += Math.log2(rho);           // # reads in the binary search iterations
+        total += (nAnchors == 0 ? 1 : 0);  // extra read if no anchors exist
+
+        // binary hops
+        //
+        total += (nAnchors > 0 || hasNullAnchor) ? 1 : 0;  // anchor read for lambda
+        rho = Math.max(2, escSize);
+        total += 1;                           // estimated # of reads to find final value of rho
+        total += Math.ceil(Math.log2(rho));   // estimated # of binary search iterations
+        total += (nNonAnchors == 0 ? 1 : 0);  // extra read if no non-anchors exist
+        return total;
+    }
+
+    /**
+     * Returns a lower-bound on how many ESC reads will be performed if a
+     * cleanup is performed on the current encrypted collection state.
+     * NOTE: call this *before* calling cleanup and before updating the tracker
+     *       with updateStatsPostCleanupForFields.
+     *
+     * @param  {string} keys list of field names that have been added to the encrypted collection
+     * @returns {int}
+     */
+    calculateEstimatedESCReadCountForCleanup(...keys) {
+        let totals = this.calculateTotalStatsForFields(keys);
+        let estimate = 0;
+
+        estimate += totals.escNonAnchors;  // # of reads into in-mem delete set
+
+        keys.forEach(key => {
+            if (!this.fieldStats.hasOwnProperty(key)) {
+                return;
+            }
+            const field = this.fieldStats[key];
+            Object.entries(field).forEach(([value, stats]) => {
+                if (stats.ecoc == 0) {
+                    return;  // value not compacted
+                }
+                estimate += 1;  // null anchor read
+                estimate += this._calculateEstimatedEmuBinaryReads(
+                    stats.anchors, stats.nonAnchors, stats.nullAnchor, totals.esc);
+            });
+        });
+        return estimate;
+    }
+
+    /**
+     * Returns a lower-bound on how many ESC reads will be performed if a
+     * compact is performed on the current encrypted collection state.
+     * NOTE: call this *before* calling compact and before updating the tracker
+     *       with updateStatsPostCompactForFields.
+     *
+     * @param  {string} keys list of field names that have been added to the encrypted collection
+     * @returns {int}
+     */
+    calculateEstimatedESCReadCountForCompact(...keys) {
+        let totals = this.calculateTotalStatsForFields(keys);
+        let estimate = 0;
+
+        estimate += totals.escNonAnchors;  // # of reads into in-mem delete set
+
+        keys.forEach(key => {
+            if (!this.fieldStats.hasOwnProperty(key)) {
+                return;
+            }
+            const field = this.fieldStats[key];
+            Object.entries(field).forEach(([value, stats]) => {
+                if (stats.ecoc == 0) {
+                    return;  // value not compacted
+                }
+                estimate += (stats.nullAnchor ? 1 : 0);  // null anchor read
+                estimate += this._calculateEstimatedEmuBinaryReads(
+                    stats.anchors, stats.nonAnchors, stats.nullAnchor, totals.esc);
+            });
+        });
+        return estimate;
+    }
 }
