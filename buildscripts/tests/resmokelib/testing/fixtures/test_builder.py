@@ -1,32 +1,13 @@
 """Unit tests for the resmokelib.testing.fixtures._builder module."""
 # pylint: disable=protected-access,invalid-name
 import unittest
-import filecmp
-import os
 from unittest.mock import MagicMock
 
 from buildscripts.resmokelib import logging, parser, config
 from buildscripts.resmokelib.core import network
 from buildscripts.resmokelib.testing.fixtures import _builder as under_test
 
-TEST_COMMIT = "1de5826097917875f48ca1ea4f2e53b40139f9ff"
-TEST_SUFFIX = "_unittest_suffix"
-TEST_RETRIEVE_DIR = os.path.join(under_test.RETRIEVE_DIR, TEST_SUFFIX)
 SET_PARAMS = "set_parameters"
-
-
-class TestRetrieveFixtures(unittest.TestCase):
-    """Class that test retrieve_fixtures methods."""
-
-    def test_retrieve_fixtures(self):
-        """function to test retrieve_fixtures"""
-        expected_standalone = os.path.join("buildscripts", "tests", "resmokelib", "testing",
-                                           "fixtures", "retrieved_fixture.txt")
-        under_test.retrieve_fixtures(TEST_RETRIEVE_DIR, TEST_COMMIT)
-        retrieved_standalone = os.path.join(TEST_RETRIEVE_DIR, "standalone.py")
-        self.assertTrue(
-            filecmp.cmpfiles(retrieved_standalone, expected_standalone,
-                             ["standalone.py", "retrieved_fixture.txt"], shallow=False))
 
 
 class TestGetPackageName(unittest.TestCase):
@@ -49,19 +30,11 @@ class TestBuildShardedCluster(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        under_test.retrieve_fixtures(TEST_RETRIEVE_DIR, TEST_COMMIT)
-        cls.original_constants["MULTIVERSION_CLASS_SUFFIX"] = under_test.MULTIVERSION_CLASS_SUFFIX
-        under_test.MULTIVERSION_CLASS_SUFFIX = TEST_SUFFIX
-
         cls.mock_logger = MagicMock(spec=logging.Logger)
         logging.loggers._FIXTURE_LOGGER_REGISTRY[cls.job_num] = cls.mock_logger
 
     def tearDown(self):
         network.PortAllocator.reset()
-
-    @classmethod
-    def tearDownClass(cls):
-        under_test.MULTIVERSION_CLASS_SUFFIX = cls.original_constants["MULTIVERSION_CLASS_SUFFIX"]
 
     def test_build_sharded_cluster_simple(self):
         parser.set_run_options()
