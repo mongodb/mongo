@@ -6428,13 +6428,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: sharding_last_lts_mongos_and_mixed_shards_gen
-  tags: ["sharding", "common", "multiversion", "no_multiversion_generate_tasks"]
+  name: sharding_mongos_and_mixed_shards_gen
+  tags: ["sharding", "common", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      sharding_last_lts_mongos_and_mixed_shards: last_lts
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      multiversion_exclude_tags_version: last_lts
       run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
@@ -6541,24 +6543,16 @@ tasks:
     vars:
       use_large_distro: "true"
 
-# Use explicit task definitions for retryable_writes_downgrade suites to avoid running
-# with all Repl multiversion combinations.
 - <<: *gen_task_template
-  name: retryable_writes_downgrade_last_continuous_gen
-  tags: ["multiversion_passthrough", "multiversion", "no_multiversion_generate_tasks"]
+  name: retryable_writes_downgrade_gen
+  tags: ["multiversion_passthrough", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      retryable_writes_downgrade_last_lts: last_lts
+      retryable_writes_downgrade_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
-      multiversion_exclude_tags_version: last_continuous
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: retryable_writes_downgrade_last_lts_gen
-  tags: ["multiversion_passthrough", "multiversion", "no_multiversion_generate_tasks"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      multiversion_exclude_tags_version: last_lts
       run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
