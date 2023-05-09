@@ -14,6 +14,11 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
 
   # activate the virtualenv if it has been set up
   activate_venv
+  # Install db-contrib-tool to symbolize crashes during resmoke suite runs
+  # This is not supported on Windows and MacOS, so doing it only on Linux
+  if [ "$(uname)" == "Linux" ]; then
+    setup_db_contrib_tool
+  fi
 
   if [[ -f "patch_test_tags.tgz" ]]; then
     tags_build_variant="${build_variant}"
