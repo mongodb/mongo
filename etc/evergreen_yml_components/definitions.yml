@@ -1130,6 +1130,11 @@ functions:
       files:
       - src/generated_resmoke_config/*.json
 
+  "initialize multiversion tasks": &initialize_multiversion_tasks
+  - command: shell.exec
+    params:
+      script: "echo 'noop'"
+
   "generate resmoke tasks":
   - *fetch_artifacts
   - *f_expansions_write
@@ -3723,6 +3728,10 @@ tasks:
   name: initial_sync_multiversion_fuzzer_gen
   tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      initial_sync_fuzzer_last_lts: last_lts
+      initial_sync_fuzzer_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
@@ -3752,12 +3761,15 @@ tasks:
   name: aggregation_multiversion_fuzzer_gen
   tags: ["aggfuzzer", "common", "multiversion", "require_npm", "random_name", "future_git_tag_incompatible"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      aggregation_expression_multiversion_fuzzer_last_lts: last_lts
+      aggregation_expression_multiversion_fuzzer_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-fuzzer
       run_no_feature_flag_tests: "true"
@@ -3767,12 +3779,15 @@ tasks:
   name: aggregation_expression_multiversion_fuzzer_gen
   tags: ["aggfuzzer", "multiversion", "require_npm", "random_name"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      aggregation_multiversion_fuzzer_last_lts: last_lts
+      aggregation_multiversion_fuzzer_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-expr-fuzzer
       run_no_feature_flag_tests: "true"
@@ -3917,13 +3932,16 @@ tasks:
   name: update_fuzzer_gen
   tags: ["updatefuzzer", "require_npm", "random_name", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      update_fuzzer_last_lts: last_lts
+      update_fuzzer_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
       npm_command: update-fuzzer
-      suite: update_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       run_no_feature_flag_tests: "true"
 
@@ -3947,13 +3965,16 @@ tasks:
   name: update_fuzzer_replication_gen
   tags: ["updatefuzzer", "require_npm", "random_name", "multiversion", "no_debug_mode"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      update_fuzzer_replication_last_lts: last_lts
+      update_fuzzer_replication_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
       npm_command: update-fuzzer
-      suite: update_fuzzer_replication
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       run_no_feature_flag_tests: "true"
 
@@ -3962,6 +3983,10 @@ tasks:
   name: rollback_multiversion_fuzzer_gen
   tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      rollback_fuzzer_last_lts: last_lts
+      rollback_fuzzer_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
@@ -4278,6 +4303,14 @@ tasks:
   name: jstestfuzz_replication_multiversion_gen
   tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      jstestfuzz_replication_last_continuous_new_new_old: last_continuous
+      jstestfuzz_replication_last_continuous_new_old_new: last_continuous
+      jstestfuzz_replication_last_continuous_old_new_new: last_continuous
+      jstestfuzz_replication_last_lts_new_new_old: last_lts
+      jstestfuzz_replication_last_lts_new_old_new: last_lts
+      jstestfuzz_replication_last_lts_old_new_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
@@ -4345,6 +4378,10 @@ tasks:
   name: jstestfuzz_sharded_multiversion_gen
   tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      jstestfuzz_sharded_last_continuous_new_old_old_new: last_continuous
+      jstestfuzz_sharded_last_lts_new_old_old_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
@@ -4478,6 +4515,14 @@ tasks:
   name: multiversion_sanity_check_gen
   tags: ["multiversion", "multiversion_sanity_check"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      multiversion_sanity_check_last_continuous_new_new_old: last_continuous
+      multiversion_sanity_check_last_continuous_new_old_new: last_continuous
+      multiversion_sanity_check_last_continuous_old_new_new: last_continuous
+      multiversion_sanity_check_last_lts_new_new_old: last_lts
+      multiversion_sanity_check_last_lts_new_old_new: last_lts
+      multiversion_sanity_check_last_lts_old_new_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       run_no_feature_flag_tests: "true"
@@ -4486,6 +4531,14 @@ tasks:
   name: replica_sets_jscore_multiversion_gen
   tags: ["multiversion", "multiversion_passthrough"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      replica_sets_jscore_passthrough_last_continuous_new_new_old: last_continuous
+      replica_sets_jscore_passthrough_last_continuous_new_old_new: last_continuous
+      replica_sets_jscore_passthrough_last_continuous_old_new_new: last_continuous
+      replica_sets_jscore_passthrough_last_lts_new_new_old: last_lts
+      replica_sets_jscore_passthrough_last_lts_new_old_new: last_lts
+      replica_sets_jscore_passthrough_last_lts_old_new_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       suite: replica_sets_jscore_passthrough
@@ -4727,6 +4780,14 @@ tasks:
   name: change_streams_multiversion_gen
   tags: ["multiversion", "multiversion_passthrough"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      change_streams_last_continuous_new_new_old: last_continuous
+      change_streams_last_continuous_new_old_new: last_continuous
+      change_streams_last_continuous_old_new_new: last_continuous
+      change_streams_last_lts_new_new_old: last_lts
+      change_streams_last_lts_new_old_new: last_lts
+      change_streams_last_lts_old_new_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       suite: change_streams
@@ -4736,6 +4797,10 @@ tasks:
   name: change_streams_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      change_streams_downgrade_last_continuous_new_old_old_new: last_continuous
+      change_streams_downgrade_last_lts_new_old_old_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       run_no_feature_flag_tests: "true"
@@ -4762,6 +4827,10 @@ tasks:
   name: change_streams_sharded_collections_multiversion_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      change_streams_sharded_collections_passthrough_last_continuous_new_old_old_new: last_continuous
+      change_streams_sharded_collections_passthrough_last_lts_new_old_old_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       suite: change_streams_sharded_collections_passthrough
@@ -4769,7 +4838,7 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_future_git_tag_gen
-  tags: ["multiversion", "no_version_combination", "multiversion_future_git_tag"]
+  tags: ["multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4777,7 +4846,7 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_auth_future_git_tag_gen
-  tags: ["auth", "multiversion", "no_version_combination", "multiversion_future_git_tag"]
+  tags: ["auth", "multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5447,13 +5516,13 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_auth_gen
-  tags: ["auth", "multiversion", "no_version_combination", "future_git_tag_incompatible"]
+  tags: ["auth", "multiversion", "no_multiversion_generate_tasks", "future_git_tag_incompatible"]
   commands:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: multiversion_gen
-  tags: ["multiversion", "no_version_combination", "future_git_tag_incompatible"]
+  tags: ["multiversion", "no_multiversion_generate_tasks", "future_git_tag_incompatible"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -5462,7 +5531,7 @@ tasks:
 # build variants that enable this task.
 - <<: *gen_task_template
   name: feature_flag_multiversion_gen
-  tags: ["multiversion", "no_version_combination"]
+  tags: ["multiversion", "no_multiversion_generate_tasks"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -5539,6 +5608,10 @@ tasks:
   name: sharded_collections_jscore_multiversion_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      sharded_collections_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
+      sharded_collections_jscore_passthrough_last_lts_new_old_old_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       suite: sharded_collections_jscore_passthrough
@@ -5562,6 +5635,10 @@ tasks:
   name: sharding_jscore_multiversion_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      sharding_jscore_passthrough_last_lts_new_old_old_new: last_lts
+      sharding_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
   - func: "generate resmoke tasks"
     vars:
       suite: sharding_jscore_passthrough
@@ -5855,6 +5932,14 @@ tasks:
   name: concurrency_replication_multiversion_gen
   tags: ["multiversion", "multiversion_passthrough"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      concurrency_replication_last_continuous_new_new_old: last_continuous
+      concurrency_replication_last_continuous_new_old_new: last_continuous
+      concurrency_replication_last_continuous_old_new_new: last_continuous
+      concurrency_replication_last_lts_new_new_old: last_lts
+      concurrency_replication_last_lts_new_old_new: last_lts
+      concurrency_replication_last_lts_old_new_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_replication
@@ -5927,6 +6012,10 @@ tasks:
   name: concurrency_sharded_replication_multiversion_gen
   tags: ["multiversion_passthrough", "sharded", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      concurrency_sharded_replication_last_continuous_new_old_old_new: last_continuous
+      concurrency_sharded_replication_last_lts_new_old_old_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_sharded_replication
@@ -6217,6 +6306,10 @@ tasks:
   name: replica_sets_multiversion_gen
   tags: ["random_multiversion_ds", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      replica_sets_last_lts: last_lts
+      replica_sets_last_continuous: last_continuous
   - func: "generate resmoke tasks"
     vars:
       suite: replica_sets
@@ -6256,6 +6349,10 @@ tasks:
   name: sharding_multiversion_gen
   tags: ["random_multiversion_ds", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      sharding_last_continuous: last_continuous
+      sharding_last_lts: last_lts
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
@@ -6332,7 +6429,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_last_lts_mongos_and_mixed_shards_gen
-  tags: ["sharding", "common", "multiversion", "no_version_combination"]
+  tags: ["sharding", "common", "multiversion", "no_multiversion_generate_tasks"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6448,7 +6545,7 @@ tasks:
 # with all Repl multiversion combinations.
 - <<: *gen_task_template
   name: retryable_writes_downgrade_last_continuous_gen
-  tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
+  tags: ["multiversion_passthrough", "multiversion", "no_multiversion_generate_tasks"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6457,7 +6554,7 @@ tasks:
 
 - <<: *gen_task_template
   name: retryable_writes_downgrade_last_lts_gen
-  tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
+  tags: ["multiversion_passthrough", "multiversion", "no_multiversion_generate_tasks"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6468,6 +6565,10 @@ tasks:
   name: sharded_retryable_writes_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      sharded_retryable_writes_downgrade_last_continuous_new_old_old_new: last_continuous
+      sharded_retryable_writes_downgrade_last_lts_new_old_old_new: last_lts
   - func: "generate resmoke tasks"
     vars:
       run_no_feature_flag_tests: "true"
