@@ -230,6 +230,10 @@ function testCaseMultiFalseUpdateFails({testUpdate}) {
 }
 
 function testCaseReplacementAndPipelineUpdateFails({testUpdate}) {
+    if (arbitraryUpdatesEnabled) {
+        return;
+    }
+
     const expectFailedUpdateDoc = expectFailedUpdate([doc2]);
 
     // Replace a document to have no metaField, which should fail since updates with replacement

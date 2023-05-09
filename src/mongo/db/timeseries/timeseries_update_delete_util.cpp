@@ -162,13 +162,17 @@ StatusWith<write_ops::UpdateModification> translateUpdate(
     const write_ops::UpdateModification& updateMod, boost::optional<StringData> metaField) {
     invariant(updateMod.type() != write_ops::UpdateModification::Type::kDelta);
 
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot perform an update on a time-series collection using a pipeline update",
-            updateMod.type() != write_ops::UpdateModification::Type::kPipeline);
+    if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
+        return Status(
+            ErrorCodes::InvalidOptions,
+            "Cannot perform an update on a time-series collection using a pipeline update");
+    }
 
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot perform an update on a time-series collection using a replacement document",
-            updateMod.type() != write_ops::UpdateModification::Type::kReplacement);
+    if (updateMod.type() == write_ops::UpdateModification::Type::kReplacement) {
+        return Status(
+            ErrorCodes::InvalidOptions,
+            "Cannot perform an update on a time-series collection using a replacement document");
+    }
 
     // We can't translate an update without a meta field.
     if (!metaField) {

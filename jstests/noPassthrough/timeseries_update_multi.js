@@ -259,6 +259,24 @@ const doc_id_8_array_meta = {
     });
 })();
 
+// This command will fail because the time field must be a timestamp.
+(function testChangeTimeFieldType() {
+    testUpdate({
+        initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        updateList: [{
+            q: {f: "F"},
+            u: {$set: {[timeFieldName]: "hello"}},
+            multi: true,
+        }],
+        resultDocList: [
+            doc_id_3_a_b_string_metric,
+            doc_id_5_a_c_array_metric,
+        ],
+        nMatched: 0,
+        failCode: ErrorCodes.BadValue,
+    });
+})();
+
 // Query on the time field and remove the metaField.
 (function testTimeFieldQueryRemoveMetaField() {
     testUpdate({
@@ -505,62 +523,143 @@ const doc_id_8_array_meta = {
     });
 })();
 
+// Use a non-idempotent update to insert the updated measurement later in the index to verify
+// handling of the Halloween Problem.
+(function testHalloweenProblem() {
+    testUpdate({
+        initialDocList: [doc_id_2_a_b_array_metric, doc_id_3_a_b_string_metric],
+        updateList: [{
+            q: {},
+            u: {$set: {[metaFieldName + '.a']: "B"}, $inc: {x: 1}},
+            multi: true,
+        }],
+        resultDocList: [
+            {
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {a: "B", b: "B"},
+                f: [{"k": "K", "v": "V"}],
+                x: 1,
+            },
+            {
+                _id: 3,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {a: "B", b: "B"},
+                f: "F",
+                x: 1,
+            },
+        ],
+        nMatched: 2,
+    });
+})();
+
 /**
  * Tests pipeline-style updates
  */
 // Add a field of the sum of an array field using aggregation pipeline.
-// TODO SERVER-73143 Enable these tests.
-// testUpdate({
-//     initialDocList: [doc_id_5_a_c_array_metric, doc_id_6_a_c_array_metric],
-//     updateList: [{
-//         q: {[metaFieldName]: {a: "A", c: "C"}},
-//         u: [{$set: {sumF: {$sum: "$f"}}}],
-//         multi: true,
-//     }],
-//     resultDocList: [
-//         {
-//             _id: 5,
-//             [timeFieldName]: dateTime,
-//             [metaFieldName]: {a: "A", c: "C"},
-//             f: [2, 3],
-//             sumF: 5,
-//         },
-//         {
-//             _id: 6,
-//             [timeFieldName]: dateTime,
-//             [metaFieldName]: {a: "A", c: "C"},
-//             f: [1, 10],
-//             sumF: 11,
-//         },
-//     ],
-//     nMatched: 2,
-// });
+(function testUpdatePipelineArrayAggregation() {
+    testUpdate({
+        initialDocList: [doc_id_5_a_c_array_metric, doc_id_6_a_c_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", c: "C"}},
+            u: [{$set: {sumF: {$sum: "$f"}}}],
+            multi: true,
+        }],
+        resultDocList: [
+            {
+                _id: 5,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {a: "A", c: "C"},
+                f: [2, 3],
+                sumF: 5,
+            },
+            {
+                _id: 6,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {a: "A", c: "C"},
+                f: [1, 10],
+                sumF: 11,
+            },
+        ],
+        nMatched: 2,
+    });
+})();
 
 // Add a new field for all measurements.
-// testUpdate({
-//     initialDocList: [doc_id_4_no_meta_string_metric, doc_id_7_no_meta_int_metric],
-//     createCollectionWithMetaField: false,
-//     updateList: [{
-//         q: {},
-//         u: [{$set: {newField: true}}],
-//         multi: true,
-//     }],
-//     resultDocList: [
-//         {
-//             _id: 4,
-//             [timeFieldName]: dateTime,
-//             f: "F",
-//             newField: true,
-//         },
-//         {
-//             _id: 7,
-//             [timeFieldName]: dateTime,
-//             g: 1,
-//             newField: true,
-//         },
-//     ],
-//     nMatched: 2,
-// });
+(function testUpdatePipelineAddNewField() {
+    testUpdate({
+        initialDocList: [doc_id_4_no_meta_string_metric, doc_id_7_no_meta_int_metric],
+        createCollectionWithMetaField: false,
+        updateList: [{
+            q: {},
+            u: [{$set: {newField: true}}],
+            multi: true,
+        }],
+        resultDocList: [
+            {
+                _id: 4,
+                [timeFieldName]: dateTime,
+                f: "F",
+                newField: true,
+            },
+            {
+                _id: 7,
+                [timeFieldName]: dateTime,
+                g: 1,
+                newField: true,
+            },
+        ],
+        nMatched: 2,
+    });
+})();
+
+// Cause a bucket to be split into multiple new buckets by an update, i.e. update documents in the
+// same bucket to belong in different buckets.
+(function testSplitBucketWithUpdate() {
+    testUpdate({
+        initialDocList:
+            [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_3_a_b_string_metric],
+        updateList: [{
+            q: {},
+            u: [{$set: {[metaFieldName]: "$f"}}],
+            multi: true,
+        }],
+        resultDocList: [
+            {
+                _id: 1,
+                [timeFieldName]: dateTime,
+            },
+            {
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: [{"k": "K", "v": "V"}],
+                f: [{"k": "K", "v": "V"}],
+            },
+            {
+                _id: 3,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: "F",
+                f: "F",
+            }
+        ],
+        nMatched: 3,
+    });
+})();
+
+// Only touch the meta field in a pipeline update.
+(function testUpdatePipelineOnlyTouchMetaField() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_6_a_c_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", b: "B"}},
+            u: [{$set: {[metaFieldName]: "$" + metaFieldName + ".a"}}],
+            multi: true,
+        }],
+        resultDocList:
+            [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "A"}, doc_id_6_a_c_array_metric],
+        nMatched: 1,
+    });
+})();
 
 /**
  * Tests upsert with multi:true.

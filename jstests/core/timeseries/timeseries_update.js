@@ -1077,51 +1077,53 @@ TimeseriesTest.run((insert) => {
         n: 1,
     });
 
-    /************************** Tests updating with an update pipeline **************************/
-    // Modify the metaField, which should fail since update pipelines are not supported.
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [{
-            q: {},
-            u: [
-                {$addFields: {[metaFieldName + ".c"]: "C", [metaFieldName + ".e"]: "E"}},
-                {$unset: metaFieldName + ".e"}
-            ],
-            multi: true,
-        }],
-        resultDocList: [doc1],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        /************************** Tests updating with an update pipeline ************************/
+        // Modify the metaField, which should fail since update pipelines are not supported.
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [{
+                q: {},
+                u: [
+                    {$addFields: {[metaFieldName + ".c"]: "C", [metaFieldName + ".e"]: "E"}},
+                    {$unset: metaFieldName + ".e"}
+                ],
+                multi: true,
+            }],
+            resultDocList: [doc1],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    /************************ Tests updating with a replacement document *************************/
-    // Replace a document to have no metaField, which should fail since updates with replacement
-    // documents are not supported.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [{
-            q: {[metaFieldName]: {c: "C", d: 2}},
-            u: {f2: {e: "E", f: "F"}, f3: 7},
-            multi: true,
-        }],
-        resultDocList: [doc2],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        /************************ Tests updating with a replacement document **********************/
+        // Replace a document to have no metaField, which should fail since updates with replacement
+        // documents are not supported.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [{
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {f2: {e: "E", f: "F"}, f3: 7},
+                multi: true,
+            }],
+            resultDocList: [doc2],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Replace a document with an empty document, which should fail since updates with replacement
-    // documents are not supported.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [{
-            q: {[metaFieldName]: {c: "C", d: 2}},
-            u: {},
-            multi: true,
-        }],
-        resultDocList: [doc2],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Replace a document with an empty document, which should fail since updates with
+        // replacement documents are not supported.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [{
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {},
+                multi: true,
+            }],
+            resultDocList: [doc2],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     /*********************** Tests updating a collection with no metaField. **********************/
     // Query on a field which is not the (nonexistent) metaField.

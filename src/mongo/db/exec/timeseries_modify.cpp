@@ -79,11 +79,6 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
             _params.updateDriver || !_params.isUpdate);
     _specificStats.isModUpdate =
         _params.isUpdate && _params.updateDriver->type() == UpdateDriver::UpdateType::kOperator;
-
-    // TODO SERVER-73143 Enable these cases.
-    uassert(ErrorCodes::InvalidOptions,
-            "Timeseries arbitrary updates must be modifier updates",
-            !_params.isUpdate || _specificStats.isModUpdate);
 }
 
 bool TimeseriesModifyStage::isEOF() {
