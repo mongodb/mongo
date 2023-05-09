@@ -198,6 +198,19 @@ void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
                                AutoGetCollection::Options{}
                                    .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                                    .expectedUUID(_doc.getCollectionUUID())};
+
+        // The drop operation is aborted if the namespace does not exist or does not comply with
+        // naming restrictions. Non-system namespaces require additional logic that cannot be done
+        // at this level, such as the time series collection must be resolved to remove the
+        // corresponding bucket collection, or tag documents associated to non-existing collections
+        // must be cleaned up.
+        if (nss().isSystem()) {
+            uassert(ErrorCodes::NamespaceNotFound,
+                    "namespace {} does not exist"_format(nss().toStringForErrorMsg()),
+                    *coll);
+
+            uassertStatusOK(isDroppableCollection(opCtx, nss()));
+        }
     }
 
     _saveCollInfo(opCtx);
