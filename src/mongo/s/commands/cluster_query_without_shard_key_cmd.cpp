@@ -64,6 +64,7 @@ struct ParsedCommandInfo {
     bool upsert = false;
     int stmtId = kUninitializedStmtId;
     boost::optional<UpdateRequest> updateRequest;
+    boost::optional<BSONObj> hint;
 };
 
 struct AsyncRequestSenderResponseData {
@@ -150,6 +151,10 @@ BSONObj createAggregateCmdObj(
         aggregate.setStmtId(parsedInfo.stmtId);
     }
 
+    if (parsedInfo.hint) {
+        aggregate.setHint(parsedInfo.hint);
+    }
+
     aggregate.setPipeline([&]() {
         std::vector<BSONObj> pipeline;
         if (timeseriesFields) {
@@ -181,6 +186,7 @@ ParsedCommandInfo parseWriteCommand(OperationContext* opCtx,
         auto updateRequest = write_ops::UpdateCommandRequest::parse(
             IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"), writeCmdObj);
         parsedInfo.query = updateRequest.getUpdates().front().getQ();
+        parsedInfo.hint = updateRequest.getUpdates().front().getHint();
 
         // In the batch write path, when the request is reconstructed to be passed to
         // the two phase write protocol, only the stmtIds field is used.
@@ -199,6 +205,7 @@ ParsedCommandInfo parseWriteCommand(OperationContext* opCtx,
         auto deleteRequest = write_ops::DeleteCommandRequest::parse(
             IDLParserContext("_clusterQueryWithoutShardKeyForDelete"), writeCmdObj);
         parsedInfo.query = deleteRequest.getDeletes().front().getQ();
+        parsedInfo.hint = deleteRequest.getDeletes().front().getHint();
 
         // In the batch write path, when the request is reconstructed to be passed to
         // the two phase write protocol, only the stmtIds field is used.
@@ -217,6 +224,7 @@ ParsedCommandInfo parseWriteCommand(OperationContext* opCtx,
 
         parsedInfo.query = findAndModifyRequest.getQuery();
         parsedInfo.stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
+        parsedInfo.hint = findAndModifyRequest.getHint();
         parsedInfo.sort =
             findAndModifyRequest.getSort() && !findAndModifyRequest.getSort()->isEmpty()
             ? findAndModifyRequest.getSort()
