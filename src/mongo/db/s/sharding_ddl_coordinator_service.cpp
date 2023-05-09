@@ -75,8 +75,6 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<DropCollectionCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kRenameCollection:
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-        case DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible:
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateCollection:
         // TODO SERVER-68008 Remove the Pre61Compatible case once 7.0 becomes last LTS

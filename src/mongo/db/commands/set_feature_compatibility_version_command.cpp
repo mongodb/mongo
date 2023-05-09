@@ -1546,14 +1546,6 @@ private:
     // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
     void _finalizeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
-        }
-
         // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
             feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(

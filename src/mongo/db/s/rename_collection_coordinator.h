@@ -67,11 +67,6 @@ private:
         return _doc.getPhase() >= Phase::kFreezeMigrations;
     };
 
-    // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-    bool _isPre63Compatible() const {
-        return operationType() == DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible;
-    }
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

@@ -96,12 +96,8 @@ public:
                 FixedFCVRegion fixedFcvRegion{opCtx};
                 auto coordinatorDoc = RenameCollectionCoordinatorDocument();
                 coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
-                // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
                 coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{fromNss,
-                      feature_flags::gGlobalIndexesShardingCatalog.isEnabled(*fixedFcvRegion)
-                          ? DDLCoordinatorTypeEnum::kRenameCollection
-                          : DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible}});
+                    {{fromNss, DDLCoordinatorTypeEnum::kRenameCollection}});
                 coordinatorDoc.setAllowEncryptedCollectionRename(
                     req.getAllowEncryptedCollectionRename().value_or(false));
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);
