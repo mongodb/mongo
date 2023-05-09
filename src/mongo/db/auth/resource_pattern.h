@@ -298,11 +298,14 @@ public:
     std::string toString() const;
 
     bool operator==(const ResourcePattern& other) const {
-        if (_matchType != other._matchType)
-            return false;
-        if (_ns != other._ns)
-            return false;
-        return true;
+        return (_matchType == other._matchType) && (_ns == other._ns);
+    }
+
+    bool operator<(const ResourcePattern& other) const {
+        if (_matchType < other._matchType) {
+            return true;
+        }
+        return (_matchType == other._matchType) && (_ns < other._ns);
     }
 
     template <typename H>
