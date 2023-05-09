@@ -821,6 +821,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 "maintenance and no other clients are connected. The TTL collection monitor will "
                 "not start because of this. For more info see "
                 "http://dochub.mongodb.org/core/ttlcollections");
+
+            if (gAllowUnsafeUntimestampedWrites &&
+                !repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+                LOGV2_WARNING_OPTIONS(
+                    7692300,
+                    {logv2::LogTag::kStartupWarnings},
+                    "Replica set member is in standalone mode. Performing any writes will result "
+                    "in them being untimestamped. If a write is to an existing document, the "
+                    "document's history will be overwritten with the new value since the beginning "
+                    "of time. This can break snapshot isolation within the storage engine.");
+            }
         } else {
             startTTLMonitor(serviceContext);
         }

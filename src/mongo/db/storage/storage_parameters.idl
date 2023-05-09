@@ -169,6 +169,14 @@ server_parameters:
         default: 10
         validator: { gte: 0 }
 
+    allowUnsafeUntimestampedWrites:
+        description: >- 
+            Allows a replica set member in standalone mode to perform unsafe untimestamped writes
+        set_at: [ startup ]
+        cpp_varname: gAllowUnsafeUntimestampedWrites
+        cpp_vartype: bool
+        default: true
+
 feature_flags:
     featureFlagTimeseriesMetricIndexes:
         description: "When enabled, support secondary indexes on time-series measurements"
