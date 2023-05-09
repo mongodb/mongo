@@ -272,23 +272,43 @@
     - "multiversion.replica_sets_multiversion_testdata_last_continuous"
 
 
-- suite_name: generational_fuzzer_last_lts
+- suite_name: aggregation_multiversion_fuzzer_last_lts
   base_suite: generational_fuzzer
   overrides:
     - "multiversion.replica_sets_multiversion_testdata_last_lts"
 
-- suite_name: generational_fuzzer_last_continuous
+- suite_name: aggregation_multiversion_fuzzer_last_continuous
+  base_suite: generational_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_continuous"
+
+- suite_name: aggregation_expression_multiversion_fuzzer_last_lts
+  base_suite: generational_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_lts"
+
+- suite_name: aggregation_expression_multiversion_fuzzer_last_continuous
+  base_suite: generational_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_continuous"
+
+- suite_name: update_fuzzer_last_lts
+  base_suite: generational_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_lts"
+
+- suite_name: update_fuzzer_last_continuous
   base_suite: generational_fuzzer
   overrides:
     - "multiversion.replica_sets_multiversion_testdata_last_continuous"
 
 
-- suite_name: generational_fuzzer_replication_last_lts
+- suite_name: update_fuzzer_replication_last_lts
   base_suite: generational_fuzzer_replication
   overrides:
     - "multiversion.replica_sets_multiversion_testdata_last_lts"
 
-- suite_name: generational_fuzzer_replication_last_continuous
+- suite_name: update_fuzzer_replication_last_continuous
   base_suite: generational_fuzzer_replication
   overrides:
     - "multiversion.replica_sets_multiversion_testdata_last_continuous"
