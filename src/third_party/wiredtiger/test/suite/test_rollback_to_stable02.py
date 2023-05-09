@@ -127,10 +127,6 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         if not self.in_memory:
             self.session.checkpoint()
 
-        # FIXME WT-10017: We need this eviction cursor to work around column-store not having the
-        # same "roll back the history store anyway" workaround that row-store has.
-        self.evict_cursor(uri, nrows, valued)
-
         self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
         # Check that the new updates are only seen after the update timestamp.
         self.session.breakpoint()

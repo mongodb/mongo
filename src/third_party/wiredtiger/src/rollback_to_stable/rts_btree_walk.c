@@ -228,13 +228,11 @@ __wt_rts_btree_walk_btree_apply(
     }
 
     /*
-     * The rollback to stable will skip the tables during recovery and shutdown in the following
-     * conditions.
-     * 1. Empty table or newly-created table.
-     * 2. Table has timestamped updates without a stable timestamp.
+     * During recovery, a table is skipped by RTS if one of the conditions is met:
+     * 1. The table is empty or newly-created.
+     * 2. The table has timestamped updates without a stable timestamp.
      */
-    if ((F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
-          F_ISSET(S2C(session), WT_CONN_CLOSING_CHECKPOINT)) &&
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
       (addr_size == 0 || (rollback_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_FILE_SKIP "skipping rollback to stable on file=%s because %s", uri,
