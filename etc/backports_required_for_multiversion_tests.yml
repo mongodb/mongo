@@ -329,8 +329,6 @@ last-continuous:
     ticket: SERVER-72224
   - test_file: jstests/sharding/internal_txns/incomplete_transaction_history_during_migration.js
     ticket: SERVER-73938
-  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
-    ticket: SERVER-74124
   - test_file: jstests/core/query/partial_index_logical.js
     ticket: SERVER-68434
   - test_file: jstests/core/timeseries/timeseries_collmod.js
@@ -379,6 +377,8 @@ last-continuous:
     ticket: SERVER-76550
   - test_file: jstests/sharding/analyze_shard_key/monotonicity_hashed_sharding_compound.js
     ticket: SERVER-76719
+  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
+    ticket: SERVER-76948
   suites: null
 last-lts:
   all:
@@ -782,8 +782,6 @@ last-lts:
     ticket: SERVER-72224
   - test_file: jstests/sharding/internal_txns/incomplete_transaction_history_during_migration.js
     ticket: SERVER-73938
-  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
-    ticket: SERVER-74124
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-69952
   - test_file: jstests/replsets/log_ddl_ops.js
@@ -842,4 +840,6 @@ last-lts:
     ticket: SERVER-76719
   - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
     ticket: SERVER-76489
+  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
+    ticket: SERVER-76948
   suites: null
