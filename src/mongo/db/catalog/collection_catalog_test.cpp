@@ -269,7 +269,7 @@ TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
     auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
 
     ASSERT(ridStr);
-    ASSERT(ridStr->find(dbName.toStringWithTenantId()) != std::string::npos);
+    ASSERT(ridStr->find(dbName.toStringWithTenantId_forTest()) != std::string::npos);
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupMissingDatabaseResource) {

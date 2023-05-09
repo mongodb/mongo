@@ -229,7 +229,7 @@ protected:
         for (const auto& tenantId : tenantsOnTarget) {
             dbnamesOnTarget.push_back(
                 DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kConfig.db())
-                    .toStringWithTenantId());
+                    .toStringWithTenantId_forTest());
         }
 
         if (gMultitenancySupport) {
@@ -260,7 +260,7 @@ protected:
             ASSERT_EQ(results[0]["_id"].String(), "testStrClusterParameter");
             ASSERT_EQ(results[0]["strData"].String(),
                       DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kConfig.db())
-                          .toStringWithTenantId());
+                          .toStringWithTenantId_forTest());
         }
     }
 

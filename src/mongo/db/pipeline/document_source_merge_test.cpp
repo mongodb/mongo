@@ -1053,8 +1053,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
     // Pass collection name as a db + coll object.
     auto stageSpec =
-        BSON("$merge" << BSON("into" << BSON("db" << nss.dbName().toStringWithTenantId() << "coll"
-                                                  << _targetColl)));
+        BSON("$merge" << BSON("into" << BSON("db" << nss.dbName().toStringWithTenantId_forTest()
+                                                  << "coll" << _targetColl)));
     auto liteParsedLookup = DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
@@ -1084,7 +1084,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
         // Assert the tenantId is not included in the serialized namespace.
         auto dbField = flagStatus ? expCtx->ns.dbName().toString()
-                                  : expCtx->ns.dbName().toStringWithTenantId();
+                                  : expCtx->ns.dbName().toStringWithTenantId_forTest();
         auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 
         auto serialized = mergeSource->serialize().getDocument();
@@ -1112,7 +1112,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
         ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
 
         auto dbField = flagStatus ? expCtx->ns.dbName().toString()
-                                  : expCtx->ns.dbName().toStringWithTenantId();
+                                  : expCtx->ns.dbName().toStringWithTenantId_forTest();
         auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 
         auto serialized = mergeSource->serialize().getDocument();

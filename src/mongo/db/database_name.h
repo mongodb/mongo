@@ -165,6 +165,14 @@ public:
     }
 
     /**
+     * Method to be used only for unit tests.
+     * It will always return a tenant prefixed dbname.
+     */
+    std::string toStringWithTenantId_forTest() const {
+        return toStringWithTenantId();
+    }
+
+    /**
      * This function should only be used when logging a db name in an error message.
      */
     std::string toStringForErrorMsg() const {
