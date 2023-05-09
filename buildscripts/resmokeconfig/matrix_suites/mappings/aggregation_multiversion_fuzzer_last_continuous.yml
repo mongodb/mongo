@@ -1,0 +1,3 @@
+base_suite: generational_fuzzer
+overrides:
+  - "multiversion.replica_sets_multiversion_testdata_last_continuous"
