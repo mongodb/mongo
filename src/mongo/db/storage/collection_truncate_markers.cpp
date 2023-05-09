@@ -569,7 +569,11 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
 void CollectionTruncateMarkersWithPartialExpiration::_updateHighestSeenRecordIdAndWallTime(
     const RecordId& rId, Date_t wallTime) {
     stdx::unique_lock lk(_lastHighestRecordMutex);
-    _lastHighestRecordId = std::max(_lastHighestRecordId, rId);
-    _lastHighestWallTime = std::max(_lastHighestWallTime, wallTime);
+    if (_lastHighestRecordId < rId) {
+        _lastHighestRecordId = rId;
+    }
+    if (_lastHighestWallTime < wallTime) {
+        _lastHighestWallTime = wallTime;
+    }
 }
 }  // namespace mongo

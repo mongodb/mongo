@@ -288,10 +288,14 @@ public:
                     tenantChangeCollection->getClusteredInfo()->getIndexSpec(),
                     tenantChangeCollection->getDefaultCollator()));
 
-                maxRecordIdSeen = std::max(std::move(recordId), maxRecordIdSeen);
+                if (maxRecordIdSeen < recordId) {
+                    maxRecordIdSeen = std::move(recordId);
+                }
                 auto docWallTime =
                     insertStatement.doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
-                maxWallTimeSeen = std::max(maxWallTimeSeen, docWallTime);
+                if (maxWallTimeSeen < docWallTime) {
+                    maxWallTimeSeen = docWallTime;
+                }
 
                 bytesInserted += insertStatement.doc.objsize();
             }

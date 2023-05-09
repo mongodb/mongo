@@ -62,7 +62,7 @@ void _generateRecords(size_t numRecords, std::deque<Record>& records) {
 }
 
 
-class CursorMock : public SeekableRecordCursor {
+class CursorMock : public RecordCursor {
 public:
     CursorMock(std::deque<Record>* records) : _records(records) {}
 
@@ -77,12 +77,6 @@ public:
         return next;
     }
 
-    boost::optional<Record> seekExact(const RecordId& id) override {
-        return Record{};
-    }
-    boost::optional<Record> seekNear(const RecordId& id) override {
-        return boost::none;
-    }
     void save() override {}
     bool restore(bool tolerateCappedRepositioning) override {
         return true;

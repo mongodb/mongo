@@ -53,12 +53,11 @@ class RecordIdChecks;
 /**
  * The key that uniquely identifies a Record in a Collection or RecordStore.
  */
-#pragma pack(push, 1)
 class alignas(int64_t) RecordId {
     // The alignas is necessary in order to comply with memory alignment. Internally we're using
     // 8-byte aligned data members (int64_t / ConstSharedBuffer) but as we're packing the structure
-    // the compiler will set the alignment to 1 due to the pragma so we must correct its alignment
-    // information for users of the class.
+    // the compiler will set the alignment to 1 so we must correct its alignment information for
+    // users of the class.
 
     // Class used for static assertions that can only happen when RecordId is completely defined.
     friend class details::RecordIdChecks;
@@ -92,89 +91,41 @@ public:
 
     ~RecordId() {
         if (_format == Format::kBigStr) {
-            _data.heapStr.buffer.~ConstSharedBuffer();
+            HeapStr::getBufferFrom(_data).~ConstSharedBuffer();
         }
     }
 
-    RecordId(RecordId&& other) {
-        switch (other._format) {
-            case kNull:
-                break;
-            case kLong:
-                _data.longId.id = other._data.longId.id;
-                break;
-            case kSmallStr:
-                _data.inlineStr = other._data.inlineStr;
-                break;
-            case kBigStr:
-                new (&_data.heapStr.buffer)
-                    ConstSharedBuffer(std::move(other._data.heapStr.buffer));
-                break;
-        }
-        _format = other._format;
-        other._format = Format::kNull;
+    RecordId(RecordId&& other) : _format(other._format), _data(other._data) {
+        other._format = kNull;
     };
 
-    RecordId(const RecordId& other) {
-        switch (other._format) {
-            case kNull:
-                break;
-            case kLong:
-                _data.longId.id = other._data.longId.id;
-                break;
-            case kSmallStr:
-                _data.inlineStr = other._data.inlineStr;
-                break;
-            case kBigStr:
-                new (&_data.heapStr.buffer) ConstSharedBuffer(other._data.heapStr.buffer);
-                break;
+    RecordId(const RecordId& other) : _format(other._format), _data(other._data) {
+        if (_format == Format::kBigStr) {
+            // Re-initialize the SharedBuffer to get the correct reference count.
+            auto* buffer = &HeapStr::getBufferFrom(_data);
+            new (buffer) ConstSharedBuffer(HeapStr::getBufferFrom(other._data));
         }
-        _format = other._format;
     };
 
     RecordId& operator=(const RecordId& other) {
-        if (_format == Format::kBigStr) {
-            _data.heapStr.buffer.~ConstSharedBuffer();
-        }
-        switch (other._format) {
-            case kNull:
-                break;
-            case kLong:
-                _data.longId.id = other._data.longId.id;
-                break;
-            case kSmallStr:
-                _data.inlineStr = other._data.inlineStr;
-                break;
-            case kBigStr:
-                new (&_data.heapStr.buffer) ConstSharedBuffer(other._data.heapStr.buffer);
-                break;
-        }
-        _format = other._format;
+        RecordId tmp{other};
+        *this = std::move(tmp);
         return *this;
     };
 
 
     RecordId& operator=(RecordId&& other) {
-        if (_format == Format::kBigStr) {
-            _data.heapStr.buffer.~ConstSharedBuffer();
-        }
-        switch (other._format) {
-            case kNull:
-                break;
-            case kLong:
-                _data.longId.id = other._data.longId.id;
-                break;
-            case kSmallStr:
-                _data.inlineStr = other._data.inlineStr;
-                break;
-            case kBigStr:
-                new (&_data.heapStr.buffer)
-                    ConstSharedBuffer(std::move(other._data.heapStr.buffer));
-                break;
-        }
-        _format = other._format;
-        other._format = Format::kNull;
+        swap(other);
         return *this;
+    }
+
+    void swap(RecordId& other) {
+        // We perform a byte-wise swap here to avoid concerns with the actual underlying type of the
+        // RecordId.
+        std::array<std::byte, sizeof(RecordId)> tmp;
+        std::memcpy(reinterpret_cast<void*>(tmp.data()), this, sizeof(RecordId));
+        std::memcpy(reinterpret_cast<void*>(this), &other, sizeof(RecordId));
+        std::memcpy(reinterpret_cast<void*>(&other), tmp.data(), sizeof(RecordId));
     }
 
     /**
@@ -183,7 +134,7 @@ public:
      */
     explicit RecordId(int64_t s) {
         _format = Format::kLong;
-        _data.longId.id = s;
+        LongId::getIdFrom(_data) = s;
     }
 
     /**
@@ -198,13 +149,15 @@ public:
             size <= kBigStrMaxSize);
         if (size <= kSmallStrMaxSize) {
             _format = Format::kSmallStr;
-            _data.inlineStr.size = static_cast<uint8_t>(size);
-            std::memcpy(_data.inlineStr.dataArr.data(), str, size);
+            InlineStr::getSizeFrom(_data) = static_cast<uint8_t>(size);
+            auto& arr = InlineStr::getArrayFrom(_data);
+            std::memcpy(arr.data(), str, size);
         } else {
             _format = Format::kBigStr;
             auto buffer = SharedBuffer::allocate(size);
             std::memcpy(buffer.get(), str, size);
-            new (&_data.heapStr.buffer) ConstSharedBuffer(std::move(buffer));
+            auto* bufferPtr = &HeapStr::getBufferFrom(_data);
+            new (bufferPtr) ConstSharedBuffer(std::move(buffer));
         }
     }
 
@@ -392,7 +345,8 @@ public:
      * buffers.
      */
     size_t memUsage() const {
-        size_t largeStrSize = (_format == Format::kBigStr) ? _data.heapStr.buffer.capacity() : 0;
+        size_t largeStrSize =
+            (_format == Format::kBigStr) ? HeapStr::getBufferFrom(_data).capacity() : 0;
         return sizeof(RecordId) + largeStrSize;
     }
 
@@ -539,15 +493,16 @@ private:
     }
 
     int64_t _getLongNoCheck() const {
-        return _data.longId.id;
+        return LongId::getIdFrom(_data);
     }
 
     StringData _getSmallStrNoCheck() const {
-        return StringData(_data.inlineStr.dataArr.data(), _data.inlineStr.size);
+        return StringData(InlineStr::getArrayFrom(_data).data(), InlineStr::getSizeFrom(_data));
     }
 
     StringData _getBigStrNoCheck() const {
-        return StringData(_data.heapStr.buffer.get(), _data.heapStr.buffer.capacity());
+        const auto& buffer = HeapStr::getBufferFrom(_data);
+        return StringData(buffer.get(), buffer.capacity());
     }
 
     static constexpr auto kTargetSizeInBytes = 32;
@@ -560,41 +515,58 @@ private:
     static_assert(sizeof(Format) == 1);
     // All of this will work if and only if char size is 1 (std::byte) for the InlineString.
     static_assert(sizeof(std::byte) == sizeof(char));
+    using Content = std::array<std::byte, kTargetSizeInBytes - sizeof(Format)>;
+    Content _data;
     // Offsets/padding will be computed in respect to the whole class by taking into account the
     // Format data member.
     struct HeapStr {
         static_assert(std::alignment_of_v<ConstSharedBuffer> <= 8,
                       "ConstSharedBuffer is expected to have 8 bytes alignment at most. Having a "
                       "larger alignment requires changing the RecordId class alignment");
-        std::byte _padding[std::alignment_of_v<ConstSharedBuffer> -
-                           sizeof(Format)];  // offset = 1, size = 7
-        ConstSharedBuffer buffer;            // offset = 1 + 7, size = 8
+        static constexpr auto kOffset = std::alignment_of_v<ConstSharedBuffer> - sizeof(Format);
+        ConstSharedBuffer buffer;  // offset = 1 + 7, size = 8
+        static ConstSharedBuffer& getBufferFrom(Content& data) {
+            ConstSharedBuffer* ptr = (ConstSharedBuffer*)(data.data() + kOffset);
+            return *ptr;
+        }
+        static const ConstSharedBuffer& getBufferFrom(const Content& data) {
+            ConstSharedBuffer* ptr = (ConstSharedBuffer*)(data.data() + kOffset);
+            return *ptr;
+        }
     };
     struct InlineStr {
-        uint8_t size;  // offset = 1, size = 1
-        std::array<char, kTargetSizeInBytes - sizeof(Format) - sizeof(size)>
-            dataArr;  // offset = 1 + 1, size = 30
+        static constexpr auto kSizeOffset = 0;
+        static uint8_t& getSizeFrom(Content& data) {
+            uint8_t* ptr = (uint8_t*)(data.data() + kSizeOffset);
+            return *ptr;
+        };
+        static const uint8_t& getSizeFrom(const Content& data) {
+            uint8_t* ptr = (uint8_t*)(data.data() + kSizeOffset);
+            return *ptr;
+        };
+        static constexpr auto kArrayOffset = sizeof(uint8_t);
+        using arr = std::array<char, kTargetSizeInBytes - sizeof(Format) - sizeof(uint8_t)>;
+        static arr& getArrayFrom(Content& data) {
+            arr* ptr = (arr*)(data.data() + kArrayOffset);
+            return *ptr;
+        };
+        static const arr& getArrayFrom(const Content& data) {
+            arr* ptr = (arr*)(data.data() + kArrayOffset);
+            return *ptr;
+        };
     };
     struct LongId {
-        std::byte _padding[std::alignment_of_v<int64_t> - sizeof(Format)];  // offset = 1, size = 7
-        int64_t id;  // offset = 1 + 7, size = 8
+        static constexpr auto kOffset = std::alignment_of_v<int64_t> - sizeof(Format);
+        static int64_t& getIdFrom(Content& data) {
+            int64_t* result = (int64_t*)(data.data() + kOffset);
+            return *result;
+        }
+        static const int64_t& getIdFrom(const Content& data) {
+            int64_t* result = (int64_t*)(data.data() + kOffset);
+            return *result;
+        }
     };
-    union Content {
-        // Constructor and destructor are needed so that the union class is default constructible.
-        // Placement new will be used to initialize the correct data member in the RecordId
-        // constructor. This is necessary due to ConstSharedBuffer not being trivially
-        // constructible.
-        Content(){};
-        // Destructor is handled in the RecordId destructor as it handles knowing which data member
-        // is active.
-        ~Content(){};
-        HeapStr heapStr;
-        InlineStr inlineStr;
-        LongId longId;
-    };
-    Content _data;  // offset = 1, size = 31
 };
-#pragma pack(pop)
 
 namespace details {
 // Various assertions of RecordId that can only happen when the type is completely defined.
@@ -629,6 +601,10 @@ inline StringBuilder& operator<<(StringBuilder& stream, const RecordId& id) {
 
 inline std::ostream& operator<<(std::ostream& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';
+}
+
+inline void swap(RecordId& lhs, RecordId& rhs) {
+    lhs.swap(rhs);
 }
 
 }  // namespace mongo
