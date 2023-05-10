@@ -83,6 +83,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     invariant(collection.exists());
 
     auto const nss = collection.nss();
+    auto const uuid = collection.uuid();
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
@@ -116,7 +117,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                 1,
                 "Begin removal of range",
                 logAttrs(nss),
-                "collectionUUID"_attr = collection.uuid(),
+                "collectionUUID"_attr = uuid,
                 "range"_attr = redact(range.toString()));
 
     auto deleteStageParams = std::make_unique<DeleteStageParams>();
@@ -169,7 +170,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
             LOGV2_WARNING(6180602,
                           "Cursor error while trying to delete range",
                           logAttrs(nss),
-                          "collectionUUID"_attr = collection.uuid(),
+                          "collectionUUID"_attr = uuid,
                           "range"_attr = redact(range.toString()),
                           "stats"_attr = redact(stats),
                           "error"_attr = redact(ex.toStatus()));
