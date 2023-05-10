@@ -83,8 +83,7 @@ const char kAttemptToBalanceJumboChunks[] = "attemptToBalanceJumboChunks";
 }  // namespace
 
 const char BalancerSettingsType::kKey[] = "balancer";
-// TODO SERVER-75757: get rid of legacy `autoSplitOnly` mode
-const char* BalancerSettingsType::kBalancerModes[] = {"full", "autoSplitOnly", "off"};
+const char* BalancerSettingsType::kBalancerModes[] = {"full", "off"};
 
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{128 * 1024 * 1024};
@@ -306,10 +305,22 @@ StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& o
                 return status;
             auto it = std::find(std::begin(kBalancerModes), std::end(kBalancerModes), modeStr);
             if (it == std::end(kBalancerModes)) {
-                return Status(ErrorCodes::BadValue, "Invalid balancer mode");
+                std::vector<std::string> supportedModes;
+                std::transform(std::begin(kBalancerModes),
+                               std::end(kBalancerModes),
+                               std::back_inserter(supportedModes),
+                               [](const char* supportedMode) -> std::string {
+                                   return std::string(supportedMode);
+                               });
+                LOGV2_WARNING(
+                    7575700,
+                    "Balancer turned off because currently set balancing mode is not valid",
+                    "currentMode"_attr = modeStr,
+                    "supportedModes"_attr = supportedModes);
+                settings._mode = kOff;
+            } else {
+                settings._mode = static_cast<BalancerMode>(it - std::begin(kBalancerModes));
             }
-
-            settings._mode = static_cast<BalancerMode>(it - std::begin(kBalancerModes));
         }
     }
 
