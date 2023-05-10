@@ -19,7 +19,6 @@ const commandsAddedToMongosSinceLastLTS = [
     "_clusterWriteWithoutShardKey",
     "abortReshardCollection",
     "analyze",
-    "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "appendOplogNote",
     "bulkWrite",
     "checkMetadataConsistency",
@@ -28,7 +27,6 @@ const commandsAddedToMongosSinceLastLTS = [
     "commitReshardCollection",
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",
-    "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "coordinateCommitTransaction",
     "createSearchIndexes",
     "dropSearchIndex",
