@@ -166,7 +166,7 @@ private:
 
 template <typename T>
 void normalTest(CollectionMarkersTest* fixture, std::string collectionName) {
-    T testMarkers(0, 0, 0);
+    auto testMarkers = std::make_shared<T>(0, 0, 0);
 
     auto opCtx = fixture->getClient()->makeOperationContext();
 
@@ -175,18 +175,18 @@ void normalTest(CollectionMarkersTest* fixture, std::string collectionName) {
 
     static constexpr auto dataLength = 4;
     auto [insertedRecordId, now] = fixture->insertElementWithCollectionMarkerUpdate(
-        opCtx.get(), collNs, testMarkers, dataLength);
+        opCtx.get(), collNs, *testMarkers, dataLength);
 
-    auto marker = testMarkers.peekOldestMarkerIfNeeded(opCtx.get());
+    auto marker = testMarkers->peekOldestMarkerIfNeeded(opCtx.get());
     ASSERT_TRUE(marker);
     ASSERT_EQ(marker->lastRecord, insertedRecordId);
     ASSERT_EQ(marker->bytes, dataLength);
     ASSERT_EQ(marker->wallTime, now);
     ASSERT_EQ(marker->records, 1);
 
-    testMarkers.popOldestMarker();
+    testMarkers->popOldestMarker();
 
-    ASSERT_FALSE(testMarkers.peekOldestMarkerIfNeeded(opCtx.get()));
+    ASSERT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
 };
 
 TEST_F(CollectionMarkersTest, NormalUsage) {
@@ -195,7 +195,7 @@ TEST_F(CollectionMarkersTest, NormalUsage) {
 }
 
 TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
-    TestCollectionMarkersWithPartialExpiration testMarkers(0, 0, 100);
+    auto testMarkers = std::make_shared<TestCollectionMarkersWithPartialExpiration>(0, 0, 100);
 
     auto opCtx = getClient()->makeOperationContext();
 
@@ -204,17 +204,17 @@ TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
 
     static constexpr auto dataLength = 4;
     auto [insertedRecordId, now] =
-        insertElementWithCollectionMarkerUpdate(opCtx.get(), collNs, testMarkers, dataLength);
+        insertElementWithCollectionMarkerUpdate(opCtx.get(), collNs, *testMarkers, dataLength);
 
-    ASSERT_FALSE(testMarkers.peekOldestMarkerIfNeeded(opCtx.get()));
+    ASSERT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
 
-    testMarkers.setExpirePartialMarker(false);
-    testMarkers.createPartialMarkerIfNecessary(opCtx.get());
-    ASSERT_FALSE(testMarkers.peekOldestMarkerIfNeeded(opCtx.get()));
+    testMarkers->setExpirePartialMarker(false);
+    testMarkers->createPartialMarkerIfNecessary(opCtx.get());
+    ASSERT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
 
-    testMarkers.setExpirePartialMarker(true);
-    testMarkers.createPartialMarkerIfNecessary(opCtx.get());
-    auto marker = testMarkers.peekOldestMarkerIfNeeded(opCtx.get());
+    testMarkers->setExpirePartialMarker(true);
+    testMarkers->createPartialMarkerIfNecessary(opCtx.get());
+    auto marker = testMarkers->peekOldestMarkerIfNeeded(opCtx.get());
     ASSERT_TRUE(marker);
 
     ASSERT_EQ(marker->lastRecord, insertedRecordId);
@@ -226,7 +226,7 @@ TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
 // Insert records into a collection and verify the number of markers that are created.
 template <typename T>
 void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionName) {
-    T testMarkers(0, 0, 100);
+    auto testMarkers = std::make_shared<T>(0, 0, 100);
 
     auto collNs = NamespaceString("test", collectionName);
     {
@@ -237,53 +237,53 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
 
-        ASSERT_EQ(0U, testMarkers.numMarkers());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
 
         // Inserting a record smaller than 'minBytesPerMarker' shouldn't create a new collection
         // marker.
         auto insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 99, Timestamp(1, 1), RecordId(1, 1));
+            opCtx.get(), collNs, *testMarkers, 99, Timestamp(1, 1), RecordId(1, 1));
         ASSERT_EQ(insertedRecordId, RecordId(1, 1));
-        ASSERT_EQ(0U, testMarkers.numMarkers());
-        ASSERT_EQ(1, testMarkers.currentRecords());
-        ASSERT_EQ(99, testMarkers.currentBytes());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
+        ASSERT_EQ(1, testMarkers->currentRecords());
+        ASSERT_EQ(99, testMarkers->currentBytes());
 
         // Inserting another record such that their combined size exceeds 'minBytesPerMarker' should
         // cause a new marker to be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 51, Timestamp(1, 2), RecordId(1, 2));
+            opCtx.get(), collNs, *testMarkers, 51, Timestamp(1, 2), RecordId(1, 2));
         ASSERT_EQ(insertedRecordId, RecordId(1, 2));
-        ASSERT_EQ(1U, testMarkers.numMarkers());
-        ASSERT_EQ(0, testMarkers.currentRecords());
-        ASSERT_EQ(0, testMarkers.currentBytes());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
+        ASSERT_EQ(0, testMarkers->currentRecords());
+        ASSERT_EQ(0, testMarkers->currentBytes());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one exceed 'minBytesPerMarker' shouldn't cause a new marker to be created because we've
         // started filling a new marker.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 50, Timestamp(1, 3), RecordId(1, 3));
+            opCtx.get(), collNs, *testMarkers, 50, Timestamp(1, 3), RecordId(1, 3));
         ASSERT_EQ(insertedRecordId, RecordId(1, 3));
-        ASSERT_EQ(1U, testMarkers.numMarkers());
-        ASSERT_EQ(1, testMarkers.currentRecords());
-        ASSERT_EQ(50, testMarkers.currentBytes());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
+        ASSERT_EQ(1, testMarkers->currentRecords());
+        ASSERT_EQ(50, testMarkers->currentBytes());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one is exactly equal to 'minBytesPerMarker' should cause a new marker to be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 50, Timestamp(1, 4), RecordId(1, 4));
+            opCtx.get(), collNs, *testMarkers, 50, Timestamp(1, 4), RecordId(1, 4));
         ASSERT_EQ(insertedRecordId, RecordId(1, 4));
-        ASSERT_EQ(2U, testMarkers.numMarkers());
-        ASSERT_EQ(0, testMarkers.currentRecords());
-        ASSERT_EQ(0, testMarkers.currentBytes());
+        ASSERT_EQ(2U, testMarkers->numMarkers());
+        ASSERT_EQ(0, testMarkers->currentRecords());
+        ASSERT_EQ(0, testMarkers->currentBytes());
 
         // Inserting a single record that exceeds 'minBytesPerMarker' should cause a new marker to
         // be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 101, Timestamp(1, 5), RecordId(1, 5));
+            opCtx.get(), collNs, *testMarkers, 101, Timestamp(1, 5), RecordId(1, 5));
         ASSERT_EQ(insertedRecordId, RecordId(1, 5));
-        ASSERT_EQ(3U, testMarkers.numMarkers());
-        ASSERT_EQ(0, testMarkers.currentRecords());
-        ASSERT_EQ(0, testMarkers.currentBytes());
+        ASSERT_EQ(3U, testMarkers->numMarkers());
+        ASSERT_EQ(0, testMarkers->currentRecords());
+        ASSERT_EQ(0, testMarkers->currentBytes());
     }
 }
 
@@ -296,7 +296,7 @@ TEST_F(CollectionMarkersTest, CreateNewMarker) {
 // records to not be in increasing order.
 template <typename T>
 void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionName) {
-    T testMarkers(0, 0, 100);
+    auto testMarkers = std::make_shared<T>(0, 0, 100);
 
     auto collNs = NamespaceString("test", collectionName);
     {
@@ -307,41 +307,41 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
 
-        ASSERT_EQ(0U, testMarkers.numMarkers());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
         auto insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 50, Timestamp(2, 2), RecordId(2, 2));
+            opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 2), RecordId(2, 2));
         ASSERT_EQ(insertedRecordId, RecordId(2, 2));
-        ASSERT_EQ(0U, testMarkers.numMarkers());
-        ASSERT_EQ(1, testMarkers.currentRecords());
-        ASSERT_EQ(50, testMarkers.currentBytes());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
+        ASSERT_EQ(1, testMarkers->currentRecords());
+        ASSERT_EQ(50, testMarkers->currentBytes());
 
         // Inserting a record that has a smaller RecordId than the previously inserted record should
         // be able to create a new marker when no markers already exist.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 50, Timestamp(2, 1), RecordId(2, 1));
+            opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 1), RecordId(2, 1));
         ASSERT_EQ(insertedRecordId, RecordId(2, 1));
-        ASSERT_EQ(1U, testMarkers.numMarkers());
-        ASSERT_EQ(0, testMarkers.currentRecords());
-        ASSERT_EQ(0, testMarkers.currentBytes());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
+        ASSERT_EQ(0, testMarkers->currentRecords());
+        ASSERT_EQ(0, testMarkers->currentBytes());
 
         // However, inserting a record that has a smaller RecordId than most recently created
         // marker's last record shouldn't cause a new marker to be created, even if the size of the
         // inserted record exceeds 'minBytesPerMarker'.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 100, Timestamp(1, 1), RecordId(1, 1));
+            opCtx.get(), collNs, *testMarkers, 100, Timestamp(1, 1), RecordId(1, 1));
         ASSERT_EQ(insertedRecordId, RecordId(1, 1));
-        ASSERT_EQ(1U, testMarkers.numMarkers());
-        ASSERT_EQ(1, testMarkers.currentRecords());
-        ASSERT_EQ(100, testMarkers.currentBytes());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
+        ASSERT_EQ(1, testMarkers->currentRecords());
+        ASSERT_EQ(100, testMarkers->currentBytes());
 
         // Inserting a record that has a larger RecordId than the most recently created marker's
         // last record should then cause a new marker to be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
-            opCtx.get(), collNs, testMarkers, 50, Timestamp(2, 3), RecordId(2, 3));
+            opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 3), RecordId(2, 3));
         ASSERT_EQ(insertedRecordId, RecordId(2, 3));
-        ASSERT_EQ(2U, testMarkers.numMarkers());
-        ASSERT_EQ(0, testMarkers.currentRecords());
-        ASSERT_EQ(0, testMarkers.currentBytes());
+        ASSERT_EQ(2U, testMarkers->numMarkers());
+        ASSERT_EQ(0, testMarkers->currentRecords());
+        ASSERT_EQ(0, testMarkers->currentBytes());
     }
 }
 TEST_F(CollectionMarkersTest, AscendingOrder) {

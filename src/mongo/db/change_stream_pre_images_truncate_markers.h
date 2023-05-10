@@ -32,21 +32,42 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 
 /**
- * Implementation of truncate markers for the pre-images collection.
+ * There is up to one 'config.system.preimages' collection per tenant. This pre-images
+ * collection contains pre-images for every collection UUID with pre-images enabled on the tenant.
+ * The pre-images collection is ordered by collection UUID, so that pre-images belonging to a given
+ * collection are grouped together. Additionally, pre-images for a given collection UUID are stored
+ * in timestamp order, which makes range truncation possible.
+ *
+ * Implementation of truncate markers for pre-images associated with a single collection UUID within
+ * a pre-images collection.
  */
 namespace mongo {
-class PreImagesTruncateMarkers final : public CollectionTruncateMarkersWithPartialExpiration {
+
+class PreImagesTruncateMarkersPerCollection final
+    : public CollectionTruncateMarkersWithPartialExpiration {
 public:
-    PreImagesTruncateMarkers(boost::optional<TenantId> tenantId,
-                             std::deque<Marker> markers,
-                             int64_t leftoverRecordsCount,
-                             int64_t leftoverRecordsBytes,
-                             int64_t minBytesPerMarker);
+    PreImagesTruncateMarkersPerCollection(boost::optional<TenantId> tenantId,
+                                          std::deque<Marker> markers,
+                                          int64_t leftoverRecordsCount,
+                                          int64_t leftoverRecordsBytes,
+                                          int64_t minBytesPerMarker);
+
+    /**
+     * Creates an initial set of markers for pre-images from 'nsUUID'.
+     */
+    static CollectionTruncateMarkers::InitialSetOfMarkers createTruncateMarkersByScanning(
+        OperationContext* opCtx,
+        RecordStore* rs,
+        const UUID& nsUUID,
+        RecordId& highestSeenRecordId,
+        Date_t& highestSeenWallTime);
 
 private:
-    friend class PreImagesTruncateMarkersTest;
+    friend class PreImagesTruncateMarkersPerCollectionTest;
 
     bool _hasExcessMarkers(OperationContext* opCtx) const override;
+
+    bool _hasPartialMarkerExpired(OperationContext* opCtx) const override;
 
     /**
      * When initialized, indicates this is a serverless environment.

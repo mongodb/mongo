@@ -164,7 +164,7 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
     const RecordId& highestInsertedRecordId,
     Date_t wallTime,
     int64_t countInserted) {
-    opCtx->recoveryUnit()->onCommit([collectionMarkers = this,
+    opCtx->recoveryUnit()->onCommit([collectionMarkers = shared_from_this(),
                                      bytesInserted,
                                      recordId = highestInsertedRecordId,
                                      wallTime,
@@ -496,26 +496,29 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
     const RecordId& highestInsertedRecordId,
     Date_t wallTime,
     int64_t countInserted) {
-    opCtx->recoveryUnit()->onCommit([collectionMarkers = this,
-                                     bytesInserted,
-                                     recordId = highestInsertedRecordId,
-                                     wallTime,
-                                     countInserted](OperationContext* opCtx, auto) {
-        invariant(bytesInserted >= 0);
-        invariant(recordId.isValid());
+    opCtx->recoveryUnit()->onCommit(
+        [collectionMarkers =
+             std::static_pointer_cast<CollectionTruncateMarkersWithPartialExpiration>(
+                 shared_from_this()),
+         bytesInserted,
+         recordId = highestInsertedRecordId,
+         wallTime,
+         countInserted](OperationContext* opCtx, auto) {
+            invariant(bytesInserted >= 0);
+            invariant(recordId.isValid());
 
-        // By putting the highest marker modification first we can guarantee than in the
-        // event of a race condition between expiring a partial marker the metrics increase
-        // will happen after the marker has been created. This guarantees that the metrics
-        // will eventually be correct as long as the expiration criteria checks for the
-        // metrics and the highest marker expiration.
-        collectionMarkers->_updateHighestSeenRecordIdAndWallTime(recordId, wallTime);
-        collectionMarkers->_currentRecords.addAndFetch(countInserted);
-        int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
-        if (newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
-            collectionMarkers->createNewMarkerIfNeeded(opCtx, recordId, wallTime);
-        }
-    });
+            // By putting the highest marker modification first we can guarantee than in the
+            // event of a race condition between expiring a partial marker the metrics increase
+            // will happen after the marker has been created. This guarantees that the metrics
+            // will eventually be correct as long as the expiration criteria checks for the
+            // metrics and the highest marker expiration.
+            collectionMarkers->_updateHighestSeenRecordIdAndWallTime(recordId, wallTime);
+            collectionMarkers->_currentRecords.addAndFetch(countInserted);
+            int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
+            if (newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
+                collectionMarkers->createNewMarkerIfNeeded(opCtx, recordId, wallTime);
+            }
+        });
 }
 
 void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecessary(

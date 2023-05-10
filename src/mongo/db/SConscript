@@ -551,6 +551,21 @@ env.Library(
 )
 
 env.Library(
+    target='change_stream_pre_image_util',
+    source=[
+        'change_stream_pre_image_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_preimage',
+        'change_stream_options_manager',
+        'change_stream_serverless_helpers',
+        'query_exec',
+        'record_id_helpers',
+        'server_base',
+    ],
+)
+
+env.Library(
     target='change_stream_pre_images_collection_manager',
     source=[
         'change_stream_pre_images_collection_manager.cpp',
@@ -567,6 +582,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/repl/storage_interface',
         'change_stream_options_manager',
+        'change_stream_pre_image_util',
         'change_stream_serverless_helpers',
         'query_exec',
         'record_id_helpers',
