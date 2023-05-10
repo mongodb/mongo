@@ -4,7 +4,7 @@ variables:
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
-    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
@@ -71,7 +71,7 @@ buildvariants:
     burn_in_tag_compile_task_dependency: archive_dist_test_debug
   depends_on:
   - name: archive_dist_test_debug
-    variant: linux-x86-dynamic-compile-required
+    variant: linux-x86-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.

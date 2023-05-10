@@ -67,12 +67,11 @@ variables:
 
 buildvariants:
 - <<: *linux-x86-dynamic-compile-params
-  name: &linux-x86-dynamic-compile-required linux-x86-dynamic-compile-required
-  display_name: "! Linux x86 Shared Library Compile & Static Analysis"
+  name: &linux-x86-dynamic-compile linux-x86-dynamic-compile
+  display_name: "* Linux x86 Shared Library"
   expansions:
     <<: *linux-x86-dynamic-compile-expansions
-    clang_tidy_toolchain: v4
-    compile_variant: *linux-x86-dynamic-compile-required
+    compile_variant: *linux-x86-dynamic-compile
   tasks:
     - name: compile_ninja_quick_TG
     - name: compile_test_and_package_parallel_unittest_stream_TG
@@ -80,11 +79,6 @@ buildvariants:
     - name: compile_test_and_package_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
-    - name: .lint
-    - name: resmoke_validation_tests
-    - name: clang_tidy_TG
-      distros:
-      - rhel80-xxlarge
     - name: server_discovery_and_monitoring_json_test_TG
       distros:
       - rhel80-large
@@ -157,15 +151,15 @@ buildvariants:
     - name: .stitch
 
 - <<: *linux-x86-dynamic-compile-params
-  name: &linux-crypt-compile-required linux-crypt-compile-required
-  display_name: "! Linux x86 Crypt Enterprise Compile"
+  name: &linux-crypt-compile linux-crypt-compile
+  display_name: "* Linux x86 Crypt Enterprise Compile"
   expansions:
     <<: *linux-x86-dynamic-compile-expansions
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    compile_variant: *linux-crypt-compile-required
+    compile_variant: *linux-crypt-compile
   tasks:
     - name: .crypt
     - name: crypt_build_debug_and_test
@@ -210,22 +204,29 @@ buildvariants:
 
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile
-  display_name: "* Amazon Linux 2 arm64 Shared Library Compile"
+  display_name: "! Amazon Linux 2 arm64 Shared Library Compile & Static Analysis"
   expansions:
     <<: *linux-arm64-dynamic-compile-expansions
+    clang_tidy_toolchain: v4
     compile_variant: *amazon-linux2-arm64-compile
   tasks:
+    - name: clang_tidy_TG
+      distros:
+        - amazon2-arm64-xlarge
+    - name: compile_ninja_quick_TG
     - name: compile_test_and_package_parallel_unittest_stream_TG
     - name: compile_test_and_package_parallel_core_stream_TG
     - name: compile_test_and_package_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
+    - name: .lint
+    - name: resmoke_validation_tests
     - name: server_discovery_and_monitoring_json_test_TG
     - name: server_selection_json_test_TG
 
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile
-  display_name: "* Amazon Linux 2 arm64 Crypt Compile"
+  display_name: "! Amazon Linux 2 arm64 Crypt Compile"
   expansions:
     <<: *linux-arm64-dynamic-compile-expansions
     compile_variant: *amazon-linux2-arm64-crypt-compile

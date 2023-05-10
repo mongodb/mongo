@@ -53,7 +53,6 @@
 # - func: "set up venv"
 
 include:
-- filename: etc/evergreen_yml_components/project_and_distro_settings.yml
 - filename: etc/evergreen_yml_components/definitions.yml
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/sanitizer.yml
@@ -73,7 +72,7 @@ variables:
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
-    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
@@ -1145,10 +1144,10 @@ buildvariants:
   - name: streams
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
-  display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
+  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags enterprise-rhel-80-64-bit-dynamic-all-feature-flags
+  display_name: "* Shared Library Enterprise RHEL 8.0 (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
@@ -1178,7 +1177,6 @@ buildvariants:
     variant: generate-tasks-for-version
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
-  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
@@ -1215,6 +1213,9 @@ buildvariants:
   - name: .config_fuzzer .large
     distros:
     - rhel80-medium
+  - name: .config_fuzzer_stress
+    distros:
+    - rhel80-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -1268,6 +1269,7 @@ buildvariants:
   - name: sharding_api_strict_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
+  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
@@ -1803,8 +1805,8 @@ buildvariants:
 - &enterprise-amazon-linux2-arm64-all-feature-flags-template
   <<: *amazon_linux2_arm64_compile_variant_dependency
   name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
-  display_name: "* Amazon Linux 2 arm64 (all feature flags)"
-  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  display_name: "! Amazon Linux 2 arm64 (all feature flags)"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
     - enterprise
   run_on:
@@ -1821,19 +1823,23 @@ buildvariants:
     max_sub_suites: 5
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
+    # TODO: These should be al2 specific variants however we haven't moved these variants over to al2
+    # For now we are not running burn_in_tag with al2
+    burn_in_tag_buildvariants: >-
+      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge,requires_external_data_source
   tasks:
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_passthrough
-  - name: cqf_parallel
+  - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic
   - name: query_golden_cqf
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
+  - name: burn_in_tags_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
@@ -1841,7 +1847,6 @@ buildvariants:
   - name: aggregation_repeat_queries
   - name: audit
   - name: .auth
-  #- name: burn_in_tags_gen
   - name: buildscripts_test
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
@@ -1850,6 +1855,10 @@ buildvariants:
   - name: .change_stream_fuzzer
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
+  - name: cqf
+  - name: cqf_disabled_pipeline_opt
+  - name: cqf_passthrough
+  - name: cqf_parallel
   - name: .misc_js
   - name: .clustered_collections
   - name: .concurrency !.large !.ubsan !.no_txns
@@ -1898,22 +1907,23 @@ buildvariants:
   - name: search_auth
   - name: search_pinned_connections_auth
   - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: sharding_api_version_jscore_passthrough_gen
-  - name: .sharding .txns
-  - name: .sharding .common
-  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: secondary_reads_passthrough_gen
   - name: .serverless
     distros:
     - amazon2-arm64-large
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-  - name: .updatefuzzer
-  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
   - name: .shard_split
   - name: .shard_merge
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: sharding_api_strict_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: .updatefuzzer
   - name: telemetry_passthrough
-
 
 ###########################################
 #     Experimental buildvariants          #
@@ -2692,20 +2702,20 @@ buildvariants:
   tasks:
   - name: win_shared_scons_cache_pruning
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-template
+- <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
   name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    <<: *linux_x86_generic_expansions
+    <<: *linux_arm64_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
-    commit_queue_alternate_cache: linux-x86-dynamic-compile-required
+    commit_queue_alternate_cache: amazon-linux2-arm64-compile
     has_packages: false
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=rhel80
+      MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
@@ -2719,20 +2729,18 @@ buildvariants:
   depends_on: []
   tasks:
   - name: compile_ninja_quick_TG
-    distros:
-    - rhel80-xlarge-commitqueue
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-xlarge-commitqueue
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-xlarge-commitqueue
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-xlarge-commitqueue
   - name: jsCore
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-large
   - name: .lint
   - name: test_api_version_compatibility
   - name: validate_commit_message
@@ -2742,7 +2750,7 @@ buildvariants:
   - name: resmoke_validation_tests
   - name: version_gen_validation
     distros:
-    - ubuntu2004-medium
+    - ubuntu2004-small
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
@@ -2815,7 +2823,7 @@ buildvariants:
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=resource_intensive
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -2830,7 +2838,7 @@ buildvariants:
       --excludeWithAnyTags=resource_intensive
       --excludeWithAnyTags=incompatible_with_shard_merge
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
