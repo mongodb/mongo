@@ -57,7 +57,7 @@ public:
 
         SerializationOptions opts;
         if (literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-            // TODO SERVER-75419 Use only 'literalPolicy.'
+            // TODO SERVER-75400 Use only 'literalPolicy.'
             opts.replacementForLiteralArgs = "?";
             opts.literalPolicy = literalPolicy;
         }
@@ -775,7 +775,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimpl
         })",
         shapified);
 
-    // TODO SERVER-75419 Use only 'literalPolicy.'
+    // TODO SERVER-75400 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.applyHmacToIdentifiers = true;
@@ -1070,7 +1070,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) {
     AggregateRequestShapifier aggShapifier(acr, *pipeline, expCtx->opCtx);
 
     SerializationOptions opts;
-    // TODO SERVER-75419 Use only 'literalPolicy.'
+    // TODO SERVER-75400 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.applyHmacToIdentifiers = true;
