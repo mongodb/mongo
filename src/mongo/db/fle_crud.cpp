@@ -405,7 +405,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     uint32_t numDocs = 0;
     write_ops::WriteCommandReplyBase writeBase;
 
-    // TODO: Remove with SERVER-73714
+    // This is an optimization for single-document unencrypted inserts.
     if (documents.size() == 1) {
         auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(documents[0]);
         if (serverPayload.size() == 0) {
