@@ -2225,6 +2225,8 @@ buildvariants:
       - name: crud_workloads_majority
       - name: mixed_workloads
       - name: tpcc
+      - name: linkbench
+      - name: linkbench2
 
   - name: linux-shard-lite-fle.2022-11
     display_name: Linux Shard Lite FLE 2022-11
@@ -3101,6 +3103,8 @@ buildvariants:
       - name: crud_workloads_w1
       - name: mixed_workloads
       - name: tpcc
+      - name: linkbench
+      - name: linkbench2
 
   - &linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm.2023-01
