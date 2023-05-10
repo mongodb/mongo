@@ -240,12 +240,6 @@ void validateEncryptedFieldConfig(const EncryptedFieldConfig* config) {
             "Encrypted State Collection name should follow enxcol_.<collection>.esc naming pattern",
             NamespaceString("", config->getEscCollection().get()).isFLE2StateCollection());
     }
-    if (config->getEccCollection()) {
-        uassert(
-            7406901,
-            "Encrypted Cache Collection name should follow enxcol_.<collection>.ecc naming pattern",
-            NamespaceString("", config->getEccCollection().get()).isFLE2StateCollection());
-    }
     if (config->getEcocCollection()) {
         uassert(7406902,
                 "Encrypted Compaction Collection name should follow enxcol_.<collection>.ecoc "

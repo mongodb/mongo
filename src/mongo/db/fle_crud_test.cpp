@@ -208,7 +208,7 @@ protected:
 
     void createCollection(const NamespaceString& ns);
 
-    void assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc, uint64_t ecoc);
+    void assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecoc);
 
     void testValidateEncryptedFieldInfo(BSONObj obj, bool bypassValidation);
 
@@ -447,15 +447,11 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
     return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(rangeSchemaV2));
 }
 
-void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecc, StringData ecoc) {
+void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecoc) {
 
     auto invalidCollectionNameSchema =
         // "{" +
-        fmt::format(
-            "{{\"escCollection\": \"{}\", \"eccCollection\": \"{}\", \"ecocCollection\": \"{}\", ",
-            esc,
-            ecc,
-            ecoc) +
+        fmt::format("{{\"escCollection\": \"{}\", \"ecocCollection\": \"{}\", ", esc, ecoc) +
         R"(
         "fields": [
             {
@@ -475,7 +471,7 @@ void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecc, StringData
     EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(invalidCollectionNameSchema));
 }
 
-void FleCrudTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc, uint64_t ecoc) {
+void FleCrudTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecoc) {
     ASSERT_EQ(_queryImpl->countDocuments(_edcNs), edc);
     ASSERT_EQ(_queryImpl->countDocuments(_escNs), esc);
     ASSERT_EQ(_queryImpl->countDocuments(_ecocNs), ecoc);
@@ -788,7 +784,7 @@ TEST_F(FleCrudTest, InsertOne) {
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
     assertECOCDocumentCountByField("encrypted", 1);
 
     ASSERT_FALSE(
@@ -801,7 +797,7 @@ TEST_F(FleCrudTest, InsertOneRange) {
     auto element = doc.firstElement();
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
-    assertDocumentCounts(1, 5, 0, 5);
+    assertDocumentCounts(1, 5, 5);
     assertECOCDocumentCountByField("encrypted", 5);
 }
 
@@ -814,7 +810,7 @@ TEST_F(FleCrudTest, InsertTwoSame) {
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
     doSingleInsert(2, element, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(2, 2, 0, 2);
+    assertDocumentCounts(2, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 
     auto escTagToken = getTestESCToken(element);
@@ -834,7 +830,7 @@ TEST_F(FleCrudTest, InsertTwoDifferent) {
                    BSON("encrypted"
                         << "topsecret"));
 
-    assertDocumentCounts(2, 2, 0, 2);
+    assertDocumentCounts(2, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 
     ASSERT_FALSE(
@@ -862,7 +858,7 @@ TEST_F(FleCrudTest, Insert100Fields) {
     };
     doSingleWideInsert(1, fieldCount, valueGenerator);
 
-    assertDocumentCounts(1, fieldCount, 0, fieldCount);
+    assertDocumentCounts(1, fieldCount, fieldCount);
 
     for (uint64_t field = 0; field < fieldCount; field++) {
         auto fieldName = fieldNameFromInt(field);
@@ -894,7 +890,7 @@ TEST_F(FleCrudTest, Insert20Fields50Rows) {
         doSingleWideInsert(row, fieldCount, valueGenerator);
     }
 
-    assertDocumentCounts(rowCount, rowCount * fieldCount, 0, rowCount * fieldCount);
+    assertDocumentCounts(rowCount, rowCount * fieldCount, rowCount * fieldCount);
 
     for (uint64_t row = 0; row < rowCount; row++) {
         for (uint64_t field = 0; field < fieldCount; field++) {
@@ -1015,7 +1011,7 @@ TEST_F(FleCrudTest, InsertAndDeleteOne) {
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     ASSERT_FALSE(
         _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
@@ -1023,7 +1019,7 @@ TEST_F(FleCrudTest, InsertAndDeleteOne) {
 
     doSingleDelete(1, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(0, 1, 0, 1);
+    assertDocumentCounts(0, 1, 1);
     assertECOCDocumentCountByField("encrypted", 1);
 }
 
@@ -1034,11 +1030,11 @@ TEST_F(FleCrudTest, InsertAndDeleteOneRange) {
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(1, 5, 0, 5);
+    assertDocumentCounts(1, 5, 5);
 
     doSingleDelete(1, Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(0, 5, 0, 5);
+    assertDocumentCounts(0, 5, 5);
     assertECOCDocumentCountByField("encrypted", 5);
 }
 
@@ -1051,7 +1047,7 @@ TEST_F(FleCrudTest, InsertTwoSameAndDeleteTwo) {
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
     doSingleInsert(2, element, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(2, 2, 0, 2);
+    assertDocumentCounts(2, 2, 2);
 
     ASSERT_FALSE(
         _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
@@ -1060,7 +1056,7 @@ TEST_F(FleCrudTest, InsertTwoSameAndDeleteTwo) {
     doSingleDelete(2, Fle2AlgorithmInt::kEquality);
     doSingleDelete(1, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(0, 2, 0, 2);
+    assertDocumentCounts(0, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 }
 
@@ -1073,12 +1069,12 @@ TEST_F(FleCrudTest, InsertTwoDifferentAndDeleteTwo) {
                    BSON("encrypted"
                         << "topsecret"));
 
-    assertDocumentCounts(2, 2, 0, 2);
+    assertDocumentCounts(2, 2, 2);
 
     doSingleDelete(2, Fle2AlgorithmInt::kEquality);
     doSingleDelete(1, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(0, 2, 0, 2);
+    assertDocumentCounts(0, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 }
 
@@ -1087,11 +1083,11 @@ TEST_F(FleCrudTest, InsertOneButDeleteAnother) {
     doSingleInsert(1,
                    BSON("encrypted"
                         << "secret"));
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     doSingleDelete(2, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
     assertECOCDocumentCountByField("encrypted", 1);
 }
 
@@ -1102,13 +1098,13 @@ TEST_F(FleCrudTest, UpdateOne) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     doSingleUpdate(1,
                    BSON("encrypted"
                         << "top secret"));
 
-    assertDocumentCounts(1, 2, 0, 2);
+    assertDocumentCounts(1, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 
     validateDocument(1,
@@ -1125,14 +1121,14 @@ TEST_F(FleCrudTest, UpdateOneRange) {
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(1, 5, 0, 5);
+    assertDocumentCounts(1, 5, 5);
 
     auto doc2 = BSON("encrypted" << 2);
     auto elem2 = doc2.firstElement();
 
     doSingleUpdate(1, elem2, Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(1, 10, 0, 10);
+    assertDocumentCounts(1, 10, 10);
 
     validateDocument(1,
                      BSON("_id" << 1 << "counter" << 2 << "plainText"
@@ -1147,13 +1143,13 @@ TEST_F(FleCrudTest, UpdateOneSameValue) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     doSingleUpdate(1,
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 2, 0, 2);
+    assertDocumentCounts(1, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 
     validateDocument(1,
@@ -1170,7 +1166,7 @@ TEST_F(FleCrudTest, UpdateOneReplace) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     auto replace = BSON("encrypted"
                         << "top secret");
@@ -1190,7 +1186,7 @@ TEST_F(FleCrudTest, UpdateOneReplace) {
         Fle2AlgorithmInt::kEquality);
 
 
-    assertDocumentCounts(1, 2, 0, 2);
+    assertDocumentCounts(1, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 
     validateDocument(1,
@@ -1207,7 +1203,7 @@ TEST_F(FleCrudTest, UpdateOneReplaceRange) {
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(1, 5, 0, 5);
+    assertDocumentCounts(1, 5, 5);
 
     auto replace = BSON("encrypted" << 2);
     auto buf = generateSinglePlaceholder(replace.firstElement(), Fle2AlgorithmInt::kRange);
@@ -1224,7 +1220,7 @@ TEST_F(FleCrudTest, UpdateOneReplaceRange) {
         write_ops::UpdateModification(result, write_ops::UpdateModification::ReplacementTag{}),
         Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(1, 10, 0, 10);
+    assertDocumentCounts(1, 10, 10);
 
     validateDocument(1,
                      BSON("_id" << 1 << "plaintext"
@@ -1240,7 +1236,7 @@ TEST_F(FleCrudTest, RenameSafeContent) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     BSONObjBuilder builder;
     builder.append("$inc", BSON("counter" << 1));
@@ -1257,7 +1253,7 @@ TEST_F(FleCrudTest, SetSafeContent) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     BSONObjBuilder builder;
     builder.append("$inc", BSON("counter" << 1));
@@ -1280,16 +1276,10 @@ TEST_F(FleCrudTest, testValidateEncryptedFieldConfig) {
 // Test that EDCServerCollection::validateEncryptedFieldInfo throws an error when collection names
 // do not match naming rules.
 TEST_F(FleCrudTest, testValidateEncryptedFieldConfigFields) {
-    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig(
-                           "enxcol_.coll.esc1", "enxcol_.coll.ecc", "enxcol_.coll.ecoc"),
+    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig("enxcol_.coll.esc1", "enxcol_.coll.ecoc"),
                        DBException,
                        7406900);
-    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig(
-                           "enxcol_.coll.esc", "enxcol_.coll.ecc1", "enxcol_.coll.ecoc"),
-                       DBException,
-                       7406901);
-    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig(
-                           "enxcol_.coll.esc", "enxcol_.coll.ecc", "enxcol_.coll.ecoc1"),
+    ASSERT_THROWS_CODE(parseEncryptedInvalidFieldConfig("enxcol_.coll.esc", "enxcol_.coll.ecoc1"),
                        DBException,
                        7406902);
 }
@@ -1300,7 +1290,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     auto doc = BSON("encrypted"
                     << "top secret");
@@ -1320,7 +1310,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
         write_ops::UpdateModification(result, write_ops::UpdateModification::ModifierUpdateTag{}));
     doFindAndModify(req, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(1, 2, 0, 2);
+    assertDocumentCounts(1, 2, 2);
     assertECOCDocumentCountByField("encrypted", 2);
 
     validateDocument(1,
@@ -1338,7 +1328,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOneRange) {
 
     doSingleInsert(1, firstDoc.firstElement(), Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(1, 5, 0, 5);
+    assertDocumentCounts(1, 5, 5);
 
     auto doc = BSON("encrypted" << 2);
     auto element = doc.firstElement();
@@ -1357,7 +1347,7 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOneRange) {
         write_ops::UpdateModification(result, write_ops::UpdateModification::ModifierUpdateTag{}));
     doFindAndModify(req, Fle2AlgorithmInt::kRange);
 
-    assertDocumentCounts(1, 10, 0, 10);
+    assertDocumentCounts(1, 10, 10);
     assertECOCDocumentCountByField("encrypted", 10);
 
     validateDocument(1,
@@ -1375,14 +1365,14 @@ TEST_F(FleCrudTest, FindAndModify_InsertAndDeleteOne) {
 
     doSingleInsert(1, element, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     write_ops::FindAndModifyCommandRequest req(_edcNs);
     req.setQuery(BSON("_id" << 1));
     req.setRemove(true);
     doFindAndModify(req, Fle2AlgorithmInt::kEquality);
 
-    assertDocumentCounts(0, 1, 0, 1);
+    assertDocumentCounts(0, 1, 1);
     assertECOCDocumentCountByField("encrypted", 1);
 }
 
@@ -1393,7 +1383,7 @@ TEST_F(FleCrudTest, FindAndModify_RenameSafeContent) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     BSONObjBuilder builder;
     builder.append("$inc", BSON("counter" << 1));
@@ -1419,7 +1409,7 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
                    BSON("encrypted"
                         << "secret"));
 
-    assertDocumentCounts(1, 1, 0, 1);
+    assertDocumentCounts(1, 1, 1);
 
     BSONObjBuilder builder;
     builder.append("$inc", BSON("counter" << 1));

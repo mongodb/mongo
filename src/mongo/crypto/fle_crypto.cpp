@@ -4992,6 +4992,14 @@ PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
     return prf(key, bufValue);
 }
 
+void FLEUtil::checkEFCForECC(const EncryptedFieldConfig& efc) {
+    uassert(7568300,
+            str::stream()
+                << "Queryable Encryption version 2 collections nust not contain the eccCollection"
+                << " in EncryptedFieldConfig",
+            !efc.getEccCollection());
+}
+
 StatusWith<std::vector<uint8_t>> FLEUtil::decryptData(ConstDataRange key,
                                                       ConstDataRange cipherText) {
     auto plainTextLength = fle2GetPlainTextLength(cipherText.length());

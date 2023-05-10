@@ -275,6 +275,8 @@ public:
                         "Encrypted collections are not supported on standalone",
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
                             repl::ReplicationCoordinator::Mode::modeReplSet);
+
+                FLEUtil::checkEFCForECC(cmd.getEncryptedFields().get());
             }
 
             if (auto timeseries = cmd.getTimeseries()) {

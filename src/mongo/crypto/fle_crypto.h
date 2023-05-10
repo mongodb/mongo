@@ -1552,6 +1552,8 @@ public:
 
     static PrfBlock prf(ConstDataRange key, uint64_t value);
 
+    static void checkEFCForECC(const EncryptedFieldConfig& efc);
+
     /**
      * Decrypt AES-256-CTR encrypted data. Exposed for benchmarking purposes.
      */
