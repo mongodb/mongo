@@ -86,7 +86,7 @@ const assertExpectedResults = (results,
     // Since the cursor hasn't been exhausted yet, ensure no telemetry results have been written
     // yet.
     let telemetry = getTelemetry(db);
-    assert.eq(0, telemetry.length, telemetry);
+    assert.eq(0, telemetry.length);
 
     // Run a getMore to exhaust the cursor, then ensure telemetry results have been written
     // accurately. batchSize must be 2 so the cursor recognizes exhaustion.
@@ -97,7 +97,7 @@ const assertExpectedResults = (results,
     }));  // returns 1 doc, exhausts the cursor
     // The $telemetry query for the previous `getTelemetry` is included in this call to $telemetry.
     telemetry = getTelemetry(db);
-    assert.eq(2, telemetry.length, telemetry);
+    assert.eq(2, telemetry.length);
     assertExpectedResults(telemetry[0],
                           telemetryKey,
                           /* expectedExecCount */ 1,
@@ -112,7 +112,7 @@ const assertExpectedResults = (results,
     coll.find({v: {$gt: 0, $lt: 1}}).batchSize(10).toArray();  // returns 0 docs
     coll.find({v: {$gt: 0, $lt: 2}}).batchSize(10).toArray();  // return 1 doc
     telemetry = getTelemetry(db);
-    assert.eq(2, telemetry.length, telemetry);
+    assert.eq(2, telemetry.length);
     assertExpectedResults(telemetry[0],
                           telemetryKey,
                           /* expectedExecCount */ 4,
@@ -150,7 +150,7 @@ const assertExpectedResults = (results,
     // Since the cursor hasn't been exhausted yet, ensure no telemetry results have been written
     // yet.
     let telemetry = getTelemetry(db);
-    assert.eq(0, telemetry.length, telemetry);
+    assert.eq(0, telemetry.length);
 
     // Run a getMore to exhaust the cursor, then ensure telemetry results have been written
     // accurately. batchSize must be 2 so the cursor recognizes exhaustion.
@@ -161,7 +161,7 @@ const assertExpectedResults = (results,
     }));  // returns 1 doc, exhausts the cursor
     // The $telemetry query for the previous `getTelemetry` is included in this call to $telemetry.
     telemetry = getTelemetry(db);
-    assert.eq(2, telemetry.length, telemetry);
+    assert.eq(2, telemetry.length);
     assertExpectedResults(telemetry[0],
                           telemetryKey,
                           /* expectedExecCount */ 1,
@@ -185,7 +185,7 @@ const assertExpectedResults = (results,
         {$project: {hello: "$galaxy"}},
     ]);  // returns 1 doc
     telemetry = getTelemetry(db);
-    assert.eq(2, telemetry.length, telemetry);
+    assert.eq(2, telemetry.length);
     assertExpectedResults(telemetry[0],
                           telemetryKey,
                           /* expectedExecCount */ 4,

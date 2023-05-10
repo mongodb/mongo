@@ -75,7 +75,6 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation),
-      _telemetryStoreKeyHash(CurOp::get(opCtx)->debug().telemetryStoreKeyHash),
       _telemetryStoreKey(CurOp::get(opCtx)->debug().telemetryStoreKey),
       _telemetryRequestShapifier(std::move(CurOp::get(opCtx)->debug().telemetryRequestShapifier)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
@@ -137,9 +136,8 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
 
-    if (_telemetryStoreKeyHash && opCtx) {
+    if (_telemetryStoreKey && opCtx) {
         telemetry::writeTelemetry(opCtx,
-                                  _telemetryStoreKeyHash,
                                   _telemetryStoreKey,
                                   std::move(_telemetryRequestShapifier),
                                   _metrics.executionTime.value_or(Microseconds{0}).count(),

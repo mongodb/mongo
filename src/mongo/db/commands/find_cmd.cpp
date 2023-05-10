@@ -778,7 +778,7 @@ public:
                 }
                 // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
                 // FLE rewrite.
-                CurOp::get(opCtx)->debug().telemetryStoreKeyHash = boost::none;
+                CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
             }
 

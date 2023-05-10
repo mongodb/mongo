@@ -447,9 +447,8 @@ private:
     boost::optional<uint32_t> _planCacheKey;
     boost::optional<uint32_t> _queryHash;
 
+    // The shape of the original query serialized with readConcern, application name, and namespace.
     // If boost::none, telemetry should not be collected for this cursor.
-    boost::optional<std::size_t> _telemetryStoreKeyHash;
-    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
     boost::optional<BSONObj> _telemetryStoreKey;
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like telemetry.
