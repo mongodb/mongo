@@ -115,7 +115,7 @@ function exit_with_code() {
 function setup_test_definition() {
   "$k_mongo" --nodb --norc --quiet --eval='
         assert(load("'"$k_test_path"'"));
-        (() => { 
+        (() => {
             const test = new TestDefinition();
             print("Running setup() for '"$k_test_path"'");
             test.setup();
@@ -128,15 +128,13 @@ function run_test() {
         assert(load("'"$k_test_path"'"));
         print("Running test '"$k_test_path"'");
 
-	(() => {
-            const test = new TestDefinition();
+        const test = new TestDefinition();
 
-            try {
-                test.run();
-            } finally {
-                test.teardown();
-            }
-        })();
+        try {
+            await test.run();
+        } finally {
+            test.teardown();
+        }
     ' || fail_and_exit_err "Test failed"
 
   echo "SUCCESS: $k_test_path"

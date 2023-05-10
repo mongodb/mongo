@@ -57,7 +57,7 @@ class SelinuxBaseTest {
      * Called by test executors (e.g. evergreen/selinux_test_executor.sh)
      * to run the test. Inheriting classes must override this to run their tests
      */
-    run() {
+    async run() {
         assert("override this function");
     }
 }

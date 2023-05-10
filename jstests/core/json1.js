@@ -1,5 +1,6 @@
 
 let x = {quotes: "a\"b", nulls: null};
+let y;
 eval("y = " + tojson(x));
 assert.eq(tojson(x), tojson(y), "A");
 assert.eq(typeof (x.nulls), typeof (y.nulls), "B");
