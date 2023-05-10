@@ -49,7 +49,13 @@ public:
     // Performs the necessary work needed for waiting. Should be called prior calling waitUntil().
     virtual void prepareForWait(OperationContext* opCtx) = 0;
 
-    // Blocks the caller until an insert event is fired or the deadline is hit.
+    // Performs any necessary steps after waiting. Should be called after waitUntil().
+    // After calling doneWaiting, the caller must attempt to read the data waited for before
+    // calling prepareForWait and waitUntil again, or a spurious wait may occur.
+    virtual void doneWaiting(OperationContext* opCtx) = 0;
+
+    // Blocks the caller until an insert event is fired or the deadline is hit.  Must be robust
+    // to being called multiple times without an intervening read.
     virtual void waitUntil(OperationContext* opCtx, Date_t deadline) = 0;
 };
 
@@ -61,17 +67,22 @@ public:
 
     void prepareForWait(OperationContext* opCtx) final {
         invariant(_notifier);
+        _currentVersion = _notifier->getVersion();
     }
 
     void waitUntil(OperationContext* opCtx, Date_t deadline) final {
-        auto currentVersion = _notifier->getVersion();
         _notifier->waitUntil(opCtx, _lastEOFVersion, deadline);
-        _lastEOFVersion = currentVersion;
+    }
+
+    void doneWaiting(OperationContext* opCtx) final {
+        _lastEOFVersion = _currentVersion;
     }
 
 private:
     std::shared_ptr<CappedInsertNotifier> _notifier;
     uint64_t _lastEOFVersion = ~uint64_t(0);
+    // This will be initialized by prepareForWait.
+    uint64_t _currentVersion;
 };
 
 // Class used to notify listeners on majority committed point advancement events.
@@ -102,6 +113,8 @@ public:
             }
         });
     }
+
+    void doneWaiting(OperationContext* opCtx) final {}
 
 private:
     repl::OpTime _opTimeToBeMajorityCommitted;
