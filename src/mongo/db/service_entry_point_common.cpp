@@ -1772,6 +1772,7 @@ void ExecCommandDatabase::_initiateCommand() {
                         "directShardOperations role. Please connect via a router.",
                         "command"_attr = request.getCommandName());
                 }
+                ShardingStatistics::get(opCtx).unauthorizedDirectShardOperations.addAndFetch(1);
             }
         }
     }

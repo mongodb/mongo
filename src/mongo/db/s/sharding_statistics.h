@@ -129,6 +129,11 @@ struct ShardingStatistics {
     // Current number for chunkMigrationConcurrency that defines concurrent fetchers and inserters
     // used for _migrateClone(step 4) of chunk migration
     AtomicWord<int> chunkMigrationConcurrencyCnt{1};
+
+    // Total number of commands run directly against this shard without the directShardOperations
+    // role.
+    AtomicWord<long long> unauthorizedDirectShardOperations{0};
+
     /**
      * Obtains the per-process instance of the sharding statistics object.
      */

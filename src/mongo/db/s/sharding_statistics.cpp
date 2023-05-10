@@ -81,6 +81,12 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe())
         builder->append("chunkMigrationConcurrency", chunkMigrationConcurrencyCnt.load());
+    // The serverStatus command is run before the FCV is initialized so we ignore it when
+    // checking whether the direct shard operations feature flag is enabled.
+    if (mongo::feature_flags::gCheckForDirectShardOperations
+            .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        builder->append("unauthorizedDirectShardOps", unauthorizedDirectShardOperations.load());
+    }
 }
 
 }  // namespace mongo
