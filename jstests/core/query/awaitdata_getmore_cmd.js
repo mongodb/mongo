@@ -145,8 +145,13 @@ if (FixtureHelpers.isReplSet(db)) {
 
     jsTestLog('Check that tailing the oplog with awaitData eventually ends up returning ' +
               'an empty batch after hitting the timeout.');
-    cmdRes = localDB.runCommand(
-        {find: oplogColl.getName(), batchSize: 2, awaitData: true, tailable: true});
+    cmdRes = localDB.runCommand({
+        find: oplogColl.getName(),
+        batchSize: 2,
+        awaitData: true,
+        tailable: true,
+        filter: {ns: {$ne: "config.system.sessions"}}
+    });
     assert.commandWorked(cmdRes);
     jsTestLog('Oplog tailing result: ' + tojson(cmdRes));
     if (cmdRes.cursor.id > NumberLong(0)) {
@@ -162,7 +167,7 @@ if (FixtureHelpers.isReplSet(db)) {
 
         jsTestLog('Keep issuing getMore on the oplog until we get an empty batch after the ' +
                   'timeout expires.');
-        while (cmdRes.cursor.nextBatch.length > 0) {
+        assert.soon(() => {
             now = new Date();
             cmdRes = localDB.runCommand(
                 {getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 4000});
@@ -170,7 +175,8 @@ if (FixtureHelpers.isReplSet(db)) {
             jsTestLog('oplog tailing cursor getMore: ' + now + ': ' + tojson(cmdRes));
             assert.gt(cmdRes.cursor.id, NumberLong(0));
             assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
-        }
+            return cmdRes.cursor.nextBatch.length == 0;
+        });
         assert.gte((new Date()) - now, 2000);
     }
 }
