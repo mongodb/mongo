@@ -151,8 +151,6 @@ all:
   ticket: SERVER-71219
 - test_file: jstests/core/partial_index_logical.js
   ticket: SERVER-68434
-- test_file: jstests/sharding/shard_keys_with_dollar_sign.js
-  ticket: SERVER-74124
 - test_file: jstests/core/map_reduce_subplanning.js
   ticket: SERVER-74131
 - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js

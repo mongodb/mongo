@@ -1,6 +1,9 @@
 /**
- * Tests that the shardCollection command command correctly rejects a shard key that has a field
- * name with parts that start with '$'.
+ * Tests that the shardCollection command correctly rejects a shard key that has a field name that
+ * starts with '$' or contains parts that start with '$' unless the part is a DBRef (i.e. is equal
+ * to '$id', '$db' or '$ref').
+ *
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
@@ -43,6 +46,15 @@ testValidation({"$": 1}, {isValidIndexKey: false, isValidShardKey: false});
 testValidation({"x$": 1}, {isValidIndexKey: true, isValidShardKey: true});
 testValidation({"x$.y": 1}, {isValidIndexKey: true, isValidShardKey: true});
 testValidation({"x.y$": 1}, {isValidIndexKey: true, isValidShardKey: true});
+
+// Verify that a shard key can have a field that contains a DBRef as long as the field itself
+// does not start with '$'.
+testValidation({"$id": 1}, {isValidIndexKey: false, isValidShardKey: false});
+testValidation({"$db": 1}, {isValidIndexKey: false, isValidShardKey: false});
+testValidation({"$ref": 1}, {isValidIndexKey: false, isValidShardKey: false});
+testValidation({"x.$id": 1}, {isValidIndexKey: true, isValidShardKey: true});
+testValidation({"x.$db": 1}, {isValidIndexKey: true, isValidShardKey: true});
+testValidation({"x.$ref": 1}, {isValidIndexKey: true, isValidShardKey: true});
 
 st.stop();
 })();
