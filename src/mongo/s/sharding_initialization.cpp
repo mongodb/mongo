@@ -213,13 +213,9 @@ Status initializeGlobalShardingState(
     LogicalTimeValidator::set(service, std::make_unique<LogicalTimeValidator>(keyManager));
     initializeTenantToShardCache(service);
 
-    // The checks below ignore the FCV because FCV is not initialized until after the replica set
-    // is initiated.
-    if (analyze_shard_key::isFeatureFlagEnabled(true /* ignoreFCV */)) {
-        analyze_shard_key::QueryAnalysisClient::get(opCtx).setTaskExecutor(
-            service, Grid::get(service)->getExecutorPool()->getFixedExecutor());
-    }
-    if (analyze_shard_key::supportsSamplingQueries(service, true /* ignoreFCV */)) {
+    analyze_shard_key::QueryAnalysisClient::get(opCtx).setTaskExecutor(
+        service, Grid::get(service)->getExecutorPool()->getFixedExecutor());
+    if (analyze_shard_key::supportsSamplingQueries(service)) {
         analyze_shard_key::QueryAnalysisSampler::get(service).onStartup();
     }
 

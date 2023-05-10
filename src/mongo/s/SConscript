@@ -174,7 +174,6 @@ env.Library(
     source=[
         'analyze_shard_key_common.idl',
         'analyze_shard_key_documents.idl',
-        'analyze_shard_key_feature_flag.idl',
         'analyze_shard_key_server_parameters.idl',
         'analyze_shard_key_role.cpp',
         'query_analysis_sample_tracker.cpp',

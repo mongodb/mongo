@@ -290,9 +290,7 @@ QueryAnalysisWriter* QueryAnalysisWriter::get(ServiceContext* serviceContext) {
 }
 
 bool QueryAnalysisWriter::shouldRegisterReplicaSetAwareService() const {
-    // This is invoked when the Register above is constructed which is before FCV is set so we need
-    // to ignore FCV when checking if the feature flag is enabled.
-    return supportsPersistingSampledQueries(true /* isReplEnabled */, true /* ignoreFCV */);
+    return supportsPersistingSampledQueries(true /* isReplEnabled */);
 }
 
 void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {

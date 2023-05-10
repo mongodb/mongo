@@ -31,7 +31,6 @@
 
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/is_mongos.h"
 
 namespace mongo {
@@ -49,20 +48,7 @@ bool isReplEnabled(ServiceContext* serviceContext) {
 
 }  // namespace
 
-bool isFeatureFlagEnabled(bool ignoreFCV) {
-    if (ignoreFCV) {
-        // (Ignore FCV check): In the following cases, ignoreFCV is set to true.
-        // 1. The call is before FCV initialization.
-        // 2. We want to stop QueryAnalysisSampler regardless of FCV.
-        return gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCVUnsafe();
-    }
-    return gFeatureFlagAnalyzeShardKey.isEnabled(serverGlobalParams.featureCompatibility);
-}
-
-bool supportsCoordinatingQueryAnalysis(bool isReplEnabled, bool ignoreFCV) {
-    if (!isFeatureFlagEnabled(ignoreFCV)) {
-        return false;
-    }
+bool supportsCoordinatingQueryAnalysis(bool isReplEnabled) {
     if (isMongos()) {
         return false;
     }
@@ -71,14 +57,11 @@ bool supportsCoordinatingQueryAnalysis(bool isReplEnabled, bool ignoreFCV) {
          serverGlobalParams.clusterRole.has(ClusterRole::None));
 }
 
-bool supportsCoordinatingQueryAnalysis(OperationContext* opCtx, bool ignoreFCV) {
-    return supportsCoordinatingQueryAnalysis(isReplEnabled(opCtx->getServiceContext()), ignoreFCV);
+bool supportsCoordinatingQueryAnalysis(OperationContext* opCtx) {
+    return supportsCoordinatingQueryAnalysis(isReplEnabled(opCtx->getServiceContext()));
 }
 
-bool supportsPersistingSampledQueries(bool isReplEnabled, bool ignoreFCV) {
-    if (!isFeatureFlagEnabled(ignoreFCV)) {
-        return false;
-    }
+bool supportsPersistingSampledQueries(bool isReplEnabled) {
     if (isMongos()) {
         return false;
     }
@@ -87,14 +70,11 @@ bool supportsPersistingSampledQueries(bool isReplEnabled, bool ignoreFCV) {
          serverGlobalParams.clusterRole.has(ClusterRole::None));
 }
 
-bool supportsPersistingSampledQueries(OperationContext* opCtx, bool ignoreFCV) {
-    return supportsPersistingSampledQueries(isReplEnabled(opCtx->getServiceContext()), ignoreFCV);
+bool supportsPersistingSampledQueries(OperationContext* opCtx) {
+    return supportsPersistingSampledQueries(isReplEnabled(opCtx->getServiceContext()));
 }
 
-bool supportsSamplingQueries(bool isReplEnabled, bool ignoreFCV) {
-    if (!isFeatureFlagEnabled(ignoreFCV)) {
-        return false;
-    }
+bool supportsSamplingQueries(bool isReplEnabled) {
     if (isMongos()) {
         return true;
     }
@@ -103,12 +83,12 @@ bool supportsSamplingQueries(bool isReplEnabled, bool ignoreFCV) {
          serverGlobalParams.clusterRole.has(ClusterRole::None));
 }
 
-bool supportsSamplingQueries(ServiceContext* serviceContext, bool ignoreFCV) {
-    return supportsSamplingQueries(isReplEnabled(serviceContext), ignoreFCV);
+bool supportsSamplingQueries(ServiceContext* serviceContext) {
+    return supportsSamplingQueries(isReplEnabled(serviceContext));
 }
 
-bool supportsSamplingQueries(OperationContext* opCtx, bool ignoreFCV) {
-    return supportsSamplingQueries(opCtx->getServiceContext(), ignoreFCV);
+bool supportsSamplingQueries(OperationContext* opCtx) {
+    return supportsSamplingQueries(opCtx->getServiceContext());
 }
 
 }  // namespace analyze_shard_key

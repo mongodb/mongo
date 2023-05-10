@@ -32,7 +32,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
@@ -125,10 +124,7 @@ public:
         return "Starts or stops collecting metrics about read and write queries against "
                "collection.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ConfigureQueryAnalyzerCmd,
-                                       analyze_shard_key::gFeatureFlagAnalyzeShardKey);
+} configureQueryAnalyzerCmd;
 
 }  // namespace
 

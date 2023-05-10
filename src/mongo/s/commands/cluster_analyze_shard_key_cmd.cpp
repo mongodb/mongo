@@ -34,7 +34,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -194,10 +193,7 @@ public:
     std::string help() const override {
         return "Returns metrics for evaluating a shard key for a collection.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(AnalyzeShardKeyCmd,
-                                       analyze_shard_key::gFeatureFlagAnalyzeShardKey);
+} analyzeShardKeyCmd;
 
 }  // namespace
 

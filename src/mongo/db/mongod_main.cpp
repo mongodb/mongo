@@ -928,7 +928,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
 
-    if (analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */) &&
+    if (analyze_shard_key::supportsSamplingQueries(serviceContext) &&
         serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onStartup();
     }
@@ -1244,14 +1244,10 @@ void setUpReplication(ServiceContext* serviceContext) {
         ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
 
-        // The check below ignores the FCV because FCV is not initialized until after the replica
-        // set is initiated.
-        if (analyze_shard_key::isFeatureFlagEnabled(true /* ignoreFCV */)) {
-            analyze_shard_key::QueryAnalysisClient::get(serviceContext)
-                .setTaskExecutor(
-                    serviceContext,
-                    ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext));
-        }
+        analyze_shard_key::QueryAnalysisClient::get(serviceContext)
+            .setTaskExecutor(
+                serviceContext,
+                ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext));
     }
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
@@ -1444,7 +1440,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         lsc->joinOnShutDown();
     }
 
-    if (analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */)) {
+    if (analyze_shard_key::supportsSamplingQueries(serviceContext)) {
         LOGV2_OPTIONS(7350601, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
     }

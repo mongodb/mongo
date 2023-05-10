@@ -36,7 +36,6 @@
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -145,10 +144,7 @@ public:
     std::string help() const override {
         return "Returns metrics for evaluating a shard key for a collection.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(AnalyzeShardKeyCmd,
-                                       analyze_shard_key::gFeatureFlagAnalyzeShardKey);
+} analyzeShardKeyCmd;
 
 }  // namespace
 

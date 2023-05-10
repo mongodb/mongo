@@ -506,7 +506,6 @@ private:
         return cursor->next();
     }
 
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
     // This fixture manually flushes sampled queries and diffs.
     FailPointEnableBlock _fp{"disableQueryAnalysisWriterFlusher"};
     PseudoRandom _random{SecureRandom{}.nextInt64()};
@@ -974,7 +973,6 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
 }
 
 TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatchesFewQueries_MaxBSONObjSize) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAnalyzeShardKey", true);
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto numQueries = 3;
@@ -999,7 +997,6 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatchesFewQueries_MaxBSONObjSize)
 }
 
 TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatchesManyQueries_MaxBSONObjSize) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAnalyzeShardKey", true);
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto numQueries = 75'000;

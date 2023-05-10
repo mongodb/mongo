@@ -329,11 +329,8 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             lsc->joinOnShutDown();
         }
 
-        if (analyze_shard_key::isFeatureFlagEnabled()) {
-            LOGV2_OPTIONS(
-                6973901, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
-            analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
-        }
+        LOGV2_OPTIONS(6973901, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
+        analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
 
         ReplicaSetMonitor::shutdown();
 

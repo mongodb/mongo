@@ -240,8 +240,6 @@ const allCommands = {
     analyzeShardKey: {
         // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
         skip: commandIsDisabledOnLastLTS,
-        // TODO SERVER-67966: Remove check when this feature flag is removed.
-        checkFeatureFlag: "AnalyzeShardKey",
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
             assert.commandWorked(
@@ -507,8 +505,6 @@ const allCommands = {
     configureQueryAnalyzer: {
         // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
         skip: commandIsDisabledOnLastLTS,
-        // TODO SERVER-67966: Remove check when this feature flag is removed.
-        checkFeatureFlag: "AnalyzeShardKey",
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
             for (let i = 0; i < 10; i++) {
