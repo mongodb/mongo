@@ -3827,6 +3827,9 @@ def doConfigure(myenv):
 
     usingLibStdCxx = False
     if has_option('libc++'):
+        # TODO SERVER-54659 - ASIO depends on std::result_of which was removed in C++ 20
+        myenv.Append(CPPDEFINES=["ASIO_HAS_STD_INVOKE_RESULT"])
+
         if not myenv.ToolchainIs('clang'):
             myenv.FatalError('libc++ is currently only supported for clang')
         if myenv.AddToCXXFLAGSIfSupported('-stdlib=libc++'):
