@@ -48,9 +48,11 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 
-MONGO_FAIL_POINT_DEFINE(fleCompactFailBeforeECOCRead);
+MONGO_FAIL_POINT_DEFINE(fleCompactOrCleanupFailBeforeECOCRead);
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCAnchorInsert);
 MONGO_FAIL_POINT_DEFINE(fleCleanupHangBeforeNullAnchorUpdate);
+MONGO_FAIL_POINT_DEFINE(fleCleanupFailAfterTransactionCommit);
+MONGO_FAIL_POINT_DEFINE(fleCompactFailAfterTransactionCommit);
 
 namespace mongo {
 namespace {
@@ -190,8 +192,8 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
     auto innerEcocStats = std::make_shared<ECOCStats>();
     auto uniqueEcocEntries = std::make_shared<stdx::unordered_set<ECOCCompactionDocumentV2>>();
 
-    if (MONGO_unlikely(fleCompactFailBeforeECOCRead.shouldFail())) {
-        uasserted(7293605, "Failed compact due to fleCompactFailBeforeECOCRead fail point");
+    if (MONGO_unlikely(fleCompactOrCleanupFailBeforeECOCRead.shouldFail())) {
+        uasserted(7293605, "Failed due to fleCompactOrCleanupFailBeforeECOCRead fail point");
     }
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
@@ -523,6 +525,10 @@ void processFLECompactV2(OperationContext* opCtx,
 
         uassertStatusOK(swResult);
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
+
+        if (MONGO_unlikely(fleCompactFailAfterTransactionCommit.shouldFail())) {
+            uasserted(7663001, "Failed due to fleCompactFailAfterTransactionCommit fail point");
+        }
     }
 
     // Update stats
@@ -571,6 +577,10 @@ void processFLECleanup(OperationContext* opCtx,
 
         uassertStatusOK(swResult);
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
+
+        if (MONGO_unlikely(fleCleanupFailAfterTransactionCommit.shouldFail())) {
+            uasserted(7663002, "Failedg due to fleCleanupFailAfterTransactionCommit fail point");
+        }
     }
 
     // Update stats
