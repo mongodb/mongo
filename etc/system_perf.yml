@@ -3184,6 +3184,36 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
 
+  - name: linux-3-node-replSet-disable-execution-control
+    display_name: Linux 3-Node ReplSet 2022-11 (Execution Control Off)
+    cron: *linux-3-node-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-disable-execution-control
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_agg_merge_wordcount
+      - name: industry_benchmarks
+      - name: linkbench2
+      - name: misc_workloads
+      - name: mixed_workloads
+      - name: snapshot_reads
+      - name: tpcc
+      - name: ycsb_60GB
+
   - &linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory.2023-01
