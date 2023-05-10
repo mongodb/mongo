@@ -131,9 +131,6 @@ class Operation:
         matches = re.search('has_prepared_updates=(\w+)', line)
         self.has_prepared_updates = matches.group(1).lower() == "true"
 
-        matches = re.search('durable_timestamp_not_found=(\w+)', line)
-        self.durable_ts_not_found = matches.group(1).lower() == "true"
-
         matches = re.search('txnid=(\d+).*>.*recovery_checkpoint_snap_min=(\d+): (\w+)', line)
         self.txnid = int(matches.group(1))
         self.recovery_ckpt_snap_min = int(matches.group(2))
