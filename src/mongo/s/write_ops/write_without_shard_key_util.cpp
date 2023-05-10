@@ -40,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
@@ -53,51 +54,6 @@ namespace {
 
 constexpr auto kIdFieldName = "_id"_sd;
 const FieldRef idFieldRef(kIdFieldName);
-
-// Used to do query validation for the _id field.
-const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
-
-/**
- * This returns "does the query have an _id field" and "is the _id field querying for a direct
- * value" e.g. _id : 3 and not _id : { $gt : 3 }.
- */
-bool isExactIdQuery(OperationContext* opCtx,
-                    const NamespaceString& nss,
-                    const BSONObj query,
-                    const BSONObj collation,
-                    bool hasDefaultCollation) {
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(query);
-    if (!collation.isEmpty()) {
-        findCommand->setCollation(collation);
-    }
-    const auto cq = CanonicalQuery::canonicalize(opCtx,
-                                                 std::move(findCommand),
-                                                 false, /* isExplain */
-                                                 nullptr,
-                                                 ExtensionsCallbackNoop(),
-                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (cq.isOK()) {
-        // Only returns a shard key iff a query has a full shard key with direct/equality matches on
-        // all shard key fields.
-        auto shardKey = extractShardKeyFromQuery(kVirtualIdShardKey, *cq.getValue());
-        BSONElement idElt = shardKey["_id"];
-
-        if (!idElt) {
-            return false;
-        }
-
-        if (CollationIndexKey::isCollatableType(idElt.type()) && !collation.isEmpty() &&
-            !hasDefaultCollation) {
-            // The collation applies to the _id field, but the user specified a collation which
-            // doesn't match the collection default.
-            return false;
-        }
-        return true;
-    }
-
-    return false;
-}
 
 bool shardKeyHasCollatableType(const BSONObj& shardKey) {
     for (BSONElement elt : shardKey) {
@@ -188,32 +144,23 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
         return false;
     }
 
-    auto [cm, _] =
+    auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
     // Unsharded collections always target the primary shard.
-    if (!cm.isSharded()) {
+    if (!cri.cm.isSharded()) {
         return false;
     }
 
-    // Check if the query has specified a different collation than the default collation.
-    auto collator = collation.isEmpty()
-        ? nullptr  // If no collation is specified we return a nullptr signifying the simple
-                   // collation.
-        : uassertStatusOK(
-              CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
-    auto hasDefaultCollation =
-        CollatorInterface::collatorsMatch(collator.get(), cm.getDefaultCollator());
-
-    auto tsFields = cm.getTimeseriesFields();
+    auto tsFields = cri.cm.getTimeseriesFields();
     bool isTimeseries = tsFields.has_value();
 
     // updateOne and deleteOne do not use the two phase protocol for single writes that specify
     // _id in their queries, unless a document is being upserted. An exact _id match requires
     // default collation if the _id value is a collatable type.
     if (isUpdateOrDelete && query.hasField("_id") &&
-        isExactIdQuery(opCtx, nss, query, collation, hasDefaultCollation) && !isUpsert &&
-        !isTimeseries) {
+        CollectionRoutingInfoTargeter::isExactIdQuery(opCtx, nss, query, collation, cri.cm) &&
+        !isUpsert && !isTimeseries) {
         return false;
     }
 
@@ -227,7 +174,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
 
     auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
         expCtx,
-        cm.getShardKeyPattern(),
+        cri.cm.getShardKeyPattern(),
         !isTimeseries ? query
                       : timeseries::getBucketLevelPredicateForRouting(
                             query, expCtx, tsFields->getTimeseriesOptions())));
@@ -236,10 +183,21 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     if (shardKey.isEmpty()) {
         return true;
     } else {
-        // If the default collection collation is not used and any field of the shard key is a
-        // collatable type, then we will use the two phase write protocol since we cannot target
-        // directly to a shard.
-        if (!hasDefaultCollation && shardKeyHasCollatableType(shardKey)) {
+        // Check if the query has specified a different collation than the default collation.
+        auto hasDefaultCollation = [&] {
+            if (collation.isEmpty()) {
+                return true;
+            }
+            auto collator = uassertStatusOK(
+                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
+            return CollatorInterface::collatorsMatch(collator.get(), cri.cm.getDefaultCollator());
+        }();
+
+        // If the default collection collation is not used or the default collation is not the
+        // simple collation and any field of the shard key is a collatable type, then we will use
+        // the two phase write protocol since we cannot target directly to a shard.
+        if ((!hasDefaultCollation || cri.cm.getDefaultCollator()) &&
+            shardKeyHasCollatableType(shardKey)) {
             return true;
         } else {
             return false;
