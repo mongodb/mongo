@@ -304,11 +304,11 @@ TEST_F(DropDatabaseTest, DropDatabasePassedThroughAwaitReplicationErrorForDropPe
                   dropDatabaseForApplyOps(_opCtx.get(), _nss.dbName()));
 }
 
-TEST_F(DropDatabaseTest, DropDatabaseSkipsSystemProfileCollectionWhenDroppingCollections) {
+TEST_F(DropDatabaseTest, DropDatabaseDropsSystemProfileCollectionWhenDroppingCollections) {
     repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
     NamespaceString profileNss =
         NamespaceString::createNamespaceString_forTest(_nss.getSisterNS("system.profile"));
-    _testDropDatabase(_opCtx.get(), _opObserver, profileNss, false);
+    _testDropDatabase(_opCtx.get(), _opObserver, profileNss, true);
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseResetsDropPendingStateOnException) {

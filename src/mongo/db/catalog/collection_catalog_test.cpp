@@ -3008,37 +3008,5 @@ TEST_F(CollectionCatalogTimestampTest, ResolveNamespaceStringOrUUIDAtLatest) {
         ASSERT_EQ(resolvedNss, nss);
     }
 }
-
-TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
-    // This test simulates the creation and dropping of system.profile collections. This collection
-    // is created untimestamped, but dropped with a timestamp.
-    // TODO SERVER-75740: Remove this test.
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("system.profile");
-
-    // Initialize the oldest timestamp.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.catalogIdTracker().cleanup(Timestamp(1, 1));
-    });
-
-    // Create and drop the collection. We have a time window where the namespace exists.
-    createCollection(opCtx.get(), nss, Timestamp::min());
-    dropCollection(opCtx.get(), nss, Timestamp(10, 10));
-
-    // Before performing cleanup, re-create the collection.
-    createCollection(opCtx.get(), nss, Timestamp::min());
-
-    // Perform collection catalog cleanup.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.catalogIdTracker().cleanup(Timestamp(20, 20));
-    });
-
-    // Drop the re-created collection.
-    dropCollection(opCtx.get(), nss, Timestamp(30, 30));
-
-    // Cleanup again.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.catalogIdTracker().cleanup(Timestamp(25, 25));
-    });
-}
 }  // namespace
 }  // namespace mongo

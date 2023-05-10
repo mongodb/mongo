@@ -551,21 +551,6 @@ void HistoricalCatalogIdTracker::_createNoTimestamp(const NamespaceString& nss,
             changesContainer = changesContainer.erase(key);
             return;
         }
-
-        if (ids->size() > 1 && !storageGlobalParams.repair) {
-            // This namespace or UUID was added due to an untimestamped write. But this
-            // namespace or UUID already had some timestamped writes performed. In this
-            // case, we re-write the history. The only known area that does this today is
-            // when profiling is enabled (untimestamped collection creation), followed by
-            // dropping the database (timestamped collection drop).
-            // TODO SERVER-75740: Remove this branch.
-            invariant(!ids->back().ts.isNull());
-
-            idsContainer = idsContainer.set(key, {{catalogId, Timestamp::min()}});
-
-            // Nothing to cleanup after untimestamped write
-            changesContainer = changesContainer.erase(key);
-        }
     };
 
     // Create on both namespace and uuid containers.

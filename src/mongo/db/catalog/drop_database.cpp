@@ -269,7 +269,39 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             });
         }
 
-        // Refresh the catalog so the views collection isn't present.
+        // The system.profile collection is created using an untimestamped write to the catalog when
+        // enabling profiling on a database. So we drop it untimestamped as well to avoid mixed-mode
+        // timestamp usage.
+        auto systemProfilePtr = catalog->lookupCollectionByNamespace(
+            opCtx, NamespaceString::makeSystemDotProfileNamespace(dbName));
+        if (systemProfilePtr) {
+            const Timestamp commitTs = opCtx->recoveryUnit()->getCommitTimestamp();
+            if (!commitTs.isNull()) {
+                opCtx->recoveryUnit()->clearCommitTimestamp();
+            }
+
+            // Ensure this block exits with the same commit timestamp state that it was called with.
+            ScopeGuard addCommitTimestamp([&opCtx, commitTs] {
+                if (!commitTs.isNull()) {
+                    opCtx->recoveryUnit()->setCommitTimestamp(commitTs);
+                }
+            });
+
+            const auto& nss = systemProfilePtr->ns();
+            LOGV2(7574000,
+                  "dropDatabase - dropping collection",
+                  logAttrs(dbName),
+                  "namespace"_attr = nss);
+
+            invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+            writeConflictRetry(opCtx, "dropDatabase_system.profile_collection", nss, [&] {
+                WriteUnitOfWork wunit(opCtx);
+                fassert(7574001, db->dropCollectionEvenIfSystem(opCtx, nss));
+                wunit.commit();
+            });
+        }
+
+        // Refresh the catalog so the views and profile collections aren't present.
         catalog = CollectionCatalog::get(opCtx);
 
         std::vector<NamespaceString> collectionsToDrop;
@@ -310,9 +342,9 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // Dropping a database on a primary replicates individual collection drops followed
                 // by a database drop oplog entry. When a secondary observes the database drop oplog
                 // entry, all of the replicated collections that were dropped must have been
-                // processed. Only non-replicated collections like `system.profile` should be left
-                // to remove. Collections with the `tmp.mr` namespace may or may not be getting
-                // replicated; be conservative and assume they are not.
+                // processed. Only non-replicated collections should be left to remove. Collections
+                // with the `tmp.mr` namespace may or may not be getting replicated; be conservative
+                // and assume they are not.
                 invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr"));
             }
 
