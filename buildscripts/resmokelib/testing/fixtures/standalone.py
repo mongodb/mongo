@@ -236,6 +236,16 @@ class MongodLauncher(object):
         if self.config.MONGOD_SET_PARAMETERS is not None:
             suite_set_parameters.update(yaml.safe_load(self.config.MONGOD_SET_PARAMETERS))
 
+        # Some storage options are both a mongod option (as in config file option and its equivalent
+        # "--xyz" command line parameter) and a "--setParameter". In case of conflict, for instance
+        # due to the config fuzzer adding "xyz" as a "--setParameter" when the "--xyz" option is
+        # already defined in the suite's YAML, the "--setParameter" value shall be preserved and the
+        # "--xyz" option discarded to avoid hitting an error due to conflicting definitions.
+        mongod_option_and_set_parameter_conflicts = ["syncdelay", "journalCommitInterval"]
+        for key in mongod_option_and_set_parameter_conflicts:
+            if (key in mongod_options and key in suite_set_parameters):
+                del mongod_options[key]
+
         # Set default log verbosity levels if none were specified.
         if "logComponentVerbosity" not in suite_set_parameters:
             suite_set_parameters[
