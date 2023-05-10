@@ -965,7 +965,8 @@ assert = (function() {
             const found = expectedCode.some((ec) => writeErrorCodes.has(ec));
             if (!found) {
                 errMsg = "found code(s) " + tojson(Array.from(writeErrorCodes)) +
-                    " does not match any of the expected codes " + tojson(expectedCode);
+                    " does not match any of the expected codes " + tojson(expectedCode) +
+                    ". Original command response: " + tojson(res);
             }
         }
 

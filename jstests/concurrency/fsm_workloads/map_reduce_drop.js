@@ -61,8 +61,8 @@ var $config = (function() {
                 var res = bulk.execute();
                 assertAlways.commandWorked(res);
             } catch (ex) {
-                assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
                 assert.eq(true, ex instanceof BulkWriteError, tojson(ex));
+                assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
             }
 
             var options = {
