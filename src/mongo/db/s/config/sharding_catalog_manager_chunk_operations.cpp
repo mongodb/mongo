@@ -2152,7 +2152,8 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
-    bool allowMigrations) {
+    bool allowMigrations,
+    const std::string& cmdName) {
     std::set<ShardId> cmShardIds;
     {
         // Mark opCtx as interruptible to ensure that all reads and writes to the metadata
@@ -2269,6 +2270,10 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
         // From now on migrations are not allowed anymore, so it is not possible that new shards
         // will own chunks for this collection.
     }
+    // If we have a session checked out, we need to yield it, considering we'll be doing a network
+    // operation that may block.
+    auto resourceYielder = TransactionParticipantResourceYielder::make(cmdName);
+    resourceYielder->yield(opCtx);
 
     // Trigger a refresh on every shard. We send this to every shard and not just shards that own
     // chunks for the collection because the set of shards owning chunks is updated before the
@@ -2289,6 +2294,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                                                      nss,
                                                      executor);
     }
+    resourceYielder->unyield(opCtx);
 }
 
 void ShardingCatalogManager::bumpCollectionMinorVersionInTxn(OperationContext* opCtx,

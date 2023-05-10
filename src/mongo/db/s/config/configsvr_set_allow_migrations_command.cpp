@@ -70,7 +70,11 @@ public:
             const auto& collectionUUID = request().getCollectionUUID();
 
             ShardingCatalogManager::get(opCtx)->setAllowMigrationsAndBumpOneChunk(
-                opCtx, nss, collectionUUID, allowMigrations);
+                opCtx,
+                nss,
+                collectionUUID,
+                allowMigrations,
+                ConfigsvrSetAllowMigrations::kCommandName.toString());
         }
 
     private:
