@@ -263,6 +263,55 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
     }
 }
 
+TEST_F(ShardRoleTest, AcquisitionWithInvalidNamespaceFails) {
+    const auto checkAcquisitionByNss = [&](const NamespaceString& nss) {
+        // With locks
+        ASSERT_THROWS_CODE(
+            acquireCollection(opCtx(),
+                              {nss, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+                              MODE_IX),
+            DBException,
+            ErrorCodes::InvalidNamespace);
+
+        // Without locks
+        ASSERT_THROWS_CODE(
+            acquireCollectionsOrViewsWithoutTakingLocks(
+                opCtx(), {{nss, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite}}),
+            DBException,
+            ErrorCodes::InvalidNamespace);
+    };
+
+    const auto checkAcquisitionByNssOrUUID = [&](const NamespaceStringOrUUID& nssOrUuid) {
+        // With locks
+        ASSERT_THROWS_CODE(
+            acquireCollection(
+                opCtx(),
+                {nssOrUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+                MODE_IX),
+            DBException,
+            ErrorCodes::InvalidNamespace);
+
+        // Without locks
+        ASSERT_THROWS_CODE(
+            acquireCollectionsOrViewsWithoutTakingLocks(
+                opCtx(),
+                {{nssOrUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite}}),
+            DBException,
+            ErrorCodes::InvalidNamespace);
+    };
+
+    const NamespaceString nssEmptyCollectionName =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "");
+    checkAcquisitionByNss(nssEmptyCollectionName);
+    checkAcquisitionByNssOrUUID(nssEmptyCollectionName);
+
+    const NamespaceString nssEmptyDbName =
+        NamespaceString::createNamespaceString_forTest("", "foo");
+    checkAcquisitionByNss(nssEmptyDbName);
+    checkAcquisitionByNssOrUUID(nssEmptyDbName);
+    checkAcquisitionByNssOrUUID(NamespaceStringOrUUID("", UUID::gen()));
+}
+
 // ---------------------------------------------------------------------------
 // Placement checks when acquiring unsharded collections
 

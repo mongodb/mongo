@@ -95,6 +95,10 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
 
     for (const auto& ar : acquisitionRequests) {
         if (ar.nss) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Namespace " << ar.nss->toStringForErrorMsg()
+                                  << "is not a valid collection name",
+                    ar.nss->isValid());
             auto coll = catalog.lookupCollectionByNamespace(opCtx, *ar.nss);
             checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, ar.uuid);
 
@@ -107,6 +111,10 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                                               std::move(resolvedAcquisitionRequest));
         } else if (ar.dbname) {
             invariant(ar.uuid);
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid db name " << ar.dbname->toStringForErrorMsg(),
+                    NamespaceString::validDBName(*ar.dbname,
+                                                 NamespaceString::DollarInDbNameBehavior::Allow));
             auto coll = catalog.lookupCollectionByUUID(opCtx, *ar.uuid);
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Namespace " << (*ar.dbname).toStringForErrorMsg() << ":"
@@ -607,6 +615,11 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
     for (const auto& ar : acquisitionRequests) {
         NamespaceStringOrUUID nssOrUUID =
             ar.nss ? NamespaceStringOrUUID(*ar.nss) : NamespaceStringOrUUID(*ar.dbname, *ar.uuid);
+        uassertStatusOK(nssOrUUID.isNssValid());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid db name " << ar.dbname->toStringForErrorMsg(),
+                NamespaceString::validDBName(nssOrUUID.dbName(),
+                                             NamespaceString::DollarInDbNameBehavior::Allow));
 
         auto coll =
             CollectionPtr(catalog.establishConsistentCollection(opCtx, nssOrUUID, readTimestamp));

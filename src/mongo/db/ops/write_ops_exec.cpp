@@ -294,7 +294,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 void insertDocumentsAtomically(OperationContext* opCtx,
-                               const CollectionPtr& collection,
+                               const ScopedCollectionAcquisition& collection,
                                std::vector<InsertStatement>::iterator begin,
                                std::vector<InsertStatement>::iterator end,
                                bool fromMigrate) {
@@ -312,7 +312,7 @@ void insertDocumentsAtomically(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto inTransaction = opCtx->inMultiDocumentTransaction();
 
-    if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
+    if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection.nss())) {
         // Populate 'slots' with new optimes for each insert.
         // This also notifies the storage engine of each new timestamp.
         auto oplogSlots = repl::getNextOpTimes(opCtx, batchSize);
@@ -334,11 +334,15 @@ void insertDocumentsAtomically(OperationContext* opCtx,
         [&](const BSONObj& data) {
             // Check if the failpoint specifies no collection or matches the existing one.
             const auto collElem = data["collectionNS"];
-            return !collElem || collection->ns().ns() == collElem.str();
+            return !collElem || collection.nss().ns() == collElem.str();
         });
 
-    uassertStatusOK(collection_internal::insertDocuments(
-        opCtx, collection, begin, end, &CurOp::get(opCtx)->debug(), fromMigrate));
+    uassertStatusOK(collection_internal::insertDocuments(opCtx,
+                                                         collection.getCollectionPtr(),
+                                                         begin,
+                                                         end,
+                                                         &CurOp::get(opCtx)->debug(),
+                                                         fromMigrate));
     wuow.commit();
 }
 
@@ -536,14 +540,15 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
     }
 
-    boost::optional<AutoGetCollection> collection;
+    boost::optional<ScopedCollectionAcquisition> collection;
     auto acquireCollection = [&] {
         while (true) {
-            collection.emplace(opCtx,
-                               nss,
-                               fixLockModeForSystemDotViewsChanges(nss, MODE_IX),
-                               AutoGetCollection::Options{}.expectedUUID(collectionUUID));
-            if (*collection) {
+            collection.emplace(mongo::acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx, nss, AcquisitionPrerequisites::kWrite, collectionUUID),
+                fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
+            if (collection->exists()) {
                 break;
             }
 
@@ -586,12 +591,12 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
     if (shouldProceedWithBatchInsert) {
         try {
-            if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
+            if (!collection->getCollectionPtr()->isCapped() && !inTxn && batch.size() > 1) {
                 // First try doing it all together. If all goes well, this is all we need to do.
                 // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
                 lastOpFixer->startingOp(nss);
                 insertDocumentsAtomically(opCtx,
-                                          collection->getCollection(),
+                                          *collection,
                                           batch.begin(),
                                           batch.end(),
                                           source == OperationSource::kFromMigrate);
@@ -628,13 +633,10 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                         acquireCollection();
                     // Transactions are not allowed to operate on capped collections.
                     uassertStatusOK(
-                        checkIfTransactionOnCappedColl(opCtx, collection->getCollection()));
+                        checkIfTransactionOnCappedColl(opCtx, collection->getCollectionPtr()));
                     lastOpFixer->startingOp(nss);
-                    insertDocumentsAtomically(opCtx,
-                                              collection->getCollection(),
-                                              it,
-                                              it + 1,
-                                              source == OperationSource::kFromMigrate);
+                    insertDocumentsAtomically(
+                        opCtx, *collection, it, it + 1, source == OperationSource::kFromMigrate);
                     lastOpFixer->finishedOpSuccessfully();
                     SingleWriteResult result;
                     result.setN(1);
@@ -1763,8 +1765,11 @@ Status performAtomicTimeseriesWrites(
     LastOpFixer lastOpFixer(opCtx);
     lastOpFixer.startingOp(ns);
 
-    AutoGetCollection coll{opCtx, ns, MODE_IX};
-    if (!coll) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    if (!coll.exists()) {
         assertTimeseriesBucketsCollectionNotFound(ns);
     }
 
@@ -1805,7 +1810,7 @@ Status performAtomicTimeseriesWrites(
 
     if (!insertOps.empty()) {
         auto status = collection_internal::insertDocuments(
-            opCtx, *coll, inserts.begin(), inserts.end(), &curOp->debug());
+            opCtx, coll.getCollectionPtr(), inserts.begin(), inserts.end(), &curOp->debug());
         if (!status.isOK()) {
             return status;
         }
@@ -1820,10 +1825,10 @@ Status performAtomicTimeseriesWrites(
         invariant(op.getUpdates().size() == 1);
         auto& update = op.getUpdates().front();
 
-        invariant(coll->isClustered());
+        invariant(coll.getCollectionPtr()->isClustered());
         auto recordId = record_id_helpers::keyForOID(update.getQ()["_id"].OID());
 
-        auto original = coll->docFor(opCtx, recordId);
+        auto original = coll.getCollectionPtr()->docFor(opCtx, recordId);
 
         CollectionUpdateArgs args{original.value()};
         args.criteria = update.getQ();
@@ -1862,7 +1867,7 @@ Status performAtomicTimeseriesWrites(
         }
 
         collection_internal::updateDocument(opCtx,
-                                            *coll,
+                                            coll.getCollectionPtr(),
                                             recordId,
                                             original,
                                             updated,
