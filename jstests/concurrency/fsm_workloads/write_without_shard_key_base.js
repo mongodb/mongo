@@ -20,11 +20,11 @@ load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.threadCount = 10;
-    $config.iterations = 10;
+    $config.iterations = 50;
     $config.startState = "init";  // Inherited from random_moveChunk_base.js.
     $config.data.partitionSize = 50;
     $config.data.secondaryDocField = 'y';
-    $config.data.tertiaryDocField = 'a';
+    $config.data.tertiaryDocField = 'tertiaryField';
     $config.data.runningWithStepdowns =
         TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
