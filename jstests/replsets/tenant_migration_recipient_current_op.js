@@ -133,8 +133,7 @@ const fpAfterForgetMigration = configureFailPoint(
 
 jsTestLog("Starting tenant migration with migrationId: " + kMigrationId +
           ", tenantId: " + kTenantId);
-assert.commandWorked(
-    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 {
     // Wait until a current operation corresponding to "tenant recipient migration" with state

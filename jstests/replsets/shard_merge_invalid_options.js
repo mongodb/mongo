@@ -8,8 +8,10 @@
 
 import {
     isShardMergeEnabled,
-    makeMigrationCertificatesForTest
+    kProtocolShardMerge,
+    makeMigrationCertificatesForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
+
 load("jstests/libs/fail_point_util.js");
 
 function runTest(nodeOptions) {
@@ -47,7 +49,7 @@ function runTest(nodeOptions) {
     assert.commandFailedWithCode(
         adminDB.runCommand({
             donorStartMigration: 1,
-            protocol: "shard merge",
+            protocol: kProtocolShardMerge,
             migrationId: UUID(),
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
@@ -63,7 +65,7 @@ function runTest(nodeOptions) {
     assert.commandFailedWithCode(
         adminDB.runCommand({
             donorStartMigration: 1,
-            protocol: "shard merge",
+            protocol: kProtocolShardMerge,
             migrationId: UUID(),
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
@@ -78,7 +80,7 @@ function runTest(nodeOptions) {
     assert.commandFailedWithCode(
         adminDB.runCommand({
             donorStartMigration: 1,
-            protocol: "shard merge",
+            protocol: kProtocolShardMerge,
             migrationId: UUID(),
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
@@ -96,7 +98,7 @@ function runTest(nodeOptions) {
     assert.commandFailedWithCode(
         adminDB.runCommand({
             donorStartMigration: 1,
-            protocol: "shard merge",
+            protocol: kProtocolShardMerge,
             migrationId: UUID(),
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
@@ -113,7 +115,7 @@ function runTest(nodeOptions) {
     assert.commandFailedWithCode(
         adminDB.runCommand({
             donorStartMigration: 1,
-            protocol: "shard merge",
+            protocol: kProtocolShardMerge,
             migrationId: UUID(),
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
@@ -129,7 +131,7 @@ function runTest(nodeOptions) {
     assert.commandFailedWithCode(
         adminDB.runCommand({
             donorStartMigration: 1,
-            protocol: "shard merge",
+            protocol: kProtocolShardMerge,
             migrationId: UUID(),
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
@@ -145,7 +147,7 @@ function runTest(nodeOptions) {
     assert.commandFailedWithCode(
         adminDB.runCommand({
             recipientSyncData: 1,
-            protocol: "shard merge",
+            protocol: kProtocolShardMerge,
             migrationId: UUID(),
             tenantIds: [ObjectId()],
             donorConnectionString: kDummyConnStr,

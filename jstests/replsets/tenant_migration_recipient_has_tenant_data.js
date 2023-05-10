@@ -58,8 +58,7 @@ const migrationOpts = {
     tenantId: kTenantId,
 };
 
-TenantMigrationTest.assertCommitted(
-    tenantMigrationTest.runMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 
 jsTest.log(

@@ -15,6 +15,7 @@
 import {
     getCertificateAndPrivateKey,
     isShardMergeEnabled,
+    kProtocolShardMerge,
     makeX509OptionsForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -51,13 +52,15 @@ TestData.stopFailPointErrorCode = 4880402;
 /**
  * Runs recipientSyncData on the given host and returns the response.
  */
-function runRecipientSyncDataCmd(primaryHost, {
-    migrationIdString,
-    tenantIds,
-    donorConnectionString,
-    readPreference,
-    recipientCertificateForDonor
-}) {
+function runRecipientSyncDataCmd(primaryHost,
+                                 {
+                                     migrationIdString,
+                                     tenantIds,
+                                     donorConnectionString,
+                                     readPreference,
+                                     recipientCertificateForDonor
+                                 },
+                                 protocol) {
     jsTestLog("Starting a recipientSyncDataCmd for migrationId: " + migrationIdString +
               " tenantIds: '" + tenantIds + "'");
     const primary = new Mongo(primaryHost);
@@ -66,7 +69,7 @@ function runRecipientSyncDataCmd(primaryHost, {
         migrationId: UUID(migrationIdString),
         donorConnectionString: donorConnectionString,
         tenantIds: eval(tenantIds),
-        protocol: "shard merge",
+        protocol,
         readPreference: readPreference,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         recipientCertificateForDonor: recipientCertificateForDonor
@@ -113,9 +116,9 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
 
     // Start the conflicting recipientSyncData cmds.
     const recipientSyncDataThread0 =
-        new Thread(runRecipientSyncDataCmd, primary.host, migrationOpts0);
+        new Thread(runRecipientSyncDataCmd, primary.host, migrationOpts0, kProtocolShardMerge);
     const recipientSyncDataThread1 =
-        new Thread(runRecipientSyncDataCmd, primary.host, migrationOpts1);
+        new Thread(runRecipientSyncDataCmd, primary.host, migrationOpts1, kProtocolShardMerge);
     recipientSyncDataThread0.start();
     recipientSyncDataThread1.start();
 

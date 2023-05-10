@@ -17,6 +17,7 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
+    kProtocolShardMerge,
     makeMigrationCertificatesForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -51,7 +52,7 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
     const cmd = {
         donorStartMigration: 1,
         migrationId: UUID(),
-        protocol: 'shard merge',
+        protocol: kProtocolShardMerge,
         tenantId: invalidTenantId,
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         readPreference,
@@ -66,7 +67,7 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
 assert.commandFailedWithCode(donorPrimary.adminCommand({
     donorStartMigration: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     recipientConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     readPreference,
     donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
@@ -78,7 +79,7 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
 assert.commandFailedWithCode(donorPrimary.adminCommand({
     donorStartMigration: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     recipientConnectionString:
         tenantMigrationTest.getRecipientRst().getURL() + "," + donorPrimary.host,
     readPreference,
@@ -91,7 +92,7 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
 assert.commandFailedWithCode(donorPrimary.adminCommand({
     donorStartMigration: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     recipientConnectionString: recipientPrimary.host,
     readPreference,
     donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
@@ -109,7 +110,7 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: invalidTenantId,
         tenantIds: [ObjectId()],
-        protocol: 'shard merge',
+        protocol: kProtocolShardMerge,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference,
         recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
@@ -121,7 +122,7 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
 assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     tenantIds: [ObjectId()],
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
@@ -134,7 +135,7 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
 assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     tenantIds: [ObjectId()],
     donorConnectionString: `${tenantMigrationTest.getDonorRst().getURL()},${recipientPrimary.host}`,
     startMigrationDonorTimestamp: Timestamp(1, 1),
@@ -147,7 +148,7 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
 assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     tenantIds: [ObjectId()],
     donorConnectionString: recipientPrimary.host,
     startMigrationDonorTimestamp: Timestamp(1, 1),
@@ -162,7 +163,7 @@ nullTimestamps.forEach((nullTs) => {
     assert.commandFailedWithCode(donorPrimary.adminCommand({
         recipientSyncData: 1,
         migrationId: UUID(),
-        protocol: 'shard merge',
+        protocol: kProtocolShardMerge,
         tenantIds: [ObjectId()],
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         startMigrationDonorTimestamp: Timestamp(1, 1),
@@ -177,7 +178,7 @@ nullTimestamps.forEach((nullTs) => {
 assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
@@ -189,7 +190,7 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
 assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
-    protocol: 'shard merge',
+    protocol: kProtocolShardMerge,
     tenantIds: [],
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
@@ -201,7 +202,7 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
 // The decision field must be set for recipientForgetMigration with shard merge
 assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientForgetMigration: 1,
-    protocol: "shard merge",
+    protocol: kProtocolShardMerge,
     migrationId: UUID(),
     tenantIds: [ObjectId()],
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),

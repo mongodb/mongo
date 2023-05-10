@@ -14,9 +14,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {donorStartMigrationWithProtocol} from "jstests/replsets/libs/tenant_migration_util.js";
 
-(function() {
 load("jstests/libs/config_shard_util.js");
 
 const st = new ShardingTest({shards: 1});
@@ -31,50 +29,44 @@ const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), donorRst: donorRstShard, recipientRst});
 
 // Run tenant migration commands on config servers.
-let donorPrimary = donorRstConfig.getPrimary();
+const donorPrimary = donorRstConfig.getPrimary();
 
-let cmdObj = donorStartMigrationWithProtocol({
+assert.commandFailedWithCode(donorPrimary.adminCommand({
     donorStartMigration: 1,
     tenantId: ObjectId().str,
     migrationId: UUID(),
     recipientConnectionString: tenantMigrationTest.getRecipientConnString(),
     readPreference: {mode: "primary"}
-},
-                                             donorPrimary.getDB("admin"));
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
+}),
+                             ErrorCodes.IllegalOperation);
 
-cmdObj = {
-    donorForgetMigration: 1,
-    migrationId: UUID()
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: UUID()}),
+    ErrorCodes.IllegalOperation);
 
-cmdObj = {
-    donorAbortMigration: 1,
-    migrationId: UUID()
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    donorPrimary.adminCommand({donorAbortMigration: 1, migrationId: UUID()}),
+    ErrorCodes.IllegalOperation);
 
-cmdObj = {
+assert.commandFailedWithCode(donorPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     tenantId: ObjectId().str,
     readPreference: {mode: "primary"},
     startMigrationDonorTimestamp: Timestamp(1, 1)
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
+}),
+                             ErrorCodes.IllegalOperation);
 
-cmdObj = {
+assert.commandFailedWithCode(donorPrimary.adminCommand({
     recipientForgetMigration: 1,
     migrationId: UUID(),
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     tenantId: ObjectId().str,
     readPreference: {mode: "primary"},
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
+}),
+                             ErrorCodes.IllegalOperation);
 
 tenantMigrationTest.stop();
 recipientRst.stopSet();
 st.stop();
-})();

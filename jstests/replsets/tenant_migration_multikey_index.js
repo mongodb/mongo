@@ -91,8 +91,7 @@ const fpBeforeFulfillingDataConsistentPromise = configureFailPoint(
     recipientPrimary, "fpBeforeFulfillingDataConsistentPromise", {action: "hang"});
 
 jsTestLog("Starting the tenant migration");
-assert.commandWorked(
-    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 fpBeforeFulfillingDataConsistentPromise.wait();
 

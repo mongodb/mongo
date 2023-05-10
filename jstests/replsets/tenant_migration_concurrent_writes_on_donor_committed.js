@@ -122,7 +122,6 @@ setupTestsBeforeMigration();
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts, {
     retryOnRetryableErrors: false,
     automaticForgetMigration: false,
-    enableDonorStartMigrationFsync: true
 }));
 
 // run the tests after the migration has committed.

@@ -128,8 +128,7 @@ const operation = test.createSplitOperation(tenantIds);
 
 setupTestsBeforeMigration();
 
-assert.commandWorked(
-    operation.commit({retryOnRetryableErrors: false}, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(operation.commit({retryOnRetryableErrors: false}));
 
 runTestsAfterMigration();
 ShardSplitTest.checkShardSplitAccessBlocker(donorPrimary, kTenantID, {

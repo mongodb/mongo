@@ -15,14 +15,14 @@
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
-    donorStartMigrationWithProtocol,
     getCertificateAndPrivateKey,
-    isMigrationCompleted,
     isShardMergeEnabled,
+    kProtocolShardMerge,
     makeMigrationCertificatesForTest,
     makeX509OptionsForTest,
-    runTenantMigrationCommand,
 } from "jstests/replsets/libs/tenant_migration_util.js";
+
+load("jstests/libs/uuid_util.js");
 
 const standalone = MongoRunner.runMongod({});
 const shardMergeFeatureFlagEnabled = isShardMergeEnabled(standalone.getDB("admin"));
@@ -64,7 +64,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference,
         recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
     }),
@@ -77,7 +77,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference,
         donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
     }),
@@ -90,7 +90,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference: kReadPreference
     }),
@@ -103,7 +103,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         decision: "aborted",
         readPreference: kReadPreference
     }),
@@ -128,7 +128,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference,
         donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
         recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
@@ -155,7 +155,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
@@ -193,7 +193,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference: kReadPreference
     }));
@@ -227,7 +227,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         decision: "aborted",
         readPreference: kReadPreference
     }));
@@ -267,16 +267,14 @@ const kExpiredMigrationCertificates = {
     const migrationId = UUID();
     const donorStartMigrationCmdObj = {
         donorStartMigration: 1,
-        migrationId: migrationId,
+        migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference
     };
-    const stateRes = assert.commandWorked(runTenantMigrationCommand(
-        donorStartMigrationCmdObj,
-        donorRst,
-        {retryOnRetryableErrors: false, shouldStopFunc: isMigrationCompleted}));
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.runMigration(donorStartMigrationCmdObj));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(
         donorRst.getPrimary().adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
@@ -314,17 +312,15 @@ const kExpiredMigrationCertificates = {
 
     const donorStartMigrationCmdObj = {
         donorStartMigration: 1,
-        migrationId: UUID(),
+        migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference
     };
 
-    const stateRes = assert.commandWorked(runTenantMigrationCommand(
-        donorStartMigrationCmdObj,
-        donorRst,
-        {retryOnRetryableErrors: false, shouldStopFunc: isMigrationCompleted}));
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.runMigration(donorStartMigrationCmdObj));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();
@@ -362,18 +358,16 @@ const kExpiredMigrationCertificates = {
 
     const donorStartMigrationCmdObj = {
         donorStartMigration: 1,
-        migrationId: UUID(),
+        migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference,
         donorCertificateForRecipient: kExpiredMigrationCertificates.donorCertificateForRecipient,
         recipientCertificateForDonor: kExpiredMigrationCertificates.recipientCertificateForDonor,
     };
-    const stateRes = assert.commandWorked(runTenantMigrationCommand(
-        donorStartMigrationCmdObj,
-        donorRst,
-        {retryOnRetryableErrors: false, shouldStopFunc: isMigrationCompleted}));
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.runMigration(donorStartMigrationCmdObj));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();

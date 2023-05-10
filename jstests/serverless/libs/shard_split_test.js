@@ -98,8 +98,7 @@ async function runCommitSplitThreadWrapper(rstArgs,
                                            tenantIds,
                                            recipientTagName,
                                            recipientSetName,
-                                           retryOnRetryableErrors,
-                                           enableDonorStartMigrationFsync) {
+                                           retryOnRetryableErrors) {
     load("jstests/replsets/rslib.js");
     const {runShardSplitCommand} = await import("jstests/serverless/libs/shard_split_test.js");
 
@@ -114,8 +113,7 @@ async function runCommitSplitThreadWrapper(rstArgs,
 
     jsTestLog(`Running async split command ${tojson(commitShardSplitCmdObj)}`);
 
-    return runShardSplitCommand(
-        donorRst, commitShardSplitCmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync);
+    return runShardSplitCommand(donorRst, commitShardSplitCmdObj, retryOnRetryableErrors);
 }
 
 /*
@@ -163,10 +161,8 @@ export function commitSplitAsync({
     recipientSetName,
     migrationId,
     retryOnRetryableErrors,
-    enableDonorStartMigrationFsync
 } = {
-    retryOnRetryableErrors: false,
-    enableDonorStartMigrationFsync: false
+    retryOnRetryableErrors: false
 }) {
     jsTestLog("Running commitAsync command");
 
@@ -179,20 +175,14 @@ export function commitSplitAsync({
                               tojson(tenantIds),
                               recipientTagName,
                               recipientSetName,
-                              retryOnRetryableErrors,
-                              enableDonorStartMigrationFsync);
+                              retryOnRetryableErrors);
     thread.start();
 
     return thread;
 }
 
-export function runShardSplitCommand(
-    replicaSet, cmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync) {
+export function runShardSplitCommand(replicaSet, cmdObj, retryOnRetryableErrors) {
     let res;
-    if (enableDonorStartMigrationFsync) {
-        replicaSet.awaitLastOpCommitted();
-        assert.commandWorked(replicaSet.getPrimary().adminCommand({fsync: 1}));
-    }
 
     assert.soon(() => {
         try {
@@ -248,8 +238,7 @@ class ShardSplitOperation {
      * Starts a shard split synchronously.
      */
 
-    commit({retryOnRetryableErrors} = {retryOnRetryableErrors: false},
-           {enableDonorStartMigrationFsync} = {enableDonorStartMigrationFsync: false}) {
+    commit({retryOnRetryableErrors} = {retryOnRetryableErrors: false}) {
         jsTestLog("Running commit command");
         const localCmdObj = {
             commitShardSplit: 1,
@@ -259,18 +248,14 @@ class ShardSplitOperation {
             recipientSetName: this.recipientSetName
         };
 
-        return runShardSplitCommand(
-            this.donorSet, localCmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync);
+        return runShardSplitCommand(this.donorSet, localCmdObj, retryOnRetryableErrors);
     }
 
     /**
      * Starts a shard split asynchronously and returns the Thread that runs it.
      * @returns the Thread running the commitShardSplit command.
      */
-    commitAsync({retryOnRetryableErrors, enableDonorStartMigrationFsync} = {
-        retryOnRetryableErrors: false,
-        enableDonorStartMigrationFsync: false
-    }) {
+    commitAsync({retryOnRetryableErrors} = {retryOnRetryableErrors: false}) {
         return commitSplitAsync({
             rst: this.donorSet,
             tenantIds: this.tenantIds,
@@ -278,7 +263,6 @@ class ShardSplitOperation {
             recipientSetName: this.recipientSetName,
             migrationId: this.migrationId,
             retryOnRetryableErrors,
-            enableDonorStartMigrationFsync
         });
     }
 
@@ -294,10 +278,7 @@ class ShardSplitOperation {
         const donorSet = createRst(donorRstArgs, true);
 
         const cmdObj = {forgetShardSplit: 1, migrationId: this.migrationId};
-        assert.commandWorked(runShardSplitCommand(donorSet,
-                                                  cmdObj,
-                                                  true /* retryableOnErrors */,
-                                                  false /*enableDonorStartMigrationFsync*/));
+        assert.commandWorked(runShardSplitCommand(donorSet, cmdObj, true /* retryableOnErrors */));
     }
 
     forgetAsync() {

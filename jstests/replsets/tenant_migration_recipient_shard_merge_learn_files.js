@@ -54,8 +54,7 @@ const migrationOpts = {
 };
 
 jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);
-assert.commandWorked(
-    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 waitInFailPoint.wait();
 

@@ -137,7 +137,7 @@ const operation = tenantMigrationTest.createSplitOperation(tenantIds);
 
 setupTestsBeforeMigration();
 
-operation.commit({retryOnRetryableErrors: false}, {enableDonorStartMigrationFsync: true});
+operation.commit({retryOnRetryableErrors: false});
 assertMigrationState(tenantMigrationTest.getDonorPrimary(), operation.migrationId, "aborted");
 
 abortFp.off();
