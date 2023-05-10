@@ -1264,7 +1264,8 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                 _args.getMaxChunkSizeBytes();
             int64_t maxUntransferredSessionsSize = BSONObjMaxUserSize *
                 _args.getMaxChunkSizeBytes() / ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes;
-            if (estimatedUntransferredChunkPercentage < maxCatchUpPercentageBeforeBlockingWrites &&
+            if (estimatedUntransferredChunkPercentage <
+                    maxCatchUpPercentageBeforeBlockingWrites.load() &&
                 estimateUntransferredSessionsSize < maxUntransferredSessionsSize) {
                 // The recipient is sufficiently caught-up with the writes on the donor.
                 // Block writes, so that it can drain everything.
