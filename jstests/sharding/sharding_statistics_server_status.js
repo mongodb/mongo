@@ -31,6 +31,9 @@ function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
         return shardVal.getDB('admin').runCommand({serverStatus: 1}).shardingStatistics;
     });
     for (let i = 0; i < shardArr.length; ++i) {
+        let countDocsDeleted = statsFromServerStatus[i].hasOwnProperty('countDocsDeletedOnDonor')
+            ? statsFromServerStatus[i].countDocsDeletedOnDonor
+            : statsFromServerStatus[i].countDocsDeletedByRangeDeleter;
         assert(statsFromServerStatus[i]);
         assert(statsFromServerStatus[i].countStaleConfigErrors);
         assert(statsFromServerStatus[i].totalCriticalSectionCommitTimeMillis);
@@ -43,8 +46,7 @@ function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
         assert.eq(stats[i].countDocsClonedOnRecipient,
                   statsFromServerStatus[i].countDocsClonedOnRecipient);
         assert.eq(stats[i].countDocsClonedOnDonor, statsFromServerStatus[i].countDocsClonedOnDonor);
-        assert.eq(stats[i].countDocsDeletedByRangeDeleter,
-                  statsFromServerStatus[i].countDocsDeletedByRangeDeleter);
+        assert.eq(stats[i].countDocsDeletedByRangeDeleter, countDocsDeleted);
         assert.eq(stats[i].countRecipientMoveChunkStarted,
                   statsFromServerStatus[i].countRecipientMoveChunkStarted);
     }
