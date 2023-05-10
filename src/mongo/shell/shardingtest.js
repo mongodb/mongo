@@ -1840,8 +1840,6 @@ var ShardingTest = function(params) {
                                 admin.runCommand({transitionFromDedicatedConfigServer: 1}));
                         }
 
-                        // TODO SERVER-74448: Investigate if transitionFromDedicatedConfigServer
-                        // should be added to the localhost bypass exception like addShard.
                         if (keyFile) {
                             authutil.asCluster(
                                 admin.getMongo(), keyFile, transitionFromDedicatedConfigServer);
