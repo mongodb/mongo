@@ -50,10 +50,7 @@ hangBeforeAbort.off();
 jsTestLog("Waiting for threads to join");
 createIdx();
 
-// Check server status metric.
-
-rst.awaitReplication();
-IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexesSoon(primaryColl, 1, ['_id_']);
 
 rst.stopSet();
 })();
