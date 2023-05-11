@@ -118,7 +118,7 @@ void removeExpiredDocuments(Client* client) {
             // maintenance flag (requires opCtx->lockState()->isRSTLLocked()).
             if (!useUnreplicatedTruncates &&
                 !repl::ReplicationCoordinator::get(opCtx.get())
-                     ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig.toString())) {
+                     ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig)) {
                 continue;
             }
 

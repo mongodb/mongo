@@ -535,7 +535,8 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
     // to wait for the oplog visibility timestamp to be updated, it would wait for a replication
     // batch that would never complete because it couldn't reacquire its own lock, the global lock
     // held by the waiting reader.
-    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin");
+    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+        opCtx, DatabaseName::kAdmin);
 }
 
 namespace {

@@ -1225,7 +1225,7 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
         // re-create the collection.
         auto coordinator = repl::ReplicationCoordinator::get(opCtx.get());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
-        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.db())) {
+        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.dbName())) {
             uassertStatusOK(
                 Status(ErrorCodes::NotWritablePrimary,
                        "Recipient node is not primary, cannot clear oplog buffer collection."));
@@ -2237,7 +2237,7 @@ void TenantMigrationRecipientService::Instance::_setup() {
 
         auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-                opCtx, oplogBufferNS.db())) {
+                opCtx, oplogBufferNS.dbName())) {
             uassertStatusOK(
                 Status(ErrorCodes::NotWritablePrimary, "Recipient node is no longer a primary."));
         }

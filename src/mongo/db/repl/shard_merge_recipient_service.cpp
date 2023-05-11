@@ -1469,7 +1469,7 @@ ShardMergeRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTim
         // re-create the collection.
         auto coordinator = repl::ReplicationCoordinator::get(opCtx.get());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
-        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.db())) {
+        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.dbName())) {
             uassertStatusOK(
                 Status(ErrorCodes::NotWritablePrimary,
                        "Recipient node is not primary, cannot clear oplog buffer collection."));
@@ -1592,8 +1592,8 @@ void ShardMergeRecipientService::Instance::_startOplogBuffer(OperationContext* o
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
     auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
-    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
-                                                                              oplogBufferNS.db())) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+            opCtx, oplogBufferNS.dbName())) {
         uassertStatusOK(
             Status(ErrorCodes::NotWritablePrimary, "Recipient node is no longer a primary."));
     }

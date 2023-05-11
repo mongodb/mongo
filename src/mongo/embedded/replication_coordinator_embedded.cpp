@@ -78,12 +78,12 @@ bool ReplicationCoordinatorEmbedded::isWritablePrimaryForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorEmbedded::canAcceptWritesForDatabase(OperationContext* opCtx,
-                                                                StringData dbName) {
+                                                                const DatabaseName& dbName) {
     return true;
 }
 
 bool ReplicationCoordinatorEmbedded::canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
-                                                                       StringData dbName) {
+                                                                       const DatabaseName& dbName) {
     return true;
 }
 

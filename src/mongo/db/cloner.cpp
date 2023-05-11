@@ -560,7 +560,7 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                               << " (after getting list of collections to clone)",
                 !opCtx->writesAreReplicated() ||
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
-                                                                                         dBName));
+                                                                                         dbName));
 
         auto status = _createCollectionsForDb(opCtx, createCollectionParams, dBName);
         if (!status.isOK()) {

@@ -1573,8 +1573,9 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     _invocation->checkAuthorization(opCtx, request);
-
-    const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
+    const auto dbName =
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
+    const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1592,7 +1593,7 @@ void ExecCommandDatabase::_initiateCommand() {
         bool couldHaveOptedIn =
             allowed == Command::AllowedOnSecondary::kOptIn && !inMultiDocumentTransaction;
         bool optedIn = couldHaveOptedIn && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
-        bool canRunHere = commandCanRunHere(opCtx, dbname, command, inMultiDocumentTransaction);
+        bool canRunHere = commandCanRunHere(opCtx, dbName, command, inMultiDocumentTransaction);
         if (!canRunHere && couldHaveOptedIn) {
             const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"_sd
                                                      : "not master and slaveOk=false"_sd;
@@ -1608,7 +1609,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
         if (!command->maintenanceOk() &&
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-            !replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname) &&
+            !replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName) &&
             !replCoord->getMemberState().secondary()) {
 
             uassert(ErrorCodes::NotPrimaryOrSecondary,
@@ -1632,7 +1633,7 @@ void ExecCommandDatabase::_initiateCommand() {
             repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
             uassert(ErrorCodes::NotWritablePrimary,
                     "Cannot start a transaction in a non-primary state",
-                    replCoord->canAcceptWritesForDatabase(opCtx, dbname));
+                    replCoord->canAcceptWritesForDatabase(opCtx, dbName));
         }
     }
 

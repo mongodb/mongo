@@ -270,13 +270,15 @@ public:
      * NOTE: This function can only be meaningfully called while the caller holds the
      * ReplicationStateTransitionLock in some mode other than MODE_NONE.
      */
-    virtual bool canAcceptWritesForDatabase(OperationContext* opCtx, StringData dbName) = 0;
+    virtual bool canAcceptWritesForDatabase(OperationContext* opCtx,
+                                            const DatabaseName& dbName) = 0;
 
     /**
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL, the
      * return value may be inaccurate by the time the function returns.
      */
-    virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx, StringData dbName) = 0;
+    virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
+                                                   const DatabaseName& dbName) = 0;
 
     /**
      * Returns true if it is valid for this node to accept writes on the given namespace.

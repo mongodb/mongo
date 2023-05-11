@@ -77,12 +77,12 @@ bool ReplicationCoordinatorNoOp::isWritablePrimaryForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorNoOp::canAcceptWritesForDatabase(OperationContext* opCtx,
-                                                            StringData dbName) {
+                                                            const DatabaseName& dbName) {
     MONGO_UNREACHABLE;
 }
 
 bool ReplicationCoordinatorNoOp::canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
-                                                                   StringData dbName) {
+                                                                   const DatabaseName& dbName) {
     MONGO_UNREACHABLE;
 }
 

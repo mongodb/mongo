@@ -2717,7 +2717,8 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2772,7 +2773,8 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2806,7 +2808,8 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2847,7 +2850,8 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2891,7 +2895,8 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2929,7 +2934,8 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2977,7 +2983,8 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3053,12 +3060,14 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     ASSERT(replCoord->getApplierState() == ApplierState::Draining);
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-        ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
+        ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(
+            opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
     }
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
-    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented again.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3140,7 +3149,8 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3201,7 +3211,8 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3230,7 +3241,8 @@ TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());

@@ -72,8 +72,8 @@ void QueryAnalysisClient::setTaskExecutor(ServiceContext* service,
 
 bool QueryAnalysisClient::_canAcceptWrites(OperationContext* opCtx, const DatabaseName& dbName) {
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-    return mongo::repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-        opCtx, DatabaseNameUtil::serialize(dbName));
+    return mongo::repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
+                                                                                       dbName);
 }
 
 BSONObj QueryAnalysisClient::_executeCommandOnPrimaryLocal(

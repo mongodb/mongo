@@ -37,7 +37,7 @@
 namespace mongo {
 
 bool commandCanRunHere(OperationContext* opCtx,
-                       const std::string& dbname,
+                       const DatabaseName& dbName,
                        const Command* command,
                        bool inMultiDocumentTransaction);
 

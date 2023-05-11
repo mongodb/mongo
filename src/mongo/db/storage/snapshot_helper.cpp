@@ -100,7 +100,8 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
     // being applied and we can read from the default snapshot. If we are in a replication state
     // (like secondary or primary catch-up) where we are not accepting writes, we should read at
     // lastApplied.
-    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin")) {
+    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+            opCtx, DatabaseName::kAdmin)) {
         if (reason) {
             *reason = "primary";
         }

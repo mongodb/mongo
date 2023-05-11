@@ -3010,14 +3010,14 @@ bool ReplicationCoordinatorImpl::isWritablePrimaryForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(OperationContext* opCtx,
-                                                            StringData dbName) {
+                                                            const DatabaseName& dbName) {
     // The answer isn't meaningful unless we hold the ReplicationStateTransitionLock.
     invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
-                                                                   StringData dbName) {
+                                                                   const DatabaseName& dbName) {
     // _canAcceptNonLocalWrites is always true for standalone nodes, and adjusted based on
     // primary+drain state in replica sets.
     //
@@ -3026,7 +3026,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationCont
     if (_readWriteAbility->canAcceptNonLocalWrites_UNSAFE() || alwaysAllowNonLocalWrites(opCtx)) {
         return true;
     }
-    if (dbName == DatabaseName::kLocal.db()) {
+    if (dbName == DatabaseName::kLocal) {
         return true;
     }
     return false;
@@ -3071,7 +3071,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                                            const NamespaceStringOrUUID& nsOrUUID) {
-    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.dbName().db());
+    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.dbName());
 
     if (!canWriteToDB && !isSystemDotProfile(opCtx, nsOrUUID)) {
         return false;

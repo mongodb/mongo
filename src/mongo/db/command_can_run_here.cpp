@@ -38,11 +38,11 @@
 namespace mongo {
 
 bool commandCanRunHere(OperationContext* opCtx,
-                       const std::string& dbname,
+                       const DatabaseName& dbName,
                        const Command* command,
                        bool inMultiDocumentTransaction) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname))
+    if (replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName))
         return true;  // primary: always ok
     if (!opCtx->writesAreReplicated())
         return true;  // standalone: always ok

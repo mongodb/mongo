@@ -2019,7 +2019,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     {
         // We can't take writes yet since we're still in drain mode.
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
     }
 
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
@@ -2044,7 +2044,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     // in drain mode.
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
     }
 
     // Now complete drain mode and ensure that we become capable of taking writes.
@@ -2053,7 +2053,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
 class StepDownTestWithUnelectableNode : public StepDownTest {
@@ -2941,7 +2941,7 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     // This is the important check, that we stepped back up when aborting the stepdown command
     // attempt.
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
 // Test that if a stepdown command is blocked waiting for secondaries to catch up when an
@@ -3001,7 +3001,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
 TEST_F(ReplCoordTest, GetReplicationModeNone) {

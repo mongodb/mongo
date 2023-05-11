@@ -497,7 +497,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
     // Early exit if the collection doesn't exist or running on a secondary.
     if (!preImageColl.exists() ||
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-            opCtx, DatabaseName::kConfig.toString())) {
+            opCtx, DatabaseName::kConfig)) {
         return 0;
     }
 
@@ -548,7 +548,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
     // Early exit if the collection doesn't exist or running on a secondary.
     if (!preImageColl.exists() ||
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-            opCtx, DatabaseName::kConfig.toString())) {
+            opCtx, DatabaseName::kConfig)) {
         return 0;
     }
 

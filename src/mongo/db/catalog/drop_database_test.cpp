@@ -221,7 +221,7 @@ TEST_F(DropDatabaseTest, DropDatabaseReturnsNotWritablePrimaryIfNotPrimary) {
     _createCollection(_opCtx.get(), _nss);
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
     ASSERT_TRUE(_opCtx->writesAreReplicated());
-    ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.db()));
+    ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.dbName()));
     ASSERT_EQUALS(ErrorCodes::NotWritablePrimary,
                   dropDatabaseForApplyOps(_opCtx.get(), _nss.dbName()));
 }
@@ -408,7 +408,7 @@ TEST_F(DropDatabaseTest,
         [this](OperationContext*, const repl::OpTime&) {
             ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
             ASSERT_TRUE(_opCtx->writesAreReplicated());
-            ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.db()));
+            ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.dbName()));
             return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
         });
 

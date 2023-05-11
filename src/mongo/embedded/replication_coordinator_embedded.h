@@ -71,8 +71,9 @@ public:
     bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const override;
     bool isInPrimaryOrSecondaryState_UNSAFE() const override;
 
-    bool canAcceptWritesForDatabase(OperationContext* opCtx, StringData dbName) override;
-    bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx, StringData dbName) override;
+    bool canAcceptWritesForDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
+    bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
+                                           const DatabaseName& dbName) override;
 
     bool canAcceptWritesFor(OperationContext* opCtx,
                             const NamespaceStringOrUUID& nsOrUUID) override;

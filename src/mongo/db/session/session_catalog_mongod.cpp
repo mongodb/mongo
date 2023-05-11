@@ -658,7 +658,7 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
     // around the fact that the logical sessions cache is not registered to listen for replication
     // state changes.
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, DatabaseName::kConfig.toString()))
+    if (!replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, DatabaseName::kConfig))
         return 0;
 
     return removeExpiredTransactionSessionsFromDisk(

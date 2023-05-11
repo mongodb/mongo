@@ -169,7 +169,7 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     // Its a proxy for being a primary
-    if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
+    if (!replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin)) {
         LOGV2_DEBUG(21220, 1, "Not a primary, skipping the noop write");
         return;
     }

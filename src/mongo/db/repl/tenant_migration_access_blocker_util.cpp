@@ -634,7 +634,7 @@ void performNoopWrite(OperationContext* opCtx, StringData msg) {
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     uassert(ErrorCodes::NotWritablePrimary,
             "Not primary when performing noop write for {}"_format(msg),
-            replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+            replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
 
     writeConflictRetry(
         opCtx, "performNoopWrite", NamespaceString::kRsOplogNamespace.ns(), [&opCtx, &msg] {

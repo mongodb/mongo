@@ -553,7 +553,7 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary when performing noop write for {}"_format(msg),
-                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+                replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
 
         writeConflictRetry(
             opCtx, "performNoopWrite", NamespaceString::kRsOplogNamespace.ns(), [&opCtx, &msg] {
@@ -946,7 +946,7 @@ void TransactionParticipant::Participant::beginOrContinue(
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary so we cannot begin or continue a transaction",
-                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+                replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
         // Disallow multi-statement transactions on shard servers that have
         // writeConcernMajorityJournalDefault=false unless enableTestCommands=true. But allow
         // retryable writes (autocommit == boost::none).
@@ -1865,7 +1865,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     if (opCtx->writesAreReplicated()) {
         uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary so we cannot commit a prepared transaction",
-                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+                replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
     }
 
     uassert(
@@ -2152,7 +2152,7 @@ void TransactionParticipant::Participant::_abortActivePreparedTransaction(Operat
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary so we cannot abort a prepared transaction",
-                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+                replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
     }
 
     _abortActiveTransaction(opCtx, TransactionState::kPrepared);
