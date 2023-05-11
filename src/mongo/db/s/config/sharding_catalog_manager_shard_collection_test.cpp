@@ -91,8 +91,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_NoZones_OneChunkToPrimary) {
         Lock::GlobalWrite lk(operationContext());
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(operationContext(),
-                                       uuid,
-                                       std::make_shared<CollectionMock>(kNamespace),
+                                       std::make_shared<CollectionMock>(uuid, kNamespace),
                                        /*ts=*/boost::none);
         });
     }

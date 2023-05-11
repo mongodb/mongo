@@ -431,10 +431,16 @@ public:
                             return true;
                         };
 
-                        std::vector<const Collection*> collections =
-                            catalog->establishConsistentCollections(opCtx, dbName, readTimestamp);
-                        for (const auto& collection : collections) {
-                            perCollectionWork(collection);
+                        // If we are lock-free we can just iterate over our collection catalog
+                        // without needing to yield as we don't take any locks.
+                        if (opCtx->isLockFreeReadsOp()) {
+                            auto collectionCatalog = CollectionCatalog::get(opCtx);
+                            for (auto&& coll : collectionCatalog->range(dbName)) {
+                                perCollectionWork(coll);
+                            }
+                        } else {
+                            mongo::catalog::forEachCollectionFromDb(
+                                opCtx, dbName, MODE_IS, perCollectionWork);
                         }
                     }
 

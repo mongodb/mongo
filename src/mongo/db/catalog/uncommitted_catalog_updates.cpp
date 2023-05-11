@@ -122,7 +122,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
 
             // This will throw when registering a namespace which is already in use.
             CollectionCatalog::write(opCtx, [&, coll = createdColl](CollectionCatalog& catalog) {
-                catalog.registerCollectionTwoPhase(opCtx, uuid, coll, /*ts=*/boost::none);
+                catalog.registerCollectionTwoPhase(opCtx, coll, /*ts=*/boost::none);
             });
 
             opCtx->recoveryUnit()->onRollback([uuid](OperationContext* opCtx) {
