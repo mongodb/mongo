@@ -652,7 +652,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
     OperationContext* opCtx,
     const NamespaceString& nss,
     const RoutingTableHistoryValueHandle& existingHistory,
-    const ComparableChunkVersion& previousVersion) {
+    const ComparableChunkVersion& timeInStore) {
     const bool isIncremental(existingHistory && existingHistory->optRt);
     _updateRefreshesStats(isIncremental, true);
     blockCollectionCacheLookup.pauseWhileSet(opCtx);
@@ -671,7 +671,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                   "Refreshing cached collection",
                                   "namespace"_attr = nss,
                                   "lookupSinceVersion"_attr = lookupVersion,
-                                  "timeInStore"_attr = previousVersion.toBSONForLogging());
+                                  "timeInStore"_attr = timeInStore.toBSONForLogging());
 
         auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
 
@@ -693,14 +693,18 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
         const ChunkVersion newVersion = newRoutingHistory->getVersion();
         newComparableVersion.setChunkVersion(newVersion);
 
-        LOGV2_FOR_CATALOG_REFRESH(4619901,
-                                  isIncremental || newComparableVersion != previousVersion ? 0 : 1,
-                                  "Refreshed cached collection",
-                                  "namespace"_attr = nss,
-                                  "lookupSinceVersion"_attr = lookupVersion,
-                                  "newVersion"_attr = newComparableVersion.toBSONForLogging(),
-                                  "timeInStore"_attr = previousVersion.toBSONForLogging(),
-                                  "duration"_attr = Milliseconds(t.millis()));
+        // The log below is logged at debug(0) (equivalent to info level) only if the new placement
+        // version is different than the one we already had (if any).
+        LOGV2_FOR_CATALOG_REFRESH(
+            4619901,
+            (!isIncremental || newVersion != existingHistory->optRt->getVersion()) ? 0 : 1,
+            "Refreshed cached collection",
+            "namespace"_attr = nss,
+            "lookupSinceVersion"_attr = lookupVersion,
+            "newVersion"_attr = newComparableVersion.toBSONForLogging(),
+            "timeInStore"_attr = timeInStore.toBSONForLogging(),
+            "duration"_attr = Milliseconds(t.millis()));
+
         _updateRefreshesStats(isIncremental, false);
 
         return LookupResult(OptionalRoutingTableHistory(std::move(newRoutingHistory)),
