@@ -87,6 +87,10 @@ void Checkpointer::run() {
 
             // Wait for 'storageGlobalParams.syncdelay' seconds; or until either shutdown is
             // signaled or a checkpoint is triggered.
+            LOGV2_DEBUG(7702900,
+                        1,
+                        "Checkpoint thread sleeping",
+                        "duration"_attr = static_cast<std::int64_t>(storageGlobalParams.syncdelay));
             _sleepCV.wait_for(
                 lock,
                 stdx::chrono::seconds(static_cast<std::int64_t>(storageGlobalParams.syncdelay)),
