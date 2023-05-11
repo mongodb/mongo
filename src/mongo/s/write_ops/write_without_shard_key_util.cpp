@@ -164,7 +164,6 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
         return false;
     }
 
-    BSONObj deleteQuery = query;
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                nss,
                                                                collation,

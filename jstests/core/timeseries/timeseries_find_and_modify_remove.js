@@ -9,8 +9,7 @@
  *   # TODO SERVER-76583: Remove following two tags.
  *   does_not_support_retryable_writes,
  *   requires_non_retryable_writes,
- *   # TODO SERVER-76530: Remove the follow tag.
- *   assumes_unsharded_collection,
+ *   featureFlagUpdateOneWithoutShardKey,
  * ]
  */
 
@@ -21,7 +20,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // findAndModify with a sort option is not supported.
 (function testSortOptionFails() {
-    jsTestLog("Running testSortOptionFails()");
     testFindOneAndRemove({
         initialDocList: [doc1_a_nofields, doc4_b_f103, doc6_c_f105],
         cmd: {filter: {f: {$gt: 100}}, sort: {f: 1}},
@@ -31,7 +29,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Query on the 'f' field leads to zero measurement delete.
 (function testZeroMeasurementDelete() {
-    jsTestLog("Running testZeroMeasurementDelete()");
     testFindOneAndRemove({
         initialDocList: [doc1_a_nofields, doc4_b_f103, doc6_c_f105],
         cmd: {filter: {f: 17}},
@@ -53,7 +50,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Query on the 'f' field leads to a partial bucket delete.
 (function testPartialBucketDelete() {
-    jsTestLog("Running testPartialBucketDelete()");
     testFindOneAndRemove({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         cmd: {filter: {f: 101}},
@@ -64,7 +60,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Query on the 'f' field leads to a partial bucket delete and 'fields' project the returned doc.
 (function testPartialBucketDeleteWithFields() {
-    jsTestLog("Running testPartialBucketDeleteWithFields()");
     testFindOneAndRemove({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         cmd: {filter: {f: 102}, fields: {f: 1, [metaFieldName]: 1, _id: 0}},
@@ -88,7 +83,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Query on the 'f' field leads to a full (single document) bucket delete.
 (function testFullBucketDelete() {
-    jsTestLog("Running testFullBucketDelete()");
     testFindOneAndRemove({
         initialDocList: [doc2_a_f101],
         cmd: {filter: {f: 101}},
@@ -111,7 +105,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Query on the 'tag' field matches all docs and deletes one.
 (function testMatchFullBucketOnlyDeletesOne() {
-    jsTestLog("Running testMatchFullBucketOnlyDeletesOne()");
     testFindOneAndRemove({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         cmd: {filter: {[metaFieldName]: "A"}},
@@ -128,7 +121,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Query on the 'tag' and metric field.
 (function testMetaAndMetricFilterOnlyDeletesOne() {
-    jsTestLog("Running testMetaAndMetricFilterOnlyDeletesOne()");
     testFindOneAndRemove({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         cmd: {filter: {[metaFieldName]: "A", f: {$gt: 101}}},
@@ -146,7 +138,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Query on the 'f' field matches docs in multiple buckets but only deletes from one.
 (function testMatchMultiBucketOnlyDeletesOne() {
-    jsTestLog("Running testMatchMultiBucketOnlyDeletesOne()");
     testFindOneAndRemove({
         initialDocList: [
             doc1_a_nofields,
@@ -171,7 +162,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
 // Empty filter matches all docs but only deletes one.
 (function testEmptyFilterOnlyDeletesOne() {
-    jsTestLog("Running testEmptyFilterOnlyDeletesOne()");
     testFindOneAndRemove({
         initialDocList: [
             doc1_a_nofields,
@@ -197,7 +187,6 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 // Verifies that the collation is properly propagated to the bucket-level filter when the
 // query-level collation overrides the collection default collation.
 (function testFindAndRemoveWithCollation() {
-    jsTestLog("Running testFindAndRemoveWithCollation()");
     testFindOneAndRemove({
         initialDocList: [
             doc1_a_nofields,

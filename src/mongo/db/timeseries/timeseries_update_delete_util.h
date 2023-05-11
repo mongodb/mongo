@@ -81,15 +81,16 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
 
 // Type requirement 1 for isTimeseries()
 template <typename T>
-constexpr bool isRequestableWithTimeseriesBucketNamespace =
-    std::is_same_v<T, write_ops::InsertCommandRequest> ||
-    std::is_same_v<T, write_ops::UpdateCommandRequest> ||
-    std::is_same_v<T, write_ops::DeleteCommandRequest>;
+constexpr bool isRequestableWithTimeseriesBucketNamespace = requires(const T& t) {
+    t.getNamespace();
+    t.getIsTimeseriesNamespace();
+};
 
 // Type requirement 2 for isTimeseries()
 template <typename T>
-constexpr bool isRequestableOnUserTimeseriesNamespace =
-    std::is_same_v<T, DeleteRequest> || std::is_same_v<T, write_ops::FindAndModifyCommandRequest>;
+constexpr bool isRequestableOnUserTimeseriesNamespace = requires(const T& t) {
+    t.getNsString();
+};
 
 // Disjuction of type requirements for isTimeseries()
 template <typename T>
@@ -116,12 +117,11 @@ requires isRequestableOnTimeseries<T> std::pair<bool, NamespaceString> isTimeser
             return request.getIsTimeseriesNamespace()
                 ? std::pair{nss, nss}
                 : std::pair{nss, nss.makeTimeseriesBucketsNamespace()};
-        } else if constexpr (std::is_same_v<T, write_ops::FindAndModifyCommandRequest>) {
-            auto nss = request.getNamespace();
-            return std::pair{nss, nss.makeTimeseriesBucketsNamespace()};
         } else {
             auto nss = request.getNsString();
-            return std::pair{nss, nss.makeTimeseriesBucketsNamespace()};
+            return std::pair{
+                nss,
+                nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace()};
         }
     }();
 

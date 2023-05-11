@@ -2,19 +2,75 @@
  * Helpers for testing timeseries arbitrary writes.
  */
 
-load("jstests/libs/analyze_plan.js");     // For getPlanStage() and getExecutionStages().
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
+load("jstests/libs/analyze_plan.js");  // For getPlanStage() and getExecutionStages().
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
-const dateTime = ISODate("2021-07-12T16:00:00Z");
-const collNamePrefix = "coll_";
+const sysCollNamePrefix = "system.buckets.";
 const closedBucketFilter = {
     "control.closed": {$not: {$eq: true}}
 };
+// The split point is between the 'A' and 'B' meta values which is _id: 4. [1, 3] goes to the
+// primary shard and [4, 7] goes to the other shard.
+const splitMetaPointBetweenTwoShards = {
+    meta: "B"
+};
+// This split point is the same as the 'splitMetaPointBetweenTwoShards'.
+const splitTimePointBetweenTwoShards = {
+    [`control.min.${timeFieldName}`]: ISODate("2003-06-30")
+};
 
-let testCaseId = 0;
+function generateTimeValue(index) {
+    return ISODate(`${2000 + index}-01-01`);
+}
+
+// Defines sample data set for testing.
+const doc1_a_nofields = {
+    _id: 1,
+    [timeFieldName]: generateTimeValue(1),
+    [metaFieldName]: "A",
+};
+const doc2_a_f101 = {
+    _id: 2,
+    [timeFieldName]: generateTimeValue(2),
+    [metaFieldName]: "A",
+    f: 101
+};
+const doc3_a_f102 = {
+    _id: 3,
+    [timeFieldName]: generateTimeValue(3),
+    [metaFieldName]: "A",
+    f: 102
+};
+const doc4_b_f103 = {
+    _id: 4,
+    [timeFieldName]: generateTimeValue(4),
+    [metaFieldName]: "B",
+    f: 103
+};
+const doc5_b_f104 = {
+    _id: 5,
+    [timeFieldName]: generateTimeValue(5),
+    [metaFieldName]: "B",
+    f: 104
+};
+const doc6_c_f105 = {
+    _id: 6,
+    [timeFieldName]: generateTimeValue(6),
+    [metaFieldName]: "C",
+    f: 105
+};
+const doc7_c_f106 = {
+    _id: 7,
+    [timeFieldName]: generateTimeValue(7),
+    [metaFieldName]: "C",
+    f: 106,
+};
+
 let testDB = null;
+let st = null;
+let primaryShard = null;
+let otherShard = null;
 
 /**
  * Composes and returns a bucket-level filter for timeseries arbitrary writes.
@@ -35,15 +91,73 @@ function getTestDB() {
     return testDB;
 }
 
-function prepareCollection(initialDocList) {
+function prepareCollection({collName, initialDocList}) {
     const testDB = getTestDB();
-    const coll = testDB.getCollection(collNamePrefix + testCaseId++);
+    const coll = testDB.getCollection(collName);
     coll.drop();
     assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     assert.commandWorked(coll.insert(initialDocList));
 
     return coll;
+}
+
+function prepareShardedCollection({collName, initialDocList, includeMeta}) {
+    assert.neq(null, testDB, "testDB must be initialized before calling prepareShardedCollection");
+
+    const coll = testDB.getCollection(collName);
+    const sysCollName = sysCollNamePrefix + coll.getName();
+    coll.drop();
+
+    const tsOptions = includeMeta
+        ? {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}
+        : {timeseries: {timeField: timeFieldName}};
+    assert.commandWorked(testDB.createCollection(coll.getName(), tsOptions));
+    assert.commandWorked(coll.insert(initialDocList));
+
+    const shardKey = includeMeta ? {[metaFieldName]: 1} : {[timeFieldName]: 1};
+    assert.commandWorked(coll.createIndex(shardKey));
+    assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
+
+    const splitPoint =
+        includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
+    // [MinKey, splitPoint) and [splitPoint, MaxKey) are the two chunks after the split.
+    assert.commandWorked(
+        testDB.adminCommand({split: testDB[sysCollName].getFullName(), middle: splitPoint}));
+
+    assert.commandWorked(testDB.adminCommand({
+        moveChunk: testDB[sysCollName].getFullName(),
+        find: splitPoint,
+        to: otherShard.shardName,
+        _waitForDelete: true
+    }));
+
+    return coll;
+}
+
+function makeFindAndModifyCommand(coll, filter, fields, sort, collation) {
+    let findAndModifyCmd = {findAndModify: coll.getName(), query: filter, remove: true};
+    if (fields) {
+        findAndModifyCmd["fields"] = fields;
+    }
+    if (sort) {
+        findAndModifyCmd["sort"] = sort;
+    }
+    if (collation) {
+        findAndModifyCmd["collation"] = collation;
+    }
+
+    return findAndModifyCmd;
+}
+
+/**
+ * Returns the name of the caller of the function that called this function using the stack trace.
+ *
+ * This is useful for generating unique collection names. If the return function name is not unique
+ * and the caller needs to generate a unique collection name, the caller can append a unique suffix.
+ */
+function getCallerName() {
+    return `${new Error().stack.split('\n')[2].split('@')[0]}`;
 }
 
 function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {
@@ -53,19 +167,14 @@ function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {
     // Validate the collection's exact contents if we were given the expected results. We may skip
     // this step in some cases, if the delete doesn't pinpoint a specific document.
     if (expectedResultDocs) {
-        assert.eq(expectedResultDocs.length, resultDocs.length, resultDocs);
-        expectedResultDocs.forEach(expectedDoc => {
-            assert.docEq(
-                expectedDoc,
-                coll.findOne({_id: expectedDoc._id}),
-                `Expected document (_id = ${expectedDoc._id}) not found in result collection: ${
-                    tojson(resultDocs)}`);
-        });
+        assert.eq(expectedResultDocs.length, resultDocs.length, tojson(resultDocs));
+        assert.sameMembers(expectedResultDocs, resultDocs, tojson(resultDocs));
     }
 }
 
 function verifyExplain(
     {explain, rootStageName, bucketFilter, residualFilter, nBucketsUnpacked, nReturned}) {
+    jsTestLog(`Explain: ${tojson(explain)}`);
     if (!rootStageName) {
         rootStageName = "TS_MODIFY";
     } else {
@@ -106,7 +215,7 @@ function verifyExplain(
 }
 
 /**
- * Confirms that a deleteOne returns the expected set of documents.
+ * Verifies that a deleteOne returns the expected set of documents.
  *
  * - initialDocList: The initial documents in the collection.
  * - filter: The filter for the deleteOne command.
@@ -114,7 +223,10 @@ function verifyExplain(
  * - nDeleted: The expected number of documents deleted.
  */
 function testDeleteOne({initialDocList, filter, expectedResultDocs, nDeleted}) {
-    const coll = prepareCollection(initialDocList);
+    const callerName = getCallerName();
+    jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
+
+    const coll = prepareCollection({collName: callerName, initialDocList: initialDocList});
 
     const res = assert.commandWorked(coll.deleteOne(filter));
     assert.eq(nDeleted, res.deletedCount);
@@ -122,8 +234,12 @@ function testDeleteOne({initialDocList, filter, expectedResultDocs, nDeleted}) {
     verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted);
 }
 
+function getBucketCollection(coll) {
+    return coll.getDB()[sysCollNamePrefix + coll.getName()];
+}
+
 /**
- * Confirms that a findAndModify with remove: true returns the expected result(s) 'res'.
+ * Verifies that a findAndModify remove returns the expected result(s) 'res'.
  *
  * - initialDocList: The initial documents in the collection.
  * - cmd.filter: The filter for the findAndModify command.
@@ -131,7 +247,7 @@ function testDeleteOne({initialDocList, filter, expectedResultDocs, nDeleted}) {
  * - cmd.sort: The sort option for the findAndModify command.
  * - cmd.collation: The collation option for the findAndModify command.
  * - res.errorCode: If errorCode is set, we expect the command to fail with that code and other
- *                  fields of 'res' and 'explain' are ignored.
+ *                  fields of 'res' are ignored.
  * - res.expectedResultDocs: The expected documents in the collection after the delete.
  * - res.nDeleted: The expected number of documents deleted.
  * - res.deletedDoc: The expected document returned by the findAndModify command.
@@ -156,34 +272,54 @@ function testFindOneAndRemove({
         nReturned,
     },
 }) {
-    const coll = prepareCollection(initialDocList);
+    const callerName = getCallerName();
+    jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
+
+    const coll = prepareCollection({collName: callerName, initialDocList: initialDocList});
+
+    const findAndModifyCmd = makeFindAndModifyCommand(coll, filter, fields, sort, collation);
+    jsTestLog(`Running findAndModify remove: ${tojson(findAndModifyCmd)}`);
 
     const session = coll.getDB().getSession();
     const shouldRetryWrites = session.getOptions().shouldRetryWrites();
-    const findAndModifyCmd = {
-        findAndModify: coll.getName(),
-        query: filter,
-        fields: fields,
-        sort: sort,
-        collation: collation,
-        remove: true
-    };
     // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
     if (!shouldRetryWrites && !errorCode) {
-        const explainRes = assert.commandWorked(
-            coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
-        if (bucketFilter) {
-            verifyExplain({
-                explain: explainRes,
-                rootStageName: rootStage,
-                bucketFilter: bucketFilter,
-                residualFilter: residualFilter,
-                nBucketsUnpacked: nBucketsUnpacked,
-                nReturned: nReturned,
-            });
+        const bucketColl = getBucketCollection(coll);
+        // TODO SERVER-76906 Enable explain for findAndModify on a sharded timeseries collection.
+        if (!FixtureHelpers.isSharded(bucketColl)) {
+            const explainRes = assert.commandWorked(
+                coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
+            if (bucketFilter) {
+                verifyExplain({
+                    explain: explainRes,
+                    rootStageName: rootStage,
+                    bucketFilter: bucketFilter,
+                    residualFilter: residualFilter,
+                    nBucketsUnpacked: nBucketsUnpacked,
+                    nReturned: nReturned,
+                });
+            }
+        } else {
+            jsTestLog("Skipping explain for sharded timeseries collections");
+
+            const collMetadata =
+                db.getSiblingDB("config").collections.findOne({_id: bucketColl.getFullName()});
+            jsTestLog(`Collection metadata -\n${tojson(collMetadata)}`);
+            if (collMetadata.timestamp) {
+                jsTestLog(`Shard info -\n${
+                    tojson(db.getSiblingDB("config")
+                               .chunks.find({uuid: collMetadata.uuid})
+                               .toArray())}`);
+            } else {
+                jsTestLog(`Shard info -\n${
+                    tojson(db.getSiblingDB("config")
+                               .chunks.find({uuid: collMetadata.uuid})
+                               .toArray())}`);
+            }
         }
 
         const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
+        jsTestLog(`findAndModify remove result: ${tojson(res)}`);
         assert.eq(nDeleted, res.lastErrorObject.n, tojson(res));
         if (deletedDoc) {
             assert.docEq(deletedDoc, res.value, tojson(res));
@@ -195,64 +331,263 @@ function testFindOneAndRemove({
 
         verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted);
     } else if (errorCode) {
-        assert.commandFailedWithCode(testDB.runCommand(findAndModifyCmd), errorCode);
+        assert.commandFailedWithCode(
+            testDB.runCommand(findAndModifyCmd), errorCode, `cmd = ${tojson(findAndModifyCmd)}`);
     } else {
         // TODO SERVER-76583: Remove this test.
-        assert.commandFailedWithCode(testDB.runCommand(findAndModifyCmd), 7308305);
+        assert.commandFailedWithCode(
+            testDB.runCommand(findAndModifyCmd), 7308305, `cmd = ${tojson(findAndModifyCmd)}`);
     }
 }
 
-// Defines sample data set for testing.
-const doc1_a_nofields = {
-    _id: 1,
-    [timeFieldName]: dateTime,
-    [metaFieldName]: "A",
-};
-const doc2_a_f101 = {
-    _id: 2,
-    [timeFieldName]: dateTime,
-    [metaFieldName]: "A",
-    f: 101
-};
-const doc3_a_f102 = {
-    _id: 3,
-    [timeFieldName]: dateTime,
-    [metaFieldName]: "A",
-    f: 102
-};
-const doc4_b_f103 = {
-    _id: 4,
-    [timeFieldName]: dateTime,
-    [metaFieldName]: "B",
-    f: 103
-};
-const doc5_b_f104 = {
-    _id: 5,
-    [timeFieldName]: dateTime,
-    [metaFieldName]: "B",
-    f: 104
-};
-const doc6_c_f105 = {
-    _id: 6,
-    [timeFieldName]: dateTime,
-    [metaFieldName]: "C",
-    f: 105
-};
-const doc7_c_f106 = {
-    _id: 7,
-    [timeFieldName]: dateTime,
-    [metaFieldName]: "C",
-    f: 106,
-};
+function getRelevantProfilerEntries(db, coll, requestType) {
+    const sysCollName = sysCollNamePrefix + coll.getName();
+    const profilerFilter = {
+        $or: [
+            // Potential two-phase protocol cluster query.
+            {
+                "op": "command",
+                "ns": `${db.getName()}.${sysCollName}`,
+                "command.aggregate": `${sysCollName}`,
+                "command.$_isClusterQueryWithoutShardKeyCmd": true,
+                // Filters out events recorded because of StaleConfig error.
+                "ok": {$ne: 0},
+            },
+            // Potential two-phase protocol write command.
+            {
+                "op": "command",
+                "ns": `${db.getName()}.${sysCollName}`,
+                [`command.${requestType}`]: `${sysCollName}`,
+            },
+            // Targeted write command.
+            {
+                "op": "command",
+                "ns": `${db.getName()}.${sysCollName}`,
+                [`command.${requestType}`]: `${coll.getName()}`,
+            }
+        ]
+    };
+    return db.system.profile.find(profilerFilter).toArray();
+}
 
-function getSampleDataForWrites() {
-    return [
-        doc1_a_nofields,
-        doc2_a_f101,
-        doc3_a_f102,
-        doc4_b_f103,
-        doc5_b_f104,
-        doc6_c_f105,
-        doc7_c_f106,
-    ];
+function verifyThatRequestIsRoutedToCorrectShard(coll, requestType, writeType, dataBearingShard) {
+    assert(primaryShard && otherShard, "The sharded cluster must be initialized");
+    assert(dataBearingShard === "primary" || dataBearingShard === "other" ||
+               dataBearingShard === "none" || dataBearingShard === "any",
+           "Invalid shard: " + dataBearingShard);
+    assert(writeType === "twoPhaseProtocol" || writeType === "targeted",
+           "Invalid write type: " + writeType);
+    assert(requestType === "findAndModify" || requestType === "delete" || requestType === "update",
+           "Invalid request type: " + requestType);
+
+    const primaryDB = primaryShard.getDB(testDB.getName());
+    const otherDB = otherShard.getDB(testDB.getName());
+
+    const primaryEntries = getRelevantProfilerEntries(primaryDB, coll, requestType);
+    const otherEntries = getRelevantProfilerEntries(otherDB, coll, requestType);
+
+    /*
+     * The profiler entries for the two-phase protocol are expected to be in the following order:
+     * On the data bearing shard:
+     * 1. Cluster query.
+     * 2. Targeted request.
+     *
+     * On the non-data bearing shard:
+     * 1. Cluster query.
+     *
+     * The profiler entries for the targeted write are expected to be in the following order:
+     * On the data bearing shard:
+     * 1. Targeted request.
+     */
+
+    if (dataBearingShard === "none") {
+        // If dataBearingShard is "none", the writeType must be "twoPhaseProtocol". So, no shards
+        // should get the targeted request after the cluster query for the case of "none".
+
+        assert.eq("twoPhaseProtocol",
+                  writeType,
+                  "Expected data bearing shard to be 'none' only for 'twoPhaseProtocol' mode");
+
+        assert.eq(1, primaryEntries.length, "Expected one profiler entry on primary shard");
+        // The entry must be for the cluster query.
+        assert(primaryEntries[0].command.hasOwnProperty("aggregate"),
+               "Unexpected profile entries: " + tojson(primaryEntries));
+
+        assert.eq(1, otherEntries.length, "Expected one profiler entry on other shard");
+        // The entry must be for the cluster query.
+        assert(otherEntries[0].command.hasOwnProperty("aggregate"),
+               "Unexpected profile entries: " + tojson(otherEntries));
+        return;
+    }
+
+    const [dataBearingShardEntries, nonDataBearingShardEntries] = (() => {
+        if (dataBearingShard === "any") {
+            assert.eq("twoPhaseProtocol",
+                      writeType,
+                      "Expected data bearing shard to be 'any' only for 'twoPhaseProtocol' mode");
+            return primaryEntries.length === 2 ? [primaryEntries, otherEntries]
+                                               : [otherEntries, primaryEntries];
+        }
+
+        return dataBearingShard === "primary" ? [primaryEntries, otherEntries]
+                                              : [otherEntries, primaryEntries];
+    })();
+
+    if (writeType === "twoPhaseProtocol") {
+        // At this point, we know that the data bearing shard is either primary or other. So, we
+        // expect two profiler entries on the data bearing shard and one on the non-data bearing
+        // shard.
+
+        assert.eq(
+            2,
+            dataBearingShardEntries.length,
+            `Expected two profiler entries for data bearing shard in 'twoPhaseProtocol' mode but
+            got: ${tojson(dataBearingShardEntries)}`);
+        // The first entry must be for the cluster query.
+        assert(dataBearingShardEntries[0].command.hasOwnProperty("aggregate"),
+               "Unexpected profile entries: " + tojson(dataBearingShardEntries));
+        // The second entry must be the findAndModify command.
+        assert(dataBearingShardEntries[1].command.hasOwnProperty(requestType),
+               "Unexpected profile entries: " + tojson(dataBearingShardEntries));
+
+        assert.eq(
+            1,
+            nonDataBearingShardEntries.length,
+            `Expected one profiler entry for non data bearing shard in 'twoPhaseProtocol' mode but
+            got: ${tojson(nonDataBearingShardEntries)}`);
+        // The first entry must be for the cluster query.
+        assert(nonDataBearingShardEntries[0].command.hasOwnProperty("aggregate"),
+               "Unexpected profile entries: " + tojson(nonDataBearingShardEntries));
+    } else {
+        // This is the targeted write case. So, we expect one profiler entry on the data bearing
+        // shard and none on the non-data bearing shard.
+
+        assert.eq(1, dataBearingShardEntries.length, tojson(dataBearingShardEntries));
+        // The first entry must be the findAndModify command.
+        assert(dataBearingShardEntries[0].command.hasOwnProperty(requestType),
+               "Unexpected profile entries: " + tojson(dataBearingShardEntries));
+
+        assert.eq(0, nonDataBearingShardEntries.length, tojson(nonDataBearingShardEntries));
+    }
+}
+
+function restartProfiler() {
+    assert(primaryShard && otherShard, "The sharded cluster must be initialized");
+
+    const primaryDB = primaryShard.getDB(testDB.getName());
+    const otherDB = otherShard.getDB(testDB.getName());
+
+    primaryDB.setProfilingLevel(0);
+    primaryDB.system.profile.drop();
+    primaryDB.setProfilingLevel(2);
+    otherDB.setProfilingLevel(0);
+    otherDB.system.profile.drop();
+    otherDB.setProfilingLevel(2);
+}
+
+/**
+ * Verifies that a findAndModify remove on a sharded timeseries collection returns the expected
+ * result(s) 'res'.
+ *
+ * - initialDocList: The initial documents in the collection.
+ * - cmd.filter: The filter for the findAndModify command.
+ * - cmd.fields: The projection for the findAndModify command.
+ * - cmd.sort: The sort option for the findAndModify command.
+ * - cmd.collation: The collation option for the findAndModify command.
+ * - res.errorCode: If errorCode is set, we expect the command to fail with that code and other
+ *                  fields of 'res' are ignored.
+ * - res.nDeleted: The expected number of documents deleted.
+ * - res.deletedDoc: The expected document returned by the findAndModify command.
+ * - res.writeType: "twoPhaseProtocol" or "targeted". On sharded time-series collection, we route
+ *                  queries to shards if the queries contain the shardkey. "twoPhaseProtocol" means
+ *                  that we cannot target a specific data-bearing shard from the query and should
+ *                  the scatter-gather-like two-phase protocol. On the other hand, "targeted" means
+ *                  we can from the query.
+ * - res.dataBearingShard: "primary", "other", "none", or "any". For "none" and "any", only
+ *                         the "twoPhaseProtocol" is allowed.
+ */
+function testFindOneAndRemoveOnShardedCollection({
+    initialDocList,
+    includeMeta = true,
+    cmd: {filter, fields, sort, collation},
+    res: {
+        errorCode,
+        nDeleted,
+        deletedDoc,
+        writeType,
+        dataBearingShard,
+    },
+}) {
+    const callerName = getCallerName();
+    jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
+
+    const coll = prepareShardedCollection(
+        {collName: callerName, initialDocList: initialDocList, includeMeta: includeMeta});
+
+    const findAndModifyCmd = makeFindAndModifyCommand(coll, filter, fields, sort, collation);
+    jsTestLog(`Running findAndModify remove: ${tojson(findAndModifyCmd)}`);
+
+    const session = coll.getDB().getSession();
+    const shouldRetryWrites = session.getOptions().shouldRetryWrites();
+    // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
+    if (!shouldRetryWrites && !errorCode) {
+        // TODO SERVER-76906 Verify explain for findAndModify on sharded timeseries collections.
+        restartProfiler();
+        const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
+        jsTestLog(`findAndModify remove result: ${tojson(res)}`);
+        assert.eq(nDeleted, res.lastErrorObject.n, tojson(res));
+        let expectedResultDocs = initialDocList;
+        if (deletedDoc) {
+            // Note: To figure out the expected result documents, we need to know the _id of the
+            // deleted document.
+            assert(deletedDoc.hasOwnProperty("_id"),
+                   `deletedDoc must have _id but got ${tojson(deletedDoc)}`);
+            assert.docEq(deletedDoc, res.value, tojson(res));
+            expectedResultDocs = initialDocList.filter(doc => doc._id !== deletedDoc._id);
+        } else if (nDeleted === 1) {
+            // Note: To figure out the expected result documents, we need to know the _id of the
+            // deleted document. And so we don't allow 'fields' to be specified because it might
+            // exclude _id field.
+            assert(!fields, `Must specify deletedDoc when fields are specified: ${tojson(fields)}`);
+            assert.neq(null, res.value, tojson(res));
+            expectedResultDocs = initialDocList.filter(doc => doc._id !== res.value._id);
+        } else if (nDeleted === 0) {
+            assert.eq(null, res.value, tojson(res));
+        }
+
+        verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted);
+        verifyThatRequestIsRoutedToCorrectShard(coll, "findAndModify", writeType, dataBearingShard);
+    } else if (errorCode) {
+        assert.commandFailedWithCode(
+            testDB.runCommand(findAndModifyCmd), errorCode, `cmd = ${tojson(findAndModifyCmd)}`);
+    } else {
+        // TODO SERVER-76583: Remove this test.
+        assert.commandFailedWithCode(
+            testDB.runCommand(findAndModifyCmd), 7308305, `cmd = ${tojson(findAndModifyCmd)}`);
+    }
+}
+
+/**
+ * Sets up a sharded cluster.
+ */
+function setUpShardedCluster() {
+    assert.eq(null, st, "A sharded cluster must not be initialized yet");
+    assert.eq(null, primaryShard, "The primary shard must not be initialized yet");
+    assert.eq(null, otherShard, "The other shard must not be initialized yet");
+    assert.eq(null, testDB, "testDB must be not initialized yet");
+
+    st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    testDB = st.s.getDB(jsTestName());
+    assert.commandWorked(testDB.dropDatabase());
+    assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
+    primaryShard = st.getPrimaryShard(testDB.getName());
+    otherShard = st.getOther(primaryShard);
+}
+
+/**
+ * Tears down the sharded cluster created by setUpShardedCluster().
+ */
+function tearDownShardedCluster() {
+    assert.neq(null, st, "A sharded cluster must be initialized");
+    st.stop();
 }
