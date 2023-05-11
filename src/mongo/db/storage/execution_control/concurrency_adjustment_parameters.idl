@@ -60,3 +60,14 @@ server_parameters:
     default: "throughputProbing"
     validator:
       callback: validateConcurrencyAdjustmentAlgorithm
+
+  storageEngineConcurrencyAdjustmentIntervalMillis:
+    description: >-
+      The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
+      not set to fixedConcurrentTransactions.
+    set_at: startup
+    cpp_vartype: int32_t
+    cpp_varname: gStorageEngineConcurrencyAdjustmentIntervalMillis
+    default: 100
+    validator:
+      gt: 0
