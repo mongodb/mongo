@@ -127,20 +127,23 @@ private:
 
     void finalize() override;
 
-    void spill(BatchedObjects&& batch) override {
+    void spill(BatchedCommandRequest&& bcr, BatchedObjects&& batch) override {
         DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
+        auto insertCommand = bcr.extractInsertRequest();
+        insertCommand->setDocuments(std::move(batch));
         auto targetEpoch = boost::none;
+
         if (_timeseries) {
             uassertStatusOK(pExpCtx->mongoProcessInterface->insertTimeseries(
                 pExpCtx,
                 _tempNs.getTimeseriesViewNamespace(),
-                std::move(batch),
+                std::move(insertCommand),
                 _writeConcern,
                 targetEpoch));
         } else {
             uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
-                pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
+                pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
         }
     }
 
@@ -149,6 +152,8 @@ private:
         tassert(6628900, "_writeSizeEstimator should be initialized", _writeSizeEstimator);
         return {obj, _writeSizeEstimator->estimateInsertSizeBytes(obj)};
     }
+
+    BatchedCommandRequest initializeBatchedWriteRequest() const override;
 
     void waitWhileFailPointEnabled() override;
 

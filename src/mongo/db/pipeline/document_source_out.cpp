@@ -284,6 +284,13 @@ void DocumentSourceOut::finalize() {
     _timeseriesStateConsistent = true;
 }
 
+BatchedCommandRequest DocumentSourceOut::initializeBatchedWriteRequest() const {
+    // Note that our insert targets '_tempNs' (or the associated timeseries view) since we will
+    // never write to 'outputNs' directly.
+    const auto& targetNss = _timeseries ? _tempNs.getTimeseriesViewNamespace() : _tempNs;
+    return DocumentSourceWriter::makeInsertCommand(targetNss, pExpCtx->bypassDocumentValidation);
+}
+
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     NamespaceString outputNs,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

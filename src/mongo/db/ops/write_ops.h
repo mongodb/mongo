@@ -127,6 +127,17 @@ int getDeleteSizeEstimate(const BSONObj& q,
  */
 bool verifySizeEstimate(const write_ops::UpdateOpEntry& update);
 bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp);
+bool verifySizeEstimate(const InsertCommandRequest& insertReq);
+bool verifySizeEstimate(const UpdateCommandRequest& updateReq);
+bool verifySizeEstimate(const DeleteCommandRequest& deleteReq);
+
+/**
+ * Set of utilities which estimate the size of the headers (that is, all fields in a write command
+ * outside of the write statements themselves) of an insert/update/delete command, respectively.
+ */
+int getInsertHeaderSizeEstimate(const InsertCommandRequest& insertReq);
+int getUpdateHeaderSizeEstimate(const UpdateCommandRequest& updateReq);
+int getDeleteHeaderSizeEstimate(const DeleteCommandRequest& deleteReq);
 
 /**
  * If the response from a write command contains any write errors, it will throw the first one. All

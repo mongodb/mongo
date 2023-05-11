@@ -53,6 +53,11 @@ public:
                                       const NamespaceString& nss,
                                       ChunkVersion targetCollectionPlacementVersion) const final;
 
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const final {
+        return std::make_unique<TargetPrimaryWriteSizeEstimator>();
+    }
+
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final {
         // We don't expect anyone to use this method on the shard itself (yet). This is currently
@@ -71,23 +76,15 @@ public:
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) final;
 
-    /**
-     * Inserts the documents 'objs' into the namespace 'ns' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
+                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                   const WriteConcernOptions& wc,
                   boost::optional<OID> targetEpoch) final;
 
-    /**
-     * Replaces the documents matching 'queries' with 'updates' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    BatchedObjects&& batch,
+                                    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,
@@ -149,7 +146,7 @@ public:
 
     Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             const NamespaceString& ns,
-                            std::vector<BSONObj>&& objs,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                             const WriteConcernOptions& wc,
                             boost::optional<OID> targetEpoch) final;
 };

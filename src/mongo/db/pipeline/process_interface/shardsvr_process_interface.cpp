@@ -123,20 +123,20 @@ boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
     return doLookupSingleDocument(expCtx, nss, collectionUUID, documentKey, std::move(opts));
 }
 
-Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           const NamespaceString& ns,
-                                           std::vector<BSONObj>&& objs,
-                                           const WriteConcernOptions& wc,
-                                           boost::optional<OID> targetEpoch) {
+Status ShardServerProcessInterface::insert(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
-    BatchedCommandRequest insertCommand(
-        buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+    BatchedCommandRequest batchInsertCommand(std::move(insertCommand));
 
-    insertCommand.setWriteConcern(wc.toBSON());
+    batchInsertCommand.setWriteConcern(wc.toBSON());
 
-    cluster::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
+    cluster::write(expCtx->opCtx, batchInsertCommand, &stats, &response, targetEpoch);
 
     return response.toStatus();
 }
@@ -144,7 +144,7 @@ Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<Expression
 StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    BatchedObjects&& batch,
+    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
     const WriteConcernOptions& wc,
     UpsertType upsert,
     bool multi,
@@ -152,11 +152,10 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
-    BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
+    BatchedCommandRequest batchUpdateCommand(std::move(updateCommand));
+    batchUpdateCommand.setWriteConcern(wc.toBSON());
 
-    updateCommand.setWriteConcern(wc.toBSON());
-
-    cluster::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
+    cluster::write(expCtx->opCtx, batchUpdateCommand, &stats, &response, targetEpoch);
 
     if (auto status = response.toStatus(); status != Status::OK()) {
         return status;
@@ -402,10 +401,11 @@ void ShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,
 Status ShardServerProcessInterface::insertTimeseries(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    std::vector<BSONObj>&& objs,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
-    return ShardServerProcessInterface::insert(expCtx, ns, std::move(objs), wc, targetEpoch);
+    return ShardServerProcessInterface::insert(
+        expCtx, ns, std::move(insertCommand), wc, targetEpoch);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
