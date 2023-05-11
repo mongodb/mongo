@@ -184,8 +184,11 @@ private:
      * Creates an UpdateModification object from the given 'doc' to be used with the batched update.
      */
     auto makeBatchUpdateModification(const Document& doc) const {
-        return _pipeline ? write_ops::UpdateModification(*_pipeline)
-                         : write_ops::UpdateModification::parseFromClassicUpdate(doc.toBson());
+        return _pipeline
+            ? write_ops::UpdateModification(*_pipeline)
+            : write_ops::UpdateModification(doc.toBson(),
+                                            write_ops::UpdateModification::ClassicTag{},
+                                            true /* isReplacement */);
     }
 
     /**
