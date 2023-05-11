@@ -1331,7 +1331,6 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
 }
 
 bool PlanEnumerator::prepSubNodes(MatchExpression* node,
-
                                   PrepMemoContext context,
                                   vector<MemoID>* subnodesOut,
                                   vector<MemoID>* mandatorySubnodes) {
@@ -1366,9 +1365,13 @@ bool PlanEnumerator::prepSubNodes(MatchExpression* node,
             childContext.elemMatchExpr = child;
             childContext.outsidePreds = context.outsidePreds;
             markTraversedThroughElemMatchObj(&childContext);
-            prepSubNodes(child, childContext, subnodesOut, mandatorySubnodes);
+            if (!prepSubNodes(child, childContext, subnodesOut, mandatorySubnodes)) {
+                return false;
+            }
         } else if (MatchExpression::AND == child->matchType()) {
-            prepSubNodes(child, context, subnodesOut, mandatorySubnodes);
+            if (!prepSubNodes(child, context, subnodesOut, mandatorySubnodes)) {
+                return false;
+            }
         }
     }
     return true;
