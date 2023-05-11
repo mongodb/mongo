@@ -100,27 +100,15 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
 }
 
 static std::string hintSpecialField = "$hint";
-void addLiteralFields(BSONObjBuilder* bob,
+void addShapeLiterals(BSONObjBuilder* bob,
                       const FindCommandRequest& findCommand,
                       const SerializationOptions& opts) {
-
     if (auto limit = findCommand.getLimit()) {
         opts.appendLiteral(
             bob, FindCommandRequest::kLimitFieldName, static_cast<long long>(*limit));
     }
     if (auto skip = findCommand.getSkip()) {
         opts.appendLiteral(bob, FindCommandRequest::kSkipFieldName, static_cast<long long>(*skip));
-    }
-    if (auto batchSize = findCommand.getBatchSize()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
-    }
-    if (auto maxTimeMs = findCommand.getMaxTimeMS()) {
-        opts.appendLiteral(bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
-    }
-    if (auto noCursorTimeout = findCommand.getNoCursorTimeout()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kNoCursorTimeoutFieldName, bool(noCursorTimeout));
     }
 }
 
@@ -133,9 +121,8 @@ static std::vector<
         {FindCommandRequest::kShowRecordIdFieldName, &FindCommandRequest::getShowRecordId},
         {FindCommandRequest::kTailableFieldName, &FindCommandRequest::getTailable},
         {FindCommandRequest::kAwaitDataFieldName, &FindCommandRequest::getAwaitData},
-        {FindCommandRequest::kAllowPartialResultsFieldName,
-         &FindCommandRequest::getAllowPartialResults},
         {FindCommandRequest::kMirroredFieldName, &FindCommandRequest::getMirrored},
+        {FindCommandRequest::kOplogReplayFieldName, &FindCommandRequest::getOplogReplay},
 };
 std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandRequest&)>>>
     objArgMap = {
@@ -230,19 +217,7 @@ BSONObj extractQueryShape(const FindCommandRequest& findCommand,
         }
     }
 
-    // Redact the namespace of the command.
-    {
-        auto nssOrUUID = findCommand.getNamespaceOrUUID();
-        std::string toSerialize;
-        if (nssOrUUID.uuid()) {
-            toSerialize = opts.serializeIdentifier(nssOrUUID.toString());
-        } else {
-            // Database is set at the command level, only serialize the collection here.
-            toSerialize = opts.serializeIdentifier(nssOrUUID.nss()->coll());
-        }
-        bob.append(FindCommandRequest::kCommandName, toSerialize);
-    }
-
+    bob.append("command", "find");
     std::unique_ptr<MatchExpression> filterExpr;
     // Filter.
     {
@@ -299,8 +274,8 @@ BSONObj extractQueryShape(const FindCommandRequest& findCommand,
                    query_shape::extractSortShape(findCommand.getSort(), expCtx, opts));
     }
 
-    // Fields for literal redaction. Adds limit, skip, batchSize, maxTimeMS, and noCursorTimeOut
-    addLiteralFields(&bob, findCommand, opts);
+    // Fields for literal redaction. Adds limit and skip.
+    addShapeLiterals(&bob, findCommand, opts);
 
     // Add the fields that require no redaction.
     addRemainingFindCommandFields(&bob, findCommand, opts);

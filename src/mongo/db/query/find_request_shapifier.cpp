@@ -35,6 +35,34 @@
 #include "mongo/db/query/query_shape.h"
 
 namespace mongo::telemetry {
+
+void addNonShapeObjCmdLiterals(BSONObjBuilder* bob,
+                               const FindCommandRequest& findCommand,
+                               const SerializationOptions& opts,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+
+    if (const auto& comment = expCtx->opCtx->getComment()) {
+        opts.appendLiteral(bob, "comment", *comment);
+    }
+
+    if (auto noCursorTimeout = findCommand.getNoCursorTimeout()) {
+        // Capture whether noCursorTimeout was specified in the query, do not distinguish between
+        // true or false.
+        opts.appendLiteral(
+            bob, FindCommandRequest::kNoCursorTimeoutFieldName, noCursorTimeout.has_value());
+    }
+
+    if (auto maxTimeMs = findCommand.getMaxTimeMS()) {
+        opts.appendLiteral(bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
+    }
+
+    if (auto batchSize = findCommand.getBatchSize()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
+    }
+}
+
+
 BSONObj FindRequestShapifier::makeTelemetryKey(const SerializationOptions& opts,
                                                OperationContext* opCtx) const {
     auto expCtx = make_intrusive<ExpressionContext>(
@@ -57,11 +85,23 @@ BSONObj FindRequestShapifier::makeTelemetryKey(
         // Read concern should not be considered a literal.
         bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
     }
+    // has_value() returns true if allowParitalResults was populated by the original query.
+    if (_request.getAllowPartialResults().has_value()) {
+        // Note we are intentionally avoiding opts.appendLiteral() here and want to keep the exact
+        // value. value_or() will return the stored value, or the default that is passed in. Since
+        // we've already checked that allowPartialResults has a stored value, the default will never
+        // be used.
+        bob.append(FindCommandRequest::kAllowPartialResultsFieldName,
+                   _request.getAllowPartialResults().value_or(false));
+    }
+
+    // Fields for literal redaction. Adds comment, batchSize, maxTimeMS, and noCursorTimeOut.
+    addNonShapeObjCmdLiterals(&bob, _request, opts, expCtx);
 
     if (_applicationName.has_value()) {
-        // TODO SERVER-76143 don't serialize appName
-        bob.append("applicationName", opts.serializeIdentifier(_applicationName.value()));
+        bob.append("applicationName", _applicationName.value());
     }
+
 
     return bob.obj();
 }

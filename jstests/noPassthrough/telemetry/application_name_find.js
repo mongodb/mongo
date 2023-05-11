@@ -2,26 +2,13 @@
  * Test that applicationName and namespace appear in telemetry for the find command.
  * @tags: [featureFlagTelemetry]
  */
+load("jstests/libs/telemetry_utils.js");
 (function() {
 "use strict";
 
 const kApplicationName = "MongoDB Shell";
-const kHashedApplicationName = "piOJ84Zjy9dJP6snMI5X6NQ42VGim3vofK5awkuY5q8=";
-
-const getTelemetry = (conn, applyHmacToIdentifiers = false) => {
-    const result = assert.commandWorked(conn.adminCommand({
-        aggregate: 1,
-        pipeline: [
-            {$telemetry: {applyHmacToIdentifiers}},
-            // Sort on telemetry key so entries are in a deterministic order.
-            {$sort: {key: 1}},
-            {$match: {"key.applicationName": {$in: [kApplicationName, kHashedApplicationName]}}},
-            {$match: {"key.queryShape.find": {$exists: true}}}
-        ],
-        cursor: {batchSize: 10}
-    }));
-    return result.cursor.firstBatch;
-};
+const kHashedCollName = "w6Ax20mVkbJu4wQWAMjL8Sl+DfXAr2Zqdc3kJRB7Oo0=";
+const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
 // Turn on the collecting of telemetry metrics.
 let options = {
@@ -42,30 +29,11 @@ coll.find({v: 1}).toArray();
 
 let telemetry = getTelemetry(conn);
 assert.eq(1, telemetry.length, telemetry);
-assert.eq({
-    queryShape: {
-        cmdNs: {db: testDB.getName(), coll: coll.getName()},
-        find: coll.getName(),
-        filter: {v: {"$eq": "?number"}},
-    },
-    applicationName: kApplicationName
-},
-          telemetry[0].key,
-          telemetry);
+assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
 
-telemetry = getTelemetry(conn, true);
+telemetry = getTelemetryRedacted(conn, true);
 assert.eq(1, telemetry.length, telemetry);
-const hashedColl = "tU+RtrEU9QHrWsxNIL8OUDvfpUdavYkcuw7evPKfxdU=";
-assert.eq({
-    queryShape: {
-        cmdNs: {db: "Q7DO+ZJl+eNMEOqdNQGSbSezn1fG1nRWHYuiNueoGfs=", coll: hashedColl},
-        find: hashedColl,
-        filter: {"ksdi13D4gc1BJ0Es4yX6QtG6MAwIeNLsCgeGRePOvFE=": {"$eq": "?number"}},
-    },
-    applicationName: kHashedApplicationName
-},
-          telemetry[0].key,
-          telemetry);
+assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
 
 MongoRunner.stopMongod(conn);
 }());

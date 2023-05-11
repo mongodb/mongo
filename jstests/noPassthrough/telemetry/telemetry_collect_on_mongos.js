@@ -73,11 +73,11 @@ const assertExpectedResults = (results,
     const telemetryKey = {
         queryShape: {
             cmdNs: {db: "test", coll: "coll"},
-            find: collName,
+            command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
-            batchSize: "?number",
         },
         readConcern: {level: "local", provenance: "implicitDefault"},
+        batchSize: "?number",
         applicationName: "MongoDB Shell",
     };
 
@@ -208,11 +208,11 @@ const assertExpectedResults = (results,
     const telemetryKey = {
         queryShape: {
             cmdNs: {db: "test", coll: "coll"},
-            find: collName,
+            command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
-            batchSize: "?number",
         },
         readConcern: {level: "local", provenance: "implicitDefault"},
+        batchSize: "?number",
         applicationName: "MongoDB Shell"
     };
 

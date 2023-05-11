@@ -102,7 +102,7 @@ const fooNeBatchSize = 3;
     // This filters telemetry entires to just the ones entered when running above find queries.
     let telemetryResults =
         testDB.getSiblingDB("admin")
-            .aggregate([{$telemetry: {}}, {$match: {"key.queryShape.find": {$exists: true}}}])
+            .aggregate([{$telemetry: {}}, {$match: {"key.queryShape.command": "find"}}])
             .toArray();
     assert.eq(telemetryResults.length, 4, telemetryResults);
 

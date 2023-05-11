@@ -61,14 +61,11 @@ function getTelemetryRedacted(
     applyHmacToIdentifiers = true,
     hmacKey = BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")) {
     // Hashed application name is generated using the default hmacKey argument.
-    const kApplicationName = "T1iwlAqhXYroi7HTycmBJvWZSETwKXnaNa5akM4q0H4=";
+    const kApplicationName = "MongoDB Shell";
     // Filter out agg queries, including $telemetry.
     const match = {
-        $match: {"key.queryShape.find": {$exists: true}, "key.applicationName": kApplicationName}
+        $match: {"key.queryShape.command": "find", "key.applicationName": kApplicationName}
     };
-    if (!applyHmacToIdentifiers) {
-        match.$match["key.applicationName"] = "MongoDB Shell";
-    }
 
     const result = conn.adminCommand({
         aggregate: 1,

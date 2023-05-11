@@ -371,7 +371,6 @@ BSONObj TelemetryEntry::makeTelemetryKey(const BSONObj& key,
                   [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); },
                   LiteralSerializationPolicy::kToDebugTypeString)
             : SerializationOptions(false);
-
         return requestShapifier->makeTelemetryKey(serializationOpts, opCtx);
     }
 
@@ -488,7 +487,6 @@ void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
     if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;

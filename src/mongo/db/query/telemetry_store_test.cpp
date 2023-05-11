@@ -161,7 +161,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
@@ -182,7 +182,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
@@ -207,7 +207,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
@@ -240,7 +240,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
@@ -276,7 +276,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
@@ -318,6 +318,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     key = makeTelemetryKeyFindRequest(
         fcr, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
+
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -325,7 +326,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
@@ -355,11 +356,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<otherSort>": -1
                 },
                 "limit": "?number",
-                "skip": "?number",
-                "batchSize": "?number",
-                "maxTimeMS": "?number"
+                "skip": "?number"
+            },
+            "maxTimeMS": "?number",
+            "batchSize": "?number"
             }
-        })",
+        )",
         key);
 
     // Add the fields that shouldn't be hmacApplied.
@@ -372,6 +374,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setMirrored(true);
     key = makeTelemetryKeyFindRequest(
         fcr, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
+
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -379,7 +382,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
@@ -410,15 +413,69 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 },
                 "limit": "?number",
                 "skip": "?number",
-                "batchSize": "?number",
-                "maxTimeMS": "?number",
                 "singleBatch": "?bool",
                 "allowDiskUse": "?bool",
                 "showRecordId": "?bool",
                 "awaitData": "?bool",
-                "allowPartialResults": "?bool",
                 "mirrored": "?bool"
-            }
+            },
+            "allowPartialResults": true,
+            "maxTimeMS": "?number",
+            "batchSize": "?number"
+        })",
+        key);
+
+    fcr.setAllowPartialResults(false);
+    key = makeTelemetryKeyFindRequest(
+        fcr, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
+    // Make sure that a false allowPartialResults is also accurately captured.
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "command": "find",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
+                },
+                "limit": "?number",
+                "skip": "?number",
+                "singleBatch": "?bool",
+                "allowDiskUse": "?bool",
+                "showRecordId": "?bool",
+                "awaitData": "?bool",
+                "mirrored": "?bool"
+            },
+            "allowPartialResults": false,
+            "maxTimeMS": "?number",
+            "batchSize": "?number"
         })",
         key);
 }
@@ -443,7 +500,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {}
             }
         })",
@@ -470,7 +527,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "db": "testDB",
                     "coll": "testColl"
                 },
-                "find": "testColl",
+                "command": "find",
                 "filter": {
                     "b": {
                         "$eq": "?number"
@@ -503,7 +560,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "db": "testDB",
                     "coll": "testColl"
                 },
-                "find": "testColl",
+                "command": "find",
                 "filter": {
                     "b": {
                         "$eq": "?number"
@@ -531,7 +588,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<b>": {
                         "$eq": 1
@@ -560,7 +617,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<b>": {
                         "$eq": "?number"
@@ -591,7 +648,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "find": "HASH<testColl>",
+                "command": "find",
                 "filter": {
                     "HASH<b>": {
                         "$eq": "?number"
@@ -668,7 +725,7 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
                     "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
                     "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
                 },
-                "find": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c=",
+                "command": "find",
                 "filter": {
                     "$expr": [
                         {

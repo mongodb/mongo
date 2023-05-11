@@ -20,7 +20,7 @@ function runTest(conn) {
     let telemetry = getTelemetryRedacted(admin);
 
     assert.eq(1, telemetry.length);
-    assert.eq(kHashedCollName, telemetry[0].key.queryShape.find);
+    assert.eq("find", telemetry[0].key.queryShape.command);
     assert.eq({[kHashedFieldName]: {$eq: "?number"}}, telemetry[0].key.queryShape.filter);
 
     db.test.insert({v: 2});
@@ -35,7 +35,7 @@ function runTest(conn) {
 
     telemetry = getTelemetryRedacted(admin);
     assert.eq(2, telemetry.length);
-    assert.eq(kHashedCollName, telemetry[1].key.queryShape.find);
+    assert.eq("find", telemetry[1].key.queryShape.command);
     assert.eq({
         "$and": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$lt": "?number"}}]
     },
