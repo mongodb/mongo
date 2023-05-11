@@ -75,7 +75,9 @@ void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
     UpdateDriver replacementDriver(nullptr);
 
     // Create a new replacement-style update from the supplied document.
-    replacementDriver.parse(write_ops::UpdateModification::parseFromClassicUpdate(suppliedDoc), {});
+    replacementDriver.parse(
+        write_ops::UpdateModification(suppliedDoc, write_ops::UpdateModification::ReplacementTag{}),
+        {});
     replacementDriver.setLogOp(false);
 
     // We do not validate for storage, as we will validate the full document before inserting.

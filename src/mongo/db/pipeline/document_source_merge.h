@@ -202,7 +202,8 @@ private:
      */
     auto makeBatchUpdateModification(const Document& doc) const {
         return _pipeline ? write_ops::UpdateModification(*_pipeline)
-                         : write_ops::UpdateModification::parseFromClassicUpdate(doc.toBson());
+                         : write_ops::UpdateModification(
+                               doc.toBson(), write_ops::UpdateModification::ReplacementTag{});
     }
 
     /**
