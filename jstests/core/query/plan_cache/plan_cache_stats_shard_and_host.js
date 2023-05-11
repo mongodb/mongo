@@ -10,6 +10,7 @@
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
+//   requires_fcv_70,
 // ]
 (function() {
 "use strict";
