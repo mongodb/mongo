@@ -65,6 +65,14 @@ struct DistributionAndPaths {
 };
 
 
+/**
+ * Structure to represent index field component and its associated collation. The _path field
+ * contains the path to the field component, restricted to Get, Traverse, and Id elements.
+ * For example, if we have an index on {a.b, c} that contains arrays, the _path for the first entry
+ * would be Get "a" Traverse Get "b" Traverse Id, and the _path for the second entry would be
+ * Get "c" Traverse Id.
+ * Implicitly contains multikey info through Traverse element or lack of Traverse element.
+ */
 struct IndexCollationEntry {
     IndexCollationEntry(ABT path, CollationOp op);
 
@@ -74,6 +82,7 @@ struct IndexCollationEntry {
     CollationOp _op;
 };
 
+// Full collation specification, using a list of component entries.
 using IndexCollationSpec = std::vector<IndexCollationEntry>;
 
 /**
@@ -115,7 +124,9 @@ struct MultikeynessTrie {
 };
 
 /**
- * Defines an available system index.
+ * Metadata associated with an index. Holds the index specification (index fields and their
+ * collations), its version (0 or 1), the collations as a bit mask, multikeyness info, and
+ * distribution info. This is a convenient structure for the query planning process.
  */
 class IndexDefinition {
 public:
@@ -161,8 +172,12 @@ private:
 using IndexDefinitions = opt::unordered_map<std::string, IndexDefinition>;
 using ScanDefOptions = opt::unordered_map<std::string, std::string>;
 
-// Used to specify parameters to scan node, such as collection name, or file where collection is
-// read from.
+/**
+ * Parameters to a scan node, including distribution information, associated index definitions,
+ * and multikeyness information. Also includes any ScanDefOptions we might have, such as which
+ * database the collection is associated with, the origin of the collection (mongod or a BSON file),
+ * or the UUID of the collection.
+ */
 class ScanDefinition {
 public:
     ScanDefinition();
@@ -207,6 +222,14 @@ private:
     boost::optional<CEType> _ce;
 };
 
+/**
+ * Represents the optimizer’s view of the state of the rest of the system in terms of relevant
+ * resources. Currently we store the set of available collections in the system. In the future,
+ * when we support distributed planning, this is where we will put information related to the
+ * physical organization and topology of the machines.
+ * For each collection, we hold distribution information (fields it may be sharded on), multikeyness
+ * info, and data related to associated indexes in addition to other relevant metadata.
+ */
 struct Metadata {
     Metadata(opt::unordered_map<std::string, ScanDefinition> scanDefs);
     Metadata(opt::unordered_map<std::string, ScanDefinition> scanDefs, size_t numberOfPartitions);

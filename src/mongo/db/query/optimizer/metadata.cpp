@@ -109,7 +109,7 @@ IndexDefinition::IndexDefinition(IndexCollationSpec collationSpec,
                                  DistributionAndPaths distributionAndPaths,
                                  PartialSchemaRequirements partialReqMap)
     : IndexDefinition(std::move(collationSpec),
-                      2 /*version*/,
+                      1 /*version*/,
                       0 /*orderingBits*/,
                       isMultiKey,
                       std::move(distributionAndPaths),

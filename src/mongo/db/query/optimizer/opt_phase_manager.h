@@ -42,16 +42,15 @@ namespace mongo::optimizer {
 
 using namespace cascades;
 
-/**
- * This class wraps together different optimization phases.
- * First the transport rewrites are applied such as constant folding and redundant expression
- * elimination. Second the logical and physical reordering rewrites are applied using the memo.
- * Third the final transport rewritesd are applied.
- */
-
 #define OPT_PHASE(F)                                                                               \
     /* ConstEval performs the following rewrites: constant folding, inlining, and dead code        \
-     * elimination. */                                                                             \
+     * elimination.                                                                                \
+     * PathFusion implements path laws, for example shortcutting field assignment and reads, and   \
+     * other path optimizations.                                                                   \
+     * We switch between applying ConstEval and PathFusion for as long as they change the query,   \
+     * as they can enable new rewrites in each other. These are both done in-place rather than     \
+     * creating plan alternatives                                                                  \
+     */                                                                                            \
     F(ConstEvalPre)                                                                                \
     F(PathFuse)                                                                                    \
                                                                                                    \
@@ -65,13 +64,23 @@ using namespace cascades;
     /* Implementation and enforcement rules. */                                                    \
     F(MemoImplementationPhase)                                                                     \
                                                                                                    \
+    /* Lowers paths to expressions. Not to be confused with SBENodeLowering, which lowers ABT      \
+     * nodes and expressions to an SBE plan. */                                                    \
     F(PathLower)                                                                                   \
+    /* Final round of constant folding, identical to the first ConstEval stage. */                 \
     F(ConstEvalPost)
 
 MAKE_PRINTABLE_ENUM(OptPhase, OPT_PHASE);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(OptPhaseEnum, OptPhase, OPT_PHASE);
 #undef OPT_PHASE
 
+/**
+ * This class drives the optimization process, wrapping together different optimization phases.
+ * First the transport rewrites are applied such as constant folding and redundant expression
+ * elimination. Second the logical and physical reordering rewrites are applied using the memo.
+ * Third the final transport rewrites are applied.
+ * Phases may be skipped by specifying a subset of the phases to run in the phaseSet argument.
+ */
 class OptPhaseManager {
 public:
     using PhaseSet = opt::unordered_set<OptPhase>;

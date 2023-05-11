@@ -18,7 +18,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -65,7 +65,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -336,7 +336,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -379,7 +379,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 0
 					distribution and paths: 
@@ -426,7 +426,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 0
 					distribution and paths: 
@@ -478,7 +478,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 0
 					distribution and paths: 
@@ -535,7 +535,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 0
 					distribution and paths: 
@@ -600,7 +600,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 0
 					distribution and paths: 
@@ -656,7 +656,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -701,7 +701,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -766,7 +766,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -810,7 +810,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
