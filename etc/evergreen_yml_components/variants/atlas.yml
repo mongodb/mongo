@@ -18,10 +18,12 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
