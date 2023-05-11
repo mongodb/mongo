@@ -72,6 +72,15 @@ function killBeforeVoteCommitSucceeds(rst) {
 
     jsTestLog("Waiting for threads to join");
     createIdx();
+
+    // Confirm that the error message returned by the createIndexes command describes the secondary
+    // running out of disk space, rather than a generic "operation was interrupted" message.
+    // We use the log message as a proxy for the error message that is returned by createIndexes.
+    checkLog.contains(
+        primary,
+        new RegExp(
+            "20655.*Index build: joined after abort.*IndexBuildAborted.*'voteAbortIndexBuild' received from.*: available disk space of.*bytes is less than required minimum of"));
+
     simulateDiskSpaceFp.off();
 
     // "Index build: aborted due to insufficient disk space"

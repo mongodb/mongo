@@ -397,7 +397,7 @@ public:
     std::string getAbortReason() const;
 
     /**
-     * Returns abort status. Invariants if not in aborted state.
+     * Returns abort status. Returns Status::OK() if not in aborted state.
      */
     Status getAbortStatus() const;
 

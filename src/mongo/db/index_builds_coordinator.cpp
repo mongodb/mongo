@@ -2846,6 +2846,15 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         }
     }
 
+    // Replace the status with the replica set index build state.
+    // This returns a meaningful error message to the createIndexes caller in case of an external
+    // abort, e.g. a secondary voting to abort the index build. Not doing so would return a generic,
+    // not too helpful "operation was interrupted" error message, because the 'voteAbortIndexBuild'
+    // command kills the index build's operation context.
+    if (replState->isAborted()) {
+        status.addContext(replState->getAbortStatus().reason());
+    }
+
     // If the index build has already been cleaned-up because it encountered an error, there is no
     // work to do. If feature flag IndexBuildGracefulErrorHandling is not enabled, the most routine
     // case is for this to be due to a self-abort caused by constraint checking during the commit
