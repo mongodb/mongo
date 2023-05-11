@@ -82,8 +82,7 @@ public:
             std::move(rs));
 
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                opCtx, options.uuid.get(), std::move(coll), /*ts=*/boost::none);
+            catalog.registerCollection(opCtx, std::move(coll), /*ts=*/boost::none);
         });
 
         return {{_storageEngine->getCatalog()->getEntry(catalogId)}};

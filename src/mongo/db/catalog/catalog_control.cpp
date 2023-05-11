@@ -147,8 +147,7 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& dbName : allDbs) {
-        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
-            auto coll = *collIt;
+        for (auto&& coll : catalog->range(dbName)) {
             if (!coll) {
                 break;
             }

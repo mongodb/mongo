@@ -151,10 +151,8 @@ void MovePrimaryDatabaseCloner::calculateListCatalogEntriesForRecipient() {
 
     if (opCtx->isLockFreeReadsOp()) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
-        for (auto it = collectionCatalog->begin(opCtx, _dbName);
-             it != collectionCatalog->end(opCtx);
-             ++it) {
-            parseCollection(*it);
+        for (auto&& coll : collectionCatalog->range(_dbName)) {
+            parseCollection(coll);
         }
     } else {
         mongo::catalog::forEachCollectionFromDb(opCtx, _dbName, MODE_IS, parseCollection);

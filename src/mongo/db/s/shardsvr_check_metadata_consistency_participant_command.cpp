@@ -266,10 +266,7 @@ public:
                 std::vector<CollectionPtr> localCollections;
                 switch (metadata_consistency_util::getCommandLevel(nss)) {
                     case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
-                        for (auto it = collCatalogSnapshot->begin(opCtx, nss.dbName());
-                             it != collCatalogSnapshot->end(opCtx);
-                             ++it) {
-                            const auto coll = *it;
+                        for (auto&& coll : collCatalogSnapshot->range(nss.dbName())) {
                             if (!coll) {
                                 continue;
                             }
