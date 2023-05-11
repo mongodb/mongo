@@ -489,6 +489,13 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
         boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
 
         {
+            // The refresh threads do not perform any data reads themselves, therefore they don't
+            // need to synchronise with secondary oplog application or go through admission control.
+            ShouldNotConflictWithSecondaryBatchApplicationBlock skipParallelBatchWriterMutex(
+                opCtx->lockState());
+            ScopedAdmissionPriorityForLock skipAdmissionControl(
+                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+
             boost::optional<Lock::DBLock> dbLock;
             boost::optional<Lock::CollectionLock> collLock;
             dbLock.emplace(opCtx, nss.dbName(), MODE_IS);
