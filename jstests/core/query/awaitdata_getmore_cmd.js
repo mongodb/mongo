@@ -7,8 +7,6 @@
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
-//   # TODO(SERVER-76821): Remove does_not_support_config_fuzzer tag.
-//   does_not_support_config_fuzzer,
 //   requires_capped,
 //   requires_getmore,
 //   uses_multiple_connections,
