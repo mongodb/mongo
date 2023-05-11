@@ -199,17 +199,25 @@ SemiFuture<BatchedCommandResponse> renameShardedCollectionStatement(
     const NamespaceString& newNss,
     const Timestamp& timeInsertion,
     int stmtId) {
-
     auto newCollectionType = oldCollection;
     newCollectionType.setNss(newNss);
     newCollectionType.setTimestamp(timeInsertion);
     newCollectionType.setEpoch(OID::gen());
 
+    // Implemented as an upsert to be idempotent
     auto query = BSON(CollectionType::kNssFieldName << newNss.ns());
-    write_ops::InsertCommandRequest insertOp(CollectionType::ConfigNS,
-                                             {newCollectionType.toBSON()});
+    write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+    updateOp.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(query);
+        entry.setU(
+            write_ops::UpdateModification::parseFromClassicUpdate(newCollectionType.toBSON()));
+        entry.setUpsert(true);
+        entry.setMulti(false);
+        return entry;
+    }()});
 
-    return txnClient.runCRUDOp(insertOp, {stmtId} /*stmtIds*/);
+    return txnClient.runCRUDOp(updateOp, {stmtId} /*stmtIds*/);
 }
 
 SemiFuture<BatchedCommandResponse> insertToPlacementHistoryStatement(
