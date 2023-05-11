@@ -8,7 +8,7 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -18,6 +18,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     multiversion_platform: amazon2
     multiversion_edition: targeted
     has_packages: true
@@ -74,7 +75,7 @@ buildvariants:
       archive-mongocryptd-debug
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -84,6 +85,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -142,7 +144,8 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -204,11 +207,12 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2
     multiversion_edition: enterprise
@@ -314,8 +318,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -367,10 +371,10 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2022
     multiversion_edition: enterprise
@@ -470,8 +474,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -524,10 +528,10 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2022
     multiversion_edition: enterprise
@@ -630,12 +634,13 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian10
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     multiversion_platform: debian10
     multiversion_edition: targeted
     has_packages: true
@@ -700,7 +705,8 @@ buildvariants:
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -757,7 +763,8 @@ buildvariants:
       MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: debian11
     multiversion_edition: targeted
     has_packages: true
@@ -821,7 +828,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -873,7 +881,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -924,10 +933,12 @@ buildvariants:
   run_on:
   - rhel76-test
   expansions:
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     compile_variant: rhel76_compile_rhel70
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -951,10 +962,11 @@ buildvariants:
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
-      --excludeWithAnyTags=requires_os_access
+      --excludeWithAnyTags=requires_os_access,requires_latch_analyzer
     compile_variant: ubi8
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -981,7 +993,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_edition: targeted
     has_packages: true
@@ -1046,7 +1059,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CFLAGS="-fno-gnu-unique"
@@ -1166,7 +1180,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -1227,7 +1242,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1285,8 +1301,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel90
     multiversion_edition: targeted
     has_packages: true
@@ -1342,8 +1358,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel90
     multiversion_edition: enterprise
@@ -1414,7 +1430,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -1475,7 +1492,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1544,7 +1562,8 @@ buildvariants:
       -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -1613,7 +1632,8 @@ buildvariants:
       -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1672,7 +1692,8 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1722,7 +1743,8 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: suse15
     multiversion_edition: targeted
     has_packages: true
@@ -1781,9 +1803,10 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -1852,13 +1875,14 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -1928,11 +1952,12 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -1989,7 +2014,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2027,7 +2053,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
     has_packages: true
@@ -2084,7 +2111,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -2148,7 +2176,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2215,7 +2244,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2281,7 +2311,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2340,7 +2371,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2377,8 +2409,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -2433,8 +2465,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2479,12 +2511,13 @@ buildvariants:
       MONGO_DISTMOD=windows
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
+      --use-diagnostic-latches=off
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
     compile_variant: windows
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -2544,6 +2577,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
+      --use-diagnostic-latches=off
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -2607,7 +2641,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -2618,6 +2652,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: macos
   tasks:
@@ -2661,7 +2696,7 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -2672,6 +2707,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: macos-arm64
   tasks:
@@ -2717,7 +2753,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -2733,6 +2769,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos
   tasks:
@@ -2762,7 +2799,7 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -2778,6 +2815,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos-arm64
   tasks:
@@ -2807,12 +2845,14 @@ buildvariants:
   - rhel82-arm64-large
   stepback: false
   expansions:
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     compile_flags: >-
       --ssl
       --dbg=on
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
       --link-model=dynamic
       ENABLE_GRPC_BUILD=1
       --use-libunwind=off

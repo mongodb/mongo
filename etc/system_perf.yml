@@ -1510,6 +1510,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
         install-mongocryptd
     run_on:
       - "amazon2-xlarge"
@@ -1542,6 +1543,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
         --allocator=system
         --enable-free-mon=off
         --enterprise-features=fle,search
@@ -1673,6 +1675,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
       compile_variant: -rhel70
     run_on:
       - rhel70-large

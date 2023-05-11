@@ -14,12 +14,14 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel81
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -74,6 +76,7 @@ buildvariants:
       MONGO_DISTMOD=rhel81
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -98,7 +101,8 @@ buildvariants:
       -j3
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -152,12 +156,14 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     release_buid: true
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel83
       -j3
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
