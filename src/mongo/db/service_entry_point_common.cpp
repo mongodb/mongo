@@ -1729,8 +1729,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // Check that the client has the directShardOperations role if this is a direct operation to a
     // shard.
-    if (command->requiresAuth() && !_isInternalClient() &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    if (command->requiresAuth() && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gCheckForDirectShardOperations.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         bool clusterHasTwoOrMoreShards = [&]() {
