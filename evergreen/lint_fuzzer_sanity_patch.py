@@ -21,7 +21,7 @@ from buildscripts import simple_report
 
 def is_js_file(filename: str) -> bool:
     # return True
-    return filename.startswith("jstests") and filename.endswith(".js")
+    return (filename.startswith("jstests") or filename.startswith("src/mongo/db/modules/enterprise/jstests")) and filename.endswith(".js")
 
 
 diffed_files = [Path(f) for f in gather_changed_files_for_lint(is_js_file)]
