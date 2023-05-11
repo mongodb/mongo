@@ -76,6 +76,7 @@ public:
         : _dbpath("wt_test"),
           _connection(_dbpath.path(), ""),
           _sessionCache(_connection.getConnection(), &_clockSource) {
+        setGlobalServiceContext(ServiceContext::make());
         _opCtx.reset(newOperationContext());
         auto ru = WiredTigerRecoveryUnit::get(_opCtx.get());
         _wtSession = ru->getSession()->getSession();
