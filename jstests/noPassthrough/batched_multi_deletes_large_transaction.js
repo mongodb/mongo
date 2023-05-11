@@ -47,7 +47,7 @@ assert.commandWorked(coll.insert(docIds.map((x) => {
 
 // Set up server to split deletes over multiple oplog entries
 // such that each oplog entry contains two delete operations.
-if (!FeatureFlagUtil.isEnabled(db, "InternalWritesAreReplicatedTransactionally")) {
+if (!FeatureFlagUtil.isEnabled(db, "LargeBatchedOperations")) {
     // Confirm legacy server behavior where mutiple oplog entries are not allowed
     // for batched writes.
     const result =

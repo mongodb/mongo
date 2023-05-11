@@ -65,8 +65,7 @@ const nodeOptions = {
 };
 const rollbackTest = new RollbackTest(jsTestName(), /*replSet=*/ undefined, nodeOptions);
 
-if (!FeatureFlagUtil.isEnabled(rollbackTest.getPrimary(),
-                               "InternalWritesAreReplicatedTransactionally")) {
+if (!FeatureFlagUtil.isEnabled(rollbackTest.getPrimary(), "LargeBatchedOperations")) {
     jsTestLog('Skipping test because required feature flag is not enabled.');
     rollbackTest.stop();
     return;

@@ -202,6 +202,16 @@ feature_flags:
         default: true
         version: 6.1
         shouldBeFCVGated: true
+    featureFlagLargeBatchedOperations:
+        description:  >-
+            Enable support for replicating batched operations over multiple applyOps oplog
+            entries. Otherwise, batched operations that do not fit within a single applyOps
+            oplog entry will fail with a TransactionTooLarge error.
+            See featureFlagBatchMultiDeletes, maxNumberOfBatchedOperationsInSingleOplogEntry,
+            and maxSizeOfBatchedOperationsInSingleOplogEntryBytes.
+        cpp_varname: gFeatureFlagLargeBatchedOperations
+        default: false
+        shouldBeFCVGated: true
     featureFlagDocumentSourceListCatalog:
         description: "When enabled, allow the use of the $listCatalog aggregation stage"
         cpp_varname: feature_flags::gDocumentSourceListCatalog
