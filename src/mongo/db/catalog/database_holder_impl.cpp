@@ -220,8 +220,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isDbLockedForMode(name.dbName(), MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = *collIt;
+    for (auto&& coll : catalog->range(name)) {
         if (!coll) {
             break;
         }
@@ -236,8 +235,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     auto const serviceContext = opCtx->getServiceContext();
 
-    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = *collIt;
+    for (auto&& coll : catalog->range(name)) {
         if (!coll) {
             break;
         }

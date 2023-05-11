@@ -72,12 +72,7 @@ public:
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(colUUID, nss);
         col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
         // Register dummy collection in catalog.
-        catalog.registerCollection(opCtx.get(), colUUID, collection);
-
-        // Validate that kNumCollectionReferencesStored is correct, add one reference for the one we
-        // hold in this function.
-        ASSERT_EQUALS(collection.use_count(),
-                      CollectionCatalog::kNumCollectionReferencesStored + 1);
+        catalog.registerCollection(opCtx.get(), collection);
     }
 
 protected:
@@ -98,17 +93,14 @@ public:
             NamespaceString fooNss("foo", "coll" + std::to_string(counter));
             NamespaceString barNss("bar", "coll" + std::to_string(counter));
 
-            auto fooUuid = UUID::gen();
             std::shared_ptr<Collection> fooColl = std::make_shared<CollectionMock>(fooNss);
-
-            auto barUuid = UUID::gen();
             std::shared_ptr<Collection> barColl = std::make_shared<CollectionMock>(barNss);
 
-            dbMap["foo"].insert(std::make_pair(fooUuid, fooColl.get()));
-            dbMap["bar"].insert(std::make_pair(barUuid, barColl.get()));
+            dbMap["foo"].insert(std::make_pair(fooColl->uuid(), fooColl.get()));
+            dbMap["bar"].insert(std::make_pair(barColl->uuid(), barColl.get()));
 
-            catalog.registerCollection(&opCtx, fooUuid, fooColl);
-            catalog.registerCollection(&opCtx, barUuid, barColl);
+            catalog.registerCollection(&opCtx, fooColl);
+            catalog.registerCollection(&opCtx, barColl);
         }
     }
 
@@ -134,10 +126,10 @@ public:
 
     void checkCollections(const TenantDatabaseName& tenantDbName) {
         unsigned long counter = 0;
-
-        for (auto [orderedIt, catalogIt] = std::tuple{collsIterator(tenantDbName.dbName()),
-                                                      catalog.begin(&opCtx, tenantDbName)};
-             catalogIt != catalog.end(&opCtx) &&
+        auto orderedIt = collsIterator(tenantDbName.dbName());
+        auto catalogRange = catalog.range(tenantDbName);
+        auto catalogIt = catalogRange.begin();
+        for (; catalogIt != catalogRange.end() &&
              orderedIt != collsIteratorEnd(tenantDbName.dbName());
              ++catalogIt, ++orderedIt) {
 
@@ -285,17 +277,13 @@ public:
         for (int i = 0; i < 5; i++) {
             NamespaceString nss("resourceDb", "coll" + std::to_string(i));
             std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-            auto uuid = collection->uuid();
 
-            catalog.registerCollection(&opCtx, uuid, std::move(collection));
+            catalog.registerCollection(&opCtx, std::move(collection));
         }
 
         int numEntries = 0;
-        for (auto it = catalog.begin(&opCtx, TenantDatabaseName(boost::none, "resourceDb"));
-             it != catalog.end(&opCtx);
-             it++) {
-            auto coll = *it;
-            std::string collName = coll->ns().ns();
+        for (auto&& coll : catalog.range(TenantDatabaseName(boost::none, "resourceDb"))) {
+            auto collName = coll->ns().ns();
             ResourceId rid(RESOURCE_COLLECTION, collName);
 
             ASSERT_NE(catalog.lookupResourceName(rid), boost::none);
@@ -306,10 +294,7 @@ public:
 
     void tearDown() {
         std::vector<UUID> collectionsToDeregister;
-        for (auto it = catalog.begin(&opCtx, TenantDatabaseName(boost::none, "resourceDb"));
-             it != catalog.end(&opCtx);
-             ++it) {
-            auto coll = *it;
+        for (auto&& coll : catalog.range(TenantDatabaseName(boost::none, "resourceDb"))) {
             auto uuid = coll->uuid();
             if (!coll) {
                 break;
@@ -323,9 +308,8 @@ public:
         }
 
         int numEntries = 0;
-        for (auto it = catalog.begin(&opCtx, TenantDatabaseName(boost::none, "resourceDb"));
-             it != catalog.end(&opCtx);
-             it++) {
+        for ([[maybe_unused]] auto&& coll :
+             catalog.range(TenantDatabaseName(boost::none, "resourceDb"))) {
             numEntries++;
         }
         ASSERT_EQ(0, numEntries);
@@ -402,13 +386,14 @@ TEST_F(CollectionCatalogIterationTest, EndAtEndOfSection) {
 }
 
 TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
-    auto it = catalog.begin(&opCtx, TenantDatabaseName(boost::none, "bar"));
+    auto range = catalog.range(TenantDatabaseName(boost::none, "bar"));
+    auto it = range.begin();
     auto collsIt = collsIterator("bar");
     auto uuid = collsIt->first;
     catalog.deregisterCollection(&opCtx, uuid);
     dropColl("bar", uuid);
 
-    ASSERT_EQUALS(uuid, it.uuid());
+    ASSERT_EQUALS(uuid, (*it)->uuid());
 }
 
 TEST_F(CollectionCatalogTest, OnCreateCollection) {
@@ -433,13 +418,13 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
 TEST_F(CollectionCatalogTest, InsertAfterLookup) {
     auto newUUID = UUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
-    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
+    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newUUID, newNss);
     auto newCol = newCollShared.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), newUUID) == nullptr);
     ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), newUUID), boost::none);
-    catalog.registerCollection(opCtx.get(), newUUID, std::move(newCollShared));
+    catalog.registerCollection(opCtx.get(), std::move(newCollShared));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), newUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
 }
@@ -482,7 +467,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     NamespaceString oldNss(nss.db(), "oldcol");
     std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(uuid, oldNss);
     auto collection = collShared.get();
-    catalog.registerCollection(opCtx.get(), uuid, std::move(collShared));
+    catalog.registerCollection(opCtx.get(), std::move(collShared));
     auto yieldableColl = catalog.lookupCollectionByUUID(opCtx.get(), uuid);
     ASSERT(yieldableColl);
     ASSERT_EQUALS(yieldableColl, collection);
@@ -537,7 +522,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDrop
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
     auto newUUID = UUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
-    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
+    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newUUID, newNss);
     auto newCol = newCollShared.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
@@ -548,7 +533,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
 
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), newUUID) == nullptr);
     ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), newUUID), boost::none);
-    catalog.registerCollection(opCtx.get(), newUUID, std::move(newCollShared));
+    catalog.registerCollection(opCtx.get(), std::move(newCollShared));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), newUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
 
@@ -564,7 +549,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
     NamespaceString newNss(nss.db(), "newcol");
-    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
+    std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(colUUID, newNss);
     auto newCol = newCollShared.get();
 
     {
@@ -575,7 +560,11 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     catalog.deregisterCollection(opCtx.get(), colUUID);
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
-    catalog.registerCollection(opCtx.get(), colUUID, std::move(newCollShared));
+    {
+        Lock::GlobalWrite lk(opCtx.get());
+        catalog.registerCollection(opCtx.get(), std::move(newCollShared));
+    }
+
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), newNss);
 
@@ -620,8 +609,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
     for (auto& nss : nsss) {
         std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
-        auto uuid = UUID::gen();
-        catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
+        catalog.registerCollection(opCtx.get(), std::move(newColl));
     }
 
     std::vector<NamespaceString> dCollList = {d1Coll, d2Coll, d3Coll};
@@ -676,8 +664,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
     for (auto& nss : nsss) {
         std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
-        auto uuid = UUID::gen();
-        catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
+        catalog.registerCollection(opCtx.get(), std::move(newColl));
     }
 
     // One dbName with only an invisible collection does not appear in dbNames. Use const_cast to

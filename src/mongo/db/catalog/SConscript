@@ -315,6 +315,7 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/multitenancy',
+        'collection',
         'collection_catalog',
     ],
 )

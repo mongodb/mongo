@@ -151,9 +151,7 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& tenantDbName : allDbs) {
-        for (auto collIt = catalog->begin(opCtx, tenantDbName); collIt != catalog->end(opCtx);
-             ++collIt) {
-            auto coll = *collIt;
+        for (auto&& coll : catalog->range(tenantDbName)) {
             if (!coll) {
                 break;
             }

@@ -76,7 +76,7 @@ public:
             _storageEngine->getCatalog()->getMetaData(opCtx, catalogId),
             std::move(rs));
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, options.uuid.get(), std::move(coll));
+            catalog.registerCollection(opCtx, std::move(coll));
         });
 
         return {{_storageEngine->getCatalog()->getEntry(catalogId)}};

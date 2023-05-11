@@ -231,8 +231,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                                   Database* db,
                                   EnsureIndexPolicy ensureIndexPolicy) {
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = *collIt;
+    for (auto&& coll : catalog->range(db->name())) {
         if (!coll) {
             break;
         }
@@ -251,7 +250,9 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                   "Collection is missing an _id index",
                   logAttrs(*coll.get()));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
-                auto status = buildMissingIdIndex(opCtx, collIt.getWritableCollection(opCtx));
+                auto writableCollection =
+                    catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, coll->uuid());
+                auto status = buildMissingIdIndex(opCtx, writableCollection);
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
                                 "could not build an _id index on collection {coll_ns}: {error}",

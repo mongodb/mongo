@@ -117,7 +117,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
 
             // This will throw when registering a namespace which is already in use.
             CollectionCatalog::write(opCtx, [&, coll = createdColl](CollectionCatalog& catalog) {
-                catalog.registerCollection(opCtx, uuid, coll);
+                catalog.registerCollection(opCtx, coll);
             });
 
             opCtx->recoveryUnit()->onRollback([opCtx, uuid]() {

@@ -406,7 +406,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     collection->setMinimumVisibleSnapshot(minVisibleTs);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, md->options.uuid.get(), std::move(collection));
+        catalog.registerCollection(opCtx, std::move(collection));
     });
 }
 
@@ -1349,10 +1349,8 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx,
 
     if (opCtx->isLockFreeReadsOp()) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
-        for (auto it = collectionCatalog->begin(opCtx, tenantDbName);
-             it != collectionCatalog->end(opCtx);
-             ++it) {
-            perCollectionWork(*it);
+        for (auto&& coll : collectionCatalog->range(tenantDbName)) {
+            perCollectionWork(coll);
         }
     } else {
         catalog::forEachCollectionFromDb(opCtx, tenantDbName, MODE_IS, perCollectionWork);

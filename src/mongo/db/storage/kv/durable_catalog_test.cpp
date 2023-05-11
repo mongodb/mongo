@@ -112,8 +112,7 @@ public:
             getCatalog()->getMetaData(operationContext(), catalogId),
             std::move(coll.second));
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                operationContext(), options.uuid.get(), std::move(collection));
+            catalog.registerCollection(operationContext(), std::move(collection));
         });
 
         wuow.commit();
