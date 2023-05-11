@@ -183,6 +183,11 @@ void DocumentSourceOut::finalize() {
     _tempNs = {};
 }
 
+BatchedCommandRequest DocumentSourceOut::initializeBatchedWriteRequest() const {
+    // Note that our insert targets '_tempNs' since we will never write to 'outputNs' directly.
+    return DocumentSourceWriter::makeInsertCommand(_tempNs, pExpCtx->bypassDocumentValidation);
+}
+
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 

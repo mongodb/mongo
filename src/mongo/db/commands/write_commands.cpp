@@ -283,6 +283,11 @@ public:
         }
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
+            // On debug builds, verify that the estimated size of the insert command is at least as
+            // large as the size of the actual, serialized insert command. This ensures that the
+            // logic which estimates the size of insert commands is correct.
+            dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
+
             doTransactionValidationForWrites(opCtx, ns());
             if (request().getEncryptionInformation().has_value()) {
                 // Flag set here and in fle_crud.cpp since this only executes on a mongod.
@@ -454,6 +459,11 @@ public:
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {
+            // On debug builds, verify that the estimated size of the update command is at least as
+            // large as the size of the actual, serialized update command. This ensures that the
+            // logic which estimates the size of update commands is correct.
+            dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
+
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
@@ -472,15 +482,6 @@ public:
                                       << ns(),
                         !opCtx->inMultiDocumentTransaction());
                 source = OperationSource::kTimeseriesUpdate;
-            }
-
-            // On debug builds, verify that the estimated size of the updates are at least as large
-            // as the actual, serialized size. This ensures that the logic that estimates the size
-            // of deletes for batch writes is correct.
-            if constexpr (kDebugBuild) {
-                for (auto&& updateOp : request().getUpdates()) {
-                    invariant(write_ops::verifySizeEstimate(updateOp));
-                }
             }
 
             long long nModified = 0;
@@ -666,6 +667,11 @@ public:
         }
 
         write_ops::DeleteCommandReply typedRun(OperationContext* opCtx) final try {
+            // On debug builds, verify that the estimated size of the deletes are at least as large
+            // as the actual, serialized size. This ensures that the logic that estimates the size
+            // of deletes for batch writes is correct.
+            dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
+
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
@@ -683,14 +689,6 @@ public:
                 source = OperationSource::kTimeseriesDelete;
             }
 
-            // On debug builds, verify that the estimated size of the deletes are at least as large
-            // as the actual, serialized size. This ensures that the logic that estimates the size
-            // of deletes for batch writes is correct.
-            if constexpr (kDebugBuild) {
-                for (auto&& deleteOp : request().getDeletes()) {
-                    invariant(write_ops::verifySizeEstimate(deleteOp));
-                }
-            }
 
             auto reply = write_ops_exec::performDeletes(opCtx, request(), source);
             populateReply(opCtx,

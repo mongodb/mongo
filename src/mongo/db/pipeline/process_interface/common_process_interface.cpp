@@ -168,12 +168,6 @@ std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsR
     return {"_id"};
 }
 
-std::unique_ptr<CommonProcessInterface::WriteSizeEstimator>
-CommonProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
-                                              const NamespaceString& ns) const {
-    return std::make_unique<LocalWriteSizeEstimator>();
-}
-
 void CommonProcessInterface::updateClientOperationTime(OperationContext* opCtx) const {
     // In order to support causal consistency in a replica set or a sharded cluster when reading
     // with secondary read preference, the secondary must propagate the primary's operation time

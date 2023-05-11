@@ -122,6 +122,200 @@ TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
     ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
 }
 
+TEST_F(WriteOpsExecTest, TestInsertRequestSizeEstimationLogic) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insert_test");
+    write_ops::InsertCommandRequest insert(ns);
+    BSONObj docToInsert(fromjson("{_id: 1, foo: 1}"));
+    insert.setDocuments({docToInsert});
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // Configure $tenant.
+    insert.setDollarTenant(mongo::TenantId(mongo::OID::gen()));
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // Configure different fields for 'wcb'.
+    write_ops::WriteCommandRequestBase wcb;
+
+    // stmtId
+    wcb.setStmtId(2);
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // stmtIds
+    wcb.setStmtIds(std::vector<int32_t>{2, 3});
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // isTimeseries
+    wcb.setIsTimeseriesNamespace(true);
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // collUUID
+    wcb.setCollectionUUID(UUID::gen());
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // encryptionInfo
+    wcb.setEncryptionInformation(
+        EncryptionInformation(fromjson("{schema: 'I love encrypting and protecting my data'}")));
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // originalQuery
+    wcb.setOriginalQuery(fromjson("{field: 'value'}"));
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // originalCollation
+    wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+}
+
+TEST_F(WriteOpsExecTest, TestUpdateRequestSizeEstimationLogic) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "update_test");
+    write_ops::UpdateCommandRequest update(ns);
+
+    const BSONObj updateStmt = fromjson("{$set: {a: 5}}");
+    auto mod = write_ops::UpdateModification::parseFromClassicUpdate(updateStmt);
+    write_ops::UpdateOpEntry updateOpEntry(BSON("_id" << 1), std::move(mod));
+    update.setUpdates({updateOpEntry});
+
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // Configure $tenant.
+    update.setDollarTenant(mongo::TenantId(mongo::OID::gen()));
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // Configure different fields for 'wcb'.
+    write_ops::WriteCommandRequestBase wcb;
+
+    // stmtId
+    wcb.setStmtId(2);
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // stmtIds
+    wcb.setStmtIds(std::vector<int32_t>{2, 3});
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // isTimeseries
+    wcb.setIsTimeseriesNamespace(true);
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // collUUID
+    wcb.setCollectionUUID(UUID::gen());
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // encryptionInfo
+    wcb.setEncryptionInformation(
+        EncryptionInformation(fromjson("{schema: 'I love encrypting and protecting my data'}")));
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // originalQuery
+    wcb.setOriginalQuery(fromjson("{field: 'value'}"));
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // originalCollation
+    wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // Configure different fields specific to 'UpdateStatementRequest'.
+    LegacyRuntimeConstants legacyRuntimeConstants;
+    const auto now = Date_t::now();
+
+    // At a minimum, $$NOW and $$CLUSTER_TIME must be set.
+    legacyRuntimeConstants.setLocalNow(now);
+    legacyRuntimeConstants.setClusterTime(Timestamp(now));
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // $$JS_SCOPE
+    BSONObj jsScope = fromjson("{constant: 'I love mapReduce and javascript :D'}");
+    legacyRuntimeConstants.setJsScope(jsScope);
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // $$IS_MR
+    legacyRuntimeConstants.setIsMapReduce(true);
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // $$USER_ROLES
+    BSONArray arr = BSON_ARRAY(fromjson("{role: 'readWriteAnyDatabase', db: 'admin'}"));
+    legacyRuntimeConstants.setUserRoles(arr);
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    const std::string kLargeString(100 * 1024, 'b');
+    BSONObj letParams = BSON("largeStrParam" << kLargeString);
+    update.setLet(letParams);
+    ASSERT(write_ops::verifySizeEstimate(update));
+}
+
+TEST_F(WriteOpsExecTest, TestDeleteRequestSizeEstimationLogic) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "delete_test");
+    write_ops::DeleteCommandRequest deleteReq(ns);
+    // Basic test case.
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << 1), false /* multi */);
+    deleteReq.setDeletes({deleteOpEntry});
+
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // Configure $tenant.
+    deleteReq.setDollarTenant(mongo::TenantId(mongo::OID::gen()));
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // Configure different fields for 'wcb'.
+    write_ops::WriteCommandRequestBase wcb;
+
+    // stmtId
+    wcb.setStmtId(2);
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // stmtIds
+    wcb.setStmtIds(std::vector<int32_t>{2, 3});
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // isTimeseries
+    wcb.setIsTimeseriesNamespace(true);
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // collUUID
+    wcb.setCollectionUUID(UUID::gen());
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // encryptionInfo
+    wcb.setEncryptionInformation(
+        EncryptionInformation(fromjson("{schema: 'I love encrypting and protecting my data'}")));
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // originalQuery
+    wcb.setOriginalQuery(fromjson("{field: 'value'}"));
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // originalCollation
+    wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+}
+
 TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
     NamespaceString ns =
         NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "ts");

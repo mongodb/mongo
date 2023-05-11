@@ -98,7 +98,7 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-std::unique_ptr<CommonProcessInterface::WriteSizeEstimator>
+std::unique_ptr<MongoProcessInterface::WriteSizeEstimator>
 MongosProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
                                               const NamespaceString& ns) const {
     return std::make_unique<TargetPrimaryWriteSizeEstimator>();

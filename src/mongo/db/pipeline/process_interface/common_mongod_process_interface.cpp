@@ -791,59 +791,6 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     return {*fieldPaths, targetCollectionPlacementVersion};
 }
 
-write_ops::InsertCommandRequest CommonMongodProcessInterface::buildInsertOp(
-    const NamespaceString& nss, std::vector<BSONObj>&& objs, bool bypassDocValidation) {
-    write_ops::InsertCommandRequest insertOp(nss);
-    insertOp.setDocuments(std::move(objs));
-    insertOp.setWriteCommandRequestBase([&] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setOrdered(false);
-        wcb.setBypassDocumentValidation(bypassDocValidation);
-        return wcb;
-    }());
-    return insertOp;
-}
-
-write_ops::UpdateCommandRequest CommonMongodProcessInterface::buildUpdateOp(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const NamespaceString& nss,
-    BatchedObjects&& batch,
-    UpsertType upsert,
-    bool multi) {
-    write_ops::UpdateCommandRequest updateOp(nss);
-    updateOp.setUpdates([&] {
-        std::vector<write_ops::UpdateOpEntry> updateEntries;
-        for (auto&& obj : batch) {
-            updateEntries.push_back([&] {
-                write_ops::UpdateOpEntry entry;
-                auto&& [q, u, c] = obj;
-                entry.setQ(std::move(q));
-                entry.setU(std::move(u));
-                entry.setC(std::move(c));
-                entry.setUpsert(upsert != UpsertType::kNone);
-                entry.setUpsertSupplied(
-                    {{entry.getUpsert(), upsert == UpsertType::kInsertSuppliedDoc}});
-                entry.setMulti(multi);
-                return entry;
-            }());
-        }
-        return updateEntries;
-    }());
-    updateOp.setWriteCommandRequestBase([&] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setOrdered(false);
-        wcb.setBypassDocumentValidation(expCtx->bypassDocumentValidation);
-        return wcb;
-    }());
-    auto [constants, letParams] =
-        expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
-    updateOp.setLegacyRuntimeConstants(std::move(constants));
-    if (!letParams.isEmpty()) {
-        updateOp.setLet(std::move(letParams));
-    }
-    return updateOp;
-}
-
 BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
     OperationContext* opCtx,
     const NamespaceString& sourceNs,

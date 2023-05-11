@@ -57,6 +57,9 @@ namespace {
 // each element.
 static constexpr int kPerElementOverhead = 2;
 
+// This constant accounts for the size of a bool.
+static constexpr int kBoolSize = 1;
+
 // This constant tracks the overhead for serializing UUIDs. It includes 1 byte for the
 // 'BinDataType', 4 bytes for serializing the integer size of the UUID, and finally, 16 bytes
 // for the UUID itself.
@@ -84,6 +87,60 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
                               << ". Write command: " << op.toBSON({}),
                 !op.getWriteCommandRequestBase().getStmtId());
     }
+}
+
+// Utility which estimates the size of 'WriteCommandRequestBase' when serialized.
+int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base) {
+    static const int kSizeOfOrderedField =
+        write_ops::WriteCommandRequestBase::kOrderedFieldName.size() + kBoolSize +
+        kPerElementOverhead;
+    static const int kSizeOfBypassDocumentValidationField =
+        write_ops::WriteCommandRequestBase::kBypassDocumentValidationFieldName.size() + kBoolSize +
+        kPerElementOverhead;
+
+    auto estSize = static_cast<int>(BSONObj::kMinBSONLength) + kSizeOfOrderedField +
+        kSizeOfBypassDocumentValidationField;
+
+    if (auto stmtId = base.getStmtId(); stmtId) {
+        estSize += write_ops::WriteCommandRequestBase::kStmtIdFieldName.size() +
+            sizeof(std::int32_t) + kPerElementOverhead;
+    }
+
+    if (auto stmtIds = base.getStmtIds(); stmtIds) {
+        estSize += write_ops::WriteCommandRequestBase::kStmtIdsFieldName.size();
+        estSize += static_cast<int>(BSONObj::kMinBSONLength);
+        estSize +=
+            ((sizeof(std::int32_t) + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes) *
+             stmtIds->size());
+        estSize += kPerElementOverhead;
+    }
+
+    if (auto isTimeseries = base.getIsTimeseriesNamespace(); isTimeseries.has_value()) {
+        estSize += write_ops::WriteCommandRequestBase::kIsTimeseriesNamespaceFieldName.size() +
+            kBoolSize + kPerElementOverhead;
+    }
+
+    if (auto collUUID = base.getCollectionUUID(); collUUID) {
+        estSize += write_ops::WriteCommandRequestBase::kCollectionUUIDFieldName.size() + kUUIDSize +
+            kPerElementOverhead;
+    }
+
+    if (auto encryptionInfo = base.getEncryptionInformation(); encryptionInfo) {
+        estSize += write_ops::WriteCommandRequestBase::kEncryptionInformationFieldName.size() +
+            encryptionInfo->toBSON().objsize() + kPerElementOverhead;
+    }
+
+    if (auto query = base.getOriginalQuery(); query) {
+        estSize += write_ops::WriteCommandRequestBase::kOriginalQueryFieldName.size() +
+            query->objsize() + kPerElementOverhead;
+    }
+
+    if (auto originalCollation = base.getOriginalCollation(); originalCollation) {
+        estSize += write_ops::WriteCommandRequestBase::kOriginalCollationFieldName.size() +
+            originalCollation->objsize() + kPerElementOverhead;
+    }
+
+    return estSize;
 }
 
 }  // namespace
@@ -145,6 +202,38 @@ int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, siz
     return kFirstStmtId + writePos;
 }
 
+int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants) {
+    int size = write_ops::UpdateCommandRequest::kLegacyRuntimeConstantsFieldName.size() +
+        static_cast<int>(BSONObj::kMinBSONLength) + kPerElementOverhead;
+
+    // $$NOW
+    size +=
+        LegacyRuntimeConstants::kLocalNowFieldName.size() + sizeof(Date_t) + kPerElementOverhead;
+
+    // $$CLUSTER_TIME
+    size += LegacyRuntimeConstants::kClusterTimeFieldName.size() + sizeof(Timestamp) +
+        kPerElementOverhead;
+
+    // $$JS_SCOPE
+    if (const auto& scope = constants.getJsScope(); scope.has_value()) {
+        size += LegacyRuntimeConstants::kJsScopeFieldName.size() + scope->objsize() +
+            kPerElementOverhead;
+    }
+
+    // $$IS_MR
+    if (const auto& isMR = constants.getIsMapReduce(); isMR.has_value()) {
+        size +=
+            LegacyRuntimeConstants::kIsMapReduceFieldName.size() + kBoolSize + kPerElementOverhead;
+    }
+
+    // $$USER_ROLES
+    if (const auto& userRoles = constants.getUserRoles(); userRoles.has_value()) {
+        size += LegacyRuntimeConstants::kUserRolesFieldName.size() + userRoles->objsize() +
+            kPerElementOverhead;
+    }
+    return size;
+}
+
 int getUpdateSizeEstimate(const BSONObj& q,
                           const write_ops::UpdateModification& u,
                           const boost::optional<mongo::BSONObj>& c,
@@ -155,11 +244,6 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const boost::optional<UUID>& sampleId,
                           const bool includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     using UpdateOpEntry = write_ops::UpdateOpEntry;
-
-    // This constant accounts for the null terminator in each field name and the BSONType byte for
-    // each element.
-    static const int kPerElementOverhead = 2;
-    static const int kBoolSize = 1;
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Add the sizes of the 'multi' and 'upsert' fields.
@@ -266,6 +350,144 @@ bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
                update.getSampleId(),
                update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) >=
         update.toBSON().objsize();
+}
+
+bool verifySizeEstimate(const InsertCommandRequest& insertReq,
+                        const OpMsgRequest* unparsedRequest) {
+    int size = getInsertHeaderSizeEstimate(insertReq);
+    for (auto&& docToInsert : insertReq.getDocuments()) {
+        size += docToInsert.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+
+    // Return true if 'insertReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
+    return size >= insertReq.toBSON({} /* commandPassthroughFields */).objsize();
+}
+
+bool verifySizeEstimate(const UpdateCommandRequest& updateReq,
+                        const OpMsgRequest* unparsedRequest) {
+    int size = getUpdateHeaderSizeEstimate(updateReq);
+
+    for (auto&& update : updateReq.getUpdates()) {
+        size += getUpdateSizeEstimate(
+                    update.getQ(),
+                    update.getU(),
+                    update.getC(),
+                    update.getUpsertSupplied().has_value(),
+                    update.getCollation(),
+                    update.getArrayFilters(),
+                    update.getHint(),
+                    update.getSampleId(),
+                    update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) +
+            kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+
+    // Return true if 'updateReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
+    return size >= updateReq.toBSON({} /* commandPassthroughFields */).objsize();
+}
+
+bool verifySizeEstimate(const DeleteCommandRequest& deleteReq,
+                        const OpMsgRequest* unparsedRequest) {
+    int size = getDeleteHeaderSizeEstimate(deleteReq);
+
+    for (auto&& deleteOp : deleteReq.getDeletes()) {
+        size += write_ops::getDeleteSizeEstimate(deleteOp.getQ(),
+                                                 deleteOp.getCollation(),
+                                                 deleteOp.getHint(),
+                                                 deleteOp.getSampleId()) +
+            kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+
+    // Return true if 'deleteReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
+    return size >= deleteReq.toBSON({} /* commandPassthroughFields */).objsize();
+}
+
+int getInsertHeaderSizeEstimate(const InsertCommandRequest& insertReq) {
+    int size = getWriteCommandRequestBaseSize(insertReq.getWriteCommandRequestBase()) +
+        write_ops::InsertCommandRequest::kDocumentsFieldName.size() + kPerElementOverhead +
+        static_cast<int>(BSONObj::kMinBSONLength);
+
+    size += InsertCommandRequest::kCommandName.size() + kPerElementOverhead +
+        insertReq.getNamespace().size() + 1 /* ns string null terminator */;
+
+    // Handle $tenant. Note that $tenant is injected as a hidden field into all IDL commands, unlike
+    // other passthrough fields.
+    if (auto tenant = insertReq.getDollarTenant(); tenant.has_value()) {
+        size += InsertCommandRequest::kDollarTenantFieldName.size() + OID::kOIDSize +
+            kPerElementOverhead;
+    }
+    return size;
+}
+
+int getUpdateHeaderSizeEstimate(const UpdateCommandRequest& updateReq) {
+    int size = getWriteCommandRequestBaseSize(updateReq.getWriteCommandRequestBase());
+
+    size += UpdateCommandRequest::kCommandName.size() + kPerElementOverhead +
+        updateReq.getNamespace().size() + 1 /* ns string null terminator */;
+
+    size += write_ops::UpdateCommandRequest::kUpdatesFieldName.size() + kPerElementOverhead +
+        static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Handle $tenant. Note that $tenant is injected as a hidden field into all IDL commands, unlike
+    // other passthrough fields.
+    if (auto tenant = updateReq.getDollarTenant(); tenant.has_value()) {
+        size += UpdateCommandRequest::kDollarTenantFieldName.size() + OID::kOIDSize +
+            kPerElementOverhead;
+    }
+
+    // Handle legacy runtime constants.
+    if (auto runtimeConstants = updateReq.getLegacyRuntimeConstants();
+        runtimeConstants.has_value()) {
+        size += estimateRuntimeConstantsSize(*runtimeConstants);
+    }
+
+    // Handle let parameters.
+    if (auto let = updateReq.getLet(); let.has_value()) {
+        size += write_ops::UpdateCommandRequest::kLetFieldName.size() + let->objsize() +
+            kPerElementOverhead;
+    }
+    return size;
+}
+
+int getDeleteHeaderSizeEstimate(const DeleteCommandRequest& deleteReq) {
+    int size = getWriteCommandRequestBaseSize(deleteReq.getWriteCommandRequestBase());
+
+    size += DeleteCommandRequest::kCommandName.size() + kPerElementOverhead +
+        deleteReq.getNamespace().size() + 1 /* ns string null terminator */;
+
+    size += write_ops::DeleteCommandRequest::kDeletesFieldName.size() + kPerElementOverhead +
+        static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Handle $tenant. Note that $tenant is injected as a hidden field into all IDL commands, unlike
+    // other passthrough fields.
+    if (auto tenant = deleteReq.getDollarTenant(); tenant.has_value()) {
+        size += DeleteCommandRequest::kDollarTenantFieldName.size() + OID::kOIDSize +
+            kPerElementOverhead;
+    }
+
+    // Handle legacy runtime constants.
+    if (auto runtimeConstants = deleteReq.getLegacyRuntimeConstants();
+        runtimeConstants.has_value()) {
+        size += estimateRuntimeConstantsSize(*runtimeConstants);
+    }
+
+    // Handle let parameters.
+    if (auto let = deleteReq.getLet(); let.has_value()) {
+        size += write_ops::UpdateCommandRequest::kLetFieldName.size() + let->objsize() +
+            kPerElementOverhead;
+    }
+    return size;
 }
 
 bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {
