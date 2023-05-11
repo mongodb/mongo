@@ -103,7 +103,7 @@ public:
     };
 
 #define DBNAME_CONSTANT(id, db) static const ConstantProxy id;
-#include "database_name_reserved.def.h"
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
 #undef DBNAME_CONSTANT
 
     static constexpr size_t kMaxDatabaseNameLength = 63;
@@ -317,14 +317,14 @@ private:
 // namespace_string.h for more details.
 namespace dbname_detail::const_proxy_shared_states {
 #define DBNAME_CONSTANT(id, db) constexpr inline DatabaseName::ConstantProxy::SharedState id{db};
-#include "database_name_reserved.def.h"
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
 #undef DBNAME_CONSTANT
 }  // namespace dbname_detail::const_proxy_shared_states
 
 #define DBNAME_CONSTANT(id, db)                                    \
     constexpr inline DatabaseName::ConstantProxy DatabaseName::id{ \
         &dbname_detail::const_proxy_shared_states::id};
-#include "database_name_reserved.def.h"
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
 #undef DBNAME_CONSTANT
 
 }  // namespace mongo

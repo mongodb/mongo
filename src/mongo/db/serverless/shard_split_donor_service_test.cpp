@@ -167,25 +167,6 @@ private:
     BSONObj _msg;
 } mockReplSetReconfigCmd;
 
-namespace {
-sdam::TopologyDescriptionPtr makeRecipientTopologyDescription(const MockReplicaSet& set) {
-    std::shared_ptr<TopologyDescription> topologyDescription =
-        std::make_shared<sdam::TopologyDescription>(sdam::SdamConfiguration(
-            set.getHosts(), sdam::TopologyType::kReplicaSetNoPrimary, set.getSetName()));
-
-    for (auto& server : set.getHosts()) {
-        auto serverDescription = sdam::ServerDescriptionBuilder()
-                                     .withAddress(server)
-                                     .withSetName(set.getSetName())
-                                     .instance();
-        topologyDescription->installServerDescription(serverDescription);
-    }
-
-    return topologyDescription;
-}
-
-}  // namespace
-
 std::ostream& operator<<(std::ostream& builder, mongo::ShardSplitDonorStateEnum state) {
     switch (state) {
         case mongo::ShardSplitDonorStateEnum::kUninitialized:

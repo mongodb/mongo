@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_tag.h"

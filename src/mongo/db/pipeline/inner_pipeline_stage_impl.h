@@ -34,6 +34,7 @@
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 
 namespace mongo {

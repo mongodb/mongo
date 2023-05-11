@@ -37,6 +37,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/static_assert.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
 
 namespace mongo {

@@ -195,7 +195,7 @@ public:
     // type is incomplete, they can't be _declared_ fully constexpr (a constexpr
     // limitation).
 #define NSS_CONSTANT(id, db, coll) static const ConstantProxy id;
-#include "namespace_string_reserved.def.h"
+#include "namespace_string_reserved.def.h"  // IWYU pragma: keep
 #undef NSS_CONSTANT
 
     /**
@@ -1139,14 +1139,14 @@ inline bool NamespaceString::validCollectionName(StringData coll) {
 namespace nss_detail::const_proxy_shared_states {
 #define NSS_CONSTANT(id, db, coll) \
     constexpr inline NamespaceString::ConstantProxy::SharedState id{db, coll};
-#include "namespace_string_reserved.def.h"
+#include "namespace_string_reserved.def.h"  // IWYU pragma: keep
 #undef NSS_CONSTANT
 }  // namespace nss_detail::const_proxy_shared_states
 
 #define NSS_CONSTANT(id, db, coll)                                       \
     constexpr inline NamespaceString::ConstantProxy NamespaceString::id{ \
         &nss_detail::const_proxy_shared_states::id};
-#include "namespace_string_reserved.def.h"
+#include "namespace_string_reserved.def.h"  // IWYU pragma: keep
 #undef NSS_CONSTANT
 
 }  // namespace mongo

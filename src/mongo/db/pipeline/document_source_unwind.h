@@ -138,4 +138,51 @@ private:
     boost::optional<long long> _smallestLimitPushedDown;
 };
 
+/** Helper class to unwind array from a single document. */
+class DocumentSourceUnwind::Unwinder {
+public:
+    Unwinder(const FieldPath& unwindPath,
+             bool preserveNullAndEmptyArrays,
+             const boost::optional<FieldPath>& indexPath,
+             bool strict);
+    /** Reset the unwinder to unwind a new document. */
+    void resetDocument(const Document& document);
+
+    /**
+     * @return the next document unwound from the document provided to resetDocument(), using
+     * the current value in the array located at the provided unwindPath.
+     *
+     * Returns boost::none if the array is exhausted.
+     */
+    DocumentSource::GetNextResult getNext();
+
+private:
+    // Tracks whether or not we can possibly return any more documents. Note we may return
+    // boost::none even if this is true.
+    bool _haveNext = false;
+
+    // Path to the array to unwind.
+    const FieldPath _unwindPath;
+
+    // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
+    // through the $unwind stage unmodified if '_preserveNullAndEmptyArrays' is true.
+    const bool _preserveNullAndEmptyArrays;
+
+    // If set, the $unwind stage will include the array index in the specified path, overwriting any
+    // existing value, setting to null when the value was a non-array or empty array.
+    const boost::optional<FieldPath> _indexPath;
+    // Specifies if input to $unwind is required to be an array.
+    const bool _strict;
+
+    Value _inputArray;
+
+    MutableDocument _output;
+
+    // Document indexes of the field path components.
+    std::vector<Position> _unwindPathFieldIndexes;
+
+    // Index into the _inputArray to return next.
+    size_t _index = 0;
+};
+
 }  // namespace mongo

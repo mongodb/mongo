@@ -2797,6 +2797,16 @@ tasks:
       targets:
         install-core
 
+- name: iwyu_self_test
+  tags: []
+  commands:
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/iwyu/test/run_tests.py"
+
 - name: libdeps_graph_linting
   tags: []
   depends_on:
@@ -8169,6 +8179,11 @@ task_groups:
   name: libdeps_graph_linting_TG
   tasks:
   - libdeps_graph_linting
+
+- <<: *compile_task_group_template
+  name: iwyu_self_test_TG
+  tasks:
+  - iwyu_self_test
 
 - <<: *compile_task_group_template
   name: compile_ninja_TG

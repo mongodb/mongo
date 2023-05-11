@@ -71,7 +71,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
 namespace log_detail {
 void logSubplannerIndexEntry(const IndexEntry& entry, size_t childIndex) {
@@ -827,7 +826,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
 // static
 Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
                                          const PlanCacheIndexTree* const indexTree,
-                                         const map<IndexEntry::Identifier, size_t>& indexMap) {
+                                         const std::map<IndexEntry::Identifier, size_t>& indexMap) {
     if (nullptr == filter) {
         return Status(ErrorCodes::NoQueryExecutionPlans, "Cannot tag tree: filter is NULL.");
     }
@@ -946,7 +945,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         QueryPlannerIXSelect::expandIndexes(fields, params.indices, false /* indexHinted */);
 
     // Map from index name to index number.
-    map<IndexEntry::Identifier, size_t> indexMap;
+    std::map<IndexEntry::Identifier, size_t> indexMap;
     for (size_t i = 0; i < expandedIndexes.size(); ++i) {
         const IndexEntry& ie = expandedIndexes[i];
         const auto insertionRes = indexMap.insert(std::make_pair(ie.identifier, i));

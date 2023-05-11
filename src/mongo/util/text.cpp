@@ -35,7 +35,7 @@
 #include <cerrno>
 #include <iostream>
 #include <memory>
-#include <sstream>
+#include <sstream>  // IWYU pragma: keep
 
 #ifdef _WIN32
 #include <io.h>

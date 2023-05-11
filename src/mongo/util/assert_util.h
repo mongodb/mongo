@@ -37,7 +37,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util_core.h"  // IWYU pragma: export
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit_code.h"

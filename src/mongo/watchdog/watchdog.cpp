@@ -32,7 +32,7 @@
 
 #include "mongo/watchdog/watchdog.h"
 
-#include <boost/align.hpp>
+#include <boost/align.hpp>  // IWYU pragma: keep
 #include <boost/filesystem.hpp>
 
 #ifndef _WIN32

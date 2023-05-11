@@ -32,9 +32,10 @@
 #include <functional>
 #include <memory>
 
+#include "mongo/client/dbclient_base.h"
+
 namespace mongo {
 
-class DBClientBase;
 class OperationContext;
 class ServiceContext;
 

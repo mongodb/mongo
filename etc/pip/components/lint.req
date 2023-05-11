@@ -10,3 +10,5 @@ yapf == 0.26.0
 evergreen-lint == 0.1.3
 types-setuptools == 57.4.12
 types-requests == 2.26.3
+tqdm
+colorama

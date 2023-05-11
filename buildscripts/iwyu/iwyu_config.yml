@@ -1,0 +1,72 @@
+# options passed to IWYU
+iwyu_options:
+  - '--mapping_file=etc/iwyu_mapping.imp'
+  - '--no_fwd_decls'
+  - '--prefix_header_includes=add'
+  - '--transitive_includes_only'
+
+# options passed to the fix script
+fix_options:
+  - '--blank_lines'
+  - '--nocomments'
+  - '--noreorder'
+  - '--separate_project_includes=mongo'
+  - '--safe_headers'
+  - '--only_re=^src/mongo\/.*'
+  # TODO SERVER-77051 we will eventually turn this on when our codebase is cleaned up with out.
+  # - '--nosafe_headers'
+
+# filename regex to swap no_include in place
+# quotes and brackets not included quotes are always assumed
+# since this is targeting IWYU added headers
+no_includes:
+  # avoid boost crazyness
+  - 'boost/.+/detail/.+'
+  - 'asio/impl/.+'
+  - 'boost/.+\.ipp'
+  # arch specific
+  - 'boost/predef/hardware/simd/x86.+'
+  - 'emmintrin\.h'
+  # we use a third party format which confuses IWYU
+  - 'format\.h'
+  # this is a link time symbol overloading thing not meant to be included
+  - 'libunwind-x86_64\.h'
+  # abuse of preprocessor
+  - 'mongo/db/namespace_string_reserved\.def\.h'
+
+# prefixes (non regex) to skip
+skip_files:
+  - 'src/third_party'
+  - 'build/'
+  - 'src/mongo/tools/mongo_tidy_checks'
+  - 'src/mongo/util/net'  # causes linkage issues
+  # IWYU confused on forward declares
+  - 'src/mongo/db/exec/near.cpp'
+  - 'src/mongo/db/storage/wiredtiger/wiredtiger_index.cpp'
+  - 'src/mongo/transport/asio/asio_transport_layer.cpp'
+  # causes IWYU to crash:
+  - 'src/mongo/db/update/update_internal_node.cpp'
+  - 'src/mongo/db/update/update_array_node.cpp'
+  - 'src/mongo/db/update/update_object_node.cpp'
+  - 'src/mongo/db/update/update_array_node_test.cpp'
+  - 'src/mongo/db/update/update_object_node_test.cpp'
+  - 'src/mongo/util/options_parser/environment.cpp'
+  - 'src/mongo/util/options_parser/option_section.cpp'
+
+# regex file paths to add keep pragma
+# include quotes are angle brackets
+keep_includes:
+  - '<fmt/printf\.h>'
+  - '<fmt/ranges\.h>'
+  - '<fmt/chrono\.h>'
+  - '<asio\.hpp>'
+  - '<boost/utility/in_place_factory\.hpp>'
+  - '<libunwind.h>'
+  - '<fstream>'  # IWYU messes up template instantiation
+  - '"mongo/rpc/object_check\.h"'
+  - '"mongo/base/init\.h"'
+  - '"mongo/scripting/mozjs/wrapconstrainedmethod\.h"'
+  - '"mongo/dbtests/dbtests\.h"'  # this is due to using statements in the header
+  - '"mongo/config\.h"'
+  - '"mongo/util/overloaded_visitor\.h"'
+  - '"mongo/db/query/optimizer/node\.h"'

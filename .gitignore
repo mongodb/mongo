@@ -13,6 +13,8 @@
 venv
 
 *~
+*.test_iwyu.h
+*.test_iwyu.cpp
 *.swp
 *.o
 *.os
@@ -44,6 +46,7 @@ venv
 *.eslintcache
 *#
 .#*
+iwyu.dat
 
 /src/mongo/*/*Debug*/
 /src/mongo/*/*/*Debug*/
@@ -60,6 +63,7 @@ venv
 /src/third_party/*/*.lastbuildstate
 /buildscripts/libdeps/graph_visualizer_web_stack/build
 /buildscripts/libdeps/graph_visualizer_web_stack/node_modules
+buildscripts/iwyu/test/*/test_run
 libdeps.graphml
 build-metrics.json
 config.log

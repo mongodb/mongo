@@ -32,6 +32,8 @@
 #include <ostream>
 #include <vector>
 
+#include "mongo/unittest/assert.h"
+
 namespace mongo::unittest {
 /**
  * Computes a difference between the expected and actual formatted output and outputs it to the

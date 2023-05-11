@@ -43,7 +43,7 @@
 #include <cstdlib>
 
 // NOTE: Header only dependencies are OK in this library.
-#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/mutex.h"  // IWYU pragma: keep
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0

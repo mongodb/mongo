@@ -30,7 +30,7 @@
 #include "pinned_connection_task_executor.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/util/scoped_unlock.h"
+#include "mongo/util/scoped_unlock.h"  // IWYU pragma: keep
 
 namespace mongo::executor {
 /**

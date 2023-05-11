@@ -43,7 +43,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_debug.h"
-#include "mongo/stdx/future.h"
+#include "mongo/stdx/future.h"  // IWYU pragma: keep
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"

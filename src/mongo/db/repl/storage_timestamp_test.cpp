@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <fstream>  // IWYU pragma: keep
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -90,7 +92,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/future.h"
+#include "mongo/stdx/future.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/stacktrace.h"

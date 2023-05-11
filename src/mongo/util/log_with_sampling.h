@@ -31,6 +31,7 @@
 
 #include <utility>
 
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 
