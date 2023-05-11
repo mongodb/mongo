@@ -650,15 +650,7 @@ private:
     void _deleteHaystackIndexesOnUpgrade(OperationContext* opCtx) {
         auto collCatalog = CollectionCatalog::get(opCtx);
         for (const auto& db : collCatalog->getAllDbNames()) {
-            for (auto collIt = collCatalog->begin(opCtx, db); collIt != collCatalog->end(opCtx);
-                 ++collIt) {
-                NamespaceStringOrUUID collName(
-                    collCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
-                AutoGetCollectionForRead coll(opCtx, collName);
-                if (!coll) {
-                    continue;
-                }
-
+            for (auto&& coll : collCatalog->range(db)) {
                 auto idxCatalog = coll->getIndexCatalog();
                 std::vector<const IndexDescriptor*> haystackIndexes;
                 idxCatalog->findIndexByType(opCtx, IndexNames::GEO_HAYSTACK, haystackIndexes);
@@ -672,7 +664,7 @@ private:
                 for (auto&& haystackIndex : haystackIndexes) {
                     indexNames.emplace_back(haystackIndex->indexName());
                 }
-                dropIndexes(opCtx, *collName.nss(), indexNames);
+                dropIndexes(opCtx, coll->ns(), indexNames);
             }
         }
     }
@@ -685,15 +677,7 @@ private:
     void _disallowIndexesWithConflictingOptionsOnDowngrade(OperationContext* opCtx) {
         auto collCatalog = CollectionCatalog::get(opCtx);
         for (const auto& db : collCatalog->getAllDbNames()) {
-            for (auto collIt = collCatalog->begin(opCtx, db); collIt != collCatalog->end(opCtx);
-                 ++collIt) {
-                NamespaceStringOrUUID collName(
-                    collCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
-                AutoGetCollectionForRead coll(opCtx, collName);
-                if (!coll) {
-                    continue;
-                }
-
+            for (auto&& coll : collCatalog->range(db)) {
                 SimpleBSONObjUnorderedSet indexKeyPatterns;
                 auto indexIterator = coll->getIndexCatalog()->getIndexIterator(
                     opCtx,

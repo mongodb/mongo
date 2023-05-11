@@ -216,12 +216,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                                   Database* db,
                                   EnsureIndexPolicy ensureIndexPolicy) {
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = collIt.getWritableCollection(opCtx, CollectionCatalog::LifetimeMode::kInplace);
-        if (!coll) {
-            break;
-        }
-
+    for (auto&& coll : catalog->range(db->name())) {
         // All user-created replicated collections created since MongoDB 4.0 have _id indexes.
         auto requiresIndex = coll->requiresIdIndex() && coll->ns().isReplicated();
         const auto& collOptions = coll->getCollectionOptions();
@@ -234,14 +229,16 @@ Status ensureCollectionProperties(OperationContext* opCtx,
             LOGV2(21001,
                   "collection {coll_ns} is missing an _id index",
                   "Collection is missing an _id index",
-                  logAttrs(*coll));
+                  logAttrs(*coll.get()));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
-                auto status = buildMissingIdIndex(opCtx, coll);
+                auto writableCollection = catalog->lookupCollectionByUUIDForMetadataWrite(
+                    opCtx, CollectionCatalog::LifetimeMode::kInplace, coll->uuid());
+                auto status = buildMissingIdIndex(opCtx, writableCollection);
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
                                 "could not build an _id index on collection {coll_ns}: {error}",
                                 "Could not build an _id index on collection",
-                                logAttrs(*coll),
+                                logAttrs(*coll.get()),
                                 "error"_attr = status);
                     return downgradeError;
                 }

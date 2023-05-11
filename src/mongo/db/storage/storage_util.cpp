@@ -55,8 +55,7 @@ auto removeEmptyDirectory =
         // will only succeed if it is empty which is the behavior we want.
         auto collectionCatalog = CollectionCatalog::get(svcCtx);
         if (!storageEngine->isUsingDirectoryPerDb() ||
-            (storageEngine->supportsPendingDrops() &&
-             collectionCatalog->begin(nullptr, ns.db()) != collectionCatalog->end(nullptr))) {
+            (storageEngine->supportsPendingDrops() && !collectionCatalog->range(ns.db()).empty())) {
             return;
         }
 
@@ -65,7 +64,7 @@ auto removeEmptyDirectory =
 
         if (!ec) {
             LOGV2(4888200, "Removed empty database directory", "db"_attr = ns.db());
-        } else if (collectionCatalog->begin(nullptr, ns.db()) == collectionCatalog->end(nullptr)) {
+        } else if (collectionCatalog->range(ns.db()).empty()) {
             // It is possible for a new collection to be created in the database between when we
             // check whether the database is empty and actually attempting to remove the directory.
             // In this case, don't log that the removal failed because it is expected. However,

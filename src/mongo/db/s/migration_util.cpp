@@ -616,8 +616,8 @@ void submitOrphanRangesForCleanup(OperationContext* opCtx) {
         if (dbName == NamespaceString::kLocalDb)
             continue;
 
-        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
-            auto uuid = collIt.uuid().get();
+        for (auto&& coll : catalog->range(dbName)) {
+            auto uuid = coll->uuid();
             auto nss = catalog->lookupNSSByUUID(opCtx, uuid).get();
             LOGV2_DEBUG(22034,
                         2,

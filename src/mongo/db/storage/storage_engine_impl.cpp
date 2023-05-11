@@ -342,7 +342,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     collection->setMinimumVisibleSnapshot(minVisibleTs);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, md->options.uuid.get(), std::move(collection));
+        catalog.registerCollection(opCtx, std::move(collection));
     });
 }
 

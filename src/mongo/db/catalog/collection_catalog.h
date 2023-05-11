@@ -37,6 +37,8 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/uuid.h"
 
@@ -52,6 +54,8 @@ class Database;
 
 class CollectionCatalog {
     friend class iterator;
+    using OrderedCollectionMap =
+        immutable::map<std::pair<std::string, CollectionUUID>, std::shared_ptr<Collection>>;
 
 public:
     using CollectionInfoFn = std::function<bool(const CollectionPtr& collection)>;
@@ -74,15 +78,11 @@ public:
     public:
         using value_type = CollectionPtr;
 
-        iterator(OperationContext* opCtx, StringData dbName, const CollectionCatalog& catalog);
-        iterator(OperationContext* opCtx,
-                 std::map<std::pair<std::string, CollectionUUID>,
-                          std::shared_ptr<Collection>>::const_iterator mapIter,
-                 const CollectionCatalog& catalog);
+        iterator(StringData dbName,
+                 OrderedCollectionMap::iterator it,
+                 const OrderedCollectionMap& catalog);
         value_type operator*();
         iterator operator++();
-        iterator operator++(int);
-        boost::optional<CollectionUUID> uuid();
 
         Collection* getWritableCollection(OperationContext* opCtx, LifetimeMode mode);
 
@@ -90,18 +90,28 @@ public:
          * Equality operators == and != do not attempt to reposition the iterators being compared.
          * The behavior for comparing invalid iterators is undefined.
          */
-        bool operator==(const iterator& other);
-        bool operator!=(const iterator& other);
+        bool operator==(const iterator& other) const;
+        bool operator!=(const iterator& other) const;
 
     private:
-        bool _exhausted();
+        void _skipUncommitted();
 
-        OperationContext* _opCtx;
+        const OrderedCollectionMap& _map;
+        immutable::map<std::pair<std::string, UUID>, std::shared_ptr<Collection>>::iterator
+            _mapIter;
+        immutable::map<std::pair<std::string, UUID>, std::shared_ptr<Collection>>::iterator _end;
+    };
+
+    class Range {
+    public:
+        Range(const OrderedCollectionMap&, StringData dbName);
+        iterator begin() const;
+        iterator end() const;
+        bool empty() const;
+
+    private:
+        OrderedCollectionMap _map;
         std::string _dbName;
-        boost::optional<CollectionUUID> _uuid;
-        std::map<std::pair<std::string, CollectionUUID>,
-                 std::shared_ptr<Collection>>::const_iterator _mapIter;
-        const CollectionCatalog* _catalog;
     };
 
     struct ProfileSettings {
@@ -174,9 +184,7 @@ public:
     /**
      * Register the collection with `uuid`.
      */
-    void registerCollection(OperationContext* opCtx,
-                            CollectionUUID uuid,
-                            std::shared_ptr<Collection> collection);
+    void registerCollection(OperationContext* opCtx, std::shared_ptr<Collection> collection);
 
     /**
      * Deregister the collection.
@@ -385,8 +393,13 @@ public:
      */
     uint64_t getEpoch() const;
 
-    iterator begin(OperationContext* opCtx, StringData db) const;
-    iterator end(OperationContext* opCtx) const;
+    /**
+     * Provides an iterable range for the collections belonging to the specified database.
+     *
+     * Will not observe any updates made to the catalog after the creation of the 'Range'. The
+     * 'Range' object just remain in scope for the duration of the iteration.
+     */
+    Range range(StringData db) const;
 
     /**
      * Lookup the name of a resource by its ResourceId. If there are multiple namespaces mapped to
@@ -421,8 +434,6 @@ private:
 
     using CollectionCatalogMap =
         immutable::unordered_map<CollectionUUID, std::shared_ptr<Collection>, CollectionUUID::Hash>;
-    using OrderedCollectionMap =
-        std::map<std::pair<std::string, CollectionUUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using DatabaseProfileSettingsMap =

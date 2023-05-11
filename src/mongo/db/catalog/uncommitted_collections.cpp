@@ -146,9 +146,8 @@ void UncommittedCollections::commit(OperationContext* opCtx,
     auto collPtr = it->second.get();
 
     auto nss = it->second->ns();
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, uuid, it->second);
-    });
+    CollectionCatalog::write(
+        opCtx, [&](CollectionCatalog& catalog) { catalog.registerCollection(opCtx, it->second); });
 
     map->_collections.erase(it);
     map->_nssIndex.erase(nss);

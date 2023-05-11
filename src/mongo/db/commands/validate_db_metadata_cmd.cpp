@@ -145,12 +145,10 @@ public:
                     });
                 }
 
-                for (auto collIt = collectionCatalog->begin(opCtx, dbName);
-                     collIt != collectionCatalog->end(opCtx);
-                     ++collIt) {
+                for (auto&& coll : collectionCatalog->range(dbName)) {
                     if (!_validateNamespace(
                             opCtx,
-                            collectionCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get())) {
+                            collectionCatalog->lookupNSSByUUID(opCtx, coll->uuid()).value())) {
                         return;
                     }
                 }

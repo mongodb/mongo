@@ -58,8 +58,7 @@ protected:
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(kNss);
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                operationContext(), CollectionUUID::gen(), std::move(collection));
+            catalog.registerCollection(operationContext(), std::move(collection));
         });
     }
 
@@ -269,7 +268,6 @@ public:
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
             for (size_t i = 0; i < NumCollections; ++i) {
                 catalog.registerCollection(operationContext(),
-                                           CollectionUUID::gen(),
                                            std::make_shared<CollectionMock>(
                                                NamespaceString("many", fmt::format("coll{}", i))));
             }
@@ -311,8 +309,7 @@ TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatches) {
 
             // Perform a write, we will later verify that all writes are observable even when
             // workers are batched together.
-            writableCatalog.registerCollection(
-                operationContext(), CollectionUUID::gen(), std::move(collectionToInsert));
+            writableCatalog.registerCollection(operationContext(), std::move(collectionToInsert));
         });
     };
 
