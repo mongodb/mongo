@@ -1305,6 +1305,7 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         }
 
         _serverEngine.CAstore = std::move(swChain.getValue());
+        _sslConfiguration.hasCA = true;
     }
     _serverEngine.hasCRL = !params.sslCRLFile.empty();
 
