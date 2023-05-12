@@ -238,9 +238,7 @@ private:
     // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;
     const std::string _columnIndexName;
-    CollectionPtr _coll;
-    boost::optional<NamespaceString> _collName;  // These two members are initialized in 'prepare()'
-    boost::optional<uint64_t> _catalogEpoch;     // and are not changed afterwards.
+    CollectionRef _coll;
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
 
     // Paths to be read from the index. '_includeInOutput' defines which of the fields should be

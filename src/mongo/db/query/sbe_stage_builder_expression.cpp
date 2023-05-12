@@ -1169,7 +1169,7 @@ public:
         auto endDateExpression = _context->popABTExpr();
         auto startDateExpression = _context->popABTExpr();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
 
@@ -1308,7 +1308,7 @@ public:
         auto dateStringExpression = _context->popABTExpr();
         auto dateStringName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
 
         // Set parameters for an invocation of built-in "dateFromString" function.
@@ -1412,7 +1412,7 @@ public:
                         "$dateFromString parameter 'timezone' must be a string",
                         sbe::value::isString(timezoneTag));
                 auto [timezoneDBTag, timezoneDBVal] =
-                    _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+                    _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
                 uassert(4997801,
                         "$dateFromString first argument must be a timezoneDB object",
                         timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
@@ -1702,7 +1702,7 @@ public:
         // for datetime computation. This global object is registered as an unowned value in the
         // runtime environment so we pass the corresponding slot to the datePartsWeekYear and
         // dateParts functions as a variable.
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto computeDate = makeABTFunction(eIsoWeekYear ? "datePartsWeekYear" : "dateParts",
                                            makeVariable(timeZoneDBName),
@@ -1784,7 +1784,7 @@ public:
         }
         auto date = _context->popABTExpr();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
 
@@ -1848,11 +1848,11 @@ public:
             ? _context->popABTExpr()
             : optimizer::Constant::str("%Y-%m-%dT%H:%M:%S.%LZ"_sd);
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
         auto [timezoneDBTag, timezoneDBVal] =
-            _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+            _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
         uassert(4997900,
                 "$dateToString first argument must be a timezoneDB object",
                 timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
@@ -1965,11 +1965,11 @@ public:
         auto unitExpression = _context->popABTExpr();
         auto dateExpression = _context->popABTExpr();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
         auto [timezoneDBTag, timezoneDBVal] =
-            _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+            _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
         tassert(7157927,
                 "$dateTrunc first argument must be a timezoneDB object",
                 timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
@@ -2233,7 +2233,7 @@ public:
                         "Encountered unexpected system variable ID",
                         it != Variables::kIdToBuiltinVarName.end());
 
-                auto slot = _context->state.data->env->getSlotIfExists(it->second);
+                auto slot = _context->state.env->getSlotIfExists(it->second);
                 uassert(5611301,
                         str::stream()
                             << "Builtin variable '$$" << it->second << "' is not available",
@@ -2849,7 +2849,7 @@ public:
         auto [specTag, specVal] = makeValue(expr->getSortPattern());
         auto specConstant = makeABTConstant(specTag, specVal);
 
-        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _context->state.env->getSlotIfExists("collator"_sd);
         auto collatorVar = collatorSlot.map(
             [&](auto slotId) { return _context->registerVariable(*collatorSlot); });
 
@@ -3390,7 +3390,7 @@ private:
         auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
         auto dateVar = makeVariable(dateName);
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
 
         // Set parameters for an invocation of the built-in function.
         optimizer::ABTVector arguments;
@@ -3408,7 +3408,7 @@ private:
         if (timezoneExpression.is<optimizer::Constant>()) {
             auto [timezoneTag, timezoneVal] = timezoneExpression.cast<optimizer::Constant>()->get();
             auto [timezoneDBTag, timezoneDBVal] =
-                _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+                _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
             auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
             uassert(5157900,
                     str::stream() << "$" << exprName.toString()
@@ -3778,7 +3778,7 @@ private:
         optimizer::ABTVector checkNulls;
         optimizer::ABTVector checkNotArrays;
 
-        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _context->state.env->getSlotIfExists("collator"_sd);
 
         args.reserve(arity);
         argNames.reserve(arity);
@@ -4087,7 +4087,7 @@ private:
             }
         }();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBVar = makeVariable(_context->registerVariable(timeZoneDBSlot));
 
         optimizer::ABTVector checkNullArg;

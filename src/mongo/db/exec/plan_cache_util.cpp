@@ -77,14 +77,6 @@ void updatePlanCache(OperationContext* opCtx,
     // TODO: SERVER-76815 enable caching the COUNT_SCAN queries for SBE.
     const CollectionPtr& collection = collections.getMainCollection();
     if (collection && shouldCacheQuery(query) && !solution.hasNode(STAGE_COUNT_SCAN)) {
-        // Clustered collection scans need to cache 'ccCollator' for bounds computation.
-        if (stageData.doSbeClusteredCollectionScan) {
-            const CollatorInterface* ccCollator = collection->getDefaultCollator();
-            if (ccCollator) {
-                stageData.ccCollator = ccCollator->cloneShared();
-            }
-        }
-
         sbe::PlanCacheKey key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), stageData);
         plan->indexFilterApplied = solution.indexFilterApplied;

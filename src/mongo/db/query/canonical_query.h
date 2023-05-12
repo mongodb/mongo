@@ -160,6 +160,10 @@ public:
         return _expCtx->getCollator();
     }
 
+    std::shared_ptr<CollatorInterface> getCollatorShared() const {
+        return _expCtx->getCollatorShared();
+    }
+
     /**
      * Returns a bitset indicating what metadata has been requested in the query.
      */

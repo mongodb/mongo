@@ -58,7 +58,8 @@ CandidatePlans CachedSolutionPlanner::plan(
         auto secondaryCollectionsInfo =
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
 
-        for (const auto& foreignCollection : roots[0].second.foreignHashJoinCollections) {
+        for (const auto& foreignCollection :
+             roots[0].second.staticData->foreignHashJoinCollections) {
             const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
             tassert(6693500,
                     "Foreign collection must be present in the collections info",
@@ -100,15 +101,14 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                         maxReadsBeforeReplan);
 
     tassert(6488200, "'debugInfo' should be initialized", candidate.data.stageData.debugInfo);
-    auto explainer = plan_explainer_factory::make(
-        candidate.root.get(),
-        &candidate.data.stageData,
-        candidate.solution.get(),
-        {},    /* optimizedData */
-        {},    /* rejectedCandidates */
-        false, /* isMultiPlan */
-        true,  /* isFromPlanCache */
-        std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.stageData.debugInfo));
+    auto explainer = plan_explainer_factory::make(candidate.root.get(),
+                                                  &candidate.data.stageData,
+                                                  candidate.solution.get(),
+                                                  {},    /* optimizedData */
+                                                  {},    /* rejectedCandidates */
+                                                  false, /* isMultiPlan */
+                                                  true,  /* isFromPlanCache */
+                                                  candidate.data.stageData.debugInfo);
 
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache

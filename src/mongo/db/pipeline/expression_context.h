@@ -112,7 +112,7 @@ public:
 
         boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-        std::unique_ptr<CollatorInterface> _originalCollator;
+        std::shared_ptr<CollatorInterface> _originalCollator;
     };
 
     /**
@@ -221,6 +221,10 @@ public:
         return _collator.get();
     }
 
+    std::shared_ptr<CollatorInterface> getCollatorShared() const {
+        return _collator;
+    }
+
     /**
      * Whether to track timing information and "work" counts in the agg layer.
      */
@@ -247,7 +251,7 @@ public:
      * Use with caution - '_collator' is used in the context of a Pipeline, and it is illegal
      * to change the collation once a Pipeline has been parsed with this ExpressionContext.
      */
-    void setCollator(std::unique_ptr<CollatorInterface> collator) {
+    void setCollator(std::shared_ptr<CollatorInterface> collator) {
         _collator = std::move(collator);
 
         // Document/Value comparisons must be aware of the collation.
@@ -619,7 +623,7 @@ protected:
     void checkForInterruptSlow();
 
     // Collator used for comparisons.
-    std::unique_ptr<CollatorInterface> _collator;
+    std::shared_ptr<CollatorInterface> _collator;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
     // Must not be changed after parsing a Pipeline with this ExpressionContext.

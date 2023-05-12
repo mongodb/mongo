@@ -77,8 +77,7 @@ SbeStageBuilderTestFixture::buildPlanStage(
     stage_builder::SlotBasedStageBuilder builder{
         operationContext(), colls, *statusWithCQ.getValue(), *querySolution, getYieldPolicy()};
 
-    auto stage = builder.build(querySolution->root());
-    auto data = builder.getPlanStageData();
+    auto [stage, data] = builder.build(querySolution->root());
 
     // Reset "shardFilterer".
     if (auto shardFiltererSlot = data.env->getSlotIfExists("shardFilterer"_sd);
@@ -92,9 +91,9 @@ SbeStageBuilderTestFixture::buildPlanStage(
 
     auto slots = sbe::makeSV();
     if (hasRecordId) {
-        slots.push_back(data.outputs.get(stage_builder::PlanStageSlots::kRecordId));
+        slots.push_back(data.staticData->outputs.get(stage_builder::PlanStageSlots::kRecordId));
     }
-    slots.push_back(data.outputs.get(stage_builder::PlanStageSlots::kResult));
+    slots.push_back(data.staticData->outputs.get(stage_builder::PlanStageSlots::kResult));
 
     // 'expCtx' owns the collator and a collator slot is registered into the runtime environment
     // while creating 'builder'. So, the caller should retain the 'expCtx' until the execution is

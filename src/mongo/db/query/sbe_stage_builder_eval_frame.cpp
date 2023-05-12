@@ -56,7 +56,7 @@ std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& v
 }
 
 std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(StageBuilderState& state) {
-    return extractExpr(state.slotVarMap, *state.data->env);
+    return extractExpr(state.slotVarMap, *state.env);
 }
 
 abt::HolderPtr EvalExpr::extractABT(optimizer::SlotVarMap& varMap) {

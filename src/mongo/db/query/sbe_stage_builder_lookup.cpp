@@ -707,8 +707,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     boost::optional<SlotId> collatorSlot,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator,
-    FrameIdGenerator& frameIdGenerator,
-    RuntimeEnvironment* env) {
+    FrameIdGenerator& frameIdGenerator) {
     CurOp::get(state.opCtx)->debug().indexedLoopJoin += 1;
 
     const auto foreignCollUUID = foreignColl->uuid();
@@ -1164,7 +1163,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         const auto& foreignColl =
             _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
 
-        boost::optional<SlotId> collatorSlot = _state.data->env->getSlotIfExists("collator"_sd);
+        boost::optional<SlotId> collatorSlot = _state.env->getSlotIfExists("collator"_sd);
         switch (eqLookupNode->lookupStrategy) {
             // When foreign collection doesn't exist, we create stages that simply append empty
             // arrays to each local document and do not consider the case that foreign collection
@@ -1192,8 +1191,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                  collatorSlot,
                                                  eqLookupNode->nodeId(),
                                                  _slotIdGenerator,
-                                                 _frameIdGenerator,
-                                                 _data.env);
+                                                 _frameIdGenerator);
             }
             case EqLookupNode::LookupStrategy::kNestedLoopJoin:
             case EqLookupNode::LookupStrategy::kHashJoin: {

@@ -78,7 +78,7 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     exprs.reserve(leaves.size());
     for (auto&& e : leaves) {
-        exprs.emplace_back(e.extractExpr(state.slotVarMap, *state.data->env));
+        exprs.emplace_back(e.extractExpr(state.slotVarMap, *state.env));
     }
     return EvalExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
 }

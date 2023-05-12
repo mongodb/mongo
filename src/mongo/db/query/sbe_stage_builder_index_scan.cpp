@@ -234,7 +234,7 @@ PlanStageSlots buildPlanStageSlots(StageBuilderState& state,
                 sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
                                       sbe::value::bitcastFrom<const char*>(keyPattern.objdata()));
             auto slot =
-                state.data->env->registerSlot(bsonObjTag, bsonObjVal, true, state.slotIdGenerator);
+                state.env->registerSlot(bsonObjTag, bsonObjVal, true, state.slotIdGenerator);
             state.keyPatternToSlotMap[keyPattern] = slot;
             outputs.set(PlanStageSlots::kIndexKeyPattern, slot);
         }
@@ -286,9 +286,9 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
     auto boundsSlot = [&] {
         if (intervals) {
             auto [boundsTag, boundsVal] = packIndexIntervalsInSbeArray(std::move(*intervals));
-            return state.data->env->registerSlot(boundsTag, boundsVal, true, state.slotIdGenerator);
+            return state.env->registerSlot(boundsTag, boundsVal, true, state.slotIdGenerator);
         } else {
-            return state.data->env->registerSlot(
+            return state.env->registerSlot(
                 sbe::value::TypeTags::Nothing, 0, true, state.slotIdGenerator);
         }
     }();
@@ -390,7 +390,7 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
     std::unique_ptr<sbe::EExpression> boundsExpr;
 
     if (hasDynamicIndexBounds) {
-        boundsSlot.emplace(state.data->env->registerSlot(
+        boundsSlot.emplace(state.env->registerSlot(
             sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator));
         boundsExpr = makeVariable(*boundsSlot);
     } else {
@@ -524,10 +524,10 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
             (lowKey && highKey) || (!lowKey && !highKey));
     const bool shouldRegisterLowHighKeyInRuntimeEnv = !lowKey;
 
-    auto lowKeySlot = !lowKey ? boost::make_optional(state.data->env->registerSlot(
+    auto lowKeySlot = !lowKey ? boost::make_optional(state.env->registerSlot(
                                     sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator))
                               : boost::none;
-    auto highKeySlot = !highKey ? boost::make_optional(state.data->env->registerSlot(
+    auto highKeySlot = !highKey ? boost::make_optional(state.env->registerSlot(
                                       sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator))
                                 : boost::none;
 
@@ -938,7 +938,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
 
         // Generate a branch stage that will either execute an optimized or a generic index scan
         // based on the condition in the slot 'isGenericScanSlot'.
-        auto isGenericScanSlot = state.data->env->registerSlot(
+        auto isGenericScanSlot = state.env->registerSlot(
             sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator);
         auto isGenericScanCondition = makeVariable(isGenericScanSlot);
         stage = sbe::makeS<sbe::BranchStage>(std::move(genericStage),

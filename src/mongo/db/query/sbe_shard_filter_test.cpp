@@ -111,7 +111,7 @@ protected:
             buildPlanStage(std::move(querySolution), false, std::move(shardFiltererFactory));
 
         // Prepare the sbe::PlanStage for execution and collect all results.
-        auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+        auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
         auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessors[0]);
         sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
 

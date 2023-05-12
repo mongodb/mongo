@@ -140,16 +140,11 @@ protected:
 
     vm::ByteCode _bytecode;
 
-    // These members are default constructed to boost::none and are initialized when 'prepare()'
-    // is called. Once they are set, they are never modified again.
-    boost::optional<NamespaceString> _collName;
-    boost::optional<uint64_t> _catalogEpoch;
+    CollectionRef _coll;
 
-    CollectionPtr _coll;
-
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _snapshotIdAccessor;
+    value::OwnedValueAccessor _recordAccessor;
+    value::OwnedValueAccessor _recordIdAccessor;
+    value::OwnedValueAccessor _snapshotIdAccessor;
 
     value::OwnedValueAccessor _indexIdentAccessor;
     value::ViewOfValueAccessor _indexIdentViewAccessor;
@@ -244,8 +239,8 @@ private:
     std::unique_ptr<vm::CodeFragment> _seekKeyLowCode;
     std::unique_ptr<vm::CodeFragment> _seekKeyHighCode;
 
-    std::unique_ptr<value::OwnedValueAccessor> _seekKeyLowHolder;
-    std::unique_ptr<value::OwnedValueAccessor> _seekKeyHighHolder;
+    value::OwnedValueAccessor _seekKeyLowHolder;
+    value::OwnedValueAccessor _seekKeyHighHolder;
 };
 
 /**

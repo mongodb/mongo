@@ -138,7 +138,6 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
 
     return env;
 }
-
 }  // namespace
 
 sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
@@ -200,9 +199,10 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     // Register this plan to yield according to the configured policy.
     yieldPolicy->registerPlan(root);
 
-    root->prepare(data->ctx);
+    auto& env = data->env;
 
-    auto env = data->env;
+    root->prepare(env.ctx);
+
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
     // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
     if (auto shardFiltererSlot = env->getSlotIfExists("shardFilterer"_sd)) {
@@ -223,7 +223,8 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     auto ids = expCtx->variablesParseState.getDefinedVariableIDs();
     for (auto id : ids) {
         // Variables defined in "ExpressionContext" may not always be translated into SBE slots.
-        if (auto it = data->variableIdToSlotMap.find(id); it != data->variableIdToSlotMap.end()) {
+        if (auto it = data->staticData->variableIdToSlotMap.find(id);
+            it != data->staticData->variableIdToSlotMap.end()) {
             auto slotId = it->second;
             auto [tag, val] = sbe::value::makeValue(expCtx->variables.getValue(id));
             env->resetSlot(slotId, tag, val, true);
@@ -244,12 +245,13 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     input_params::bind(cq, *data, preparingFromCache);
 
     interval_evaluation_tree::IndexBoundsEvaluationCache indexBoundsEvaluationCache;
-    for (auto&& indexBoundsInfo : data->indexBoundsEvaluationInfos) {
-        input_params::bindIndexBounds(cq, indexBoundsInfo, env, &indexBoundsEvaluationCache);
+    for (auto&& indexBoundsInfo : data->staticData->indexBoundsEvaluationInfos) {
+        input_params::bindIndexBounds(
+            cq, indexBoundsInfo, env.runtimeEnv, &indexBoundsEvaluationCache);
     }
 
-    if (preparingFromCache && data->doSbeClusteredCollectionScan) {
-        input_params::bindClusteredCollectionBounds(cq, root, data, env);
+    if (preparingFromCache && data->staticData->doSbeClusteredCollectionScan) {
+        input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
     }
 }  // prepareSlotBasedExecutableTree
 
@@ -263,10 +265,10 @@ PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
 std::string PlanStageData::debugString() const {
     StringBuilder builder;
 
-    if (auto slot = outputs.getIfExists(PlanStageSlots::kResult); slot) {
+    if (auto slot = staticData->outputs.getIfExists(PlanStageSlots::kResult)) {
         builder << "$$RESULT=s" << *slot << " ";
     }
-    if (auto slot = outputs.getIfExists(PlanStageSlots::kRecordId); slot) {
+    if (auto slot = staticData->outputs.getIfExists(PlanStageSlots::kRecordId)) {
         builder << "$$RID=s" << *slot << " ";
     }
 
@@ -352,16 +354,17 @@ std::unique_ptr<fts::FTSMatcher> makeFtsMatcher(OperationContext* opCtx,
 }
 
 void initCollator(const CanonicalQuery& cq,
-                  PlanStageData* data,
+                  PlanStageEnvironment& env,
+                  PlanStageStaticData* data,
                   sbe::value::SlotIdGenerator* slotIdGenerator) {
-    if (auto collator = cq.getCollator(); collator) {
-        data->collator = collator->cloneShared();
-        data->env->registerSlot(
-            "collator"_sd,
-            sbe::value::TypeTags::collator,
-            sbe::value::bitcastFrom<const CollatorInterface*>(data->collator.get()),
-            false,
-            slotIdGenerator);
+    data->queryCollator = cq.getCollatorShared();
+
+    if (auto coll = data->queryCollator.get()) {
+        env->registerSlot("collator"_sd,
+                          sbe::value::TypeTags::collator,
+                          sbe::value::bitcastFrom<const CollatorInterface*>(coll),
+                          false,
+                          slotIdGenerator);
     }
 }
 }  // namespace
@@ -371,20 +374,22 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
                                              const CanonicalQuery& cq,
                                              const QuerySolution& solution,
                                              PlanYieldPolicySBE* yieldPolicy)
-    : StageBuilder(opCtx, cq, solution),
+    : BaseType(opCtx, cq, solution),
       _collections(collections),
       _mainNss(cq.nss()),
       _yieldPolicy(yieldPolicy),
-      _data(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
+      _env(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
+      _data(std::make_unique<PlanStageStaticData>()),
       _state(_opCtx,
-             &_data,
+             _env,
+             _data.get(),
              _cq.getExpCtxRaw()->variables,
              &_slotIdGenerator,
              &_frameIdGenerator,
              &_spoolIdGenerator,
              _cq.getExpCtx()->needsMerge,
              _cq.getExpCtx()->allowDiskUse) {
-    initCollator(cq, &_data, &_slotIdGenerator);
+    initCollator(cq, _env, _data.get(), &_slotIdGenerator);
 
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
@@ -398,20 +403,30 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
             count <= 1);
 
     if (node) {
-        const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(node);
-        _data.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
-        _data.shouldTrackResumeToken = csn->requestResumeToken;
-        _data.shouldUseTailableScan = csn->tailable;
-        _data.direction = csn->direction;
-        _data.doSbeClusteredCollectionScan = csn->doSbeClusteredCollectionScan();
-        if (_data.doSbeClusteredCollectionScan) {
-            _data.clusterKeyFieldName =
+        auto csn = static_cast<const CollectionScanNode*>(node);
+
+        bool doSbeClusteredCollectionScan = csn->doSbeClusteredCollectionScan();
+
+        _data->shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
+        _data->shouldTrackResumeToken = csn->requestResumeToken;
+        _data->shouldUseTailableScan = csn->tailable;
+        _data->direction = csn->direction;
+        _data->doSbeClusteredCollectionScan = doSbeClusteredCollectionScan;
+
+        if (doSbeClusteredCollectionScan) {
+            _data->clusterKeyFieldName =
                 clustered_util::getClusterKeyFieldName(*(csn->clusteredIndex)).toString();
+
+            const auto& collection = _collections.getMainCollection();
+            const CollatorInterface* ccCollator = collection->getDefaultCollator();
+            if (ccCollator) {
+                _data->ccCollator = ccCollator->cloneShared();
+            }
         }
     }
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
+SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
     // For a given SlotBasedStageBuilder instance, this build() method can only be called once.
     invariant(!_buildHasStarted);
     _buildHasStarted = true;
@@ -423,7 +438,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     // resumed (via a resume token or a tailable cursor) or if the caller simply expects to be able
     // to read it.
     reqs.setIf(kRecordId,
-               (_data.shouldUseTailableScan || _data.shouldTrackResumeToken ||
+               (_data->shouldUseTailableScan || _data->shouldTrackResumeToken ||
                 _cq.getForceGenerateRecordId()));
 
     // Set the target namespace to '_mainNss'. This is necessary as some QuerySolutionNodes that
@@ -439,9 +454,9 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     invariant(outputs.has(kResult));
     invariant(reqs.has(kRecordId) == outputs.has(kRecordId));
 
-    _data.outputs = std::move(outputs);
+    _data->outputs = std::move(outputs);
 
-    return std::move(stage);
+    return {std::move(stage), PlanStageData(std::move(_env), std::move(_data))};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildCollScan(
@@ -947,7 +962,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             6935000, "ABT must be valid if have fields to project", fieldsToProject.empty() || abt);
         optimizer::SlotVarMap slotMap{};
         slotMap[rootStr] = rowStoreSlot;
-        rowStoreExpr = abt ? abtToExpr(*abt, slotMap, *_data.env)
+        rowStoreExpr = abt ? abtToExpr(*abt, slotMap, *_env)
                            : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
     }
 
@@ -1100,7 +1115,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                      &outputs);
     stage = std::move(outStage);
 
-    auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
     for (size_t i = 0; i < fieldsAndSortKeys.size(); ++i) {
@@ -1346,7 +1361,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [stage, childOutputs] = build(child, childReqs);
     auto outputs = std::move(childOutputs);
 
-    auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
@@ -1564,7 +1579,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto [stage, outputs] = build(child, childReqs);
 
-    auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
@@ -2115,7 +2130,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto innerCondSlots = sbe::makeSV(innerIdSlot);
     auto innerProjectSlots = sbe::makeSV(innerResultSlot);
 
-    auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
     // Designate outputs.
     PlanStageSlots outputs;
@@ -2435,7 +2450,7 @@ sbe::value::SlotVector generateAccumulator(
     sbe::HashAggStage::AggExprVector& aggSlotExprs,
     boost::optional<sbe::value::SlotId> initializerRootSlot) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
-    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2552,7 +2567,7 @@ sbe::SlotExprPairVector generateMergingExpressions(StageBuilderState& state,
     tassert(7039557, "expected non-null 'frameIdGenerator' pointer", frameIdGenerator);
 
     auto spillSlots = slotIdGenerator->generateMultiple(numInputSlots);
-    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
 
     auto mergingExprs = [&]() {
         if (isTopBottomN(accStmt)) {
@@ -2610,7 +2625,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
         }
     }();
 
-    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
     auto finalSlots{sbe::value::SlotVector{finalGroupBySlot}};
     std::vector<std::string> fieldNames{"_id"};
     size_t idxAccFirstSlot = dedupedGroupBySlots.size();
@@ -2922,7 +2937,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto groupEvalStage = makeHashAgg(std::move(currentStage),
                                       dedupedGroupBySlots,
                                       std::move(aggSlotExprs),
-                                      _state.data->env->getSlotIfExists("collator"_sd),
+                                      _state.env->getSlotIfExists("collator"_sd),
                                       _cq.getExpCtx()->allowDiskUse,
                                       std::move(mergingExprs),
                                       nodeId);
@@ -3022,7 +3037,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     // Register a SlotId in the global environment which would contain a recordId to resume a
     // tailable collection scan from. A PlanStage executor will track the last seen recordId and
     // will reset a SlotAccessor for the resumeRecordIdSlot with this recordId.
-    auto resumeRecordIdSlot = _data.env->registerSlot(
+    auto resumeRecordIdSlot = _env->registerSlot(
         "resumeRecordId"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
 
     // For tailable collection scan we need to build a special union sub-tree consisting of two
@@ -3113,7 +3128,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
     // We register the "shardFilterer" slot but we don't construct the ShardFilterer here, because
     // once constructed the ShardFilterer will prevent orphaned documents from being deleted. We
     // will construct the ShardFilterer later while preparing the SBE tree for execution.
-    auto shardFiltererSlot = _data.env->registerSlot(
+    auto shardFiltererSlot = _env->registerSlot(
         "shardFilterer"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
 
     for (auto&& shardKeyElt : shardKeyPattern) {
@@ -3215,7 +3230,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // We register the "shardFilterer" slot but we don't construct the ShardFilterer here, because
     // once constructed the ShardFilterer will prevent orphaned documents from being deleted. We
     // will construct the ShardFilterer later while preparing the SBE tree for execution.
-    auto shardFiltererSlot = _data.env->registerSlot(
+    auto shardFiltererSlot = _env->registerSlot(
         "shardFilterer"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
 
     // Request slots for top level shard key fields and cache parsed key path.

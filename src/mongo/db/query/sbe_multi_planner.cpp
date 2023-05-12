@@ -292,7 +292,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         // explain operation, save the stats from the old tree before we discard it.
         if (_cq.getExplain()) {
             winner.data.stageData.savedStatsOnEarlyExit =
-                winner.root->getStats(true /* includeDebugInfo  */);
+                winner.root->getStats(true /* includeDebugInfo */);
         }
         winner.root = winner.clonedPlan->first->clone();
 

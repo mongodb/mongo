@@ -63,7 +63,7 @@ TEST_F(SbeStageBuilderTest, TestVirtualScan) {
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
 
     int64_t index = 0;
     for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED; st = stage->getNext()) {
@@ -103,7 +103,7 @@ TEST_F(SbeStageBuilderTest, TestLimitOneVirtualScan) {
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
 
     // Prepare the sbe::PlanStage for execution.
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
 
     int64_t index = 0;
     for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED; st = stage->getNext()) {
@@ -139,7 +139,7 @@ TEST_F(SbeStageBuilderTest, VirtualCollScanWithoutRecordId) {
         buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
 
     // Prepare the sbe::PlanStage for execution.
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 1u);
 
     int64_t index = 0;
@@ -169,7 +169,7 @@ TEST_F(SbeStageBuilderTest, VirtualIndexScan) {
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 2u);
 
     int64_t index = 0;
@@ -203,7 +203,7 @@ TEST_F(SbeStageBuilderTest, VirtualIndexScanWithoutRecordId) {
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 1u);
 
     int64_t index = 0;

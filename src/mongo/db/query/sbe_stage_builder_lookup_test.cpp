@@ -132,7 +132,7 @@ public:
         auto ctx = makeCompileCtx();
         prepareTree(ctx.get(), stage.get());
 
-        auto resultSlot = data.outputs.get(stage_builder::PlanStageSlots::kResult);
+        auto resultSlot = data.staticData->outputs.get(stage_builder::PlanStageSlots::kResult);
         SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
 
         return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};

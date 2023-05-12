@@ -53,6 +53,8 @@ class Projection;
 namespace mongo::stage_builder {
 
 class PlanStageSlots;
+struct PlanStageEnvironment;
+struct PlanStageStaticData;
 
 std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
                                               std::unique_ptr<sbe::EExpression> operand);
@@ -72,6 +74,11 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> rhs,
                                                sbe::RuntimeEnvironment* env);
 
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               PlanStageEnvironment& env);
+
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
                                                std::unique_ptr<sbe::EExpression> collator = {});
@@ -79,6 +86,10 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
                                                sbe::RuntimeEnvironment* env);
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               PlanStageEnvironment& env);
 
 /**
  * Generates an EExpression that checks if the input expression is null or missing.
@@ -556,15 +567,14 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
 
-struct PlanStageData;
-
 /**
  * Common parameters to SBE stage builder functions extracted into separate class to simplify
  * argument passing. Also contains a mapping of global variable ids to slot ids.
  */
 struct StageBuilderState {
     StageBuilderState(OperationContext* opCtx,
-                      PlanStageData* data,
+                      PlanStageEnvironment& env,
+                      PlanStageStaticData* data,
                       const Variables& variables,
                       sbe::value::SlotIdGenerator* slotIdGenerator,
                       sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -575,6 +585,7 @@ struct StageBuilderState {
           frameIdGenerator{frameIdGenerator},
           spoolIdGenerator{spoolIdGenerator},
           opCtx{opCtx},
+          env{env},
           data{data},
           variables{variables},
           needsMerge{needsMerge},
@@ -609,7 +620,8 @@ struct StageBuilderState {
     sbe::value::SpoolIdGenerator* const spoolIdGenerator;
 
     OperationContext* const opCtx;
-    PlanStageData* const data;
+    PlanStageEnvironment& env;
+    PlanStageStaticData* const data;
 
     const Variables& variables;
     // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'

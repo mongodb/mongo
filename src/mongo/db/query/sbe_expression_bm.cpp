@@ -52,17 +52,16 @@ const NamespaceString kNss{"test.bm"};
 
 class SbeExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
 public:
-    SbeExpressionBenchmarkFixture() : _planStageData(std::make_unique<sbe::RuntimeEnvironment>()) {
-        _inputSlotId = _planStageData.env->registerSlot(
+    SbeExpressionBenchmarkFixture() : _env(std::make_unique<sbe::RuntimeEnvironment>()) {
+        _inputSlotId = _env->registerSlot(
             "input"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
         _timeZoneDB = std::make_unique<TimeZoneDatabase>();
-        _planStageData.env->registerSlot(
-            "timeZoneDB"_sd,
-            sbe::value::TypeTags::timeZoneDB,
-            sbe::value::bitcastFrom<TimeZoneDatabase*>(_timeZoneDB.get()),
-            false,
-            &_slotIdGenerator);
-        _inputSlotAccessor = _planStageData.env->getAccessor(_inputSlotId);
+        _env->registerSlot("timeZoneDB"_sd,
+                           sbe::value::TypeTags::timeZoneDB,
+                           sbe::value::bitcastFrom<TimeZoneDatabase*>(_timeZoneDB.get()),
+                           false,
+                           &_slotIdGenerator);
+        _inputSlotAccessor = _env->getAccessor(_inputSlotId);
     }
 
     void benchmarkExpression(BSONObj expressionSpec,
@@ -97,7 +96,8 @@ public:
 
         stage_builder::StageBuilderState state{
             opCtx.get(),
-            &_planStageData,
+            _env,
+            _planStageData.get(),
             _variables,
             &_slotIdGenerator,
             &_frameIdGenerator,
@@ -113,17 +113,17 @@ public:
                     "sbe expression benchmark PlanStage",
                     "stage"_attr = debugPrint(stage.get()));
 
-        auto expr = evalExpr.extractExpr(state.slotVarMap, *_planStageData.env);
+        auto expr = evalExpr.extractExpr(state.slotVarMap, *_env);
         LOGV2_DEBUG(6979802,
                     1,
                     "sbe expression benchmark EExpression",
                     "expression"_attr = debugPrint(expr.get()));
 
         stage->attachToOperationContext(opCtx.get());
-        stage->prepare(_planStageData.ctx);
+        stage->prepare(_env.ctx);
 
-        _planStageData.ctx.root = stage.get();
-        sbe::vm::CodeFragment code = expr->compileDirect(_planStageData.ctx);
+        _env.ctx.root = stage.get();
+        sbe::vm::CodeFragment code = expr->compileDirect(_env.ctx);
         sbe::vm::ByteCode vm;
         stage->open(/*reopen =*/false);
         for (auto keepRunning : benchmarkState) {
@@ -154,7 +154,8 @@ private:
         }
     }
 
-    stage_builder::PlanStageData _planStageData;
+    stage_builder::PlanStageEnvironment _env;
+    std::unique_ptr<stage_builder::PlanStageStaticData> _planStageData;
     Variables _variables;
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;

@@ -1307,7 +1307,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     // we will need to do the runtime planning to check if the cached plan still
     // performs efficiently, or requires re-planning.
     tassert(6693503, "PlanStageData must be present", planStageData);
-    const bool hasHashLookup = !planStageData->foreignHashJoinCollections.empty();
+    const bool hasHashLookup = !planStageData->staticData->foreignHashJoinCollections.empty();
     if (decisionWorks || hasHashLookup) {
         QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;

@@ -221,15 +221,6 @@ void updatePlanCacheFromCandidates(
                     std::move(winningPlan.clonedPlan->second.stageData));
                 cachedPlan->indexFilterApplied = winningPlan.solution->indexFilterApplied;
 
-                // Clustered collection scans need to cache 'ccCollator' for bounds computation.
-                stage_builder::PlanStageData& stageData = cachedPlan->planStageData;
-                if (stageData.doSbeClusteredCollectionScan) {
-                    const CollatorInterface* ccCollator = collection->getDefaultCollator();
-                    if (ccCollator) {
-                        stageData.ccCollator = ccCollator->cloneShared();
-                    }
-                }
-
                 auto buildDebugInfoFn =
                     [soln = winningPlan.solution.get()]() -> plan_cache_debug_info::DebugInfoSBE {
                     return buildDebugInfo(soln);

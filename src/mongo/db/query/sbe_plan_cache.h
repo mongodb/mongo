@@ -180,7 +180,7 @@ struct PlanCachePartitioner {
 struct CachedSbePlan {
     CachedSbePlan(std::unique_ptr<sbe::PlanStage> root, stage_builder::PlanStageData data)
         : root(std::move(root)), planStageData(std::move(data)) {
-        tassert(5968206, "The RuntimeEnvironment should not be null", planStageData.env);
+        tassert(5968206, "The RuntimeEnvironment should not be null", planStageData.env.runtimeEnv);
     }
 
     std::unique_ptr<CachedSbePlan> clone() const {

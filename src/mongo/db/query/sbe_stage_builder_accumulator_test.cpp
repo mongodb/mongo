@@ -129,7 +129,7 @@ protected:
             std::move(querySolution), false /*hasRecordId*/, nullptr, std::move(collator));
         ASSERT_EQ(resultSlots.size(), 1);
 
-        auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots[0]);
+        auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots[0]);
         return getAllResults(stage.get(), &resultAccessors[0]);
     }
 

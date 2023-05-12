@@ -88,8 +88,9 @@ public:
         // contains any regexes.
         tassert(6279503, "Unexpected parameter marker for $in with regexes", !expr->hasRegex());
 
+        auto coll = _data.staticData->queryCollator.get();
         auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
-            stage_builder::convertInExpressionEqualities(expr, _data);
+            stage_builder::convertInExpressionEqualities(expr, coll);
         bindParam(*slotId, true /*owned*/, arrSetTag, arrSetVal);
 
         // Auto-parameterization should not kick in if the $in's list of equalities includes any
@@ -300,8 +301,8 @@ private:
     }
 
     boost::optional<sbe::value::SlotId> getSlotId(MatchExpression::InputParamId paramId) const {
-        auto it = _data.inputParamToSlotMap.find(paramId);
-        if (it != _data.inputParamToSlotMap.end()) {
+        auto it = _data.staticData->inputParamToSlotMap.find(paramId);
+        if (it != _data.staticData->inputParamToSlotMap.end()) {
             return it->second;
         }
         return boost::none;
@@ -470,14 +471,14 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
     // need to set it in its 'hasCompatibleCollation' member.
     static_cast<void>(QueryPlannerAccess::handleRIDRangeScan(conjunct,
                                                              queryCollator,
-                                                             data->ccCollator.get(),
-                                                             data->clusterKeyFieldName,
+                                                             data->staticData->ccCollator.get(),
+                                                             data->staticData->clusterKeyFieldName,
                                                              minRecord,
                                                              maxRecord));
     QueryPlannerAccess::handleRIDRangeMinMax(cq,
-                                             data->direction,
+                                             data->staticData->direction,
                                              queryCollator,
-                                             data->ccCollator.get(),
+                                             data->staticData->ccCollator.get(),
                                              minRecord,
                                              maxRecord,
                                              boundInclusion);

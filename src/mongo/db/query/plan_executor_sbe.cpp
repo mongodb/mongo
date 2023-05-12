@@ -71,22 +71,24 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     invariant(!_nss.isEmpty());
     invariant(_root);
 
-    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
-        _result = _root->getAccessor(_rootData.ctx, *slot);
+    auto& outputs = _rootData.staticData->outputs;
+
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kResult)) {
+        _result = _root->getAccessor(_rootData.env.ctx, *slot);
         uassert(4822865, "Query does not have result slot.", _result);
     }
 
-    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId); slot) {
-        _resultRecordId = _root->getAccessor(_rootData.ctx, *slot);
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId)) {
+        _resultRecordId = _root->getAccessor(_rootData.env.ctx, *slot);
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    sbe::RuntimeEnvironment* env = _rootData.env;
-    if (_rootData.shouldTrackLatestOplogTimestamp) {
+    auto& env = _rootData.env;
+    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
         _oplogTs = env->getAccessor(env->getSlot("oplogTs"_sd));
     }
 
-    if (_rootData.shouldUseTailableScan) {
+    if (_rootData.staticData->shouldUseTailableScan) {
         _resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
     }
     _minRecordIdSlot = env->getSlotIfExists("minRecordId"_sd);
@@ -363,7 +365,7 @@ template PlanExecutor::ExecState PlanExecutorSBE::getNextImpl<Document>(Document
                                                                         RecordId* dlOut);
 
 Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
-    if (_rootData.shouldTrackLatestOplogTimestamp) {
+    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
         tassert(5567201,
                 "The '_oplogTs' accessor should be populated when "
                 "'shouldTrackLatestOplogTimestamp' is true",
@@ -384,7 +386,7 @@ Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
 }
 
 BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
-    if (_rootData.shouldTrackResumeToken) {
+    if (_rootData.staticData->shouldTrackResumeToken) {
         invariant(_resultRecordId);
 
         auto [tag, val] = _resultRecordId->getViewOfValue();
@@ -401,7 +403,7 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
         }
     }
 
-    if (_rootData.shouldTrackLatestOplogTimestamp) {
+    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
         return ResumeTokenOplogTimestamp{getLatestOplogTimestamp()}.toBSON();
     }
 
