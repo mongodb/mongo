@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
@@ -278,6 +279,21 @@ private:
                                 bool isMajorityDataAvailable) override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final{};
     void onBecomeArbiter() override final {}
+};
+
+/**
+ * Scoped lock to synchronize with the execution of range deletions.
+ * The range-deleter acquires a scoped lock in IX mode while orphans are being deleted.
+ * As long as this scoped lock is acquired in MODE_X, no range deletion will be running.
+ */
+class ScopedRangeDeleterLock {
+public:
+    ScopedRangeDeleterLock(OperationContext* opCtx, LockMode mode)
+        : _resourceLock(opCtx, _mutex.getRid(), mode) {}
+
+private:
+    const Lock::ResourceLock _resourceLock;
+    static inline const Lock::ResourceMutex _mutex{"ScopedRangeDeleterLock"};
 };
 
 }  // namespace mongo

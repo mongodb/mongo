@@ -34,7 +34,6 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 #include "mongo/db/s/range_deletion_util.h"
