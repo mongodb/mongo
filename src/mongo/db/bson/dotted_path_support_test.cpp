@@ -626,5 +626,19 @@ TEST(ExtractElementAtPathOrArrayAlongPath, NumericalPathElementTreatedAsFieldNam
     ASSERT(StringData(pathData).empty());
 }
 
+TEST(ExtractElementAtPathOrArrayAlongPath, FieldWithDotsDontHideNestedObjects) {
+    BSONObj obj(fromjson("{b: {c: 'foo'}, \"b.c\": 'bar'}"));
+    BSONElementSet actualElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "b.c", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
+
+    assertBSONElementSetsAreEqual({BSON("c"
+                                        << "foo")},
+                                  actualElements);
+    assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
+}
+
 }  // namespace
 }  // namespace mongo
