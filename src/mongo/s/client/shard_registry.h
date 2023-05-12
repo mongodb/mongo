@@ -156,10 +156,30 @@ private:
 };
 
 /**
- * Maintains the set of all shards known to the instance and their connections and exposes
- * functionality to run commands against shards. All commands which this registry executes are
- * retried on NotPrimary class of errors and in addition all read commands are retried on network
- * errors automatically as well.
+ * Each node (router, shard server, config server, primaries and secondaries) has one instance of
+ * this object. It is an in-memory cache mirroring the `config.shards` collection on the config
+ * server, whose causal consistency is driven by the `topologyTime` component of the vector clock.
+ * The collection (and thus the cache) contains an entry for each shard in the cluster. Each entry
+ * contains the connection string for that shard.
+ *
+ * Retrieving a shard from the registry returns a `Shard` object. Using that object, one can access
+ * more information about a shard and run commands against that shard. A `Shard` object can be
+ * retrieved from the registry by using any of:
+ * - The shard's name
+ * - The replica set's name
+ * - The HostAndPort object
+ * - The connection string
+ *
+ * REFRESHES: The shard registry refreshes itself in these scenarios:
+ * - Upon the node's start-up
+ * - Upon completion of a background job that runs every thirty seconds
+ * - Upon an attempt to retrieve a shard that doesn’t have a matching entry in the cache
+ * - Upon calling the ShardRegistry’s reload function (ShardRegistry::reload())
+ * - After an operation has gossipped-in a higher `topologyTime`
+ *
+ * The shard registry makes updates to the `config.shards` collection in one case. If the shard
+ * registry discovers an updated connection string for another shard via a replica set topology
+ * change, it will persist that update to `config.shards`.
  */
 class ShardRegistry {
     ShardRegistry(const ShardRegistry&) = delete;
