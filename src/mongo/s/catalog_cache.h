@@ -82,6 +82,11 @@ public:
     virtual ~CatalogCache();
 
     /**
+     * Shuts down and joins the executor used by all the caches to run their blocking work.
+     */
+    void shutDownAndJoin();
+
+    /**
      * Blocking method that ensures the specified database is in the cache, loading it if necessary,
      * and returns it. If the database was not in cache, all the sharded collections will be in the
      * 'needsRefresh' state.
