@@ -381,6 +381,8 @@ last-continuous:
     ticket: SERVER-76948
   - test_file: jstests/sharding/merge_let_params_size_estimation.js
     ticket: SERVER-74806
+  - test_file: jstests/sharding/resharding_with_multi_deletes_reduced_ticket_pool_size.js
+    ticket: SERVER-77097
   suites: null
 last-lts:
   all:
@@ -846,4 +848,6 @@ last-lts:
     ticket: SERVER-76948
   - test_file: jstests/sharding/merge_let_params_size_estimation.js
     ticket: SERVER-74806
+  - test_file: jstests/sharding/resharding_with_multi_deletes_reduced_ticket_pool_size.js
+    ticket: SERVER-77097
   suites: null
