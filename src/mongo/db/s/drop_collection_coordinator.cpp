@@ -251,10 +251,8 @@ void DropCollectionCoordinator::_freezeMigrations(
         opCtx, "dropCollection.start", nss().ns(), logChangeDetail.obj());
 
     if (_doc.getCollInfo()) {
-        _updateSession(opCtx);
-
         sharding_ddl_util::stopMigrations(
-            opCtx, nss(), _doc.getCollInfo()->getUuid(), getCurrentSession());
+            opCtx, nss(), _doc.getCollInfo()->getUuid(), getNewSession(opCtx));
     }
 }
 
@@ -266,7 +264,6 @@ void DropCollectionCoordinator::_enterCriticalSection(
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
 
-    _updateSession(opCtx);
     ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
     blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
     blockCRUDOperationsRequest.setReason(_critSecReason);
@@ -277,7 +274,7 @@ void DropCollectionCoordinator::_enterCriticalSection(
     sharding_ddl_util::sendAuthenticatedCommandToShards(
         opCtx,
         nss().db(),
-        cmdObj.addFields(getCurrentSession().toBSON()),
+        cmdObj.addFields(getNewSession(opCtx).toBSON()),
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
         **executor);
 
@@ -298,7 +295,6 @@ void DropCollectionCoordinator::_commitDropCollection(
     sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
         opCtx, BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName << nss().toString()));
 
-    _updateSession(opCtx);
     if (collIsSharded) {
         invariant(_doc.getCollInfo());
         const auto& coll = _doc.getCollInfo().value();
@@ -312,18 +308,15 @@ void DropCollectionCoordinator::_commitDropCollection(
             Grid::get(opCtx)->catalogClient(),
             coll,
             ShardingCatalogClient::kMajorityWriteConcern,
-            getCurrentSession(),
+            getNewSession(opCtx),
             useClusterTransaction,
             **executor);
     }
 
     // Remove tags even if the collection is not sharded or didn't exist
-    _updateSession(opCtx);
-    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getCurrentSession());
+    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getNewSession(opCtx));
 
-    // get a Lsid and an incremented txnNumber. Ensures we are the primary
-    _updateSession(opCtx);
-
+    // Ensures we are the primary
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
     // We need to send the drop to all the shards because both movePrimary and
@@ -334,13 +327,13 @@ void DropCollectionCoordinator::_commitDropCollection(
                        participants.end());
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss(), participants, **executor, getCurrentSession(), true /*fromMigrate*/);
+        opCtx, nss(), participants, **executor, getNewSession(opCtx), true /*fromMigrate*/);
 
     // The sharded collection must be dropped on the primary shard after it has been
     // dropped on all of the other shards to ensure it can only be re-created as
     // unsharded with a higher optime than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss(), {primaryShardId}, **executor, getCurrentSession(), false /*fromMigrate*/);
+        opCtx, nss(), {primaryShardId}, **executor, getNewSession(opCtx), false /*fromMigrate*/);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));
@@ -354,7 +347,6 @@ void DropCollectionCoordinator::_exitCriticalSection(
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
 
-    _updateSession(opCtx);
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
@@ -365,7 +357,7 @@ void DropCollectionCoordinator::_exitCriticalSection(
     sharding_ddl_util::sendAuthenticatedCommandToShards(
         opCtx,
         nss().db(),
-        cmdObj.addFields(getCurrentSession().toBSON()),
+        cmdObj.addFields(getNewSession(opCtx).toBSON()),
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
         **executor);
 
