@@ -97,7 +97,7 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
       _txn(std::make_shared<details::TransactionWithRetries>(
           opCtx,
           _sleepExec,
-          _source.token(),
+          opCtx->getCancellationToken(),
           txnClient ? std::move(txnClient)
                     : std::make_unique<details::SEPTransactionClient>(
                           opCtx,
@@ -118,7 +118,7 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     }
 
     Notification<void> mayReturn;
-    auto txnFuture = _txn->run(opCtx, std::move(callback))
+    auto txnFuture = _txn->run(std::move(callback))
                          .unsafeToInlineFuture()
                          .tapAll([&](auto&&) { mayReturn.set(); })
                          .semi();
@@ -126,9 +126,6 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     runFutureInline(_inlineExecutor.get(), mayReturn);
 
     auto txnResult = txnFuture.getNoThrow(opCtx);
-
-    // Cancel the source to guarantee the transaction will terminate if our opCtx was interrupted.
-    _source.cancel();
 
     // Post transaction processing, which must also happen inline.
     OperationTimeTracker::get(opCtx)->updateOperationTime(_txn->getOperationTime());
@@ -157,6 +154,14 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
 
     if (!txnResult.isOK()) {
+        if (auto interruptStatus = opCtx->checkForInterruptNoAssert(); !interruptStatus.isOK()) {
+            // The caller was interrupted during the transaction, so if the transaction failed,
+            // return the caller's interruption code instead. The transaction uses a
+            // CancelableOperationContext inherited from the caller's opCtx, but that type can only
+            // kill with an Interrupted error, so this is meant as a workaround to preserve the
+            // presumably more meaningful error the caller was interrupted with.
+            return interruptStatus;
+        }
         return txnResult;
     } else if (!unyieldStatus.isOK()) {
         return unyieldStatus;
@@ -301,8 +306,7 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep,
     LOGV2(5918600, "Chose internal transaction error handling step", attr);
 }
 
-SemiFuture<CommitResult> TransactionWithRetries::run(OperationContext* opCtx,
-                                                     Callback callback) noexcept {
+SemiFuture<CommitResult> TransactionWithRetries::run(Callback callback) noexcept {
     InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())->incrementStarted();
     _internalTxn->setCallback(std::move(callback));
 
