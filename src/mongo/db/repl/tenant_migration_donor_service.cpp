@@ -539,7 +539,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
                                      MODE_IX);
 
                writeConflictRetry(
-                   opCtx, "TenantMigrationDonorInsertStateDoc", _stateDocumentsNS.ns(), [&] {
+                   opCtx, "TenantMigrationDonorInsertStateDoc", _stateDocumentsNS, [&] {
                        const auto filter =
                            BSON(TenantMigrationDonorDocument::kIdFieldName << _migrationUuid);
                        const auto updateMod = [&]() {
@@ -594,7 +594,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        collection);
 
                writeConflictRetry(
-                   opCtx, "TenantMigrationDonorUpdateStateDoc", _stateDocumentsNS.ns(), [&] {
+                   opCtx, "TenantMigrationDonorUpdateStateDoc", _stateDocumentsNS, [&] {
                        WriteUnitOfWork wuow(opCtx);
 
                        const auto originalRecordId = Helpers::findOne(
@@ -718,7 +718,7 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
                writeConflictRetry(
                    opCtx,
                    "TenantMigrationDonorMarkStateDocAsGarbageCollectable",
-                   _stateDocumentsNS.ns(),
+                   _stateDocumentsNS,
                    [&] {
                        const auto filter =
                            BSON(TenantMigrationDonorDocument::kIdFieldName << _migrationUuid);

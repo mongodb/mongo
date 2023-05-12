@@ -349,7 +349,7 @@ public:
     }
 
     void create(NamespaceString nss) const {
-        ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss.ns(), [&] {
+        ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss, [&] {
             _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             _opCtx->recoveryUnit()->abandonSnapshot();
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);

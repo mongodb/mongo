@@ -489,10 +489,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
         }
 
         writeConflictRetry(
-            opCtx,
-            "waitForLinearizableReadConcern",
-            NamespaceString::kRsOplogNamespace.ns(),
-            [&opCtx] {
+            opCtx, "waitForLinearizableReadConcern", NamespaceString::kRsOplogNamespace, [&opCtx] {
                 WriteUnitOfWork uow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
                     opCtx,

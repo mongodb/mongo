@@ -120,7 +120,7 @@ CollectionOptions createOplogCollectionOptions() {
 void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options = generateOptionsWithUuid()) {
-    writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+    writeConflictRetry(opCtx, "createCollection", nss, [&] {
         Lock::DBLock dblk(opCtx, nss.dbName(), MODE_X);
         OldClientContext ctx(opCtx, nss);
         auto db = ctx.db();

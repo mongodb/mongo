@@ -491,7 +491,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
 
     auto opStr = "getTagsFromStorage"_sd;
     return writeConflictRetry(
-        opCtx, opStr, nsOrUUID.toString(), [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
+        opCtx, opStr, nsOrUUID, [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
             AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nsOrUUID);
 
             const auto& collection = autoColl.getCollection();

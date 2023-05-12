@@ -836,7 +836,7 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
     const std::vector<Timestamp>& ts) const {
     tassert(5643012, "Attempted to write to record store with nullptr", records);
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns.ns(), [&] {
+    writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns, [&] {
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         auto writeResult = rs->insertRecords(expCtx->opCtx, records, ts);
@@ -866,7 +866,7 @@ Document CommonMongodProcessInterface::readRecordFromRecordStore(
 void CommonMongodProcessInterface::deleteRecordFromRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::deleteFromRecordStore", expCtx->ns.ns(), [&] {
+    writeConflictRetry(expCtx->opCtx, "MPI::deleteFromRecordStore", expCtx->ns, [&] {
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         rs->deleteRecord(expCtx->opCtx, rID);
@@ -877,7 +877,7 @@ void CommonMongodProcessInterface::deleteRecordFromRecordStore(
 void CommonMongodProcessInterface::truncateRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::truncateRecordStore", expCtx->ns.ns(), [&] {
+    writeConflictRetry(expCtx->opCtx, "MPI::truncateRecordStore", expCtx->ns, [&] {
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         auto status = rs->truncate(expCtx->opCtx);

@@ -242,7 +242,7 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // Create the destination collection if necessary.
-    writeConflictRetry(opCtx, "createReshardingLocalOplogBuffer", nss.toString(), [&] {
+    writeConflictRetry(opCtx, "createReshardingLocalOplogBuffer", nss, [&] {
         const Collection* coll =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         if (coll) {

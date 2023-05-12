@@ -849,7 +849,7 @@ Status _collModInternal(OperationContext* opCtx,
         LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmd.toBSON(BSONObj()));
     }
 
-    return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "collMod", nss, [&] {
         WriteUnitOfWork wunit(opCtx);
 
         // Handle collMod on a view and return early. The CollectionCatalog handles the creation of

@@ -869,7 +869,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
                     return writeConflictRetry(
-                        opCtx, "recordingDuplicateKey", entry->getNSSFromCatalog(opCtx).ns(), [&] {
+                        opCtx, "recordingDuplicateKey", entry->getNSSFromCatalog(opCtx), [&] {
                             if (dupsAllowed && !onDuplicateRecord && !_ignoreUnique &&
                                 entry->indexBuildInterceptor()) {
                                 WriteUnitOfWork wuow(opCtx);

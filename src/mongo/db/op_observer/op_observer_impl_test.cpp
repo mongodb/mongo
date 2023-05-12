@@ -203,7 +203,7 @@ protected:
     void reset(OperationContext* opCtx,
                NamespaceString nss,
                boost::optional<UUID> uuid = boost::none) const {
-        writeConflictRetry(opCtx, "deleteAll", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "deleteAll", nss, [&] {
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             opCtx->recoveryUnit()->abandonSnapshot();
 

@@ -56,7 +56,7 @@ public:
                                    std::vector<Record>* records,
                                    const std::vector<Timestamp>& ts) const override {
 
-        writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns.ns(), [&] {
+        writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns, [&] {
             AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
             WriteUnitOfWork wuow(expCtx->opCtx);
             auto writeResult = rs->insertRecords(expCtx->opCtx, records, ts);

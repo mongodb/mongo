@@ -67,7 +67,7 @@ UpdateResult update(OperationContext* opCtx,
 
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.
-    writeConflictRetry(opCtx, "createCollection", nsString.ns(), [&] {
+    writeConflictRetry(opCtx, "createCollection", nsString, [&] {
         if (!coll.exists() && request.isUpsert()) {
             const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
                 !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString);

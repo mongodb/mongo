@@ -195,13 +195,12 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
                         "Writing noop to oplog as there has been no writes to this replica set "
                         "within write interval",
                         "writeInterval"_attr = _writeInterval);
-            writeConflictRetry(
-                opCtx, "writeNoop", NamespaceString::kRsOplogNamespace.ns(), [&opCtx] {
-                    WriteUnitOfWork uow(opCtx);
-                    opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx,
-                                                                                          kMsgObj);
-                    uow.commit();
-                });
+            writeConflictRetry(opCtx, "writeNoop", NamespaceString::kRsOplogNamespace, [&opCtx] {
+                WriteUnitOfWork uow(opCtx);
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx,
+                                                                                      kMsgObj);
+                uow.commit();
+            });
         }
     }
 

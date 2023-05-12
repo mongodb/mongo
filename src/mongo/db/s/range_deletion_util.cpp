@@ -422,7 +422,7 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
         // The DBDirectClient will not retry WriteConflictExceptions internally while holding an X
         // mode lock, so we need to retry at this level.
         writeConflictRetry(
-            opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace.ns(), [&] {
+            opCtx, "updateOrphanCount", NamespaceString::kRangeDeletionNamespace, [&] {
                 store.update(opCtx,
                              query,
                              BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName

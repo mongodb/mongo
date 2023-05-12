@@ -83,10 +83,7 @@ void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recor
     }
 
     writeConflictRetry(
-        opCtx,
-        "recordSkippedRecordTracker",
-        NamespaceString::kIndexBuildEntryNamespace.ns(),
-        [&]() {
+        opCtx, "recordSkippedRecordTracker", NamespaceString::kIndexBuildEntryNamespace, [&]() {
             WriteUnitOfWork wuow(opCtx);
             uassertStatusOK(
                 _skippedRecordsTable->rs()

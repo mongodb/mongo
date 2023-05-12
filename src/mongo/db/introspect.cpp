@@ -153,7 +153,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     // Checking the collection exists must also be done in the WCE retry loop. Only retrying
     // collection creation would endlessly throw errors because the collection exists: must check
     // and see the collection exists in order to break free.
-    return writeConflictRetry(opCtx, "createProfileCollection", dbProfilingNS.ns(), [&] {
+    return writeConflictRetry(opCtx, "createProfileCollection", dbProfilingNS, [&] {
         const Collection* collection =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, dbProfilingNS);
         if (collection) {

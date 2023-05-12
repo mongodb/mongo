@@ -66,7 +66,7 @@ NamespaceString kInitialSyncIdNss =
  * Returns min valid document.
  */
 BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minValidNss) {
-    return writeConflictRetry(opCtx, "getMinValidDocument", minValidNss.ns(), [opCtx, minValidNss] {
+    return writeConflictRetry(opCtx, "getMinValidDocument", minValidNss, [opCtx, minValidNss] {
         Lock::DBLock dblk(opCtx, minValidNss.dbName(), MODE_IS);
         Lock::CollectionLock lk(opCtx, minValidNss, MODE_IS);
         BSONObj mv;

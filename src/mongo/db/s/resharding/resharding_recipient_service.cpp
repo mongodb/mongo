@@ -810,7 +810,7 @@ void ReshardingRecipientService::RecipientStateMachine::_writeStrictConsistencyO
 
     auto oplog = generateOplogEntry();
     writeConflictRetry(
-        rawOpCtx, "ReshardDoneCatchUpOplog", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        rawOpCtx, "ReshardDoneCatchUpOplog", NamespaceString::kRsOplogNamespace, [&] {
             AutoGetOplog oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
             WriteUnitOfWork wunit(rawOpCtx);
             const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
@@ -1120,36 +1120,34 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
     auto opCtx = factory.makeOperationContext(&cc());
 
     const auto& nss = NamespaceString::kRecipientReshardingOperationsNamespace;
-    writeConflictRetry(
-        opCtx.get(), "RecipientStateMachine::_removeRecipientDocument", nss.toString(), [&] {
-            const auto coll =
-                acquireCollection(opCtx.get(),
-                                  CollectionAcquisitionRequest(
-                                      NamespaceString(nss),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                      repl::ReadConcernArgs::get(opCtx.get()),
-                                      AcquisitionPrerequisites::kWrite),
-                                  MODE_IX);
+    writeConflictRetry(opCtx.get(), "RecipientStateMachine::_removeRecipientDocument", nss, [&] {
+        const auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString(nss),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
-            if (!coll.exists()) {
-                return;
-            }
+        if (!coll.exists()) {
+            return;
+        }
 
-            WriteUnitOfWork wuow(opCtx.get());
+        WriteUnitOfWork wuow(opCtx.get());
 
-            opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
-                stdx::lock_guard<Latch> lk(_mutex);
-                _completionPromise.emplaceValue();
-            });
-
-            deleteObjects(opCtx.get(),
-                          coll,
-                          BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
-                               << _metadata.getReshardingUUID()),
-                          true /* justOne */);
-
-            wuow.commit();
+        opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
+            stdx::lock_guard<Latch> lk(_mutex);
+            _completionPromise.emplaceValue();
         });
+
+        deleteObjects(opCtx.get(),
+                      coll,
+                      BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                           << _metadata.getReshardingUUID()),
+                      true /* justOne */);
+
+        wuow.commit();
+    });
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_startMetrics(

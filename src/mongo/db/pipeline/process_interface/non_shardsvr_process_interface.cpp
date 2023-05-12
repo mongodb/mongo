@@ -170,7 +170,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     AutoGetCollection autoColl(opCtx, ns, MODE_X);
     CollectionWriter collection(opCtx, autoColl);
     writeConflictRetry(
-        opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
+        opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns, [&] {
             uassert(ErrorCodes::DatabaseDropPending,
                     str::stream() << "The database is in the process of being dropped "
                                   << ns.dbName().toStringForErrorMsg(),

@@ -292,7 +292,7 @@ public:
         BSONObj query = BSON("files_id" << jsobj["filemd5"] << "n" << GTE << n);
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
-        return writeConflictRetry(opCtx, "filemd5", toStringForLogging(dbName), [&] {
+        return writeConflictRetry(opCtx, "filemd5", NamespaceString(dbName), [&] {
             auto findCommand = std::make_unique<FindCommandRequest>(nss);
             findCommand->setFilter(query.getOwned());
             findCommand->setSort(sort.getOwned());

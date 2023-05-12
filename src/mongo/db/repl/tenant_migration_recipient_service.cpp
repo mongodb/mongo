@@ -1096,7 +1096,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
 
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
-        opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             // Write the no-op entry and update 'config.transactions'.
@@ -1822,7 +1822,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
             writeConflictRetry(
                 opCtx,
                 "markTenantMigrationRecipientStateDocGarbageCollectable",
-                NamespaceString::kTenantMigrationRecipientsNamespace.ns(),
+                NamespaceString::kTenantMigrationRecipientsNamespace,
                 [&]() {
                     WriteUnitOfWork wuow(opCtx);
                     auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];

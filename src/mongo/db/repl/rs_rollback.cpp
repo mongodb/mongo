@@ -1704,10 +1704,7 @@ void syncFixUp(OperationContext* opCtx,
                                 if (!loc.isNull()) {
                                     try {
                                         writeConflictRetry(
-                                            opCtx,
-                                            "cappedTruncateAfter",
-                                            collection.nss().ns(),
-                                            [&] {
+                                            opCtx, "cappedTruncateAfter", collection.nss(), [&] {
                                                 collection_internal::cappedTruncateAfter(
                                                     opCtx,
                                                     collection.getCollectionPtr(),
@@ -1719,7 +1716,7 @@ void syncFixUp(OperationContext* opCtx,
                                             // hack: need to just make cappedTruncate do this...
                                             CollectionWriter collectionWriter(opCtx, &collection);
                                             writeConflictRetry(
-                                                opCtx, "truncate", collection.nss().ns(), [&] {
+                                                opCtx, "truncate", collection.nss(), [&] {
                                                     WriteUnitOfWork wunit(opCtx);
                                                     uassertStatusOK(
                                                         collectionWriter

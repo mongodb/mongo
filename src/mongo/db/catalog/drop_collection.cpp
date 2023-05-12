@@ -371,7 +371,7 @@ Status _dropCollection(OperationContext* opCtx,
                        boost::optional<UUID> dropIfUUIDNotMatching = boost::none) {
 
     try {
-        return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
+        return writeConflictRetry(opCtx, "drop", collectionName, [&] {
             // If a change collection is to be dropped, that is, the change streams are being
             // disabled for a tenant, acquire exclusive tenant lock.
             AutoGetDb autoDb(opCtx,
@@ -453,7 +453,7 @@ Status _dropCollection(OperationContext* opCtx,
                         // Drop the buckets collection in its own writeConflictRetry so that if
                         // it throws a WCE, only the buckets collection drop is retried.
                         writeConflictRetry(
-                            opCtx, "drop", bucketsNs.ns(), [opCtx, db, &bucketsNs, fromMigrate] {
+                            opCtx, "drop", bucketsNs, [opCtx, db, &bucketsNs, fromMigrate] {
                                 WriteUnitOfWork wuow(opCtx);
                                 db->dropCollectionEvenIfSystem(opCtx, bucketsNs, {}, fromMigrate)
                                     .ignore();
@@ -584,7 +584,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         LOGV2(20333, "Hanging drop collection before lock acquisition while fail point is set");
         hangDropCollectionBeforeLockAcquisition.pauseWhileSet();
     }
-    return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
+    return writeConflictRetry(opCtx, "drop", collectionName, [&] {
         AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_IX);
         Database* db = autoDb.getDb();
         if (!db) {

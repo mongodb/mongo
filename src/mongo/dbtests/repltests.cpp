@@ -36,6 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/ops/update.h"
@@ -170,7 +171,7 @@ protected:
         return "unittests.repltests";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
     static const char* cllNS() {
         return "local.oplog.rs";
@@ -265,8 +266,8 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        ::mongo::writeConflictRetry(&_opCtx, "deleteAll", ns, [&] {
-            NamespaceString nss(ns);
+        NamespaceString nss(ns);
+        ::mongo::writeConflictRetry(&_opCtx, "deleteAll", nss, [&] {
             Lock::GlobalWrite lk(&_opCtx);
             OldClientContext ctx(&_opCtx, nss);
             WriteUnitOfWork wunit(&_opCtx);

@@ -85,7 +85,7 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
 
     const auto cmd = cmdBuilder.obj();
 
-    writeConflictRetry(opCtx, "ReshardCollection", NamespaceString::kRsOplogNamespace.ns(), [&] {
+    writeConflictRetry(opCtx, "ReshardCollection", NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork uow(opCtx);
         serviceContext->getOpObserver()->onInternalOpMessage(opCtx,

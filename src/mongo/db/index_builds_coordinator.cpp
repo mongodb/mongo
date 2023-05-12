@@ -372,10 +372,9 @@ repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
     BSONObj oplogEntryBSON;
     // This operation does not perform any writes, but the index building code is sensitive to
     // exceptions and we must protect it from unanticipated write conflicts from reads.
-    writeConflictRetry(
-        opCtx, "getLatestOplogOpTime", NamespaceString::kRsOplogNamespace.ns(), [&]() {
-            invariant(Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
-        });
+    writeConflictRetry(opCtx, "getLatestOplogOpTime", NamespaceString::kRsOplogNamespace, [&]() {
+        invariant(Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
+    });
 
     auto optime = repl::OpTime::parseFromOplogEntry(oplogEntryBSON);
     invariant(optime.isOK(),
@@ -1079,7 +1078,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     // proceeding with building them.
     if (indexBuildOptions.applicationMode == ApplicationMode::kInitialSync) {
         auto dbAndUUID = NamespaceStringOrUUID(nss.db().toString(), collUUID);
-        writeConflictRetry(opCtx, "IndexBuildsCoordinator::applyStartIndexBuild", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "IndexBuildsCoordinator::applyStartIndexBuild", nss, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             AutoGetCollection coll(opCtx, dbAndUUID, MODE_X);
@@ -2284,7 +2283,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
             // the catalog update when it uses the timestamp from the startIndexBuild, rather than
             // the commitIndexBuild, oplog entry.
             writeConflictRetry(
-                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss.ns(), [&] {
+                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss, [&] {
                     WriteUnitOfWork wuow(opCtx);
                     createIndexesOnEmptyCollection(opCtx, collection, filteredSpecs, false);
                     wuow.commit();

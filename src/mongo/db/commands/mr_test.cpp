@@ -548,7 +548,7 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
         AutoGetCollection coll(_opCtx.get(), outputNss, MODE_X);
         ASSERT(coll);
         writeConflictRetry(
-            _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss.ns(), [&] {
+            _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss, [&] {
                 WriteUnitOfWork wuow(_opCtx.get());
                 ASSERT_OK(
                     coll.getWritableCollection(_opCtx.get())

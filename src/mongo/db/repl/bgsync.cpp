@@ -969,7 +969,7 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
     BSONObj oplogEntry;
     try {
         bool success = writeConflictRetry(
-            opCtx, "readLastAppliedOpTime", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            opCtx, "readLastAppliedOpTime", NamespaceString::kRsOplogNamespace, [&] {
                 return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
             });
 

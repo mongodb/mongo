@@ -77,7 +77,7 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
         return {ErrorCodes::NotWritablePrimary, "Not a primary"};
     }
 
-    writeConflictRetry(opCtx, note, NamespaceString::kRsOplogNamespace.ns(), [&opCtx, &msgObj] {
+    writeConflictRetry(opCtx, note, NamespaceString::kRsOplogNamespace, [&opCtx, &msgObj] {
         WriteUnitOfWork uow(opCtx);
         opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msgObj);
         uow.commit();

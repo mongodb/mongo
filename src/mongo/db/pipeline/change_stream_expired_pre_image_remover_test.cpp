@@ -181,7 +181,7 @@ protected:
         NamespaceString arbitraryNss =
             NamespaceString::createNamespaceString_forTest("test", "coll");
 
-        writeConflictRetry(opCtx, "createCollection", arbitraryNss.ns(), [&] {
+        writeConflictRetry(opCtx, "createCollection", arbitraryNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collRaii(opCtx, arbitraryNss, MODE_X);
             invariant(!collRaii);

@@ -120,7 +120,7 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
     LOGV2(6789200, "Create global index container", "indexUUID"_attr = indexUUID);
 
     // Create the container.
-    return writeConflictRetry(opCtx, "createGlobalIndexContainer", nss.ns(), [&]() {
+    return writeConflictRetry(opCtx, "createGlobalIndexContainer", nss, [&]() {
         const auto indexKeySpec =
             BSON("v" << 2 << "name" << kContainerIndexKeyFieldName.toString() + "_1"
                      << "key" << BSON(kContainerIndexKeyFieldName << 1) << "unique" << true);
@@ -188,7 +188,7 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
     LOGV2(6789300, "Drop global index container", "indexUUID"_attr = indexUUID);
 
     // Drop the container.
-    return writeConflictRetry(opCtx, "dropGlobalIndexContainer", nss.ns(), [&]() {
+    return writeConflictRetry(opCtx, "dropGlobalIndexContainer", nss, [&]() {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         if (!autoColl) {
             // Idempotent command, return OK if the collection is non-existing.
@@ -230,7 +230,7 @@ void insertKey(OperationContext* opCtx,
     const auto indexEntry = buildIndexEntry(key, docKey);
 
     // Insert the index entry.
-    writeConflictRetry(opCtx, "insertGlobalIndexKey", ns.toString(), [&] {
+    writeConflictRetry(opCtx, "insertGlobalIndexKey", ns, [&] {
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
         auto& container = autoColl.getCollection();
@@ -300,7 +300,7 @@ void deleteKey(OperationContext* opCtx,
     const auto ns = NamespaceString::makeGlobalIndexNSS(indexUUID);
 
     // Find and delete the index entry.
-    writeConflictRetry(opCtx, "deleteGlobalIndexKey", ns.toString(), [&] {
+    writeConflictRetry(opCtx, "deleteGlobalIndexKey", ns, [&] {
         WriteUnitOfWork wuow(opCtx);
 
         const auto coll = acquireCollection(

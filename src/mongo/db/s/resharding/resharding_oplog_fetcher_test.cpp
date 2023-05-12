@@ -213,7 +213,7 @@ public:
     }
 
     void create(NamespaceString nss) {
-        writeConflictRetry(_opCtx, "create", nss.ns(), [&] {
+        writeConflictRetry(_opCtx, "create", nss, [&] {
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(_opCtx->lockState());
             AutoGetDb autoDb(_opCtx, nss.dbName(), LockMode::MODE_X);
             WriteUnitOfWork wunit(_opCtx);

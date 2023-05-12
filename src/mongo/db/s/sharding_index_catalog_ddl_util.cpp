@@ -74,7 +74,7 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "RenameCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             boost::optional<UUID> toUuid;
             WriteUnitOfWork wunit(opCtx);
@@ -181,7 +181,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
     indexCatalogEntry.setIndexCollectionUUID(indexCollectionUUID);
 
     writeConflictRetry(
-        opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+        opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace, [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, userCollectionNss, MODE_IX);
             auto acquisitions = acquireCollections(
@@ -270,7 +270,7 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "RemoveShardingIndexCatalogEntryFromCollection",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
@@ -355,7 +355,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "ReplaceCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
@@ -451,7 +451,7 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
     writeConflictRetry(
         opCtx,
         "DropCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             boost::optional<UUID> collectionUUID;
             WriteUnitOfWork wunit(opCtx);
@@ -516,7 +516,7 @@ void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "ClearCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);

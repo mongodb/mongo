@@ -108,7 +108,7 @@ struct DefaultClonerImpl::BatchHandler {
         auto catalog = CollectionCatalog::get(opCtx);
         auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
-            writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "createCollection", nss, [&] {
                 opCtx->checkForInterrupt();
 
                 WriteUnitOfWork wunit(opCtx);
@@ -190,7 +190,7 @@ struct DefaultClonerImpl::BatchHandler {
             verify(collection);
             ++numSeen;
 
-            writeConflictRetry(opCtx, "cloner insert", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "cloner insert", nss, [&] {
                 opCtx->checkForInterrupt();
 
                 WriteUnitOfWork wunit(opCtx);
@@ -302,7 +302,7 @@ void DefaultClonerImpl::_copyIndexes(OperationContext* opCtx,
     }
 
     auto fromMigrate = false;
-    writeConflictRetry(opCtx, "_copyIndexes", nss.ns(), [&] {
+    writeConflictRetry(opCtx, "_copyIndexes", nss, [&] {
         WriteUnitOfWork wunit(opCtx);
         IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
             opCtx, collection, indexesToBuild, fromMigrate);
@@ -367,7 +367,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
         const NamespaceString nss(dbName, params.collectionName);
 
         uassertStatusOK(userAllowedCreateNS(opCtx, nss));
-        Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+        Status status = writeConflictRetry(opCtx, "createCollection", nss, [&] {
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 

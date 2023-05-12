@@ -115,7 +115,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
 
     std::vector<BSONObj> indexes;
     try {
-        indexes = writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss.ns(), [&]() {
+        indexes = writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss, [&]() {
             MultiIndexBlock::InitMode mode = options.forRecovery
                 ? MultiIndexBlock::InitMode::Recovery
                 : MultiIndexBlock::InitMode::SteadyState;
@@ -172,7 +172,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
         opCtx->checkForInterrupt();
         // Cursor is left one past the end of the batch inside writeConflictRetry
         auto beginBatchId = record->id;
-        Status status = writeConflictRetry(opCtx, "repairDatabase", ns.ns(), [&] {
+        Status status = writeConflictRetry(opCtx, "repairDatabase", ns, [&] {
             // In the case of WCE in a partial batch, we need to go back to the beginning
             if (!record || (beginBatchId != record->id)) {
                 record = cursor->seekExact(beginBatchId);
@@ -216,7 +216,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                             writeConflictRetry(
                                 opCtx,
                                 "insertSingleDocumentForInitialSyncOrRecovery-restoreCursor",
-                                ns.ns(),
+                                ns,
                                 [&cursor] { cursor->restore(); });
                         });
                     if (!insertStatus.isOK()) {
@@ -239,7 +239,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
             ON_BLOCK_EXIT([opCtx, ns, &cursor]() {
                 // restore CAN throw WCE per API
                 writeConflictRetry(
-                    opCtx, "retryRestoreCursor", ns.ns(), [&cursor] { cursor->restore(); });
+                    opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
             });
             wunit.commit();
             return Status::OK();
@@ -336,7 +336,7 @@ Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
     return writeConflictRetry(
         opCtx,
         "IndexBuildsManager::commitIndexBuild",
-        nss.ns(),
+        nss,
         [this, builder, buildUUID, opCtx, &collection, nss, &onCreateEachFn, &onCommitFn] {
             WriteUnitOfWork wunit(opCtx);
             auto status = builder->commit(

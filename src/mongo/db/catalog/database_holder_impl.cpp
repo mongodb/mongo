@@ -230,7 +230,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
         });
 
     auto const storageEngine = serviceContext->getStorageEngine();
-    writeConflictRetry(opCtx, "dropDatabase", toStringForLogging(name), [&] {
+    writeConflictRetry(opCtx, "dropDatabase", NamespaceString(name), [&] {
         storageEngine->dropDatabase(opCtx, name).transitional_ignore();
     });
 }

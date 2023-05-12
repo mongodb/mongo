@@ -536,20 +536,19 @@ void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-    writeConflictRetry(
-        opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            WriteUnitOfWork uow(opCtx);
-            serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
-                                                                 collNss,
-                                                                 *collUUID,
-                                                                 BSON("msg" << dbgMessage),
-                                                                 o2Message,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none);
-            uow.commit();
-        });
+    writeConflictRetry(opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace, [&] {
+        WriteUnitOfWork uow(opCtx);
+        serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
+                                                             collNss,
+                                                             *collUUID,
+                                                             BSON("msg" << dbgMessage),
+                                                             o2Message,
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none);
+        uow.commit();
+    });
 }
 
 void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
@@ -570,20 +569,19 @@ void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-    writeConflictRetry(
-        opCtx, "migrateLastChunkFromShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            WriteUnitOfWork uow(opCtx);
-            serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
-                                                                 collNss,
-                                                                 *collUUID,
-                                                                 BSON("msg" << oMessage),
-                                                                 o2Message,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none);
-            uow.commit();
-        });
+    writeConflictRetry(opCtx, "migrateLastChunkFromShard", NamespaceString::kRsOplogNamespace, [&] {
+        WriteUnitOfWork uow(opCtx);
+        serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
+                                                             collNss,
+                                                             *collUUID,
+                                                             BSON("msg" << oMessage),
+                                                             o2Message,
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none);
+        uow.commit();
+    });
 }
 
 void persistCommitDecision(OperationContext* opCtx,

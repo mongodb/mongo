@@ -269,7 +269,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
-    writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
+    writeConflictRetry(opCtx, "implicit collection creation", ns, [&opCtx, &ns] {
         AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
 
@@ -627,7 +627,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
             opCtx->getWriteConcern());
         try {
-            writeConflictRetry(opCtx, "insert", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "insert", nss, [&] {
                 try {
                     if (!collection)
                         acquireCollection();

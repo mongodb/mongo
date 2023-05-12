@@ -631,7 +631,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         // is executing an update. This is done to ensure that we can always match,
         // modify, and return the document under concurrency, if a matching document exists.
         lastOpFixer.startingOp(nsString);
-        return writeConflictRetry(opCtx, "bulkWriteUpdate", nsString.ns(), [&] {
+        return writeConflictRetry(opCtx, "bulkWriteUpdate", nsString, [&] {
             if (MONGO_unlikely(hangBeforeBulkWritePerformsUpdate.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeBulkWritePerformsUpdate, opCtx, "hangBeforeBulkWritePerformsUpdate");
@@ -769,7 +769,7 @@ bool handleDeleteOp(OperationContext* opCtx,
 
         const bool inTransaction = opCtx->inMultiDocumentTransaction();
         lastOpFixer.startingOp(nsString);
-        return writeConflictRetry(opCtx, "bulkWriteDelete", nsString.ns(), [&] {
+        return writeConflictRetry(opCtx, "bulkWriteDelete", nsString, [&] {
             boost::optional<BSONObj> docFound;
             auto nDeleted = write_ops_exec::writeConflictRetryRemove(
                 opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);

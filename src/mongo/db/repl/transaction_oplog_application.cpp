@@ -209,7 +209,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
     const auto dbName = entry.getNss().dbName();
     Status status = Status::OK();
 
-    writeConflictRetry(opCtx, "replaying prepared transaction", dbName.db(), [&] {
+    writeConflictRetry(opCtx, "replaying prepared transaction", NamespaceString(dbName), [&] {
         WriteUnitOfWork wunit(opCtx);
 
         // We might replay a prepared transaction behind oldest timestamp.
@@ -570,7 +570,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         opCtx->resetMultiDocumentTransactionState();
     });
 
-    return writeConflictRetry(opCtx, "applying prepare transaction", prepareOp.getNss().ns(), [&] {
+    return writeConflictRetry(opCtx, "applying prepare transaction", prepareOp.getNss(), [&] {
         // The write on transaction table may be applied concurrently, so refreshing
         // state from disk may read that write, causing starting a new transaction
         // on an existing txnNumber. Thus, we start a new transaction without

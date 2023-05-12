@@ -163,7 +163,7 @@ Status _createView(OperationContext* opCtx,
                           << "': this is a reserved system namespace",
             !nss.isSystemDotViews());
 
-    return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "create", nss, [&] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         // Operations all lock system.views in the end to prevent deadlock.
@@ -362,104 +362,101 @@ Status _createTimeseries(OperationContext* opCtx,
 
     bool existingBucketCollectionIsCompatible = false;
 
-    Status ret =
-        writeConflictRetry(opCtx, "createBucketCollection", bucketsNs.ns(), [&]() -> Status {
-            AutoGetDb autoDb(opCtx, bucketsNs.dbName(), MODE_IX);
-            Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_X);
-            auto db = autoDb.ensureDbExists(opCtx);
+    Status ret = writeConflictRetry(opCtx, "createBucketCollection", bucketsNs, [&]() -> Status {
+        AutoGetDb autoDb(opCtx, bucketsNs.dbName(), MODE_IX);
+        Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_X);
+        auto db = autoDb.ensureDbExists(opCtx);
 
-            // Check if there already exist a Collection on the namespace we will later create a
-            // view on. We're not holding a Collection lock for this Collection so we may only check
-            // if the pointer is null or not. The answer may also change at any point after this
-            // call which is fine as we properly handle an orphaned bucket collection. This check is
-            // just here to prevent it from being created in the common case.
-            Status status = catalog::checkIfNamespaceExists(opCtx, ns);
-            if (!status.isOK()) {
-                return status;
-            }
+        // Check if there already exist a Collection on the namespace we will later create a
+        // view on. We're not holding a Collection lock for this Collection so we may only check
+        // if the pointer is null or not. The answer may also change at any point after this
+        // call which is fine as we properly handle an orphaned bucket collection. This check is
+        // just here to prevent it from being created in the common case.
+        Status status = catalog::checkIfNamespaceExists(opCtx, ns);
+        if (!status.isOK()) {
+            return status;
+        }
 
-            if (opCtx->writesAreReplicated() &&
-                !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, bucketsNs)) {
-                // Report the error with the user provided namespace
-                return Status(ErrorCodes::NotWritablePrimary,
-                              str::stream() << "Not primary while creating collection "
-                                            << ns.toStringForErrorMsg());
-            }
+        if (opCtx->writesAreReplicated() &&
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, bucketsNs)) {
+            // Report the error with the user provided namespace
+            return Status(ErrorCodes::NotWritablePrimary,
+                          str::stream() << "Not primary while creating collection "
+                                        << ns.toStringForErrorMsg());
+        }
 
-            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
-                ->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
+            ->checkShardVersionOrThrow(opCtx);
 
-            WriteUnitOfWork wuow(opCtx);
-            AutoStatsTracker bucketsStatsTracker(
-                opCtx,
-                bucketsNs,
-                Top::LockType::NotLocked,
-                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
+        WriteUnitOfWork wuow(opCtx);
+        AutoStatsTracker bucketsStatsTracker(
+            opCtx,
+            bucketsNs,
+            Top::LockType::NotLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
 
-            // If the buckets collection and time-series view creation roll back, ensure that their
-            // Top entries are deleted.
-            opCtx->recoveryUnit()->onRollback(
-                [serviceContext = opCtx->getServiceContext(), bucketsNs](OperationContext*) {
-                    Top::get(serviceContext).collectionDropped(bucketsNs);
-                });
+        // If the buckets collection and time-series view creation roll back, ensure that their
+        // Top entries are deleted.
+        opCtx->recoveryUnit()->onRollback(
+            [serviceContext = opCtx->getServiceContext(), bucketsNs](OperationContext*) {
+                Top::get(serviceContext).collectionDropped(bucketsNs);
+            });
 
 
-            // Prepare collection option and index spec using the provided options. In case the
-            // collection already exist we use these to validate that they are the same as being
-            // requested here.
-            CollectionOptions bucketsOptions = options;
-            bucketsOptions.validator = validatorObj;
+        // Prepare collection option and index spec using the provided options. In case the
+        // collection already exist we use these to validate that they are the same as being
+        // requested here.
+        CollectionOptions bucketsOptions = options;
+        bucketsOptions.validator = validatorObj;
 
-            // Cluster time-series buckets collections by _id.
-            auto expireAfterSeconds = options.expireAfterSeconds;
-            if (expireAfterSeconds) {
-                uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
-                    *expireAfterSeconds,
-                    index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
-                bucketsOptions.expireAfterSeconds = expireAfterSeconds;
-            }
+        // Cluster time-series buckets collections by _id.
+        auto expireAfterSeconds = options.expireAfterSeconds;
+        if (expireAfterSeconds) {
+            uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
+                *expireAfterSeconds,
+                index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
+            bucketsOptions.expireAfterSeconds = expireAfterSeconds;
+        }
 
-            bucketsOptions.clusteredIndex =
-                clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+        bucketsOptions.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
 
-            if (auto coll =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNs)) {
-                // Compare CollectionOptions and eventual TTL index to see if this bucket collection
-                // may be reused for this request.
+        if (auto coll =
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNs)) {
+            // Compare CollectionOptions and eventual TTL index to see if this bucket collection
+            // may be reused for this request.
+            existingBucketCollectionIsCompatible =
+                coll->getCollectionOptions().matchesStorageOptions(
+                    bucketsOptions, CollatorFactoryInterface::get(opCtx->getServiceContext()));
+
+            // We may have a bucket collection created with a previous version of mongod, this
+            // is also OK as we do not convert bucket collections to latest version during
+            // upgrade.
+            while (!existingBucketCollectionIsCompatible &&
+                   bucketVersion > timeseries::kTimeseriesControlMinVersion) {
+                validatorObj = _generateTimeseriesValidator(--bucketVersion, timeField);
+                bucketsOptions.validator = validatorObj;
+
                 existingBucketCollectionIsCompatible =
                     coll->getCollectionOptions().matchesStorageOptions(
                         bucketsOptions, CollatorFactoryInterface::get(opCtx->getServiceContext()));
-
-                // We may have a bucket collection created with a previous version of mongod, this
-                // is also OK as we do not convert bucket collections to latest version during
-                // upgrade.
-                while (!existingBucketCollectionIsCompatible &&
-                       bucketVersion > timeseries::kTimeseriesControlMinVersion) {
-                    validatorObj = _generateTimeseriesValidator(--bucketVersion, timeField);
-                    bucketsOptions.validator = validatorObj;
-
-                    existingBucketCollectionIsCompatible =
-                        coll->getCollectionOptions().matchesStorageOptions(
-                            bucketsOptions,
-                            CollatorFactoryInterface::get(opCtx->getServiceContext()));
-                }
-
-                return Status(ErrorCodes::NamespaceExists,
-                              str::stream()
-                                  << "Bucket Collection already exists. NS: "
-                                  << bucketsNs.toStringForErrorMsg() << ". UUID: " << coll->uuid());
             }
 
-            // Create the buckets collection that will back the view.
-            const bool createIdIndex = false;
-            uassertStatusOK(db->userCreateNS(opCtx, bucketsNs, bucketsOptions, createIdIndex));
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream()
+                              << "Bucket Collection already exists. NS: "
+                              << bucketsNs.toStringForErrorMsg() << ". UUID: " << coll->uuid());
+        }
 
-            CollectionWriter collectionWriter(opCtx, bucketsNs);
-            uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter));
-            wuow.commit();
-            return Status::OK();
-        });
+        // Create the buckets collection that will back the view.
+        const bool createIdIndex = false;
+        uassertStatusOK(db->userCreateNS(opCtx, bucketsNs, bucketsOptions, createIdIndex));
+
+        CollectionWriter collectionWriter(opCtx, bucketsNs);
+        uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter));
+        wuow.commit();
+        return Status::OK();
+    });
 
     // If compatible bucket collection already exists then proceed with creating view defintion.
     // If the 'temp' flag is true, we are in the $out stage, and should return without creating the
@@ -467,7 +464,7 @@ Status _createTimeseries(OperationContext* opCtx,
     if ((!ret.isOK() && !existingBucketCollectionIsCompatible) || options.temp)
         return ret;
 
-    ret = writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
+    ret = writeConflictRetry(opCtx, "create", ns, [&]() -> Status {
         AutoGetCollection autoColl(
             opCtx,
             ns,
@@ -552,7 +549,7 @@ Status _createCollection(
     const CollectionOptions& collectionOptions,
     const boost::optional<BSONObj>& idIndex,
     const boost::optional<VirtualCollectionOptions>& virtualCollectionOptions = boost::none) {
-    return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "create", nss, [&] {
         // If a change collection is to be created, that is, the change streams are being enabled
         // for a tenant, acquire exclusive tenant lock.
         AutoGetDb autoDb(opCtx,
@@ -835,7 +832,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                   "conflictingUUID"_attr = uuid,
                   "tempName"_attr = tmpName);
             Status status =
-                writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName.ns(), [&] {
+                writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName, [&] {
                     WriteUnitOfWork wuow(opCtx);
                     Status status = db->renameCollection(opCtx, newCollName, tmpName, stayTemp);
                     if (!status.isOK())
@@ -886,7 +883,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     str::stream() << "Invalid name " << newCollName.toStringForErrorMsg()
                                   << " for UUID " << uuid,
                     currentName->db() == newCollName.db());
-            return writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName.ns(), [&] {
+            return writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName, [&] {
                 WriteUnitOfWork wuow(opCtx);
                 Status status = db->renameCollection(opCtx, *currentName, newCollName, stayTemp);
                 if (!status.isOK())

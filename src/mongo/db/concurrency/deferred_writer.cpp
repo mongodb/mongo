@@ -111,7 +111,7 @@ Status DeferredWriter::_worker(InsertStatement stmt) noexcept try {
 
     const CollectionPtr& collection = agc->getCollection();
 
-    Status status = writeConflictRetry(opCtx, "deferred insert", _nss.ns(), [&] {
+    Status status = writeConflictRetry(opCtx, "deferred insert", _nss, [&] {
         WriteUnitOfWork wuow(opCtx);
         Status status =
             collection_internal::insertDocument(opCtx, collection, stmt, nullptr, false);

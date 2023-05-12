@@ -112,7 +112,7 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
     options.validator = fromjson(validatorStr);
     options.uuid = UUID::gen();
 
-    return writeConflictRetry(opCtx.get(), "create", newNss.ns(), [&] {
+    return writeConflictRetry(opCtx.get(), "create", newNss, [&] {
         AutoGetCollection autoColl(opCtx.get(), newNss, MODE_IX);
         auto db = autoColl.ensureDbExists(opCtx.get());
         ASSERT_TRUE(db) << "Cannot create collection " << newNss.toStringForErrorMsg()

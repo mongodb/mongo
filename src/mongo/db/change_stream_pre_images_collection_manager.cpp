@@ -114,7 +114,7 @@ void truncateExpiredMarkersForCollection(
     Date_t& maxWallTimeForNsTruncateOutput) {
     while (auto marker = truncateMarkersForNss->peekOldestMarkerIfNeeded(opCtx)) {
         writeConflictRetry(
-            opCtx, "truncate pre-images collection for UUID", preImagesColl->ns().ns(), [&] {
+            opCtx, "truncate pre-images collection for UUID", preImagesColl->ns(), [&] {
                 // The session might be in use from marker initialisation so we must
                 // reset it here in order to allow an untimestamped write.
                 opCtx->recoveryUnit()->abandonSnapshot();
@@ -464,7 +464,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
         writeConflictRetry(
             opCtx,
             "ChangeStreamExpiredPreImagesRemover",
-            NamespaceString::makePreImageCollectionNSS(boost::none).ns(),
+            NamespaceString::makePreImageCollectionNSS(boost::none),
             [&] {
                 auto exec = getDeleteExpiredPreImagesExecutor(
                     opCtx, preImageColl, filterPtr, maxRecordIdTimestamp, *currentCollectionUUID);

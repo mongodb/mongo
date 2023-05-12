@@ -733,7 +733,7 @@ void createOplog(OperationContext* opCtx,
     options.cappedSize = sz;
     options.autoIndexId = CollectionOptions::NO;
 
-    writeConflictRetry(opCtx, "createCollection", oplogCollectionName.ns(), [&] {
+    writeConflictRetry(opCtx, "createCollection", oplogCollectionName, [&] {
         WriteUnitOfWork uow(opCtx);
         invariant(ctx.db()->createCollection(opCtx, oplogCollectionName, options));
         acquireOplogCollectionForLogging(opCtx);
@@ -1447,7 +1447,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     "mode should be in initialSync or recovering",
                     mode == OplogApplication::Mode::kInitialSync ||
                         OplogApplication::inRecovering(mode));
-            writeConflictRetry(opCtx, "applyOps_imageInvalidation", op.getNss().toString(), [&] {
+            writeConflictRetry(opCtx, "applyOps_imageInvalidation", op.getNss(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 bool upsertConfigImage = true;
                 writeToImageCollection(opCtx,
@@ -1739,8 +1739,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     request.setUpsert();
                     request.setFromOplogApplication(true);
 
-                    const StringData ns = op.getNss().ns();
-                    writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
+                    writeConflictRetry(opCtx, "applyOps_upsert", op.getNss(), [&] {
                         WriteUnitOfWork wuow(opCtx);
                         // If `haveWrappingWriteUnitOfWork` is true, do not timestamp the write.
                         if (assignOperationTimestamp && timestamp != Timestamp::min()) {
@@ -1825,7 +1824,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 timestamp = op.getTimestamp();
             }
 
-            const StringData ns = op.getNss().ns();
             // Operations that were part of a retryable findAndModify have two formats for
             // replicating pre/post images. The classic format has primaries writing explicit noop
             // oplog entries that contain the necessary details for reconstructed a response to a
@@ -1856,7 +1854,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // to insert a document. We only have to make sure we didn't race with an insert that
             // won, but with an earlier `ts`.
             bool upsertConfigImage = true;
-            auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
+            auto status = writeConflictRetry(opCtx, "applyOps_update", op.getNss(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
@@ -2015,9 +2013,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // Determine if a change stream pre-image has to be recorded for the oplog entry.
             const bool recordChangeStreamPreImage = shouldRecordChangeStreamPreImage();
 
-            const StringData ns = op.getNss().ns();
             bool upsertConfigImage = true;
-            writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
+            writeConflictRetry(opCtx, "applyOps_delete", op.getNss(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
@@ -2138,7 +2135,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 timestamp = op.getTimestamp();
             }
 
-            writeConflictRetry(opCtx, "applyOps_insertGlobalIndexKey", collection->ns().ns(), [&] {
+            writeConflictRetry(opCtx, "applyOps_insertGlobalIndexKey", collection->ns(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
@@ -2162,7 +2159,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 timestamp = op.getTimestamp();
             }
 
-            writeConflictRetry(opCtx, "applyOps_deleteGlobalIndexKey", collection->ns().ns(), [&] {
+            writeConflictRetry(opCtx, "applyOps_deleteGlobalIndexKey", collection->ns(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));

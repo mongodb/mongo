@@ -420,7 +420,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 
         writeConflictRetry(opCtx,
                            "initiate oplog entry",
-                           NamespaceString::kRsOplogNamespace.toString(),
+                           NamespaceString::kRsOplogNamespace,
                            [this, &opCtx, &config] {
                                // Permit writing to the oplog before we step up to primary.
                                AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
@@ -506,15 +506,16 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx);
 
     LOGV2(6015309, "Logging transition to primary to oplog on stepup");
-    writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
-        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-        WriteUnitOfWork wuow(opCtx);
-        opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-            opCtx,
-            BSON(ReplicationCoordinator::newPrimaryMsgField
-                 << ReplicationCoordinator::newPrimaryMsg));
-        wuow.commit();
-    });
+    writeConflictRetry(
+        opCtx, "logging transition to primary to oplog", NamespaceString::kRsOplogNamespace, [&] {
+            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+            WriteUnitOfWork wuow(opCtx);
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                opCtx,
+                BSON(ReplicationCoordinator::newPrimaryMsgField
+                     << ReplicationCoordinator::newPrimaryMsg));
+            wuow.commit();
+        });
     const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     fassert(28665, loadLastOpTimeAndWallTimeResult);
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
@@ -571,10 +572,7 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
     OperationContext* opCtx) {
     try {
         return writeConflictRetry(
-            opCtx,
-            "load replica set config",
-            NamespaceString::kSystemReplSetNamespace.ns(),
-            [opCtx] {
+            opCtx, "load replica set config", NamespaceString::kSystemReplSetNamespace, [opCtx] {
                 BSONObj config;
                 if (!Helpers::getSingleton(
                         opCtx, NamespaceString::kSystemReplSetNamespace, config)) {
@@ -595,7 +593,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                                                                          bool writeOplog) {
     try {
         writeConflictRetry(
-            opCtx, "save replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
+            opCtx, "save replica set config", NamespaceString::kSystemReplSetNamespace, [&] {
                 {
                     // Writes to 'local.system.replset' must be untimestamped.
                     WriteUnitOfWork wuow(opCtx);
@@ -634,7 +632,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
 Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
     OperationContext* opCtx, const BSONObj& config) try {
     writeConflictRetry(
-        opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
+        opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);
             auto coll =
                 acquireCollection(opCtx,
@@ -668,7 +666,7 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
     try {
         writeConflictRetry(opCtx,
                            "create initial replica set lastVote",
-                           NamespaceString::kLastVoteNamespace.toString(),
+                           NamespaceString::kLastVoteNamespace,
                            [opCtx] {
                                auto coll = acquireCollection(
                                    opCtx,
@@ -697,10 +695,7 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteD
     OperationContext* opCtx) {
     try {
         return writeConflictRetry(
-            opCtx,
-            "load replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [opCtx] {
+            opCtx, "load replica set lastVote", NamespaceString::kLastVoteNamespace, [opCtx] {
                 BSONObj lastVoteObj;
                 if (!Helpers::getSingleton(
                         opCtx, NamespaceString::kLastVoteNamespace, lastVoteObj)) {
@@ -740,10 +735,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
             noInterrupt.emplace(opCtx->lockState());
 
         Status status = writeConflictRetry(
-            opCtx,
-            "save replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [&] {
+            opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
                 // Writes to non-replicated collections do not need concurrency control with the
                 // OplogApplier that never accesses them. Skip taking the PBWM.
                 ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
@@ -816,10 +808,9 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
 
         BSONObj oplogEntry;
 
-        if (!writeConflictRetry(
-                opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                    return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
-                })) {
+        if (!writeConflictRetry(opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace, [&] {
+                return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
+            })) {
             return StatusWith<OpTimeAndWallTime>(
                 ErrorCodes::NoMatchingDocument,
                 str::stream() << "Did not find any entries in "

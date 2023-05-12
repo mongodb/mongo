@@ -170,7 +170,7 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
             &hangBeforeUpsertPerformsInsert, opCtx(), "hangBeforeUpsertPerformsInsert");
     }
 
-    writeConflictRetry(opCtx(), "upsert", collection()->ns().ns(), [&] {
+    writeConflictRetry(opCtx(), "upsert", collection()->ns(), [&] {
         WriteUnitOfWork wunit(opCtx());
         InsertStatement insertStmt(_params.request->getStmtIds(), newDocument);
 

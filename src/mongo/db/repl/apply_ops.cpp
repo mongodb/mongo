@@ -99,7 +99,7 @@ Status _applyOps(OperationContext* opCtx,
             status = writeConflictRetry(
                 opCtx,
                 "applyOps",
-                nss.ns(),
+                nss,
                 [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode, &info, &dbName] {
                     BSONObjBuilder builder;
                     // Remove 'hash' field if it is set. A bit slow as it rebuilds the object.

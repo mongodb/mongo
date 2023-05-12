@@ -234,7 +234,7 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
 
         // Import the collection and it's indexes.
         const auto nss = metadata.ns;
-        writeConflictRetry(opCtx, "importCollection", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "importCollection", nss, [&] {
             LOGV2_DEBUG(6114303, 1, "Importing donor collection", "ns"_attr = nss);
             AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
             auto db = autoDb.ensureDbExists(opCtx);

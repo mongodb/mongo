@@ -248,7 +248,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         auto opCtx = operationContext();
         repl::UnreplicatedWritesBlock uwb(opCtx);
         auto nss = VersionType::ConfigNS;
-        writeConflictRetry(opCtx, "removeConfigDocuments", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "removeConfigDocuments", nss, [&] {
             AutoGetCollection coll(opCtx, nss, MODE_IX);
             ASSERT_TRUE(coll);
             auto cursor = coll->getCursor(opCtx);

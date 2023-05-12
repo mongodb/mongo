@@ -495,7 +495,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
     // is executing a findAndModify. This is done to ensure that we can always match,
     // modify, and return the document under concurrency, if a matching document exists.
-    return writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
+    return writeConflictRetry(opCtx, "findAndModify", nsString, [&] {
         if (req.getRemove().value_or(false)) {
             DeleteRequest deleteRequest;
             makeDeleteRequest(opCtx, req, false, &deleteRequest);

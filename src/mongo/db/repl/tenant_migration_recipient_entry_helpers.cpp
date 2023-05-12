@@ -71,7 +71,7 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
     return writeConflictRetry(
-        opCtx, "insertTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
+        opCtx, "insertTenantMigrationRecipientStateDoc", nss, [&]() -> Status {
             // Insert the 'stateDoc' if no active tenant migration found for the 'tenantId' provided
             // in the 'stateDoc'. Tenant Migration is considered as active for a tenantId if a state
             // document exists on the disk for that 'tenantId' and not marked to be garbage
@@ -113,7 +113,7 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
     }
 
     return writeConflictRetry(
-        opCtx, "updateTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
+        opCtx, "updateTenantMigrationRecipientStateDoc", nss, [&]() -> Status {
             auto updateResult =
                 Helpers::upsert(opCtx, collection, stateDoc.toBSON(), /*fromMigrate=*/false);
             if (updateResult.numMatched == 0) {
@@ -145,11 +145,10 @@ StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* op
     auto query = BSON(TenantMigrationRecipientDocument::kTenantIdFieldName
                       << tenantId << TenantMigrationRecipientDocument::kExpireAtFieldName
                       << BSON("$exists" << 1));
-    return writeConflictRetry(
-        opCtx, "deleteTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> bool {
-            auto nDeleted = deleteObjects(opCtx, collection, query, true /* justOne */);
-            return nDeleted > 0;
-        });
+    return writeConflictRetry(opCtx, "deleteTenantMigrationRecipientStateDoc", nss, [&]() -> bool {
+        auto nDeleted = deleteObjects(opCtx, collection, query, true /* justOne */);
+        return nDeleted > 0;
+    });
 }
 
 StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx,

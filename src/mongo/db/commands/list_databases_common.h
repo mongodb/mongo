@@ -118,7 +118,7 @@ int64_t setReplyItems(OperationContext* opCtx,
                 continue;
             }
 
-            writeConflictRetry(opCtx, "sizeOnDisk", toStringForLogging(dbName), [&] {
+            writeConflictRetry(opCtx, "sizeOnDisk", NamespaceString(dbName), [&] {
                 size = storageEngine->sizeOnDiskForDb(opCtx, dbName);
             });
             item.setSizeOnDisk(size);

@@ -405,7 +405,7 @@ void RenameCollectionTest::tearDown() {
 void _createCollection(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const CollectionOptions options = {}) {
-    writeConflictRetry(opCtx, "_createCollection", nss.ns(), [=] {
+    writeConflictRetry(opCtx, "_createCollection", nss, [=] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db) << "Cannot create collection " << nss.toStringForErrorMsg()
@@ -490,7 +490,7 @@ bool _isTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
 void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const std::string& indexName) {
-    writeConflictRetry(opCtx, "_createIndexOnEmptyCollection", nss.ns(), [=] {
+    writeConflictRetry(opCtx, "_createIndexOnEmptyCollection", nss, [=] {
         AutoGetCollection collection(opCtx, nss, MODE_X);
         ASSERT_TRUE(collection) << "Cannot create index on empty collection "
                                 << nss.toStringForErrorMsg() << " because collection "
@@ -515,7 +515,7 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
  * Inserts a single document into a collection.
  */
 void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
-    writeConflictRetry(opCtx, "_insertDocument", nss.ns(), [=] {
+    writeConflictRetry(opCtx, "_insertDocument", nss, [=] {
         AutoGetCollection collection(opCtx, nss, MODE_X);
         ASSERT_TRUE(collection) << "Cannot insert document " << doc << " into collection "
                                 << nss.toStringForErrorMsg() << " because collection "

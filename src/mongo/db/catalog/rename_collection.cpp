@@ -173,7 +173,7 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
     }
     const auto& tmpName = tmpNameResult.getValue();
     const bool stayTemp = true;
-    return writeConflictRetry(opCtx, "renameCollection", targetNs.ns(), [&] {
+    return writeConflictRetry(opCtx, "renameCollection", targetNs, [&] {
         WriteUnitOfWork wunit(opCtx);
         auto status = targetDB->renameCollection(opCtx, targetNs, tmpName, stayTemp);
         if (!status.isOK())
@@ -202,7 +202,7 @@ Status renameCollectionDirectly(OperationContext* opCtx,
                                 NamespaceString source,
                                 NamespaceString target,
                                 RenameCollectionOptions options) {
-    return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
+    return writeConflictRetry(opCtx, "renameCollection", target, [&] {
         WriteUnitOfWork wunit(opCtx);
 
         {
@@ -233,7 +233,7 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
                                      const CollectionPtr& targetColl,
                                      RenameCollectionOptions options,
                                      repl::OpTime renameOpTimeFromApplyOps) {
-    return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
+    return writeConflictRetry(opCtx, "renameCollection", target, [&] {
         WriteUnitOfWork wunit(opCtx);
 
         // Target collection exists - drop it.
@@ -375,7 +375,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         AutoStatsTracker::LogMode::kUpdateCurOp,
         CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.dbName()));
 
-    return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
+    return writeConflictRetry(opCtx, "renameCollection", target, [&] {
         auto targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, target);
         WriteUnitOfWork wuow(opCtx);
         if (targetColl) {
@@ -576,7 +576,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         auto collectionOptions = sourceColl->getCollectionOptions();
         collectionOptions.uuid = tmpCollUUID.uuid();
 
-        writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
+        writeConflictRetry(opCtx, "renameCollection", tmpName, [&] {
             WriteUnitOfWork wunit(opCtx);
             targetDB->createCollection(opCtx, tmpName, collectionOptions);
             wunit.commit();
@@ -633,7 +633,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     // index in an unfinished state. For more information on assigning timestamps to multiple index
     // builds, please see SERVER-35780 and SERVER-35070.
     if (!indexesToCopy.empty()) {
-        Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
+        Status status = writeConflictRetry(opCtx, "renameCollection", tmpName, [&] {
             WriteUnitOfWork wunit(opCtx);
             auto fromMigrate = false;
             try {
@@ -681,7 +681,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
             opCtx->checkForInterrupt();
             // Cursor is left one past the end of the batch inside writeConflictRetry.
             auto beginBatchId = record->id;
-            Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
+            Status status = writeConflictRetry(opCtx, "renameCollection", tmpName, [&] {
                 // Always reposition cursor in case it gets a WCE midway through.
                 record = cursor->seekExact(beginBatchId);
 
@@ -733,7 +733,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
                 cursor->save();
                 // When this exits via success or WCE, we need to restore the cursor.
-                ON_BLOCK_EXIT([opCtx, ns = tmpName.ns(), &cursor]() {
+                ON_BLOCK_EXIT([opCtx, ns = tmpName, &cursor]() {
                     writeConflictRetry(
                         opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
                 });

@@ -406,111 +406,110 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
         incrementOpsAppliedStats();
         return Status::OK();
     } else if (DurableOplogEntry::isCrudOpType(opType)) {
-        auto status =
-            writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_CRUD", nss.ns(), [&] {
-                // Need to throw instead of returning a status for it to be properly ignored.
+        auto status = writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_CRUD", nss, [&] {
+            // Need to throw instead of returning a status for it to be properly ignored.
+            try {
+                boost::optional<ScopedCollectionAcquisition> coll;
+                Database* db = nullptr;
+
+                // If the collection UUID does not resolve, acquire the collection using the
+                // namespace. This is so we reach `applyOperation_inlock` below and invalidate
+                // the preimage / postimage for the op if applicable.
+
+                // TODO SERVER-41371 / SERVER-73661 this code is difficult to maintain and
+                // needs to be done everywhere this situation is possible. We should try
+                // to consolidate this into applyOperation_inlock.
                 try {
-                    boost::optional<ScopedCollectionAcquisition> coll;
-                    Database* db = nullptr;
+                    coll.emplace(
+                        acquireCollection(opCtx,
+                                          {getNsOrUUID(nss, *op),
+                                           AcquisitionPrerequisites::kPretendUnsharded,
+                                           repl::ReadConcernArgs::get(opCtx),
+                                           AcquisitionPrerequisites::kWrite},
+                                          fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
 
-                    // If the collection UUID does not resolve, acquire the collection using the
-                    // namespace. This is so we reach `applyOperation_inlock` below and invalidate
-                    // the preimage / postimage for the op if applicable.
-
-                    // TODO SERVER-41371 / SERVER-73661 this code is difficult to maintain and
-                    // needs to be done everywhere this situation is possible. We should try
-                    // to consolidate this into applyOperation_inlock.
-                    try {
+                    AutoGetDb autoDb(opCtx, coll->nss().dbName(), MODE_IX);
+                    db = autoDb.getDb();
+                } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                    if (!isDataConsistent) {
                         coll.emplace(
                             acquireCollection(opCtx,
-                                              {getNsOrUUID(nss, *op),
+                                              {nss,
                                                AcquisitionPrerequisites::kPretendUnsharded,
                                                repl::ReadConcernArgs::get(opCtx),
                                                AcquisitionPrerequisites::kWrite},
                                               fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
 
                         AutoGetDb autoDb(opCtx, coll->nss().dbName(), MODE_IX);
-                        db = autoDb.getDb();
-                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                        if (!isDataConsistent) {
-                            coll.emplace(acquireCollection(
-                                opCtx,
-                                {nss,
-                                 AcquisitionPrerequisites::kPretendUnsharded,
-                                 repl::ReadConcernArgs::get(opCtx),
-                                 AcquisitionPrerequisites::kWrite},
-                                fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
-
-                            AutoGetDb autoDb(opCtx, coll->nss().dbName(), MODE_IX);
-                            db = autoDb.ensureDbExists(opCtx);
-                        } else {
-                            throw ex;
-                        }
+                        db = autoDb.ensureDbExists(opCtx);
+                    } else {
+                        throw ex;
                     }
-
-                    invariant(coll);
-                    uassert(ErrorCodes::NamespaceNotFound,
-                            str::stream() << "missing database ("
-                                          << nss.dbName().toStringForErrorMsg() << ")",
-                            db);
-                    OldClientContext ctx(opCtx, coll->nss(), db);
-
-                    // We convert updates to upserts in secondary mode when the
-                    // oplogApplicationEnforcesSteadyStateConstraints parameter is false, to avoid
-                    // failing on the constraint that updates in steady state mode always update
-                    // an existing document.
-                    //
-                    // In initial sync and recovery modes we always ignore errors about missing
-                    // documents on update, so there is no reason to convert the updates to upsert.
-
-                    bool shouldAlwaysUpsert = !oplogApplicationEnforcesSteadyStateConstraints &&
-                        oplogApplicationMode == OplogApplication::Mode::kSecondary;
-                    Status status = applyOperation_inlock(opCtx,
-                                                          *coll,
-                                                          entryOrGroupedInserts,
-                                                          shouldAlwaysUpsert,
-                                                          oplogApplicationMode,
-                                                          isDataConsistent,
-                                                          incrementOpsAppliedStats);
-                    if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
-                        throwWriteConflictException(
-                            str::stream() << "WriteConflict caught when applying operation."
-                                          << " Original error: " << status.reason());
-                    }
-                    return status;
-                } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                    // This can happen in initial sync or recovery modes (when a delete of the
-                    // namespace appears later in the oplog), but we will ignore it in the caller.
-                    //
-                    // When we're not enforcing steady-state constraints, the error is ignored
-                    // only for deletes, on the grounds that deleting from a non-existent collection
-                    // is a no-op.
-                    if (opType == OpTypeEnum::kDelete &&
-                        !oplogApplicationEnforcesSteadyStateConstraints &&
-                        oplogApplicationMode == OplogApplication::Mode::kSecondary) {
-                        if (opCounters) {
-                            const auto& opObj = redact(op->toBSONForLogging());
-                            opCounters->gotDeleteFromMissingNamespace();
-                            logOplogConstraintViolation(
-                                opCtx,
-                                op->getNss(),
-                                OplogConstraintViolationEnum::kDeleteOnMissingNs,
-                                "delete",
-                                opObj,
-                                boost::none /* status */);
-                        }
-                        return Status::OK();
-                    }
-
-                    ex.addContext(str::stream() << "Failed to apply operation: "
-                                                << redact(entryOrGroupedInserts.toBSON()));
-                    throw;
                 }
-            });
+
+                invariant(coll);
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream()
+                            << "missing database (" << nss.dbName().toStringForErrorMsg() << ")",
+                        db);
+                OldClientContext ctx(opCtx, coll->nss(), db);
+
+                // We convert updates to upserts in secondary mode when the
+                // oplogApplicationEnforcesSteadyStateConstraints parameter is false, to avoid
+                // failing on the constraint that updates in steady state mode always update
+                // an existing document.
+                //
+                // In initial sync and recovery modes we always ignore errors about missing
+                // documents on update, so there is no reason to convert the updates to upsert.
+
+                bool shouldAlwaysUpsert = !oplogApplicationEnforcesSteadyStateConstraints &&
+                    oplogApplicationMode == OplogApplication::Mode::kSecondary;
+                Status status = applyOperation_inlock(opCtx,
+                                                      *coll,
+                                                      entryOrGroupedInserts,
+                                                      shouldAlwaysUpsert,
+                                                      oplogApplicationMode,
+                                                      isDataConsistent,
+                                                      incrementOpsAppliedStats);
+                if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
+                    throwWriteConflictException(str::stream()
+                                                << "WriteConflict caught when applying operation."
+                                                << " Original error: " << status.reason());
+                }
+                return status;
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                // This can happen in initial sync or recovery modes (when a delete of the
+                // namespace appears later in the oplog), but we will ignore it in the caller.
+                //
+                // When we're not enforcing steady-state constraints, the error is ignored
+                // only for deletes, on the grounds that deleting from a non-existent collection
+                // is a no-op.
+                if (opType == OpTypeEnum::kDelete &&
+                    !oplogApplicationEnforcesSteadyStateConstraints &&
+                    oplogApplicationMode == OplogApplication::Mode::kSecondary) {
+                    if (opCounters) {
+                        const auto& opObj = redact(op->toBSONForLogging());
+                        opCounters->gotDeleteFromMissingNamespace();
+                        logOplogConstraintViolation(
+                            opCtx,
+                            op->getNss(),
+                            OplogConstraintViolationEnum::kDeleteOnMissingNs,
+                            "delete",
+                            opObj,
+                            boost::none /* status */);
+                    }
+                    return Status::OK();
+                }
+
+                ex.addContext(str::stream() << "Failed to apply operation: "
+                                            << redact(entryOrGroupedInserts.toBSON()));
+                throw;
+            }
+        });
         return status;
     } else if (opType == OpTypeEnum::kCommand) {
         auto status =
-            writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_command", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_command", nss, [&] {
                 // A special case apply for commands to avoid implicit database creation.
                 Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
                 incrementOpsAppliedStats();

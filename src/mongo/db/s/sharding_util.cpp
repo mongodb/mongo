@@ -155,7 +155,7 @@ Status createIndexOnCollection(OperationContext* opCtx,
         if (!collection) {
             CollectionOptions options;
             options.uuid = UUID::gen();
-            writeConflictRetry(opCtx, "createIndexOnCollection", ns.ns(), [&] {
+            writeConflictRetry(opCtx, "createIndexOnCollection", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 auto db = autoColl.ensureDbExists(opCtx);
                 collection = db->createCollection(opCtx, ns, options);
@@ -197,7 +197,7 @@ Status createIndexOnCollection(OperationContext* opCtx,
             IndexBuildsCoordinator::get(opCtx)->createIndex(
                 opCtx, collection->uuid(), indexSpec, indexConstraints, fromMigrate);
         } else {
-            writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns.ns(), [&] {
+            writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 CollectionWriter collWriter(opCtx, collection->uuid());
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(

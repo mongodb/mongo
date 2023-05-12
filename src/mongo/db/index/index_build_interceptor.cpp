@@ -270,8 +270,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
     // Apply batches of side writes until the last record in the table is seen.
     while (!atEof) {
-        auto swAtEof =
-            writeConflictRetry(opCtx, "index build drain", coll->ns().ns(), applySingleBatch);
+        auto swAtEof = writeConflictRetry(opCtx, "index build drain", coll->ns(), applySingleBatch);
         if (!swAtEof.isOK()) {
             return swAtEof.getStatus();
         }

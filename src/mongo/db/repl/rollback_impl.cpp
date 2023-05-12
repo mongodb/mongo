@@ -529,7 +529,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
             sessionTxnRecord.setLastWriteDate(wallClockTime);
         }
         const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
-        writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss, [&] {
             opCtx->recoveryUnit()->allowOneUntimestampedWrite();
             auto collection =
                 acquireCollection(opCtx,

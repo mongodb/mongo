@@ -226,7 +226,7 @@ void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx,
 
     ColumnStoreAccessMethod* csam = checked_cast<ColumnStoreAccessMethod*>(index->accessMethod());
 
-    writeConflictRetry(opCtx, "removingExtraColumnIndexEntries", _validateState->nss().ns(), [&] {
+    writeConflictRetry(opCtx, "removingExtraColumnIndexEntries", _validateState->nss(), [&] {
         WriteUnitOfWork wunit(opCtx);
         auto& indexResults = results->indexResultsMap[csam->indexName()];
         auto cursor = csam->writableStorage()->newWriteCursor(opCtx);

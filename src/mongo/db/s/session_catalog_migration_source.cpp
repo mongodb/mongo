@@ -280,7 +280,7 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
         writeConflictRetry(
             opCtx,
             "session migration initialization majority commit barrier",
-            NamespaceString::kRsOplogNamespace.ns(),
+            NamespaceString::kRsOplogNamespace,
             [&] {
                 const auto message = BSON("sessionMigrateCloneStart" << _ns.ns());
 

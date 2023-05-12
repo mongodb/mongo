@@ -556,7 +556,7 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
                 replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
 
         writeConflictRetry(
-            opCtx, "performNoopWrite", NamespaceString::kRsOplogNamespace.ns(), [&opCtx, &msg] {
+            opCtx, "performNoopWrite", NamespaceString::kRsOplogNamespace, [&opCtx, &msg] {
                 WriteUnitOfWork wuow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
                     opCtx, BSON("msg" << msg));

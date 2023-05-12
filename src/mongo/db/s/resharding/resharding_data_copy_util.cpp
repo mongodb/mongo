@@ -60,7 +60,7 @@ void ensureCollectionExists(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-    writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionExists", nss.toString(), [&] {
+    writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionExists", nss, [&] {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
         if (coll) {
             return;
@@ -78,20 +78,19 @@ void ensureCollectionDropped(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-    writeConflictRetry(
-        opCtx, "resharding::data_copy::ensureCollectionDropped", nss.toString(), [&] {
-            AutoGetCollection coll(opCtx, nss, MODE_X);
-            if (!coll || (uuid && coll->uuid() != uuid)) {
-                // If the collection doesn't exist or exists with a different UUID, then the
-                // requested collection has been dropped already.
-                return;
-            }
+    writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionDropped", nss, [&] {
+        AutoGetCollection coll(opCtx, nss, MODE_X);
+        if (!coll || (uuid && coll->uuid() != uuid)) {
+            // If the collection doesn't exist or exists with a different UUID, then the
+            // requested collection has been dropped already.
+            return;
+        }
 
-            WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
-                opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
-            wuow.commit();
-        });
+        WriteUnitOfWork wuow(opCtx);
+        uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
+            opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
+        wuow.commit();
+    });
 }
 
 void ensureOplogCollectionsDropped(OperationContext* opCtx,
@@ -237,7 +236,7 @@ std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSiz
 int insertBatch(OperationContext* opCtx,
                 const NamespaceString& nss,
                 std::vector<InsertStatement>& batch) {
-    return writeConflictRetry(opCtx, "resharding::data_copy::insertBatch", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "resharding::data_copy::insertBatch", nss, [&] {
         AutoGetCollection outputColl(opCtx, nss, MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection '" << nss.toStringForErrorMsg()
@@ -349,7 +348,7 @@ void updateSessionRecord(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "resharding::data_copy::updateSessionRecord",
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        NamespaceString::kSessionTransactionsTableNamespace,
         [&] {
             AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
 

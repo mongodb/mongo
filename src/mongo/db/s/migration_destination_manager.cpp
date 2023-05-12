@@ -1711,7 +1711,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                 uassertStatusOK(rs->goingToDelete(fullObj));
             }
 
-            writeConflictRetry(opCtx, "transferModsDeletes", _nss.ns(), [&] {
+            writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {
                 deleteObjects(opCtx,
                               collection,
                               id,
@@ -1769,7 +1769,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
             }
 
             // We are in write lock here, so sure we aren't killing
-            writeConflictRetry(opCtx, "transferModsUpdates", _nss.ns(), [&] {
+            writeConflictRetry(opCtx, "transferModsUpdates", _nss, [&] {
                 auto res = Helpers::upsert(opCtx, collection, updatedDoc, true);
                 if (!res.upsertedId.isEmpty()) {
                     changeInOrphans++;

@@ -295,7 +295,7 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
     }
 
     writeConflictRetry(
-        opCtx, "set index multikey", collection->ns().ns(), [&] {
+        opCtx, "set index multikey", collection->ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
 
             // If we have a prepare optime for recovery, then we always use that. This is safe since

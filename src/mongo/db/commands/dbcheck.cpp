@@ -71,7 +71,7 @@ repl::OpTime _logOp(OperationContext* opCtx,
     oplogEntry.setObject(obj);
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     return writeConflictRetry(
-        opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace, [&] {
             auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
             oplogEntry.setWallClockTime(clockSource->now());
 

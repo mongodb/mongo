@@ -364,7 +364,7 @@ NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorS
 }
 
 void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceString& nss) {
-    writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace.ns(), [&] {
+    writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
 
         const std::string msg = str::stream() << opStr << " on " << nss.toStringForErrorMsg();

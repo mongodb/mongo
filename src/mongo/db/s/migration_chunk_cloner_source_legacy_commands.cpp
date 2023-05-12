@@ -302,7 +302,7 @@ public:
         writeConflictRetry(
             opCtx,
             "Fetching session related oplogs for migration",
-            NamespaceString::kRsOplogNamespace.ns(),
+            NamespaceString::kRsOplogNamespace,
             [&]() {
                 AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, false);
                 opTime = autoCloner.getCloner()->nextSessionMigrationBatch(opCtx, arrBuilder);

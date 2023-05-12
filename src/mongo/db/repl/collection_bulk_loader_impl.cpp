@@ -83,7 +83,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
         return writeConflictRetry(
             _opCtx.get(),
             "CollectionBulkLoader::init",
-            _acquisition.nss().ns(),
+            _acquisition.nss(),
             [&secondaryIndexSpecs, this] {
                 WriteUnitOfWork wuow(_opCtx.get());
                 // All writes in CollectionBulkLoaderImpl should be unreplicated.
@@ -137,7 +137,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
     while (iter != end) {
         std::vector<RecordId> locs;
         Status status = writeConflictRetry(
-            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsUncapped", _nss.ns(), [&] {
+            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsUncapped", _nss, [&] {
                 WriteUnitOfWork wunit(_opCtx.get());
                 auto insertIter = iter;
                 int bytesInBlock = 0;
@@ -170,7 +170,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
         // Inserts index entries into the external sorter. This will not update pre-existing
         // indexes. Wrap this in a WUOW since the index entry insertion may modify the durable
         // record store which can throw a write conflict exception.
-        status = writeConflictRetry(_opCtx.get(), "_addDocumentToIndexBlocks", _nss.ns(), [&] {
+        status = writeConflictRetry(_opCtx.get(), "_addDocumentToIndexBlocks", _nss, [&] {
             WriteUnitOfWork wunit(_opCtx.get());
             for (size_t index = 0; index < locs.size(); ++index) {
                 status = _addDocumentToIndexBlocks(*iter++, locs.at(index));
@@ -195,7 +195,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
     for (auto iter = begin; iter != end; ++iter) {
         const auto& doc = *iter;
         Status status = writeConflictRetry(
-            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsCapped", _nss.ns(), [&] {
+            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsCapped", _nss, [&] {
                 WriteUnitOfWork wunit(_opCtx.get());
                 // For capped collections, we use regular insertDocument, which
                 // will update pre-existing indexes.
@@ -247,8 +247,8 @@ Status CollectionBulkLoaderImpl::commit() {
             invariant(_secondaryIndexesBlock->checkConstraints(_opCtx.get(),
                                                                _acquisition.getCollectionPtr()));
 
-            status = writeConflictRetry(
-                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
+            status =
+                writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss, [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
                     CollectionWriter collWriter(_opCtx.get(), &_acquisition);
                     auto status = _secondaryIndexesBlock->commit(
@@ -272,7 +272,7 @@ Status CollectionBulkLoaderImpl::commit() {
             auto status = _idIndexBlock->dumpInsertsFromBulk(
                 _opCtx.get(), _acquisition.getCollectionPtr(), [&](const RecordId& rid) {
                     writeConflictRetry(
-                        _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &rid] {
+                        _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss, [this, &rid] {
                             WriteUnitOfWork wunit(_opCtx.get());
 
                             auto doc = _acquisition.getCollectionPtr()->docFor(_opCtx.get(), rid);
@@ -324,8 +324,8 @@ Status CollectionBulkLoaderImpl::commit() {
 
             // Commit the _id index, there won't be any documents with duplicate _ids as they were
             // deleted prior to this.
-            status = writeConflictRetry(
-                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
+            status =
+                writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss, [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
                     CollectionWriter collWriter(_opCtx.get(), &_acquisition);
                     auto status =

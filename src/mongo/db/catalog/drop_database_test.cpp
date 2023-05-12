@@ -182,7 +182,7 @@ void DropDatabaseTest::tearDown() {
  * Creates a collection without any namespace restrictions.
  */
 void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
+    writeConflictRetry(opCtx, "testDropCollection", nss, [=] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);

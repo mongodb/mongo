@@ -1336,7 +1336,7 @@ void ShardMergeRecipientService::Instance::_processCommittedTransactionEntry(con
 
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
-        opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             // Write the no-op entry and update 'config.transactions'.
@@ -1790,7 +1790,7 @@ ShardMergeRecipientService::Instance::_advanceMajorityCommitTsToBkpCursorCheckpo
 
     writeConflictRetry(opCtx,
                        "mergeRecipientWriteNoopToAdvanceStableTimestamp",
-                       NamespaceString::kRsOplogNamespace.ns(),
+                       NamespaceString::kRsOplogNamespace,
                        [&] {
                            if (token.isCanceled()) {
                                return;
@@ -2030,7 +2030,7 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
             str::stream() << nss.toStringForErrorMsg() << " does not exist",
             collection.exists());
 
-    writeConflictRetry(opCtx, "writeShardMergeRecipientStateDoc", nss.ns(), [&]() {
+    writeConflictRetry(opCtx, "writeShardMergeRecipientStateDoc", nss, [&]() {
         WriteUnitOfWork wunit(opCtx);
 
         if (registerChange)
@@ -2278,7 +2278,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
             str::stream() << nss.toStringForErrorMsg() << " does not exist",
             collection);
 
-    writeConflictRetry(opCtx, "markShardMergeStateDocGarbageCollectable", nss.ns(), [&]() {
+    writeConflictRetry(opCtx, "markShardMergeStateDocGarbageCollectable", nss, [&]() {
         WriteUnitOfWork wuow(opCtx);
         auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
         const auto originalRecordId =

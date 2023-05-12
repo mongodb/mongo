@@ -167,7 +167,7 @@ Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
                              " state document",
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
-    return writeConflictRetry(opCtx, "insertShardSplitStateDoc", nss.ns(), [&]() -> Status {
+    return writeConflictRetry(opCtx, "insertShardSplitStateDoc", nss, [&]() -> Status {
         const auto filter = BSON(ShardSplitDonorDocument::kIdFieldName
                                  << stateDoc.getId() << ShardSplitDonorDocument::kExpireAtFieldName
                                  << BSON("$exists" << false));
@@ -200,7 +200,7 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
                       str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
 
-    return writeConflictRetry(opCtx, "updateShardSplitStateDoc", nss.ns(), [&]() -> Status {
+    return writeConflictRetry(opCtx, "updateShardSplitStateDoc", nss, [&]() -> Status {
         auto updateResult =
             Helpers::upsert(opCtx, collection, stateDoc.toBSON(), /*fromMigrate=*/false);
         if (updateResult.numMatched == 0) {
@@ -228,7 +228,7 @@ StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitI
                       str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
     auto query = BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId);
-    return writeConflictRetry(opCtx, "ShardSplitDonorDeleteStateDoc", nss.ns(), [&]() -> bool {
+    return writeConflictRetry(opCtx, "ShardSplitDonorDeleteStateDoc", nss, [&]() -> bool {
         auto nDeleted = deleteObjects(opCtx, collection, query, true /* justOne */);
         return nDeleted > 0;
     });

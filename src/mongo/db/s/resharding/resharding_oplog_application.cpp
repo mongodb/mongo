@@ -146,7 +146,7 @@ Status ReshardingOplogApplicationRules::applyOperation(
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     invariant(opCtx->writesAreReplicated());
 
-    return writeConflictRetry(opCtx, "applyOplogEntryCRUDOpResharding", op.getNss().ns(), [&] {
+    return writeConflictRetry(opCtx, "applyOplogEntryCRUDOpResharding", op.getNss(), [&] {
         try {
             auto opType = op.getOpType();
             switch (opType) {

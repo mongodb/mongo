@@ -898,111 +898,107 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            collection.exists());
                }
 
-               writeConflictRetry(
-                   opCtx, "ShardSplitDonorUpdateStateDoc", _stateDocumentsNS.ns(), [&]() {
-                       WriteUnitOfWork wuow(opCtx);
+               writeConflictRetry(opCtx, "ShardSplitDonorUpdateStateDoc", _stateDocumentsNS, [&]() {
+                   WriteUnitOfWork wuow(opCtx);
 
-                       if (nextState == ShardSplitDonorStateEnum::kBlocking) {
-                           // Start blocking writes before getting an oplog slot to guarantee no
-                           // writes to the tenant's data can commit with a timestamp after the
-                           // block timestamp.
-                           auto mtabVector =
-                               TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                                   .getDonorAccessBlockersForMigration(uuid);
-                           invariant(!mtabVector.empty());
+                   if (nextState == ShardSplitDonorStateEnum::kBlocking) {
+                       // Start blocking writes before getting an oplog slot to guarantee no
+                       // writes to the tenant's data can commit with a timestamp after the
+                       // block timestamp.
+                       auto mtabVector =
+                           TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                               .getDonorAccessBlockersForMigration(uuid);
+                       invariant(!mtabVector.empty());
 
-                           for (auto& mtab : mtabVector) {
-                               invariant(mtab);
-                               mtab->startBlockingWrites();
+                       for (auto& mtab : mtabVector) {
+                           invariant(mtab);
+                           mtab->startBlockingWrites();
 
-                               opCtx->recoveryUnit()->onRollback(
-                                   [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
+                           opCtx->recoveryUnit()->onRollback(
+                               [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
+                       }
+                   }
+
+                   // Reserve an opTime for the write.
+                   auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
+                   auto updatedStateDocBson = [&]() {
+                       stdx::lock_guard<Latch> lg(_mutex);
+                       _stateDoc.setState(nextState);
+                       switch (nextState) {
+                           case ShardSplitDonorStateEnum::kUninitialized:
+                           case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+                               break;
+                           case ShardSplitDonorStateEnum::kBlocking:
+                               _stateDoc.setBlockOpTime(oplogSlot);
+                               break;
+                           case ShardSplitDonorStateEnum::kCommitted:
+                               _stateDoc.setCommitOrAbortOpTime(oplogSlot);
+                               break;
+                           case ShardSplitDonorStateEnum::kAborted: {
+                               _stateDoc.setCommitOrAbortOpTime(oplogSlot);
+
+                               invariant(_abortReason);
+                               BSONObjBuilder bob;
+                               _abortReason.value().serializeErrorToBSON(&bob);
+                               _stateDoc.setAbortReason(bob.obj());
+                               break;
                            }
+                           default:
+                               MONGO_UNREACHABLE;
+                       }
+                       if (isInsert) {
+                           return BSON("$setOnInsert" << _stateDoc.toBSON());
                        }
 
-                       // Reserve an opTime for the write.
-                       auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
-                       auto updatedStateDocBson = [&]() {
-                           stdx::lock_guard<Latch> lg(_mutex);
-                           _stateDoc.setState(nextState);
-                           switch (nextState) {
-                               case ShardSplitDonorStateEnum::kUninitialized:
-                               case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
-                                   break;
-                               case ShardSplitDonorStateEnum::kBlocking:
-                                   _stateDoc.setBlockOpTime(oplogSlot);
-                                   break;
-                               case ShardSplitDonorStateEnum::kCommitted:
-                                   _stateDoc.setCommitOrAbortOpTime(oplogSlot);
-                                   break;
-                               case ShardSplitDonorStateEnum::kAborted: {
-                                   _stateDoc.setCommitOrAbortOpTime(oplogSlot);
+                       return _stateDoc.toBSON();
+                   }();
 
-                                   invariant(_abortReason);
-                                   BSONObjBuilder bob;
-                                   _abortReason.value().serializeErrorToBSON(&bob);
-                                   _stateDoc.setAbortReason(bob.obj());
-                                   break;
-                               }
-                               default:
-                                   MONGO_UNREACHABLE;
-                           }
-                           if (isInsert) {
-                               return BSON("$setOnInsert" << _stateDoc.toBSON());
-                           }
+                   auto updateOpTime = [&]() {
+                       if (isInsert) {
+                           const auto filter = BSON(ShardSplitDonorDocument::kIdFieldName << uuid);
+                           auto updateResult = Helpers::upsert(opCtx,
+                                                               collection,
+                                                               filter,
+                                                               updatedStateDocBson,
+                                                               /*fromMigrate=*/false);
 
-                           return _stateDoc.toBSON();
-                       }();
+                           // '$setOnInsert' update operator can never modify an existing
+                           // on-disk state doc.
+                           invariant(!updateResult.existing);
+                           invariant(!updateResult.numDocsModified);
 
-                       auto updateOpTime = [&]() {
-                           if (isInsert) {
-                               const auto filter =
-                                   BSON(ShardSplitDonorDocument::kIdFieldName << uuid);
-                               auto updateResult = Helpers::upsert(opCtx,
-                                                                   collection,
-                                                                   filter,
-                                                                   updatedStateDocBson,
-                                                                   /*fromMigrate=*/false);
+                           return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+                       }
 
-                               // '$setOnInsert' update operator can never modify an existing
-                               // on-disk state doc.
-                               invariant(!updateResult.existing);
-                               invariant(!updateResult.numDocsModified);
+                       const auto originalRecordId =
+                           Helpers::findOne(opCtx,
+                                            collection.getCollectionPtr(),
+                                            BSON("_id" << originalStateDocBson["_id"]));
+                       const auto originalSnapshot = Snapshotted<BSONObj>(
+                           opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
+                       invariant(!originalRecordId.isNull());
 
-                               return repl::ReplClientInfo::forClient(opCtx->getClient())
-                                   .getLastOp();
-                           }
+                       CollectionUpdateArgs args{originalSnapshot.value()};
+                       args.criteria = BSON("_id" << uuid);
+                       args.oplogSlots = {oplogSlot};
+                       args.update = updatedStateDocBson;
 
-                           const auto originalRecordId =
-                               Helpers::findOne(opCtx,
-                                                collection.getCollectionPtr(),
-                                                BSON("_id" << originalStateDocBson["_id"]));
-                           const auto originalSnapshot = Snapshotted<BSONObj>(
-                               opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
-                           invariant(!originalRecordId.isNull());
+                       collection_internal::updateDocument(opCtx,
+                                                           collection.getCollectionPtr(),
+                                                           originalRecordId,
+                                                           originalSnapshot,
+                                                           updatedStateDocBson,
+                                                           collection_internal::kUpdateNoIndexes,
+                                                           nullptr /* indexesAffected */,
+                                                           nullptr /* OpDebug* */,
+                                                           &args);
 
-                           CollectionUpdateArgs args{originalSnapshot.value()};
-                           args.criteria = BSON("_id" << uuid);
-                           args.oplogSlots = {oplogSlot};
-                           args.update = updatedStateDocBson;
+                       return oplogSlot;
+                   }();
 
-                           collection_internal::updateDocument(
-                               opCtx,
-                               collection.getCollectionPtr(),
-                               originalRecordId,
-                               originalSnapshot,
-                               updatedStateDocBson,
-                               collection_internal::kUpdateNoIndexes,
-                               nullptr /* indexesAffected */,
-                               nullptr /* OpDebug* */,
-                               &args);
-
-                           return oplogSlot;
-                       }();
-
-                       wuow.commit();
-                       return updateOpTime;
-                   });
+                   wuow.commit();
+                   return updateOpTime;
+               });
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })

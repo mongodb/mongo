@@ -126,7 +126,10 @@ template <ErrorCodes::Error ec>
  * invocation of the argument function f without any exception handling and retry logic.
  */
 template <typename F>
-auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns, F&& f) {
+auto writeConflictRetry(OperationContext* opCtx,
+                        StringData opStr,
+                        const NamespaceStringOrUUID& nssOrUUID,
+                        F&& f) {
     invariant(opCtx);
     invariant(opCtx->lockState());
     invariant(opCtx->recoveryUnit());
@@ -141,7 +144,9 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
             return f();
         } catch (TemporarilyUnavailableException const& e) {
             if (opCtx->inMultiDocumentTransaction()) {
-                handleTemporarilyUnavailableExceptionInTransaction(opCtx, opStr, ns, e);
+                // TODO SERVER-76897: use nssOrUUID.toStringForLogging().
+                handleTemporarilyUnavailableExceptionInTransaction(
+                    opCtx, opStr, nssOrUUID.toStringForErrorMsg(), e);
             }
             throw;
         }
@@ -154,13 +159,16 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
             return f();
         } catch (WriteConflictException const& e) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), ns);
+            logWriteConflictAndBackoff(
+                writeConflictAttempts, opStr, e.reason(), nssOrUUID.toStringForErrorMsg());
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
         } catch (TemporarilyUnavailableException const& e) {
-            handleTemporarilyUnavailableException(opCtx, ++attemptsTempUnavailable, opStr, ns, e);
+            handleTemporarilyUnavailableException(
+                opCtx, ++attemptsTempUnavailable, opStr, nssOrUUID.toStringForErrorMsg(), e);
         } catch (TransactionTooLargeForCacheException const& e) {
-            handleTransactionTooLargeForCacheException(opCtx, &writeConflictAttempts, opStr, ns, e);
+            handleTransactionTooLargeForCacheException(
+                opCtx, &writeConflictAttempts, opStr, nssOrUUID.toStringForErrorMsg(), e);
         }
     }
 }

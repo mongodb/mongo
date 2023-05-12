@@ -121,7 +121,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
 
-        writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
+        writeConflictRetry(opCtx, "insertFCVDocument", fcvNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             uassertStatusOK(collection_internal::insertDocument(
                 opCtx, fcvColl, InsertStatement(fcvDoc.toBSON()), nullptr /* OpDebug */, false));

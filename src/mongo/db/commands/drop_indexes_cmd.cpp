@@ -192,7 +192,7 @@ public:
         std::vector<BSONObj> all;
         {
             std::vector<std::string> indexNames;
-            writeConflictRetry(opCtx, "listIndexes", toReIndexNss.ns(), [&] {
+            writeConflictRetry(opCtx, "listIndexes", toReIndexNss, [&] {
                 indexNames.clear();
                 acquisition.getCollectionPtr()->getAllIndexes(&indexNames);
             });
@@ -201,7 +201,7 @@ public:
 
             for (size_t i = 0; i < indexNames.size(); i++) {
                 const std::string& name = indexNames[i];
-                BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss.ns(), [&] {
+                BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss, [&] {
                     return acquisition.getCollectionPtr()->getIndexSpec(name);
                 });
 
@@ -241,7 +241,7 @@ public:
         indexer->setIndexBuildMethod(IndexBuildMethod::kForeground);
         StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
                                                             "Uninitialized");
-        writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
+        writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             CollectionWriter collection(opCtx, &acquisition);
             collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
@@ -274,7 +274,7 @@ public:
 
         uassertStatusOK(indexer->checkConstraints(opCtx, acquisition.getCollectionPtr()));
 
-        writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
+        writeConflictRetry(opCtx, "commitReIndex", toReIndexNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             CollectionWriter collection(opCtx, &acquisition);
             uassertStatusOK(indexer->commit(opCtx,
