@@ -115,6 +115,7 @@ let testCases = {
     _configsvrRenameCollection: {skip: "internal command"},
     _configsvrRenameCollectionMetadata: {skip: "internal command"},
     _configsvrRepairShardedCollectionChunksHistory: {skip: "internal command"},
+    _configsvrResetPlacementHistory: {skip: "internal command"},
     _configsvrReshardCollection: {skip: "internal command"},
     _configsvrRunRestore: {skip: "internal command"},
     _configsvrSetAllowMigrations: {skip: "internal command"},
@@ -669,6 +670,7 @@ let testCases = {
     replSetTest: {skip: "does not accept read or write concern"},
     replSetTestEgress: {skip: "does not accept read or write concern"},
     replSetUpdatePosition: {skip: "does not accept read or write concern"},
+    resetPlacementHistory: {skip: "does not accept read or write concern"},
     reshardCollection: {skip: "does not accept read or write concern"},
     resync: {skip: "does not accept read or write concern"},
     revokePrivilegesFromRole: {

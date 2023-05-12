@@ -27,67 +27,68 @@
  *    it in the license file.
  */
 
+
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/placement_history_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 
 namespace mongo {
 namespace {
 
-class ConfigsvrGetHistoricalPlacementCommand final
-    : public TypedCommand<ConfigsvrGetHistoricalPlacementCommand> {
+class ConfigSvrResetPlacementHistoryCommand final
+    : public TypedCommand<ConfigSvrResetPlacementHistoryCommand> {
 public:
-    using Request = ConfigsvrGetHistoricalPlacement;
+    using Request = ConfigsvrResetPlacementHistory;
+
+    std::string help() const override {
+        return "Internal command only invokable on the config server. Do not call directly. "
+               "Reinitializes the content of config.placementHistory based on a recent snapshot of "
+               "the Sharding catalog.";
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
 
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
-        ConfigsvrGetHistoricalPlacementResponse typedRun(OperationContext* opCtx) {
-            const NamespaceString& nss = ns();
-
+        void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "_configsvrGetHistoricalPlacement can only be run on config servers",
+                    str::stream() << Request::kCommandName
+                                  << " can only be run on the config server",
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
-            // Set the operation context read concern level to majority for reads into the config
-            // database.
-            repl::ReadConcernArgs::get(opCtx) =
-                repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+            uassert(ErrorCodes::TemporarilyUnavailable,
+                    "feature compatibility version 7.0 or later is required to run this command",
+                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+                        serverGlobalParams.featureCompatibility));
 
-            if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                auto shardsWithOpTime = uassertStatusOK(catalogClient->getAllShards(
-                    opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
-                std::vector<ShardId> shardIds;
-                std::transform(shardsWithOpTime.value.begin(),
-                               shardsWithOpTime.value.end(),
-                               std::back_inserter(shardIds),
-                               [](const ShardType& s) { return s.getName(); });
-                HistoricalPlacement historicalPlacement{std::move(shardIds), false};
-                ConfigsvrGetHistoricalPlacementResponse response(std::move(historicalPlacement));
-                return response;
-            }
-
-            boost::optional<NamespaceString> targetedNs = request().getTargetWholeCluster()
-                ? (boost::optional<NamespaceString>)boost::none
-                : nss;
-            return ConfigsvrGetHistoricalPlacementResponse(
-                catalogClient->getHistoricalPlacement(opCtx, request().getAt(), targetedNs));
+            ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
         }
 
     private:
         NamespaceString ns() const override {
-            return request().getCommandParameter();
+            return NamespaceString(request().getDbName());
         }
 
         bool supportsWriteConcern() const override {
-            return false;
+            return true;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -98,26 +99,7 @@ public:
                                                            ActionType::internal));
         }
     };
-
-    bool skipApiVersionCheck() const override {
-        // Internal command (server to server).
-        return true;
-    }
-
-    std::string help() const override {
-        return "Internal command, which is exported by the sharding config server. Do not call "
-               "directly. Allows to run queries concerning historical placement of a namespace in "
-               "a controlled way.";
-    }
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-} configsvrGetHistoricalPlacementCmd;
+} _cfgsvrResetPlacementHistory;
 
 }  // namespace
 }  // namespace mongo

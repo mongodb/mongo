@@ -218,10 +218,6 @@ NSS_CONSTANT(kShardCollectionCatalogNamespace, DatabaseName::kConfig, "shard.col
 // Namespace used for storing NamespacePlacementType docs on the CSRS.
 NSS_CONSTANT(kConfigsvrPlacementHistoryNamespace, DatabaseName::kConfig, "placementHistory"_sd)
 
-// Identifier for the "initialization metadata descriptors" contained by
-// kConfigsvrPlacementHistoryNamespace
-NSS_CONSTANT(kConfigsvrPlacementHistoryFcvMarkerNamespace, DatabaseName::kEmpty, StringData{})
-
 // TODO SERVER-68551: remove once 7.0 becomes last-lts
 NSS_CONSTANT(kLockpingsNamespace, DatabaseName::kConfig, "lockpings"_sd)
 

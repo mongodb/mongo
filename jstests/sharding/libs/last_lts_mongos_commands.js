@@ -38,6 +38,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "moveRange",
     "oidcListKeys",
     "oidcRefreshKeys",
+    "resetPlacementHistory",
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",

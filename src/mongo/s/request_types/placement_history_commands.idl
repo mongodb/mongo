@@ -25,8 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 
-# TODO (SERVER-73029): remove this file and the class implementing _configsvrGetHistoricalPlacement
-
 global:
     cpp_namespace: "mongo"
 
@@ -44,6 +42,25 @@ structs:
         historicalPlacement: HistoricalPlacement
 commands:
 
+    clusterResetPlacementHistory:
+        command_name: resetPlacementHistory
+        cpp_name: ClusterResetPlacementHistory
+        description: "Admin command to reinitialize the content of config.placementHistory 
+                      based on the current state of the Sharding catalog."
+        namespace: ignored
+        api_version: ""
+        strict: false
+
+    _configsvrResetPlacementHistory:
+        command_name: _configsvrResetPlacementHistory
+        cpp_name: ConfigsvrResetPlacementHistory
+        description: "Definition of the resetPlacementHistory command called 
+                      from routers on the config server."
+        namespace: ignored
+        api_version: ""
+        strict: false
+
+    # TODO (SERVER-73029): remove the _configsvrGetHistoricalPlacement and the code supporting it.
     _configsvrGetHistoricalPlacement:
         command_name: _configsvrGetHistoricalPlacement
         cpp_name: ConfigsvrGetHistoricalPlacement

@@ -87,6 +87,7 @@ env.Library(
         'cluster_rename_collection_cmd.cpp',
         'cluster_repair_sharded_collection_chunks_history_cmd.cpp',
         'cluster_repl_set_get_status_cmd.cpp',
+        'cluster_reset_placement_history_cmd.cpp',
         'cluster_reshard_collection_cmd.cpp',
         'cluster_rwc_defaults_commands.cpp',
         'cluster_set_allow_migrations_cmd.cpp',

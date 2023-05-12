@@ -43,7 +43,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/index_version.h"
-#include "mongo/s/request_types/get_historical_placement_info_gen.h"
+#include "mongo/s/request_types/placement_history_commands_gen.h"
 
 namespace mongo {
 
@@ -86,6 +86,9 @@ public:
 
     // Constant to use for configuration data local writes
     static const WriteConcernOptions kLocalWriteConcern;
+
+    // Identifier for the "initialization metadata" documents of config.placementHistory
+    static const NamespaceString kConfigPlacementHistoryInitializationMarker;
 
     virtual ~ShardingCatalogClient() = default;
 
