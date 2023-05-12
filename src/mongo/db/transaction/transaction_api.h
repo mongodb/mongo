@@ -213,7 +213,6 @@ public:
     }
 
 private:
-    CancellationSource _source;
     std::unique_ptr<ResourceYielder> _resourceYielder;
     std::shared_ptr<executor::InlineExecutor> _inlineExecutor;
     std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _sleepExec;
@@ -600,7 +599,7 @@ public:
      *
      * TODO SERVER-65840: Allow returning a SemiFuture with any type.
      */
-    SemiFuture<CommitResult> run(OperationContext* opCtx, Callback callback) noexcept;
+    SemiFuture<CommitResult> run(Callback callback) noexcept;
 
     /**
      * Returns the latest operationTime returned by a command in this transaction.
