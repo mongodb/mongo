@@ -2416,19 +2416,54 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 auto ns = cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns();
 
-                // This error is only possible during initial sync mode.
-                invariant(mode == OplogApplication::Mode::kInitialSync);
+                // TODO (SERVER-74953): Turn the 'mode == OplogApplication::Mode::kInitialSync' if
+                // condition below into an invariant and remove the trailing 'else' block.
+                if (mode == OplogApplication::Mode::kInitialSync) {
+                    // Aborting an index build involves writing to the catalog. This write needs to
+                    // be timestamped. It will be given 'writeTime' as the commit timestamp.
+                    TimestampBlock tsBlock(opCtx, writeTime);
+                    abortIndexBuilds(opCtx,
+                                     op->getCommandType(),
+                                     ns,
+                                     "Aborting index builds during initial sync");
+                    LOGV2_DEBUG(4665901,
+                                1,
+                                "Conflicting DDL operation encountered during initial sync; "
+                                "aborting index build and retrying",
+                                logAttrs(ns));
+                } else {
+                    invariant(!opCtx->lockState()->isLocked());
 
-                // Aborting an index build involves writing to the catalog. This write needs to be
-                // timestamped. It will be given 'writeTime' as the commit timestamp.
-                TimestampBlock tsBlock(opCtx, writeTime);
-                abortIndexBuilds(
-                    opCtx, op->getCommandType(), ns, "Aborting index builds during initial sync");
-                LOGV2_DEBUG(4665901,
-                            1,
-                            "Conflicting DDL operation encountered during initial sync; "
-                            "aborting index build and retrying",
-                            logAttrs(ns));
+                    auto swUUID = op->getUuid();
+                    if (!swUUID) {
+                        LOGV2_ERROR(21261,
+                                    "Failed command during oplog application. Expected a UUID",
+                                    "command"_attr = redact(o),
+                                    logAttrs(ns));
+                    }
+
+                    LOGV2_DEBUG(
+                        7702500,
+                        1,
+                        "Waiting for index build(s) to complete on the namespace before retrying "
+                        "the conflicting operation",
+                        logAttrs(ns),
+                        "oplogEntry"_attr = redact(op->toBSONForLogging()));
+
+                    IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
+                        opCtx, swUUID.get());
+
+                    opCtx->recoveryUnit()->abandonSnapshot();
+                    opCtx->checkForInterrupt();
+
+                    LOGV2_DEBUG(
+                        51775,
+                        1,
+                        "Acceptable error during oplog application: background operation in "
+                        "progress for namespace",
+                        logAttrs(ns),
+                        "oplogEntry"_attr = redact(op->toBSONForLogging()));
+                }
 
                 break;
             }
