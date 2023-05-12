@@ -474,8 +474,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // Additionally we want to perform a majority write on the CSRS to ensure that
                     // all the subsequent reads will see all the writes performed from a previous
                     // execution of this coordinator.
+                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor);
+                        opCtx, getCurrentSession(), **executor);
 
                     if (_timeseriesNssResolvedByCommandHandler() ||
                         _doc.getTranslatedRequestParams()) {
@@ -533,10 +534,12 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                         "Removing partial changes from previous run",
                                         logAttrs(nss()));
 
+                            _updateSession(opCtx);
                             cleanupPartialChunksFromPreviousAttempt(
-                                opCtx, *uuid, getNewSession(opCtx));
+                                opCtx, *uuid, getCurrentSession());
 
-                            broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
+                            _updateSession(opCtx);
+                            broadcastDropCollection(opCtx, nss(), **executor, getCurrentSession());
                         }
                     }
                 }
@@ -593,7 +596,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // shard
                     _promoteCriticalSectionsToBlockReads(opCtx);
 
-                    _createCollectionOnNonPrimaryShards(opCtx, getNewSession(opCtx));
+                    _updateSession(opCtx);
+                    _createCollectionOnNonPrimaryShards(opCtx, getCurrentSession());
 
                     _commit(opCtx, **executor);
                 }
@@ -1196,7 +1200,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     }
 
     // Upsert Chunks.
-    insertChunks(opCtx, _initialChunks->chunks, getNewSession(opCtx));
+    _updateSession(opCtx);
+    insertChunks(opCtx, _initialChunks->chunks, getCurrentSession());
 
     // The coll and shardsHoldingData objects will be used by both this function and
     // insertCollectionAndPlacementEntries(), which accesses their content from a separate thread
@@ -1235,7 +1240,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         coll->setUnique(*_request.getUnique());
     }
 
-    const auto& osi = getNewSession(opCtx);
+    _updateSession(opCtx);
     try {
         notifyChangeStreamsOnShardCollection(opCtx,
                                              nss(),
@@ -1245,7 +1250,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
                                              *shardsHoldingData);
 
         insertCollectionAndPlacementEntries(
-            opCtx, executor, coll, placementVersion, shardsHoldingData, osi);
+            opCtx, executor, coll, placementVersion, shardsHoldingData, getCurrentSession());
 
         notifyChangeStreamsOnShardCollection(
             opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kSuccessful);
