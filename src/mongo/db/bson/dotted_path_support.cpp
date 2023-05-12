@@ -54,70 +54,70 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                                   bool expandArrayOnTrailingField,
                                   BSONDepthIndex depth,
                                   MultikeyComponents* arrayComponents) {
-    BSONElement e = obj.getField(path);
+    size_t idx = path.find('.');
+    if (idx != std::string::npos) {
+        invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
+        StringData left = path.substr(0, idx);
+        StringData next = path.substr(idx + 1, path.size());
 
-    if (e.eoo()) {
-        size_t idx = path.find('.');
-        if (idx != std::string::npos) {
-            invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
-            StringData left = path.substr(0, idx);
-            StringData next = path.substr(idx + 1, path.size());
+        BSONElement e = obj.getField(left);
 
-            BSONElement e = obj.getField(left);
-
-            if (e.type() == Object) {
+        if (e.type() == Object) {
+            _extractAllElementsAlongPath(e.embeddedObject(),
+                                         next,
+                                         elements,
+                                         expandArrayOnTrailingField,
+                                         depth + 1,
+                                         arrayComponents);
+        } else if (e.type() == Array) {
+            bool allDigits = false;
+            if (next.size() > 0 && ctype::isDigit(next[0])) {
+                unsigned temp = 1;
+                while (temp < next.size() && ctype::isDigit(next[temp]))
+                    temp++;
+                allDigits = temp == next.size() || next[temp] == '.';
+            }
+            if (allDigits) {
                 _extractAllElementsAlongPath(e.embeddedObject(),
                                              next,
                                              elements,
                                              expandArrayOnTrailingField,
                                              depth + 1,
                                              arrayComponents);
-            } else if (e.type() == Array) {
-                bool allDigits = false;
-                if (next.size() > 0 && ctype::isDigit(next[0])) {
-                    unsigned temp = 1;
-                    while (temp < next.size() && ctype::isDigit(next[temp]))
-                        temp++;
-                    allDigits = temp == next.size() || next[temp] == '.';
-                }
-                if (allDigits) {
-                    _extractAllElementsAlongPath(e.embeddedObject(),
-                                                 next,
-                                                 elements,
-                                                 expandArrayOnTrailingField,
-                                                 depth + 1,
-                                                 arrayComponents);
-                } else {
-                    BSONObjIterator i(e.embeddedObject());
-                    while (i.more()) {
-                        BSONElement e2 = i.next();
-                        if (e2.type() == Object || e2.type() == Array)
-                            _extractAllElementsAlongPath(e2.embeddedObject(),
-                                                         next,
-                                                         elements,
-                                                         expandArrayOnTrailingField,
-                                                         depth + 1,
-                                                         arrayComponents);
-                    }
-                    if (arrayComponents) {
-                        arrayComponents->insert(depth);
-                    }
-                }
             } else {
-                // do nothing: no match
-            }
-        }
-    } else {
-        if (e.type() == Array && expandArrayOnTrailingField) {
-            BSONObjIterator i(e.embeddedObject());
-            while (i.more()) {
-                elements.insert(i.next());
-            }
-            if (arrayComponents) {
-                arrayComponents->insert(depth);
+                BSONObjIterator i(e.embeddedObject());
+                while (i.more()) {
+                    BSONElement e2 = i.next();
+                    if (e2.type() == Object || e2.type() == Array)
+                        _extractAllElementsAlongPath(e2.embeddedObject(),
+                                                     next,
+                                                     elements,
+                                                     expandArrayOnTrailingField,
+                                                     depth + 1,
+                                                     arrayComponents);
+                }
+                if (arrayComponents) {
+                    arrayComponents->insert(depth);
+                }
             }
         } else {
-            elements.insert(e);
+            // do nothing: no match
+        }
+    } else {
+        BSONElement e = obj.getField(path);
+
+        if (e.ok()) {
+            if (e.type() == Array && expandArrayOnTrailingField) {
+                BSONObjIterator i(e.embeddedObject());
+                while (i.more()) {
+                    elements.insert(i.next());
+                }
+                if (arrayComponents) {
+                    arrayComponents->insert(depth);
+                }
+            } else {
+                elements.insert(e);
+            }
         }
     }
 }
