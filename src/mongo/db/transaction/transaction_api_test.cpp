@@ -80,6 +80,19 @@ const BSONObj kRetryableWriteConcernError =
 const BSONObj kResWithRetryableWriteConcernError =
     BSON("ok" << 1 << "writeConcernError" << kRetryableWriteConcernError);
 
+const BSONObj kResWithTransientCommitErrorAndRetryableWriteConcernError =
+    BSON("ok" << 0 << "code" << ErrorCodes::LockTimeout << kErrorLabelsFieldName
+              << BSON_ARRAY(ErrorLabel::kTransientTransaction) << "writeConcernError"
+              << kRetryableWriteConcernError);
+
+const BSONObj kResWithNonTransientCommitErrorAndRetryableWriteConcernError =
+    BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction << "writeConcernError"
+              << kRetryableWriteConcernError);
+
+const BSONObj kResWithNonTransientCommitErrorAndNonRetryableWriteConcernError =
+    BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction << "writeConcernError"
+              << kWriteConcernError);
+
 class MockResourceYielder : public ResourceYielder {
 public:
     void yield(OperationContext*) {
@@ -191,6 +204,15 @@ public:
     }
 
     virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
+                                                  BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -499,6 +521,15 @@ public:
     }
 
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
+                                                  BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -1070,6 +1101,49 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
+TEST_F(TxnAPITest, DoesNotRetryOnNonTransientCommitErrorWithNonRetryableCommitWCError) {
+    auto swResult = txnWithRetries().runNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes =
+                txnClient
+                    .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                                BSON("insert"
+                                     << "foo"
+                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                    .get();
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
+
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(
+                mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+
+            // The commit response.
+            mockClient()->setNextCommandResponse(
+                kResWithNonTransientCommitErrorAndNonRetryableWriteConcernError);
+
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT_EQ(swResult.getValue().cmdStatus, ErrorCodes::NoSuchTransaction);
+    ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::NoSuchTransaction);
+
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      0 /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
 TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
     int attempt = -1;
     auto swResult = txnWithRetries().runNoThrow(
@@ -1239,6 +1313,97 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       CommandHelpers::kMajorityWriteConcern.toBSON());
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
+TEST_F(TxnAPITest, RetriesOnNonTransientCommitWithErrorRetryableCommitWCError) {
+    auto swResult = txnWithRetries().runNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes =
+                txnClient
+                    .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                                BSON("insert"
+                                     << "foo"
+                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                    .get();
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
+
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(
+                mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+
+            // The commit responses.
+            mockClient()->setNextCommandResponse(
+                kResWithNonTransientCommitErrorAndRetryableWriteConcernError);
+            mockClient()->setNextCommandResponse(kOKCommandResponse);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      0 /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      CommandHelpers::kMajorityWriteConcern.toBSON());
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
+TEST_F(TxnAPITest, RetriesOnTransientCommitErrorWithRetryableWCError) {
+    int attempt = -1;
+    auto swResult = txnWithRetries().runNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            attempt += 1;
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes =
+                txnClient
+                    .runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                                BSON("insert"
+                                     << "foo"
+                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                    .get();
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
+
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              attempt /* txnNumber */,
+                              true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+
+            // Set commit response. Initial commit response is a transient txn error so the
+            // transaction retries.
+            if (attempt == 0) {
+                mockClient()->setNextCommandResponse(
+                    kResWithTransientCommitErrorAndRetryableWriteConcernError);
+            } else {
+                mockClient()->setNextCommandResponse(kOKCommandResponse);
+            }
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      attempt /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }

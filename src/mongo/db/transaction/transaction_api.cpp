@@ -452,9 +452,10 @@ ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& db
     return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
         .thenRunOn(_executor)
         .then([this](DbResponse dbResponse) {
+            // NOTE: The API uses this method to run commit and abort, so be careful about adding
+            // new logic here to ensure it cannot interfere with error handling for either command.
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);
-            uassertStatusOK(getStatusFromCommandResult(reply));
             return reply;
         });
 }
@@ -473,6 +474,30 @@ BSONObj SEPTransactionClient::runCommandSync(const DatabaseName& dbName, BSONObj
 SemiFuture<BSONObj> SEPTransactionClient::runCommand(const DatabaseName& dbName,
                                                      BSONObj cmdObj) const {
     return _runCommand(dbName, cmdObj).semi();
+}
+
+ExecutorFuture<BSONObj> SEPTransactionClient::_runCommandChecked(const DatabaseName& dbName,
+                                                                 BSONObj cmdObj) const {
+    return _runCommand(dbName, cmdObj).then([](BSONObj reply) {
+        uassertStatusOK(getStatusFromCommandResult(reply));
+        return reply;
+    });
+}
+
+SemiFuture<BSONObj> SEPTransactionClient::runCommandChecked(const DatabaseName& dbName,
+                                                            BSONObj cmdObj) const {
+    return _runCommandChecked(dbName, cmdObj).semi();
+}
+
+BSONObj SEPTransactionClient::runCommandCheckedSync(const DatabaseName& dbName,
+                                                    BSONObj cmdObj) const {
+    Notification<void> mayReturn;
+    auto result = _runCommandChecked(dbName, cmdObj).unsafeToInlineFuture().tapAll([&](auto&&) {
+        mayReturn.set();
+    });
+    runFutureInline(_inlineExecutor.get(), mayReturn);
+
+    return std::move(result).get();
 }
 
 ExecutorFuture<BatchedCommandResponse> SEPTransactionClient::_runCRUDOp(

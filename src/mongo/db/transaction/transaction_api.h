@@ -100,8 +100,15 @@ public:
      * Runs the given command as part of the transaction that owns this transaction client.
      */
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const = 0;
-
     virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const = 0;
+
+    /**
+     * Same as runCommand but will assert the command status is ok.
+     */
+    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
+                                                  BSONObj cmd) const = 0;
+    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const = 0;
+
     /**
      * Helper method to run commands representable as a BatchedCommandRequest in the transaction
      * client's transaction.
@@ -298,6 +305,10 @@ public:
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override;
     virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override;
 
+    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
+                                                  BSONObj cmd) const override;
+    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override;
+
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
         const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const override;
     virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
@@ -321,6 +332,8 @@ public:
 
 private:
     ExecutorFuture<BSONObj> _runCommand(const DatabaseName& dbName, BSONObj cmd) const;
+
+    ExecutorFuture<BSONObj> _runCommandChecked(const DatabaseName& dbName, BSONObj cmd) const;
 
     ExecutorFuture<BatchedCommandResponse> _runCRUDOp(const BatchedCommandRequest& cmd,
                                                       std::vector<StmtId> stmtIds) const;
