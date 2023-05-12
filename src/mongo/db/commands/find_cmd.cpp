@@ -571,6 +571,10 @@ public:
                 }
             }
 
+            // We need to copy the serialization context from the request to the reply object before
+            // the request object goes out of scope
+            const auto serializationContext = cq->getFindCommandRequest().getSerializationContext();
+
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
@@ -726,8 +730,8 @@ public:
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(nss.ns(), docUnitsReturned);
-            query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
-                                                         nss.tenantId());
+            query_request_helper::validateCursorResponse(
+                result->getBodyBuilder().asTempObj(), nss.tenantId(), serializationContext);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

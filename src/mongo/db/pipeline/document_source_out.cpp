@@ -96,8 +96,10 @@ DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
     DocumentSourceOutSpec outSpec;
     if (spec.type() == BSONType::String) {
         outSpec.setColl(spec.valueStringData());
+        // TODO SERVER-77000: access a SerializationContext object to serialize properly
         outSpec.setDb(defaultDB.db());
     } else if (spec.type() == BSONType::Object) {
+        // TODO SERVER-77000: access a SerializationContext object to pass into the IDLParserContext
         outSpec = mongo::DocumentSourceOutSpec::parse(IDLParserContext(kStageName),
                                                       spec.embeddedObject());
     } else {
@@ -325,6 +327,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 Value DocumentSourceOut::serialize(SerializationOptions opts) const {
     BSONObjBuilder bob;
     DocumentSourceOutSpec spec;
+    // TODO SERVER-74284: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
     spec.setDb(_outputNs.dbName().db());
     spec.setColl(_outputNs.coll());
     spec.setTimeseries(_timeseries);

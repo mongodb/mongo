@@ -285,6 +285,9 @@ public:
                                            const NamespaceString& nss) {
             auto& cmd = request();
 
+            // We need to copy the serialization context from the request to the reply object
+            const auto serializationContext = cmd.getSerializationContext();
+
             long long batchSize = std::numeric_limits<long long>::max();
             if (cmd.getCursor() && cmd.getCursor()->getBatchSize()) {
                 batchSize = *cmd.getCursor()->getBatchSize();
@@ -335,7 +338,12 @@ public:
 
                 try {
                     firstBatch.push_back(ListIndexesReplyItem::parse(
-                        IDLParserContext("ListIndexesReplyItem"), nextDoc));
+                        IDLParserContext(
+                            "ListIndexesReplyItem",
+                            false /* apiStrict */,
+                            nss.tenantId(),
+                            SerializationContext::stateCommandReply(serializationContext)),
+                        nextDoc));
                 } catch (const DBException& exc) {
                     LOGV2_ERROR(5254500,
                                 "Could not parse catalog entry while replying to listIndexes",
@@ -351,7 +359,11 @@ public:
             }
 
             if (exec->isEOF()) {
-                return ListIndexesReplyCursor(0 /* cursorId */, nss, std::move(firstBatch));
+                return ListIndexesReplyCursor(
+                    0 /* cursorId */,
+                    nss,
+                    std::move(firstBatch),
+                    SerializationContext::stateCommandReply(serializationContext));
             }
 
             exec->saveState();
@@ -374,7 +386,10 @@ public:
             pinnedCursor->incNReturnedSoFar(firstBatch.size());
 
             return ListIndexesReplyCursor(
-                pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch));
+                pinnedCursor.getCursor()->cursorid(),
+                nss,
+                std::move(firstBatch),
+                SerializationContext::stateCommandReply(serializationContext));
         }
     };
 } cmdListIndexes;

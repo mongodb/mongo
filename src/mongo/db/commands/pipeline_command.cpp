@@ -230,7 +230,8 @@ public:
             if (!_aggregationRequest.getExplain() && !_aggregationRequest.getExchange()) {
                 query_request_helper::validateCursorResponse(
                     reply->getBodyBuilder().asTempObj(),
-                    _aggregationRequest.getNamespace().tenantId());
+                    _aggregationRequest.getNamespace().tenantId(),
+                    _aggregationRequest.getSerializationContext());
             }
         }
 

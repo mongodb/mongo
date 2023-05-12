@@ -96,8 +96,12 @@ public:
         CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
         bodyBuilder.doneFast();
 
+        // We need to copy the serialization context from the request to the reply object
         return CursorResponse::parseFromBSON(
-            replyBuilder.releaseBody(), nullptr, request.getNamespace().tenantId());
+            replyBuilder.releaseBody(),
+            nullptr,
+            request.getNamespace().tenantId(),
+            SerializationContext::stateCommandReply(request.getSerializationContext()));
     }
 
     virtual void appendToResponse(BSONObjBuilder* result) const final {

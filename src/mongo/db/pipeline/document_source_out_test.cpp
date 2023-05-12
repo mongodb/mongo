@@ -216,6 +216,8 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     ASSERT_EQ(outSource->getOutputNs(),
               NamespaceString::createNamespaceString_forTest(defaultDb, targetColl));
 
+    // TODO SERVER-74284: update this test once the serialize function has been updated to use
+    // DatabaseNameUtil::serialize() instead
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();
     auto expectedDoc = Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().db()}};

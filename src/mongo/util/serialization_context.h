@@ -97,6 +97,13 @@ struct SerializationContext {
         return *stateCommandReply;
     }
 
+    static SerializationContext stateCommandReply(const SerializationContext& requestCtxt) {
+        return SerializationContext(Source::Command,
+                                    CallerType::Reply,
+                                    requestCtxt._prefixState,
+                                    requestCtxt._nonPrefixedTenantId);
+    }
+
     static const SerializationContext& stateCommandRequest() {
         static StaticImmortal<SerializationContext> stateCommandRequest{Source::Command,
                                                                         CallerType::Request};
