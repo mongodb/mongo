@@ -44,3 +44,8 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gInternalValidateFeaturesAsPrimary
         default: true
+    defaultStartupFCV:
+        description: 'Startup parameter to set a default FCV at startup'
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gDefaultStartupFCV
