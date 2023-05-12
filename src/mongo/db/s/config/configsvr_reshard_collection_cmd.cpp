@@ -127,6 +127,19 @@ public:
                     *presetChunks, opCtx, ShardKeyPattern(request().getKey()).getKeyPattern());
             }
 
+            if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, reject shardDistribution parameter",
+                    !request().getShardDistribution().has_value());
+            }
+
+            if (const auto& shardDistribution = request().getShardDistribution()) {
+                resharding::validateShardDistribution(
+                    *shardDistribution, opCtx, ShardKeyPattern(request().getKey()));
+            }
+
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance =
                 ([&]() -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
@@ -178,6 +191,7 @@ public:
                     coordinatorDoc.setZones(request().getZones());
                     coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
                     coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
+                    coordinatorDoc.setShardDistribution(request().getShardDistribution());
 
                     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
                     auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);

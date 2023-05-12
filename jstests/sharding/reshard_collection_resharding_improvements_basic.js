@@ -27,23 +27,92 @@ const testShardDistribution = (mongos) => {
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
-    jsTest.log("reshardCollection cmd should succeed with shardDistribution parameter.");
-    assert.commandWorked(mongos.adminCommand({
+    jsTest.log("reshardCollection cmd should fail when shardDistribution is missing min or max.");
+    assert.commandFailedWithCode(mongos.adminCommand({
         reshardCollection: ns,
         key: {newKey: 1},
-        shardDistribution: [{shard: "shard-1"}, {shard: "shard-2"}]
-    }));
+        shardDistribution: [
+            {shard: st.shard0.shardName, min: {newKey: MinKey}},
+            {shard: st.shard1.shardName, max: {newKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    jsTest.log(
+        "reshardCollection cmd should fail when shardDistribution is not specified using the shard key.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [
+            {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: 0}},
+            {shard: st.shard1.shardName, min: {oldKey: 0}, max: {oldKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    jsTest.log(
+        "reshardCollection cmd should fail when one shard specifies min/max and the other does not.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [
+            {shard: st.shard0.shardName},
+            {shard: st.shard1.shardName, min: {newKey: MinKey}, max: {newKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    jsTest.log(
+        "reshardCollection cmd should fail when shardDistribution is not starting with globalMin.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [
+            {shard: st.shard0.shardName, min: {newKey: -1}, max: {newKey: 0}},
+            {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    jsTest.log("reshardCollection cmd should fail when shardDistribution is not continuous.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [
+            {shard: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: -1}},
+            {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    jsTest.log(
+        "reshardCollection cmd should fail when the shardId in shardDistribution is not recognized.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [
+            {shard: "s1", min: {newKey: MinKey}, max: {newKey: 0}},
+            {shard: "s2", min: {newKey: 0}, max: {newKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.ShardNotFound);
+
+    jsTest.log("reshardCollection cmd should succeed with shardDistribution parameter.");
+    // TODO(SERVER-76791): This should work after supporting non-explicit form of shardDistribution.
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [{shard: st.shard0.shardName}, {shard: st.shard1.shardName}]
+    }),
+                                 ErrorCodes.InvalidOptions);
     assert.commandWorked(mongos.adminCommand({
         reshardCollection: ns,
         key: {newKey: 1},
         shardDistribution: [
-            {shard: "shard-1", min: {newKey: MinKey}, max: {newKey: 0}},
-            {shard: "shard-2", min: {newKey: 0}, max: {newKey: MaxKey}}
+            {shard: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
+            {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
         ]
     }));
-
-    jsTest.log("reshardCollection cmd should fail when shardDistribution is not valid.");
-    // TODO(SERVER-76615): Add tests for invalid shardDistribution parameter.
 };
 
 testShardDistribution(mongos);

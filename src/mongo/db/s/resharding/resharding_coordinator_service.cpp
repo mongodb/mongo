@@ -67,6 +67,7 @@
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -1100,17 +1101,31 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             }
         }
 
-        auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
-                                                              coordinatorDoc.getSourceNss(),
-                                                              shardKey,
-                                                              numInitialChunks,
-                                                              std::move(parsedZones));
+        InitialSplitPolicy::ShardCollectionConfig splitResult;
+        if (const auto& shardDistribution = coordinatorDoc.getShardDistribution()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, should not have shardDistribution in "
+                    "coordinatorDoc",
+                    resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+            auto initialSplitter = ShardDistributionSplitPolicy::make(
+                opCtx, shardKey, *shardDistribution, std::move(parsedZones));
+            const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
+                                                *donorShardIds.begin()};
+            splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
+        } else {
+            auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
+                                                                  coordinatorDoc.getSourceNss(),
+                                                                  shardKey,
+                                                                  numInitialChunks,
+                                                                  std::move(parsedZones));
+            // Note: The resharding initial split policy doesn't care about what is the real primary
+            // shard, so just pass in a random shard.
+            const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
+                                                *donorShardIds.begin()};
+            splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
+        }
 
-        // Note: The resharding initial split policy doesn't care about what is the real primary
-        // shard, so just pass in a random shard.
-        const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
-                                            *donorShardIds.begin()};
-        auto splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
         initialChunks = std::move(splitResult.chunks);
 
         for (const auto& chunk : initialChunks) {
