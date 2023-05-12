@@ -31,7 +31,6 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/db/cst/c_node.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -221,14 +220,6 @@ public:
         return _sbeCompatible;
     }
 
-    void setUseCqfIfEligible(bool useCqfIfEligible) {
-        _useCqfIfEligible = useCqfIfEligible;
-    }
-
-    bool useCqfIfEligible() const {
-        return _useCqfIfEligible;
-    }
-
     bool isParameterized() const {
         return !_inputParamIdToExpressionMap.empty();
     }
@@ -326,16 +317,6 @@ private:
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;
-
-    // If true, indicates that we should use CQF if this query is eligible (see the
-    // isEligibleForBonsai() function for eligiblitly requirements).
-    // If false, indicates that we shouldn't use CQF even if this query is eligible. This is used to
-    // prevent hybrid classic and CQF plans in the following cases:
-    // 1. A pipeline that is not eligible for CQF but has an eligible prefix pushed down to find.
-    // 2. A subpipeline pushed down to find as part of a $lookup or $graphLookup.
-    // The default value of false ensures that only codepaths (find command) which opt-in are able
-    // to use CQF.
-    bool _useCqfIfEligible = false;
 
     // True if this query must produce a RecordId output in addition to the BSON objects that
     // constitute the result set of the query. Any generated query solution must not discard record

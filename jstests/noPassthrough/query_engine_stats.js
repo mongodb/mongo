@@ -42,13 +42,12 @@ function initializeTestCollection() {
 }
 
 const framework = {
-    find: {sbe: "sbe", classic: "classic", cqf: "findCQF"},
+    find: {sbe: "sbe", classic: "classic"},
     aggregate: {
         sbeHybrid: "sbeHybrid",
         classicHybrid: "classicHybrid",
         sbeOnly: "sbeOnly",
         classicOnly: "classicOnly",
-        cqf: "aggCQF"
     }
 };
 
@@ -86,9 +85,6 @@ function generateExpectedCounters(queryFramework) {
         case framework.find.classic:
             expected.find.classic = NumberLong(expected.find.classic + 1);
             break;
-        case framework.find.cqf:
-            expected.find.cqf = NumberLong(expected.find.cqf + 1);
-            break;
         case framework.aggregate.sbeOnly:
             expected.aggregate.sbeOnly = NumberLong(expected.aggregate.sbeOnly + 1);
             break;
@@ -100,9 +96,6 @@ function generateExpectedCounters(queryFramework) {
             break;
         case framework.aggregate.classicHybrid:
             expected.aggregate.classicHybrid = NumberLong(expected.aggregate.classicHybrid + 1);
-            break;
-        case framework.aggregate.cqf:
-            expected.aggregate.cqf = NumberLong(expected.aggregate.cqf + 1);
             break;
     }
     return expected;
@@ -226,60 +219,6 @@ cursor.next();  // initial query
 verifyProfiler(queryComment, framework.find.sbe);
 cursor.next();  // getMore performed
 verifyProfiler(queryComment, framework.find.sbe);
-
-MongoRunner.stopMongod(conn);
-
-conn = MongoRunner.runMongod({
-    restart: conn,
-    setParameter:
-        {featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: "tryBonsai"}
-});
-assert.neq(null, conn, "mongod was unable to start up");
-
-db = conn.getDB(jsTestName());
-
-coll = initializeTestCollection();
-
-// Run find using CQF
-expectedCounters = generateExpectedCounters(framework.find.cqf);
-queryComment = "cqfFind";
-assert.eq(coll.find({a: 1}).comment(queryComment).itcount(), 1);
-verifySlowQueryLog(db, queryComment, "cqf");
-compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, "cqf");
-
-// Run aggregate using CQF
-expectedCounters = generateExpectedCounters(framework.aggregate.cqf);
-queryComment = "cqfAggregate";
-assert.eq(
-    coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0}}], {comment: queryComment}).itcount(), 1);
-verifySlowQueryLog(db, queryComment, "cqf");
-compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, "cqf");
-
-// Run CQF query which falls back to SBE (unsupported match expression)
-expectedCounters = generateExpectedCounters(framework.find.sbe);
-queryComment = "cqfFallback";
-assert.eq(coll.find({a: {$mod: [4, 0]}}).comment(queryComment).itcount(), 1);
-verifySlowQueryLog(db, queryComment, framework.find.sbe);
-compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, framework.find.sbe);
-
-// CQF find with getMore.
-queryComment = "findCQFGetMore";
-cursor = coll.find({a: {$gt: 2}}).comment(queryComment).batchSize(1);
-cursor.next();  // initial query
-verifyProfiler(queryComment, "cqf");
-cursor.next();  // getMore performed
-verifyProfiler(queryComment, "cqf");
-
-// CQF aggregation with getMore.
-queryComment = "aggCQFGetMore";
-cursor = coll.aggregate([{$match: {a: {$gt: 2}}}], {comment: queryComment, batchSize: 1});
-cursor.next();  // initial query
-verifyProfiler(queryComment, "cqf");
-cursor.next();  // getMore performed
-verifyProfiler(queryComment, "cqf");
 
 MongoRunner.stopMongod(conn);
 })();

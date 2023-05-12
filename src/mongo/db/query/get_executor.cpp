@@ -71,8 +71,6 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/cqf_command_utils.h"
-#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
@@ -1550,28 +1548,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         const auto& mainColl = collections.getMainCollection();
         canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));
 
-        if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
-            optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
-            const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
-            auto maybeExec = getSBEExecutorViaCascadesOptimizer(
-                mainColl, std::move(queryHints), canonicalQuery.get());
-            if (maybeExec) {
-                auto exec = uassertStatusOK(
-                    makeExecFromParams(std::move(canonicalQuery), std::move(*maybeExec)));
-                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
-                    std::move(exec));
-            } else {
-                const auto queryControl =
-                    ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
-                        "internalQueryFrameworkControl");
-                tassert(7319400,
-                        "Optimization failed either without tryBonsai set, or without a hint.",
-                        queryControl->_data.get() == QueryFrameworkControlEnum::kTryBonsai &&
-                            !canonicalQuery->getFindCommandRequest().getHint().isEmpty() &&
-                            !fastIndexNullHandling);
-            }
-        }
-
         // Use SBE if 'canonicalQuery' is SBE compatible.
         if (!canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()) {
             auto statusWithExecutor =
@@ -1859,10 +1835,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
 
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "delete command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collection));
-
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
 
@@ -2067,10 +2039,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
-
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "update command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collection));
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -2400,10 +2368,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     const auto skip = request.getSkip().value_or(0);
     const auto limit = request.getLimit().value_or(0);
-
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "count command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collection));
 
     if (!collection) {
         // Treat collections that do not exist as empty collections. Note that the explain reporting
@@ -2909,11 +2873,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     const auto yieldPolicy = opCtx->inMultiDocumentTransaction()
         ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
         : PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
-
-    // Assert that not eligible for bonsai
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "distinct command is not eligible for bonsai",
-            !isEligibleForBonsai(*parsedDistinct->getQuery(), opCtx, collection));
 
     if (!collection) {
         // Treat collections that do not exist as empty collections.

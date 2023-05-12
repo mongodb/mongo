@@ -35,7 +35,6 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/cst/cst_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/namespace_string.h"

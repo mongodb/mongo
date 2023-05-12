@@ -46,8 +46,6 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/cqf_command_utils.h"
-#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
@@ -354,8 +352,6 @@ public:
                 return;
             }
 
-            cq->setUseCqfIfEligible(true);
-
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
@@ -581,8 +577,6 @@ public:
                 // execution to assume read data will not be needed again and need not be cached.
                 opCtx->recoveryUnit()->setReadOnce(true);
             }
-
-            cq->setUseCqfIfEligible(true);
 
             if (collection) {
                 // Collect telemetry. Exclude queries against collections with encrypted fields.
