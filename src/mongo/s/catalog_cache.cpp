@@ -251,9 +251,12 @@ CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& ca
 }
 
 CatalogCache::~CatalogCache() {
-    // The executor is used by the Database and Collection caches,
-    // so it must be joined, before these caches are destroyed,
-    // per the contract of ReadThroughCache.
+    // The executor is used by all the caches that correspond to the router role, so it must be
+    // joined before these caches are destroyed, per the contract of ReadThroughCache.
+    shutDownAndJoin();
+}
+
+void CatalogCache::shutDownAndJoin() {
     _executor->shutdown();
     _executor->join();
 }

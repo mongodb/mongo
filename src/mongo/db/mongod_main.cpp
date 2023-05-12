@@ -1370,6 +1370,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         validator->shutDown();
     }
 
+    if (auto pool = Grid::get(serviceContext)->getExecutorPool()) {
+        LOGV2_OPTIONS(6773200, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
+        pool->shutdownAndJoin();
+    }
+
     // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader.
     // Otherwise, it may try to schedule work on the CatalogCacheLoader and fail.
     LOGV2_OPTIONS(4784921, {LogComponent::kSharding}, "Shutting down the MigrationUtilExecutor");
@@ -1378,6 +1383,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     migrationUtilExecutor->join();
 
     if (ShardingState::get(serviceContext)->enabled()) {
+        // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as the
+        // CatalogCache may try to schedule work on CatalogCacheLoader and fail.
+        LOGV2_OPTIONS(6773201, {LogComponent::kSharding}, "Shutting down the CatalogCache");
+        Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
+
         LOGV2_OPTIONS(4784922, {LogComponent::kSharding}, "Shutting down the CatalogCacheLoader");
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
