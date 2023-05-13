@@ -124,12 +124,20 @@ int getDeleteSizeEstimate(const BSONObj& q,
 /**
  * Set of utilities which return true if the estimated write size is greater than or equal to the
  * actual write size, false otherwise.
+ *
+ * If the caller specifies 'unparsedRequest', these utilities will also return true if the request
+ * used document sequences and the size estimate is greater than the maximum size of a BSONObj. This
+ * indicates that 'unparsedRequest' cannot be serialized to a BSONObj because it exceeds the maximum
+ * BSONObj size.
  */
 bool verifySizeEstimate(const write_ops::UpdateOpEntry& update);
 bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp);
-bool verifySizeEstimate(const InsertCommandRequest& insertReq);
-bool verifySizeEstimate(const UpdateCommandRequest& updateReq);
-bool verifySizeEstimate(const DeleteCommandRequest& deleteReq);
+bool verifySizeEstimate(const InsertCommandRequest& insertReq,
+                        const OpMsgRequest* unparsedRequest = nullptr);
+bool verifySizeEstimate(const UpdateCommandRequest& updateReq,
+                        const OpMsgRequest* unparsedRequest = nullptr);
+bool verifySizeEstimate(const DeleteCommandRequest& deleteReq,
+                        const OpMsgRequest* unparsedRequest = nullptr);
 
 /**
  * Set of utilities which estimate the size of the headers (that is, all fields in a write command

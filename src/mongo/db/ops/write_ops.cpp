@@ -352,15 +352,23 @@ bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
         update.toBSON().objsize();
 }
 
-bool verifySizeEstimate(const InsertCommandRequest& insertReq) {
+bool verifySizeEstimate(const InsertCommandRequest& insertReq,
+                        const OpMsgRequest* unparsedRequest) {
     int size = getInsertHeaderSizeEstimate(insertReq);
     for (auto&& docToInsert : insertReq.getDocuments()) {
         size += docToInsert.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
     }
+
+    // Return true if 'insertReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
     return size >= insertReq.toBSON({} /* commandPassthroughFields */).objsize();
 }
 
-bool verifySizeEstimate(const UpdateCommandRequest& updateReq) {
+bool verifySizeEstimate(const UpdateCommandRequest& updateReq,
+                        const OpMsgRequest* unparsedRequest) {
     int size = getUpdateHeaderSizeEstimate(updateReq);
 
     for (auto&& update : updateReq.getUpdates()) {
@@ -376,10 +384,17 @@ bool verifySizeEstimate(const UpdateCommandRequest& updateReq) {
                     update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) +
             kWriteCommandBSONArrayPerElementOverheadBytes;
     }
+
+    // Return true if 'updateReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
     return size >= updateReq.toBSON({} /* commandPassthroughFields */).objsize();
 }
 
-bool verifySizeEstimate(const DeleteCommandRequest& deleteReq) {
+bool verifySizeEstimate(const DeleteCommandRequest& deleteReq,
+                        const OpMsgRequest* unparsedRequest) {
     int size = getDeleteHeaderSizeEstimate(deleteReq);
 
     for (auto&& deleteOp : deleteReq.getDeletes()) {
@@ -388,6 +403,12 @@ bool verifySizeEstimate(const DeleteCommandRequest& deleteReq) {
                                                  deleteOp.getHint(),
                                                  deleteOp.getSampleId()) +
             kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+
+    // Return true if 'deleteReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
     }
     return size >= deleteReq.toBSON({} /* commandPassthroughFields */).objsize();
 }
