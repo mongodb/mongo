@@ -38,6 +38,8 @@ var ReshardingTest = class {
         maxNumberOfTransactionOperationsInSingleOplogEntry:
             maxNumberOfTransactionOperationsInSingleOplogEntry = undefined,
         configShard: configShard = false,
+        wiredTigerConcurrentWriteTransactions: wiredTigerConcurrentWriteTransactions = undefined,
+        reshardingOplogBatchTaskCount: reshardingOplogBatchTaskCount = undefined,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -70,6 +72,8 @@ var ReshardingTest = class {
         this._maxNumberOfTransactionOperationsInSingleOplogEntry =
             maxNumberOfTransactionOperationsInSingleOplogEntry;
         this._configShard = configShard || jsTestOptions().configShard;
+        this._wiredTigerConcurrentWriteTransactions = wiredTigerConcurrentWriteTransactions;
+        this._reshardingOplogBatchTaskCount = reshardingOplogBatchTaskCount;
 
         // Properties set by setup().
         /** @private */
@@ -184,6 +188,18 @@ var ReshardingTest = class {
                 Object.merge(rsOptions.setParameter, configOptions.setParameter);
             configOptions.setParameter =
                 Object.merge(configOptions.setParameter, rsOptions.setParameter);
+        }
+
+        if (this._wiredTigerConcurrentWriteTransactions !== undefined) {
+            rsOptions.setParameter.storageEngineConcurrencyAdjustmentAlgorithm =
+                "fixedConcurrentTransactions";
+            rsOptions.setParameter.wiredTigerConcurrentWriteTransactions =
+                this._wiredTigerConcurrentWriteTransactions;
+        }
+
+        if (this._reshardingOplogBatchTaskCount !== undefined) {
+            rsOptions.setParameter.reshardingOplogBatchTaskCount =
+                this._reshardingOplogBatchTaskCount;
         }
 
         this._st = new ShardingTest({

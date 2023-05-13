@@ -76,6 +76,10 @@ public:
                           const repl::OplogEntry& op) const;
 
 private:
+    // Applies an insert or update operation
+    void _applyInsertOrUpdate(OperationContext* opCtx,
+                              const boost::optional<ShardingIndexesCatalogCache>& gii,
+                              const repl::OplogEntry& op) const;
     // Applies an insert operation
     void _applyInsert_inlock(OperationContext* opCtx,
                              Database* db,
@@ -91,12 +95,9 @@ private:
                              const repl::OplogEntry& op) const;
 
     // Applies a delete operation
-    void _applyDelete_inlock(OperationContext* opCtx,
-                             Database* db,
-                             const CollectionPtr& outputColl,
-                             const CollectionPtr& stashColl,
-                             const boost::optional<ShardingIndexesCatalogCache>& gii,
-                             const repl::OplogEntry& op) const;
+    void _applyDelete(OperationContext* opCtx,
+                      const boost::optional<ShardingIndexesCatalogCache>& gii,
+                      const repl::OplogEntry& op) const;
 
     // Queries '_stashNss' using 'idQuery'.
     BSONObj _queryStashCollById(OperationContext* opCtx,
