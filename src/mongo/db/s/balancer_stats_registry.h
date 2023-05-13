@@ -29,13 +29,29 @@
 
 #pragma once
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
-#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+/**
+ * Scoped lock to synchronize with the execution of range deletions.
+ * The range-deleter acquires a scoped lock in IX mode while orphans are being deleted.
+ * Acquiring the scoped lock in MODE_X ensures that no orphan counter in `config.rangeDeletions`
+ * entries is going to be updated concurrently.
+ */
+class ScopedRangeDeleterLock {
+public:
+    ScopedRangeDeleterLock(OperationContext* opCtx, LockMode mode)
+        : _resourceLock(opCtx, _mutex.getRid(), mode) {}
+
+private:
+    const Lock::ResourceLock _resourceLock;
+    static inline const Lock::ResourceMutex _mutex{"ScopedRangeDeleterLock"};
+};
 
 /**
  * The BalancerStatsRegistry is used to cache metadata on shards, such as the orphan documents
