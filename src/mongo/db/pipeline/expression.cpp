@@ -2649,6 +2649,21 @@ std::unique_ptr<Expression> ExpressionFieldPath::copyWithSubstitution(
     return nullptr;
 }
 
+bool ExpressionFieldPath::isRenameableByAnyPrefixNameIn(
+    const StringMap<std::string>& renameList) const {
+    if (_variable != Variables::kRootId || _fieldPath.getPathLength() == 1) {
+        return false;
+    }
+
+    FieldRef path(getFieldPathWithoutCurrentPrefix().fullPath());
+    for (const auto& rename : renameList) {
+        if (FieldRef oldName(rename.first); oldName.isPrefixOfOrEqualTo(path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 monotonic::State ExpressionFieldPath::getMonotonicState(const FieldPath& sortedFieldPath) const {
     return getFieldPathWithoutCurrentPrefix() == sortedFieldPath ? monotonic::State::Increasing
                                                                  : monotonic::State::NonMonotonic;

@@ -403,8 +403,7 @@ const generateTest = (useHint) => {
                            {},
                            collation);
 
-        /*********************************** Tests $expr predicates
-         * *********************************/
+        /*********************************** Tests $expr predicates *******************************/
         resetCollections();
         assert.commandWorked(insert(coll, [
             {_id: 0, [timeFieldName]: ISODate('1990-01-01 00:00:00.000Z'), [metaFieldName]: 2},

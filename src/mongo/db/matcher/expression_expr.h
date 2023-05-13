@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/query/expression_walker.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -134,6 +135,18 @@ public:
     void applyRename(const StringMap<std::string>& renameList) {
         SubstituteFieldPathWalker substituteWalker(renameList);
         expression_walker::walk<Expression>(_expression.get(), &substituteWalker);
+    }
+
+    bool hasRenameablePath(const StringMap<std::string>& renameList) const {
+        bool hasRenameablePath = false;
+        FieldPathVisitor visitor([&](const ExpressionFieldPath* expr) {
+            hasRenameablePath =
+                hasRenameablePath || expr->isRenameableByAnyPrefixNameIn(renameList);
+        });
+        stage_builder::ExpressionWalker walker(
+            &visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+        expression_walker::walk(_expression.get(), &walker);
+        return hasRenameablePath;
     }
 
 private:

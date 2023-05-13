@@ -826,8 +826,8 @@ TEST(IsIndependent, AndIsIndependentOnlyIfChildrenAre) {
     ASSERT_OK(status.getStatus());
 
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"b"}));
-    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"c"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"b"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"c"}));
 }
 
 TEST(IsIndependent, ElemMatchIsIndependent) {
@@ -838,9 +838,9 @@ TEST(IsIndependent, ElemMatchIsIndependent) {
     ASSERT_OK(status.getStatus());
 
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"x"}));
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"x.y"}));
-    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"y"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"x"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"x.y"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"y"}));
 }
 
 TEST(IsIndependent, NorIsIndependentOnlyIfChildrenAre) {
@@ -851,8 +851,8 @@ TEST(IsIndependent, NorIsIndependentOnlyIfChildrenAre) {
     ASSERT_OK(status.getStatus());
 
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"b"}));
-    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"c"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"b"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"c"}));
 }
 
 TEST(IsIndependent, NotIsIndependentOnlyIfChildrenAre) {
@@ -863,8 +863,8 @@ TEST(IsIndependent, NotIsIndependentOnlyIfChildrenAre) {
     ASSERT_OK(status.getStatus());
 
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
-    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"b"}));
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"b"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a"}));
 }
 
 TEST(IsIndependent, OrIsIndependentOnlyIfChildrenAre) {
@@ -875,8 +875,8 @@ TEST(IsIndependent, OrIsIndependentOnlyIfChildrenAre) {
     ASSERT_OK(status.getStatus());
 
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a"}));
-    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"c"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"c"}));
 }
 
 TEST(IsIndependent, AndWithDottedFieldPathsIsNotIndependent) {
@@ -887,8 +887,8 @@ TEST(IsIndependent, AndWithDottedFieldPathsIsNotIndependent) {
     ASSERT_OK(status.getStatus());
 
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a.b.c"}));
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a.b"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.b.c"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.b"}));
 }
 
 TEST(IsIndependent, BallIsIndependentOfBalloon) {
@@ -899,9 +899,9 @@ TEST(IsIndependent, BallIsIndependentOfBalloon) {
     ASSERT_OK(status.getStatus());
 
     unique_ptr<MatchExpression> expr = std::move(status.getValue());
-    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"a.balloon"}));
-    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"a.b"}));
-    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a.ball.c"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"a.balloon"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"a.b"}));
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.ball.c"}));
 }
 
 // This is a descriptive test to ensure that until renames are implemented for these expressions,
@@ -921,8 +921,8 @@ TEST(IsIndependent, NonRenameableExpressionIsNotIndependent) {
         auto matchExpression = std::move(swMatchExpression.getValue());
 
         // Both of these should be true once renames are implemented.
-        ASSERT_FALSE(expression::isIndependentOf(*matchExpression.get(), {"c"}));
-        ASSERT_FALSE(expression::isOnlyDependentOn(*matchExpression.get(), {"a", "b"}));
+        ASSERT_FALSE(expression::isIndependentOfConst(*matchExpression.get(), {"c"}));
+        ASSERT_FALSE(expression::isOnlyDependentOnConst(*matchExpression.get(), {"a", "b"}));
     }
 }
 
@@ -932,7 +932,7 @@ TEST(IsIndependent, EmptyDependencySetsPassIsOnlyDependentOn) {
     auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(swMatchExpression.getStatus());
     auto matchExpression = std::move(swMatchExpression.getValue());
-    ASSERT_TRUE(expression::isOnlyDependentOn(*matchExpression.get(), {}));
+    ASSERT_TRUE(expression::isOnlyDependentOnConst(*matchExpression.get(), {}));
 }
 
 TEST(ContainsOverlappingPaths, Basics) {
@@ -1830,7 +1830,10 @@ TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaPatternByIsOnlyDepen
 
     ASSERT_TRUE(splitOutExpr.get());
     // 'splitOutExpr' must be same as the expression after renaming 'a' to 'meta'.
-    expression::applyRenamesToExpression(originalExprCopy.get(), {{"a", "meta"}});
+    expression::Renameables renameables;
+    ASSERT_TRUE(
+        expression::isOnlyDependentOn(*originalExprCopy, {"a"}, {{"a", "meta"}}, renameables));
+    expression::applyRenamesToExpression({{"a", "meta"}}, &renameables);
     ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), originalExprCopy->serialize());
 
     ASSERT_FALSE(residualExpr.get());
@@ -1918,9 +1921,10 @@ TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "d"}, {"c", "e"}, {"x", "y"}};
-    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_TRUE(renamedExpr);
 
-    ASSERT_BSONOBJ_EQ(matcher.getValue()->serialize(), fromjson("{$expr: {$eq: ['$d.b', '$e']}}"));
+    ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{$expr: {$eq: ['$d.b', '$e']}}"));
 }
 
 TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatchWithExpr) {
@@ -1930,9 +1934,10 @@ TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatchWithExpr) {
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a.b.c", "x"}, {"d.e", "y"}};
-    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_TRUE(renamedExpr);
 
-    ASSERT_BSONOBJ_EQ(matcher.getValue()->serialize(), fromjson("{$expr: {$lt: ['$x', '$y.f']}}"));
+    ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{$expr: {$lt: ['$x', '$y.f']}}"));
 }
 
 TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatchWithNestedExpr) {
@@ -1943,10 +1948,11 @@ TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatchWithNestedExpr) 
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "x.y"}, {"d.e", "y"}, {"c", "q.r"}};
-    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_TRUE(renamedExpr);
 
     ASSERT_BSONOBJ_EQ(
-        matcher.getValue()->serialize(),
+        renamedExpr->serialize(),
         fromjson(
             "{$and: [{$expr: {$eq: ['$x.y.b.c', '$q.r']}}, {$expr: {$lt: ['$y.f', '$x.y']}}]}"));
 }
@@ -1958,10 +1964,11 @@ TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForAMatchWithExprWithNoField
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "x.y"}, {"d.e", "y"}, {"c", "q.r"}};
-    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_TRUE(renamedExpr);
 
     ASSERT_BSONOBJ_EQ(
-        matcher.getValue()->serialize(),
+        renamedExpr->serialize(),
         fromjson("{$expr: {$concat: [{$const: 'a'}, {$const: 'b'}, {$const: 'c'}]}}"));
 }
 
