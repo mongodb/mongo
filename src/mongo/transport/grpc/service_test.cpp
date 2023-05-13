@@ -462,7 +462,7 @@ TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
             std::vector<stdx::thread> threads;
             for (int32_t i = 0; i < 10; i++) {
                 auto clientId = UUID::gen().toString();
-                threads.push_back(monitor.spawn([&methodCallback, clientId, i] {
+                threads.push_back(monitor.spawn([&, clientId] {
                     ::grpc::ClientContext ctx;
                     CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
                     ctx.AddMetadata(std::string{CommandService::kClientIdKey}, clientId);
