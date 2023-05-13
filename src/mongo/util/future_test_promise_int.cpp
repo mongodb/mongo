@@ -34,7 +34,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concepts.h"
 
 #include "mongo/util/future_test_utils.h"
 

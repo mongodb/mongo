@@ -32,7 +32,6 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value_internal.h"
-#include "mongo/util/concepts.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/uuid.h"
 
@@ -417,22 +416,15 @@ inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
     lhs.swap(rhs);
 }
 
-MONGO_MAKE_BOOL_TRAIT(CanConstructValueFrom,
-                      (typename T),
-                      (T),
-                      (T val),
-                      //
-                      Value(std::forward<T>(val)));
-
 /**
  * This class is identical to Value, but supports implicit creation from any of the types explicitly
  * supported by Value.
  */
 class ImplicitValue : public Value {
 public:
-    TEMPLATE(typename T)
-    REQUIRES(CanConstructValueFrom<T>)
-    ImplicitValue(T&& arg) : Value(std::forward<T>(arg)) {}
+    template <typename T>
+    requires std::is_constructible_v<Value, T> ImplicitValue(T&& arg)
+        : Value(std::forward<T>(arg)) {}
 
     ImplicitValue(std::initializer_list<ImplicitValue> values) : Value(convertToValues(values)) {}
     ImplicitValue(std::vector<ImplicitValue> values) : Value(convertToValues(values)) {}

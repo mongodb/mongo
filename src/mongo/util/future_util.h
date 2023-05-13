@@ -495,11 +495,11 @@ public:
  * error as soon as any input future is set with an error. The resulting vector contains the results
  * of all of the input futures in the same order in which they were provided.
  */
-TEMPLATE(typename FutureLike,
-         typename Value = typename FutureLike::value_type,
-         typename ResultVector = std::vector<Value>)
-REQUIRES(!std::is_void_v<Value> && future_util_details::isFutureOrExecutorFuture<FutureLike>)
-SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
+template <typename FutureLike,
+          typename Value = typename FutureLike::value_type,
+          typename ResultVector = std::vector<Value>>
+requires(!std::is_void_v<Value> && future_util_details::isFutureOrExecutorFuture<FutureLike>)
+    SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
     invariant(futures.size() > 0, future_util_details::kWhenAllSucceedEmptyInputInvariantMsg);
 
     // A structure used to share state between the input futures.
@@ -559,9 +559,9 @@ SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
  * Variant of whenAllSucceed for void input futures. The only behavior difference is that it returns
  * SemiFuture<void> instead of SemiFuture<std::vector<T>>.
  */
-TEMPLATE(typename FutureLike, typename Value = typename FutureLike::value_type)
-REQUIRES(std::is_void_v<Value>&& future_util_details::isFutureOrExecutorFuture<FutureLike>)
-SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
+template <typename FutureLike, typename Value = typename FutureLike::value_type>
+requires(std::is_void_v<Value>&& future_util_details::isFutureOrExecutorFuture<FutureLike>)
+    SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
     invariant(futures.size() > 0, future_util_details::kWhenAllSucceedEmptyInputInvariantMsg);
 
     // A structure used to share state between the input futures.
@@ -714,11 +714,11 @@ SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
  * we peel off the first element of each input list in order to assist the compiler in type
  * inference and to prevent 0 length lists from compiling.
  */
-TEMPLATE(typename... FuturePack,
-         typename FutureLike = std::common_type_t<FuturePack...>,
-         typename Value = typename FutureLike::value_type,
-         typename ResultVector = std::vector<Value>)
-REQUIRES(future_util_details::isFutureOrExecutorFuture<FutureLike>)
+template <typename... FuturePack,
+          typename FutureLike = std::common_type_t<FuturePack...>,
+          typename Value = typename FutureLike::value_type,
+          typename ResultVector = std::vector<Value>>
+requires future_util_details::isFutureOrExecutorFuture<FutureLike>
 auto whenAllSucceed(FuturePack&&... futures) {
     return whenAllSucceed(
         future_util_details::variadicArgsToVector(std::forward<FuturePack>(futures)...));

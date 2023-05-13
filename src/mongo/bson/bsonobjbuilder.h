@@ -539,9 +539,9 @@ public:
      * Append a map of values as a sub-object.
      * Note: the keys of the map should be StringData-compatible (i.e. strings).
      */
-    TEMPLATE(typename Map)
-    REQUIRES(std::is_convertible_v<decltype(std::declval<Map>().begin()->first), StringData>)
-    Derived& append(StringData fieldName, const Map& map) {
+    template <typename Map>
+    requires std::is_convertible_v<decltype(std::declval<Map>().begin()->first), StringData>
+        Derived& append(StringData fieldName, const Map& map) {
         typename std::remove_reference<Derived>::type bob;
         for (auto&& [k, v] : map) {
             bob.append(k, v);

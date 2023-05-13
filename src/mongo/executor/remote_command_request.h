@@ -38,7 +38,6 @@
 #include "mongo/executor/hedge_options_util.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/concepts.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -127,15 +126,16 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
     RemoteCommandRequestImpl();
 
     // Allow implicit conversion from RemoteCommandRequest to RemoteCommandRequestOnAny
-    REQUIRES_FOR_NON_TEMPLATE(std::is_same_v<Target, std::vector<HostAndPort>>)
-    RemoteCommandRequestImpl(const RemoteCommandRequestImpl<HostAndPort>& other)
+    template <int...>
+    requires std::is_same_v<Target, std::vector<HostAndPort>> RemoteCommandRequestImpl(
+        const RemoteCommandRequestImpl<HostAndPort>& other)
         : RemoteCommandRequestBase(other), target({other.target}) {}
 
     // Allow conversion from RemoteCommandRequestOnAny to RemoteCommandRequest with the index of a
     // particular host
-    REQUIRES_FOR_NON_TEMPLATE(std::is_same_v<Target, HostAndPort>)
-    RemoteCommandRequestImpl(const RemoteCommandRequestImpl<std::vector<HostAndPort>>& other,
-                             size_t idx)
+    template <int...>
+    requires std::is_same_v<Target, HostAndPort> RemoteCommandRequestImpl(
+        const RemoteCommandRequestImpl<std::vector<HostAndPort>>& other, size_t idx)
         : RemoteCommandRequestBase(other), target(other.target[idx]) {}
 
     RemoteCommandRequestImpl(RequestId requestId,

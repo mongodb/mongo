@@ -748,7 +748,6 @@ icuEnv.CppUnitTest(
         'base64_test.cpp',
         'cancellation_test.cpp',
         'clock_source_mock_test.cpp',
-        'concepts_test.cpp',
         'container_size_helper_test.cpp',
         'ctype_test.cpp',
         'decimal_counter_test.cpp',
