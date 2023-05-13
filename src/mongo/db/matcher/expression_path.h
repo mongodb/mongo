@@ -105,19 +105,51 @@ public:
      * element) and the path components that should replace the renamed prefix (as the second
      * element).
      *
-     * Returns whether there is any attempted but failed to rename. This case can happen when any
-     * renamed path component is part of sub-fields. For example, expr = {x: {$eq: {y: 3}}} and
-     * renames = {{"x.y", "a.b"}}. We should be able to rename 'x' and 'y' to 'a' and 'b'
-     * respectively but due to the current limitation of the algorithm, we cannot rename such match
-     * expressions.
+     * Returns whether renames will always succeed if any rename is applicable. See
+     * wouldRenameSucceed() for more details.
      *
      * TODO SERVER-74298 As soon as we implement SERVER-74298, the return value might not be
      * necessary any more.
      */
-    bool applyRename(const StringMap<std::string>& renameList) {
-        if (!_elementPath) {
-            return false;
+    [[nodiscard]] bool applyRename(const StringMap<std::string>& renameList) {
+        if (!_elementPath || renameList.size() == 0) {
+            return true;
         }
+
+        if (auto&& [isRenamable, optRewrittenPath] = wouldRenameSucceed(renameList); !isRenamable) {
+            return false;
+        } else if (optRewrittenPath) {
+            setPath(*optRewrittenPath);
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns a pair of bool and boost::optional<StringData>.
+     *
+     * - The bool indicates whether renames will always succeed if any rename is applicable. No
+     *   applicable renames is considered as a successful rename and returns true with the second
+     *   element of the pair is boost::none. This function can return false when a renamed path
+     *   component descends into an $elemMatch or an object literal. For examples,
+     *
+     *   expr = {x: {$eq: {y: 3}}} and renames = {{"x.y", "a.b"}}. We should be able to rename 'x'
+     *   and 'y' to 'a' and 'b' respectively but due to the current limitation of the algorithm, we
+     *   cannot rename such match expressions.
+     *
+     *   Another similar example is expr = {x: {$elemMatch: {$eq: {y: 3}}}} and renames = {{"x.y",
+     *   "a.b"}}.
+
+     * - The boost::optional<StringData> is the rewritten path iff one rename is applicable. The
+     *   rewritten path is the path after applying the only applicable rename in 'renameList'. If no
+     *   rename is applicable, the rewritten path is boost::none.
+     *
+     * TODO SERVER-74298 As soon as we implement SERVER-74298, this separate function may not be
+     * necessary any more and can be combined into applyRenames().
+     */
+    std::pair<bool, boost::optional<std::string>> wouldRenameSucceed(
+        const StringMap<std::string>& renameList) const {
+        invariant(_elementPath);
 
         size_t renamesFound = 0u;
         std::string rewrittenPath;
@@ -141,9 +173,14 @@ public:
 
                 ++renamesFound;
             } else if (pathFieldRef.isPrefixOf(prefixToRename)) {
-                // TODO SERVER-74298 Implement renaming by each path component instead of
-                // incrementing 'attemptedButFailedRenames'.
-                return true;
+                // TODO SERVER-74298 Implement renaming by each path component instead of returning
+                // the pair of 'false' and boost::none. We can traverse subexpressions with the
+                // remaining path suffix of 'prefixToRename' to see if we can rename each path
+                // component. Any subexpression would succeed with 'rewrittenPath' then this path
+                // component can be renamed. For example, assuming that 'pathFieldRef' == "a.b" and
+                // 'prefixToRename' == "a.b.c", we can recurse down to the subexpression with path
+                // "c" to see if we can rename it. If we can, we can rename this path too.
+                return {false, boost::none};
             }
         }
 
@@ -152,10 +189,10 @@ public:
         if (renamesFound == 1u) {
             // There is an applicable rename. Modify the path of this expression to use the new
             // name.
-            setPath(rewrittenPath);
+            return {true, rewrittenPath};
         }
 
-        return false;
+        return {true, boost::none};
     }
 
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const override {

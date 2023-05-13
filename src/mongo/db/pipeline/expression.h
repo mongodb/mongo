@@ -1994,6 +1994,12 @@ public:
     std::unique_ptr<Expression> copyWithSubstitution(
         const StringMap<std::string>& renameList) const;
 
+    /**
+     * Checks if any key of 'renameList' map is a prefix of this ExpressionFieldPath's path. It
+     * would mean that this ExpressionFieldPath is renameable by 'renameList' if so.
+     */
+    bool isRenameableByAnyPrefixNameIn(const StringMap<std::string>& renameList) const;
+
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
     }
@@ -4251,6 +4257,30 @@ struct SubstituteFieldPathWalker {
     }
 
     const StringMap<std::string>& renameList;
+};
+
+/**
+ * This visitor is used to visit only ExpressionFieldPath nodes in an expression tree and call 'fn'
+ * on them.
+ *
+ * Usage example:
+ * bool isFoo = false;
+ * FieldPathVisitor visitor([&](const ExpressionFieldPath* expr) {
+ *     isFoo = isFoo || expr->isFoo();
+ * });
+ */
+template <typename F>
+struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
+    // To avoid overloaded-virtual warnings.
+    using SelectiveConstExpressionVisitorBase::visit;
+
+    explicit FieldPathVisitor(const F& fn) : _fn(fn) {}
+
+    void visit(const ExpressionFieldPath* expr) final {
+        _fn(expr);
+    }
+
+    F _fn;
 };
 
 /**
