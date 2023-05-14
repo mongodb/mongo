@@ -136,3 +136,9 @@ feature_flags:
       default: true
       version: 7.1
       shouldBeFCVGated: true
+
+    featureFlagQuerySettings:
+      description: "Feature flag for enabling persistent query settings"
+      cpp_varname: gFeatureFlagQuerySettings
+      default: false
+      shouldBeFCVGated: true
