@@ -48,7 +48,7 @@ void ResourceCatalog::add(ResourceId id, const NamespaceString& ns) {
 
 void ResourceCatalog::add(ResourceId id, const DatabaseName& dbName) {
     invariant(id.getType() == RESOURCE_DATABASE);
-    _add(id, dbName.toStringWithTenantId());
+    _add(id, DatabaseNameUtil::serializeForCatalog(dbName));
 }
 
 void ResourceCatalog::_add(ResourceId id, std::string name) {
@@ -63,7 +63,7 @@ void ResourceCatalog::remove(ResourceId id, const NamespaceString& ns) {
 
 void ResourceCatalog::remove(ResourceId id, const DatabaseName& dbName) {
     invariant(id.getType() == RESOURCE_DATABASE);
-    _remove(id, dbName.toStringWithTenantId());
+    _remove(id, DatabaseNameUtil::serializeForCatalog(dbName));
 }
 
 void ResourceCatalog::_remove(ResourceId id, const std::string& name) {

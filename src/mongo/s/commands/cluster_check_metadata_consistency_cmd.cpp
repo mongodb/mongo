@@ -158,7 +158,7 @@ public:
                                                              const NamespaceString& nss) {
             const CachedDatabaseInfo dbInfo =
                 uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
-                    opCtx, nss.dbName().toStringWithTenantId()));
+                    opCtx, DatabaseNameUtil::serializeForCatalog(nss.dbName())));
 
             ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
             shardsvrRequest.setDbName(nss.dbName());

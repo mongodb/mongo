@@ -57,7 +57,7 @@ bool cursorCommandPassthroughPrimaryShard(OperationContext* opCtx,
     // TODO SERVER-67411 change executeCommandAgainstDatabasePrimary to take in DatabaseName
     auto response = executeCommandAgainstDatabasePrimary(
         opCtx,
-        dbName.toStringWithTenantId(),
+        DatabaseNameUtil::serialize(dbName),
         dbInfo,
         CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
         ReadPreferenceSetting::get(opCtx),
@@ -110,7 +110,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // DB resource grants all non-system collections, so filter out system collections. This is done
     // inside the $or, since some system collections might be granted specific privileges.
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forDatabaseName(dbName.toStringWithTenantId()))) {
+            ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbName)))) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^(?!system\\.)"))));
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
@@ -119,7 +119,8 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // system_buckets DB resource grants all system_buckets.* collections so create a filter to
     // include them
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forAnySystemBucketsInDatabase(dbName.toStringWithTenantId())) ||
+            ResourcePattern::forAnySystemBucketsInDatabase(
+                DatabaseNameUtil::serializeForAuth(dbName))) ||
         authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnySystemBuckets())) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^system\\.buckets\\."))));
@@ -132,13 +133,13 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
         for (const auto& [resource, privilege] : authUser.value()->getPrivileges()) {
             if (resource.isCollectionPattern() ||
                 (resource.isExactNamespacePattern() &&
-                 resource.databaseToMatch() == dbName.toStringWithTenantId())) {
+                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
                 collectionNames.emplace(resource.collectionToMatch().toString());
             }
 
             if (resource.isAnySystemBucketsCollectionInAnyDB() ||
                 (resource.isExactSystemBucketsCollection() &&
-                 resource.databaseToMatch() == dbName.toStringWithTenantId())) {
+                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
                 collectionNames.emplace(systemBucketsDot + resource.collectionToMatch().toString());
             }
         }
@@ -234,8 +235,8 @@ public:
         }
 
         // TODO SERVER-67797 Change CatalogCache to use DatabaseName object
-        auto dbInfoStatus =
-            Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName.toStringWithTenantId());
+        auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(
+            opCtx, DatabaseNameUtil::serializeForCatalog(dbName));
         if (!dbInfoStatus.isOK()) {
             appendEmptyResultSet(opCtx, output, dbInfoStatus.getStatus(), nss);
             return true;
@@ -250,9 +251,9 @@ public:
             &output,
             // Use the original command object rather than the rewritten one to preserve whether
             // 'authorizedCollections' field is set.
-            uassertStatusOK(
-                AuthorizationSession::get(opCtx->getClient())
-                    ->checkAuthorizedToListCollections(dbName.toStringWithTenantId(), cmdObj)));
+            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                ->checkAuthorizedToListCollections(
+                                    DatabaseNameUtil::serializeForAuth(dbName), cmdObj)));
     }
 
     void validateResult(const BSONObj& result) final {

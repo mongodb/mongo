@@ -121,7 +121,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(rename_collection::checkAuthForRenameCollectionCommand(
                 opCtx->getClient(),
-                request().getDbName().toStringWithTenantId(),
+                DatabaseNameUtil::serializeForAuth(request().getDbName()),
                 request().toBSON(BSONObj())));
         }
     };

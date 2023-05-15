@@ -67,6 +67,13 @@ public:
         const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
 
     /**
+     *
+     * TODO SERVER-76294 Remove this function. Any remaining call sites must be changed to use a
+     * function on DatabaseNameUtil.
+     */
+    static std::string serializeForAuth(
+        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+    /**
      * To be used only for durable catalog. We always include the tenantId as prefixed in a
      * databasename for the catalog.
      */

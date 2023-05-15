@@ -102,7 +102,7 @@ public:
                     "command"_attr = redact(cmdObj));
 
         // TODO SERVER-67798 Change cluster::createDatabase to use DatabaseName
-        cluster::createDatabase(opCtx, dbName.toStringWithTenantId());
+        cluster::createDatabase(opCtx, DatabaseNameUtil::serialize(dbName));
 
         auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
         auto routingInfo = targeter.getRoutingInfo();

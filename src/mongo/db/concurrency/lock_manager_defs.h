@@ -243,7 +243,7 @@ public:
         verifyNoResourceMutex(type);
     }
     ResourceId(ResourceType type, const DatabaseName& dbName)
-        : _fullHash(fullHash(type, hashStringData(dbName.toStringWithTenantId()))) {
+        : _fullHash(fullHash(type, hashStringData(dbName.toStringForResourceId()))) {
         verifyNoResourceMutex(type);
     }
     ResourceId(ResourceType type, StringData str) : _fullHash(fullHash(type, hashStringData(str))) {

@@ -90,7 +90,7 @@ public:
 
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
-            dbName.toStringWithTenantId(),
+            DatabaseNameUtil::serialize(dbName),
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),

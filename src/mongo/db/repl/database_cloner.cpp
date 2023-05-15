@@ -128,7 +128,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
 }
 
 bool DatabaseCloner::isMyFailPoint(const BSONObj& data) const {
-    return data["database"].str() == _dbName.toStringWithTenantId() &&
+    return data["database"].str() == DatabaseNameUtil::serializeForCatalog(_dbName) &&
         BaseCloner::isMyFailPoint(data);
 }
 

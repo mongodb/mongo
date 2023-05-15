@@ -296,8 +296,8 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
 void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
                                                    const BSONObj& cmdObj) {
-    auto cachedDbInfo = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName.toStringWithTenantId()));
+    auto cachedDbInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
+        opCtx, DatabaseNameUtil::serializeForCatalog(dbName)));
     BSONObjBuilder finalCmdBuilder(cmdObj);
     finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                            opCtx->getWriteConcern().toBSON());
@@ -305,7 +305,7 @@ void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
     // TODO SERVER-67411 change executeCommandAgainstDatabasePrimary to take in DatabaseName
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
-                                             dbName.toStringWithTenantId(),
+                                             DatabaseNameUtil::serialize(dbName),
                                              std::move(cachedDbInfo),
                                              finalCmdObj,
                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),

@@ -152,19 +152,10 @@ public:
         return _data.size() == kDataOffset;
     }
 
-    std::string toStringWithTenantId() const {
-        if (_hasTenantId()) {
-            return str::stream() << TenantId{OID::from(&_data[kDataOffset])} << "_" << db();
-        }
-
-        return db().toString();
-    }
-
     /**
-     * Method to be used only for unit tests.
-     * It will always return a tenant prefixed dbname.
+     * This function should only be used when creating a resouce id for databasename.
      */
-    std::string toStringWithTenantId_forTest() const {
+    std::string toStringForResourceId() const {
         return toStringWithTenantId();
     }
 
@@ -181,6 +172,15 @@ public:
      */
     friend std::string toStringForLogging(const DatabaseName& dbName) {
         return dbName.toStringWithTenantId();
+    }
+
+    /**
+     * This function returns the DatabaseName as a string, including the tenantId.
+     *
+     * MUST only be used for tests.
+     */
+    std::string toStringWithTenantId_forTest() const {
+        return toStringWithTenantId();
     }
 
     /**
@@ -293,6 +293,15 @@ private:
     }
 
     std::string toString() const {
+        return db().toString();
+    }
+
+    std::string toStringWithTenantId() const {
+        if (_hasTenantId()) {
+            auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
+            return str::stream() << tenantId.toString() << "_" << db();
+        }
+
         return db().toString();
     }
 

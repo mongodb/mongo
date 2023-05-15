@@ -163,7 +163,7 @@ Status checkAuthorizedToSetRestrictions(AuthorizationSession* authzSession,
                                         const DatabaseName& dbname) {
     if (hasAuthRestriction) {
         if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()),
+                ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
                 ActionType::setAuthenticationRestriction)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -190,7 +190,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const CreateUserCommand& 
             str::stream() << "Not authorized to create users on db: "
                           << dbname.toStringForErrorMsg(),
             as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()),
+                ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
                 ActionType::createUser));
 
     auto resolvedRoles = resolveRoleNames(request.getRoles(), dbname);
@@ -210,7 +210,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& 
             (request.getPwd() == boost::none) ||
                 isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()),
+                    ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
                     ActionType::changePassword));
 
     uassert(ErrorCodes::Unauthorized,
@@ -218,7 +218,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& 
             (request.getCustomData() == boost::none) ||
                 isAuthorizedToChangeOwnCustomDataAsUser(as, userName) ||
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()),
+                    ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
                     ActionType::changeCustomData));
 
     if (auto possibleRoles = request.getRoles()) {
@@ -309,24 +309,24 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const DropRoleCommand& re
     const auto& dbname = request.getDbName();
     auto* as = AuthorizationSession::get(opCtx->getClient());
 
-    uassert(
-        ErrorCodes::Unauthorized,
-        str::stream() << "Not authorized to drop roles from the " << dbname.toStringForErrorMsg()
-                      << " database",
-        as->isAuthorizedForActionsOnResource(
-            ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()), ActionType::dropRole));
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to drop roles from the "
+                          << dbname.toStringForErrorMsg() << " database",
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
+                ActionType::dropRole));
 }
 
 void checkAuthForTypedCommand(OperationContext* opCtx,
                               const DropAllUsersFromDatabaseCommand& request) {
     const auto& dbname = request.getDbName();
     auto* as = AuthorizationSession::get(opCtx->getClient());
-    uassert(
-        ErrorCodes::Unauthorized,
-        str::stream() << "Not authorized to drop users from the " << dbname.toStringForErrorMsg()
-                      << " database",
-        as->isAuthorizedForActionsOnResource(
-            ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()), ActionType::dropUser));
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to drop users from the "
+                          << dbname.toStringForErrorMsg() << " database",
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
+                ActionType::dropUser));
 }
 
 void checkAuthForTypedCommand(OperationContext* opCtx, const RevokeRolesFromUserCommand& request) {
@@ -351,7 +351,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
                 str::stream() << "Not authorized to view users from the "
                               << dbname.toStringForErrorMsg() << " database",
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()),
+                    ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
                     ActionType::viewUser));
     } else if (arg.isAllForAllDBs()) {
         uassert(ErrorCodes::Unauthorized,
@@ -394,12 +394,12 @@ void checkAuthForTypedCommand(OperationContext* opCtx,
                               const DropAllRolesFromDatabaseCommand& request) {
     const auto& dbname = request.getDbName();
     auto* as = AuthorizationSession::get(opCtx->getClient());
-    uassert(
-        ErrorCodes::Unauthorized,
-        str::stream() << "Not authorized to drop roles from the " << dbname.toStringForErrorMsg()
-                      << " database",
-        as->isAuthorizedForActionsOnResource(
-            ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()), ActionType::dropRole));
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to drop roles from the "
+                          << dbname.toStringForErrorMsg() << " database",
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
+                ActionType::dropRole));
 }
 
 void checkAuthForTypedCommand(OperationContext* opCtx, const RolesInfoCommand& request) {
@@ -413,7 +413,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const RolesInfoCommand& r
                 str::stream() << "Not authorized to view roles from the "
                               << dbname.toStringForErrorMsg() << " database",
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(dbname.toStringWithTenantId()),
+                    ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbname)),
                     ActionType::viewRole));
     } else {
         invariant(arg.isExact());
