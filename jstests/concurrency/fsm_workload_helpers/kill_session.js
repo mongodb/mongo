@@ -23,7 +23,10 @@ function killSession(db, collName) {
                 ourSessionWasKilled = true;
                 continue;
             } else {
-                assertAlways.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+                assertAlways.commandFailedWithCode(
+                    res,
+                    [ErrorCodes.DuplicateKey, ErrorCodes.WriteConcernFailed],
+                    'unexpected error code: ' + res.code + ': ' + res.message);
             }
 
             const sessionToKill = db.getSiblingDB("config").system.sessions.aggregate([
