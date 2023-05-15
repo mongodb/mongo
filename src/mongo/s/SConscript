@@ -410,9 +410,11 @@ env.Library(
     source=[
         'sessions_collection_sharded.cpp',
     ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/session/logical_session_id',
+    LIBDEPS=[
         '$BUILD_DIR/mongo/db/session/sessions_collection',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         'sharding_api',
     ],
 )
@@ -472,8 +474,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/server_options_base',
         '$BUILD_DIR/mongo/db/service_liaison_mongos',
-        '$BUILD_DIR/mongo/db/session/logical_session_cache',
-        '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/db/stats/counters',
@@ -540,6 +540,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/serverinit',
         '$BUILD_DIR/mongo/db/service_liaison_mongos',
+        '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_refresher',

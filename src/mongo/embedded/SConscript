@@ -101,7 +101,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_entry_point_common',
         '$BUILD_DIR/mongo/db/service_liaison_mongod',
-        '$BUILD_DIR/mongo/db/session/logical_session_cache',
         '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/session/sessions_collection_standalone',
         '$BUILD_DIR/mongo/db/startup_recovery',

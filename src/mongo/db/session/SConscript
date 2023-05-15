@@ -122,7 +122,6 @@ env.Library(
 env.Library(
     target='logical_session_cache_impl',
     source=[
-        'initialize_operation_session_info.cpp',
         'logical_session_cache_impl.cpp',
     ],
     LIBDEPS=[

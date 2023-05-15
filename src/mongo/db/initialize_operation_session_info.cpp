@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/session/initialize_operation_session_info.h"
+#include "mongo/db/initialize_operation_session_info.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/operation_context.h"

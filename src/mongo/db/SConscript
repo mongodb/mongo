@@ -875,12 +875,15 @@ env.Library(
         's/transaction_coordinator_curop.cpp',
         's/transaction_coordinator_factory.cpp',
         's/transaction_coordinator_worker_curop_repository.cpp',
+        'transaction_resources.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/grid',
         'concurrency/lock_manager',
         'index/index_access_method',
+        'rw_concern_d',
         'shard_role_api_stor_ex',
+        'views/views',
     ],
     LIBDEPS_PRIVATE=[
         'server_base',
@@ -891,13 +894,12 @@ env.Library(
 env.Library(
     target='shard_role',
     source=[
-        'catalog_raii.cpp',
         'catalog/catalog_helper.cpp',
         'catalog/collection_uuid_mismatch.cpp',
         'catalog/collection_yield_restore.cpp',
+        'catalog_raii.cpp',
         'db_raii.cpp',
         'shard_role.cpp',
-        'transaction_resources.cpp',
     ],
     LIBDEPS=[
         'catalog/collection_catalog',
@@ -905,7 +907,6 @@ env.Library(
         'shard_role_api',
         'stats/top',
         'storage/write_unit_of_work',
-        'views/views',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
@@ -1830,23 +1831,24 @@ env.Library(
         'error_labels.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
-        '$BUILD_DIR/mongo/db/query/op_metrics',
-        '$BUILD_DIR/mongo/db/session/logical_session_id',
         'commands',
+        'pipeline/lite_parsed_document_source',
+        'query/op_metrics',
+        'session/logical_session_id',
     ],
 )
 
 env.Library(
     target='shared_request_handling',
     source=[
+        'initialize_operation_session_info.cpp',
         'transaction_validation.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'api_parameters',
         'error_labels',
-        'session/logical_session_cache_impl',
+        'repl/repl_coordinator_interface',
+        'session/logical_session_cache',
     ],
 )
 
@@ -2271,11 +2273,11 @@ env.Library(
 )
 
 env.Library(
-    target="mongod_initializers",
+    target='mongod_initializers',
     source=[
         # NOTE: If you add an additional source file here, please delete
         # the file db/mongod_initializers.cpp.
-        "mongod_initializers.cpp",
+        'mongod_initializers.cpp',
     ],
     LIBDEPS_PRIVATE=[
         # NOTE: If you need to add a static or mongo initializer to mongod startup,
@@ -2357,7 +2359,6 @@ env.Library(
         'serverless/shard_split_commands',
         'service_liaison_mongod',
         'session/kill_sessions_local',
-        'session/logical_session_cache_impl',
         'session/sessions_collection_rs',
         'session/sessions_collection_standalone',
         'shard_role',
@@ -2413,6 +2414,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
         '$BUILD_DIR/mongo/db/query/stats/query_stats',
         '$BUILD_DIR/mongo/db/s/query_analysis_writer',
+        '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/set_change_stream_state_coordinator',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_initializer',
@@ -2691,9 +2693,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
             '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
             '$BUILD_DIR/mongo/db/s/shard_server_test_fixture',
-            '$BUILD_DIR/mongo/db/session/logical_session_cache',
             '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
-            '$BUILD_DIR/mongo/db/session/logical_session_id',
             '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
             '$BUILD_DIR/mongo/db/session/session_catalog',
             '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
