@@ -2,6 +2,8 @@
  * Test creating and using partial indexes, on a time-series collection.
  *
  * @tags: [
+ *   # TODO (SERVER-73316): remove
+ *   assumes_against_mongod_not_mongos,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
@@ -107,16 +109,10 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
         // If scan is not present, check rejected plans
         if (scan === null) {
             const rejectedPlans = getRejectedPlans(getAggPlanStage(explain, "$cursor")["$cursor"]);
-            if (rejectedPlans.length === 2) {
-                let firstScan = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
-                let secondScan = getPlanStages(getRejectedPlan(rejectedPlans[1]), "IXSCAN");
-                // Both plans should have an "IXSCAN" stage and one stage should scan the index on
-                // the 'a' field.
-                if (firstScan.length === 1 && secondScan.length === 1) {
-                    scan = firstScan[0];
-                    if (secondScan[0]["indexName"] == "a_1") {
-                        scan = secondScan[0];
-                    }
+            if (rejectedPlans.length === 1) {
+                const scans = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
+                if (scans.length === 1) {
+                    scan = scans[0];
                 }
             }
         } else {
@@ -169,12 +165,6 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
 
     // Test some predicates on the time field.
     {
-        // This index is implicitly created for sharded collections. We want to create the same
-        // index for non-sharded collections, so the same query plans are generated.
-        if (!FixtureHelpers.isSharded(buckets)) {
-            assert.commandWorked(coll.createIndex({[timeField]: 1}));
-        }
-
         const t0 = ISODate('2000-01-01T00:00:00Z');
         const t1 = ISODate('2000-01-01T00:00:01Z');
         const t2 = ISODate('2000-01-01T00:00:02Z');
@@ -202,11 +192,6 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
             coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$gte: t1}}}));
         check({a: {$lt: 999}, [timeField]: {$gte: t1}});
         check({a: {$lt: 999}, [timeField]: {$gte: t2}});
-
-        // Drop the index, so it doesn't interfere with other tests.
-        if (!FixtureHelpers.isSharded(buckets)) {
-            assert.commandWorked(coll.dropIndex({[timeField]: 1}));
-        }
     }
 
     assert.commandWorked(coll.dropIndex({a: 1}));
