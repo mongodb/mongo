@@ -2545,6 +2545,21 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
                                                   const IndexBuildOptions& indexBuildOptions,
                                                   const Status& status) {
 
+    if (!replState->isAbortCleanUpRequired()) {
+        // The index build aborted at an early stage before the 'startIndexBuild' oplog entry is
+        // replicated: members replicating from this sync source are not aware of this index
+        // build, nor has any build state been persisted locally. Unregister the index build
+        // locally. In two phase index builds, any conditions causing secondaries to fail setting up
+        // an index build (which must have succeeded in the primary) are assumed to eventually cause
+        // the node to crash, so we do not attempt to verify this is a primary.
+        LOGV2(7564400,
+              "Index build: unregistering without cleanup",
+              "buildUUD"_attr = replState->buildUUID,
+              "error"_attr = status);
+        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+        return;
+    }
+
     if (!status.isA<ErrorCategory::ShutdownError>()) {
         try {
             // It is still possible to get a shutdown request while trying to clean-up. All shutdown
@@ -2579,6 +2594,8 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterNonShutdownFailure(
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
 
+    invariant(replState->isAbortCleanUpRequired());
+
     // The index builder thread can abort on its own if it is interrupted by a user killop. This
     // would prevent us from taking locks. Use a new OperationContext to abort the index build.
     runOnAlternateContext(
@@ -2605,21 +2622,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
 
-    // We can only get here when there is no external abort, after a failure. If the operation has
-    // been killed, it must have been from a killop. In which case we cannot continue and try to
-    // vote, because we want the voting itself to be killable. Continue and try to abort as primary
-    // or crash.
-    if (!opCtx->isKillPending() &&
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
-        if (ErrorCodes::NotWritablePrimary == status && !replState->isAbortCleanUpRequired()) {
-            // Clean up if the error happens due to stepdown before 'startIndexBuild' oplog entry is
-            // replicated. Other nodes will not be aware of this index build, so trying to signal
-            // for abort to the new primary cannot succeed.
-            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
-            return;
-        }
-    }
+    invariant(replState->isAbortCleanUpRequired());
 
     // Use a new OperationContext to abort the index build since our current opCtx may be
     // interrupted. This is still susceptible to shutdown interrupts, but in that case, on server
@@ -2659,20 +2662,14 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
                 auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
                 if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
-                    if (replState->isSettingUp()) {
-                        // Clean up if the error happens before StartIndexBuild oplog entry
-                        // is replicated during startup or stepdown.
-                        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
-                        return;
-                    } else {
-                        // Index builds may not fail on secondaries. If a primary replicated
-                        // an abortIndexBuild oplog entry, then this index build would have
-                        // received an IndexBuildAborted error code.
-                        fassert(51101,
-                                status.withContext(str::stream()
-                                                   << "Index build: " << replState->buildUUID
-                                                   << "; Database: " << replState->dbName));
-                    }
+                    // Index builds may not fail on secondaries. If a primary replicated
+                    // an abortIndexBuild oplog entry, then this index build would have
+                    // received an IndexBuildAborted error code.
+                    fassert(51101,
+                            status.withContext(str::stream()
+                                               << "Index build: " << replState->buildUUID
+                                               << "; Database: "
+                                               << replState->dbName.toStringForErrorMsg()));
                 }
 
                 CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
