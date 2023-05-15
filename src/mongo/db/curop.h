@@ -432,7 +432,7 @@ public:
      * report, since this may be called in either a mongoD or mongoS context and the latter does not
      * supply lock stats. The client must be locked before calling this method.
      */
-    static void reportCurrentOpForClient(OperationContext* opCtx,
+    static void reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          Client* client,
                                          bool truncateOps,
                                          bool backtraceMode,
@@ -875,7 +875,9 @@ public:
      * If called from a thread other than the one executing the operation associated with this
      * CurOp, it is necessary to lock the associated Client object before executing this method.
      */
-    void reportState(BSONObjBuilder* builder, bool truncateOps = false);
+    void reportState(BSONObjBuilder* builder,
+                     const SerializationContext& serializationContext,
+                     bool truncateOps = false);
 
     /**
      * Sets the message for FailPoints used.

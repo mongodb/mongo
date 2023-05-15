@@ -77,7 +77,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         {},       // resolvedNamespaces
                         findCmd.getNamespaceOrUUID().uuid(),
                         findCmd.getLet(),
-                        mayDbProfile) {}
+                        mayDbProfile,
+                        findCmd.getSerializationContext()) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,
@@ -101,7 +102,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         std::move(resolvedNamespaces),
                         std::move(collUUID),
                         request.getLet(),
-                        mayDbProfile) {
+                        mayDbProfile,
+                        request.getSerializationContext()) {
 
     if (request.getIsMapReduceCommand()) {
         // mapReduce command JavaScript invocation is only subject to the server global
@@ -126,7 +128,8 @@ ExpressionContext::ExpressionContext(
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID,
     const boost::optional<BSONObj>& letParameters,
-    bool mayDbProfile)
+    bool mayDbProfile,
+    const SerializationContext& serializationCtx)
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
@@ -134,6 +137,7 @@ ExpressionContext::ExpressionContext(
                    !(opCtx && opCtx->readOnly())),  // Disallow disk use if in read-only mode.
       bypassDocumentValidation(bypassDocumentValidation),
       ns(ns),
+      serializationCtxt(serializationCtx),
       uuid(std::move(collUUID)),
       opCtx(opCtx),
       mongoProcessInterface(mongoProcessInterface),
@@ -242,7 +246,8 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     _resolvedNamespaces,
                                                     uuid,
                                                     boost::none /* letParameters */,
-                                                    mayDbProfile);
+                                                    mayDbProfile,
+                                                    SerializationContext());
 
     expCtx->inMongos = inMongos;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
@@ -263,6 +268,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->originalAggregateCommand = originalAggregateCommand.getOwned();
 
     expCtx->inLookup = inLookup;
+    expCtx->serializationCtxt = serializationCtxt;
 
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.

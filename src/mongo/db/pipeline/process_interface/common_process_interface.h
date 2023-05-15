@@ -154,7 +154,7 @@ protected:
      * executed by the supplied client. This method is called by the getCurrentOps method of
      * CommonProcessInterface to delegate to the mongoS- or mongoD- specific implementation.
      */
-    virtual BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
+    virtual BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               Client* client,
                                               CurrentOpTruncateMode truncateOps,
                                               CurrentOpBacktraceMode backtraceMode) const = 0;

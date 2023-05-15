@@ -168,7 +168,8 @@ public:
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
                       const boost::optional<BSONObj>& letParameters = boost::none,
-                      bool mayDbProfile = true);
+                      bool mayDbProfile = true,
+                      const SerializationContext& serializationCtx = SerializationContext());
 
     /**
      * Constructs an ExpressionContext suitable for use outside of the aggregation system, including
@@ -463,6 +464,8 @@ public:
     bool hasWhereClause = false;
 
     NamespaceString ns;
+
+    SerializationContext serializationCtxt;
 
     // If known, the UUID of the execution namespace for this aggregation command.
     boost::optional<UUID> uuid;

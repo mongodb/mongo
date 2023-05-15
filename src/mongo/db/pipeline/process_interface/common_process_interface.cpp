@@ -109,7 +109,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
         }
 
         // Delegate to the mongoD- or mongoS-specific implementation of _reportCurrentOpForClient.
-        ops.emplace_back(_reportCurrentOpForClient(opCtx, client, truncateMode, backtraceMode));
+        ops.emplace_back(_reportCurrentOpForClient(expCtx, client, truncateMode, backtraceMode));
     }
 
     // If 'cursorMode' is set to include idle cursors, retrieve them and add them to ops.
@@ -120,8 +120,17 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
             cursorObj.append("type", "idleCursor");
             cursorObj.append("host", getHostNameCachedAndPort());
             // First, extract fields which need to go at the top level out of the GenericCursor.
-            auto ns = cursor.getNs();
-            cursorObj.append("ns", ns ? NamespaceStringUtil::serialize(*ns) : "");
+            if (auto ns = cursor.getNs()) {
+                tassert(7663401,
+                        str::stream()
+                            << "SerializationContext on the expCtx should not be empty, with ns: "
+                            << ns->ns(),
+                        expCtx->serializationCtxt != SerializationContext::stateDefault());
+                cursorObj.append("ns",
+                                 NamespaceStringUtil::serialize(*ns, expCtx->serializationCtxt));
+            } else
+                cursorObj.append("ns", "");
+
             if (auto lsid = cursor.getLsid()) {
                 cursorObj.append("lsid", lsid->toBSON());
             }

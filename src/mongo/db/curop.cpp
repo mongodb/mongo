@@ -183,7 +183,7 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
     return _curopStack(opCtx).top();
 }
 
-void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
+void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      Client* client,
                                      bool truncateOps,
                                      bool backtraceMode,
@@ -210,8 +210,9 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
 
     // Fill out the rest of the BSONObj with opCtx specific details.
     infoBuilder->appendBool("active", client->hasAnyActiveCurrentOp());
-    infoBuilder->append("currentOpTime",
-                        opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
+    infoBuilder->append(
+        "currentOpTime",
+        expCtx->opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
 
     auto authSession = AuthorizationSession::get(client);
     // Depending on whether the authenticated user is the same user which ran the command,
@@ -261,7 +262,11 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
             lsid->serialize(&lsidBuilder);
         }
 
-        CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
+        tassert(7663403,
+                str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
+                              << expCtx->ns.ns(),
+                expCtx->serializationCtxt != SerializationContext::stateDefault());
+        CurOp::get(clientOpCtx)->reportState(infoBuilder, expCtx->serializationCtxt, truncateOps);
     }
 
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
@@ -705,7 +710,9 @@ BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor* cursor,
     return serialized;
 }
 
-void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
+void CurOp::reportState(BSONObjBuilder* builder,
+                        const SerializationContext& serializationContext,
+                        bool truncateOps) {
     auto opCtx = this->opCtx();
     auto start = _start.load();
     if (start) {
@@ -716,7 +723,7 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
     }
 
     builder->append("op", logicalOpToString(_logicalOp));
-    builder->append("ns", NamespaceStringUtil::serialize(_nss));
+    builder->append("ns", NamespaceStringUtil::serialize(_nss, serializationContext));
 
     bool omitAndRedactInformation = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
     builder->append("redacted", omitAndRedactInformation);

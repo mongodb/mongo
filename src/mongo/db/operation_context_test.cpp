@@ -1116,6 +1116,9 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
     auto client = makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
 
+    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
+        opCtx.get(), nullptr, NamespaceString::createNamespaceString_forTest("foo.bar"_sd)));
+
     for (auto truncateOps : {true, false}) {
         for (auto backtraceMode : {true, false}) {
             BSONObjBuilder bobNoOpCtx, bobKilledOpCtx;
@@ -1129,14 +1132,14 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
 
                 // Generate report in absence of any opCtx
                 CurOp::reportCurrentOpForClient(
-                    opCtx.get(), threadClient.get(), truncateOps, backtraceMode, &bobNoOpCtx);
+                    expCtx, threadClient.get(), truncateOps, backtraceMode, &bobNoOpCtx);
 
                 auto threadOpCtx = threadClient->makeOperationContext();
                 getServiceContext()->killAndDelistOperation(threadOpCtx.get());
 
                 // Generate report in presence of a killed opCtx
                 CurOp::reportCurrentOpForClient(
-                    opCtx.get(), threadClient.get(), truncateOps, backtraceMode, &bobKilledOpCtx);
+                    expCtx, threadClient.get(), truncateOps, backtraceMode, &bobKilledOpCtx);
             });
 
             thread.join();

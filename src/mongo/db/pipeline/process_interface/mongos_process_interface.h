@@ -310,7 +310,7 @@ public:
     }
 
 protected:
-    BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
+    BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       Client* client,
                                       CurrentOpTruncateMode truncateOps,
                                       CurrentOpBacktraceMode backtraceMode) const final;

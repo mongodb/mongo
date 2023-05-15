@@ -65,8 +65,15 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     uassert(40166,
             str::stream() << "$collStats must take a nested object but found: " << specElem,
             specElem.type() == BSONType::Object);
-    auto spec =
-        DocumentSourceCollStatsSpec::parse(IDLParserContext(kStageName), specElem.embeddedObject());
+
+    // TODO SERVER-77056: add assertion to validate pExpCtx->serializationCtxt != stateDefault()
+
+    auto spec = DocumentSourceCollStatsSpec::parse(
+        IDLParserContext(kStageName,
+                         false /* apiStrict */,
+                         pExpCtx->ns.tenantId(),
+                         SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)),
+        specElem.embeddedObject());
 
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
@@ -79,7 +86,7 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     BSONObjBuilder builder;
 
     // We need to use the serialization context from the request when calling
-    // NamespaceStringUtil to build the reply
+    // NamespaceStringUtil to build the reply.
     builder.append(
         "ns",
         NamespaceStringUtil::serialize(
