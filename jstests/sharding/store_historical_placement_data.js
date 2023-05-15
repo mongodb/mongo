@@ -408,15 +408,6 @@ function testAddShard() {
     newReplicaSet.stopSet();
 }
 
-// TODO SERVER-69106 remove the logic to skip the test execution
-const historicalPlacementDataFeatureFlag = FeatureFlagUtil.isEnabled(
-    st.configRS.getPrimary().getDB('admin'), "HistoricalPlacementShardingCatalog");
-if (!historicalPlacementDataFeatureFlag) {
-    jsTestLog("Skipping as featureFlagHistoricalPlacementShardingCatalog is disabled");
-    st.stop();
-    return;
-}
-
 jsTest.log('Testing placement entries added by explicit DB creation');
 testEnableSharding('explicitlyCreatedDB', shard0);
 
