@@ -97,11 +97,11 @@ feature_flags:
     default: true
     version: 7.0
     shouldBeFCVGated: true
-
   featureFlagCheckForDirectShardOperations:
     description: "Feature flag for checking for direct shard operations."
     cpp_varname: feature_flags::gCheckForDirectShardOperations
-    default: false
+    default: true
+    version: 7.1
     shouldBeFCVGated: true
   featureFlagClusterCardinalityParameter:
     description: "Feature flag for enabling the cluster parameter tracking cluster cardinality."
