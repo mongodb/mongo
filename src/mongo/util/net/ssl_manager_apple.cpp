@@ -1391,6 +1391,7 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
     if (!params.sslClusterCAFile.empty()) {
         auto ca = uassertStatusOK(loadPEM(params.sslClusterCAFile, "", kLoadPEMStripKeys));
         _serverCA = std::move(ca);
+        _sslConfiguration.hasCA = true;
     } else {
         // No inbound CA specified, share a reference with outbound CA.
         auto ca = _clientCA.get();
@@ -1592,7 +1593,7 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
             return SSLPeerInfo(sniName);
         } else {
             if (status == ::errSecSuccess) {
-                return badCert(str::stream() << "no SSL certificate provided by peer: "
+                return badCert(str::stream() << "No SSL certificate provided by peer: "
                                              << stringFromOSStatus(status),
                                _weakValidation);
             } else {
