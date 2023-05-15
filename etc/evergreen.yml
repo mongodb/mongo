@@ -2913,6 +2913,7 @@ buildvariants:
       --excludeWithAnyTags=resource_intensive
       --excludeWithAnyTags=incompatible_with_shard_merge
 
+### Security Patch-Specific Build Variants ###
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (all feature flags)"
@@ -2930,12 +2931,25 @@ buildvariants:
     - name: archive_dist_test_debug
       variant: *linux_x86_dynamic_compile_variant_name
   - name: .audit .patch_build
-  - name: .sasl .patch_build
   - name: .encrypt .patch_build
+  - name: .sasl .patch_build
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: lint_fuzzer_sanity_patch
+
+- <<: *enterprise-windows-template
+  name: &windows-compile-security-patch-only windows-compile-security-patch-only
+  display_name: "~ Windows Security Patch Only"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  expansions:
+    <<: *windows_required_expansions
+    exe: ".exe"
+  tasks:
+  - name: .encrypt .patch_build
+  - name: .sasl .patch_build
+  - name: external_auth_aws
+  - name: external_auth_oidc
 
 - name: &enterprise-ubuntu1804-64-libvoidstar enterprise-ubuntu1804-64-libvoidstar
   display_name: "~ Enterprise Ubuntu 18.04 w/ libvoidstar"
