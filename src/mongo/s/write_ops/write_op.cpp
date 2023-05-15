@@ -71,7 +71,7 @@ write_ops::WriteError getFirstNonRetryableError(const std::vector<ChildWriteOp c
             return !isRetryErrCode(errOp->error->getStatus().code());
         });
 
-    dassert(nonRetryableErr != errOps.end());
+    invariant(nonRetryableErr != errOps.end());
 
     return *(*nonRetryableErr)->error;
 }
