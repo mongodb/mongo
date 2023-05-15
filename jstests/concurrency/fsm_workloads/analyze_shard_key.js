@@ -6,8 +6,6 @@
  * This workload implicitly assumes that its tid range is [0, $config.threadCount). This isn't
  * guaranteed to be true when it is run in parallel with other workloads.
  *
- * TODO (SERVER-76445): Re-enable analyze_shard_key.js in suites with chunk migration and/or
- * stepdown/kill/terminate.
  * @tags: [
  *  requires_fcv_70,
  *  featureFlagUpdateOneWithoutShardKey,
