@@ -454,31 +454,53 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesFailUnordered) {
     OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
 }
 
-// TODO (SERVER-75202): Re-enable this test & write a test for deletes.
-// Unordered updates into different collections where some fail.
-// TEST_F(BulkWriteShardTest, UpdatesFailUnordered) {
-//     BulkWriteCommandRequest request(
-//         {
-//         BulkWriteUpdateOp(1, BSON("x" << BSON("$gt" << 0)), BSON("x" << -99)),
-//         BulkWriteUpdateOp(0, BSON("x" << BSON("$gt" << 0)), BSON("x" << -9)),
-//         BulkWriteInsertOp(1, BSON("x" << -1))},
-//         {nsInfoWithShardDatabaseVersions(
-//              nssShardedCollection1, dbVersionTestDb, incorrectShardVersion),
-//          nsInfoWithShardDatabaseVersions(
-//              nssShardedCollection2, dbVersionTestDb, shardVersionShardedCollection2)});
+// Ordered updates into different collections where some fail.
+TEST_F(BulkWriteShardTest, UpdatesFailOrdered) {
+    BulkWriteCommandRequest request(
+        {BulkWriteUpdateOp(1, BSON("x" << BSON("$gt" << 0)), BSON("x" << -99)),
+         BulkWriteUpdateOp(0, BSON("x" << BSON("$gt" << 0)), BSON("x" << -9)),
+         BulkWriteInsertOp(1, BSON("x" << -1))},
+        {nsInfoWithShardDatabaseVersions(
+             nssShardedCollection1, dbVersionTestDb1, incorrectShardVersion),
+         nsInfoWithShardDatabaseVersions(
+             nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2)});
 
-//     request.setOrdered(false);
+    request.setOrdered(true);
 
-//     const auto& [replyItems, retriedStmtIds, numErrors] =
-//         bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds, numErrors] =
+        bulk_write::performWrites(opCtx(), request);
 
-//     ASSERT_EQ(2, replyItems.size());
-//     ASSERT_OK(replyItems.front().getStatus());
-//     ASSERT_EQ(ErrorCodes::StaleConfig, replyItems[1].getStatus().code());
-//     ASSERT_EQ(1, numErrors);
+    ASSERT_EQ(2, replyItems.size());
+    ASSERT_OK(replyItems.front().getStatus());
+    ASSERT_EQ(ErrorCodes::StaleConfig, replyItems[1].getStatus().code());
+    ASSERT_EQ(1, numErrors);
 
-//     OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
-// }
+    OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
+}
+
+// Ordered deletes into different collections where some fail.
+TEST_F(BulkWriteShardTest, DeletesFailOrdered) {
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(1, BSON("x" << -1)),
+         BulkWriteDeleteOp(0, BSON("x" << BSON("$gt" << 0))),
+         BulkWriteInsertOp(1, BSON("x" << -1))},
+        {nsInfoWithShardDatabaseVersions(
+             nssShardedCollection1, dbVersionTestDb1, incorrectShardVersion),
+         nsInfoWithShardDatabaseVersions(
+             nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2)});
+
+    request.setOrdered(true);
+
+    const auto& [replyItems, retriedStmtIds, numErrors] =
+        bulk_write::performWrites(opCtx(), request);
+
+    ASSERT_EQ(2, replyItems.size());
+    ASSERT_OK(replyItems.front().getStatus());
+    ASSERT_EQ(ErrorCodes::StaleConfig, replyItems[1].getStatus().code());
+    ASSERT_EQ(1, numErrors);
+
+    OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
+}
 
 // After the first insert fails due to an incorrect database version, the rest
 // of the writes are skipped when operations are ordered.
