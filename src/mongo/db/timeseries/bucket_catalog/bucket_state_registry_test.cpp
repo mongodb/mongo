@@ -60,7 +60,7 @@ public:
     bool cannotAccessBucket(Bucket& bucket) {
         if (hasBeenCleared(bucket)) {
             internal::removeBucket(*this,
-                                   stripes[internal::getStripeNumber(bucket.key)],
+                                   stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
                                    withLock,
                                    bucket,
                                    internal::RemovalMode::kAbort);
@@ -71,20 +71,22 @@ public:
     }
 
     void checkAndRemoveClearedBucket(Bucket& bucket) {
-        auto a = internal::findBucket(bucketStateRegistry,
-                                      stripes[internal::getStripeNumber(bucket.key)],
-                                      withLock,
-                                      bucket.bucketId,
-                                      internal::IgnoreBucketState::kYes);
+        auto a =
+            internal::findBucket(bucketStateRegistry,
+                                 stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                                 withLock,
+                                 bucket.bucketId,
+                                 internal::IgnoreBucketState::kYes);
         ASSERT(a == &bucket);
-        auto b = internal::findBucket(bucketStateRegistry,
-                                      stripes[internal::getStripeNumber(bucket.key)],
-                                      withLock,
-                                      bucket.bucketId,
-                                      internal::IgnoreBucketState::kNo);
+        auto b =
+            internal::findBucket(bucketStateRegistry,
+                                 stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                                 withLock,
+                                 bucket.bucketId,
+                                 internal::IgnoreBucketState::kNo);
         ASSERT(b == nullptr);
         internal::removeBucket(*this,
-                               stripes[internal::getStripeNumber(bucket.key)],
+                               stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
                                withLock,
                                bucket,
                                internal::RemovalMode::kAbort);
@@ -103,12 +105,24 @@ public:
     TimeseriesOptions options;
     ExecutionStatsController stats = internal::getOrInitializeExecutionStats(*this, ns1);
     ClosedBuckets closedBuckets;
-    internal::CreationInfo info1{
-        bucketKey1, internal::getStripeNumber(bucketKey1), date, options, stats, &closedBuckets};
-    internal::CreationInfo info2{
-        bucketKey2, internal::getStripeNumber(bucketKey2), date, options, stats, &closedBuckets};
-    internal::CreationInfo info3{
-        bucketKey3, internal::getStripeNumber(bucketKey3), date, options, stats, &closedBuckets};
+    internal::CreationInfo info1{bucketKey1,
+                                 internal::getStripeNumber(bucketKey1, numberOfStripes),
+                                 date,
+                                 options,
+                                 stats,
+                                 &closedBuckets};
+    internal::CreationInfo info2{bucketKey2,
+                                 internal::getStripeNumber(bucketKey2, numberOfStripes),
+                                 date,
+                                 options,
+                                 stats,
+                                 &closedBuckets};
+    internal::CreationInfo info3{bucketKey3,
+                                 internal::getStripeNumber(bucketKey3, numberOfStripes),
+                                 date,
+                                 options,
+                                 stats,
+                                 &closedBuckets};
 };
 
 TEST_F(BucketStateRegistryTest, BucketStateSetUnsetFlag) {

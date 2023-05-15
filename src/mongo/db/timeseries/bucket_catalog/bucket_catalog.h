@@ -127,7 +127,9 @@ public:
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
 
-    BucketCatalog() = default;
+    BucketCatalog() : stripes(numberOfStripes) {}
+    BucketCatalog(size_t numberOfStripes)
+        : numberOfStripes(numberOfStripes), stripes(numberOfStripes){};
     BucketCatalog(const BucketCatalog&) = delete;
     BucketCatalog operator=(const BucketCatalog&) = delete;
 
@@ -135,9 +137,10 @@ public:
     BucketStateRegistry bucketStateRegistry;
 
     // The actual buckets in the catalog are distributed across a number of 'Stripe's. Each can be
-    // independently locked and operated on in parallel.
-    static constexpr std::size_t kNumberOfStripes = 32;
-    std::array<Stripe, kNumberOfStripes> stripes;
+    // independently locked and operated on in parallel. The size of the stripe vector should not be
+    // changed after initialization.
+    const std::size_t numberOfStripes = 32;
+    std::vector<Stripe> stripes;
 
     // Per-namespace execution stats. This map is protected by 'mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the
@@ -168,8 +171,9 @@ BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& bucket);
 /**
  * Tries to insert 'doc' into a suitable bucket. If an open bucket is full (or has incompatible
  * schema), but is otherwise suitable, we will close it and open a new bucket. If we find no bucket
- * with matching data and a time range that can accomodate 'doc', we will not open a new bucket, but
- * rather let the caller know to search for an archived or closed bucket that can accomodate 'doc'.
+ * with matching data and a time range that can accommodate 'doc', we will not open a new bucket,
+ * but rather let the caller know to search for an archived or closed bucket that can accommodate
+ * 'doc'.
  *
  * If a suitable bucket is found or opened, returns the WriteBatch into which 'doc' was inserted and
  * a list of any buckets that were closed to make space to insert 'doc'. Any caller who receives the
@@ -178,7 +182,7 @@ BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& bucket);
  *
  * If no suitable bucket is found or opened, returns an optional bucket ID. If set, the bucket ID
  * corresponds to an archived bucket which should be fetched; otherwise the caller should search for
- * a previously-closed bucket that can accomodate 'doc'. The caller should proceed to call 'insert'
+ * a previously-closed bucket that can accommodate 'doc'. The caller should proceed to call 'insert'
  * to insert 'doc', passing any fetched bucket.
  */
 StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
