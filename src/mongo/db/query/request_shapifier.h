@@ -67,8 +67,16 @@ protected:
                 _applicationName = metadata->getApplicationName().toString();
             }
         }
+        if (const auto& comment = opCtx->getComment()) {
+            BSONObjBuilder commentBuilder;
+            commentBuilder.append(*comment);
+            _commentObj = commentBuilder.obj();
+            _comment = _commentObj.firstElement();
+        }
     }
 
     boost::optional<std::string> _applicationName;
+    BSONObj _commentObj;
+    boost::optional<BSONElement> _comment = boost::none;
 };
 }  // namespace mongo::telemetry

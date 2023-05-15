@@ -99,10 +99,13 @@ extern CounterMetric telemetryStoreSizeEstimateBytesMetric;
 // Used to aggregate the metrics for one telemetry key over all its executions.
 class TelemetryEntry {
 public:
-    TelemetryEntry(std::unique_ptr<RequestShapifier> requestShapifier, NamespaceStringOrUUID nss)
+    TelemetryEntry(std::unique_ptr<RequestShapifier> requestShapifier,
+                   NamespaceStringOrUUID nss,
+                   const BSONObj& cmdObj)
         : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0),
           requestShapifier(std::move(requestShapifier)),
-          nss(nss) {
+          nss(nss),
+          oldTelemetryKey(cmdObj.copy()) {
         telemetryStoreSizeEstimateBytesMetric.increment(sizeof(TelemetryEntry) + sizeof(BSONObj));
     }
 
@@ -123,10 +126,9 @@ public:
     /**
      * Redact a given telemetry key and set _keySize.
      */
-    BSONObj makeTelemetryKey(const BSONObj& key,
-                             bool applyHmacToIdentifiers,
-                             std::string hmacKey,
-                             OperationContext* opCtx) const;
+    BSONObj computeTelemetryKey(OperationContext* opCtx,
+                                bool applyHmacToIdentifiers,
+                                std::string hmacKey) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -151,35 +153,31 @@ public:
 
     NamespaceStringOrUUID nss;
 
-private:
-    /**
-     * We cache the hmac applied key the first time it's computed.
-     */
-    mutable boost::optional<BSONObj> _hmacAppliedKey;
+    // TODO: SERVER-73152 remove oldTelemetryKey when RequestShapifier is used for agg.
+    BSONObj oldTelemetryKey;
 };
 
 struct TelemetryPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.
-    std::size_t operator()(const BSONObj& k, const std::size_t nPartitions) const {
-        return SimpleBSONObjComparator::Hasher()(k) % nPartitions;
+    std::size_t operator()(const std::size_t k, const std::size_t nPartitions) const {
+        return k % nPartitions;
     }
 };
 
 struct TelemetryStoreEntryBudgetor {
-    size_t operator()(const BSONObj& key, const std::shared_ptr<TelemetryEntry>& value) {
-        // The buget estimator for <key,value> pair in LRU cache accounts for size of value
-        // (TelemetryEntry) size of the key, and size of the key's underlying data struture
-        // (BSONObj).
-        return sizeof(TelemetryEntry) + sizeof(BSONObj) + key.objsize();
+    size_t operator()(const std::size_t key, const std::shared_ptr<TelemetryEntry>& value) {
+        // The buget estimator for <key,value> pair in LRU cache accounts for the size of the key
+        // and the size of the metrics, including the bson object used for generating the telemetry
+        // key at read time.
+
+        return sizeof(TelemetryEntry) + sizeof(std::size_t) + value->oldTelemetryKey.objsize();
     }
 };
 
-using TelemetryStore = PartitionedCache<BSONObj,
+using TelemetryStore = PartitionedCache<std::size_t,
                                         std::shared_ptr<TelemetryEntry>,
                                         TelemetryStoreEntryBudgetor,
-                                        TelemetryPartitioner,
-                                        SimpleBSONObjComparator::Hasher,
-                                        SimpleBSONObjComparator::EqualTo>;
+                                        TelemetryPartitioner>;
 
 /**
  * Acquire a reference to the global telemetry store.
@@ -208,6 +206,7 @@ void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
  * Writes telemetry to the telemetry store for the operation identified by `telemetryKey`.
  */
 void writeTelemetry(OperationContext* opCtx,
+                    boost::optional<size_t> telemetryKeyHash,
                     boost::optional<BSONObj> telemetryKey,
                     std::unique_ptr<RequestShapifier> requestShapifier,
                     uint64_t queryExecMicros,

@@ -124,6 +124,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planSummary(_exec->getPlanExplainer().getPlanSummary()),
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
+      _telemetryStoreKeyHash(CurOp::get(operationUsingCursor)->debug().telemetryStoreKeyHash),
       _telemetryStoreKey(CurOp::get(operationUsingCursor)->debug().telemetryStoreKey),
       _telemetryRequestShapifier(
           std::move(CurOp::get(operationUsingCursor)->debug().telemetryRequestShapifier)),
@@ -160,8 +161,9 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         return;
     }
 
-    if (_telemetryStoreKey && opCtx) {
+    if (_telemetryStoreKeyHash && opCtx) {
         telemetry::writeTelemetry(opCtx,
+                                  _telemetryStoreKeyHash,
                                   _telemetryStoreKey,
                                   std::move(_telemetryRequestShapifier),
                                   _metrics.executionTime.value_or(Microseconds{0}).count(),
@@ -406,6 +408,7 @@ void collectTelemetryMongod(OperationContext* opCtx,
     auto& opDebug = CurOp::get(opCtx)->debug();
     telemetry::writeTelemetry(
         opCtx,
+        opDebug.telemetryStoreKeyHash,
         opDebug.telemetryStoreKey,
         std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),

@@ -294,6 +294,8 @@ public:
     boost::optional<uint32_t> queryHash;
     // The shape of the original query serialized with readConcern, application name, and namespace.
     // If boost::none, telemetry should not be collected for this operation.
+    boost::optional<std::size_t> telemetryStoreKeyHash;
+    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
     boost::optional<BSONObj> telemetryStoreKey;
     // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
     // store key.

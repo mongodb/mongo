@@ -190,9 +190,9 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
             try {
-                auto hmacKey = metrics->makeTelemetryKey(
-                    key, _applyHmacToIdentifiers, _hmacKey, pExpCtx->opCtx);
-                _materializedPartition.push_back({{"key", std::move(hmacKey)},
+                auto telemetryKey =
+                    metrics->computeTelemetryKey(pExpCtx->opCtx, _applyHmacToIdentifiers, _hmacKey);
+                _materializedPartition.push_back({{"key", std::move(telemetryKey)},
                                                   {"metrics", metrics->toBSON()},
                                                   {"asOf", partitionReadTime}});
             } catch (const DBException& ex) {
@@ -201,7 +201,8 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
                             3,
                             "Error encountered when applying hmac to query shape, will not publish "
                             "telemetry for this entry.",
-                            "status"_attr = ex.toStatus());
+                            "status"_attr = ex.toStatus(),
+                            "hash"_attr = key);
                 if (kDebugBuild) {
                     tasserted(7349401,
                               "Was not able to re-parse telemetry key when reading telemetry.");

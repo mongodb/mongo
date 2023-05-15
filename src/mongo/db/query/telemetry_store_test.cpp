@@ -46,6 +46,11 @@ namespace mongo::telemetry {
 std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
+
+std::size_t hash(const BSONObj& obj) {
+    return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
+}
+
 class TelemetryStoreTest : public ServiceContextTest {
 public:
     BSONObj makeTelemetryKeyFindRequest(
@@ -73,17 +78,18 @@ public:
 TEST_F(TelemetryStoreTest, BasicUsage) {
     TelemetryStore telStore{5000000, 1000};
 
-    auto getMetrics = [&](BSONObj& key) {
-        auto lookupResult = telStore.lookup(key);
+    auto getMetrics = [&](const BSONObj& key) {
+        auto lookupResult = telStore.lookup(hash(key));
         return *lookupResult.getValue();
     };
 
     auto collectMetrics = [&](BSONObj& key) {
         std::shared_ptr<TelemetryEntry> metrics;
-        auto lookupResult = telStore.lookup(key);
+        auto lookupResult = telStore.lookup(hash(key));
         if (!lookupResult.isOK()) {
-            telStore.put(key, std::make_shared<TelemetryEntry>(nullptr, NamespaceString{}));
-            lookupResult = telStore.lookup(key);
+            telStore.put(hash(key),
+                         std::make_shared<TelemetryEntry>(nullptr, NamespaceString{}, key));
+            lookupResult = telStore.lookup(hash(key));
         }
         metrics = *lookupResult.getValue();
         metrics->execCount += 1;
@@ -105,7 +111,7 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
     ASSERT_EQ(getMetrics(query2)->execCount, 1);
 
     auto collectMetricsWithLock = [&](BSONObj& key) {
-        auto [lookupResult, lock] = telStore.getWithPartitionLock(key);
+        auto [lookupResult, lock] = telStore.getWithPartitionLock(hash(key));
         auto metrics = *lookupResult.getValue();
         metrics->execCount += 1;
         metrics->lastExecutionMicros += 123456;
@@ -121,7 +127,7 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
     int numKeys = 0;
 
     telStore.forEach(
-        [&](const BSONObj& key, const std::shared_ptr<TelemetryEntry>& entry) { numKeys++; });
+        [&](std::size_t key, const std::shared_ptr<TelemetryEntry>& entry) { numKeys++; });
 
     ASSERT_EQ(numKeys, 2);
 }
@@ -135,13 +141,15 @@ TEST_F(TelemetryStoreTest, EvictEntries) {
 
     for (int i = 0; i < 20; i++) {
         auto query = BSON("query" + std::to_string(i) << 1 << "xEquals" << 42);
-        telStore.put(query, std::make_shared<TelemetryEntry>(nullptr, NamespaceString{}));
+        telStore.put(hash(query),
+                     std::make_shared<TelemetryEntry>(nullptr, NamespaceString{}, BSONObj{}));
     }
     int numKeys = 0;
     telStore.forEach(
-        [&](const BSONObj& key, const std::shared_ptr<TelemetryEntry>& entry) { numKeys++; });
+        [&](std::size_t key, const std::shared_ptr<TelemetryEntry>& entry) { numKeys++; });
 
-    int entriesPerPartition = (cacheSize / numPartitions) / (46 + sizeof(TelemetryEntry));
+    int entriesPerPartition = (cacheSize / numPartitions) /
+        (sizeof(std::size_t) + sizeof(TelemetryEntry) + BSONObj().objsize());
     ASSERT_EQ(numKeys, entriesPerPartition * numPartitions);
 }
 
@@ -683,33 +691,38 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
     const auto cmdObj = fcr.toBSON(BSON("$db"
                                         << "testDB"));
     TelemetryEntry testMetrics{std::make_unique<telemetry::FindRequestShapifier>(fcr, opCtx.get()),
-                               fcr.getNamespaceOrUUID()};
+                               fcr.getNamespaceOrUUID(),
+                               cmdObj};
 
     bool applyHmacToIdentifiers = false;
     auto hmacApplied =
-        testMetrics.makeTelemetryKey(cmdObj, applyHmacToIdentifiers, std::string{}, opCtx.get());
-    // As the query never moves through registerFindRequest and hmac is not enabled,
-    // makeTelemetryKey() never gets called and consequently the query never gets shapified.
+        testMetrics.computeTelemetryKey(opCtx.get(), applyHmacToIdentifiers, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "find": "testColl",
-            "filter": {
-                "$expr": [
-                    {
-                        "$eq": [
-                            "$a",
-                            "$$var"
-                        ]
-                    }
-                ]
-            },
-            "projection": {
-                "varIs": "$$var"
-            },
-            "let": {
-                "var": 2
-            },
-            "$db": "testDB"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "find",
+                "filter": {
+                    "$expr": [
+                        {
+                            "$eq": [
+                                "$a",
+                                "$$var"
+                            ]
+                        }
+                    ]
+                },
+                "let": {
+                    "var": "?number"
+                },
+                "projection": {
+                    "varIs": "$$var",
+                    "_id": true
+                }
+            }
         })",
         hmacApplied);
 
@@ -717,7 +730,7 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
     // do the hashing, so we'll just stick with the big long strings here for now.
     applyHmacToIdentifiers = true;
     hmacApplied =
-        testMetrics.makeTelemetryKey(cmdObj, applyHmacToIdentifiers, std::string{}, opCtx.get());
+        testMetrics.computeTelemetryKey(opCtx.get(), applyHmacToIdentifiers, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {

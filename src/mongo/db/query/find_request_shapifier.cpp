@@ -40,11 +40,6 @@ void addNonShapeObjCmdLiterals(BSONObjBuilder* bob,
                                const FindCommandRequest& findCommand,
                                const SerializationOptions& opts,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
-    if (const auto& comment = expCtx->opCtx->getComment()) {
-        opts.appendLiteral(bob, "comment", *comment);
-    }
-
     if (auto noCursorTimeout = findCommand.getNoCursorTimeout()) {
         // Capture whether noCursorTimeout was specified in the query, do not distinguish between
         // true or false.
@@ -95,9 +90,11 @@ BSONObj FindRequestShapifier::makeTelemetryKey(
                    _request.getAllowPartialResults().value_or(false));
     }
 
-    // Fields for literal redaction. Adds comment, batchSize, maxTimeMS, and noCursorTimeOut.
+    // Fields for literal redaction. Adds batchSize, maxTimeMS, and noCursorTimeOut.
     addNonShapeObjCmdLiterals(&bob, _request, opts, expCtx);
-
+    if (_comment) {
+        opts.appendLiteral(&bob, "comment", *_comment);
+    }
     if (_applicationName.has_value()) {
         bob.append("applicationName", _applicationName.value());
     }
