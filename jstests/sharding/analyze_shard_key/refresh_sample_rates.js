@@ -293,6 +293,11 @@ function runTest(createConnFn, rst, samplerNames) {
     st.configRS.isConfigSvr = true;
     const samplerNames = [st.s0.host, st.s1.host, st.s2.host];
 
+    jsTest.log("Wait for the config server to be aware that there are 3 mongoses in the cluster");
+    assert.soon(() => {
+        return st.s.getCollection("config.mongos").find().itcount() == 3;
+    });
+
     jsTest.log("Test that the _refreshQueryAnalyzerConfiguration command is not supported on " +
                "mongos or shardsvr mongod or configsvr secondary mongod");
     const cmdObj = {
