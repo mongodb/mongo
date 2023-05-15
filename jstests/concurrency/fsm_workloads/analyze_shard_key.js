@@ -14,7 +14,6 @@
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
- *  assumes_balancer_off,
  * ]
  */
 load("jstests/concurrency/fsm_libs/extend_workload.js");
@@ -951,8 +950,13 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db.runCommand(cmdObj);
         try {
             assert.commandWorked(res);
-            assert.eq(res.nModified, 1, {cmdObj, res});
-            assert.eq(res.n, 1, {cmdObj, res});
+            if (res.n == 0) {
+                // TODO: Make this state always validate the response after BF-28440 is resolved.
+                assert(TestData.runningWithBalancer);
+            } else {
+                assert.eq(res.nModified, 1, {cmdObj, res});
+                assert.eq(res.n, 1, {cmdObj, res});
+            }
         } catch (e) {
             if (!this.isAcceptableUpdateError(res) &&
                 !(res.hasOwnProperty("writeErrors") &&
@@ -977,7 +981,12 @@ var $config = extendWorkload($config, function($config, $super) {
         };
         print("Starting remove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
-        assert.eq(res.n, 1, {cmdObj, res});
+        if (res.n == 0) {
+            // TODO: Make this state always validate the response after BF-28440 is resolved.
+            assert(TestData.runningWithBalancer);
+        } else {
+            assert.eq(res.n, 1, {cmdObj, res});
+        }
         // Insert a random document to restore the original number of documents.
         assert.commandWorked(
             db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
@@ -1001,8 +1010,13 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db.runCommand(cmdObj);
         try {
             assert.commandWorked(res);
-            assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
-            assert.eq(res.lastErrorObject.updatedExisting, true, {cmdObj, res});
+            if (res.lastErrorObject.n == 0) {
+                // TODO: Make this state always validate the response after BF-28440 is resolved.
+                assert(TestData.runningWithBalancer);
+            } else {
+                assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+                assert.eq(res.lastErrorObject.updatedExisting, true, {cmdObj, res});
+            }
         } catch (e) {
             if (!this.isAcceptableUpdateError(res)) {
                 throw e;
@@ -1025,7 +1039,12 @@ var $config = extendWorkload($config, function($config, $super) {
         };
         print("Starting findAndModifyRemove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
-        assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+        if (res.lastErrorObject.n == 0) {
+            // TODO: Make this state always validate the response after BF-28440 is resolved.
+            assert(TestData.runningWithBalancer);
+        } else {
+            assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+        }
         // Insert a random document to restore the original number of documents.
         assert.commandWorked(
             db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
