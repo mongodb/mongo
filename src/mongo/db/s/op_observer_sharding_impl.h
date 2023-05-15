@@ -37,13 +37,6 @@ class OpObserverShardingImpl : public OpObserverImpl {
 public:
     OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter);
 
-    // True if the document being deleted belongs to a chunk which, while still in the shard,
-    // is being migrated out. (Not to be confused with "fromMigrate", which tags operations
-    // that are steps in performing the migration.)
-    static bool isMigrating(OperationContext* opCtx,
-                            NamespaceString const& nss,
-                            BSONObj const& docToDelete);
-
 protected:
     void shardObserveAboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,

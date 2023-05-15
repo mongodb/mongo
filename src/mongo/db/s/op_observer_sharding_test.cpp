@@ -36,6 +36,7 @@
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -141,7 +142,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
     ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
+    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
@@ -170,7 +171,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
                                  << "abc"
                                  << "_id"
                                  << "hello"));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
+    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
@@ -198,7 +199,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
                       BSON("key" << 100 << "_id"
                                  << "hello"
                                  << "key2" << true));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
+    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
@@ -223,7 +224,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
+    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, CheckDBVersion) {
