@@ -1588,7 +1588,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     migrationUtilExecutor->shutdown();
     migrationUtilExecutor->join();
 
-    if (ShardingState::get(serviceContext)->enabled()) {
+    if (Grid::get(serviceContext)->isShardingInitialized()) {
         // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as the
         // CatalogCache may try to schedule work on CatalogCacheLoader and fail.
         LOGV2_OPTIONS(6773201, {LogComponent::kSharding}, "Shutting down the CatalogCache");
