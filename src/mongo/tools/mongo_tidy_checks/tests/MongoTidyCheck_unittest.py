@@ -276,6 +276,25 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoConfigHeaderCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-config-header-check'
+                WarningsAsErrors: '*'
+                HeaderFilterRegex: '(mongo/.*)'
+                """))
+
+        self.expected_output = [
+            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#define MONGO_CONFIG_TEST1 1",
+            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#ifdef MONGO_CONFIG_TEST1",
+            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#if MONGO_CONFIG_TEST1 == 1",
+            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#ifndef MONGO_CONFIG_TEST2",
+            "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#if defined(MONGO_CONFIG_TEST1)",
+        ]
+
+        self.run_clang_tidy()
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()

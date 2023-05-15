@@ -29,6 +29,7 @@ if env.GetOption('ninja') == 'disabled':
         'test_MongoVolatileCheck.cpp',
         'test_MongoUninterruptibleLockGuardCheck.cpp',
         'test_MongoCctypeCheck.cpp',
+        'test_MongoConfigHeaderCheck.cpp',
         'test_MongoCxx20BannedIncludesCheck.cpp',
         'test_MongoStdOptionalCheck.cpp',
         'test_MongoTraceCheck.cpp',

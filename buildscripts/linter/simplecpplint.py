@@ -129,8 +129,6 @@ class Linter:
         self.feature_flag_ignore_fcv_check_comments = []
         self._error_count = 0
 
-        self.found_config_header = False
-
     def lint(self):
         """Run linter, returning error count."""
         # steps:
@@ -153,7 +151,6 @@ class Linter:
                 continue
 
             self._check_for_mongo_polyfill(linenum)
-            self._check_for_mongo_config_header(linenum)
             self._check_for_collection_sharding_runtime(linenum)
             self._check_for_rand(linenum)
             self._check_for_c_stdlib_headers(linenum)
@@ -289,18 +286,6 @@ class Linter:
                                 category='legal/enterprise_license')
             return linenum
         return linenum
-
-    def _check_for_mongo_config_header(self, linenum):
-        """Check for a config file."""
-        if self.found_config_header:
-            return
-
-        line = self.clean_lines[linenum]
-        self.found_config_header = line.startswith('#include "mongo/config.h"')
-
-        if not self.found_config_header and "MONGO_CONFIG_" in line:
-            self._error(linenum, 'build/config_h_include',
-                        'MONGO_CONFIG define used without prior inclusion of config.h.')
 
     def _check_for_generic_fcv(self, linenum):
         line = self.clean_lines[linenum]
