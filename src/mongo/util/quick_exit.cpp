@@ -65,6 +65,12 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
+#if __has_feature(xray_instrument)
+// See clang/test/Lexer/has_feature_xray_instrument.cpp
+// see compiler-rt/lib/xray/xray_basic_flags.inc
+#include <xray/xray_log_interface.h>
+#endif
+
 #ifdef MONGO_GCOV
 extern "C" void __gcov_flush();
 extern "C" void __gcov_dump();
@@ -90,6 +96,13 @@ void quickExitWithoutLogging(ExitCode code) {
 #else
     __gcov_flush();
 #endif
+#endif
+
+#if __has_feature(xray_instrument)
+    // Stop XRay and flush the xray basic log
+    /* ignore */ __xray_log_finalize();
+    /* ignore */ __xray_unpatch();
+    /* ignore */ __xray_log_flushLog();
 #endif
 
 #if __has_feature(address_sanitizer)
