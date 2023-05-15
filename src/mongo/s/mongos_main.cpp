@@ -341,6 +341,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
+            LOGV2_OPTIONS(7698300, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
             pool->shutdownAndJoin();
         }
 
@@ -349,6 +350,13 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (Grid::get(serviceContext)->isShardingInitialized()) {
+            // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as
+            // the CatalogCache may try to schedule work on CatalogCacheLoader and fail.
+            LOGV2_OPTIONS(7698301, {LogComponent::kSharding}, "Shutting down the CatalogCache");
+            Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
+
+            LOGV2_OPTIONS(
+                7698302, {LogComponent::kSharding}, "Shutting down the CatalogCacheLoader");
             CatalogCacheLoader::get(serviceContext).shutDown();
         }
 
