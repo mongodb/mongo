@@ -46,19 +46,19 @@ const auto validatedTenancyScopeDecoration =
     OperationContext::declareDecoration<boost::optional<ValidatedTenancyScope>>();
 MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
     if (gMultitenancySupport) {
-        logv2::detail::setGetTenantIDCallback([]() -> boost::optional<TenantId> {
+        logv2::detail::setGetTenantIDCallback([]() -> std::string {
             auto* client = Client::getCurrent();
             if (!client) {
-                return boost::none;
+                return std::string();
             }
 
             if (auto* opCtx = client->getOperationContext()) {
                 if (auto token = ValidatedTenancyScope::get(opCtx)) {
-                    return token->tenantId();
+                    return token->tenantId().toString();
                 }
             }
 
-            return boost::none;
+            return std::string();
         });
     }
 
