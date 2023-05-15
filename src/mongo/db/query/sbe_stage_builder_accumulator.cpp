@@ -651,7 +651,18 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorFirstN(
     boost::optional<sbe::value::SlotId> collatorSlot,
     sbe::value::FrameIdGenerator& frameIdGenerator) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(makeFunction("aggFirstN", makeFillEmptyNull(std::move(arg))));
+    aggs.push_back(makeLocalBind(
+        &frameIdGenerator,
+        [&](sbe::EVariable accumulatorState) {
+            return sbe::makeE<sbe::EIf>(
+                makeFunction("aggFirstNNeedsMoreInput", accumulatorState.clone()),
+                makeFunction(
+                    "aggFirstN",
+                    makeMoveVariable(*accumulatorState.getFrameId(), accumulatorState.getSlotId()),
+                    makeFillEmptyNull(std::move(arg))),
+                makeMoveVariable(*accumulatorState.getFrameId(), accumulatorState.getSlotId()));
+        },
+        makeFunction("aggState")));
     return aggs;
 }
 

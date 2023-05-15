@@ -6076,6 +6076,30 @@ std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t> multi
     return {state, array, startIndexVal, maxSize, memUsage, memLimit};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNNeedsMoreInput(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    uassert(7695200, "Unexpected accumulator state ownership", !stateOwned);
+
+    auto state = value::getArrayView(stateVal);
+    uassert(
+        7695201, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
+
+    auto [arrayTag, arrayVal] = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
+    uassert(7695202,
+            "Internal array component is not of correct type",
+            arrayTag == value::TypeTags::Array);
+    auto array = value::getArrayView(arrayVal);
+
+    auto [maxSizeTag, maxSize] = state->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
+    uassert(7695203,
+            "MaxSize component should be a 64-bit integer",
+            maxSizeTag == value::TypeTags::NumberInt64);
+
+    bool needMoreInput = (array->size() < maxSize);
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(needMoreInput)};
+}
+
 int32_t updateAndCheckMemUsage(value::Array* state,
                                int32_t memUsage,
                                int32_t memAdded,
@@ -6122,11 +6146,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstN(ArityT
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     value::ValueGuard stateGuard{stateTag, stateVal};
 
-    auto [state, array, accStartIdx, accSize, memUsage, memLimit] =
-        multiAccState(stateTag, stateVal);
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] = multiAccState(stateTag, stateVal);
 
     auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
-    aggFirstN(state, array, accSize, memUsage, memLimit, fieldTag, fieldVal);
+    aggFirstN(state, array, maxSize, memUsage, memLimit, fieldTag, fieldVal);
 
     stateGuard.reset();
     return {true, stateTag, stateVal};
@@ -6813,6 +6836,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinObjectToArray(arity);
         case Builtin::arrayToObject:
             return builtinArrayToObject(arity);
+        case Builtin::aggFirstNNeedsMoreInput:
+            return builtinAggFirstNNeedsMoreInput(arity);
         case Builtin::aggFirstN:
             return builtinAggFirstN(arity);
         case Builtin::aggFirstNMerge:
@@ -7121,6 +7146,8 @@ std::string builtinToString(Builtin b) {
             return "objectToArray";
         case Builtin::arrayToObject:
             return "arrayToObject";
+        case Builtin::aggFirstNNeedsMoreInput:
+            return "aggFirstNNeedsMoreInput";
         case Builtin::aggFirstN:
             return "aggFirstN";
         case Builtin::aggFirstNMerge:

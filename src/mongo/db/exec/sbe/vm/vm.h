@@ -761,6 +761,7 @@ enum class Builtin : uint8_t {
     objectToArray,
     arrayToObject,
 
+    aggFirstNNeedsMoreInput,
     aggFirstN,
     aggFirstNMerge,
     aggFirstNFinalize,
@@ -786,7 +787,7 @@ std::string builtinToString(Builtin b);
 /**
  * This enum defines indices into an 'Array' that store state for $AccumulatorN expressions.
  *
- * The array might contain up to four elements:
+ * The array contains five elements:
  * - The element at index `kInternalArr` is the array that holds the values.
  * - The element at index `kStartIdx` is the logical start index in the internal array. This is
  *   used for emulating queue behaviour.
@@ -1691,6 +1692,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
 
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNNeedsMoreInput(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstN(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNFinalize(ArityType arity);

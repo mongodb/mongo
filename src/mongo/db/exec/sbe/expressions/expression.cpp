@@ -782,7 +782,9 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"arrayToObject",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::arrayToObject, false}},
     {"array", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::newArray, false}},
-    {"aggFirstN", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggFirstN, true}},
+    {"aggFirstNNeedsMoreInput",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggFirstNNeedsMoreInput, false}},
+    {"aggFirstN", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggFirstN, false}},
     {"aggFirstNMerge",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggFirstNMerge, true}},
     {"aggFirstNFinalize",
@@ -1148,6 +1150,18 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
         }
 
         return (it->second.generate)(ctx, _nodes, it->second.aggregate);
+    }
+
+    if (_name == "aggState") {
+        uassert(7695204,
+                "aggregate function call: aggState occurs in the non-aggregate context.",
+                ctx.aggExpression && ctx.accumulator);
+        uassert(7695205,
+                str::stream() << "function call: aggState has wrong arity: " << _nodes.size(),
+                _nodes.size() == 0);
+        vm::CodeFragment code;
+        code.appendMoveVal(ctx.accumulator);
+        return code;
     }
 
     uasserted(4822847, str::stream() << "unknown function call: " << _name);

@@ -1612,15 +1612,19 @@ TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorSingleGroup) {
                                        BSON_ARRAY(BSON("a" << 22 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 33 << "b" << 3)),
                                        BSON_ARRAY(BSON("a" << 44 << "b" << 4))};
-    runGroupAggregationTest(
-        "{_id: null, x: {$firstN: {input: '$a', n: 3}}}",
-        docs,
-        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(11 << 22 << 33))));
+    runGroupAggregationTest("{_id: null, x: {$firstN: {input: {a: '$a', b: '$b'}, n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                                                  << BSON_ARRAY(BSON("a" << 11 << "b" << 1)
+                                                                << BSON("a" << 22 << "b" << 2)
+                                                                << BSON("a" << 33 << "b" << 3)))));
 
-    runGroupAggregationTest(
-        "{_id: null, x: {$lastN: {input: '$a', n: 3}}}",
-        docs,
-        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(22 << 33 << 44))));
+    runGroupAggregationTest("{_id: null, x: {$lastN: {input: {a: '$a', b: '$b'}, n: 3}}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                                                  << BSON_ARRAY(BSON("a" << 22 << "b" << 2)
+                                                                << BSON("a" << 33 << "b" << 3)
+                                                                << BSON("a" << 44 << "b" << 4)))));
 }
 
 TEST_F(SbeStageBuilderGroupTest, FirstNLastNAccumulatorNotEnoughElement) {
