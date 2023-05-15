@@ -1240,7 +1240,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     migrationUtilExecutor->shutdown();
     migrationUtilExecutor->join();
 
-    if (ShardingState::get(serviceContext)->enabled()) {
+    if (Grid::get(serviceContext)->isShardingInitialized()) {
         LOGV2_OPTIONS(4784922, {LogComponent::kSharding}, "Shutting down the CatalogCacheLoader");
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
