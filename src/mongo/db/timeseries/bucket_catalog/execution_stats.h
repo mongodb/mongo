@@ -103,4 +103,10 @@ private:
 
 void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder);
 
+/**
+ * Adds the execution stats of a collection to both the collection and global stats of an execution
+ * stats controller.
+ */
+void addCollectionExecutionStats(ExecutionStatsController stats, const ExecutionStats& collStats);
+
 }  // namespace mongo::timeseries::bucket_catalog
