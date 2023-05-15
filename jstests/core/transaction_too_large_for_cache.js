@@ -38,8 +38,8 @@ for (let i = 0; i < 61; i++) {
 }
 
 // Retry the operation until we eventually hit the TransactionTooLargeForCache. Retry on
-// WriteConflict or TemporarilyUnavailable errors, as those are expected to be returned if the
-// threshold for TransactionTooLargeForCache is not reached, possibly due to concurrent operations.
+// WriteConflict errors, as those are expected to be returned if the threshold for
+// TransactionTooLargeForCache is not reached, possibly due to concurrent operations.
 assert.soon(() => {
     let result;
     try {
@@ -47,8 +47,7 @@ assert.soon(() => {
         assert.commandFailedWithCode(result, ErrorCodes.TransactionTooLargeForCache);
         return true;
     } catch (e) {
-        assert.commandFailedWithCode(result,
-                                     [ErrorCodes.WriteConflict, ErrorCodes.TemporarilyUnavailable]);
+        assert.commandFailedWithCode(result, [ErrorCodes.WriteConflict]);
         return false;
     }
 }, "Expected operation to eventually fail with TransactionTooLargeForCache error.");
