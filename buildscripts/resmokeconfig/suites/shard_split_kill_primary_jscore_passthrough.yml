@@ -97,8 +97,6 @@ selector:
   - requires_dbstats
   # "Cowardly fail if collStats is run with a mongod that had an unclean shutdown: ..."
   - requires_collstats
-  # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
-  - requires_datasize
   # Due to background shard splits, operations in the main test shell are not guaranteed to
   # be causally consistent with operations in a parallel shell. The reason is that
   # TenantMigrationCommitted error is only thrown when the client does a write or a atClusterTime/

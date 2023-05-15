@@ -264,7 +264,6 @@ selector:
   - requires_fastcount
   - requires_dbstats
   - requires_collstats
-  - requires_datasize
   - uses_parallel_shell
   - requires_profiling
   - requires_capped

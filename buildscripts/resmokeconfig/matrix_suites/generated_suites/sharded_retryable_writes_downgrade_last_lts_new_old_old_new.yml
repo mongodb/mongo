@@ -133,7 +133,6 @@ selector:
   - requires_fastcount
   - requires_dbstats
   - requires_collstats
-  - requires_datasize
   - operations_longer_than_stepdown_interval
   - uses_parallel_shell
   - cannot_run_during_upgrade_downgrade
