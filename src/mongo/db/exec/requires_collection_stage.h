@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -101,6 +102,20 @@ private:
 };
 
 // Type alias for use by PlanStages that write to a Collection.
-using RequiresMutableCollectionStage = RequiresCollectionStage;
+class RequiresWritableCollectionStage : public RequiresCollectionStage {
+public:
+    RequiresWritableCollectionStage(const char* stageType,
+                                    ExpressionContext* expCtx,
+                                    const ScopedCollectionAcquisition& coll)
+        : RequiresCollectionStage(stageType, expCtx, coll.getCollectionPtr()),
+          _collectionAcquisition(coll) {}
+
+    const ScopedCollectionAcquisition& collectionAcquisition() const {
+        return _collectionAcquisition;
+    }
+
+private:
+    const ScopedCollectionAcquisition& _collectionAcquisition;
+};
 
 }  // namespace mongo

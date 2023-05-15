@@ -98,7 +98,7 @@ struct TimeseriesModifyParams {
  * The stage processes one bucket at a time, unpacking all the measurements and writing the output
  * bucket in a single doWork() call.
  */
-class TimeseriesModifyStage final : public RequiresMutableCollectionStage {
+class TimeseriesModifyStage final : public RequiresWritableCollectionStage {
 public:
     static const char* kStageType;
 
@@ -106,7 +106,7 @@ public:
                           TimeseriesModifyParams&& params,
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child,
-                          const CollectionPtr& coll,
+                          const ScopedCollectionAcquisition& coll,
                           BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate);
 

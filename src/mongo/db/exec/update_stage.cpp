@@ -106,11 +106,10 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          const ScopedCollectionAcquisition& collection)
-    : RequiresMutableCollectionStage(kStageType.rawData(), expCtx, collection.getCollectionPtr()),
+    : RequiresWritableCollectionStage(kStageType.rawData(), expCtx, collection),
       _params(params),
       _ws(ws),
       _doc(params.driver->getDocument()),
-      _cachedShardingCollectionDescription(collection.nss()),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
       _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr),
@@ -157,11 +156,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     FieldRefSet immutablePaths;
 
     if (_isUserInitiatedWrite) {
-        // Documents coming directly from users should be validated for storage. It is safe to
-        // access the CollectionShardingState in this write context and to throw SSV if the sharding
-        // metadata has not been initialized.
-        const auto& collDesc =
-            _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
+        // Documents coming directly from users should be validated for storage.
+        const auto& collDesc = collectionAcquisition().getShardingDescription();
 
         if (collDesc.isSharded() && !OperationShardingState::isComingFromRouter(opCtx())) {
             immutablePaths.fillFrom(collDesc.getKeyPatternFields());
@@ -238,8 +234,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
             args.sampleId = request->getSampleId();
             args.update = logObj;
             if (_isUserInitiatedWrite) {
-                const auto& collDesc =
-                    _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
+                const auto& collDesc = collectionAcquisition().getShardingDescription();
                 args.criteria = collDesc.extractDocumentKey(oldObjValue);
             } else {
                 const auto docId = oldObjValue[idFieldName];
@@ -600,7 +595,6 @@ void UpdateStage::doRestoreStateRequiresCollection() {
     }
 
     _preWriteFilter.restoreState();
-    _cachedShardingCollectionDescription.restoreState();
 }
 
 std::unique_ptr<PlanStageStats> UpdateStage::getStats() {
@@ -694,9 +688,9 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
 void UpdateStage::checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
                                                   const BSONObj& newObj,
                                                   const Snapshotted<BSONObj>& oldObj) {
-    const auto& collDesc = shardingWriteRouter.getCollDesc();
+    const auto& collDesc = collectionAcquisition().getShardingDescription();
 
-    auto reshardingKeyPattern = collDesc->getReshardingKeyIfShouldForwardOps();
+    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
     if (!reshardingKeyPattern)
         return;
 
@@ -706,8 +700,8 @@ void UpdateStage::checkUpdateChangesReshardingKey(const ShardingWriteRouter& sha
     if (newShardKey.binaryEqual(oldShardKey))
         return;
 
-    FieldRefSet shardKeyPaths(collDesc->getKeyPatternFields());
-    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(*collDesc, shardKeyPaths);
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
     auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldObj.value());
     auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newObj);
@@ -721,22 +715,11 @@ void UpdateStage::checkUpdateChangesReshardingKey(const ShardingWriteRouter& sha
 
 void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
                                                    const Snapshotted<BSONObj>& oldObj) {
-    ShardingWriteRouter shardingWriteRouter(
-        opCtx(), collection()->ns(), Grid::get(opCtx())->catalogCache());
-
-    auto* const css = shardingWriteRouter.getCss();
-
-    // css can be null when this is a config server.
-    if (css == nullptr) {
-        return;
-    }
-
-    const auto collDesc = css->getCollectionDescription(opCtx());
-
     // Calling mutablebson::Document::getObject() renders a full copy of the updated document. This
     // can be expensive for larger documents, so we skip calling it when the collection isn't even
     // sharded.
-    if (!collDesc.isSharded()) {
+    const auto isSharded = collectionAcquisition().getShardingDescription().isSharded();
+    if (!isSharded) {
         return;
     }
 
@@ -744,15 +727,16 @@ void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
 
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    checkUpdateChangesExistingShardKey(shardingWriteRouter, newObj, oldObj);
+    ShardingWriteRouter shardingWriteRouter(
+        opCtx(), collection()->ns(), Grid::get(opCtx())->catalogCache());
+    checkUpdateChangesExistingShardKey(newObj, oldObj);
     checkUpdateChangesReshardingKey(shardingWriteRouter, newObj, oldObj);
 }
 
-void UpdateStage::checkUpdateChangesExistingShardKey(const ShardingWriteRouter& shardingWriteRouter,
-                                                     const BSONObj& newObj,
+void UpdateStage::checkUpdateChangesExistingShardKey(const BSONObj& newObj,
                                                      const Snapshotted<BSONObj>& oldObj) {
-    const auto& collDesc = shardingWriteRouter.getCollDesc();
-    const auto& shardKeyPattern = collDesc->getShardKeyPattern();
+    const auto& collDesc = collectionAcquisition().getShardingDescription();
+    const auto& shardKeyPattern = collDesc.getShardKeyPattern();
 
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
@@ -764,25 +748,24 @@ void UpdateStage::checkUpdateChangesExistingShardKey(const ShardingWriteRouter& 
         return;
     }
 
-    FieldRefSet shardKeyPaths(collDesc->getKeyPatternFields());
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
 
     // Assert that the updated doc has no arrays or array descendants for the shard key fields.
     update::assertPathsNotArray(_doc, shardKeyPaths);
 
-    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(*collDesc, shardKeyPaths);
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
     // At this point we already asserted that the complete shardKey have been specified in the
     // query, this implies that mongos is not doing a broadcast update and that it attached a
     // shardVersion to the command. Thus it is safe to call getOwnershipFilter
-    auto* const css = shardingWriteRouter.getCss();
-    const auto collFilter = css->getOwnershipFilter(
-        opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
+    const auto& collFilter = collectionAcquisition().getShardingFilter();
+    invariant(collFilter);
 
     // If the shard key of an orphan document is allowed to change, and the document is allowed to
     // become owned by the shard, the global uniqueness assumption for _id values would be violated.
-    invariant(collFilter.keyBelongsToMe(oldShardKey));
+    invariant(collFilter->keyBelongsToMe(oldShardKey));
 
-    if (!collFilter.keyBelongsToMe(newShardKey)) {
+    if (!collFilter->keyBelongsToMe(newShardKey)) {
         if (MONGO_unlikely(hangBeforeThrowWouldChangeOwningShard.shouldFail())) {
             LOGV2(20605, "Hit hangBeforeThrowWouldChangeOwningShard failpoint");
             hangBeforeThrowWouldChangeOwningShard.pauseWhileSet(opCtx());

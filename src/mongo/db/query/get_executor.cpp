@@ -1929,7 +1929,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             TimeseriesModifyParams(deleteStageParams.get()),
             ws.get(),
             std::move(root),
-            collectionPtr,
+            coll,
             BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
             parsedDelete->releaseResidualExpr());
     } else if (batchDelete) {
@@ -2119,7 +2119,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             TimeseriesModifyParams(&updateStageParams),
             ws.get(),
             std::move(root),
-            collectionPtr,
+            coll,
             BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
             parsedUpdate->releaseResidualExpr());
     } else {

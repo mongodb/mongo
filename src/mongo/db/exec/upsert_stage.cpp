@@ -131,18 +131,14 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
     // 'q' field belong to this shard, but those in the 'u' field do not. In this case we need to
     // throw so that MongoS can target the insert to the correct shard.
     if (_isUserInitiatedWrite) {
-        const auto& collDesc =
-            _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
+        const auto& collDesc = collectionAcquisition().getShardingDescription();
 
         if (collDesc.isSharded()) {
-            auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
-                opCtx(), collection()->ns());
-            auto collFilter = scopedCss->getOwnershipFilter(
-                opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
-            const ShardKeyPattern& shardKeyPattern = collFilter.getShardKeyPattern();
-            auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newDocument);
+            const auto& collFilter = collectionAcquisition().getShardingFilter();
+            invariant(collFilter);
+            auto newShardKey = collDesc.getShardKeyPattern().extractShardKeyFromDoc(newDocument);
 
-            if (!collFilter.keyBelongsToMe(newShardKey)) {
+            if (!collFilter->keyBelongsToMe(newShardKey)) {
                 // An attempt to upsert a document with a shard key value that belongs on another
                 // shard must either be a retryable write or inside a transaction.
                 // An upsert without a transaction number is legal if
@@ -203,8 +199,7 @@ BSONObj UpsertStage::_produceNewDocumentForInsert() {
     FieldRefSet shardKeyPaths, immutablePaths;
     if (_isUserInitiatedWrite) {
         // Obtain the collection description. This will be needed to compute the shardKey paths.
-        const auto& collDesc =
-            _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
+        const auto& collDesc = collectionAcquisition().getShardingDescription();
 
         // If the collection is sharded, add all fields from the shard key to the 'shardKeyPaths'
         // set.

@@ -44,15 +44,15 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
                                              TimeseriesModifyParams&& params,
                                              WorkingSet* ws,
                                              std::unique_ptr<PlanStage> child,
-                                             const CollectionPtr& coll,
+                                             const ScopedCollectionAcquisition& coll,
                                              BucketUnpacker bucketUnpacker,
                                              std::unique_ptr<MatchExpression> residualPredicate)
-    : RequiresCollectionStage(kStageType, expCtx, coll),
+    : RequiresWritableCollectionStage(kStageType, expCtx, coll),
       _params(std::move(params)),
       _ws(ws),
       _bucketUnpacker{std::move(bucketUnpacker)},
       _residualPredicate(std::move(residualPredicate)),
-      _preWriteFilter(opCtx(), coll->ns()) {
+      _preWriteFilter(opCtx(), coll.nss()) {
     tassert(7308200,
             "Multi deletes must have a residual predicate",
             _isSingletonWrite() || _residualPredicate || _params.isUpdate);
