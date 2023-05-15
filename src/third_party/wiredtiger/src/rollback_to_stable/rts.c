@@ -143,7 +143,7 @@ __wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_times
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         WT_ERR(__wt_rts_history_final_pass(session, rollback_timestamp));
 
 err:

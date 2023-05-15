@@ -77,8 +77,9 @@ class Checker:
         self.visited_pages.add(page)
 
     def __apply_check_update_abort(self, operation):
-        if operation.file != self.current_tree.file:
-            raise Exception(f"spurious visit to {operation.file}")
+        # TODO expand this out - not always spurious for the history store.
+        # if operation.file != self.current_tree.file:
+        #     raise Exception(f"spurious visit to {operation.file}")
 
         if not(operation.txnid_not_visible or
                operation.stable_lt_durable or
