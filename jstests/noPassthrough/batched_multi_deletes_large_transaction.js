@@ -6,7 +6,7 @@
  * handled by the primary.
  *
  * @tags: [
- *     requires_fcv_62,
+ *     requires_fcv_71,
  *     requires_replication,
  * ]
  */
