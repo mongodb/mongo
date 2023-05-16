@@ -17,13 +17,16 @@
 "use strict";
 
 function getPreImage(collectionIndex, ts) {
+    const farOffDate = ISODate("2100-01-01");
+    const epochSeconds = farOffDate.valueOf() / 1000;
+    // Return a document inserted with a date really far off into the future.
     return {
         _id: {
             nsUUID: UUID(`3b241101-e2bb-4255-8caf-4136c566a12${collectionIndex}`),
-            ts: new Timestamp(ts, 0),
+            ts: new Timestamp(epochSeconds, ts),
             applyOpsIndex: 0,
         },
-        operationTime: ISODate("9000-01-01"),  // Put a date really far off into the future.
+        operationTime: farOffDate,
     };
 }
 
