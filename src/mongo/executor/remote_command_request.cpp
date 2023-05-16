@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/str.h"
 
 using namespace fmt::literals;
@@ -73,12 +74,14 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
         ? theCmdObj.addField(*opCtx->getComment())
         : cmdObj = theCmdObj;
 
-    // maxTimeMSOpOnly is set in the network interface based on the remaining max time attached to
-    // the OpCtx.  It should never be specified explicitly.
-    uassert(4924403,
-            str::stream() << "Command request object should not manually specify "
-                          << query_request_helper::kMaxTimeMSOpOnlyField,
-            !cmdObj.hasField(query_request_helper::kMaxTimeMSOpOnlyField));
+    // For hedged requests, adjust timeout
+    if (cmdObj.hasField("maxTimeMSOpOnly")) {
+        int maxTimeField = cmdObj["maxTimeMSOpOnly"].Number();
+        if (auto maxTimeMSOpOnly = Milliseconds(maxTimeField);
+            timeout == executor::RemoteCommandRequest::kNoTimeout || maxTimeMSOpOnly < timeout) {
+            timeout = maxTimeMSOpOnly;
+        }
+    }
 
     if (options.hedgeOptions.isHedgeEnabled) {
         operationKey.emplace(UUID::gen());
