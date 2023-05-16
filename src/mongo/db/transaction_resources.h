@@ -76,11 +76,13 @@ struct AcquisitionPrerequisites {
 
     AcquisitionPrerequisites(NamespaceString nss,
                              boost::optional<UUID> uuid,
+                             repl::ReadConcernArgs readConcern,
                              PlacementConcernVariant placementConcern,
                              OperationType operationType,
                              ViewMode viewMode)
         : nss(std::move(nss)),
           uuid(std::move(uuid)),
+          readConcern(std::move(readConcern)),
           placementConcern(std::move(placementConcern)),
           operationType(operationType),
           viewMode(viewMode) {}
@@ -88,6 +90,7 @@ struct AcquisitionPrerequisites {
     NamespaceString nss;
     boost::optional<UUID> uuid;
 
+    repl::ReadConcernArgs readConcern;
     PlacementConcernVariant placementConcern;
     OperationType operationType;
     ViewMode viewMode;
@@ -180,7 +183,7 @@ struct AcquiredView {
  * the read concern of the operation).
  */
 struct TransactionResources {
-    TransactionResources(repl::ReadConcernArgs readConcern);
+    TransactionResources();
 
     TransactionResources(TransactionResources&&) = delete;
     TransactionResources& operator=(TransactionResources&&) = delete;
@@ -190,15 +193,8 @@ struct TransactionResources {
 
     ~TransactionResources();
 
-    AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection) {
-        return acquiredCollections.emplace_back(std::move(acquiredCollection));
-    }
-
-    void releaseCollection(UUID uuid);
-
-    const AcquiredView& addAcquiredView(AcquiredView&& acquiredView) {
-        return acquiredViews.emplace_back(std::move(acquiredView));
-    }
+    AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection);
+    const AcquiredView& addAcquiredView(AcquiredView&& acquiredView);
 
     void releaseAllResourcesOnCommitOrAbort() noexcept;
 
@@ -209,22 +205,22 @@ struct TransactionResources {
      */
     void assertNoAcquiredCollections() const;
 
-    // The read concern with which the whole operation started. Remains the same for the duration of
-    // the entire operation.
-    repl::ReadConcernArgs readConcern;
-
     // Indicates whether yield has been performed on these resources
     bool yielded{false};
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Global resources (cover all collections for the operation)
 
+    // The read concern with which the transaction runs. All acquisitions must match that read
+    // concern.
+    boost::optional<repl::ReadConcernArgs> readConcern;
+
     // Set of locks acquired by the operation or nullptr if yielded.
     std::unique_ptr<Locker> locker;
 
     // If '_locker' has been yielded, contains a snapshot of the locks which have been yielded.
     // Otherwise boost::none.
-    boost::optional<Locker::LockSnapshot> lockSnapshot;
+    boost::optional<Locker::LockSnapshot> yieldedLocker;
 
     // The storage engine snapshot associated with this transaction (when yielded).
     struct YieldedRecoveryUnit {
@@ -232,7 +228,7 @@ struct TransactionResources {
         WriteUnitOfWork::RecoveryUnitState recoveryUnitState;
     };
 
-    boost::optional<YieldedRecoveryUnit> yieldRecoveryUnit;
+    boost::optional<YieldedRecoveryUnit> yieldedRecoveryUnit;
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Per-collection resources

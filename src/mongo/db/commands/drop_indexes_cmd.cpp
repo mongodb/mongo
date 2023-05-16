@@ -31,7 +31,6 @@
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/drop_indexes_gen.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"

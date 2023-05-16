@@ -35,13 +35,55 @@ const PlacementConcern AcquisitionPrerequisites::kPretendUnsharded =
     PlacementConcern{boost::none, boost::none};
 
 namespace shard_role_details {
+namespace {
 
-TransactionResources::TransactionResources(repl::ReadConcernArgs readConcern)
-    : readConcern(std::move(readConcern)) {}
+/**
+ * This method ensures that two read concerns are equivalent for the purposes of acquiring a
+ * transactional snapshot. Equivalence means that they don't acquire snapshot at conflicting levels,
+ * such as one operation asking for local and a subsequent one for majority. Similarly, we can't
+ * have two subsequent acquisitions asking for snapshots at two different timestamps.
+ */
+void assertReadConcernsAreEquivalent(const repl::ReadConcernArgs& rc1,
+                                     const repl::ReadConcernArgs& rc2) {
+    tassert(771230,
+            str::stream() << "Acquired two different collections on the same transaction with "
+                             "read concerns that are not equivalent ("
+                          << rc1.toString() << " != " << rc2.toString() << ")",
+            rc1.getLevel() == rc2.getLevel() &&
+                rc1.getArgsAtClusterTime() == rc2.getArgsAtClusterTime());
+}
+
+}  // namespace
+
+TransactionResources::TransactionResources() = default;
+
+TransactionResources::~TransactionResources() {
+    invariant(!locker);
+    invariant(!yieldedLocker);
+    invariant(!yieldedRecoveryUnit);
+    invariant(acquiredCollections.empty());
+    invariant(acquiredViews.empty());
+}
+
+AcquiredCollection& TransactionResources::addAcquiredCollection(
+    AcquiredCollection&& acquiredCollection) {
+    if (!readConcern) {
+        readConcern = acquiredCollection.prerequisites.readConcern;
+    }
+    assertReadConcernsAreEquivalent(*readConcern, acquiredCollection.prerequisites.readConcern);
+
+    return acquiredCollections.emplace_back(std::move(acquiredCollection));
+}
+
+const AcquiredView& TransactionResources::addAcquiredView(AcquiredView&& acquiredView) {
+    return acquiredViews.emplace_back(std::move(acquiredView));
+}
 
 void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
+    readConcern.reset();
     locker.reset();
-    lockSnapshot.reset();
+    yieldedLocker.reset();
+    yieldedRecoveryUnit.reset();
     acquiredCollections.clear();
     acquiredViews.clear();
 }
@@ -55,13 +97,6 @@ void TransactionResources::assertNoAcquiredCollections() const {
         ss << "\n" << acquisition.prerequisites.nss.toStringForErrorMsg();
     }
     fassertFailedWithStatus(737660, Status{ErrorCodes::InternalError, ss.str()});
-}
-
-TransactionResources::~TransactionResources() {
-    invariant(!locker);
-    invariant(!lockSnapshot);
-    invariant(acquiredCollections.empty());
-    invariant(acquiredViews.empty());
 }
 
 }  // namespace shard_role_details

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/read_concern_args.h"
 
 #include "mongo/bson/util/bson_extract.h"
@@ -41,14 +38,14 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-
-using std::string;
-
 namespace mongo {
 namespace repl {
+namespace {
 
 const OperationContext::Decoration<ReadConcernArgs> handle =
     OperationContext::declareDecoration<ReadConcernArgs>();
+
+}  // namespace
 
 ReadConcernArgs& ReadConcernArgs::get(OperationContext* opCtx) {
     return handle(opCtx);
@@ -57,7 +54,6 @@ ReadConcernArgs& ReadConcernArgs::get(OperationContext* opCtx) {
 const ReadConcernArgs& ReadConcernArgs::get(const OperationContext* opCtx) {
     return handle(opCtx);
 }
-
 
 // The "kImplicitDefault" read concern, used by internal operations, is deliberately empty (no
 // 'level' specified). This allows internal operations to specify a read concern, while still

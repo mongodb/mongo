@@ -30,6 +30,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/bulk_write.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/dbdirectclient.h"

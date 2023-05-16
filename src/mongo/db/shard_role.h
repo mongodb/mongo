@@ -29,8 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/transaction_resources.h"

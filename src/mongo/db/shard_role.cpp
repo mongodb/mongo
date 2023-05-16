@@ -60,11 +60,9 @@ auto getTransactionResources = OperationContext::declareDecoration<
     std::unique_ptr<shard_role_details::TransactionResources>>();
 
 shard_role_details::TransactionResources& getOrMakeTransactionResources(OperationContext* opCtx) {
-    auto& readConcern = repl::ReadConcernArgs::get(opCtx);
     auto& optTransactionResources = getTransactionResources(opCtx);
     if (!optTransactionResources) {
-        optTransactionResources =
-            std::make_unique<shard_role_details::TransactionResources>(readConcern);
+        optTransactionResources = std::make_unique<shard_role_details::TransactionResources>();
     }
 
     return *optTransactionResources;
@@ -102,8 +100,12 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
             auto coll = catalog.lookupCollectionByNamespace(opCtx, *ar.nss);
             checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, ar.uuid);
 
-            AcquisitionPrerequisites prerequisites(
-                *ar.nss, ar.uuid, ar.placementConcern, ar.operationType, ar.viewMode);
+            AcquisitionPrerequisites prerequisites(*ar.nss,
+                                                   ar.uuid,
+                                                   ar.readConcern,
+                                                   ar.placementConcern,
+                                                   ar.operationType,
+                                                   ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
                 prerequisites, nullptr, boost::none};
@@ -131,8 +133,12 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                 checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, *ar.uuid);
             }
 
-            AcquisitionPrerequisites prerequisites(
-                coll->ns(), coll->uuid(), ar.placementConcern, ar.operationType, ar.viewMode);
+            AcquisitionPrerequisites prerequisites(coll->ns(),
+                                                   coll->uuid(),
+                                                   ar.readConcern,
+                                                   ar.placementConcern,
+                                                   ar.operationType,
+                                                   ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
                 prerequisites, nullptr, boost::none};
@@ -640,7 +646,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
 
         const auto& nss = ar.nss ? *ar.nss : coll->ns();
         AcquisitionPrerequisites prerequisites(
-            nss, ar.uuid, ar.placementConcern, ar.operationType, ar.viewMode);
+            nss, ar.uuid, ar.readConcern, ar.placementConcern, ar.operationType, ar.viewMode);
 
         ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
             prerequisites, nullptr, boost::none};
@@ -811,6 +817,7 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
     auto prerequisites =
         AcquisitionPrerequisites(nss,
                                  boost::none,
+                                 repl::ReadConcernArgs::get(opCtx),
                                  AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss,
                                  AcquisitionPrerequisites::OperationType::kWrite,
                                  AcquisitionPrerequisites::ViewMode::kMustBeCollection);
@@ -819,18 +826,16 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
     invariant(std::holds_alternative<CollectionPtr>(collOrView));
 
     auto& coll = std::get<CollectionPtr>(collOrView);
+    if (coll)
+        prerequisites.uuid = boost::optional<UUID>(coll->uuid());
 
-    shard_role_details::AcquiredCollection& acquiredCollection = txnResources.addAcquiredCollection(
-        {AcquisitionPrerequisites(nss,
-                                  coll ? boost::optional<UUID>(coll->uuid()) : boost::none,
-                                  AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss,
-                                  AcquisitionPrerequisites::OperationType::kWrite,
-                                  AcquisitionPrerequisites::ViewMode::kMustBeCollection),
-         std::move(dbLock),
-         std::move(collLock),
-         boost::none,
-         boost::none,
-         std::move(coll)});
+    shard_role_details::AcquiredCollection& acquiredCollection =
+        txnResources.addAcquiredCollection({prerequisites,
+                                            std::move(dbLock),
+                                            std::move(collLock),
+                                            boost::none,
+                                            boost::none,
+                                            std::move(coll)});
 
     return ScopedCollectionAcquisition(opCtx, acquiredCollection);
 }
@@ -925,11 +930,11 @@ boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperat
             "Yielding view acquisitions is forbidden",
             transactionResources->acquiredViews.empty());
 
-    invariant(!transactionResources->lockSnapshot);
+    invariant(!transactionResources->yieldedLocker);
     Locker::LockSnapshot lockSnapshot;
     opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot);
 
-    transactionResources->lockSnapshot.emplace(std::move(lockSnapshot));
+    transactionResources->yieldedLocker.emplace(std::move(lockSnapshot));
     transactionResources->yielded = true;
 
     return YieldedTransactionResources(std::move(transactionResources));
@@ -950,10 +955,10 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
 
     auto restoreFn = [&]() {
         // Reacquire locks.
-        if (yieldedResources._yieldedResources->lockSnapshot) {
-            opCtx->lockState()->restoreLockState(opCtx,
-                                                 *yieldedResources._yieldedResources->lockSnapshot);
-            yieldedResources._yieldedResources->lockSnapshot.reset();
+        if (yieldedResources._yieldedResources->yieldedLocker) {
+            opCtx->lockState()->restoreLockState(
+                opCtx, *yieldedResources._yieldedResources->yieldedLocker);
+            yieldedResources._yieldedResources->yieldedLocker.reset();
         }
 
         // Reestablish a consistent catalog snapshot (multi document transactions don't yield).
@@ -1036,10 +1041,10 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                     // the point we had left. We do this to prevent large multi-writes from
                     // repeatedly failing due to StaleConfig and exhausting the mongos retry
                     // attempts. Yield the locks.
-                    yieldedResources._yieldedResources->lockSnapshot.emplace();
+                    yieldedResources._yieldedResources->yieldedLocker.emplace();
                     opCtx->recoveryUnit()->abandonSnapshot();
                     opCtx->lockState()->saveLockStateAndUnlock(
-                        &(*yieldedResources._yieldedResources->lockSnapshot));
+                        yieldedResources._yieldedResources->yieldedLocker.get_ptr());
                     // Wait for the critical section to finish.
                     OperationShardingState::waitForCriticalSectionToComplete(
                         opCtx, *ex->getCriticalSectionSignal())
