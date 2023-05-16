@@ -171,7 +171,7 @@ class TestTimeout(_ResmokeSelftest):
         ]
         self.execute_resmoke(resmoke_args)
 
-        archival_dirs_to_expect = 4  # 2 tests * 2 nodes
+        archival_dirs_to_expect = 8  # 2 tests * 2 nodes
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
@@ -189,9 +189,11 @@ class TestTimeout(_ResmokeSelftest):
 
         self.execute_resmoke(resmoke_args, sleep_secs=25)
 
-        archival_dirs_to_expect = 2  # 2 tests * 2 nodes / 2 data_file directories
+        archival_dirs_to_expect = 4
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
-        self.assert_dir_file_count(self.test_dir_inner, self.archival_file, archival_dirs_to_expect)
+        archival_inner_dirs_to_expect = 2
+        self.assert_dir_file_count(self.test_dir_inner, self.archival_file,
+                                   archival_inner_dirs_to_expect)
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
         self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
