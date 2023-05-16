@@ -344,7 +344,7 @@ functions:
             set -o igncr
           fi;
 
-          # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
+          # set_goenv provides set_goenv()
           . ./set_goenv.sh
           GOROOT="" set_goenv || exit
           go version
@@ -354,7 +354,7 @@ functions:
               build_tools="$build_tools mongoreplay"
           fi
           for i in $build_tools; do
-              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
+              go build -ldflags -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
               "../../../../../mongodb/bin/$i${exe|}" --version
           done
     - command: shell.exec
