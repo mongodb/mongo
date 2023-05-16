@@ -154,6 +154,9 @@ class test_hs21(wttest.WiredTigerTestCase):
             self.check(self.session, value1, ds.uri, self.nrows // 2, 2, flcs_nrows=self.nrows)
             self.check(self.session, value2, ds.uri, self.nrows, 100)
 
+        # Set the stable timestamp to 100 to let checkpoint write all the stable data.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
+
         # Our sweep scan interval is every 1 second and the amount of idle time needed for a handle to be closed is 2 seconds.
         # It should take roughly 3 seconds for the sweep server to close our file handles. Lets wait at least double
         # that to be safe.
