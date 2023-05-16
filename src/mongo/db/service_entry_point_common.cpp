@@ -1510,7 +1510,10 @@ void ExecCommandDatabase::_initiateCommand() {
     // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should
     // not contribute to resource consumption metrics.
     const bool collect = command->collectsResourceConsumptionMetrics() && !_isInternalClient();
-    _scopedMetrics.emplace(opCtx, dbname, collect);
+    _scopedMetrics.emplace(
+        opCtx,
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
+        collect);
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
