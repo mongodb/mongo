@@ -81,12 +81,12 @@ public:
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
+        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns_forTest());
 
         int numFinishedIndexesStart = indexCatalog(&opCtx)->numIndexesReady();
 
-        dbtests::createIndex(&opCtx, _nss.ns(), BSON("x" << 1)).transitional_ignore();
-        dbtests::createIndex(&opCtx, _nss.ns(), BSON("y" << 1)).transitional_ignore();
+        dbtests::createIndex(&opCtx, _nss.ns_forTest(), BSON("x" << 1)).transitional_ignore();
+        dbtests::createIndex(&opCtx, _nss.ns_forTest(), BSON("y" << 1)).transitional_ignore();
 
         ASSERT_TRUE(indexCatalog(&opCtx)->numIndexesReady() == numFinishedIndexesStart + 2);
 
@@ -128,7 +128,7 @@ public:
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
+        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns_forTest());
 
         const IndexDescriptor* idDesc = indexCatalog(&opCtx)->findIdIndex(&opCtx);
         std::shared_ptr<const IndexCatalogEntry> entry =
@@ -185,11 +185,11 @@ public:
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns());
+        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns_forTest());
         const std::string indexName = "x_1";
 
         ASSERT_OK(dbtests::createIndexFromSpec(&opCtx,
-                                               _nss.ns(),
+                                               _nss.ns_forTest(),
                                                BSON("name" << indexName << "key" << BSON("x" << 1)
                                                            << "v" << static_cast<int>(kIndexVersion)
                                                            << "expireAfterSeconds" << 5)));

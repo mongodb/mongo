@@ -100,7 +100,7 @@ public:
      * Create a collection table in the KVEngine not reflected in the DurableCatalog.
      */
     Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
-        const std::string identName = "collection-" + collName.ns();
+        const std::string identName = "collection-" + collName.ns_forTest();
         return _storageEngine->getEngine()->createRecordStore(
             opCtx, collName, identName, CollectionOptions());
     }

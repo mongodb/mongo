@@ -59,12 +59,12 @@ public:
     QueryStageSubplanTest() : _client(_opCtx.get()) {}
 
     virtual ~QueryStageSubplanTest() {
-        dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+        dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
         _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(opCtx(), nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(opCtx(), nss.ns_forTest(), obj));
     }
 
     void dropIndex(BSONObj keyPattern) {
@@ -126,7 +126,7 @@ private:
  * back to regular planning.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
     addIndex(BSON("a"
                   << "2d"
                   << "b" << 1));
@@ -215,7 +215,7 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
  * Test the SubplanStage's ability to plan an individual branch using the plan cache.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -228,7 +228,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
  * Test that the SubplanStage can plan an individual branch from the cache using a $** index.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCacheWithWildcardIndex) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("$**" << 1));
     addIndex(BSON("a.$**" << 1));
@@ -240,7 +240,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCacheWithWildcardIndex) {
  * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1));
@@ -296,7 +296,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
  * Ensure that the subplan stage doesn't create a plan cache entry if the candidate plans tie.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
@@ -476,7 +476,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
  * Regression test for SERVER-19388.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
 
@@ -517,7 +517,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
 }
 
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
@@ -551,7 +551,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 }
 
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
@@ -579,7 +579,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
 TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelection) {
     CollectionPtr collection;
     {
-        dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
+        dbtests::WriteContextForTests ctx{opCtx(), nss.ns_forTest()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));
         addIndex(BSON("p1" << 1 << "opt2" << 1));
         addIndex(BSON("p2" << 1 << "opt1" << 1));
@@ -625,7 +625,7 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
 TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSelection) {
     CollectionPtr collection;
     {
-        dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
+        dbtests::WriteContextForTests ctx{opCtx(), nss.ns_forTest()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));
         addIndex(BSON("p1" << 1 << "opt2" << 1));
         addIndex(BSON("p2" << 1 << "opt1" << 1));

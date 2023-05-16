@@ -75,7 +75,7 @@ public:
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns_forTest(), obj));
     }
 
     void insert(const BSONObj& obj) {
@@ -201,7 +201,7 @@ private:
  * Test dropping the collection while an agg PlanExecutor is doing an index scan.
  */
 TEST_F(PlanExecutorTest, DropIndexScanAgg) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
 
     insert(BSON("_id" << 1 << "a" << 6));
     insert(BSON("_id" << 2 << "a" << 7));
@@ -239,7 +239,7 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -256,7 +256,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwaitData) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -276,7 +276,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwa
 }
 
 TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailableButNotAwaitData) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -296,7 +296,7 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -363,7 +363,7 @@ protected:
  * scan.
  */
 TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     setupCollection();
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
@@ -387,7 +387,7 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
  * index scan.
  */
 TEST_F(PlanExecutorSnapshotTest, SnapshotTest) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     setupCollection();
     BSONObj indexSpec = BSON("_id" << 1);
     addIndex(indexSpec);

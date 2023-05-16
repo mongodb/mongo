@@ -49,7 +49,7 @@ public:
     inline static const NamespaceString collNss =
         NamespaceString::createNamespaceString_forTest("TestDB", "TestCollection");
     inline static const BSONObj collOpReason =
-        BSON("Dummy operation on collection" << collNss.ns());
+        BSON("Dummy operation on collection" << collNss.ns_forTest());
 
     inline static const NamespaceString dbName =
         NamespaceString::createNamespaceString_forTest("TestDB");
@@ -126,7 +126,7 @@ public:
     }
 
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(nss.ns_forTest())) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
@@ -144,7 +144,7 @@ public:
     }
 
     void assertCriticalSectionCommitEnteredInMemory(const NamespaceString& nss) {
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(nss.ns_forTest())) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
@@ -161,7 +161,7 @@ public:
     }
 
     void assertCriticalSectionLeftInMemory(const NamespaceString& nss) {
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(nss.ns_forTest())) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());

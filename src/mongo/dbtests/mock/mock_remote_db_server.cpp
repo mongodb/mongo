@@ -127,13 +127,13 @@ void MockRemoteDBServer::setCommandReply(const string& cmdName,
 void MockRemoteDBServer::insert(const NamespaceString& nss, BSONObj obj) {
     scoped_spinlock sLock(_lock);
 
-    vector<BSONObj>& mockCollection = _dataMgr[nss.ns().toString()];
+    vector<BSONObj>& mockCollection = _dataMgr[nss.toString()];
     mockCollection.push_back(obj.copy());
 }
 
 void MockRemoteDBServer::remove(const NamespaceString& nss, const BSONObj&) {
     scoped_spinlock sLock(_lock);
-    auto ns = nss.ns().toString();
+    auto ns = nss.toString();
     if (_dataMgr.count(ns) == 0) {
         return;
     }
@@ -214,7 +214,7 @@ mongo::BSONArray MockRemoteDBServer::findImpl(InstanceID id,
     scoped_spinlock sLock(_lock);
     _queryCount++;
 
-    auto ns = nsOrUuid.uuid() ? _uuidToNs[*nsOrUuid.uuid()] : nsOrUuid.nss()->ns().toString();
+    auto ns = nsOrUuid.uuid() ? _uuidToNs[*nsOrUuid.uuid()] : nsOrUuid.nss()->toString();
     const vector<BSONObj>& coll = _dataMgr[ns];
     BSONArrayBuilder result;
     for (vector<BSONObj>::const_iterator iter = coll.begin(); iter != coll.end(); ++iter) {

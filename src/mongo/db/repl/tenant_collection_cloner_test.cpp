@@ -116,7 +116,7 @@ protected:
     void setUp() override {
         TenantClonerTestFixture::setUp();
 
-        _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
+        _mockServer->assignCollectionUuid(_nss.ns_forTest(), _collUuid);
         _mockServer->setCommandReply("dbStats", StatusWith<BSONObj>(BSON("dataSize" << 1)));
         _mockServer->setCommandReply("collStats", BSON("size" << 1));
 
@@ -246,7 +246,8 @@ TEST_F(TenantCollectionClonerTest, ListIndexesReturnedNoIndexesShouldFail) {
     auto cloner = makeCollectionCloner();
     cloner->setStopAfterStage_forTest("listIndexes");
     _mockServer->setCommandReply("count", createCountResponse(1));
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), BSONArray()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns_forTest(), BSONArray()));
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_EQUALS(ErrorCodes::IllegalOperation, cloner->run());
@@ -262,7 +263,7 @@ TEST_F(TenantCollectionClonerTest, ListIndexesHasResults) {
     _mockServer->setCommandReply(
         "listIndexes",
         createCursorResponse(
-            _nss.ns(),
+            _nss.ns_forTest(),
             BSON_ARRAY(_secondaryIndexSpecs[0] << _idIndexSpec << _secondaryIndexSpecs[1])));
     _mockServer->setCommandReply("find", createFindResponse());
     ASSERT_OK(cloner->run());
@@ -284,7 +285,7 @@ TEST_F(TenantCollectionClonerTest, ListIndexesRemoteUnreachableBeforeMajorityFin
     auto cloner = makeCollectionCloner();
     _mockServer->setCommandReply("count", createCountResponse(1));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
 
     auto clonerOperationTimeFP =
         globalFailPointRegistry().find("tenantCollectionClonerHangAfterGettingOperationTime");
@@ -308,7 +309,7 @@ TEST_F(TenantCollectionClonerTest, ListIndexesRecordsCorrectOperationTime) {
     auto cloner = makeCollectionCloner();
     _mockServer->setCommandReply("count", createCountResponse(1));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     auto clonerOperationTimeFP =
@@ -338,12 +339,13 @@ TEST_F(TenantCollectionClonerTest, BeginCollection) {
     for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
         indexSpecs.append(secondaryIndexSpec);
     }
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns_forTest(), indexSpecs.arr()));
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_EQUALS(Status::OK(), cloner->run());
 
-    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(_nss.ns_forTest(), _opObserver->nssToCapture.ns_forTest());
     ASSERT_TRUE(_opObserver->collCreated);
     ASSERT_BSONOBJ_EQ(_options.toBSON(), _opObserver->collectionOptions.toBSON());
 
@@ -365,7 +367,7 @@ TEST_F(TenantCollectionClonerTest, BeginCollectionFailed) {
     cloner->setStopAfterStage_forTest("createCollection");
     _mockServer->setCommandReply("count", createCountResponse(1));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Run the cloner in a separate thread.
@@ -381,7 +383,7 @@ TEST_F(TenantCollectionClonerTest, BeginCollectionFailed) {
 
     clonerThread.join();
 
-    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(_nss.ns_forTest(), _opObserver->nssToCapture.ns_forTest());
     ASSERT_FALSE(_opObserver->collCreated);
 }
 
@@ -389,7 +391,7 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsSingleBatch) {
     // Set up data for preliminary stages
     _mockServer->setCommandReply("count", createCountResponse(2));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
@@ -399,7 +401,7 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsSingleBatch) {
     auto cloner = makeCollectionCloner();
     ASSERT_OK(cloner->run());
 
-    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(_nss.ns_forTest(), _opObserver->nssToCapture.ns_forTest());
     ASSERT_EQUALS(2, _opObserver->numDocsInserted);
 
     auto stats = cloner->getStats();
@@ -415,7 +417,7 @@ TEST_F(TenantCollectionClonerTest, BatchSizeStoredInConstructor) {
     // Set up data for preliminary stages.
     _mockServer->setCommandReply("count", createCountResponse(7));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node. It should take 3 batches to clone the
@@ -431,7 +433,7 @@ TEST_F(TenantCollectionClonerTest, BatchSizeStoredInConstructor) {
     auto cloner = makeCollectionCloner();
     ASSERT_OK(cloner->run());
 
-    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(_nss.ns_forTest(), _opObserver->nssToCapture.ns_forTest());
     ASSERT_EQUALS(7, _opObserver->numDocsInserted);
 
     auto stats = cloner->getStats();
@@ -443,7 +445,7 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsMultipleBatches) {
     // Set up data for preliminary stages
     _mockServer->setCommandReply("count", createCountResponse(5));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
@@ -457,7 +459,7 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsMultipleBatches) {
     cloner->setBatchSize_forTest(2);
     ASSERT_OK(cloner->run());
 
-    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(_nss.ns_forTest(), _opObserver->nssToCapture.ns_forTest());
     ASSERT_EQUALS(5, _opObserver->numDocsInserted);
 
     auto stats = cloner->getStats();
@@ -469,7 +471,7 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsFailed) {
     // Set up data for preliminary stages
     _mockServer->setCommandReply("count", createCountResponse(3));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
@@ -497,7 +499,7 @@ TEST_F(TenantCollectionClonerTest, QueryFailure) {
                                 << "_id_");
     _mockServer->setCommandReply("count", createCountResponse(3));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
@@ -559,7 +561,7 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnFirstBatch) {
     // Set up data for preliminary stages.
     _mockServer->setCommandReply("count", createCountResponse(2));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
 
     // Set up before-stage failpoint.
@@ -603,7 +605,7 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnSubsequentBatch)
     // Set up data for preliminary stages.
     _mockServer->setCommandReply("count", createCountResponse(2));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
 
     // Set up after-first-batch failpoint.
@@ -700,7 +702,7 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundFirstBatc
     // Set up data for preliminary stages.
     _mockServer->setCommandReply("count", createCountResponse(3));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
 
     // Set up failpoints.
@@ -757,7 +759,7 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundSubsequen
     // Set up data for preliminary stages.
     _mockServer->setCommandReply("count", createCountResponse(3));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
 
     // Set up failpoints.
@@ -823,7 +825,8 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingAllSecondaryI
     for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
         indexSpecs.append(secondaryIndexSpec);
     }
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns_forTest(), indexSpecs.arr()));
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_EQUALS(Status::OK(), cloner->run());
@@ -860,7 +863,8 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingSomeSecondary
     for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
         indexSpecs.append(secondaryIndexSpec);
     }
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns_forTest(), indexSpecs.arr()));
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_EQUALS(Status::OK(), cloner->run());
@@ -890,7 +894,8 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingNoSecondaryIn
     for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
         indexSpecs.append(secondaryIndexSpec);
     }
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns_forTest(), indexSpecs.arr()));
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_EQUALS(Status::OK(), cloner->run());
@@ -921,7 +926,8 @@ TEST_F(TenantCollectionClonerTest, ResumeFromNonEmptyCollection) {
     for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
         indexSpecs.append(secondaryIndexSpec);
     }
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns_forTest(), indexSpecs.arr()));
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_EQUALS(Status::OK(), cloner->run());
@@ -943,7 +949,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRecreatedCollection) {
 
     _mockServer->setCommandReply("count", createCountResponse(3));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
 
     _mockServer->insert(_nss, BSON("_id" << 1));
@@ -955,7 +961,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRecreatedCollection) {
     // Test that the cloner correctly skips cloning this collection as it must have been dropped and
     // re-created on the donor. And the drop and the re-create will be covered by the oplog
     // application phase.
-    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(_nss.ns_forTest(), _opObserver->nssToCapture.ns_forTest());
     ASSERT_EQUALS(0, _opObserver->numDocsInserted);
     auto stats = cloner->getStats();
     ASSERT_EQUALS(0, stats.documentsCopied);
@@ -977,7 +983,8 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
     for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
         indexSpecs.append(secondaryIndexSpec);
     }
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns_forTest(), indexSpecs.arr()));
     _mockServer->setCommandReply("find", createFindResponse());
 
     // Set up documents to be returned from upstream node.
@@ -1010,15 +1017,15 @@ TEST_F(TenantCollectionClonerTest, NoDocumentsIfInsertedAfterListIndexes) {
     // Set up data for preliminary stages
     _mockServer->setCommandReply("count", createCountResponse(0));
     _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+                                 createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     auto collClonerAfterFailPoint = globalFailPointRegistry().find("hangAfterClonerStage");
     auto timesEntered = collClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'TenantCollectionCloner', stage: 'listIndexes', nss: '" + _nss.ns() +
-                 "'}"));
+        fromjson("{cloner: 'TenantCollectionCloner', stage: 'listIndexes', nss: '" +
+                 _nss.ns_forTest() + "'}"));
     auto cloner = makeCollectionCloner();
     stdx::thread clonerThread([&] {
         Client::initThread("ClonerRunner");

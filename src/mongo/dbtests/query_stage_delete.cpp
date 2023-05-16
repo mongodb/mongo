@@ -54,7 +54,7 @@ static const NamespaceString nss("unittests.QueryStageDelete");
 class QueryStageDeleteBase {
 public:
     QueryStageDeleteBase() : _client(&_opCtx) {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
 
         for (size_t i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -65,7 +65,7 @@ public:
     }
 
     virtual ~QueryStageDeleteBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
         _client.dropCollection(nss);
     }
 

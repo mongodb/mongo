@@ -558,7 +558,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
 
 // Tests targetBatchTimeMS is enforced.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSBasic) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
 
     std::vector<std::pair<BSONObj, Milliseconds>> timedBatch0{
         {BSON("_id" << 1 << "a" << 1), Milliseconds(2)},
@@ -626,7 +626,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSBasic) {
 
 // Tests when the total time it takes to delete targetBatchDocs exceeds targetBatchTimeMS.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatchDocs) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
 
     std::vector<std::pair<BSONObj, Milliseconds>> timedBatch0{
         {BSON("_id" << 1 << "a" << 1), Milliseconds(1)},
@@ -726,7 +726,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatc
 }
 
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     auto nDocs = 52;
     prePopulateCollection(nDocs);
 
@@ -798,7 +798,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
 // No limits on batch targets means all deletes will be committed in a single batch, and the
 // 'targetPassDocs' will be ignored.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatchTargets) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     auto nDocs = 52;
     prePopulateCollection(nDocs);
 
@@ -854,7 +854,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatc
 }
 
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     auto nDocs = 52;
     prePopulateCollection(nDocs);
 
@@ -905,7 +905,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSBasic) {
 
 // Demonstrates 'targetPassTimeMS' has no impact when there are no batch limits.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBatchTargets) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     auto nDocs = 52;
     prePopulateCollection(nDocs);
 
@@ -962,7 +962,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSWithUnlimitedBa
 // Tests a more realistic scenario where both batch and pass targets are set. In this case,
 // 'targetPassTimeMS' is met before 'targetPassDocs' is.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTargetPassDocs) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
 
     // Prepare the targets such that 'targetPassTimeMS' will be reached before 'targetPassDocs'.
     auto targetBatchDocs = 3;

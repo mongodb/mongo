@@ -92,7 +92,7 @@ TEST_F(ExtensionsCallbackRealTest, TextNoIndex) {
 
 TEST_F(ExtensionsCallbackRealTest, TextBasic) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -114,7 +114,7 @@ TEST_F(ExtensionsCallbackRealTest, TextBasic) {
 
 TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -128,7 +128,7 @@ TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -145,7 +145,7 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveFalse) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -162,7 +162,7 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveFalse) {
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveError) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -176,7 +176,7 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveError) {
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveTrue) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -193,7 +193,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveTrue) {
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveFalse) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -210,7 +210,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveFalse) {
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveError) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique
@@ -224,7 +224,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveError) {
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
     ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns(),
+                                   _nss.ns_forTest(),
                                    BSON("a"
                                         << "text"),
                                    false));  // isUnique

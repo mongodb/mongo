@@ -92,7 +92,7 @@ protected:
         // clean up first if this was called before
         _source.reset();
 
-        dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+        dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
         _coll = ctx.getCollection();
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);

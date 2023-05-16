@@ -112,7 +112,7 @@ void _testConfigParseOutputOptions(const std::string& dbname,
     _compareOutputOptionField(dbname,
                               cmdObjStr,
                               "finalNamespace",
-                              outputOptions.finalNamespace.ns().toString(),
+                              outputOptions.finalNamespace.toString(),
                               expectedFinalNamespace);
     _compareOutputOptionField(
         dbname, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic, expectedOutNonAtomic);
@@ -479,7 +479,7 @@ void MapReduceCommandTest::_assertTemporaryCollectionsAreDropped() {
     for (const auto& tempNss : _opObserver->tempNamespaces) {
         ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                       _storage.getCollectionCount(_opCtx.get(), tempNss))
-            << "mapReduce did not remove temporary collection on success: " << tempNss.ns();
+            << "mapReduce did not remove temporary collection on success: " << tempNss.ns_forTest();
     }
 }
 

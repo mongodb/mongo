@@ -436,6 +436,10 @@ public:
         return StringData{_data.data() + offset, _data.size() - offset};
     }
 
+    StringData ns_forTest() const {
+        return ns();
+    }
+
     std::string toString() const {
         return ns().toString();
     }

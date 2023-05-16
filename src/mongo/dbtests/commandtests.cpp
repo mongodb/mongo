@@ -105,7 +105,8 @@ namespace FileMD5 {
 struct Base {
     Base() : db(&_opCtx) {
         db.dropCollection(nss());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, nss().ns(), BSON("files_id" << 1 << "n" << 1)));
+        ASSERT_OK(
+            dbtests::createIndex(&_opCtx, nss().ns_forTest(), BSON("files_id" << 1 << "n" << 1)));
     }
 
     NamespaceString nss() {

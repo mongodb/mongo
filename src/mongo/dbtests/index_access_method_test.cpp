@@ -233,7 +233,7 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "unique" << true << "v"
                                  << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns(), indexSpec));
+    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
     const auto& coll = autoColl.getCollection();
@@ -270,7 +270,7 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
         auto indexSpec =
             BSON("name" << indexName << "key" << BSON("a" << 1) << "prepareUnique" << true << "v"
                         << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-        ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns(), indexSpec));
+        ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
         AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
         const auto& coll = autoColl.getCollection();
@@ -307,7 +307,7 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
         auto indexSpec =
             BSON("name" << indexName << "key" << BSON("a" << 1) << "prepareUnique" << true << "v"
                         << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-        ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns(), indexSpec));
+        ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
         AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
         const auto& coll = autoColl.getCollection();

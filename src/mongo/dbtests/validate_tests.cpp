@@ -308,7 +308,7 @@ public:
         }
 
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "a"
                                                         << "key" << BSON("a" << 1) << "v"
@@ -378,7 +378,7 @@ public:
         }
 
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "a"
                                                         << "key" << BSON("a" << 1) << "v"
@@ -531,7 +531,7 @@ public:
 
         // Create multi-key index.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "multikey_index"
                                                         << "key" << BSON("a.b" << 1) << "v"
@@ -604,7 +604,7 @@ public:
         // Create a sparse index.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "sparse_index"
                                               << "key" << BSON("a" << 1) << "v"
@@ -671,7 +671,7 @@ public:
         // Create a partial index.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key" << BSON("a" << 1) << "v"
@@ -733,7 +733,7 @@ public:
         // Create a partial geo index that indexes the document. This should return an error.
         ASSERT_NOT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key"
@@ -746,7 +746,7 @@ public:
         // Create a partial geo index that does not index the document.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key"
@@ -808,7 +808,7 @@ public:
         // Create two compound indexes, one forward and one reverse, to test
         // validate()'s index direction parsing.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "compound_index_1"
                                                         << "key" << BSON("a" << 1 << "b" << -1)
@@ -817,7 +817,7 @@ public:
         ASSERT_OK(status);
 
         status = dbtests::createIndexFromSpec(&_opCtx,
-                                              coll()->ns().ns(),
+                                              coll()->ns().ns_forTest(),
                                               BSON("name"
                                                    << "compound_index_2"
                                                    << "key" << BSON("a" << -1 << "b" << 1) << "v"
@@ -882,7 +882,7 @@ public:
         const std::string indexName = "bad_index";
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                         << static_cast<int>(kIndexVersion) << "background" << false));
 
@@ -953,7 +953,7 @@ public:
         const std::string indexName = "bad_specs_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion) << "sparse"
                                                      << "false"));
@@ -991,7 +991,7 @@ public:
         const auto indexKey = BSON("$**" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1117,7 +1117,7 @@ public:
         const auto indexKey = BSON("a.$**" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1219,7 +1219,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1315,7 +1315,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1431,7 +1431,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1518,7 +1518,7 @@ public:
         const auto indexKeyA = BSON("a" << 1);
         ASSERT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexNameA << "key" << indexKeyA << "v"
                                                      << static_cast<int>(kIndexVersion))));
 
@@ -1527,7 +1527,7 @@ public:
         const auto indexKeyB = BSON("b" << 1);
         ASSERT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexNameB << "key" << indexKeyB << "v"
                                                      << static_cast<int>(kIndexVersion))));
 
@@ -1703,7 +1703,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << indexKey << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -1881,7 +1881,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << indexKey << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -2041,7 +2041,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2282,7 +2282,7 @@ public:
             const auto indexKeyA = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameA << "key" << indexKeyA << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2293,7 +2293,7 @@ public:
             const auto indexKeyB = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameB << "key" << indexKeyB << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2544,7 +2544,7 @@ public:
             const auto indexKeyA = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameA << "key" << indexKeyA << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2555,7 +2555,7 @@ public:
             const auto indexKeyB = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameB << "key" << indexKeyB << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2883,7 +2883,7 @@ public:
         const auto indexName = "non_mk_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -3058,7 +3058,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);
@@ -3069,7 +3069,7 @@ public:
             const auto indexKey = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);
@@ -3206,7 +3206,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false << "unique"
                             << true));
@@ -3641,7 +3641,7 @@ public:
         const auto indexName = "non_mk_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -3864,7 +3864,7 @@ public:
         // Create a multikey index.
         const auto indexName = "mk_index";
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name" << indexName << "key"
                                                                << BSON("a" << 1 << "b" << 1) << "v"
                                                                << static_cast<int>(kIndexVersion)));
@@ -4060,7 +4060,7 @@ public:
 
         const auto indexName = "mk_index";
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name" << indexName << "key"
                                                                << BSON("a" << 1 << "b" << 1) << "v"
                                                                << static_cast<int>(kIndexVersion)));
@@ -4274,7 +4274,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -4385,7 +4385,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -4548,7 +4548,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);

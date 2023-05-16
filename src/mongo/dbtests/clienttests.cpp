@@ -67,7 +67,7 @@ public:
     }
 
     StringData ns() {
-        return _nss.ns();
+        return _nss.ns_forTest();
     }
 
     const NamespaceString _nss;

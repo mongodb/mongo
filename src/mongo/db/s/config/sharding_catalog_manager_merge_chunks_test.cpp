@@ -893,7 +893,7 @@ protected:
         size_t numMerges = 0;
         for (const auto& chunkDiff : chunksDiff) {
             BSONObjBuilder query;
-            query << ChangeLogType::what("merge") << ChangeLogType::ns(nss.ns().toString());
+            query << ChangeLogType::what("merge") << ChangeLogType::ns(nss.toString());
             chunkDiff.getVersion().serialize("details.mergedVersion", &query);
 
             auto response = assertGet(getConfigShard()->exhaustiveFindOnConfig(

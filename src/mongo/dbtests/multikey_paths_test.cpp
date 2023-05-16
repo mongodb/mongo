@@ -85,7 +85,7 @@ public:
 
 
     Status createIndex(const CollectionPtr& collection, BSONObj indexSpec) {
-        return dbtests::createIndexFromSpec(_opCtx.get(), collection->ns().ns(), indexSpec);
+        return dbtests::createIndexFromSpec(_opCtx.get(), collection->ns().ns_forTest(), indexSpec);
     }
 
     void assertMultikeyPaths(const CollectionPtr& collection,
