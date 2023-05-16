@@ -194,6 +194,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
     const boost::optional<TenantId>& tenantId, StringData db, StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{tenantId, db, coll};
+    }
+
     if (coll.empty())
         return deserialize(tenantId, db);
 
@@ -206,6 +210,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(const DatabaseName& dbName,
                                                                StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{dbName, coll};
+    }
+
     if (coll.empty()) {
         return NamespaceString(dbName);
     }
@@ -224,6 +232,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
     const boost::optional<TenantId>& tenantId, StringData db, StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{tenantId, db, coll};
+    }
+
     if (coll.empty())
         return deserialize(tenantId, db);
 
@@ -236,6 +248,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(const DatabaseName& dbName,
                                                            StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{dbName, coll};
+    }
+
     if (coll.empty())
         return NamespaceString(dbName);
 
