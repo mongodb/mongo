@@ -141,28 +141,32 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
     def stopTest(self, test):  # pylint: disable=invalid-name
         """Call after 'test' has run."""
 
-        unittest.TestResult.stopTest(self, test)
+        try:
+            unittest.TestResult.stopTest(self, test)
 
-        with self._lock:
-            test_info = self.find_test_info(test)
-            test_info.end_time = time.time()
-            test_status = "no failures detected" if test_info.status == "pass" else "failed"
+            with self._lock:
+                test_info = self.find_test_info(test)
+                test_info.end_time = time.time()
+                test_status = "no failures detected" if test_info.status == "pass" else "failed"
 
-        time_taken = test_info.end_time - test_info.start_time
-        self.job_logger.info("%s ran in %0.2f seconds: %s.", test.basename(), time_taken,
-                             test_status)
+            time_taken = test_info.end_time - test_info.start_time
+            self.job_logger.info("%s ran in %0.2f seconds: %s.", test.basename(), time_taken,
+                                 test_status)
 
-        # Asynchronously closes the buildlogger test handler to avoid having too many threads open
-        # on 32-bit systems.
-        for handler in test.logger.handlers:
-            # We ignore the cancellation token returned by close_later() since we always want the
-            # logs to eventually get flushed.
-            logging.flush.close_later(handler)
+        finally:
+            # This is a failsafe. In the event that 'stopTest' fails,
+            # any rogue logger handlers will be removed from this test.
+            # If not cleaned up, these will trigger 'setup failures' --
+            # indicated by exiting with LoggerRuntimeConfigError.EXIT_CODE.
+            for handler in test.logger.handlers:
+                # We ignore the cancellation token returned by close_later() since we always want the
+                # logs to eventually get flushed.
+                logging.flush.close_later(handler)
 
-        # Restore the original logger for the test.
-        test.reset_logger()
+            # Restore the original logger for the test.
+            test.reset_logger()
 
-    def addError(self, test, err):  # pylint: disable=invalid-name
+    def addError(self, test, err):
         """Call when a non-failureException was raised during the execution of 'test'."""
 
         unittest.TestResult.addError(self, test, err)

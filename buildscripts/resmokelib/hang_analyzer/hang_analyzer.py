@@ -58,7 +58,13 @@ class HangAnalyzer(Subcommand):
         self._setup_logging(logger)
         self.debug_symbols_url = self._configure_debug_symbols_download()
 
-    def execute(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+    def kill_rogue_processes(self):
+        """Kill any processes that are currently being analyzed."""
+        processes = process_list.get_processes(self.process_ids, self.interesting_processes,
+                                               self.options.process_match, self.root_logger)
+        process.teardown_processes(self.root_logger, processes, dump_pids={})
+
+    def execute(self):  # pylint: disable=too-many-branches
         """
         Execute hang analysis.
 

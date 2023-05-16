@@ -6,6 +6,7 @@ import threading
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib.utils import globstar
 
 
@@ -108,5 +109,9 @@ class HookTestArchival(object):
         else:
             logger.info("Archive succeeded for %s: %s", test_name, message)
 
-        if not manager.setup_fixture(logger):
+        if HANG_ANALYZER_CALLED.is_set():
+            logger.info("Hang Analyzer has been called. Fixtures will not be restarted.")
+            raise errors.StopExecution(
+                "Hang analyzer has been called. Stopping further execution of tests.")
+        elif not manager.setup_fixture(logger):
             raise errors.StopExecution("Error while restarting test fixtures after archiving.")
