@@ -51,6 +51,14 @@ class IntervalPrinter(OptimizerTypePrinter):
         super().__init__(val, "ExplainGenerator::explainInterval")
 
 
+class CandidateIndexEntryPrinter(OptimizerTypePrinter):
+    """Pretty-printer for mongo::optimizer::CandidateIndexEntry."""
+
+    def __init__(self, val):
+        """Initialize CandidateIndexEntryPrinter."""
+        super().__init__(val, "ExplainGenerator::explainCandidateIndex")
+
+
 class IntervalExprPrinter(OptimizerTypePrinter):
     """Pretty-printer for mongo::optimizer::IntervalRequirement::Node."""
 
@@ -99,6 +107,7 @@ class FixedArityNodePrinter(object):
         self.val = val
         self.arity = arity
         self.name = name
+        self.custom_children = []
 
     @staticmethod
     def display_hint():
@@ -109,7 +118,16 @@ class FixedArityNodePrinter(object):
         """children."""
 
         prior_indent = ABTPrinter.indent_level
-        current_indent = ABTPrinter.indent_level + self.arity - 1
+        current_indent = ABTPrinter.indent_level + self.arity + len(self.custom_children) - 1
+        for child in self.custom_children:
+            lhs = "\n"
+            for _ in range(current_indent):
+                lhs += "|   "
+
+            ABTPrinter.indent_level = current_indent
+            yield lhs, child
+            current_indent -= 1
+
         for i in range(self.arity):
             lhs = "\n"
             for _ in range(current_indent):
@@ -120,6 +138,10 @@ class FixedArityNodePrinter(object):
             yield lhs, self.val["_nodes"][self.arity - i - 1]
             current_indent -= 1
         ABTPrinter.indent_level = prior_indent
+
+    # Adds a custom child node which is not directly contained in the "_nodes" member variable.
+    def add_child(self, child):
+        self.custom_children.append(child)
 
     def to_string(self):
         # Default for nodes which just print their type.
@@ -550,9 +572,9 @@ class FieldProjectionMapPrinter(object):
         if get_boost_optional(root_proj) is not None:
             res += "<root>: " + str(root_proj) + ", "
         # Rely on default printer for std::set, but remove the extra metadata at the start.
-        # TODO SERVER-75541 pretty print field projections map.
-        # field_projections = self.val["_fieldProjections"]
-        # res += str(field_projections).split("elems  =")[-1]
+        field_projections = self.val["_fieldProjections"]
+        res += "<empty>" if field_projections["size_"] == 0 else str(field_projections).split(
+            "elems  =")[-1]
         res += "}"
         return res
 
@@ -599,7 +621,7 @@ class IndexScanNodePrinter(FixedArityNodePrinter):
     def to_string(self):
         return "IndexScan[{{{}}}, scanDef={}, indexDef={}, interval={}]".format(
             self.val["_fieldProjectionMap"], self.val["_scanDefName"], self.val["_indexDefName"],
-            self.val["_indexInterval"])
+            self.val["_indexInterval"]).replace("\n", "")
 
 
 class SeekNodePrinter(FixedArityNodePrinter):
@@ -610,7 +632,7 @@ class SeekNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 2, "Seek")
 
     def to_string(self):
-        return "Seek[rid_projection: {}, {}, scanDef: {}]".format(self.val["_rid_projectionName"],
+        return "Seek[rid_projection: {}, {}, scanDef: {}]".format(self.val["_ridProjectionName"],
                                                                   self.val["_fieldProjectionMap"],
                                                                   self.val["_scanDefName"])
 
@@ -638,12 +660,70 @@ class MemoPhysicalDelegatorNodePrinter(FixedArityNodePrinter):
                                                                     self.val["_nodeId"]["_index"])
 
 
+class ResidualRequirementPrinter(object):
+    """Pretty-printer for ResidualRequirement."""
+
+    def __init__(self, val):
+        """Initialize ResidualRequirementPrinter."""
+        self.val = val
+
+    def to_string(self):
+        key = self.val["_key"]
+        req = self.val["_req"]
+        res = "<"
+        if get_boost_optional(key["_projectionName"]) is not None:
+            res += "refProj: " + str(get_boost_optional(key["_projectionName"])) + ", "
+
+        res += "path: '" + str(key["_path"]).replace("|   ", "").replace("\n", " -> ") + "'"
+
+        if get_boost_optional(req["_boundProjectionName"]) is not None:
+            res += "boundProj: " + str(get_boost_optional(req["_boundProjectionName"])) + ", "
+
+        res += ">"
+        return res
+
+
 class SargableNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for SargableNode."""
 
     def __init__(self, val):
         """Initialize SargableNodePrinter."""
-        super().__init__(val, 3, "Sargable")
+        # Although Sargable technically has 3 children, avoid printing the refs (child1) and bind block (child2).
+        super().__init__(val, 1, "Sargable")
+
+        # Add children for requirements, candidateIndex, and scan_params.
+        self.add_child(str(self.val["_reqMap"]).replace("\n", ""))
+        self.add_child(self.print_candidate_indexes())
+
+        self.scan_params = get_boost_optional(self.val["_scanParams"])
+        if self.scan_params is not None:
+            self.add_child(self.print_scan_params())
+
+    def print_scan_params(self):
+        res = "scan_params: (proj: " + str(self.scan_params["_fieldProjectionMap"]) + ", "
+        residual_reqs = get_boost_optional(self.scan_params["_residualRequirements"])
+        if residual_reqs is not None:
+            res += "residual: " + str(residual_reqs)
+        res += ")"
+        return res
+
+    def print_candidate_indexes(self):
+        res = "candidateIndexes: ["
+        indexes = Vector(self.val["_candidateIndexes"])
+        for i in range(indexes.count()):
+            if i > 0:
+                res += ", "
+            res += "<id: " + str(i) + ", " + str(indexes.get(i)).replace("\n", "") + ">"
+        res += "]"
+        return res
+
+    @staticmethod
+    def index_req_to_string(index_req):
+        req_map = ["Index", "Seek", "Complete"]
+        return req_map[index_req]
+
+    def to_string(self):
+        return "Sargable [" + self.index_req_to_string(self.val["_target"]) + "]"
 
 
 class RIDIntersectNodePrinter(FixedArityNodePrinter):
@@ -908,6 +988,69 @@ class ABTPrinter(PolyValuePrinter):
         super().__init__(ABTPrinter.abt_type_set, ABTPrinter.abt_namespace, val)
 
 
+class AtomPrinter(object):
+    """Pretty-printer for Atom."""
+
+    def __init__(self, val):
+        """Initialize AtomPrinter."""
+        self.val = val
+
+    def to_string(self):
+        return self.val["_expr"]
+
+
+class ConjunctionPrinter(object):
+    """Pretty-printer for Conjunction."""
+
+    def __init__(self, val, separator=" ^ "):
+        """Initialize ConjunctionPrinter."""
+        self.val = val
+        self.dynamic_nodes = Vector(self.val["_dyNodes"])
+        self.dynamic_count = self.dynamic_nodes.count()
+        self.separator = separator
+
+    def to_string(self):
+        if self.dynamic_count == 0:
+            return "<empty>"
+
+        res = ""
+        first = True
+        for child in self.dynamic_nodes:
+            if first:
+                first = False
+            else:
+                res += self.separator
+
+            res += str(child)
+        return res
+
+
+class DisjunctionPrinter(ConjunctionPrinter):
+    """Pretty-printer for Disjunction."""
+
+    def __init__(self, val):
+        super().__init__(val, " U ")
+
+
+class BoolExprPrinter(PolyValuePrinter):
+    """Pretty-printer for BoolExpr."""
+
+    type_set = ["Atom", "Conjunction", "Disjunction"]
+
+    def __init__(self, val, template_type):
+        """Initialize BoolExprPrinter."""
+        namespace = "mongo::optimizer::BoolExpr<" + template_type + ">::"
+        super().__init__(BoolExprPrinter.type_set, namespace, val)
+
+
+class ResidualReqExprPrinter(BoolExprPrinter):
+    """Pretty-printer for BoolExpr<ResidualRequirement>."""
+
+    def __init__(self, val):
+        """Initialize ResidualReqExprPrinter."""
+        super().__init__(val, "mongo::optimizer::ResidualRequirement")
+
+
 def register_abt_printers(pp):
     """Registers a number of pretty printers related to the CQF optimizer."""
 
@@ -933,6 +1076,28 @@ def register_abt_printers(pp):
     # PartialSchemaRequirements printer.
     pp.add("PartialSchemaRequirements", "mongo::optimizer::PartialSchemaRequirements", False,
            PartialSchemaReqMapPrinter)
+
+    # ResidualRequirement printer.
+    pp.add("ResidualRequirement", "mongo::optimizer::ResidualRequirement", False,
+           ResidualRequirementPrinter)
+
+    # CandidateIndexEntry printer.
+    pp.add("CandidateIndexEntry", "mongo::optimizer::CandidateIndexEntry", False,
+           CandidateIndexEntryPrinter)
+
+    pp.add(
+        "ResidualRequirementExpr",
+        ("mongo::optimizer::algebra::PolyValue<" +
+         "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::Atom, " +
+         "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::Conjunction, " +
+         "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::Disjunction>"),
+        False,
+        ResidualReqExprPrinter,
+    )
+    for bool_type in BoolExprPrinter.type_set:
+        pp.add(bool_type,
+               "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::" + bool_type,
+               False, getattr(sys.modules[__name__], bool_type + "Printer"))
 
     # Utility types within the optimizer.
     pp.add("StrongStringAlias", "mongo::optimizer::StrongStringAlias", True,

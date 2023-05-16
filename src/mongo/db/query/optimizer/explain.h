@@ -122,6 +122,8 @@ public:
     static std::string explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr);
 
     static std::string explainIntervalExpr(const CompoundIntervalReqExpr::Node& intervalExpr);
+
+    static std::string explainCandidateIndex(const CandidateIndexEntry& indexEntry);
 };
 
 }  // namespace mongo::optimizer
