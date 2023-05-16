@@ -146,13 +146,9 @@ class TestReport(unittest.TestResult):
 
         try:
             # check if there are stacktrace files, if so, invoke the symbolizer here.
-            # If there are no stacktrace files for this job, we do not need to invoke the symbolizer at all.
-            # Take a lock to download the debug symbols if it hasn't already been downloaded.
             # log symbolized output to test.logger.info()
-
             symbolizer = ResmokeSymbolizer()
             symbolizer.symbolize_test_logs(test)
-            # symbolization completed
 
             unittest.TestResult.stopTest(self, test)
 
@@ -404,7 +400,7 @@ class TestInfo(object):
         self.evergreen_status = None
         self.return_code = None
         self.url_endpoint = None
-        self.exception_extractors = None
+        self.exception_extractors = []
         self.error = None
 
 
