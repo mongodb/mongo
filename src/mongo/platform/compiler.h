@@ -195,3 +195,9 @@
 #else
 #error "Unsupported compiler family"
 #endif
+
+// Define clang's has_feature macro for other compilers
+// See https://clang.llvm.org/docs/LanguageExtensions.html#has-feature-and-has-extension
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif

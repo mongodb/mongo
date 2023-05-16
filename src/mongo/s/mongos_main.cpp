@@ -132,10 +132,6 @@ namespace mongo {
 
 using logv2::LogComponent;
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 // Failpoint for disabling replicaSetChangeConfigServerUpdateHook calls on signaled mongos.
 MONGO_FAIL_POINT_DEFINE(failReplicaSetChangeConfigServerUpdateHook);
 

@@ -214,10 +214,8 @@ public:
     }
 
 // Ignore data races in this function when running with TSAN, races are acceptable here
-#if defined(__has_feature)
 #if __has_feature(thread_sanitizer)
     __attribute__((no_sanitize("thread")))
-#endif
 #endif
     void
     setSignalOnCount(int c) {

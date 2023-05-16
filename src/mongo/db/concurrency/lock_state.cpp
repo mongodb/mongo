@@ -54,7 +54,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
@@ -65,7 +64,7 @@ namespace {
 // Ignore data races in certain functions when running with TSAN. For performance reasons,
 // diagnostic commands are expected to race with concurrent lock acquisitions while gathering
 // statistics.
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if __has_feature(thread_sanitizer)
 #define MONGO_TSAN_IGNORE __attribute__((no_sanitize("thread")))
 #else
 #define MONGO_TSAN_IGNORE

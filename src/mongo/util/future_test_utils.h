@@ -36,10 +36,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 /** Workaround for bug in MSVC 2022's lambda processor. See SERVER-62480. */
 #ifdef _MSC_VER
 #define FTU_LAMBDA_R(...) ->__VA_ARGS__

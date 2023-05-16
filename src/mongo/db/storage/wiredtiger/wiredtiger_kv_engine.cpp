@@ -129,10 +129,6 @@ MONGO_FAIL_POINT_DEFINE(WTDisableFastShutDown);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 #if __has_feature(address_sanitizer)
 constexpr bool kAddressSanitizerEnabled = true;
 #else

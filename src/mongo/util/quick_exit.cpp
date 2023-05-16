@@ -45,10 +45,6 @@
 // NOTE: Header only dependencies are OK in this library.
 #include "mongo/stdx/mutex.h"  // IWYU pragma: keep
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 #if !defined(__has_include)
 #define __has_include(x) 0
 #endif
