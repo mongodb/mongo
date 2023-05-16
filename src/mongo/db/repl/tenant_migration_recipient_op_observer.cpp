@@ -127,12 +127,12 @@ void TenantMigrationRecipientOpObserver::onInserts(
                 ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                     .acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient,
                                  recipientStateDoc.getId());
-                opCtx->recoveryUnit()->onRollback(
-                    [migrationId = recipientStateDoc.getId()](OperationContext* opCtx) {
-                        ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                            .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                                         migrationId);
-                    });
+                opCtx->recoveryUnit()->onRollback([migrationId = recipientStateDoc.getId()](
+                                                      OperationContext* opCtx) {
+                    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                        .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient,
+                                     migrationId);
+                });
             }
         }
     }
