@@ -214,7 +214,7 @@ public:
     NamespaceString(StringData db,
                     StringData collectionName,
                     boost::optional<TenantId> tenantId = boost::none)
-        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
+        : NamespaceString(std::move(tenantId), db, collectionName) {}
 
     /**
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
@@ -821,52 +821,29 @@ private:
      * Constructs a NamespaceString from the fully qualified namespace named in "ns" and the
      * tenantId. "ns" is NOT expected to contain the tenantId.
      */
-    explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
-        uassert(ErrorCodes::InvalidNamespace,
-                "namespaces cannot have embedded null characters",
-                ns.find('\0') == std::string::npos);
-
-        auto dotIndex = ns.find('.');
-        uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("db name must be at most {} characters, found: {}",
-                            DatabaseName::kMaxDatabaseNameLength,
-                            dotIndex),
-                (dotIndex != std::string::npos ? dotIndex : ns.size()) <=
-                    DatabaseName::kMaxDatabaseNameLength);
-
-        uint8_t details =
-            (dotIndex != std::string::npos ? dotIndex : ns.size()) & kDatabaseNameOffsetEndMask;
-        size_t dbStartIndex = kDataOffset;
-        if (tenantId) {
-            dbStartIndex += OID::kOIDSize;
-            details |= kTenantIdMask;
-        }
-
-        _data.resize(dbStartIndex + ns.size());
-        *reinterpret_cast<uint8_t*>(_data.data()) = details;
-        if (tenantId) {
-            std::memcpy(_data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
-        }
-        if (!ns.empty()) {
-            std::memcpy(_data.data() + dbStartIndex, ns.rawData(), ns.size());
-        }
-    }
+    explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns)
+        : _data(makeData(std::move(tenantId), ns)) {}
 
     /**
      * Constructs a NamespaceString for the given database and collection names.
      * "dbName" must not contain a ".", and "collectionName" must not start with one.
      */
     NamespaceString(DatabaseName dbName, StringData collectionName) {
-        const auto db = dbName.db();
         uassert(ErrorCodes::InvalidNamespace,
                 "Collection names cannot start with '.': " + collectionName,
                 collectionName.empty() || collectionName[0] != '.');
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
-                db.find('\0') == std::string::npos &&
-                    collectionName.find('\0') == std::string::npos);
+                collectionName.find('\0') == std::string::npos);
 
-        _data = str::stream() << dbName._data << "." << collectionName;
+        _data.resize(dbName._data.size() + 1 + collectionName.size());
+        std::memcpy(_data.data(), dbName._data.data(), dbName._data.size());
+        *reinterpret_cast<uint8_t*>(_data.data() + dbName._data.size()) = '.';
+        if (!collectionName.empty()) {
+            std::memcpy(_data.data() + dbName._data.size() + 1,
+                        collectionName.rawData(),
+                        collectionName.size());
+        }
     }
 
     /**
@@ -875,7 +852,7 @@ private:
      * NOT expected to contain a tenantId.
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
-        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
+        : _data(makeData(std::move(tenantId), db, collectionName)) {}
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);
     static constexpr uint8_t kTenantIdMask = 0x80;
@@ -887,6 +864,60 @@ private:
 
     inline size_t _dbNameOffsetEnd() const {
         return static_cast<uint8_t>(_data.front()) & kDatabaseNameOffsetEndMask;
+    }
+
+    std::string makeData(boost::optional<TenantId> tenantId,
+                         StringData db,
+                         StringData collectionName) {
+        uassert(ErrorCodes::InvalidNamespace,
+                "namespaces cannot have embedded null characters",
+                db.find('\0') == std::string::npos &&
+                    collectionName.find('\0') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("Collection names cannot start with '.': {}", collectionName),
+                collectionName.empty() || collectionName[0] != '.');
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("db name must be at most {} characters, found: {}",
+                            DatabaseName::kMaxDatabaseNameLength,
+                            db.size()),
+                db.size() <= DatabaseName::kMaxDatabaseNameLength);
+
+        uint8_t details = db.size() & kDatabaseNameOffsetEndMask;
+        size_t dbStartIndex = kDataOffset;
+        if (tenantId) {
+            dbStartIndex += OID::kOIDSize;
+            details |= kTenantIdMask;
+        }
+
+        std::string data;
+        data.resize(collectionName.empty() ? dbStartIndex + db.size()
+                                           : dbStartIndex + db.size() + 1 + collectionName.size());
+        *reinterpret_cast<uint8_t*>(data.data()) = details;
+        if (tenantId) {
+            std::memcpy(data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
+        }
+
+        if (!db.empty()) {
+            std::memcpy(data.data() + dbStartIndex, db.rawData(), db.size());
+        }
+
+        if (!collectionName.empty()) {
+            *reinterpret_cast<uint8_t*>(data.data() + dbStartIndex + db.size()) = '.';
+            std::memcpy(data.data() + dbStartIndex + db.size() + 1,
+                        collectionName.rawData(),
+                        collectionName.size());
+        }
+
+        return data;
+    }
+
+    std::string makeData(boost::optional<TenantId> tenantId, StringData ns) {
+        auto dotIndex = ns.find('.');
+        if (dotIndex == std::string::npos) {
+            return makeData(tenantId, ns, {});
+        }
+
+        return makeData(tenantId, ns.substr(0, dotIndex), ns.substr(dotIndex + 1, ns.size()));
     }
 
     // In order to reduce the size of a NamespaceString, we pack all possible namespace data
