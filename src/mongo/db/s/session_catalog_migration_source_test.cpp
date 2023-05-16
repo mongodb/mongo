@@ -996,8 +996,9 @@ TEST_F(SessionCatalogMigrationSourceTest,
     ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
 }
 
-TEST_F(SessionCatalogMigrationSourceTest,
-       DiscardOplogEntriesForNewCommittedInternalTransactionForNonRetryableWrite) {
+DEATH_TEST_F(SessionCatalogMigrationSourceTest,
+             DiscardOplogEntriesForNewCommittedInternalTransactionForNonRetryableWrite,
+             "invariant") {
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     migrationSource.init(opCtx(), kMigrationLsid);
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
@@ -1021,6 +1022,10 @@ TEST_F(SessionCatalogMigrationSourceTest,
     ASSERT_TRUE(migrationSource.hasMoreOplog());
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
     ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 0);
+
+    // notifyNewWriteOpTime() uses dassert, so it will only invariant in debug mode. Deliberately
+    // crash here in non-debug mode to make the test work in both modes.
+    invariant(kDebugBuild);
 }
 
 TEST_F(SessionCatalogMigrationSourceTest,

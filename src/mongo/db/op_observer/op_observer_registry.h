@@ -443,11 +443,12 @@ public:
     }
 
     void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const LogicalSessionId& lsid,
                                         const std::vector<repl::OplogEntry>& statements,
                                         const repl::OpTime& prepareOpTime) override {
         ReservedTimes times{opCtx};
         for (auto& observer : _observers) {
-            observer->onTransactionPrepareNonPrimary(opCtx, statements, prepareOpTime);
+            observer->onTransactionPrepareNonPrimary(opCtx, lsid, statements, prepareOpTime);
         }
     }
 

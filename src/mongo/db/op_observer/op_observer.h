@@ -521,11 +521,20 @@ public:
         Date_t wallClockTime) = 0;
 
     /**
-     * This is called when a transaction transitions into prepare while it is not primary. Example
-     * case can include secondary oplog application or when node was restared and tries to
-     * recover prepared transactions from the oplog.
+     * This method is called when a transaction transitions into prepare while it is not primary,
+     * e.g. during secondary oplog application or recoverying prepared transactions from the
+     * oplog after restart. The method explicitly requires a session id (i.e. does not use the
+     * session id attached to the opCtx) because transaction oplog application currently applies the
+     * oplog entries for each prepared transaction in multiple internal sessions acquired from the
+     * InternalSessionPool. Currently, those internal sessions are completely unrelated to the
+     * session for the transaction itself. For a non-retryable internal transaction, not using the
+     * transaction session id in the codepath here can cause the opTime for the transaction to
+     * show up in the chunk migration opTime buffer although the writes they correspond to are not
+     * retryable and therefore are discarded anyway.
+     *
      */
     virtual void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                                const LogicalSessionId& lsid,
                                                 const std::vector<repl::OplogEntry>& statements,
                                                 const repl::OpTime& prepareOpTime) = 0;
 

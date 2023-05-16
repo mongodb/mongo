@@ -646,7 +646,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
-        opObserver->onTransactionPrepareNonPrimary(opCtx, txnOps, prepareOp.getOpTime());
+        opObserver->onTransactionPrepareNonPrimary(
+            opCtx, *prepareOp.getSessionId(), txnOps, prepareOp.getOpTime());
 
         // Prepare transaction success.
         abortOnError.dismiss();
