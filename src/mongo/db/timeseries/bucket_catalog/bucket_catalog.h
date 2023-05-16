@@ -268,7 +268,7 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns);
  * Clears the buckets for the given database by removing the bucket from the catalog asynchronously
  * through the BucketStateRegistry.
  */
-void clear(BucketCatalog& catalog, StringData dbName);
+void clear(BucketCatalog& catalog, const DatabaseName& dbName);
 
 /**
  * Appends the execution stats for the given namespace to the builder.

@@ -109,6 +109,20 @@ protected:
     BSONObj _makeTimeseriesOptionsForCreate() const override;
 };
 
+class BucketCatalogInMultitenancyEnv : public BucketCatalogTest {
+protected:
+    void setUp() override;
+
+private:
+    boost::optional<RAIIServerParameterControllerForTest> __multitenancyController;
+
+protected:
+    NamespaceString _tenant1Ns1 =
+        NamespaceString::createNamespaceString_forTest({TenantId(OID::gen())}, "db1", "coll1");
+    NamespaceString _tenant2Ns1 =
+        NamespaceString::createNamespaceString_forTest({TenantId(OID::gen())}, "db1", "coll1");
+};
+
 void BucketCatalogTest::setUp() {
     CatalogTestFixture::setUp();
 
@@ -116,6 +130,21 @@ void BucketCatalogTest::setUp() {
     _bucketCatalog = &BucketCatalog::get(_opCtx);
 
     for (const auto& ns : {_ns1, _ns2, _ns3}) {
+        ASSERT_OK(createCollection(
+            _opCtx,
+            ns.dbName(),
+            BSON("create" << ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
+    }
+}
+
+void BucketCatalogInMultitenancyEnv::setUp() {
+    __multitenancyController.emplace("multitenancySupport", true);
+    CatalogTestFixture::setUp();
+
+    _opCtx = operationContext();
+    _bucketCatalog = &BucketCatalog::get(_opCtx);
+
+    for (const auto& ns : {_tenant1Ns1, _tenant2Ns1}) {
         ASSERT_OK(createCollection(
             _opCtx,
             ns.dbName(),
@@ -586,11 +615,25 @@ TEST_F(BucketCatalogTest, ClearDatabaseBuckets) {
     _insertOneAndCommit(_ns2, 0);
     _insertOneAndCommit(_ns3, 0);
 
-    clear(*_bucketCatalog, _ns1.db());
+    clear(*_bucketCatalog, _ns1.dbName());
 
     _insertOneAndCommit(_ns1, 0);
     _insertOneAndCommit(_ns2, 0);
     _insertOneAndCommit(_ns3, 1);
+}
+
+TEST_F(BucketCatalogInMultitenancyEnv, ClearDatabaseBuckets) {
+    _insertOneAndCommit(_tenant1Ns1, 0);
+    _insertOneAndCommit(_tenant2Ns1, 0);
+
+    // Clear the buckets for the database of tenant1.
+    clear(*_bucketCatalog, _tenant1Ns1.dbName());
+    _insertOneAndCommit(_tenant1Ns1, 0);
+    _insertOneAndCommit(_tenant2Ns1, 1);
+
+    // Clear the buckets for the database of tenant2.
+    clear(*_bucketCatalog, _tenant2Ns1.dbName());
+    _insertOneAndCommit(_tenant2Ns1, 0);
 }
 
 TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {

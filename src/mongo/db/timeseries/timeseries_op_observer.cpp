@@ -107,7 +107,7 @@ void TimeSeriesOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void TimeSeriesOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-    timeseries::bucket_catalog::clear(bucketCatalog, dbName.db());
+    timeseries::bucket_catalog::clear(bucketCatalog, dbName);
 }
 
 repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
