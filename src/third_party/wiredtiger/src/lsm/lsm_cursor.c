@@ -436,6 +436,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, bool update, u_int start_chunk, uint32_
     locked = false;
     lsm_tree = clsm->lsm_tree;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     /*
      * Ensure that any snapshot update has cursors on the right set of chunks to guarantee
      * visibility is correct.

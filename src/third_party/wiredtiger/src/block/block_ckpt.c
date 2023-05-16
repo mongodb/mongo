@@ -218,6 +218,11 @@ __wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block, bool che
 void
 __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
 {
+    /*
+     * We should hold the live lock here when running on the live checkpoint. But there is no easy
+     * way to determine if the checkpoint is live so we cannot assert the locking here.
+     */
+
     /* Discard the extent lists. */
     __wt_block_extlist_free(session, &ci->alloc);
     __wt_block_extlist_free(session, &ci->avail);
@@ -458,6 +463,9 @@ __ckpt_add_blk_mods_alloc(
     WT_EXT *ext;
     u_int i;
 
+    if (&block->live == ci)
+        WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
+
     WT_CKPT_FOREACH (ckptbase, ckpt) {
         if (F_ISSET(ckpt, WT_CKPT_ADD))
             break;
@@ -526,10 +534,10 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
     WT_CKPT *ckpt, *next_ckpt;
     WT_DECL_RET;
     uint64_t ckpt_size;
-    bool deleting, fatal, local, locked;
+    bool deleting, fatal, local;
 
     ci = &block->live;
-    fatal = locked = false;
+    fatal = false;
 
     if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_CHECKPOINT_VALIDATE))
         WT_RET(__ckpt_verify(session, ckptbase));
@@ -647,7 +655,6 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
      * ranges into the live tree.
      */
     __wt_spin_lock(session, &block->live_lock);
-    locked = true;
 
     /*
      * We've allocated our last page, update the checkpoint size. We need to calculate the live
@@ -828,8 +835,7 @@ err:
         __wt_blkcache_set_readonly(session);
     }
 
-    if (locked)
-        __wt_spin_unlock(session, &block->live_lock);
+    __wt_spin_unlock_if_owned(session, &block->live_lock);
 
     /* Discard any checkpoint information we loaded. */
     WT_CKPT_FOREACH (ckptbase, ckpt)
@@ -853,6 +859,8 @@ __ckpt_update(
     bool is_live;
 
     is_live = F_ISSET(ckpt, WT_CKPT_ADD);
+    if (is_live)
+        WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
 
 #ifdef HAVE_DIAGNOSTIC
     /* Check the extent list combinations for overlaps. */

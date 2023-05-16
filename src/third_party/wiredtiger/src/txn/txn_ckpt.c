@@ -82,6 +82,9 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     WT_STAT_CONN_INCR(session, flush_tier);
     conn = S2C(session);
     cursor = NULL;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     /*
      * For supporting splits and merge:
      * - See if there is any merging work to do to prepare and create an object that is
@@ -671,6 +674,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
     use_timestamp = (cval.val != 0);
     WT_RET(__wt_config_gets(session, cfg, "flush_tier.enabled", &cval));
@@ -1005,6 +1010,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     txn_global = &conn->txn_global;
     saved_isolation = session->isolation;
     full = idle = tracking = use_timestamp = false;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     /* Avoid doing work if possible. */
     WT_RET(__txn_checkpoint_can_skip(session, cfg, &full, &use_timestamp, &can_skip));
@@ -1400,6 +1407,8 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
     conn = S2C(session);
     txn_global = &conn->txn_global;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
     txn_global->checkpoint_running = true;
@@ -2450,6 +2459,8 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
     WT_BTREE *btree;
     WT_DECL_RET;
     bool bulk, metadata, need_tracking;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &session->dhandle->close_lock);
 
     btree = S2BT(session);
     bulk = F_ISSET(btree, WT_BTREE_BULK);

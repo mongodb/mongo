@@ -388,6 +388,7 @@ __fsync_background(WT_SESSION_IMPL *session, WT_FH *fh)
     uint64_t now;
 
     conn = S2C(session);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->fh_lock);
     WT_STAT_CONN_INCR(session, fsync_all_fh_total);
 
     handle = fh->handle;

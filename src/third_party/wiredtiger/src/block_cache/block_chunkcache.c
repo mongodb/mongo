@@ -121,8 +121,7 @@ __chunkcache_alloc_chunk(WT_SESSION_IMPL *session, wt_off_t offset, WT_BLOCK *bl
     hash = __wt_hash_city64((void *)hash_id, sizeof(WT_CHUNKCACHE_HASHID));
     (*newchunk)->bucket_id = hash % chunkcache->hashtable_size;
 
-    WT_ASSERT(
-      session, __wt_spin_trylock(session, WT_BUCKET_LOCK(chunkcache, (*newchunk)->bucket_id)) != 0);
+    WT_ASSERT_SPINLOCK_OWNED(session, WT_BUCKET_LOCK(chunkcache, (*newchunk)->bucket_id));
 
     if ((ret = __chunkcache_alloc(session, *newchunk)) != 0) {
         __wt_free(session, *newchunk);
@@ -408,6 +407,8 @@ __wt_chunkcache_remove(
     size_t already_removed, remains_to_remove, removable_in_chunk, size_removed;
     uint64_t bucket_id;
     bool done;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
 
     chunkcache = &S2C(session)->chunkcache;
     already_removed = 0;

@@ -183,10 +183,10 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     WT_TIERED *tiered;
     u_int i, localid;
     const char *filename, *name;
-    bool exist, got_dhandle, locked, remove_files, remove_shared;
+    bool exist, got_dhandle, remove_files, remove_shared;
 
     conn = S2C(session);
-    got_dhandle = locked = false;
+    got_dhandle = false;
     WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
     remove_files = cval.val != 0;
     WT_RET(__wt_config_gets(session, cfg, "remove_shared", &cval));
@@ -279,7 +279,6 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
      * race and process work for this handle.
      */
     __wt_spin_lock(session, &conn->tiered_lock);
-    locked = true;
     /*
      * Close all btree handles associated with this table. This must be done after we're done using
      * the tiered structure because that is from the dhandle.
@@ -291,9 +290,8 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     WT_ERR(ret);
 
     /* If everything is successful, remove any tiered work associated with this tiered handle. */
-    __wt_tiered_remove_work(session, tiered, locked);
+    __wt_tiered_remove_work(session, tiered, true);
     __wt_spin_unlock(session, &conn->tiered_lock);
-    locked = false;
 
     __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove tiered table %s from metadata", uri);
     ret = __wt_metadata_remove(session, uri);
@@ -302,8 +300,7 @@ err:
     if (got_dhandle)
         WT_TRET(__wt_session_release_dhandle(session));
     __wt_free(session, name);
-    if (locked)
-        __wt_spin_unlock(session, &conn->tiered_lock);
+    __wt_spin_unlock_if_owned(session, &conn->tiered_lock);
     return (ret);
 }
 
@@ -369,6 +366,15 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
     WT_DECL_RET;
     WT_SESSION_IMPL *int_session;
+
+    /*
+     * We should be calling this function with the schema lock, but we cannot verify it here because
+     * we can re-enter this function with the internal session. If we get here using the internal
+     * session, we cannot check whether we own the lock, as it would be locked by the outer session.
+     * We can thus only check whether the lock is acquired, as opposed to, whether the lock is
+     * acquired by us.
+     */
+    WT_ASSERT(session, __wt_spin_locked(session, &S2C(session)->schema_lock));
 
     WT_RET(__wt_schema_internal_session(session, &int_session));
     ret = __schema_drop(int_session, uri, cfg);

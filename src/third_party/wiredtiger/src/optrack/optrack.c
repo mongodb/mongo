@@ -20,15 +20,12 @@ __wt_optrack_record_funcid(WT_SESSION_IMPL *session, const char *func, uint16_t 
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     wt_off_t fsize;
-    bool locked;
 
     conn = S2C(session);
-    locked = false;
 
     WT_ERR(__wt_scr_alloc(session, strlen(func) + 32, &tmp));
 
     __wt_spin_lock(session, &conn->optrack_map_spinlock);
-    locked = true;
     if (*func_idp == 0) {
         *func_idp = ++optrack_uid;
 
@@ -42,8 +39,7 @@ err:
         WT_IGNORE_RET(__wt_panic(session, ret, "operation tracking initialization failure"));
     }
 
-    if (locked)
-        __wt_spin_unlock(session, &conn->optrack_map_spinlock);
+    __wt_spin_unlock_if_owned(session, &conn->optrack_map_spinlock);
     __wt_scr_free(session, &tmp);
 }
 

@@ -475,6 +475,9 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
     incremental_config = log_config = false;
     is_dup = othercb != NULL;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     /*
      * Per-file offset incremental hot backup configurations take a starting checkpoint and optional
      * maximum transfer size, and the subsequent duplicate cursors take a file object.
@@ -679,6 +682,9 @@ __backup_start(
     srcfs = NULL;
     dest = NULL;
     is_dup = othercb != NULL;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
 
     cb->next = 0;
     cb->list = NULL;

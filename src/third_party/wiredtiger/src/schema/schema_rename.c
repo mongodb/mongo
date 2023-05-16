@@ -321,6 +321,16 @@ __wt_schema_rename(WT_SESSION_IMPL *session, const char *uri, const char *newuri
     WT_DECL_RET;
     WT_SESSION_IMPL *int_session;
 
+    /*
+     * We should be calling this function with the checkpoint lock and the schema lock, but we
+     * cannot verify that here because we can re-enter this function with the internal session. If
+     * we get here using the internal session, we cannot check whether we own the locks, as they
+     * would be locked by the outer session. We can thus only check whether the locks are acquired,
+     * as opposed to, whether the locks are acquired by us.
+     */
+    WT_ASSERT(session, __wt_spin_locked(session, &S2C(session)->checkpoint_lock));
+    WT_ASSERT(session, __wt_spin_locked(session, &S2C(session)->schema_lock));
+
     WT_RET(__wt_schema_internal_session(session, &int_session));
     ret = __schema_rename(int_session, uri, newuri, cfg);
     WT_TRET(__wt_schema_session_release(session, int_session));

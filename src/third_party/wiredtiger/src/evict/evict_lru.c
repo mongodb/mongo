@@ -172,6 +172,8 @@ __evict_list_clear_page_locked(WT_SESSION_IMPL *session, WT_REF *ref, bool exclu
     cache = S2C(session)->cache;
     found = false;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &cache->evict_queue_lock);
+
     for (q = 0; q < last_queue_idx && !found; q++) {
         __wt_spin_lock(session, &cache->evict_queues[q].evict_lock);
         elem = cache->evict_queues[q].evict_max;
@@ -405,6 +407,8 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 
     conn = S2C(session);
     cache = conn->cache;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &cache->evict_pass_lock);
 
     /* Evict pages from the cache as needed. */
     WT_RET(__evict_pass(session));
@@ -1755,6 +1759,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     last_parent = NULL;
     restarts = 0;
     give_up = urgent_queued = false;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &cache->evict_walk_lock);
 
     /*
      * Figure out how many slots to fill from this tree. Note that some care is taken in the

@@ -273,6 +273,7 @@ __wt_sync_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent)
 
     WT_ASSERT_ALWAYS(session, WT_PAGE_IS_INTERNAL(parent->page),
       "Checkpoint obsolete cleanup requires an internal page");
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
     __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
       "%p: traversing the internal page %p for obsolete child pages", (void *)parent,

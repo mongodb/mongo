@@ -21,6 +21,8 @@ __compact_page_inmem_check_addrs(WT_SESSION_IMPL *session, WT_REF *ref, bool *sk
     WT_PAGE_MODIFY *mod;
     uint32_t i;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
+
     *skipp = true; /* Default skip. */
 
     bm = S2BT(session)->bm;
@@ -61,6 +63,8 @@ __compact_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
     *skipp = true; /* Default skip. */
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
+
     /*
      * Ignore dirty pages, checkpoint will likely write them. There are cases where checkpoint can
      * skip dirty pages: to avoid that, we could alter the transactional information of the page,
@@ -98,6 +102,8 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     WT_ADDR *addr;
     WT_CELL_UNPACK_ADDR unpack;
     WT_DECL_RET;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
     /*
      * If there's no address at all (the page has never been written), allocate a new WT_ADDR
@@ -160,6 +166,8 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     uint8_t previous_state;
 
     *skipp = true; /* Default skip. */
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
     /* Lock the WT_REF. */
     WT_REF_LOCK(session, ref, &previous_state);

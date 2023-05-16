@@ -112,6 +112,9 @@ __tier_flush_meta(
     WT_RET(__wt_scr_alloc(session, 512, &buf));
     dhandle = &tiered->iface;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     newconfig = obj_value = NULL;
     WT_ERR(__wt_meta_track_on(session));
     tracking = true;

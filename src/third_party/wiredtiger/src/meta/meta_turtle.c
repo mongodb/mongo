@@ -623,6 +623,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 
     /* Require single-threading. */
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TURTLE));
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->turtle_lock);
 
     /*
      * Open the turtle file; there's one case where we won't find the turtle file, yet still
@@ -688,6 +689,7 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 
     /* Require single-threading. */
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TURTLE));
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->turtle_lock);
 
     /*
      * Create the turtle setup file: we currently re-write it from scratch every time.

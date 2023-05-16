@@ -50,10 +50,10 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
     WT_DECL_RET;
     uint64_t chunk, quota, reserve, size, used_cache;
     char *pool_name;
-    bool cp_locked, created, updating;
+    bool cp_lock_available, created, updating;
 
     conn = S2C(session);
-    cp_locked = created = updating = false;
+    cp_lock_available = created = updating = false;
     pool_name = NULL;
     cp = NULL;
 
@@ -103,13 +103,18 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
           session, WT_ERROR, "Attempting to join a cache pool that does not exist: %s", pool_name);
 
     /*
+     * The cache pool lock now exists for sure, and we may now lock it. Remember this so that we can
+     * use __wt_spin_unlock_if_owned at the end of the function.
+     */
+    cp_lock_available = true;
+
+    /*
      * At this point we have a cache pool to use. We need to take its lock. We need to drop the
      * process lock first to avoid deadlock and acquire in the proper order.
      */
     __wt_spin_unlock(session, &__wt_process.spinlock);
     cp = __wt_process.cache_pool;
     __wt_spin_lock(session, &cp->cache_pool_lock);
-    cp_locked = true;
     __wt_spin_lock(session, &__wt_process.spinlock);
 
     /*
@@ -194,7 +199,6 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
     conn->cache->cp_reserved = reserve;
     conn->cache->cp_quota = quota;
     __wt_spin_unlock(session, &cp->cache_pool_lock);
-    cp_locked = false;
 
     /* Wake up the cache pool server so any changes are noticed. */
     if (updating)
@@ -207,8 +211,9 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
     F_SET(conn, WT_CONN_CACHE_POOL);
 err:
     __wt_spin_unlock(session, &__wt_process.spinlock);
-    if (cp_locked)
-        __wt_spin_unlock(session, &cp->cache_pool_lock);
+
+    if (cp_lock_available)
+        __wt_spin_unlock_if_owned(session, &cp->cache_pool_lock);
     __wt_free(session, pool_name);
     if (ret != 0 && created) {
         __wt_free(session, cp->name);
@@ -281,11 +286,11 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
     WT_CACHE_POOL *cp;
     WT_CONNECTION_IMPL *conn, *entry;
     WT_DECL_RET;
-    bool cp_locked, found;
+    bool cp_lock_available, found;
 
     conn = S2C(session);
     cache = conn->cache;
-    WT_NOT_READ(cp_locked, false);
+    cp_lock_available = true;
     found = false;
     cp = __wt_process.cache_pool;
 
@@ -294,7 +299,6 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
     F_CLR(conn, WT_CONN_CACHE_POOL);
 
     __wt_spin_lock(session, &cp->cache_pool_lock);
-    cp_locked = true;
     TAILQ_FOREACH (entry, &cp->cache_pool_qh, cpq)
         if (entry == conn) {
             found = true;
@@ -318,7 +322,6 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
          * it to complete any balance operation.
          */
         __wt_spin_unlock(session, &cp->cache_pool_lock);
-        WT_NOT_READ(cp_locked, false);
 
         FLD_CLR_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_RUN);
         __wt_cond_signal(session, cp->cache_pool_cond);
@@ -331,7 +334,6 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
          * whether we were the last participant.
          */
         __wt_spin_lock(session, &cp->cache_pool_lock);
-        cp_locked = true;
     }
 
     /*
@@ -339,8 +341,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
      * nothing further to do.
      */
     if (cp->refs < 1) {
-        if (cp_locked)
-            __wt_spin_unlock(session, &cp->cache_pool_lock);
+        __wt_spin_unlock_if_owned(session, &cp->cache_pool_lock);
         return (0);
     }
 
@@ -359,17 +360,17 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
         __wt_process.cache_pool = NULL;
         __wt_spin_unlock(session, &__wt_process.spinlock);
         __wt_spin_unlock(session, &cp->cache_pool_lock);
-        cp_locked = false;
 
         /* Now free the pool. */
         __wt_free(session, cp->name);
 
+        cp_lock_available = false;
         __wt_spin_destroy(session, &cp->cache_pool_lock);
         __wt_cond_destroy(session, &cp->cache_pool_cond);
         __wt_free(session, cp);
     }
 
-    if (cp_locked) {
+    if (cp_lock_available && __wt_spin_owned(session, &cp->cache_pool_lock)) {
         __wt_spin_unlock(session, &cp->cache_pool_lock);
 
         /* Notify other participants if we were managing */
@@ -545,6 +546,9 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
     pct_full = 0.0;
     /* Highest as a percentage, avoid 0 */
     highest_percentile = (highest / 100) + 1;
+
+    /* The cache pool lock is locked using the NULL session. */
+    WT_ASSERT_SPINLOCK_OWNED(NULL, &cp->cache_pool_lock);
 
     if (WT_VERBOSE_ISSET(session, WT_VERB_SHARED_CACHE)) {
         __wt_verbose(session, WT_VERB_SHARED_CACHE, "%s", "Cache pool distribution: ");

@@ -1410,6 +1410,9 @@ err:
 static int
 __session_salvage_worker(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     WT_RET(__wt_schema_worker(
       session, uri, __wt_salvage, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
     WT_RET(

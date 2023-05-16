@@ -31,8 +31,6 @@ __wt_nlpo2
 __wt_nlpo2_round
 __wt_print_huffman_code
 __wt_session_breakpoint
-__wt_spin_locked
-__wt_spin_unlock_if_owned
 __wt_stat_join_aggregate
 __wt_stat_join_clear_all
 __wt_strcat

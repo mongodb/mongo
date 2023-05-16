@@ -20,6 +20,8 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_TXN *txn;
     u_int i;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
+
     mod = ref->page->modify;
     txn = session->txn;
 

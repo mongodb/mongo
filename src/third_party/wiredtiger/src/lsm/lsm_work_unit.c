@@ -325,6 +325,9 @@ __lsm_checkpoint_chunk(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     /*
      * Turn on metadata tracking to ensure the checkpoint gets the necessary handle locks.
      */
