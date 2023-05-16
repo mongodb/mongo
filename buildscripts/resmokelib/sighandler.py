@@ -10,10 +10,10 @@ import traceback
 
 import psutil
 
+from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib import reportfile
 from buildscripts.resmokelib import testing
 from buildscripts.resmokelib import config
-from buildscripts.resmokelib.hang_analyzer import hang_analyzer
 from buildscripts.resmokelib import parser
 
 _IS_WINDOWS = (sys.platform == "win32")
@@ -32,8 +32,8 @@ def register(logger, suites, start_time):
         log suite summaries.
         """
 
+        HANG_ANALYZER_CALLED.set()
         header_msg = "Dumping stacks due to SIGUSR1 signal"
-
         _dump_and_log(header_msg)
 
     def _handle_set_event(event_handle):
@@ -53,6 +53,7 @@ def register(logger, suites, start_time):
             except win32event.error as err:
                 logger.error("Exception from win32event.WaitForSingleObject with error: %s" % err)
             else:
+                HANG_ANALYZER_CALLED.set()
                 header_msg = "Dumping stacks due to signal from win32event.SetEvent"
 
                 _dump_and_log(header_msg)
@@ -159,4 +160,26 @@ def _analyze_pids(logger, pids):
     if not os.getenv('ASAN_OPTIONS'):
         hang_analyzer_args.append('-c')
     _hang_analyzer = parser.parse_command_line(hang_analyzer_args, logger=logger)
-    _hang_analyzer.execute()
+
+    # Evergreen has a 15 minute timeout for task timeout commands
+    # Limit the hang analyzer to 12 minutes so there is time for other tasks.
+    hang_analyzer_hard_timeout = None
+    if config.EVERGREEN_TASK_ID:
+        hang_analyzer_hard_timeout = 60 * 12
+        logger.info(
+            "Limit the resmoke invoked hang analyzer to 12 minutes so there is time for resmoke to finish up."
+        )
+
+    hang_analyzer_thread = threading.Thread(target=_hang_analyzer.execute, daemon=True)
+    hang_analyzer_thread.start()
+    hang_analyzer_thread.join(hang_analyzer_hard_timeout)
+
+    if hang_analyzer_thread.is_alive():
+        logger.warning(
+            "Resmoke invoked hang analyzer thread did not finish, but will continue running in the background. The thread may be disruputed and may show extraneous output."
+        )
+        logger.warning("Cleaning up resmoke child processes so that resmoke can fail gracefully.")
+        _hang_analyzer.kill_rogue_processes()
+
+    else:
+        logger.info("Done running resmoke invoked hang analyzer thread.")

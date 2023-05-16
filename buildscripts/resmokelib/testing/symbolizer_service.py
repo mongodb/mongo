@@ -11,6 +11,7 @@ from threading import Lock
 from typing import List, Optional, NamedTuple, Set
 
 from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
 
 # This lock prevents different resmoke jobs from symbolizing stacktraces concurrently,
@@ -146,6 +147,12 @@ class ResmokeSymbolizer:
 
         if self.config.is_macos():
             test.logger.info("Running on MacOS, skipping symbolization")
+            return False
+
+        if HANG_ANALYZER_CALLED.is_set():
+            test.logger.info(
+                "Hang analyzer has been called, skipping symbolization to meet timeout constraints."
+            )
             return False
 
         return True
