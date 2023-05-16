@@ -556,7 +556,7 @@ ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> im
       _factory(std::move(impl)),
       _options(std::move(options)),
       _controller(_options.controllerFactory()),
-      _manager(options.egressTagCloserManager) {
+      _manager(_options.egressTagCloserManager) {
     if (_manager) {
         _manager->add(this);
     }
