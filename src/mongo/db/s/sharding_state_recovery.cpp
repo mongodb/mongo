@@ -147,14 +147,14 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
                               const WriteConcernOptions& writeConcern) {
     try {
         {
-            auto collection = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest(
-                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
-                    PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                    repl::ReadConcernArgs::get(opCtx),
-                    AcquisitionPrerequisites::kWrite),
-                MODE_X);
+            auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kServerConfigurationNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
 
             const auto configOpTime = [&]() {
                 const auto vcTime = VectorClock::get(opCtx)->getTime();

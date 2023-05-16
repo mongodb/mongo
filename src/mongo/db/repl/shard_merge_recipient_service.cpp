@@ -2020,7 +2020,7 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
     const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
     auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),

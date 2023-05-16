@@ -1123,7 +1123,7 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
     writeConflictRetry(opCtx.get(), "RecipientStateMachine::_removeRecipientDocument", nss, [&] {
         const auto coll = acquireCollection(
             opCtx.get(),
-            CollectionAcquisitionRequest(NamespaceString(nss),
+            CollectionAcquisitionRequest(nss,
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kWrite),

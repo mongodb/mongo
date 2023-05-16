@@ -76,7 +76,7 @@ public:
         Lock::DBLock dbLock(opCtx, DatabaseName::kLocal, MODE_X);
         auto coll = acquireCollection(
             opCtx,
-            CollectionAcquisitionRequest(NamespaceString(NamespaceString::kSystemReplSetNamespace),
+            CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kWrite),

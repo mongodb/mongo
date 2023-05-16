@@ -507,14 +507,13 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
 
     try {
-        auto collection =
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest(
-                                  NamespaceString(NamespaceString::kServerConfigurationNamespace),
-                                  PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                  repl::ReadConcernArgs::get(opCtx),
-                                  AcquisitionPrerequisites::kWrite),
-                              MODE_IX);
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kServerConfigurationNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_IX);
         auto result = update(opCtx, collection, updateReq);
         if (result.numMatched == 0) {
             LOGV2_WARNING(22076,

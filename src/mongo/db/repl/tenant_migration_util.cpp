@@ -132,7 +132,7 @@ repl::OpTime storeExternalClusterTimeKeyDocs(std::vector<ExternalKeysCollectionD
     for (auto& keyDoc : keyDocs) {
         auto collection = acquireCollection(
             opCtx,
-            CollectionAcquisitionRequest(NamespaceString(nss),
+            CollectionAcquisitionRequest(nss,
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kWrite),
@@ -612,7 +612,7 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
                    auto collection = acquireCollection(
                        opCtx,
                        CollectionAcquisitionRequest(
-                           NamespaceString(nss),
+                           nss,
                            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                            repl::ReadConcernArgs::get(opCtx),
                            AcquisitionPrerequisites::kWrite),

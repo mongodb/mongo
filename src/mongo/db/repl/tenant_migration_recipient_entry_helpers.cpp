@@ -58,7 +58,7 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
     auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
@@ -101,7 +101,7 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
     auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
@@ -131,7 +131,7 @@ StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* op
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
     const auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),

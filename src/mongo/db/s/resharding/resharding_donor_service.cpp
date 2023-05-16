@@ -999,7 +999,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     writeConflictRetry(opCtx.get(), "DonorStateMachine::_updateDonorDocument", nss, [&] {
         auto coll = acquireCollection(
             opCtx.get(),
-            CollectionAcquisitionRequest(NamespaceString(nss),
+            CollectionAcquisitionRequest(nss,
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kWrite),
@@ -1031,7 +1031,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
     writeConflictRetry(opCtx.get(), "DonorStateMachine::_removeDonorDocument", nss, [&] {
         const auto coll = acquireCollection(
             opCtx.get(),
-            CollectionAcquisitionRequest(NamespaceString(nss),
+            CollectionAcquisitionRequest(nss,
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kWrite),

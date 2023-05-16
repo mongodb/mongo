@@ -156,7 +156,7 @@ Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
     const auto nss = NamespaceString::kShardSplitDonorsNamespace;
     auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
@@ -189,7 +189,7 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
     const auto nss = NamespaceString::kShardSplitDonorsNamespace;
     auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
@@ -217,7 +217,7 @@ StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitI
     const auto nss = NamespaceString::kShardSplitDonorsNamespace;
     const auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),

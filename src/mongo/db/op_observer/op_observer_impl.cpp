@@ -290,7 +290,7 @@ void writeToImageCollection(OperationContext* opCtx,
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(NamespaceString::kConfigImagesNamespace),
+        CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),

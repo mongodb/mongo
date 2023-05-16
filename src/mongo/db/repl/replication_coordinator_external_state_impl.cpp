@@ -428,7 +428,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                auto coll = acquireCollection(
                                    opCtx,
                                    CollectionAcquisitionRequest(
-                                       NamespaceString(NamespaceString::kSystemReplSetNamespace),
+                                       NamespaceString::kSystemReplSetNamespace,
                                        PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                        repl::ReadConcernArgs::get(opCtx),
                                        AcquisitionPrerequisites::kWrite),
@@ -600,7 +600,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                     auto coll = acquireCollection(
                         opCtx,
                         CollectionAcquisitionRequest(
-                            NamespaceString(NamespaceString::kSystemReplSetNamespace),
+                            NamespaceString::kSystemReplSetNamespace,
                             PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                             repl::ReadConcernArgs::get(opCtx),
                             AcquisitionPrerequisites::kWrite),
@@ -637,7 +637,7 @@ Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
             auto coll =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
-                                      NamespaceString(NamespaceString::kSystemReplSetNamespace),
+                                      NamespaceString::kSystemReplSetNamespace,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
@@ -671,7 +671,7 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
                                auto coll = acquireCollection(
                                    opCtx,
                                    CollectionAcquisitionRequest(
-                                       NamespaceString(NamespaceString::kLastVoteNamespace),
+                                       NamespaceString::kLastVoteNamespace,
                                        PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                        repl::ReadConcernArgs::get(opCtx),
                                        AcquisitionPrerequisites::kWrite),
@@ -744,7 +744,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                 auto coll =
                     acquireCollection(opCtx,
                                       CollectionAcquisitionRequest(
-                                          NamespaceString(NamespaceString::kLastVoteNamespace),
+                                          NamespaceString::kLastVoteNamespace,
                                           PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                           repl::ReadConcernArgs::get(opCtx),
                                           AcquisitionPrerequisites::kWrite),

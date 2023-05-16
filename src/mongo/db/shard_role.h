@@ -44,15 +44,18 @@ namespace mongo {
  */
 struct CollectionOrViewAcquisitionRequest {
     /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
+     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
+     * relationship between NSS and UUID.
      */
     CollectionOrViewAcquisitionRequest(
-        NamespaceString nss,
+        NamespaceStringOrUUID nssOrUUID,
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nss),
+        : nss(nssOrUUID.nss()),
+          dbname(nssOrUUID.dbName()),
+          uuid(nssOrUUID.uuid()),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -71,24 +74,6 @@ struct CollectionOrViewAcquisitionRequest {
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
         : nss(nss),
           uuid(uuid),
-          placementConcern(placementConcern),
-          readConcern(readConcern),
-          operationType(operationType),
-          viewMode(viewMode) {}
-
-    /**
-     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
-     * relationship between NSS and UUID.
-     */
-    CollectionOrViewAcquisitionRequest(
-        NamespaceStringOrUUID nssOrUUID,
-        PlacementConcern placementConcern,
-        repl::ReadConcernArgs readConcern,
-        AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nssOrUUID.nss()),
-          dbname(nssOrUUID.dbName()),
-          uuid(nssOrUUID.uuid()),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -118,13 +103,14 @@ struct CollectionOrViewAcquisitionRequest {
 
 struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest {
     /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
+     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
+     * relationship between NSS and UUID.
      */
-    CollectionAcquisitionRequest(NamespaceString nss,
+    CollectionAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
                                  PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
                                  AcquisitionPrerequisites::OperationType operationType)
-        : CollectionOrViewAcquisitionRequest(nss,
+        : CollectionOrViewAcquisitionRequest(nssOrUUID,
                                              placementConcern,
                                              readConcern,
                                              operationType,
@@ -141,20 +127,6 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
                                  AcquisitionPrerequisites::OperationType operationType)
         : CollectionOrViewAcquisitionRequest(nss,
                                              uuid,
-                                             placementConcern,
-                                             readConcern,
-                                             operationType,
-                                             AcquisitionPrerequisites::kMustBeCollection) {}
-
-    /**
-     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
-     * relationship between NSS and UUID.
-     */
-    CollectionAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
-                                 PlacementConcern placementConcern,
-                                 repl::ReadConcernArgs readConcern,
-                                 AcquisitionPrerequisites::OperationType operationType)
-        : CollectionOrViewAcquisitionRequest(nssOrUUID,
                                              placementConcern,
                                              readConcern,
                                              operationType,

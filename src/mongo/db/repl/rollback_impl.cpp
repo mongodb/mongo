@@ -534,7 +534,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
             auto collection =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
-                                      NamespaceString(nss),
+                                      nss,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
