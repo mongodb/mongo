@@ -176,6 +176,7 @@ __wt_lex_compare_skip(const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t
 {
     size_t len, usz, tsz;
     const uint8_t *userp, *treep;
+    int ret_val;
 
     usz = user_item->size;
     tsz = tree_item->size;
@@ -231,15 +232,30 @@ __wt_lex_compare_skip(const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t
         len += remain;
     }
 #endif
+    ret_val = 0;
     /*
      * Use the non-vectorized version for the remaining bytes and for the small key sizes.
      */
     for (; len > 0; --len, ++userp, ++treep, ++*matchp)
-        if (*userp != *treep)
-            return (*userp < *treep ? -1 : 1);
+        if (*userp != *treep) {
+            ret_val = *userp < *treep ? -1 : 1;
+            break;
+        }
 
     /* Contents are equal up to the smallest length. */
-    return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
+    if (ret_val == 0)
+        ret_val = ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
+        /* In diagnostic mode ensure that short comparisons work as expected */
+#ifdef HAVE_DIAGNOSTIC
+    {
+        int full_cmp_ret;
+        full_cmp_ret = __wt_lex_compare(user_item, tree_item);
+        WT_ASSERT_ALWAYS(NULL, full_cmp_ret == ret_val,
+          "Comparison that skipped prefix returned different result than a full comparison");
+    }
+#endif
+
+    return (ret_val);
 }
 
 /*
