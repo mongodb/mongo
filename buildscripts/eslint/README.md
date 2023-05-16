@@ -21,6 +21,7 @@
    "pkg": {
      "scripts": [ "conf/**/*", "lib/**/*", "messages/**/*" ],
      "targets": [ "linux-x64", "macos-x64" ]
+     # "targets": [ "linux-arm64" ] 
      },
    ```
 6. Run pkg command to make ESLint executables.
@@ -38,6 +39,10 @@
    ```
    eslint-macos --help
    ```
+   or (if you are on arm)
+   ```
+   eslint --help
+   ```
 
 (*) If executable fails to find some .js files there are [extra steps](#extra-steps)
 required to be done before step 6.
@@ -48,19 +53,25 @@ Rename produced files.
 ```
 mv eslint-linux eslint-Linux-x86_64
 mv eslint-macos eslint-Darwin-x86_64
+# arm
+# mv eslint eslint-Linux-arm64
 ```
-Archive files.
+Archive files. (No leading v in version e.g. 8.28.0 NOT v8.28.0)
 ```
-tar -czvf eslint-${version}-linux.tar.gz eslint-Linux-x86_64
+tar -czvf eslint-${version}-linux-x86_64.tar.gz eslint-Linux-x86_64
 tar -czvf eslint-${version}-darwin.tar.gz eslint-Darwin-x86_64
+# arm
+# tar -czvf eslint-${version}-linux-arm64.tar.gz eslint-Linux-arm64
 ```
 
 ### Upload archives to `boxes.10gen.com`
 
 Archives should be available by the following links:
 ```
-https://s3.amazonaws.com/boxes.10gen.com/build/eslint-${version}-linux.tar.gz
+https://s3.amazonaws.com/boxes.10gen.com/build/eslint-${version}-linux-x86_64.tar.gz
 https://s3.amazonaws.com/boxes.10gen.com/build/eslint-${version}-darwin.tar.gz
+# arm
+# https://s3.amazonaws.com/boxes.10gen.com/build/eslint-${version}-linux-arm64.tar.gz
 ```
 Build team has an access to do that.
 You can create a build ticket in Jira for them to do it
