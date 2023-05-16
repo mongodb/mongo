@@ -382,6 +382,8 @@ last-continuous:
     ticket: SERVER-76872
   - test_file: jstests/sharding/merge_let_params_size_estimation.js
     ticket: SERVER-74806
+  - test_file: jstests/sharding/resharding_update_tag_zones_large.js
+    ticket: SERVER-76988
   suites: null
 last-lts:
   all:
@@ -849,4 +851,6 @@ last-lts:
     ticket: SERVER-76872
   - test_file: jstests/sharding/merge_let_params_size_estimation.js
     ticket: SERVER-74806
+  - test_file: jstests/sharding/resharding_update_tag_zones_large.js
+    ticket: SERVER-76988
   suites: null
