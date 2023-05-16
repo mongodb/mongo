@@ -380,30 +380,6 @@ void logGlobalIndexDDLOperation(OperationContext* opCtx,
     onWriteOpCompleted(opCtx, {stmtId}, sessionTxnRecord);
 }
 
-/**
- * See isTenantChangeStreamEnabled() in oplog.cpp.
- */
-bool isTenantChangeStreamEnabled(OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    const auto& settings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
-    if (!settings.isServerless()) {
-        return false;
-    }
-
-    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
-        return false;
-    }
-
-    if (!tenantId) {
-        return false;
-    }
-
-    if (!change_stream_serverless_helpers::isChangeStreamEnabled(opCtx, tenantId.get())) {
-        return false;
-    }
-
-    return true;
-}
-
 }  // namespace
 
 OpObserverImpl::OpObserverImpl(std::unique_ptr<OplogWriter> oplogWriter)
@@ -629,7 +605,9 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     // UUID and optional donor timeline metadata.
     if (const auto& recipientInfo = repl::tenantMigrationInfo(opCtx)) {
         oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
-        if (isTenantChangeStreamEnabled(opCtx, oplogEntryTemplate->getTid()) &&
+        if (oplogEntryTemplate->getTid() &&
+            change_stream_serverless_helpers::isChangeStreamEnabled(
+                opCtx, *oplogEntryTemplate->getTid()) &&
             recipientInfo->donorOplogEntryData) {
             oplogEntryTemplate->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
             oplogEntryTemplate->setDonorApplyOpsIndex(

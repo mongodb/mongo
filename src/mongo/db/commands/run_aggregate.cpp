@@ -874,9 +874,8 @@ Status runAggregate(OperationContext* opCtx,
             nss = NamespaceString::kRsOplogNamespace;
 
             // In case of serverless the change stream will be opened on the change collection.
-            const bool changeCollectionsMode =
-                change_stream_serverless_helpers::isChangeCollectionsModeActive();
-            if (changeCollectionsMode) {
+            const bool isServerless = change_stream_serverless_helpers::isServerlessEnvironment();
+            if (isServerless) {
                 const auto tenantId =
                     change_stream_serverless_helpers::resolveTenantId(origNss.tenantId());
 
@@ -923,7 +922,7 @@ Status runAggregate(OperationContext* opCtx,
             registerTelemetry();
             uassert(ErrorCodes::ChangeStreamNotEnabled,
                     "Change streams must be enabled before being used",
-                    !changeCollectionsMode ||
+                    !isServerless ||
                         change_stream_serverless_helpers::isChangeStreamEnabled(opCtx,
                                                                                 *nss.tenantId()));
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {

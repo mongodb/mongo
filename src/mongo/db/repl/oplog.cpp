@@ -174,27 +174,6 @@ StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool i
     return ""_sd;
 }
 
-bool isTenantChangeStreamEnabled(OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    const auto& settings = ReplicationCoordinator::get(opCtx)->getSettings();
-    if (!settings.isServerless()) {
-        return false;
-    }
-
-    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
-        return false;
-    }
-
-    if (!tenantId) {
-        return false;
-    }
-
-    if (!change_stream_serverless_helpers::isChangeStreamEnabled(opCtx, tenantId.get())) {
-        return false;
-    }
-
-    return true;
-}
-
 Status insertDocumentsForOplog(OperationContext* opCtx,
                                const CollectionPtr& oplogCollection,
                                std::vector<Record>* records,
@@ -518,7 +497,8 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     // UUID and optional donor timeline metadata.
     if (const auto& recipientInfo = tenantMigrationInfo(opCtx)) {
         oplogEntry->setFromTenantMigration(recipientInfo->uuid);
-        if (isTenantChangeStreamEnabled(opCtx, oplogEntry->getTid()) &&
+        if (oplogEntry->getTid() &&
+            change_stream_serverless_helpers::isChangeStreamEnabled(opCtx, *oplogEntry->getTid()) &&
             recipientInfo->donorOplogEntryData) {
             oplogEntry->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
             oplogEntry->setDonorApplyOpsIndex(recipientInfo->donorOplogEntryData->applyOpsIndex);

@@ -57,11 +57,7 @@ boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
 
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime) {
     // Non-serverless and serverless environments expire pre-images according to different logic and
-    // parameters.
-    //
-    // This method retrieves the 'expireAfterSeconds' for a single-tenant environment. Prohibit
-    // callers from using this in a serverless setting.
-    invariant(!change_stream_serverless_helpers::isChangeCollectionsModeActive());
+    // parameters. This method retrieves the 'expireAfterSeconds' for a single-tenant environment.
     boost::optional<std::int64_t> expireAfterSeconds = boost::none;
 
     // Get the expiration time directly from the change stream manager.
