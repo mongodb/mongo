@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -1506,34 +1507,10 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
     return resharding::WithAutomaticRetry([this, executor, updatedCoordinatorDoc] {
                return ExecutorFuture<void>(**executor)
                    .then(
-                       [this, executor, updatedCoordinatorDoc] { _commit(updatedCoordinatorDoc); })
-                   .then([this] { return _waitForMajority(_ctHolder->getStepdownToken()); })
-                   .thenRunOn(**executor)
-                   .then([this, executor] {
-                       _tellAllParticipantsToCommit(_coordinatorDoc.getSourceNss(), executor);
-                   })
-                   .then([this] { _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss()); })
-                   .then([this, updatedCoordinatorDoc] {
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                       resharding::removeChunkDocs(opCtx.get(),
-                                                   updatedCoordinatorDoc.getSourceUUID());
-                       return Status::OK();
-                   })
-                   .then([this, executor] { return _awaitAllParticipantShardsDone(executor); })
-                   .then([this, executor] {
-                       _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                                           getCurrentTime());
-
-                       // Best-effort attempt to trigger a refresh on the participant shards so
-                       // they see the collection metadata without reshardingFields and no longer
-                       // throw ReshardCollectionInProgress. There is no guarantee this logic ever
-                       // runs if the config server primary steps down after having removed the
-                       // coordinator state document.
-                       return _tellAllRecipientsToRefresh(executor);
-                   });
+                       [this, executor, updatedCoordinatorDoc] { _commit(updatedCoordinatorDoc); });
            })
         .onTransientError([](const Status& status) {
-            LOGV2(5093705,
+            LOGV2(7698801,
                   "Resharding coordinator encountered transient error while committing",
                   "error"_attr = status);
         })
@@ -1541,18 +1518,68 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getStepdownToken())
         .onError([this, executor](Status status) {
-            {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                reshardingPauseCoordinatorBeforeStartingErrorFlow.pauseWhileSet(opCtx.get());
+            if (status == ErrorCodes::TransactionTooLargeForCache) {
+                return _onAbortCoordinatorAndParticipants(executor, status);
             }
+            return ExecutorFuture<void>(**executor, status);
+        })
+        .then([this, executor, updatedCoordinatorDoc] {
+            return resharding::WithAutomaticRetry([this, executor, updatedCoordinatorDoc] {
+                       return ExecutorFuture<void>(**executor)
+                           .then([this] { return _waitForMajority(_ctHolder->getStepdownToken()); })
+                           .thenRunOn(**executor)
+                           .then([this, executor] {
+                               _tellAllParticipantsToCommit(_coordinatorDoc.getSourceNss(),
+                                                            executor);
+                           })
+                           .then([this] {
+                               _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss());
+                           })
+                           .then([this, updatedCoordinatorDoc] {
+                               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                               resharding::removeChunkDocs(opCtx.get(),
+                                                           updatedCoordinatorDoc.getSourceUUID());
+                               return Status::OK();
+                           })
+                           .then([this, executor] {
+                               return _awaitAllParticipantShardsDone(executor);
+                           })
+                           .then([this, executor] {
+                               _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                                                   getCurrentTime());
 
-            if (_ctHolder->isSteppingOrShuttingDown()) {
-                return status;
-            }
+                               // Best-effort attempt to trigger a refresh on the participant shards
+                               // so they see the collection metadata without reshardingFields and
+                               // no longer throw ReshardCollectionInProgress. There is no guarantee
+                               // this logic ever runs if the config server primary steps down after
+                               // having removed the coordinator state document.
+                               return _tellAllRecipientsToRefresh(executor);
+                           });
+                   })
+                .onTransientError([](const Status& status) {
+                    LOGV2(5093705,
+                          "Resharding coordinator encountered transient error while committing",
+                          "error"_attr = status);
+                })
+                .onUnrecoverableError([](const Status& status) {})
+                .until<Status>([](const Status& status) { return status.isOK(); })
+                .on(**executor, _ctHolder->getStepdownToken())
+                .onError([this, executor](Status status) {
+                    {
+                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                        reshardingPauseCoordinatorBeforeStartingErrorFlow.pauseWhileSet(
+                            opCtx.get());
+                    }
 
-            LOGV2_FATAL(5277000,
+                    if (_ctHolder->isSteppingOrShuttingDown()) {
+                        return status;
+                    }
+
+                    LOGV2_FATAL(
+                        5277000,
                         "Unrecoverable error past the point resharding was guaranteed to succeed",
                         "error"_attr = redact(status));
+                });
         });
 }
 
