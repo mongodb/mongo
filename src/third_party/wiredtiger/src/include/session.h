@@ -53,6 +53,12 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 /* Maximum number of buckets to visit during a regular cursor sweep. */
 #define WT_SESSION_CURSOR_SWEEP_MAX 64
 
+/* Invalid session ID. */
+#define WT_SESSION_ID_INVALID 0xffffffff
+
+/* A fake session ID for when we need to refer to a session that is actually NULL. */
+#define WT_SESSION_ID_NULL 0xfffffffe
+
 /*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
