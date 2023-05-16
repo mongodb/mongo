@@ -32,7 +32,7 @@
 #include <memory>
 
 #include "mongo/db/curop.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
@@ -75,9 +75,10 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation),
-      _telemetryStoreKeyHash(CurOp::get(opCtx)->debug().telemetryStoreKeyHash),
-      _telemetryStoreKey(CurOp::get(opCtx)->debug().telemetryStoreKey),
-      _telemetryRequestShapifier(std::move(CurOp::get(opCtx)->debug().telemetryRequestShapifier)) {
+      _queryStatsStoreKeyHash(CurOp::get(opCtx)->debug().queryStatsStoreKeyHash),
+      _queryStatsStoreKey(CurOp::get(opCtx)->debug().queryStatsStoreKey),
+      _queryStatsRequestShapifier(
+          std::move(CurOp::get(opCtx)->debug().queryStatsRequestShapifier)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -137,13 +138,13 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
 
-    if (_telemetryStoreKeyHash && opCtx) {
-        telemetry::writeTelemetry(opCtx,
-                                  _telemetryStoreKeyHash,
-                                  _telemetryStoreKey,
-                                  std::move(_telemetryRequestShapifier),
-                                  _metrics.executionTime.value_or(Microseconds{0}).count(),
-                                  _metrics.nreturned.value_or(0));
+    if (_queryStatsStoreKeyHash && opCtx) {
+        query_stats::writeQueryStats(opCtx,
+                                     _queryStatsStoreKeyHash,
+                                     _queryStatsStoreKey,
+                                     std::move(_queryStatsRequestShapifier),
+                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                     _metrics.nreturned.value_or(0));
     }
 
     _root->kill(opCtx);
@@ -285,8 +286,8 @@ bool ClusterClientCursorImpl::shouldOmitDiagnosticInformation() const {
     return _shouldOmitDiagnosticInformation;
 }
 
-std::unique_ptr<telemetry::RequestShapifier> ClusterClientCursorImpl::getRequestShapifier() {
-    return std::move(_telemetryRequestShapifier);
+std::unique_ptr<query_stats::RequestShapifier> ClusterClientCursorImpl::getRequestShapifier() {
+    return std::move(_queryStatsRequestShapifier);
 }
 
 }  // namespace mongo

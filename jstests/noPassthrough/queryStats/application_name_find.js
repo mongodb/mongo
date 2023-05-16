@@ -1,6 +1,6 @@
 /**
  * Test that applicationName and namespace appear in telemetry for the find command.
- * @tags: [featureFlagTelemetry]
+ * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/telemetry_utils.js");
 (function() {
@@ -12,7 +12,7 @@ const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
+    setParameter: {internalQueryStatsSamplingRate: -1},
 };
 
 const conn = MongoRunner.runMongod(options);

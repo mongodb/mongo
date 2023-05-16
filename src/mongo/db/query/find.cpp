@@ -112,7 +112,7 @@ void endQueryOp(OperationContext* opCtx,
     auto curOp = CurOp::get(opCtx);
 
     // Fill out basic CurOp query exec properties. More metrics (nreturned and executionTime)
-    // are collected within collectTelemetryMongod.
+    // are collected within collectQueryStatsMongod.
     curOp->debug().cursorid = (cursor.has_value() ? cursor->getCursor()->cursorid() : -1);
     curOp->debug().cursorExhausted = !cursor.has_value();
     curOp->debug().additiveMetrics.nBatches = 1;
@@ -125,9 +125,9 @@ void endQueryOp(OperationContext* opCtx,
     curOp->setEndOfOpMetrics(numResults);
 
     if (cursor) {
-        collectTelemetryMongod(opCtx, *cursor);
+        collectQueryStatsMongod(opCtx, *cursor);
     } else {
-        collectTelemetryMongod(opCtx, std::move(curOp->debug().telemetryRequestShapifier));
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsRequestShapifier));
     }
 
     if (collection) {

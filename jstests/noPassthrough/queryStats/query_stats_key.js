@@ -64,7 +64,7 @@ function confirmAllFieldsPresent(queryStatsEntries) {
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
+    setParameter: {internalQueryStatsSamplingRate: -1},
 };
 
 const conn = MongoRunner.runMongod(options);

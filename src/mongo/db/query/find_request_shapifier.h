@@ -32,7 +32,7 @@
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/request_shapifier.h"
 
-namespace mongo::telemetry {
+namespace mongo::query_stats {
 
 /**
  * Handles shapification for FindCommandRequests.
@@ -49,12 +49,13 @@ public:
 
     virtual ~FindRequestShapifier() = default;
 
-    BSONObj makeTelemetryKey(const SerializationOptions& opts, OperationContext* opCtx) const final;
+    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                              OperationContext* opCtx) const final;
 
-    BSONObj makeTelemetryKey(const SerializationOptions& opts,
-                             const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 
 private:
     FindCommandRequest _request;
 };
-}  // namespace mongo::telemetry
+}  // namespace mongo::query_stats

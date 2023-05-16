@@ -31,20 +31,20 @@
 
 #include "mongo/db/query/query_shape.h"
 
-namespace mongo::telemetry {
+namespace mongo::query_stats {
 
-BSONObj AggregateRequestShapifier::makeTelemetryKey(const SerializationOptions& opts,
-                                                    OperationContext* opCtx) const {
+BSONObj AggregateRequestShapifier::makeQueryStatsKey(const SerializationOptions& opts,
+                                                     OperationContext* opCtx) const {
     // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
     // to mongot.
     auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, _request.getNamespace());
     expCtx->variables.setDefaultRuntimeConstants(opCtx);
     expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
     expCtx->stopExpressionCounters();
-    return makeTelemetryKey(opts, expCtx);
+    return makeQueryStatsKey(opts, expCtx);
 }
 
-BSONObj AggregateRequestShapifier::makeTelemetryKey(
+BSONObj AggregateRequestShapifier::makeQueryStatsKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     BSONObjBuilder bob;
 
@@ -84,4 +84,4 @@ BSONObj AggregateRequestShapifier::makeTelemetryKey(
 
     return bob.obj();
 }
-}  // namespace mongo::telemetry
+}  // namespace mongo::query_stats

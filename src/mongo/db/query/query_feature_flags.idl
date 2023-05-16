@@ -90,9 +90,9 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
-    featureFlagTelemetry:
-      description: "Feature flag for enabling the telemetry store."
-      cpp_varname: gFeatureFlagTelemetry
+    featureFlagQueryStats:
+      description: "Feature flag for enabling the queryStats store."
+      cpp_varname: gFeatureFlagQueryStats
       default: false
       shouldBeFCVGated: true
 
