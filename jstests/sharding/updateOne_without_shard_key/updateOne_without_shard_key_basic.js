@@ -389,7 +389,7 @@ const testCases = [
             updates: [{q: {y: 5}, u: {_id: 5, x: -1}, upsert: true}],
         },
         options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{_id: 5, x: -1, y: 5}],
+        expectedMods: [{_id: 5}, {x: -1}],
         expectedResponse: {n: 1, nModified: 0, upserted: [{"index": 0, _id: 5}]},
         dbName: dbName,
         collName: collName
@@ -408,7 +408,7 @@ const testCases = [
         },
         mustBeInRetryableWriteOrTransaction: true,
         options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{_id: 0, x: xFieldValShard0_1, y: yFieldVal + 1}, {_id: 6, y: 6, x: -1}],
+        expectedMods: [{_id: 0}, {y: yFieldVal + 1}, {_id: 6}, {x: -1}],
         expectedResponse: {n: 2, nModified: 1, upserted: [{"index": 1, _id: 6}]},
         dbName: dbName,
         collName: collName
