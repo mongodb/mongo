@@ -11,12 +11,16 @@
 'use strict';
 
 load("jstests/libs/feature_flag_util.js");
+load("jstests/sharding/libs/reshard_collection_util.js");
 
 const st = new ShardingTest({mongos: 1, shards: 2});
 const kDbName = 'db';
 const collName = 'foo';
 const ns = kDbName + '.' + collName;
 const mongos = st.s0;
+const kNumInitialDocs = 500;
+const reshardCmdTest =
+    new ReshardCollectionCmdTest({st, dbName: kDbName, collName, numInitialDocs: kNumInitialDocs});
 
 const testShardDistribution = (mongos) => {
     if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
@@ -105,14 +109,20 @@ const testShardDistribution = (mongos) => {
         shardDistribution: [{shard: st.shard0.shardName}, {shard: st.shard1.shardName}]
     }),
                                  ErrorCodes.InvalidOptions);
-    assert.commandWorked(mongos.adminCommand({
-        reshardCollection: ns,
-        key: {newKey: 1},
-        shardDistribution: [
-            {shard: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
-            {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
-        ]
-    }));
+    reshardCmdTest.assertReshardCollOk(
+        {
+            reshardCollection: ns,
+            key: {newKey: 1},
+            shardDistribution: [
+                {shard: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
+                {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+            ]
+        },
+        2,
+        [
+            {recipientShardId: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
+            {recipientShardId: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+        ]);
 };
 
 testShardDistribution(mongos);
