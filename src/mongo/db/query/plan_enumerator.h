@@ -338,7 +338,8 @@ private:
      * Recursively traverse 'node', with OR nodes as the base case. The OR nodes are not
      * explored--instead we call prepMemo() on the OR subnode, and add its assignment to the output.
      * Subnodes are "mandatory" if they *must* use an index (TEXT and GEO).
-     * Returns a boolean indicating whether all mandatory subnodes can be indexed.
+     * Returns a boolean indicating whether all mandatory subnodes can be indexed and returns false
+     * to stop enumerating alternatives for an indexed OR.
      */
     bool prepSubNodes(MatchExpression* node,
                       PrepMemoContext context,
