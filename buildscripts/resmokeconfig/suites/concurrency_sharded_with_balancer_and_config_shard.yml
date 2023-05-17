@@ -101,8 +101,6 @@ selector:
   # mongos has no system.profile collection.
   - requires_profiling
   - assumes_unsharded_collection
-  # TODO SERVER-73279: Remove after branching 7.0 and a config shard can be downgraded.
-  - multiversion_incompatible
 
 executor:
   archive:

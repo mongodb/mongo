@@ -1,7 +1,7 @@
 /**
- * Tests that CRUD and aggregation commands through the mongos continue to work as expected on both
- * sharded and unsharded collection at each step of cluster upgrade/downgrade between last-lts and
- * latest and between last-continuous and latest.
+ * Tests that CRUD, aggregation and DDL commands continue to work as expected with a config shard on
+ * both sharded and unsharded collection at each step of cluster upgrade/downgrade between last-lts
+ * and latest and between last-continuous and latest.
  */
 (function() {
 "use strict";
@@ -29,7 +29,8 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
 
             rsOptions: {binVersion: oldVersion},
             rs: true,
-        }
+        },
+        configShard: true
     });
     st.configRS.awaitReplication();
 
