@@ -207,6 +207,7 @@ public:
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) override{};
     void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const LogicalSessionId& lsid,
                                         const std::vector<repl::OplogEntry>& statements,
                                         const repl::OpTime& prepareOpTime) override {}
     void onTransactionAbort(OperationContext* opCtx,

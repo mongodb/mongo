@@ -77,6 +77,7 @@ protected:
         const repl::OpTime& prepareOrCommitOptime) override;
     void shardObserveNonPrimaryTransactionPrepare(
         OperationContext* opCtx,
+        const LogicalSessionId& lsid,
         const std::vector<repl::OplogEntry>& stmts,
         const repl::OpTime& prepareOrCommitOptime) override;
 };

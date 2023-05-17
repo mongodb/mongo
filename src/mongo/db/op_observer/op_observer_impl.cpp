@@ -2179,9 +2179,10 @@ void OpObserverImpl::onTransactionPrepare(
 }
 
 void OpObserverImpl::onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                                    const LogicalSessionId& lsid,
                                                     const std::vector<repl::OplogEntry>& statements,
                                                     const repl::OpTime& prepareOpTime) {
-    shardObserveNonPrimaryTransactionPrepare(opCtx, statements, prepareOpTime);
+    shardObserveNonPrimaryTransactionPrepare(opCtx, lsid, statements, prepareOpTime);
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
