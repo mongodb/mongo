@@ -233,12 +233,12 @@ DatabaseType ShardingCatalogManager::createDatabase(
             // - a "commitSuccessful" notification after completing the write into config.databases
             // will allow change streams to stop collecting events on the namespace created from
             // shards != resolvedPrimaryShard.
+            const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
             {
-                DatabasesAdded prepareCommitEvent({DatabaseName(dbName)}, false /*areImported*/);
-                prepareCommitEvent.setPhase(CommitPhaseEnum::kPrepare);
+                DatabasesAdded prepareCommitEvent(
+                    {DatabaseName(dbName)}, false /*areImported*/, CommitPhaseEnum::kPrepare);
                 prepareCommitEvent.setPrimaryShard(resolvedPrimaryShard->getId());
-                uassertStatusOK(_notifyClusterOnNewDatabases(
-                    opCtx, prepareCommitEvent, {resolvedPrimaryShard->getId()}));
+                uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, prepareCommitEvent, allShards));
             }
 
             const auto transactionChain = [db](const txn_api::TransactionClient& txnClient,
@@ -277,10 +277,10 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
             hangBeforeNotifyingCreateDatabaseCommitted.pauseWhileSet();
 
-            DatabasesAdded commitCompletedEvent({DatabaseName(dbName)}, false /*areImported*/);
-            commitCompletedEvent.setPhase(CommitPhaseEnum::kSuccessful);
-            const auto notificationOutcome = _notifyClusterOnNewDatabases(
-                opCtx, commitCompletedEvent, {resolvedPrimaryShard->getId()});
+            DatabasesAdded commitCompletedEvent(
+                {DatabaseName(dbName)}, false /*areImported*/, CommitPhaseEnum::kSuccessful);
+            const auto notificationOutcome =
+                _notifyClusterOnNewDatabases(opCtx, commitCompletedEvent, allShards);
             if (!notificationOutcome.isOK()) {
                 LOGV2_WARNING(7175500,
                               "Unable to send out notification of successful createDatabase",
