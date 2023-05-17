@@ -49,5 +49,11 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite);
  */
 std::vector<Privilege> getPrivileges(const BulkWriteCommandRequest& req);
 
+/**
+ * Get the statement ID for an operation within a bulkWrite command, taking into consideration
+ * whether the stmtId / stmtIds fields are present on the request.
+ */
+int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx);
+
 }  // namespace bulk_write_common
 }  // namespace mongo

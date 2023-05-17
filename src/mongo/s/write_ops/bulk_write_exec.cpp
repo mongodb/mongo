@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/commands/bulk_write_common.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/database_name.h"
@@ -84,8 +85,6 @@ void executeChildBatches(OperationContext* opCtx,
         requests.emplace_back(childBatch.first, request);
     }
 
-    bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
-
     // Use MultiStatementTransactionRequestsSender to send any ready sub-batches to targeted
     // shard endpoints. Requests are sent on construction.
     MultiStatementTransactionRequestsSender ars(
@@ -94,7 +93,7 @@ void executeChildBatches(OperationContext* opCtx,
         DatabaseName::kAdmin,
         requests,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+        opCtx->isRetryableWrite() ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
 
     while (!ars.done()) {
         // Block until a response is available.
@@ -303,7 +302,11 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
         ops;
     std::vector<NamespaceInfoEntry> nsInfo = _clientRequest.getNsInfo();
 
-    for (auto&& targetedWrite : targetedBatch.getWrites()) {
+    std::vector<int> stmtIds;
+    if (_isRetryableWrite)
+        stmtIds.reserve(targetedBatch.getNumOps());
+
+    for (const auto& targetedWrite : targetedBatch.getWrites()) {
         const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
         ops.push_back(_clientRequest.getOps().at(writeOpRef.first));
 
@@ -325,6 +328,10 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
 
         nsInfoEntry.setShardVersion(targetedWrite->endpoint.shardVersion);
         nsInfoEntry.setDatabaseVersion(targetedWrite->endpoint.databaseVersion);
+
+        if (_isRetryableWrite) {
+            stmtIds.push_back(bulk_write_common::getStatementId(_clientRequest, writeOpRef.first));
+        }
     }
 
     request.setOps(ops);
@@ -336,8 +343,9 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     request.setOrdered(_clientRequest.getOrdered());
     request.setBypassDocumentValidation(_clientRequest.getBypassDocumentValidation());
 
-    // TODO (SERVER-72989): Attach stmtIds etc. when building support for retryable
-    // writes on mongos
+    if (_isRetryableWrite) {
+        request.setStmtIds(stmtIds);
+    }
 
     request.setDbName(DatabaseName::kAdmin);
 

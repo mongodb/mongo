@@ -129,5 +129,17 @@ std::vector<Privilege> getPrivileges(const BulkWriteCommandRequest& req) {
     return privileges;
 }
 
+int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx) {
+    auto stmtId = req.getStmtId();
+    auto stmtIds = req.getStmtIds();
+
+    if (stmtIds) {
+        return stmtIds->at(currentOpIdx);
+    }
+
+    int32_t firstStmtId = stmtId ? *stmtId : 0;
+    return firstStmtId + currentOpIdx;
+}
+
 }  // namespace bulk_write_common
 }  // namespace mongo

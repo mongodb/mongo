@@ -375,24 +375,6 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     }
 }
 
-int32_t getStatementId(OperationContext* opCtx,
-                       const BulkWriteCommandRequest& req,
-                       const size_t currentOpIdx) {
-    if (opCtx->isRetryableWrite()) {
-        auto stmtId = req.getStmtId();
-        auto stmtIds = req.getStmtIds();
-
-        if (stmtIds) {
-            return stmtIds->at(currentOpIdx);
-        }
-
-        const int32_t firstStmtId = stmtId ? *stmtId : 0;
-        return firstStmtId + currentOpIdx;
-    }
-
-    return kUninitializedStmtId;
-}
-
 std::tuple<long long, boost::optional<BSONObj>> getRetryResultForDelete(
     OperationContext* opCtx,
     const NamespaceString& nsString,
@@ -501,7 +483,8 @@ bool handleInsertOp(OperationContext* opCtx,
     const auto& nsInfo = req.getNsInfo();
     auto idx = op->getInsert();
 
-    auto stmtId = getStatementId(opCtx, req, currentOpIdx);
+    auto stmtId = opCtx->isRetryableWrite() ? bulk_write_common::getStatementId(req, currentOpIdx)
+                                            : kUninitializedStmtId;
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
@@ -582,7 +565,9 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         doTransactionValidationForWrites(opCtx, nsString);
 
-        auto stmtId = getStatementId(opCtx, req, currentOpIdx);
+        auto stmtId = opCtx->isRetryableWrite()
+            ? bulk_write_common::getStatementId(req, currentOpIdx)
+            : kUninitializedStmtId;
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
@@ -728,7 +713,9 @@ bool handleDeleteOp(OperationContext* opCtx,
 
         doTransactionValidationForWrites(opCtx, nsString);
 
-        auto stmtId = getStatementId(opCtx, req, currentOpIdx);
+        auto stmtId = opCtx->isRetryableWrite()
+            ? bulk_write_common::getStatementId(req, currentOpIdx)
+            : kUninitializedStmtId;
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             // If 'return' is not specified then we do not need to parse the statement. Since

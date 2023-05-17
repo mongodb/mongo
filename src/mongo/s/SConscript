@@ -39,6 +39,7 @@ env.Library(
         'write_ops/write_without_shard_key_util.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/bulk_write_common',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
