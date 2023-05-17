@@ -71,14 +71,12 @@ buildvariants:
     burn_in_tag_compile_task_dependency: archive_dist_test_debug
   depends_on:
   - name: archive_dist_test_debug
-    variant: linux-x86-dynamic-compile
+    variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: version_burn_in_gen
-    variant: generate-tasks-for-version
   tasks:
   - name: .aggfuzzer !.sbe_only
   - name: .aggregation !.sbe_only
@@ -116,7 +114,19 @@ buildvariants:
   - name: aggregation_repeat_queries
   - name: audit
   - name: burn_in_tags_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: disk_wiredtiger

@@ -96,6 +96,9 @@ variables:
   depends_on:
   - name: version_gen
     variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
   - name: archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
@@ -105,10 +108,11 @@ variables:
 - &gen_burn_in_task_template
   name: gen_burn_in_task_template
   depends_on:
-  - name: version_gen
-    variant: generate-tasks-for-version
   - name: version_burn_in_gen
     variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
   - name: archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
@@ -175,6 +179,9 @@ variables:
   depends_on:
   - name: version_gen
     variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
   - archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
