@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batch_write_op.h"
@@ -127,8 +128,14 @@ public:
      */
     void abortBatch(const Status& status);
 
-    // TODO(SERVER-72792): Finish this and process real batch responses.
-    void noteBatchResponse(const TargetedWriteBatch& targetedBatch);
+    /**
+     * Processes the response to a TargetedWriteBatch. The response is captured by the vector of
+     * BulkWriteReplyItems. Sharding related errors are then grouped by namespace and captured in
+     * the map passed in.
+     */
+    void noteBatchResponse(TargetedWriteBatch& targetedBatch,
+                           const std::vector<BulkWriteReplyItem>& replyItems,
+                           stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace);
 
     /**
      * Returns a vector of BulkWriteReplyItem based on the end state of each individual write in

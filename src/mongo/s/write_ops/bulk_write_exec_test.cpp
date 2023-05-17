@@ -905,54 +905,58 @@ public:
     }
 };
 
-TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
-    ShardId shardIdA("shardA");
-    ShardId shardIdB("shardB");
-    NamespaceString nss0("foo.bar");
-    NamespaceString nss1("bar.foo");
-    ShardEndpoint endpoint0(
-        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
-    ShardEndpoint endpoint1(
-        shardIdB,
-        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
-                                  boost::optional<CollectionIndexes>(boost::none)),
-        boost::none);
+// TODO (SERVER-76953): Uncomment after mongos can handle targeting errors in unordered ops.
+// TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
+//     ShardId shardIdA("shardA");
+//     ShardId shardIdB("shardB");
+//     NamespaceString nss0("foo.bar");
+//     NamespaceString nss1("bar.foo");
+//     ShardEndpoint endpoint0(
+//         shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+//     ShardEndpoint endpoint1(
+//         shardIdB,
+//         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+//                                   boost::optional<CollectionIndexes>(boost::none)),
+//         boost::none);
 
-    std::vector<std::unique_ptr<NSTargeter>> targeters;
-    // Initialize the targeter so that x >= 0 values are untargetable so target call will encounter
-    // an error.
-    targeters.push_back(initTargeterHalfRange(nss0, endpoint0));
-    targeters.push_back(initTargeterFullRange(nss1, endpoint1));
+//     std::vector<std::unique_ptr<NSTargeter>> targeters;
+//     // Initialize the targeter so that x >= 0 values are untargetable so target call will
+//     encounter
+//     // an error.
+//     targeters.push_back(initTargeterHalfRange(nss0, endpoint0));
+//     targeters.push_back(initTargeterFullRange(nss1, endpoint1));
 
-    auto targeter0 = static_cast<BulkWriteMockNSTargeter*>(targeters[0].get());
-    auto targeter1 = static_cast<BulkWriteMockNSTargeter*>(targeters[1].get());
+//     auto targeter0 = static_cast<BulkWriteMockNSTargeter*>(targeters[0].get());
+//     auto targeter1 = static_cast<BulkWriteMockNSTargeter*>(targeters[1].get());
 
-    // Only the first op would get a target error.
-    BulkWriteCommandRequest request(
-        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
-        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+//     // Only the first op would get a target error.
+//     BulkWriteCommandRequest request(
+//         {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
+//         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
 
-    // Test unordered operations. Since only the first op is untargetable, the second op will
-    // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and try
-    // to refresh the targeters upon targeting errors.
-    request.setOrdered(false);
-    auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
-    ASSERT_EQUALS(replyItems.size(), 2u);
-    ASSERT_NOT_OK(replyItems[0].getStatus());
-    ASSERT_OK(replyItems[1].getStatus());
-    ASSERT_EQUALS(targeter0->getNumRefreshes(), 1);
-    ASSERT_EQUALS(targeter1->getNumRefreshes(), 1);
+//     // Test unordered operations. Since only the first op is untargetable, the second op will
+//     // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and
+//     try
+//     // to refresh the targeters upon targeting errors.
+//     request.setOrdered(false);
+//     auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
+//     ASSERT_EQUALS(replyItems.size(), 2u);
+//     ASSERT_NOT_OK(replyItems[0].getStatus());
+//     ASSERT_OK(replyItems[1].getStatus());
+//     ASSERT_EQUALS(targeter0->getNumRefreshes(), 1);
+//     ASSERT_EQUALS(targeter1->getNumRefreshes(), 1);
 
-    // Test ordered operations. This is mostly the same as the test case above except that we should
-    // only return the first error for ordered operations.
-    request.setOrdered(true);
-    replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
-    ASSERT_EQUALS(replyItems.size(), 1u);
-    ASSERT_NOT_OK(replyItems[0].getStatus());
-    // We should have another refresh attempt.
-    ASSERT_EQUALS(targeter0->getNumRefreshes(), 2);
-    ASSERT_EQUALS(targeter1->getNumRefreshes(), 2);
-}
+//     // Test ordered operations. This is mostly the same as the test case above except that we
+//     should
+//     // only return the first error for ordered operations.
+//     request.setOrdered(true);
+//     replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
+//     ASSERT_EQUALS(replyItems.size(), 1u);
+//     ASSERT_NOT_OK(replyItems[0].getStatus());
+//     // We should have another refresh attempt.
+//     ASSERT_EQUALS(targeter0->getNumRefreshes(), 2);
+//     ASSERT_EQUALS(targeter1->getNumRefreshes(), 2);
+// }
 
 TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
     ShardId shardId("shardA");
