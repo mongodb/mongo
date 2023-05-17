@@ -2632,7 +2632,12 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
 
             if (status.code() == ErrorCodes::DataCorruptionDetected) {
                 indexBuildsSSS.failedDueToDataCorruption.addAndFetch(1);
-                LOGV2(7333600, "Index build: data corruption detected", "status"_attr = status);
+                LOGV2(7333600,
+                      "Index build: data corruption detected",
+                      "buildUUID"_attr = replState->buildUUID,
+                      logAttrs(replState->dbName),
+                      "collectionUUID"_attr = replState->collectionUUID,
+                      "error"_attr = status);
             }
 
             if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
