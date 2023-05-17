@@ -196,7 +196,7 @@ def main():
             for link_model, tasks in tasks['linux_arm64_tasks'].items():
                 variant.add_task_group(
                     create_task_group(f'linux_arm64_{link_model}', tasks),
-                    ['amazon2022-arm64-large'])
+                    ['amazon2023-arm64-large'])
 
     project = ShrubProject({variant})
     with open('build_metrics_task_gen.json', 'w') as fout:

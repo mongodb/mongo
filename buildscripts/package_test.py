@@ -56,7 +56,7 @@ OS_DOCKER_LOOKUP = {
     'amazon2': ('amazonlinux:2', "yum",
                 frozenset(["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
                 "python3"),
-    'amazon2022': ('amazonlinux:2022', "yum",
+    'amazon2023': ('amazonlinux:2023', "yum",
                    frozenset(
                        ["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
                    "python3"),
