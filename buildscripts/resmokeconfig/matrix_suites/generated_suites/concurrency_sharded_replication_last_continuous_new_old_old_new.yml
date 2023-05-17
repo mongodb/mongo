@@ -87,6 +87,7 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
   - jstests/concurrency/fsm_workloads/create_collection_and_view.js
+  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
   exclude_with_any_tags:
   - requires_replication
   - assumes_balancer_on
