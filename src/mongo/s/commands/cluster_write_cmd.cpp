@@ -50,11 +50,13 @@
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -632,6 +634,78 @@ void ClusterWriteCmd::InvocationBase::run(OperationContext* opCtx,
         CommandHelpers::appendSimpleCommandStatus(bob, ok);
 }
 
+bool ClusterWriteCmd::InvocationBase::_runExplainWithoutShardKey(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    ExplainOptions::Verbosity verbosity,
+    BSONObjBuilder* result) {
+    if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Delete ||
+        _batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+        bool isMultiWrite = false;
+        BSONObj query;
+        BSONObj collation;
+        bool isUpsert = false;
+        if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+            auto updateOp = _batchedRequest.getUpdateRequest().getUpdates().begin();
+            isMultiWrite = updateOp->getMulti();
+            query = updateOp->getQ();
+            collation = updateOp->getCollation().value_or(BSONObj());
+            isUpsert = updateOp->getUpsert();
+        } else {
+            auto deleteOp = _batchedRequest.getDeleteRequest().getDeletes().begin();
+            isMultiWrite = deleteOp->getMulti();
+            query = deleteOp->getQ();
+            collation = deleteOp->getCollation().value_or(BSONObj());
+        }
+
+        if (!isMultiWrite &&
+            write_without_shard_key::useTwoPhaseProtocol(
+                opCtx,
+                nss,
+                true /* isUpdateOrDelete */,
+                isUpsert,
+                query,
+                collation,
+                _batchedRequest.getLet(),
+                _batchedRequest.getLegacyRuntimeConstants())) {
+            // Explain currently cannot be run within a transaction, so each command is instead run
+            // separately outside of a transaction, and we compose the results at the end.
+            auto clusterQueryWithoutShardKeyExplainRes = [&] {
+                ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(
+                    ClusterExplain::wrapAsExplain(_batchedRequest.toBSON(), verbosity));
+                const auto explainClusterQueryWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
+                    clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
+                auto opMsg =
+                    OpMsgRequest::fromDBAndBody(nss.db(), explainClusterQueryWithoutShardKeyCmd);
+                return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+            }();
+
+            // Since 'explain' does not return the results of the query, we do not have an _id
+            // document to target by from the 'Read Phase'. We instead will use a dummy _id target
+            // document 'Write Phase'.
+            auto clusterWriteWithoutShardKeyExplainRes = [&] {
+                ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
+                    ClusterExplain::wrapAsExplain(_batchedRequest.toBSON(), verbosity),
+                    clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId")
+                        .toString(),
+                    write_without_shard_key::targetDocForExplain);
+                const auto explainClusterWriteWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
+                    clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
+                auto opMsg =
+                    OpMsgRequest::fromDBAndBody(nss.db(), explainClusterWriteWithoutShardKeyCmd);
+                return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+            }();
+
+            auto output = write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
+                clusterQueryWithoutShardKeyExplainRes, clusterWriteWithoutShardKeyExplainRes);
+            result->appendElementsUnique(output);
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
 void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
                                               ExplainOptions::Verbosity verbosity,
                                               rpc::ReplyBuilderInterface* result) {
@@ -652,6 +726,13 @@ void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
     auto nss = req ? req->getNS() : _batchedRequest.getNS();
     auto requestBSON = req ? req->toBSON() : _request->body;
     auto requestPtr = req ? req.get() : &_batchedRequest;
+    auto bodyBuilder = result->getBodyBuilder();
+
+    // If we aren't running an explain for updateOne or deleteOne without shard key, continue and
+    // run the original explain path.
+    if (_runExplainWithoutShardKey(opCtx, nss, verbosity, &bodyBuilder)) {
+        return;
+    }
 
     const auto explainCmd = ClusterExplain::wrapAsExplain(requestBSON, verbosity);
 
@@ -662,7 +743,6 @@ void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
     BatchItemRef targetingBatchItem(requestPtr, 0);
     std::vector<AsyncRequestsSender::Response> shardResponses;
     _commandOpWrite(opCtx, nss, explainCmd, targetingBatchItem, &shardResponses);
-    auto bodyBuilder = result->getBodyBuilder();
     uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
                                                        shardResponses,
                                                        ClusterExplain::kWriteOnShards,

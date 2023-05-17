@@ -15,7 +15,7 @@ selector:
   # Test assertions expect a certain document is deleted whereas updateOnes, deleteOnes, and
   # findAndModify without shard key can pick and modify any matching document.
   - jstests/core/**/crud_api.js
-  # TODO SERVER-69922: Requires explain for single writes without shard key.
+  # TODO SERVER-76907: Include hint stage if the original query provides one.
   - jstests/core/**/update_hint.js
   - jstests/core/**/delete_hint.js
   - jstests/core/**/find_and_modify_hint.js

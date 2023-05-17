@@ -135,15 +135,21 @@ assert.eq(explain.queryPlanner.winningPlan.shards.length, 1);
 // Check that the upsert didn't actually happen.
 assert.eq(0, collSharded.count({a: 10}));
 
+// Sharded updateOne that does not target a single shard can now be executed with a two phase
+// write protocol that will target at most 1 matching document.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(collSharded.getDB())) {
     // Explain an upsert operation which cannot be targeted and verify that it is successful.
-    // TODO SERVER-69922: Verify expected response.
     explain = db.runCommand({
         explain: {update: collSharded.getName(), updates: [{q: {b: 10}, u: {b: 10}, upsert: true}]},
         verbosity: "allPlansExecution"
     });
-    assert.commandWorked(explain, tojson(explain));
-    assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
+    assert(explain.queryPlanner);
+    assert(explain.executionStats);
+    assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_WRITE");
+    assert.eq(explain.queryPlanner.winningPlan.inputStage.winningPlan.stage, "SHARD_MERGE");
+    assert.eq(explain.executionStats.executionStages.stage, "SHARD_WRITE");
+    assert.eq(explain.executionStats.inputStage.executionStages.stage, "SHARD_MERGE");
+
     // Check that the upsert didn't actually happen.
     assert.eq(0, collSharded.count({b: 10}));
 } else {

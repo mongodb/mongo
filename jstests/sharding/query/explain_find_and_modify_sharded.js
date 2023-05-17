@@ -5,6 +5,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 var collName = 'explain_find_and_modify';
 
 // Create a cluster with 2 shards.
@@ -37,21 +39,53 @@ assert.commandWorked(testDB.adminCommand(
 
 var res;
 
-// Queries that do not involve the shard key are invalid.
-res = testDB.runCommand(
-    {explain: {findAndModify: collName, query: {b: 1}, remove: true}, verbosity: 'queryPlanner'});
-assert.commandFailed(res);
+// Sharded updateOne that does not target a single shard can now be executed with a two phase
+// write protocol that will target at most 1 matching document.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
+    res = assert.commandWorked(testDB.runCommand({
+        explain: {findAndModify: collName, query: {b: 1}, remove: true},
+        verbosity: 'queryPlanner'
+    }));
 
-// Queries that have non-equality queries on the shard key are invalid.
-res = testDB.runCommand({
-    explain: {
-        findAndModify: collName,
-        query: {a: {$gt: 5}},
-        update: {$inc: {b: 7}},
-    },
-    verbosity: 'allPlansExecution'
-});
-assert.commandFailed(res);
+    assert(res.queryPlanner);
+    assert(!res.executionStats);
+    assert.eq(res.queryPlanner.winningPlan.stage, "SHARD_WRITE");
+    assert.eq(res.queryPlanner.winningPlan.inputStage.winningPlan.stage, "SHARD_MERGE");
+
+    res = assert.commandWorked(testDB.runCommand({
+        explain: {
+            findAndModify: collName,
+            query: {a: {$gt: 5}},
+            update: {$inc: {b: 7}},
+        },
+        verbosity: 'allPlansExecution'
+    }));
+
+    assert(res.queryPlanner);
+    assert(res.executionStats);
+    assert.eq(res.queryPlanner.winningPlan.stage, "SHARD_WRITE");
+    assert.eq(res.queryPlanner.winningPlan.inputStage.winningPlan.stage, "SHARD_MERGE");
+    assert.eq(res.executionStats.executionStages.stage, "SHARD_WRITE");
+    assert.eq(res.executionStats.inputStage.executionStages.stage, "SHARD_MERGE");
+} else {
+    // Queries that do not involve the shard key are invalid.
+    res = testDB.runCommand({
+        explain: {findAndModify: collName, query: {b: 1}, remove: true},
+        verbosity: 'queryPlanner'
+    });
+    assert.commandFailed(res);
+
+    // Queries that have non-equality queries on the shard key are invalid.
+    res = testDB.runCommand({
+        explain: {
+            findAndModify: collName,
+            query: {a: {$gt: 5}},
+            update: {$inc: {b: 7}},
+        },
+        verbosity: 'allPlansExecution'
+    });
+    assert.commandFailed(res);
+}
 
 // Asserts that the explain command ran on the specified shard and used the given stage
 // for performing the findAndModify command.

@@ -29,6 +29,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/explain_gen.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/projection_parser.h"
@@ -36,6 +37,7 @@
 #include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/cluster_find_and_modify_cmd.h"
 #include "mongo/s/commands/cluster_write_cmd.h"
 #include "mongo/s/grid.h"
@@ -293,6 +295,56 @@ public:
         }
 
     private:
+        void explain(OperationContext* opCtx,
+                     ExplainOptions::Verbosity verbosity,
+                     rpc::ReplyBuilderInterface* result) override {
+            const auto shardId = ShardId(request().getShardId().toString());
+            const auto writeCmdObj = [&] {
+                const auto explainCmdObj = request().getWriteCmd();
+                const auto opMsgRequestExplainCmd =
+                    OpMsgRequest::fromDBAndBody(ns().db(), explainCmdObj);
+                auto explainRequest = ExplainCommandRequest::parse(
+                    IDLParserContext("_clusterWriteWithoutShardKeyExplain"),
+                    opMsgRequestExplainCmd.body);
+                return explainRequest.getCommandParameter().getOwned();
+            }();
+
+            const NamespaceString nss =
+                CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmdObj);
+            const auto targetDocId = request().getTargetDocId();
+            const auto commandName = writeCmdObj.firstElementFieldNameStringData();
+
+            const BSONObj cmdObj =
+                _createCmdObj(opCtx, shardId, nss, commandName, writeCmdObj, targetDocId);
+
+            const auto explainCmdObj = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
+
+            AsyncRequestsSender::Request arsRequest(shardId, explainCmdObj);
+            std::vector<AsyncRequestsSender::Request> arsRequestVector({arsRequest});
+
+            Timer timer;
+            MultiStatementTransactionRequestsSender ars(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                request().getDbName(),
+                std::move(arsRequestVector),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kNoRetry);
+
+            auto response = ars.next();
+            uassertStatusOK(response.swResponse);
+
+            const auto millisElapsed = timer.millis();
+
+            auto bodyBuilder = result->getBodyBuilder();
+            uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
+                                                               {response},
+                                                               ClusterExplain::kWriteOnShards,
+                                                               millisElapsed,
+                                                               writeCmdObj,
+                                                               &bodyBuilder));
+        }
+
         NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }

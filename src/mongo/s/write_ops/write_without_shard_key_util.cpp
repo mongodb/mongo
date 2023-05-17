@@ -302,5 +302,92 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
         return StatusWith<ClusterWriteWithoutShardKeyResponse>(swResult.getStatus());
     }
 }
+
+BSONObj generateExplainResponseForTwoPhaseWriteProtocol(
+    const BSONObj& clusterQueryWithoutShardKeyExplainObj,
+    const BSONObj& clusterWriteWithoutShardKeyExplainObj) {
+    // To express the two phase nature of the two phase write protocol, we use the output of the
+    // 'Read Phase' explain as the 'inputStage' of the 'Write Phase' explain for both queryPlanner
+    // and executionStats sections.
+    //
+    // An example output would look like:
+
+    //  "queryPlanner" : {
+    //      "winningPlan" : {
+    // 	        "stage" : "SHARD_WRITE",
+    // 	        ...
+    //          “inputStage”: {
+    // 		        queryPlanner: {
+    // 		            winningPlan: {
+    // 		                stage: "SHARD_MERGE",
+    //                      ...
+    //
+    //                  }
+    //              }
+    //          }
+    //      }
+    //  }
+    //
+    // executionStats : {
+    //     "executionStages" : {
+    //         "stage" : "SHARD_WRITE",
+    //          ...
+    //     },
+    //     "inputStage" : {
+    //         "stage" : "SHARD_MERGE",
+    //             ...
+    //      }
+    //
+    // }
+    // ... other explain result fields ...
+
+    auto queryPlannerOutput = [&] {
+        auto clusterQueryWithoutShardKeyQueryPlannerObj =
+            clusterQueryWithoutShardKeyExplainObj.getObjectField("queryPlanner");
+        auto clusterWriteWithoutShardKeyQueryPlannerObj =
+            clusterWriteWithoutShardKeyExplainObj.getObjectField("queryPlanner");
+
+        auto winningPlan = clusterWriteWithoutShardKeyQueryPlannerObj.getObjectField("winningPlan");
+        BSONObjBuilder newWinningPlanBuilder(winningPlan);
+        newWinningPlanBuilder.appendObject("inputStage",
+                                           clusterQueryWithoutShardKeyQueryPlannerObj.objdata());
+        auto newWinningPlan = newWinningPlanBuilder.obj();
+
+        auto queryPlannerObjNoWinningPlan =
+            clusterWriteWithoutShardKeyQueryPlannerObj.removeField("winningPlan");
+        BSONObjBuilder newQueryPlannerBuilder(queryPlannerObjNoWinningPlan);
+        newQueryPlannerBuilder.appendObject("winningPlan", newWinningPlan.objdata());
+        return newQueryPlannerBuilder.obj();
+    }();
+
+    auto executionStatsOutput = [&] {
+        auto clusterQueryWithoutShardKeyExecutionStatsObj =
+            clusterQueryWithoutShardKeyExplainObj.getObjectField("executionStats");
+        auto clusterWriteWithoutShardKeyExecutionStatsObj =
+            clusterWriteWithoutShardKeyExplainObj.getObjectField("executionStats");
+
+        if (clusterQueryWithoutShardKeyExecutionStatsObj.isEmpty() &&
+            clusterWriteWithoutShardKeyExecutionStatsObj.isEmpty()) {
+            return BSONObj();
+        }
+
+        BSONObjBuilder newExecutionStatsBuilder(clusterWriteWithoutShardKeyExecutionStatsObj);
+        newExecutionStatsBuilder.appendObject(
+            "inputStage", clusterQueryWithoutShardKeyExecutionStatsObj.objdata());
+        return newExecutionStatsBuilder.obj();
+    }();
+
+    BSONObjBuilder explainOutputBuilder;
+    if (!queryPlannerOutput.isEmpty()) {
+        explainOutputBuilder.appendObject("queryPlanner", queryPlannerOutput.objdata());
+    }
+    if (!executionStatsOutput.isEmpty()) {
+        explainOutputBuilder.appendObject("executionStats", executionStatsOutput.objdata());
+    }
+    // This step is to get 'command', 'serverInfo', and 'serverParamter' fields to return in the
+    // final explain output.
+    explainOutputBuilder.appendElementsUnique(clusterWriteWithoutShardKeyExplainObj);
+    return explainOutputBuilder.obj();
+}
 }  // namespace write_without_shard_key
 }  // namespace mongo

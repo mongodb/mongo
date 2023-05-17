@@ -517,6 +517,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
                                  rpc::ReplyBuilderInterface* result) const {
     const DatabaseName dbName =
         DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
+    auto bodyBuilder = result->getBodyBuilder();
     const BSONObj& cmdObj = [&]() {
         // Check whether the query portion needs to be rewritten for FLE.
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
@@ -538,20 +539,11 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const auto& cm = cri.cm;
 
     std::shared_ptr<Shard> shard;
-    if (cm.isSharded()) {
-        const BSONObj query = cmdObj.getObjectField("query");
-        const BSONObj collation = getCollation(cmdObj);
-        const auto let = getLet(cmdObj);
-        const auto rc = getLegacyRuntimeConstants(cmdObj);
-        const BSONObj shardKey =
-            getShardKey(makeExpCtx(opCtx, nss, collation, boost::none, let, rc), cm, query);
-        const auto chunk = cm.findIntersectingChunk(shardKey, collation);
-
-        shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
-    } else {
-        shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
-    }
+    const BSONObj query = cmdObj.getObjectField("query");
+    const BSONObj collation = getCollation(cmdObj);
+    const auto isUpsert = cmdObj.getBoolField("upsert");
+    const auto let = getLet(cmdObj);
+    const auto rc = getLegacyRuntimeConstants(cmdObj);
 
     const auto explainCmd = ClusterExplain::wrapAsExplain(
         appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj), verbosity);
@@ -561,16 +553,31 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     BSONObjBuilder bob;
 
     if (cm.isSharded()) {
-        _runCommand(opCtx,
-                    shard->getId(),
-                    cri.getShardVersion(shard->getId()),
-                    boost::none,
-                    nss,
-                    applyReadWriteConcern(opCtx, false, false, explainCmd),
-                    true /* isExplain */,
-                    boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                    &bob);
+        if (write_without_shard_key::useTwoPhaseProtocol(
+                opCtx, nss, false /* isUpdateOrDelete */, isUpsert, query, collation, let, rc)) {
+            _runExplainWithoutShardKey(opCtx, nss, explainCmd, verbosity, &bob);
+            bodyBuilder.appendElementsUnique(bob.obj());
+            return Status::OK();
+        } else {
+            const BSONObj shardKey =
+                getShardKey(makeExpCtx(opCtx, nss, collation, boost::none, let, rc), cm, query);
+            const auto chunk = cm.findIntersectingChunk(shardKey, collation);
+            shard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
+
+            _runCommand(opCtx,
+                        shard->getId(),
+                        cri.getShardVersion(shard->getId()),
+                        boost::none,
+                        nss,
+                        applyReadWriteConcern(opCtx, false, false, explainCmd),
+                        true /* isExplain */,
+                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        &bob);
+        }
     } else {
+        shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
+
         _runCommand(opCtx,
                     shard->getId(),
                     boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
@@ -591,7 +598,6 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     AsyncRequestsSender::Response arsResponse{
         shard->getId(), response, shard->getConnString().getServers().front()};
 
-    auto bodyBuilder = result->getBodyBuilder();
     return ClusterExplain::buildExplainResult(
         opCtx, {arsResponse}, ClusterExplain::kSingleShard, millisElapsed, cmdObj, &bodyBuilder);
 }
@@ -681,12 +687,8 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                     cmdObjForShard = replaceNamespaceByBucketNss(cmdObjForShard, nss);
                 }
 
-                _runCommandWithoutShardKey(opCtx,
-                                           nss,
-                                           applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                                           false /* isExplain */,
-                                           allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                                           &result);
+                _runCommandWithoutShardKey(
+                    opCtx, nss, applyReadWriteConcern(opCtx, this, cmdObjForShard), &result);
             }
         } else {
             findAndModifyTargetedShardedCount.increment(1);
@@ -801,19 +803,18 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
 }
 
 // Two-phase protocol to run a findAndModify command without a shard key or _id.
-void FindAndModifyCmd::_runCommandWithoutShardKey(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& cmdObj,
-    bool isExplain,
-    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-    BSONObjBuilder* result) {
+void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& cmdObj,
+                                                  BSONObjBuilder* result) {
+    auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
     auto cmdObjForPassthrough =
         prepareCmdObjForPassthrough(opCtx,
                                     cmdObj,
                                     nss,
-                                    isExplain,
+                                    false /* isExplain */,
                                     boost::none /* dbVersion */,
                                     boost::none /* shardVersion */,
                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
@@ -853,6 +854,50 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(
                      swRes.getStatus(),
                      cmdResponse,
                      result);
+}
+
+// Two-phase protocol to run an explain for a findAndModify command without a shard key or _id.
+void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& cmdObj,
+                                                  ExplainOptions::Verbosity verbosity,
+                                                  BSONObjBuilder* result) {
+    auto cmdObjForPassthrough = prepareCmdObjForPassthrough(
+        opCtx,
+        cmdObj,
+        nss,
+        true /* isExplain */,
+        boost::none /* dbVersion */,
+        boost::none /* shardVersion */,
+        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
+
+    // Explain currently cannot be run within a transaction, so each command is instead run
+    // separately outside of a transaction, and we compose the results at the end.
+    auto clusterQueryWithoutShardKeyExplainRes = [&] {
+        ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(cmdObjForPassthrough);
+        const auto explainClusterQueryWithoutShardKeyCmd =
+            ClusterExplain::wrapAsExplain(clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
+        auto opMsg = OpMsgRequest::fromDBAndBody(nss.db(), explainClusterQueryWithoutShardKeyCmd);
+        return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+    }();
+
+    auto clusterWriteWithoutShardKeyExplainRes = [&] {
+        // Since 'explain' does not return the results of the query, we do not have an _id
+        // document to target by from the 'Read Phase'. We instead will use a dummy _id
+        // target document for the 'Write Phase'.
+        ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
+            cmdObjForPassthrough,
+            clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId").toString(),
+            write_without_shard_key::targetDocForExplain);
+        const auto explainClusterWriteWithoutShardKeyCmd =
+            ClusterExplain::wrapAsExplain(clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
+        auto opMsg = OpMsgRequest::fromDBAndBody(nss.db(), explainClusterWriteWithoutShardKeyCmd);
+        return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+    }();
+
+    auto output = write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
+        clusterQueryWithoutShardKeyExplainRes, clusterWriteWithoutShardKeyExplainRes);
+    result->appendElementsUnique(output);
 }
 
 // Command invocation to be used if a shard key is specified or the collection is unsharded.
@@ -938,12 +983,7 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                                                          getLet(cmdObj),
                                                          getLegacyRuntimeConstants(cmdObj))) {
             findAndModifyNonTargetedShardedCount.increment(1);
-            _runCommandWithoutShardKey(opCtx,
-                                       nss,
-                                       stripWriteConcern(cmdObj),
-                                       false /* isExplain */,
-                                       true /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                                       result);
+            _runCommandWithoutShardKey(opCtx, nss, stripWriteConcern(cmdObj), result);
 
         } else {
             findAndModifyTargetedShardedCount.increment(1);
