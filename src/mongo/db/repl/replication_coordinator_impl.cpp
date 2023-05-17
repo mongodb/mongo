@@ -52,7 +52,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -91,6 +91,7 @@
 #include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_options.h"
@@ -2632,7 +2633,7 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
         }
 
         // Dump all locks to identify which thread(s) are holding RSTL.
-        getGlobalLockManager()->dump();
+        LockManager::get(opCtx)->dump();
 
         auto lockerInfo = opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase());
         BSONObjBuilder lockRep;

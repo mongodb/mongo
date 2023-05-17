@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/unittest/temp_dir.h"
 

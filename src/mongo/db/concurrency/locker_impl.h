@@ -436,14 +436,4 @@ public:
     }
 };
 
-/**
- * Retrieves the global lock manager instance.
- * Legacy global lock manager accessor for internal lock implementation * and debugger scripts
- * such as gdb/mongo_lock.py.
- * The lock manager is now a decoration on the service context and this accessor is retained for
- * startup, lock internals, and debugger scripts.
- * Using LockManager::get(ServiceContext*) where possible is preferable.
- */
-LockManager* getGlobalLockManager();
-
 }  // namespace mongo

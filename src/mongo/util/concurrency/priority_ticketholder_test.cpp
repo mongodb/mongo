@@ -30,7 +30,6 @@
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder_test_fixture.h"
 #include "mongo/util/periodic_runner_factory.h"

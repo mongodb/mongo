@@ -285,6 +285,7 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'service_executor',
         'transport_layer_mock',
@@ -297,6 +298,7 @@ env.Benchmark(
         'session_workflow_bm.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'service_entry_point',
         'service_executor',

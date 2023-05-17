@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/service_entry_point_mongod.h"
 
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -52,7 +49,6 @@
 #include "mongo/s/stale_exception.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 

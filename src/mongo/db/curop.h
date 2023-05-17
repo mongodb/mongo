@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_acquisition_stats.h"
