@@ -1436,8 +1436,8 @@ void ShardingCatalogManager::_addShardInTransaction(
         databasesInNewShard.end(),
         std::back_inserter(importedDbNames),
         [](const std::string& s) { return DatabaseNameUtil::deserialize(boost::none, s); });
-    DatabasesAdded notification(std::move(importedDbNames), true /*addImported*/);
-    notification.setPhase(CommitPhaseEnum::kPrepare);
+    DatabasesAdded notification(
+        std::move(importedDbNames), true /*addImported*/, CommitPhaseEnum::kPrepare);
     notification.setPrimaryShard(ShardId(newShard.getName()));
     uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, notification, existingShardIds));
 
