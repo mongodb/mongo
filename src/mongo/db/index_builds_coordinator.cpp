@@ -98,6 +98,7 @@ MONGO_FAIL_POINT_DEFINE(failIndexBuildWithErrorInSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangInRemoveIndexBuildEntryAfterCommitOrAbort);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
+MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
 
 IndexBuildsCoordinator::IndexBuildsSSS::IndexBuildsSSS()
     : ServerStatusSection("indexBuilds"),
@@ -1703,6 +1704,8 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                 // This reads from system.indexBuilds collection to see if commit quorum got
                 // satisfied.
                 try {
+                    hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum.pauseWhileSet();
+
                     if (_signalIfCommitQuorumIsSatisfied(opCtx, replState)) {
                         // The index build has been signalled to commit. As retrying skipped records
                         // during step-up is done to prevent waiting until commit time, if the build
@@ -1711,12 +1714,20 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                         return;
                     }
                 } catch (DBException& ex) {
+                    // If the operation context is interrupted (shutdown, stepdown, killOp), stop
+                    // the verification process and exit.
+                    opCtx->checkForInterrupt();
+
                     fassert(31440, ex.toStatus());
                 }
             }
 
             try {
-                // Only checks if key generation is valid, does not actually insert.
+                // Unlike the primary, secondaries cannot fail immediately when detecting key
+                // generation errors; they instead temporarily store them in the 'skipped records'
+                // table, to validate them on commit. As an optimisation to potentially detect
+                // errors earlier, check the table on step-up. Unlike during commit, we only check
+                // key generation here, we do not actually insert the keys.
                 uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
                     opCtx,
                     replState->buildUUID,
@@ -1724,13 +1735,12 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                     IndexBuildsManager::RetrySkippedRecordMode::kKeyGeneration));
 
             } catch (const DBException& ex) {
-                // Shutdown or replication state change might happen while iterating the index
-                // builds. In both cases, the opCtx is interrupted, in which case we want to stop
-                // the verification process and exit. This might also be the case for a killOp.
+                // If the operation context is interrupted (shutdown, stepdown, killOp), stop the
+                // verification process and exit.
                 opCtx->checkForInterrupt();
 
-                // All other errors must be due to key generation. We can abort the build early as
-                // it would eventually fail anyways during the commit phase retry.
+                // All other errors must be due to key generation. Abort the build now, instead of
+                // failing later during the commit phase retry.
                 auto status = ex.toStatus().withContext("Skipped records retry failed on step-up");
                 abortIndexBuildByBuildUUID(
                     opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, status.reason());
