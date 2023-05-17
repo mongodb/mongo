@@ -111,6 +111,12 @@ void ThroughputProbing::_run(Client* client) {
     }
 
     double elapsed = _timer.micros();
+    if (elapsed == 0) {
+        // The clock used to sleep between iterations may not be reliable, and thus the timer may
+        // report that no time has elapsed. If this occurs, just wait for the next iteration.
+        return;
+    }
+
     auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) / elapsed;
     _stats.opsPerSec.store(throughput * 1'000'000);
 
