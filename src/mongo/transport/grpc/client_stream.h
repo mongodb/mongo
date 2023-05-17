@@ -29,27 +29,50 @@
 
 #pragma once
 
-#include "mongo/transport/grpc/mock_server_stream.h"
-#include "mongo/transport/grpc/server_context.h"
+#include <boost/optional.hpp>
+#include <grpcpp/grpcpp.h>
+
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo::transport::grpc {
 
-class MockServerContext : public ServerContext {
+/**
+ * Base class modeling a synchronous client side of a gRPC stream.
+ * See: https://grpc.github.io/grpc/cpp/classgrpc_1_1_client_reader_writer.html
+ *
+ * ClientStream::read() is thread safe with respect to ClientStream::write(), but neither method
+ * should be called concurrently with another invocation of itself on the same stream.
+ *
+ * ClientStream::finish() is thread safe with respect to ClientStream::read().
+ */
+class ClientStream {
 public:
-    explicit MockServerContext(MockServerStream* stream) : _stream{stream} {}
-    ~MockServerContext() = default;
+    virtual ~ClientStream() = default;
 
-    void addInitialMetadataEntry(const std::string& key, const std::string& value) override;
-    const MetadataView& getClientMetadata() const override;
-    Date_t getDeadline() const override;
-    bool isCancelled() const override;
-    HostAndPort getRemote() const override {
-        return _stream->_remote;
-    }
-    void tryCancel() override;
+    /**
+     * Block to read a message from the stream.
+     *
+     * Returns boost::none if the stream is closed, either cleanly or due to an underlying
+     * connection failure.
+     */
+    virtual boost::optional<SharedBuffer> read() = 0;
 
-private:
-    MockServerStream* _stream;
+    /**
+     * Block to write a message to the stream.
+     *
+     * Returns true if the write was successful or false if it failed due to the stream being
+     * closed, either explicitly or due to an underlying connection failure.
+     */
+    virtual bool write(ConstSharedBuffer msg) = 0;
+
+    /**
+     * Block waiting until all received messages have been read and the stream has been closed.
+     *
+     * Returns the final status of the RPC associated with this stream.
+     *
+     * This method should only be called once.
+     */
+    virtual ::grpc::Status finish() = 0;
 };
 
 }  // namespace mongo::transport::grpc

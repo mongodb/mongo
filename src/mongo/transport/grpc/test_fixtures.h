@@ -49,6 +49,7 @@
 #include "mongo/transport/grpc/mock_client_stream.h"
 #include "mongo/transport/grpc/mock_server_context.h"
 #include "mongo/transport/grpc/mock_server_stream.h"
+#include "mongo/transport/grpc/mock_stub.h"
 #include "mongo/transport/grpc/server.h"
 #include "mongo/transport/grpc/service.h"
 #include "mongo/transport/grpc/util.h"
@@ -71,28 +72,59 @@ inline Message makeUniqueMessage() {
 }
 
 struct MockStreamTestFixtures {
-    MockStreamTestFixtures(HostAndPort hostAndPort,
-                           Milliseconds timeout,
-                           MetadataView clientMetadata) {
-        BidirectionalPipe pipe;
-        auto promiseAndFuture = makePromiseFuture<MetadataContainer>();
+    std::shared_ptr<MockClientStream> clientStream;
+    std::shared_ptr<MockClientContext> clientCtx;
+    std::shared_ptr<MockServerStream> serverStream;
+    std::shared_ptr<MockServerContext> serverCtx;
+};
 
-        serverStream = std::make_unique<MockServerStream>(hostAndPort,
-                                                          timeout,
-                                                          std::move(promiseAndFuture.promise),
-                                                          std::move(*pipe.left),
-                                                          clientMetadata);
-        serverCtx = std::make_unique<MockServerContext>(serverStream.get());
+class MockStubTestFixtures {
+public:
+    static constexpr auto kBindAddress = "localhost:1234";
+    static constexpr auto kClientAddress = "abc:5678";
 
-        clientStream = std::make_unique<MockClientStream>(
-            hostAndPort, timeout, std::move(promiseAndFuture.future), std::move(*pipe.right));
-        clientCtx = std::make_unique<MockClientContext>(clientStream.get());
+    MockStubTestFixtures() {
+        MockRPCQueue::Pipe pipe;
+
+        _channel = std::make_shared<MockChannel>(
+            HostAndPort(kClientAddress), HostAndPort(kBindAddress), std::move(pipe.producer));
+        _server = std::make_unique<MockServer>(std::move(pipe.consumer));
     }
 
-    std::unique_ptr<MockClientStream> clientStream;
-    std::unique_ptr<MockClientContext> clientCtx;
-    std::unique_ptr<MockServerStream> serverStream;
-    std::unique_ptr<MockServerContext> serverCtx;
+    MockStub makeStub() {
+        return MockStub(_channel);
+    }
+
+    std::unique_ptr<MockStreamTestFixtures> makeStreamTestFixtures(
+        Date_t deadline, const MetadataView& clientMetadata) {
+        MockStreamTestFixtures fixtures{
+            nullptr, std::make_shared<MockClientContext>(), nullptr, nullptr};
+
+        auto clientThread = stdx::thread([&] {
+            fixtures.clientCtx->setDeadline(deadline);
+            for (auto& kvp : clientMetadata) {
+                fixtures.clientCtx->addMetadataEntry(kvp.first.toString(), kvp.second.toString());
+            }
+            fixtures.clientStream =
+                makeStub().unauthenticatedCommandStream(fixtures.clientCtx.get());
+        });
+
+        auto rpc = getServer().acceptRPC();
+        ASSERT_TRUE(rpc);
+        fixtures.serverCtx = std::move(rpc->serverCtx);
+        fixtures.serverStream = std::move(rpc->serverStream);
+        clientThread.join();
+
+        return std::make_unique<MockStreamTestFixtures>(std::move(fixtures));
+    }
+
+    MockServer& getServer() {
+        return *_server;
+    }
+
+private:
+    std::unique_ptr<MockServer> _server;
+    std::shared_ptr<MockChannel> _channel;
 };
 
 class ServiceContextWithClockSourceMockTest : public LockerNoopServiceContextTest {

@@ -56,6 +56,7 @@
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -191,6 +192,43 @@ TEST_F(CommandServiceTest, Echo) {
         SharedBuffer readMsg;
         ASSERT_TRUE(stream->Read(&readMsg)) << stream->Finish().error_message();
         ASSERT_EQ_MSG(Message{readMsg}, message);
+    });
+}
+
+TEST_F(CommandServiceTest, SessionTerminate) {
+    const int kMessageCount = 5;
+    auto termination = std::make_unique<Notification<void>>();
+
+    auto handler = [&termination](IngressSession& session) {
+        for (int i = 0; i < kMessageCount; i++) {
+            auto status = session.sinkMessage(makeUniqueMessage());
+            ASSERT_OK(status);
+        }
+        session.terminate(Status(ErrorCodes::StreamTerminated, "dummy error"));
+        termination->set();
+        ASSERT_NOT_OK(session.sinkMessage(makeUniqueMessage()));
+        return ::grpc::Status::CANCELLED;
+    };
+
+    runTestWithBothMethods(handler, [&](auto&, auto& monitor, auto methodCallback) {
+        ::grpc::ClientContext ctx;
+        CommandServiceTestFixtures::addAllClientMetadata(ctx);
+        auto stream = methodCallback(ctx);
+
+        // Messages sent before the RPC was cancelled should be able to be read.
+        termination->get();
+        ON_BLOCK_EXIT([&] {
+            // Reset the termination notification for the next test run.
+            termination = std::make_unique<Notification<void>>();
+        });
+        for (int i = 0; i < kMessageCount; i++) {
+            SharedBuffer b;
+            ASSERT_TRUE(stream->Read(&b));
+        }
+
+        SharedBuffer b;
+        ASSERT_FALSE(stream->Read(&b));
+        ASSERT_EQ(stream->Finish().error_code(), ::grpc::StatusCode::CANCELLED);
     });
 }
 

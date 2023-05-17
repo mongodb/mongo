@@ -53,7 +53,7 @@ public:
     }
 
     explicit GRPCServerContext(::grpc::ServerContext* ctx)
-        : _ctx{ctx}, _hostAndPort{parseURI(_ctx->peer())} {
+        : _ctx{ctx}, _remote{parseURI(_ctx->peer())} {
         for (auto& kvp : _ctx->client_metadata()) {
             _clientMetadata.insert({StringData{kvp.first.data(), kvp.first.length()},
                                     StringData{kvp.second.data(), kvp.second.length()}});
@@ -74,8 +74,8 @@ public:
         return Date_t{_ctx->deadline()};
     }
 
-    HostAndPort getHostAndPort() const override {
-        return _hostAndPort;
+    HostAndPort getRemote() const override {
+        return _remote;
     }
 
     bool isCancelled() const override {
@@ -89,7 +89,7 @@ public:
 private:
     ::grpc::ServerContext* _ctx;
     MetadataView _clientMetadata;
-    HostAndPort _hostAndPort;
+    HostAndPort _remote;
 };
 
 }  // namespace mongo::transport::grpc

@@ -39,42 +39,54 @@
 namespace mongo::transport::grpc {
 
 /**
- * Base class modeling a gRPC ServerContext.
- * See: https://grpc.github.io/grpc/cpp/classgrpc_1_1_server_context.html
+ * Base class modeling a gRPC ClientContext.
+ * See: https://grpc.github.io/grpc/cpp/classgrpc_1_1_client_context.html
  */
-class ServerContext {
+class ClientContext {
 public:
-    virtual ~ServerContext() {}
+    virtual ~ClientContext() = default;
 
     /**
-     * Set the server's initial metadata.
-     * This must only be called before the first message is sent using the corresponding
-     * ServerStream.
+     * Add an entry to the metadata associated with the RPC.
      *
-     * This method is not thread safe with respect to ServerStream::write().
+     * This must only be called before invoking the RPC.
      */
-    virtual void addInitialMetadataEntry(const std::string& key, const std::string& value) = 0;
-    virtual const MetadataView& getClientMetadata() const = 0;
+    virtual void addMetadataEntry(const std::string& key, const std::string& value) = 0;
+
+    /**
+     * Retrieve the server's initial metadata.
+     *
+     * This must only be called after the first message has been received on the ClientStream
+     * created from the RPC that this context is associated with.
+     */
+    virtual boost::optional<const MetadataContainer&> getServerInitialMetadata() const = 0;
+
+    /**
+     * Set the deadline for the RPC to be executed using this context.
+     *
+     * This must only be called before invoking the RPC.
+     */
+    virtual void setDeadline(Date_t deadline) = 0;
+
     virtual Date_t getDeadline() const = 0;
+
     virtual HostAndPort getRemote() const = 0;
 
     /**
-     * Attempt to cancel the RPC this context is associated with. This may not have an effect if the
-     * RPC handler already returned a successful status to the client.
+     * Send a best-effort out-of-band cancel on the call associated with this ClientContext. There
+     * is no guarantee the call will be cancelled (e.g. if the call has already finished by the time
+     * the cancellation is received).
      *
-     * This is thread-safe.
+     * Note that tryCancel() will not impede the execution of any already scheduled work (e.g.
+     * messages already queued to be sent on a stream will still be sent), though the reported
+     * sucess or failure of such work may reflect the cancellation.
+     *
+     * This method is thread-safe, and can be called multiple times from any thread. It should not
+     * be called before this ClientContext has been used to invoke an RPC.
+     *
+     * See:
+     * https://grpc.github.io/grpc/cpp/classgrpc_1_1_client_context.html#abd0f6715c30287b75288015eee628984
      */
     virtual void tryCancel() = 0;
-
-    /**
-     * Return true if the RPC associated with this ServerContext failed before the RPC handler could
-     * return its final status back to the client (e.g. due to explicit cancellation or a network
-     * issue).
-     *
-     * If the handler was able to return a status successfully, even if that status was
-     * Status::CANCELLED, then this method will return false.
-     */
-    virtual bool isCancelled() const = 0;
 };
-
 }  // namespace mongo::transport::grpc

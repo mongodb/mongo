@@ -61,8 +61,11 @@ public:
 
     void setUp() override {
         SessionTest::setUp();
-        _fixture = std::make_unique<MockStreamTestFixtures>(
-            HostAndPort{kRemote}, kStreamTimeout, _clientMetadata);
+        // The MockStreamTestFixtures created here doesn't contain any references to the channel or
+        // server, so it's okay to let stubFixture go out of scope.
+        MockStubTestFixtures stubFixture;
+        _fixture = stubFixture.makeStreamTestFixtures(
+            getServiceContext()->getFastClockSource()->now() + kStreamTimeout, _clientMetadata);
     }
 
     void tearDown() override {
@@ -109,7 +112,7 @@ TEST_F(IngressSessionTest, GetClientId) {
 
 TEST_F(IngressSessionTest, GetRemote) {
     auto session = makeSession();
-    ASSERT_EQ(session->remote().toString(), kRemote);
+    ASSERT_EQ(session->remote().toString(), MockStubTestFixtures::kClientAddress);
 }
 
 TEST_F(IngressSessionTest, IsConnected) {
@@ -119,9 +122,9 @@ TEST_F(IngressSessionTest, IsConnected) {
     ASSERT_FALSE(session->isConnected());
 }
 
-TEST_F(IngressSessionTest, Terminate) {
+TEST_F(IngressSessionTest, End) {
     auto session = makeSession();
-    session->terminate(Status::OK());
+    session->end();
     ASSERT_FALSE(session->isConnected());
     ASSERT_TRUE(session->terminationStatus());
     ASSERT_OK(*session->terminationStatus());
@@ -134,13 +137,14 @@ TEST_F(IngressSessionTest, TerminateWithError) {
     ASSERT_FALSE(session->isConnected());
     ASSERT_TRUE(session->terminationStatus());
     ASSERT_EQ(*session->terminationStatus(), error);
+    ASSERT_TRUE(fixture()->serverCtx->isCancelled());
 }
 
 TEST_F(IngressSessionTest, TerminateRetainsStatus) {
     const Status error(ErrorCodes::InternalError, "Some Error");
     auto session = makeSession();
     session->terminate(error);
-    session->terminate(Status::OK());
+    session->end();
     ASSERT_EQ(*session->terminationStatus(), error);
 }
 
