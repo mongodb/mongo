@@ -74,6 +74,11 @@ public:
                 str::stream() << "Collection " << nss->ns() << " does not exist",
                 _autoColl->getCollection());
 
+        uassert(ErrorCodes::NotWritablePrimary,
+                "No longer primary when trying to acquire active migrate cloner",
+                opCtx->writesAreReplicated() &&
+                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, *nss));
+
         {
             auto csr = CollectionShardingRuntime::get(opCtx, *nss);
             auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
