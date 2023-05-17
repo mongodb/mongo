@@ -160,6 +160,10 @@ selector:
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
+  # The test may spuriously fail when run against sharded clusters, due to limitations of the
+  # infrastructure. See SERVER-77039 for full details.
+  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
+
   exclude_with_any_tags:
   - assumes_balancer_off
   - requires_replication
