@@ -102,20 +102,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     }
 
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
-
-    UserHandle user;
-    const auto swUser = [&] {
-        if (gEnableDetailedConnectionHealthMetricLogLines) {
-            ScopedCallbackTimer timer([&](Microseconds elapsed) {
-                LOGV2(6788603,
-                      "Auth metrics report",
-                      "metric"_attr = "sasl_acquireUser",
-                      "micros"_attr = elapsed.count());
-            });
-        }
-
-        return authManager->acquireUser(opCtx, UserRequest(userName, boost::none));
-    }();
+    const auto swUser = authManager->acquireUser(opCtx, UserRequest(userName, boost::none));
 
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
@@ -128,7 +115,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
         uassertStatusOK(status);
     }
 
-    user = std::move(swUser.getValue());
+    UserHandle user = std::move(swUser.getValue());
     BSONArrayBuilder mechanismsBuilder;
     const auto& mechList = _getMapRef(userName.getDB());
 
