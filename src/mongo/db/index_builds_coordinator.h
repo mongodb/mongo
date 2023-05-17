@@ -602,7 +602,11 @@ protected:
      * exception of the RSTL. The RSTL will be acquired last, with a timeout. On timeout, all locks
      * are released. If 'retry' is true, keeps until successful RSTL acquisition, and the returned
      * StatusWith will always be OK and contain the locks. If false, it returns with the error after
-     * a single try.
+     * a single try. If 'collLockTimeout' is set to true, collection lock acquisition is done with
+     * a timeout. The function returns LockTimeout immediately upon collection lock acquisition
+     * timeout.
+     *
+     * TODO (SERVER-76935): Remove collection timeout.
      *
      * This is intended to avoid a three-way deadlock between prepared transactions, stepdown, and
      * index build threads when trying to acquire an exclusive collection lock.
@@ -614,7 +618,8 @@ protected:
                           repl::ReplicationStateTransitionLockGuard>>
     _acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
                                        ReplIndexBuildState* replState,
-                                       bool retry = true);
+                                       bool retry = true,
+                                       bool collLockTimeout = false);
 
 
     /**

@@ -144,12 +144,17 @@ public:
          */
         kApplyCommitOplogEntry,
         /**
-         * Below state indicates that index build was successfully able to commit or abort. For
-         * kCommitted, the state is set immediately before it commits the index build. For
-         * kAborted, this state is set after the build is cleaned up and the abort oplog entry is
-         * replicated.
+         * Below state indicates that index build was successfully able to commit and is set
+         * immediately before it commits the index build.
          */
         kCommitted,
+        /**
+         * Below state indicates that index build was successfully able to abort. In case of self
+         * abort this state is set after the build is cleaned up and the abort oplog entry is
+         * replicated. In case of an external abort, this state is set before interrupting the
+         * builder thread, as a way of indicating that a self abort is not required. Cleanup and
+         * oplog entry replicating in this case is done after setting the state.
+         */
         kAborted,
         /**
          * Below state indicates that the index build thread has voted for an abort to the current
