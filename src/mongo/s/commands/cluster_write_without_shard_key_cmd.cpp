@@ -100,7 +100,7 @@ BSONObj _createCmdObj(OperationContext* opCtx,
                       const BSONObj& writeCmd,
                       const BSONObj& targetDocId) {
     const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-    uassert(ErrorCodes::InvalidOptions,
+    uassert(ErrorCodes::NamespaceNotSharded,
             "_clusterWriteWithoutShardKey can only be run against sharded collections.",
             cri.cm.isSharded());
     const auto shardVersion = cri.getShardVersion(shardId);

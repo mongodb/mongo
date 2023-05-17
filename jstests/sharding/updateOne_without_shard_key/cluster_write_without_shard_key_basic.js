@@ -359,7 +359,7 @@ function runAndVerifyCommand(testCase) {
         autocommit: false
     };
     mongosConn.getCollection(unshardedCollName).insert([{_id: _id, a: aFieldValue}]);
-    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.NamespaceNotSharded);
 
     // Must run in a transaction.
     cmdObj = {
