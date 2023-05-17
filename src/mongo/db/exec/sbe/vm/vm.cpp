@@ -33,6 +33,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 
@@ -77,6 +78,8 @@ namespace vm {
 int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     1,   // pushConstVal
     1,   // pushAccessVal
+    1,   // pushOwnedAccessorVal
+    1,   // pushEnvAccessorVal
     1,   // pushMoveVal
     1,   // pushLocalVal
     1,   // pushMoveLocalVal
@@ -480,8 +483,15 @@ void CodeFragment::appendConstVal(value::TypeTags tag, value::Value val) {
 
 void CodeFragment::appendAccessVal(value::SlotAccessor* accessor) {
     Instruction i;
-    i.tag = Instruction::pushAccessVal;
+    i.tag = [](value::SlotAccessor* accessor) {
+        if (accessor->is<value::OwnedValueAccessor>()) {
+            return Instruction::pushOwnedAccessorVal;
+        } else if (accessor->is<RuntimeEnvironment::Accessor>()) {
+            return Instruction::pushEnvAccessorVal;
+        }
 
+        return Instruction::pushAccessVal;
+    }(accessor);
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(accessor));
 
     offset += writeToMemory(offset, i);
@@ -6637,6 +6647,24 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::pushAccessVal: {
                 auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
+                pcPointer += sizeof(accessor);
+
+                auto [tag, val] = accessor->getViewOfValue();
+                pushStack(false, tag, val);
+
+                break;
+            }
+            case Instruction::pushOwnedAccessorVal: {
+                auto accessor = readFromMemory<value::OwnedValueAccessor*>(pcPointer);
+                pcPointer += sizeof(accessor);
+
+                auto [tag, val] = accessor->getViewOfValue();
+                pushStack(false, tag, val);
+
+                break;
+            }
+            case Instruction::pushEnvAccessorVal: {
+                auto accessor = readFromMemory<RuntimeEnvironment::Accessor*>(pcPointer);
                 pcPointer += sizeof(accessor);
 
                 auto [tag, val] = accessor->getViewOfValue();

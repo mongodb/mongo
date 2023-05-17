@@ -264,6 +264,8 @@ struct Instruction {
     enum Tags {
         pushConstVal,
         pushAccessVal,
+        pushOwnedAccessorVal,
+        pushEnvAccessorVal,
         pushMoveVal,
         pushLocalVal,
         pushMoveLocalVal,
@@ -432,6 +434,10 @@ struct Instruction {
                 return "pushConstVal";
             case pushAccessVal:
                 return "pushAccessVal";
+            case pushOwnedAccessorVal:
+                return "pushOwnedAccessorVal";
+            case pushEnvAccessorVal:
+                return "pushEnvAccessorVal";
             case pushMoveVal:
                 return "pushMoveVal";
             case pushLocalVal:

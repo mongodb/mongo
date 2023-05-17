@@ -296,6 +296,8 @@ public:
                         .writeValueToStream(tag, val);
                     break;
                 }
+                case Instruction::pushOwnedAccessorVal:
+                case Instruction::pushEnvAccessorVal:
                 case Instruction::pushAccessVal:
                 case Instruction::pushMoveVal: {
                     auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);

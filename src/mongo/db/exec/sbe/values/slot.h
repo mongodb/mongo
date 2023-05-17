@@ -70,6 +70,11 @@ public:
      * make a deep copy. The returned value is owned by the caller.
      */
     virtual std::pair<TypeTags, Value> copyOrMoveValue() = 0;
+
+    template <typename T>
+    bool is() const {
+        return dynamic_cast<const T*>(this) != nullptr;
+    }
 };
 
 /**
