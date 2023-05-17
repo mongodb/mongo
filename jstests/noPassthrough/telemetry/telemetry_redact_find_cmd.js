@@ -1,5 +1,5 @@
 /**
- * Test that $queryStats properly applies hmac to find commands, on mongod and mongos.
+ * Test that $telemetry properly applies hmac to find commands, on mongod and mongos.
  */
 load("jstests/libs/telemetry_utils.js");
 (function() {
@@ -44,8 +44,8 @@ function runTest(conn) {
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryStatsSamplingRate: -1,
-        featureFlagQueryStats: true,
+        internalQueryConfigureTelemetrySamplingRate: -1,
+        featureFlagTelemetry: true,
     }
 });
 runTest(conn);
@@ -58,8 +58,8 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     mongosOptions: {
         setParameter: {
-            internalQueryStatsSamplingRate: -1,
-            featureFlagQueryStats: true,
+            internalQueryConfigureTelemetrySamplingRate: -1,
+            featureFlagTelemetry: true,
             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
         }
     },

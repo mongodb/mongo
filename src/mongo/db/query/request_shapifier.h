@@ -34,27 +34,27 @@
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 
-namespace mongo::query_stats {
+namespace mongo::telemetry {
 
 /**
- * An abstract base class to handle query shapification for queryStats. Each request type should
- * define its own shapification strategy in its implementation of makeQueryStatsKey(), and then a
- * request should be registered with queryStats via query_stats::registerRequest(RequestShapifier).
+ * An abstract base class to handle query shapification for telemetry. Each request type should
+ * define its own shapification strategy in its implementation of makeTelemetryKey(), and then a
+ * request should be registered with telemetry via telemetry::registerRequest(RequestShapifier).
  */
 class RequestShapifier {
 public:
     virtual ~RequestShapifier() = default;
 
     /**
-     * makeQueryStatsKey generates the telemetry key representative of the specific request's
+     * makeTelemetryKey generates the telemetry key representative of the specific request's
      * payload. If there exists an ExpressionContext set up to parse and evaluate the request,
-     * makeQueryStatsKey should be called with that ExpressionContext. If not, you can call the
+     * makeTelemetryKey should be called with that ExpressionContext. If not, you can call the
      * overload that accepts the OperationContext and will construct a minimally-acceptable
      * ExpressionContext for the sake of generating the key.
      */
-    virtual BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                                      OperationContext* opCtx) const = 0;
-    virtual BSONObj makeQueryStatsKey(
+    virtual BSONObj makeTelemetryKey(const SerializationOptions& opts,
+                                     OperationContext* opCtx) const = 0;
+    virtual BSONObj makeTelemetryKey(
         const SerializationOptions& opts,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
 
@@ -79,4 +79,4 @@ protected:
     BSONObj _commentObj;
     boost::optional<BSONElement> _comment = boost::none;
 };
-}  // namespace mongo::query_stats
+}  // namespace mongo::telemetry

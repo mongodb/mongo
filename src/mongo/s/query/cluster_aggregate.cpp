@@ -56,7 +56,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -324,7 +324,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
 
     if (!shouldDoFLERewrite) {
-        query_stats::registerAggRequest(request, opCtx);
+        telemetry::registerAggRequest(request, opCtx);
     }
 
     // If the routing table is not already taken by the higher level, fill it now.

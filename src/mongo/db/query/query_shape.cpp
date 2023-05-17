@@ -227,7 +227,7 @@ BSONObj extractQueryShape(const FindCommandRequest& findCommand,
                                          expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures),
-            "Failed to parse 'filter' option when making queryStats key");
+            "Failed to parse 'filter' option when making telemetry key");
         bob.append(FindCommandRequest::kFilterFieldName, filterExpr->serialize(opts));
     }
 

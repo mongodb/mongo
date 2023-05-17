@@ -149,7 +149,7 @@ enums:
            planCacheIndexFilter :  "planCacheIndexFilter"  # view/update index filters
            planCacheRead :  "planCacheRead"         # view contents of plan cache
            planCacheWrite :  "planCacheWrite"        # clear cache, drop cache entry, pin/unpin/shun plans
-           queryStatsRead: "queryStatsRead" # view contents of queryStats store
+           telemetryRead: "telemetryRead" # view contents of telemetry store
            refineCollectionShardKey :  "refineCollectionShardKey"
            reIndex :  "reIndex"
            remove :  "remove"

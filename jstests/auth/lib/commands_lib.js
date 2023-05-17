@@ -6629,12 +6629,12 @@ export const authCommandsLib = {
           ]
         },
         {
-            // Test that only clusterManager has permission to run $queryStats
+            // Test that only clusterManager has permission to run $telemetry
             testname: "testTelemetryReadPrivilege",
-            command: {aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}},
+            command: {aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}},
             skipSharded: false,
             skipTest: (conn) => {
-                return !TestData.setParameters.featureFlagQueryStats;
+                return !TestData.setParameters.featureFlagTelemetry;
             },
             testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
         },

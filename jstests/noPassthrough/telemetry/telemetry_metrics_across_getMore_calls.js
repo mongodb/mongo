@@ -1,7 +1,7 @@
 /**
  * Test that the telemetry metrics are aggregated properly by distinct query shape over getMore
  * calls.
- * @tags: [featureFlagQueryStats]
+ * @tags: [featureFlagTelemetry]
  */
 load("jstests/libs/telemetry_utils.js");  // For verifyMetrics.
 
@@ -10,7 +10,7 @@ load("jstests/libs/telemetry_utils.js");  // For verifyMetrics.
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
 };
 
 const conn = MongoRunner.runMongod(options);
@@ -35,7 +35,7 @@ assert.commandWorked(bulk.execute());
     coll.aggregate([{$match: {foo: 0}}], {cursor: {batchSize: 2}}).toArray();
 
     // This command will return all telemetry store entires.
-    const telemetryResults = testDB.getSiblingDB("admin").aggregate([{$queryStats: {}}]).toArray();
+    const telemetryResults = testDB.getSiblingDB("admin").aggregate([{$telemetry: {}}]).toArray();
     // Assert there is only one entry.
     assert.eq(telemetryResults.length, 1, telemetryResults);
     const telemetryEntry = telemetryResults[0];
@@ -71,7 +71,7 @@ const fooNeBatchSize = 3;
     // This filters telemetry entires to just the ones entered when running above find queries.
     const telemetryResults = testDB.getSiblingDB("admin")
                                  .aggregate([
-                                     {$queryStats: {}},
+                                     {$telemetry: {}},
                                      {$match: {"key.queryShape.filter.foo": {$exists: true}}},
                                      {$sort: {key: 1}},
                                  ])
@@ -102,7 +102,7 @@ const fooNeBatchSize = 3;
     // This filters telemetry entires to just the ones entered when running above find queries.
     let telemetryResults =
         testDB.getSiblingDB("admin")
-            .aggregate([{$queryStats: {}}, {$match: {"key.queryShape.command": "find"}}])
+            .aggregate([{$telemetry: {}}, {$match: {"key.queryShape.command": "find"}}])
             .toArray();
     assert.eq(telemetryResults.length, 4, telemetryResults);
 
@@ -110,7 +110,7 @@ const fooNeBatchSize = 3;
 
     // This filters to just the telemetry for query coll.find().sort({"foo": 1}).batchSize(2).
     telemetryResults = testDB.getSiblingDB("admin")
-                           .aggregate([{$queryStats: {}}, {$match: {"key.queryShape.sort.foo": 1}}])
+                           .aggregate([{$telemetry: {}}, {$match: {"key.queryShape.sort.foo": 1}}])
                            .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.db, "test");
@@ -123,7 +123,7 @@ const fooNeBatchSize = 3;
     // 1}}).limit(query2Limit).batchSize(2).
     telemetryResults =
         testDB.getSiblingDB("admin")
-            .aggregate([{$queryStats: {}}, {$match: {"key.queryShape.limit": '?number'}}])
+            .aggregate([{$telemetry: {}}, {$match: {"key.queryShape.limit": '?number'}}])
             .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.db, "test");
@@ -135,7 +135,7 @@ const fooNeBatchSize = 3;
     // This filters to just the telemetry for query coll.find({foo: {$eq: 0}}).batchSize(2).
     telemetryResults = testDB.getSiblingDB("admin")
                            .aggregate([
-                               {$queryStats: {}},
+                               {$telemetry: {}},
                                {
                                    $match: {
                                        "key.queryShape.filter.foo": {$eq: {$eq: "?number"}},

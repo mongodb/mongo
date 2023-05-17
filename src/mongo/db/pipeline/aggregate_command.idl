@@ -96,10 +96,10 @@ commands:
                 - privilege: # $planCacheStats
                     resource_pattern: exact_namespace
                     action_type: planCacheRead
-                - privilege: # $queryStats
-                    agg_stage: queryStats
+                - privilege: # $telemetry
+                    agg_stage: telemetry
                     resource_pattern: cluster
-                    action_type: queryStatsRead
+                    action_type: telemetryRead
                 - privilege: # $changeStream
                     resource_pattern: exact_namespace
                     action_type: changeStream

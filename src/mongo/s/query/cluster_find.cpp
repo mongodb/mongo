@@ -48,7 +48,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -444,7 +444,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         if (shardIds.size() > 0) {
             updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
         }
-        collectQueryStatsMongos(opCtx, ccc->getRequestShapifier());
+        collectTelemetryMongos(opCtx, ccc->getRequestShapifier());
         return CursorId(0);
     }
 
@@ -455,7 +455,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         ? ClusterCursorManager::CursorLifetime::Immortal
         : ClusterCursorManager::CursorLifetime::Mortal;
     auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
-    collectQueryStatsMongos(opCtx, ccc);
+    collectTelemetryMongos(opCtx, ccc);
 
     auto cursorId = uassertStatusOK(cursorManager->registerCursor(
         opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUser));
@@ -923,7 +923,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
     pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-    collectQueryStatsMongos(opCtx, pinnedCursor.getValue());
+    collectTelemetryMongos(opCtx, pinnedCursor.getValue());
 
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.

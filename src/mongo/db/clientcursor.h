@@ -448,15 +448,15 @@ private:
     boost::optional<uint32_t> _queryHash;
 
     // If boost::none, telemetry should not be collected for this cursor.
-    boost::optional<std::size_t> _queryStatsStoreKeyHash;
+    boost::optional<std::size_t> _telemetryStoreKeyHash;
     // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
-    boost::optional<BSONObj> _queryStatsStoreKey;
+    boost::optional<BSONObj> _telemetryStoreKey;
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
-    // Useful for diagnostics like queryStats.
+    // Useful for diagnostics like telemetry.
     OpDebug::AdditiveMetrics _metrics;
     // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
     // store key.
-    std::unique_ptr<query_stats::RequestShapifier> _queryStatsRequestShapifier;
+    std::unique_ptr<telemetry::RequestShapifier> _telemetryRequestShapifier;
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};
@@ -598,7 +598,7 @@ void startClientCursorMonitor();
  * Currently, telemetry is only collected for find and aggregate requests (and their subsequent
  * getMore requests), so these should only be called from those request paths.
  */
-void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
-void collectQueryStatsMongod(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier);
+void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor);
+void collectTelemetryMongod(OperationContext* opCtx,
+                            std::unique_ptr<telemetry::RequestShapifier> requestShapifier);
 }  // namespace mongo

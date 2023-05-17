@@ -353,7 +353,7 @@ roles:
                   - getClusterParameter
                   - setChangeStreamState
                   - getChangeStreamState
-                  - queryStatsRead
+                  - telemetryRead
                   - checkMetadataConsistency
                   - transitionFromDedicatedConfigServer
                   - transitionToDedicatedConfigServer

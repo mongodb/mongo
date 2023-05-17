@@ -40,7 +40,7 @@ constexpr StringData kLiteralArgString = "?"_sd;
 
 /**
  * Computes a BSONObj that is meant to be used to classify queries according to their shape, for the
- * purposes of collecting queryStats.
+ * purposes of collecting telemetry.
  *
  * For example, if the MatchExpression represents {a: 2}, it will return the same BSONObj as the
  * MatchExpression for {a: 1}, {a: 10}, and {a: {$eq: 2}} (identical bits but not sharing memory)

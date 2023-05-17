@@ -55,7 +55,7 @@ namespace {
 using BSONNumeric = long long;
 }  // namespace
 
-namespace query_stats {
+namespace telemetry {
 
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
@@ -95,26 +95,26 @@ struct AggregatedMetric {
     uint64_t sumOfSquares = 0;
 };
 
-extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
+extern CounterMetric telemetryStoreSizeEstimateBytesMetric;
 // Used to aggregate the metrics for one telemetry key over all its executions.
-class QueryStatsEntry {
+class TelemetryEntry {
 public:
-    QueryStatsEntry(std::unique_ptr<RequestShapifier> requestShapifier,
-                    NamespaceStringOrUUID nss,
-                    const BSONObj& cmdObj)
+    TelemetryEntry(std::unique_ptr<RequestShapifier> requestShapifier,
+                   NamespaceStringOrUUID nss,
+                   const BSONObj& cmdObj)
         : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0),
           requestShapifier(std::move(requestShapifier)),
           nss(nss),
-          oldQueryStatsKey(cmdObj.copy()) {
-        queryStatsStoreSizeEstimateBytesMetric.increment(sizeof(QueryStatsEntry) + sizeof(BSONObj));
+          oldTelemetryKey(cmdObj.copy()) {
+        telemetryStoreSizeEstimateBytesMetric.increment(sizeof(TelemetryEntry) + sizeof(BSONObj));
     }
 
-    ~QueryStatsEntry() {
-        queryStatsStoreSizeEstimateBytesMetric.decrement(sizeof(QueryStatsEntry) + sizeof(BSONObj));
+    ~TelemetryEntry() {
+        telemetryStoreSizeEstimateBytesMetric.decrement(sizeof(TelemetryEntry) + sizeof(BSONObj));
     }
 
     BSONObj toBSON() const {
-        BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
+        BSONObjBuilder builder{sizeof(TelemetryEntry) + 100};
         builder.append("lastExecutionMicros", (BSONNumeric)lastExecutionMicros);
         builder.append("execCount", (BSONNumeric)execCount);
         queryExecMicros.appendTo(builder, "queryExecMicros");
@@ -124,11 +124,11 @@ public:
     }
 
     /**
-     * Redact a given queryStats key and set _keySize.
+     * Redact a given telemetry key and set _keySize.
      */
-    BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 bool applyHmacToIdentifiers,
-                                 std::string hmacKey) const;
+    BSONObj computeTelemetryKey(OperationContext* opCtx,
+                                bool applyHmacToIdentifiers,
+                                std::string hmacKey) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -153,8 +153,8 @@ public:
 
     NamespaceStringOrUUID nss;
 
-    // TODO: SERVER-73152 remove oldQueryStatsKey when RequestShapifier is used for agg.
-    BSONObj oldQueryStatsKey;
+    // TODO: SERVER-73152 remove oldTelemetryKey when RequestShapifier is used for agg.
+    BSONObj oldTelemetryKey;
 };
 
 struct TelemetryPartitioner {
@@ -164,32 +164,32 @@ struct TelemetryPartitioner {
     }
 };
 
-struct QueryStatsStoreEntryBudgetor {
-    size_t operator()(const std::size_t key, const std::shared_ptr<QueryStatsEntry>& value) {
+struct TelemetryStoreEntryBudgetor {
+    size_t operator()(const std::size_t key, const std::shared_ptr<TelemetryEntry>& value) {
         // The buget estimator for <key,value> pair in LRU cache accounts for the size of the key
         // and the size of the metrics, including the bson object used for generating the telemetry
         // key at read time.
 
-        return sizeof(QueryStatsEntry) + sizeof(std::size_t) + value->oldQueryStatsKey.objsize();
+        return sizeof(TelemetryEntry) + sizeof(std::size_t) + value->oldTelemetryKey.objsize();
     }
 };
 
-using QueryStatsStore = PartitionedCache<std::size_t,
-                                         std::shared_ptr<QueryStatsEntry>,
-                                         QueryStatsStoreEntryBudgetor,
-                                         TelemetryPartitioner>;
+using TelemetryStore = PartitionedCache<std::size_t,
+                                        std::shared_ptr<TelemetryEntry>,
+                                        TelemetryStoreEntryBudgetor,
+                                        TelemetryPartitioner>;
 
 /**
- * Acquire a reference to the global queryStats store.
+ * Acquire a reference to the global telemetry store.
  */
-QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
+TelemetryStore& getTelemetryStore(OperationContext* opCtx);
 
 /**
- * Register a request for queryStats collection. The queryStats machinery may decide not to
+ * Register a request for telemetry collection. The telemetry machinery may decide not to
  * collect anything but this should be called for all requests. The decision is made based on
- * the feature flag and queryStats parameters such as rate limiting.
+ * the feature flag and telemetry parameters such as rate limiting.
  *
- * The caller is still responsible for subsequently calling writeQueryStats() once the request is
+ * The caller is still responsible for subsequently calling writeTelemetry() once the request is
  * completed.
  *
  * Note that calling this affects internal state. It should be called once for each request for
@@ -203,22 +203,22 @@ void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
- * Writes queryStats to the queryStats store for the operation identified by `queryStatsKey`.
+ * Writes telemetry to the telemetry store for the operation identified by `telemetryKey`.
  */
-void writeQueryStats(OperationContext* opCtx,
-                     boost::optional<size_t> queryStatsKeyHash,
-                     boost::optional<BSONObj> queryStatsKey,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
-                     uint64_t queryExecMicros,
-                     uint64_t docsReturned);
+void writeTelemetry(OperationContext* opCtx,
+                    boost::optional<size_t> telemetryKeyHash,
+                    boost::optional<BSONObj> telemetryKey,
+                    std::unique_ptr<RequestShapifier> requestShapifier,
+                    uint64_t queryExecMicros,
+                    uint64_t docsReturned);
 
 /**
  * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
  * with hmac applied to all field names and literals.
  */
-BSONObj makeQueryStatsKey(const FindCommandRequest& findCommand,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          boost::optional<const QueryStatsEntry&> existingMetrics = boost::none);
-}  // namespace query_stats
+BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
+                         const SerializationOptions& opts,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         boost::optional<const TelemetryEntry&> existingMetrics = boost::none);
+}  // namespace telemetry
 }  // namespace mongo

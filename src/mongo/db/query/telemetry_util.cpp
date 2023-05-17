@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats_util.h"
+#include "mongo/db/query/telemetry_util.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -40,25 +40,25 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-namespace mongo::query_stats_util {
+namespace mongo::telemetry_util {
 
 namespace {
 /**
  * Given the current 'Client', returns a pointer to the 'ServiceContext' and an interface for
- * updating the queryStats store.
+ * updating the telemetry store.
  */
 std::pair<ServiceContext*, OnParamChangeUpdater*> getUpdater(const Client& client) {
     auto serviceCtx = client.getServiceContext();
     tassert(7106500, "ServiceContext must be non null", serviceCtx);
 
-    auto updater = queryStatsStoreOnParamChangeUpdater(serviceCtx).get();
+    auto updater = telemetryStoreOnParamChangeUpdater(serviceCtx).get();
     tassert(7106501, "Telemetry store size updater must be non null", updater);
     return {serviceCtx, updater};
 }
 }  // namespace
 
 
-Status onQueryStatsStoreSizeUpdate(const std::string& str) {
+Status onTelemetryStoreSizeUpdate(const std::string& str) {
     auto newSize = memory_util::MemorySize::parse(str);
     if (!newSize.isOK()) {
         return newSize.getStatus();
@@ -75,11 +75,11 @@ Status onQueryStatsStoreSizeUpdate(const std::string& str) {
     return Status::OK();
 }
 
-Status validateQueryStatsStoreSize(const std::string& str, const boost::optional<TenantId>&) {
+Status validateTelemetryStoreSize(const std::string& str, const boost::optional<TenantId>&) {
     return memory_util::MemorySize::parse(str).getStatus();
 }
 
-Status onQueryStatsSamplingRateUpdate(int samplingRate) {
+Status onTelemetrySamplingRateUpdate(int samplingRate) {
     // The client is nullptr if the parameter is supplied from the command line. In this case, we
     // ignore the update event, the parameter will be processed when initializing the service
     // context.
@@ -92,6 +92,6 @@ Status onQueryStatsSamplingRateUpdate(int samplingRate) {
 }
 
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>
-    queryStatsStoreOnParamChangeUpdater =
+    telemetryStoreOnParamChangeUpdater =
         ServiceContext::declareDecoration<std::unique_ptr<OnParamChangeUpdater>>();
-}  // namespace mongo::query_stats_util
+}  // namespace mongo::telemetry_util

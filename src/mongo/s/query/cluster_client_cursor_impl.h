@@ -121,7 +121,7 @@ public:
 
     bool shouldOmitDiagnosticInformation() const final;
 
-    std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() final;
+    std::unique_ptr<telemetry::RequestShapifier> getRequestShapifier() final;
 
 public:
     /**
@@ -186,12 +186,12 @@ private:
     bool _shouldOmitDiagnosticInformation = false;
 
     // If boost::none, telemetry should not be collected for this cursor.
-    boost::optional<std::size_t> _queryStatsStoreKeyHash;
-    // TODO: SERVER-73152 remove queryStatsStoreKey when RequestShapifier is used for agg.
-    boost::optional<BSONObj> _queryStatsStoreKey;
+    boost::optional<std::size_t> _telemetryStoreKeyHash;
+    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
+    boost::optional<BSONObj> _telemetryStoreKey;
     // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
     // store key.
-    std::unique_ptr<query_stats::RequestShapifier> _queryStatsRequestShapifier;
+    std::unique_ptr<telemetry::RequestShapifier> _telemetryRequestShapifier;
 
     // Tracks if kill() has been called on the cursor. Multiple calls to kill() is an error.
     bool _hasBeenKilled = false;

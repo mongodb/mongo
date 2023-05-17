@@ -1,6 +1,6 @@
 /**
- * Test the $queryStats hmac properties.
- * @tags: [featureFlagQueryStats]
+ * Test the $telemetry hmac properties.
+ * @tags: [featureFlagTelemetry]
  */
 
 load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
@@ -42,41 +42,41 @@ function runTest(conn) {
     assertTelemetryKeyWithoutHmac(getTelemetryRedacted(conn, false)[0]["key"].queryShape);
 
     // Wrong parameter name throws error.
-    let pipeline = [{$queryStats: {redactFields: true}}];
+    let pipeline = [{$telemetry: {redactFields: true}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: redactFields");
+        "$telemetry parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: redactFields");
 
     // Wrong parameter type throws error.
-    pipeline = [{$queryStats: {applyHmacToIdentifiers: 1}}];
+    pipeline = [{$telemetry: {applyHmacToIdentifiers: 1}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "$queryStats applyHmacToIdentifiers parameter must be boolean. Found type: double");
+        "$telemetry applyHmacToIdentifiers parameter must be boolean. Found type: double");
 
-    pipeline = [{$queryStats: {hmacKey: 1}}];
+    pipeline = [{$telemetry: {hmacKey: 1}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "$queryStats hmacKey parameter must be bindata of length 32 or greater. Found type: double");
+        "$telemetry hmacKey parameter must be bindata of length 32 or greater. Found type: double");
 
     // Parameter object with unrecognized key throws error.
-    pipeline = [{$queryStats: {applyHmacToIdentifiers: true, hmacStrategy: "on"}}];
+    pipeline = [{$telemetry: {applyHmacToIdentifiers: true, hmacStrategy: "on"}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: hmacStrategy");
+        "$telemetry parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: hmacStrategy");
 }
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryStatsSamplingRate: -1,
-        featureFlagQueryStats: true,
+        internalQueryConfigureTelemetrySamplingRate: -1,
+        featureFlagTelemetry: true,
     }
 });
 runTest(conn);
@@ -89,8 +89,8 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     mongosOptions: {
         setParameter: {
-            internalQueryStatsSamplingRate: -1,
-            featureFlagQueryStats: true,
+            internalQueryConfigureTelemetrySamplingRate: -1,
+            featureFlagTelemetry: true,
             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
         }
     },

@@ -35,52 +35,52 @@
 #include "mongo/db/query/util/memory_util.h"
 
 
-namespace mongo::query_stats_util {
+namespace mongo::telemetry_util {
 
-Status onQueryStatsStoreSizeUpdate(const std::string& str);
+Status onTelemetryStoreSizeUpdate(const std::string& str);
 
 
-Status validateQueryStatsStoreSize(const std::string& str, const boost::optional<TenantId>&);
+Status validateTelemetryStoreSize(const std::string& str, const boost::optional<TenantId>&);
 
-Status onQueryStatsSamplingRateUpdate(int samplingRate);
+Status onTelemetrySamplingRateUpdate(int samplingRate);
 
 /**
- *  An interface used to modify the queryStats store when query setParameters are modified. This is
+ *  An interface used to modify the telemetry store when query setParameters are modified. This is
  *  done via an interface decorating the 'ServiceContext' in order to avoid a link-time dependency
- *  of the query knobs library on the queryStats code.
+ *  of the query knobs library on the telemetry code.
  */
 class OnParamChangeUpdater {
 public:
     virtual ~OnParamChangeUpdater() = default;
 
     /**
-     * Resizes the queryStats store decorating 'serviceCtx' to the new size given by 'memSize'. If
+     * Resizes the telemetry store decorating 'serviceCtx' to the new size given by 'memSize'. If
      * the new size is smaller than the old, cache entries are evicted in order to ensure the
      * cache fits within the new size bound.
      */
     virtual void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) = 0;
 
     /**
-     * Updates the sampling rate for the queryStats rate limiter.
+     * Updates the sampling rate for the telemetry rate limiter.
      */
     virtual void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) = 0;
 };
 
 /**
- * A stub implementation that does not allow changing any parameters - to be used if the queryStats
+ * A stub implementation that does not allow changing any parameters - to be used if the telemetry
  * store is disabled and cannot be re-enabled without restarting, as with a feature flag.
  */
 class NoChangesAllowedTelemetryParamUpdater : public OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
         uasserted(7373500,
-                  "Cannot configure queryStats store - it is currently disabled and a restart is "
+                  "Cannot configure telemetry store - it is currently disabled and a restart is "
                   "required to activate.");
     }
 
     void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) {
         uasserted(7506200,
-                  "Cannot configure queryStats store - it is currently disabled and a restart is "
+                  "Cannot configure telemetry store - it is currently disabled and a restart is "
                   "required to activate.");
     }
 };
@@ -89,5 +89,5 @@ public:
  * Decorated accessor to the 'OnParamChangeUpdater' stored in 'ServiceContext'.
  */
 extern const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>
-    queryStatsStoreOnParamChangeUpdater;
-}  // namespace mongo::query_stats_util
+    telemetryStoreOnParamChangeUpdater;
+}  // namespace mongo::telemetry_util

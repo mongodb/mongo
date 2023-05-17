@@ -1,6 +1,6 @@
 /**
  * Test that telemetry doesn't work on a lower FCV version but works after an FCV upgrade.
- * @tags: [featureFlagQueryStats]
+ * @tags: [featureFlagTelemetry]
  */
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/feature_flag_util.js");
@@ -12,7 +12,7 @@ const dbpath = MongoRunner.dataPath + jsTestName();
 let conn = MongoRunner.runMongod({dbpath: dbpath});
 let testDB = conn.getDB(jsTestName());
 // This test should only be run with the flag enabled.
-assert(FeatureFlagUtil.isEnabled(testDB, "QueryStats"));
+assert(FeatureFlagUtil.isEnabled(testDB, "Telemetry"));
 
 function testLower(restart = false) {
     let adminDB = conn.getDB("admin");
@@ -26,7 +26,7 @@ function testLower(restart = false) {
     }
 
     assert.commandFailedWithCode(
-        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}), 6579000);
+        testDB.adminCommand({aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}}), 6579000);
 
     // Upgrade FCV.
     assert.commandWorked(adminDB.runCommand(
@@ -34,7 +34,7 @@ function testLower(restart = false) {
 
     // We should be able to run a telemetry pipeline now that the FCV is correct.
     assert.commandWorked(
-        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
+        testDB.adminCommand({aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}}),
     );
 }
 testLower(true);

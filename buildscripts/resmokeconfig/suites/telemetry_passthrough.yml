@@ -27,4 +27,4 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryStatsSamplingRate: -1
+        internalQueryConfigureTelemetrySamplingRate: -1

@@ -1,6 +1,6 @@
 /**
  * Test that mongos is collecting telemetry metrics.
- * @tags: [featureFlagQueryStats]
+ * @tags: [featureFlagTelemetry]
  */
 
 load('jstests/libs/telemetry_utils.js');
@@ -18,7 +18,7 @@ const setup = () => {
         rs: {nodes: 1},
         mongosOptions: {
             setParameter: {
-                internalQueryStatsSamplingRate: -1,
+                internalQueryConfigureTelemetrySamplingRate: -1,
                 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
             }
         },
@@ -95,8 +95,7 @@ const assertExpectedResults = (results,
         collection: coll.getName(),
         batchSize: 2
     }));  // returns 1 doc, exhausts the cursor
-    // The $queryStats query for the previous `getTelemetry` is included in this call to
-    // $queryStats.
+    // The $telemetry query for the previous `getTelemetry` is included in this call to $telemetry.
     telemetry = getTelemetry(db);
     assert.eq(2, telemetry.length, telemetry);
     assertExpectedResults(telemetry[0],
@@ -160,8 +159,7 @@ const assertExpectedResults = (results,
         collection: coll.getName(),
         batchSize: 2
     }));  // returns 1 doc, exhausts the cursor
-    // The $queryStats query for the previous `getTelemetry` is included in this call to
-    // $queryStats.
+    // The $telemetry query for the previous `getTelemetry` is included in this call to $telemetry.
     telemetry = getTelemetry(db);
     assert.eq(2, telemetry.length, telemetry);
     assertExpectedResults(telemetry[0],

@@ -38,7 +38,7 @@
 #include "mongo/db/allocate_cursor_id.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/telemetry.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/logv2/log.h"
@@ -591,25 +591,25 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     return std::move(cursor);
 }
 
-void collectQueryStatsMongos(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier) {
+void collectTelemetryMongos(OperationContext* opCtx,
+                            std::unique_ptr<telemetry::RequestShapifier> requestShapifier) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
-    // queryStats directly.
+    // telemetry directly.
     auto&& opDebug = CurOp::get(opCtx)->debug();
-    query_stats::writeQueryStats(
+    telemetry::writeTelemetry(
         opCtx,
-        opDebug.queryStatsStoreKeyHash,
-        opDebug.queryStatsStoreKey,
+        opDebug.telemetryStoreKeyHash,
+        opDebug.telemetryStoreKey,
         std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
         opDebug.additiveMetrics.nreturned.value_or(0));
 }
 
-void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
+void collectTelemetryMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
     cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
-void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
+void collectTelemetryMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
     cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 

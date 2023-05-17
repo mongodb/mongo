@@ -214,10 +214,10 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     CurOp::get(opCtx)->debug().queryHash = cursor->_queryHash;
     CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
 
-    // Pass along queryStats context so it is retrievable after query execution for storing metrics.
-    CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = cursor->_queryStatsStoreKeyHash;
-    // TODO: SERVER-73152 remove queryStatsStoreKey when RequestShapifier is used for agg.
-    CurOp::get(opCtx)->debug().queryStatsStoreKey = cursor->_queryStatsStoreKey;
+    // Pass along telemetry context so it is retrievable after query execution for storing metrics.
+    CurOp::get(opCtx)->debug().telemetryStoreKeyHash = cursor->_telemetryStoreKeyHash;
+    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
+    CurOp::get(opCtx)->debug().telemetryStoreKey = cursor->_telemetryStoreKey;
 
     cursor->_operationUsingCursor = opCtx;
 
