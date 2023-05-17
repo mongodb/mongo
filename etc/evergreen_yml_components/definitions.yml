@@ -5564,12 +5564,11 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
-- <<: *task_template
-  name: sharded_collections_jscore_passthrough_with_config_shard
+- <<: *gen_task_template
+  name: sharded_collections_jscore_passthrough_with_config_shard_gen
   tags: ["sharding", "jscore"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: sharded_collections_jscore_multiversion_gen
@@ -5591,12 +5590,11 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
-- <<: *task_template
-  name: sharding_jscore_passthrough_with_config_shard
+- <<: *gen_task_template
+  name: sharding_jscore_passthrough_with_config_shard_gen
   tags: ["sharding", "jscore", "common"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: sharding_jscore_multiversion_gen
