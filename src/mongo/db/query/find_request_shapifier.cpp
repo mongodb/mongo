@@ -34,7 +34,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_shape.h"
 
-namespace mongo::telemetry {
+namespace mongo::query_stats {
 
 void addNonShapeObjCmdLiterals(BSONObjBuilder* bob,
                                const FindCommandRequest& findCommand,
@@ -58,8 +58,8 @@ void addNonShapeObjCmdLiterals(BSONObjBuilder* bob,
 }
 
 
-BSONObj FindRequestShapifier::makeTelemetryKey(const SerializationOptions& opts,
-                                               OperationContext* opCtx) const {
+BSONObj FindRequestShapifier::makeQueryStatsKey(const SerializationOptions& opts,
+                                                OperationContext* opCtx) const {
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, _request, nullptr /* collator doesn't matter here.*/, false /* mayDbProfile */);
     expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
@@ -67,10 +67,10 @@ BSONObj FindRequestShapifier::makeTelemetryKey(const SerializationOptions& opts,
     // expressions/stages, so it's a side effect tied to parsing. We must stop expression counters
     // before re-parsing to avoid adding to the counters more than once per a given query.
     expCtx->stopExpressionCounters();
-    return makeTelemetryKey(opts, expCtx);
+    return makeQueryStatsKey(opts, expCtx);
 }
 
-BSONObj FindRequestShapifier::makeTelemetryKey(
+BSONObj FindRequestShapifier::makeQueryStatsKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     BSONObjBuilder bob;
 
@@ -102,4 +102,4 @@ BSONObj FindRequestShapifier::makeTelemetryKey(
 
     return bob.obj();
 }
-}  // namespace mongo::telemetry
+}  // namespace mongo::query_stats

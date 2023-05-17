@@ -121,7 +121,7 @@ public:
 
     bool shouldOmitDiagnosticInformation() const final;
 
-    std::unique_ptr<telemetry::RequestShapifier> getRequestShapifier() final;
+    std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() final;
 
 private:
     bool _killed = false;

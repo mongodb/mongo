@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_telemetry.h"
+#include "mongo/db/pipeline/document_source_query_stats.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
@@ -38,14 +38,14 @@
 
 namespace mongo {
 namespace {
-CounterMetric telemetryHmacApplicationErrors("telemetry.numHmacApplicationErrors");
+CounterMetric queryStatsHmacApplicationErrors("queryStats.numHmacApplicationErrors");
 }
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
-                                           DocumentSourceTelemetry::LiteParsed::parse,
-                                           DocumentSourceTelemetry::createFromBson,
+REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
+                                           DocumentSourceQueryStats::LiteParsed::parse,
+                                           DocumentSourceQueryStats::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
-                                           feature_flags::gFeatureFlagTelemetry);
+                                           feature_flags::gFeatureFlagQueryStats);
 
 namespace {
 /**
@@ -55,7 +55,7 @@ boost::optional<bool> parseApplyHmacToIdentifiers(const BSONElement& el) {
     if (el.fieldNameStringData() == "applyHmacToIdentifiers"_sd) {
         auto type = el.type();
         uassert(ErrorCodes::FailedToParse,
-                str::stream() << DocumentSourceTelemetry::kStageName
+                str::stream() << DocumentSourceQueryStats::kStageName
                               << " applyHmacToIdentifiers parameter must be boolean. Found type: "
                               << typeName(type),
                 type == BSONType::Bool);
@@ -74,14 +74,14 @@ boost::optional<std::string> parseHmacKey(const BSONElement& el) {
             int len;
             auto data = el.binData(len);
             uassert(ErrorCodes::FailedToParse,
-                    str::stream() << DocumentSourceTelemetry::kStageName
+                    str::stream() << DocumentSourceQueryStats::kStageName
                                   << "hmacKey must be greater than or equal to 32 bytes",
                     len >= 32);
             return {{data, (size_t)len}};
         }
         uasserted(ErrorCodes::FailedToParse,
                   str::stream()
-                      << DocumentSourceTelemetry::kStageName
+                      << DocumentSourceQueryStats::kStageName
                       << " hmacKey parameter must be bindata of length 32 or greater. Found type: "
                       << typeName(type));
     }
@@ -95,7 +95,7 @@ boost::optional<std::string> parseHmacKey(const BSONElement& el) {
 template <typename Ctor>
 auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << DocumentSourceTelemetry::kStageName
+            str::stream() << DocumentSourceQueryStats::kStageName
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
@@ -110,7 +110,7 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
         } else {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream()
-                          << DocumentSourceTelemetry::kStageName
+                          << DocumentSourceQueryStats::kStageName
                           << " parameters object may only contain 'applyHmacToIdentifiers' or "
                              "'hmacKey' options. Found: "
                           << el.fieldName());
@@ -122,34 +122,34 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
 
 }  // namespace
 
-std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::LiteParsed::parse(
+std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
     return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
-        return std::make_unique<DocumentSourceTelemetry::LiteParsed>(
+        return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
             spec.fieldName(), applyHmacToIdentifiers, hmacKey);
     });
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
+boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
-            "$telemetry must be run against the 'admin' database with {aggregate: 1}",
+            "$queryStats must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
     return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
-        return new DocumentSourceTelemetry(pExpCtx, applyHmacToIdentifiers, hmacKey);
+        return new DocumentSourceQueryStats(pExpCtx, applyHmacToIdentifiers, hmacKey);
     });
 }
 
-Value DocumentSourceTelemetry::serialize(SerializationOptions opts) const {
+Value DocumentSourceQueryStats::serialize(SerializationOptions opts) const {
     // This document source never contains any user information, so no need for any work when
     // applying hmac.
     return Value{Document{{kStageName, Document{}}}};
 }
 
-DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
     /**
      * We maintain nested iterators:
      * - Outer one over the set of partitions.
@@ -158,7 +158,7 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
      * When an inner iterator is present and contains more elements, we can return the next element.
      * When the inner iterator is exhausted, we move to the next element in the outer iterator and
      * create a new inner iterator. When the outer iterator is exhausted, we have finished iterating
-     * over the telemetry store entries.
+     * over the queryStats store entries.
      *
      * The inner iterator iterates over a materialized container of all entries in the partition.
      * This is done to reduce the time under which the partition lock is held.
@@ -172,17 +172,17 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
             return {std::move(doc)};
         }
 
-        TelemetryStore& _telemetryStore = getTelemetryStore(getContext()->opCtx);
+        QueryStatsStore& _queryStatsStore = getQueryStatsStore(getContext()->opCtx);
 
         // Materialized partition is exhausted, move to the next.
         _currentPartition++;
-        if (_currentPartition >= _telemetryStore.numPartitions()) {
+        if (_currentPartition >= _queryStatsStore.numPartitions()) {
             return DocumentSource::GetNextResult::makeEOF();
         }
 
         // We only keep the partition (which holds a lock) for the time needed to materialize it to
         // a set of Document instances.
-        auto&& partition = _telemetryStore.getPartition(_currentPartition);
+        auto&& partition = _queryStatsStore.getPartition(_currentPartition);
 
         // Capture the time at which reading the partition begins to indicate to the caller
         // when the snapshot began.
@@ -190,22 +190,22 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
             try {
-                auto telemetryKey =
-                    metrics->computeTelemetryKey(pExpCtx->opCtx, _applyHmacToIdentifiers, _hmacKey);
-                _materializedPartition.push_back({{"key", std::move(telemetryKey)},
+                auto queryStatsKey = metrics->computeQueryStatsKey(
+                    pExpCtx->opCtx, _applyHmacToIdentifiers, _hmacKey);
+                _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics->toBSON()},
                                                   {"asOf", partitionReadTime}});
             } catch (const DBException& ex) {
-                telemetryHmacApplicationErrors.increment();
+                queryStatsHmacApplicationErrors.increment();
                 LOGV2_DEBUG(7349403,
                             3,
                             "Error encountered when applying hmac to query shape, will not publish "
-                            "telemetry for this entry.",
+                            "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
                             "hash"_attr = key);
                 if (kDebugBuild) {
                     tasserted(7349401,
-                              "Was not able to re-parse telemetry key when reading telemetry.");
+                              "Was not able to re-parse queryStats key when reading queryStats.");
                 }
             }
         }

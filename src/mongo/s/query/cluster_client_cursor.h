@@ -270,11 +270,11 @@ public:
      * Returns and releases ownership of the RequestShapifier associated with the request this
      * cursor is handling.
      */
-    virtual std::unique_ptr<telemetry::RequestShapifier> getRequestShapifier() = 0;
+    virtual std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() = 0;
 
 protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
-    // Useful for diagnostics like telemetry.
+    // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
 
 private:

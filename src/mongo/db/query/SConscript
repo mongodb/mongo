@@ -262,7 +262,7 @@ env.Library(
         'query_feature_flags.idl',
         'query_knobs.idl',
         'sbe_plan_cache_on_parameter_change.cpp',
-        'telemetry_util.cpp',
+        'query_stats_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
@@ -366,7 +366,7 @@ env.Library(
     target='op_metrics',
     source=[
         'query_shape.cpp',
-        'telemetry.cpp',
+        'query_stats.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -448,6 +448,7 @@ env.CppUnitTest(
         "query_settings_test.cpp",
         "query_shape_test.cpp",
         "query_shape_test.idl",
+        "query_stats_store_test.cpp",
         "query_solution_test.cpp",
         "rate_limiting_test.cpp",
         "sbe_and_hash_test.cpp",
@@ -461,7 +462,6 @@ env.CppUnitTest(
         "sbe_stage_builder_type_checker_test.cpp",
         "shard_filterer_factory_mock.cpp",
         "sort_pattern_test.cpp",
-        "telemetry_store_test.cpp",
         "util/memory_util_test.cpp",
         "view_response_formatter_test.cpp",
         'map_reduce_output_format_test.cpp',

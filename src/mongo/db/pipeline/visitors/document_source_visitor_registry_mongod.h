@@ -70,6 +70,7 @@
 #include "mongo/db/pipeline/document_source_operation_metrics.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
+#include "mongo/db/pipeline/document_source_query_stats.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -83,7 +84,6 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_streaming_group.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
-#include "mongo/db/pipeline/document_source_telemetry.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
@@ -169,7 +169,7 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceSort,
                        DocumentSourceStreamingGroup,
                        DocumentSourceTeeConsumer,
-                       DocumentSourceTelemetry,
+                       DocumentSourceQueryStats,
                        DocumentSourceUnionWith,
                        DocumentSourceUnwind>(&registry);
 }

@@ -10,14 +10,14 @@ load("jstests/libs/feature_flag_util.js");
 
 // Set sampling rate to -1.
 let options = {
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
+    setParameter: {internalQueryStatsSamplingRate: -1},
 };
 const conn = MongoRunner.runMongod(options);
 const testdb = conn.getDB('test');
 
 // This test specifically tests error handling when the feature flag is not on.
 // TODO SERVER-65800 This test can be deleted when the feature is on by default.
-if (!conn || FeatureFlagUtil.isEnabled(testdb, "Telemetry")) {
+if (!conn || FeatureFlagUtil.isEnabled(testdb, "QueryStats")) {
     jsTestLog(`Skipping test since feature flag is disabled. conn: ${conn}`);
     if (conn) {
         MongoRunner.stopMongod(conn);
@@ -38,14 +38,14 @@ assert.commandWorked(bulk.execute());
 // Pipeline to read telemetry store should fail without feature flag turned on even though sampling
 // rate is > 0.
 assert.commandFailedWithCode(
-    testdb.adminCommand({aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}}),
+    testdb.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
     ErrorCodes.QueryFeatureNotAllowed);
 
 // Pipeline, with a filter, to read telemetry store fails without feature flag turned on even though
 // sampling rate is > 0.
 assert.commandFailedWithCode(testdb.adminCommand({
     aggregate: 1,
-    pipeline: [{$telemetry: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],
+    pipeline: [{$queryStats: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],
     cursor: {}
 }),
                              ErrorCodes.QueryFeatureNotAllowed);

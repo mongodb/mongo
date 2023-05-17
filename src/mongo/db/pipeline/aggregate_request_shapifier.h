@@ -33,7 +33,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/request_shapifier.h"
 
-namespace mongo::telemetry {
+namespace mongo::query_stats {
 
 /**
  * Handles shapification for AggregateCommandRequests. Requires a pre-parsed pipeline in order to
@@ -50,13 +50,14 @@ public:
 
     virtual ~AggregateRequestShapifier() = default;
 
-    BSONObj makeTelemetryKey(const SerializationOptions& opts, OperationContext* opCtx) const final;
+    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                              OperationContext* opCtx) const final;
 
-    BSONObj makeTelemetryKey(const SerializationOptions& opts,
-                             const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 
 private:
     const AggregateCommandRequest& _request;
     const Pipeline& _pipeline;
 };
-}  // namespace mongo::telemetry
+}  // namespace mongo::query_stats

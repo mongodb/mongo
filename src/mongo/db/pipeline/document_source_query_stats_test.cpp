@@ -32,7 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_telemetry.h"
+#include "mongo/db/pipeline/document_source_query_stats.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -45,50 +45,50 @@ namespace {
  * {aggregate: 1} by default, so that parsing tests other than those which validate the namespace do
  * not need to explicitly set it.
  */
-class DocumentSourceTelemetryTest : public AggregationContextFixture {
+class DocumentSourceQueryStatsTest : public AggregationContextFixture {
 public:
-    DocumentSourceTelemetryTest()
+    DocumentSourceQueryStatsTest()
         : AggregationContextFixture(
               NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin)) {}
 };
 
-TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfSpecIsNotObject) {
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
-                           fromjson("{$telemetry: 1}").firstElement(), getExpCtx()),
+TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfSpecIsNotObject) {
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
+                           fromjson("{$queryStats: 1}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
-TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunOnAdmin) {
+TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunOnAdmin) {
     getExpCtx()->ns = NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
-                           fromjson("{$telemetry: {}}").firstElement(), getExpCtx()),
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
+                           fromjson("{$queryStats: {}}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);
 }
 
-TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunWithAggregateOne) {
+TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunWithAggregateOne) {
     getExpCtx()->ns = NamespaceString::createNamespaceString_forTest("admin.foo");
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
-                           fromjson("{$telemetry: {}}").firstElement(), getExpCtx()),
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
+                           fromjson("{$queryStats: {}}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);
 }
 
-TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
-    ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
-                           fromjson("{$telemetry: {foo: true}}").firstElement(), getExpCtx()),
+TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
+                           fromjson("{$queryStats: {foo: true}}").firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
 }
 
-TEST_F(DocumentSourceTelemetryTest, ParseAndSerialize) {
-    auto obj = fromjson("{$telemetry: {}}");
-    auto doc = DocumentSourceTelemetry::createFromBson(obj.firstElement(), getExpCtx());
-    auto telemetryOp = static_cast<DocumentSourceTelemetry*>(doc.get());
-    auto expected = Document{{"$telemetry", Document{}}};
-    ASSERT_DOCUMENT_EQ(telemetryOp->serialize().getDocument(), expected);
+TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {
+    auto obj = fromjson("{$queryStats: {}}");
+    auto doc = DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx());
+    auto queryStatsOp = static_cast<DocumentSourceQueryStats*>(doc.get());
+    auto expected = Document{{"$queryStats", Document{}}};
+    ASSERT_DOCUMENT_EQ(queryStatsOp->serialize().getDocument(), expected);
 }
 
 }  // namespace

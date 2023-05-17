@@ -55,7 +55,7 @@
 #include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
@@ -561,13 +561,14 @@ public:
             cq->setUseCqfIfEligible(true);
 
             if (collection) {
-                // Collect telemetry. Exclude queries against collections with encrypted fields.
+                // Collect queryStats. Exclude queries against collections with encrypted fields.
                 if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
-                    telemetry::registerRequest(std::make_unique<telemetry::FindRequestShapifier>(
-                                                   cq->getFindCommandRequest(), opCtx),
-                                               collection.get()->ns(),
-                                               opCtx,
-                                               cq->getExpCtx());
+                    query_stats::registerRequest(
+                        std::make_unique<query_stats::FindRequestShapifier>(
+                            cq->getFindCommandRequest(), opCtx),
+                        collection.get()->ns(),
+                        opCtx,
+                        cq->getExpCtx());
                 }
             }
 
@@ -780,9 +781,9 @@ public:
                     processFLEFindD(
                         opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
                 }
-                // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
-                // FLE rewrite.
-                CurOp::get(opCtx)->debug().telemetryStoreKeyHash = boost::none;
+                // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done
+                // a FLE rewrite.
+                CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
             }
 

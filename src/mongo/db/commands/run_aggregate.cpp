@@ -76,7 +76,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -836,11 +836,11 @@ Status runAggregate(OperationContext* opCtx,
     };
 
     auto registerTelemetry = [&]() -> void {
-        // Register telemetry. Exclude queries against collections with encrypted fields.
-        // We still collect telemetry on collection-less aggregations.
+        // Register queryStats. Exclude queries against collections with encrypted fields.
+        // We still collect queryStats on collection-less aggregations.
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            telemetry::registerAggRequest(request, opCtx);
+            query_stats::registerAggRequest(request, opCtx);
         }
     };
 
@@ -1051,9 +1051,9 @@ Status runAggregate(OperationContext* opCtx,
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
 
-            // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a FLE
-            // rewrite.
-            CurOp::get(opCtx)->debug().telemetryStoreKeyHash = boost::none;
+            // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done a
+            // FLE rewrite.
+            CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
         }
 
         pipeline->optimizePipeline();
@@ -1223,9 +1223,9 @@ Status runAggregate(OperationContext* opCtx,
         curOp->setEndOfOpMetrics(stats.nReturned);
 
         if (keepCursor) {
-            collectTelemetryMongod(opCtx, pins[0]);
+            collectQueryStatsMongod(opCtx, pins[0]);
         } else {
-            collectTelemetryMongod(opCtx, std::move(curOp->debug().telemetryRequestShapifier));
+            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsRequestShapifier));
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.

@@ -1,6 +1,6 @@
 /**
  * This test confirms that telemetry store key fields are properly nested and none are missing.
- * @tags: [featureFlagTelemetry]
+ * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/telemetry_utils.js");
 (function() {
@@ -64,7 +64,7 @@ function confirmAllFieldsPresent(queryStatsEntries) {
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
+    setParameter: {internalQueryStatsSamplingRate: -1},
 };
 
 const conn = MongoRunner.runMongod(options);

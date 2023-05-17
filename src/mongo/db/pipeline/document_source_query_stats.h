@@ -31,16 +31,16 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 namespace mongo {
 
-using namespace telemetry;
+using namespace query_stats;
 
-class DocumentSourceTelemetry final : public DocumentSource {
+class DocumentSourceQueryStats final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$telemetry"_sd;
+    static constexpr StringData kStageName = "$queryStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -58,12 +58,12 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::telemetryRead)};
+            return {Privilege(ResourcePattern::forClusterResource(), ActionType::queryStatsRead)};
             ;
         }
 
         bool allowedToPassthroughFromMongos() const final {
-            // $telemetry must be run locally on a mongod.
+            // $queryStats must be run locally on a mongod.
             return false;
         }
 
@@ -83,7 +83,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    virtual ~DocumentSourceTelemetry() = default;
+    virtual ~DocumentSourceQueryStats() = default;
 
     StageConstraints constraints(
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
@@ -114,9 +114,9 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            bool applyHmacToIdentifiers = false,
-                            std::string hmacKey = {})
+    DocumentSourceQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             bool applyHmacToIdentifiers = false,
+                             std::string hmacKey = {})
         : DocumentSource(kStageName, expCtx),
           _applyHmacToIdentifiers(applyHmacToIdentifiers),
           _hmacKey(hmacKey) {}
@@ -130,10 +130,10 @@ private:
     std::deque<Document> _materializedPartition;
 
     /**
-     * Iterator over all telemetry partitions. This is incremented when we exhaust the current
+     * Iterator over all queryStats partitions. This is incremented when we exhaust the current
      * _materializedPartition.
      */
-    TelemetryStore::PartitionId _currentPartition = -1;
+    QueryStatsStore::PartitionId _currentPartition = -1;
 
     // When true, apply hmac to field names from returned query shapes.
     bool _applyHmacToIdentifiers;
