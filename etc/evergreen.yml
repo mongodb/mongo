@@ -1648,14 +1648,14 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - amazon2022-arm64-large
+  - amazon2023.0-arm64-large
   expansions:
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
-    large_distro_name: amazon2022-arm64-large
+    large_distro_name: amazon2023.0-arm64-large
     num_scons_link_jobs_available: 0.1
   tasks:
   - name: build_metrics_gen_TG

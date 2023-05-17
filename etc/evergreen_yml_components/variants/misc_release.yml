@@ -308,37 +308,37 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: amazon2022
-  display_name: Amazon Linux 2022
+- name: amazon2023
+  display_name: Amazon Linux 2023
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2022-small
+  - amazon2023.0-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: x86_64-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    push_arch: x86_64-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2022-large
-    compile_variant: amazon2022
+    large_distro_name: amazon2023.0-large
+    compile_variant: amazon2023
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
@@ -358,37 +358,37 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-amazon2022
-  display_name: "Enterprise Amazon Linux 2022"
+- name: enterprise-amazon2023
+  display_name: "Enterprise Amazon Linux 2023"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - amazon2022-small
+  - amazon2023.0-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: x86_64-enterprise-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    push_arch: x86_64-enterprise-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
-    multiversion_platform: amazon2022
+    multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: x86_64
     packager_script: packager_enterprise.py
     packager_arch: x86_64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: enterprise
     scons_cache_scope: shared
-    compile_variant: enterprise-amazon2022
+    compile_variant: enterprise-amazon2023
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: .aggregation !.feature_flag_guarded
@@ -401,7 +401,7 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns
   - name: .concurrency .large !.ubsan !.no_txns
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: config_fuzzer_concurrency
   - name: config_fuzzer_jsCore
   - name: disk_wiredtiger
@@ -410,7 +410,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .jscore .common !jsCore !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -422,17 +422,17 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -448,46 +448,46 @@ buildvariants:
   - name: .stitch
   - name: .crypt
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .publish_crypt
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: server_selection_json_test_TG
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: test_packages
     distros:
     - ubuntu2204-large
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: amazon2022-arm64
-  display_name: Amazon Linux 2022 arm64
+- name: amazon2023-arm64
+  display_name: Amazon Linux 2023 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2022-arm64-small
+  - amazon2023.0-arm64-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: aarch64-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    push_arch: aarch64-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2022-arm64-large
-    compile_variant: amazon2022-arm64
+    large_distro_name: amazon2023.0-arm64-large
+    compile_variant: amazon2023-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: sharding_auth_gen
@@ -495,7 +495,7 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency .common
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
@@ -515,37 +515,37 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-amazon2022-arm64
-  display_name: "Enterprise Amazon Linux 2022 arm64"
+- name: enterprise-amazon2023-arm64
+  display_name: "Enterprise Amazon Linux 2023 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - amazon2022-arm64-small
+  - amazon2023.0-arm64-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: aarch64-enterprise-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    push_arch: aarch64-enterprise-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
-    multiversion_platform: amazon2022
+    multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
     packager_script: packager_enterprise.py
     packager_arch: aarch64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: enterprise
     scons_cache_scope: shared
-    compile_variant: enterprise-amazon2022-arm64
+    compile_variant: enterprise-amazon2023-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: .aggregation !.feature_flag_guarded
@@ -558,18 +558,18 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns
   - name: .concurrency .large !.ubsan !.no_txns
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .jscore .common !jsCore !.feature_flag_guarded
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
@@ -582,17 +582,17 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -608,16 +608,16 @@ buildvariants:
   - name: .stitch
   - name: .crypt
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .publish_crypt
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: server_selection_json_test_TG
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
