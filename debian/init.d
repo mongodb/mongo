@@ -145,8 +145,11 @@ start_server() {
             fi
 
             # Start the process using the wrapper
+            sudo touch $PIDFILE
+            sudo chown mongodb:mongodb $PIDFILE
+
             start-stop-daemon --background --start --quiet --pidfile $PIDFILE \
-                        --make-pidfile --chuid $DAEMONUSER:$DAEMONGROUP \
+                        --chuid $DAEMONUSER:$DAEMONGROUP \
                         --exec $NUMACTL $DAEMON $DAEMON_OPTS
             errcode=$?
         return $errcode
