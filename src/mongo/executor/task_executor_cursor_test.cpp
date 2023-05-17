@@ -532,11 +532,16 @@ public:
         // NetworkInterfaceMock.
         stdx::thread t(
             [this, cursorId] { scheduleSuccessfulCursorResponse("nextBatch", 3, 4, 0); });
-        t.detach();
 
         // Schedules the GetMore request and exhausts the cursor.
         ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
         ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
+
+        // Joining the thread which schedules the cursor response for the GetMore here forces the
+        // destructor of NetworkInterfaceMock::InNetworkGuard to run, which ensures that the
+        // 'NetworkInterfaceMock' stops executing as the network thread. This is required before we
+        // invoke 'hasReadyRequests()' which enters the network again.
+        t.join();
 
         // Assert no GetMore is requested.
         ASSERT_FALSE(hasReadyRequests());
