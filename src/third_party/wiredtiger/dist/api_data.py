@@ -550,6 +550,10 @@ connection_runtime_config = [
             periodic checkpoints''',
             min='0', max='100000'),
         ]),
+    Config('checkpoint_cleanup', 'none', r'''
+        control how aggressively obsolete content is removed when creating checkpoints.
+        Default to none, which means no additional work is done to find obsolete content.
+        ''', choices=['none', 'reclaim_space']),
     Config('chunk_cache', '', r'''
         chunk cache configuration options''',
         type='category', subconfig=[
