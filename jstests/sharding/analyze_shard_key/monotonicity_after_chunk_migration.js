@@ -12,7 +12,7 @@ load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 const st = new ShardingTest({
     shards: 2,
     rs: {
-        nodes: 2,
+        nodes: 1,
         setParameter: {
             "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
                 tojson({mode: "alwaysOn"})

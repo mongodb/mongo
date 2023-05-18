@@ -188,6 +188,7 @@ var $config = extendWorkload($config, function($config, $super) {
     /**
      * Generates and inserts initial documents.
      */
+    $config.data.insertBatchSize = 1000;
     $config.data.generateInitialDocuments = function generateInitialDocuments(
         db, collName, cluster) {
         this.numInitialDocuments = 0;
@@ -222,12 +223,17 @@ var $config = extendWorkload($config, function($config, $super) {
 
         assert.commandWorked(
             db.runCommand({createIndexes: collName, indexes: this.shardKeyOptions.indexSpecs}));
-        assert.commandWorked(db.runCommand({insert: collName, documents: docs}));
-
-        // Wait for the documents to get replicated to all nodes so that a analyzeShardKey command
-        // runs immediately after this can assert on the metrics regardless of which nodes it
-        // targets.
-        cluster.awaitReplication();
+        // To reduce the insertion order noise caused by parallel oplog application on
+        // secondaries, insert the documents in multiple batches.
+        let currIndex = 0;
+        while (currIndex < docs.length) {
+            const endIndex = currIndex + this.insertBatchSize;
+            assert.commandWorked(db.runCommand(
+                {insert: collName, documents: docs.slice(currIndex, endIndex), ordered: true}));
+            currIndex = endIndex;
+            // Wait for secondaries to have replicated the writes.
+            cluster.awaitReplication();
+        }
 
         print(`Set up collection that have the following shard key to analyze ${tojson({
             shardKeyOptions: this.shardKeyOptions,
