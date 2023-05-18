@@ -29,7 +29,7 @@
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"

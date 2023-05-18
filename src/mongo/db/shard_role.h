@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/s/database_version.h"
 
 namespace mongo {
 

@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/service_context.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
 
 #include <iostream>
 
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 

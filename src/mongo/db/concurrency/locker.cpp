@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,20 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 
 namespace mongo {
 
-// Hardcoded resource IDs.
-const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, DatabaseName::kLocal);
-const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, DatabaseName::kAdmin);
-const ResourceId resourceIdGlobal =
-    ResourceId(RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kGlobal));
-const ResourceId resourceIdParallelBatchWriterMode =
-    ResourceId(RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kParallelBatchWriterMode));
-const ResourceId resourceIdFeatureCompatibilityVersion = ResourceId(
-    RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kFeatureCompatibilityVersion));
-const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(
-    RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kReplicationStateTransitionLock));
+Locker::Locker() = default;
+
+Locker::~Locker() = default;
 
 }  // namespace mongo
