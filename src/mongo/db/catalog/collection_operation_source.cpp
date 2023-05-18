@@ -38,6 +38,8 @@ StringData toString(OperationSource source) {
     static constexpr StringData kTimeseriesInsertString = "time-series insert"_sd;
     static constexpr StringData kTimeseriesUpdateString = "time-series update"_sd;
     static constexpr StringData kTimeseriesDeleteString = "time-series delete"_sd;
+    static constexpr StringData kTimeseriesBucketCompressionString =
+        "time-series bucket compression"_sd;
 
     switch (source) {
         case OperationSource::kStandard:
@@ -50,6 +52,8 @@ StringData toString(OperationSource source) {
             return kTimeseriesUpdateString;
         case OperationSource::kTimeseriesDelete:
             return kTimeseriesDeleteString;
+        case OperationSource::kTimeseriesBucketCompression:
+            return kTimeseriesBucketCompressionString;
     }
 
     MONGO_UNREACHABLE;

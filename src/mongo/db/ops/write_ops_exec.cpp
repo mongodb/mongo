@@ -1452,6 +1452,15 @@ WriteResult performUpdates(OperationContext* opCtx,
                 collectMultiUpdateDeleteMetrics(timer->elapsed(), reply.getNModified());
             }
         } catch (const DBException& ex) {
+            // Do not handle errors for time-series bucket compressions. They need to be transparent
+            // to users to not interfere with any decisions around operation retry. It is OK to
+            // leave bucket uncompressed in these edge cases. We just record the status to the
+            // result vector so we can keep track of statistics for failed bucket compressions.
+            if (source == OperationSource::kTimeseriesBucketCompression) {
+                out.results.emplace_back(ex.toStatus());
+                break;
+            }
+
             out.canContinue = handleError(opCtx,
                                           ex,
                                           ns,
@@ -1974,11 +1983,6 @@ struct TimeseriesSingleWriteResult {
     bool canContinue = true;
 };
 
-enum struct TimeseriesAtomicWriteResult {
-    kSuccess,
-    kContinuableError,
-    kNonContinuableError,
-};
 /**
  * Returns true if the time-series write is retryable.
  */
@@ -2235,13 +2239,17 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
         write_ops_exec::performUpdates(opCtx, op, OperationSource::kTimeseriesInsert), request);
 }
 
-TimeseriesSingleWriteResult performTimeseriesBucketCompression(
+/**
+ * Attempts to perform bucket compression on time-series bucket. It will surpress any error caused
+ * by the write and silently leave the bucket uncompressed when any type of error is encountered.
+ */
+void tryPerformTimeseriesBucketCompression(
     OperationContext* opCtx,
     const timeseries::bucket_catalog::ClosedBucket& closedBucket,
     const write_ops::InsertCommandRequest& request) {
     // Buckets with just a single measurement is not worth compressing.
     if (closedBucket.numMeasurements.has_value() && closedBucket.numMeasurements.value() <= 1) {
-        return {SingleWriteResult(), true};
+        return;
     }
 
     bool validateCompression = gValidateTimeseriesCompression.load();
@@ -2280,7 +2288,9 @@ TimeseriesSingleWriteResult performTimeseriesBucketCompression(
     auto compressionOp = makeTimeseriesTransformationOp(
         opCtx, closedBucket.bucketId.oid, bucketCompressionFunc, request);
     auto result = getTimeseriesSingleWriteResult(
-        write_ops_exec::performUpdates(opCtx, compressionOp, OperationSource::kStandard), request);
+        write_ops_exec::performUpdates(
+            opCtx, compressionOp, OperationSource::kTimeseriesBucketCompression),
+        request);
 
     // Report stats, if we fail before running the transform function then just skip
     // reporting.
@@ -2296,8 +2306,6 @@ TimeseriesSingleWriteResult performTimeseriesBucketCompression(
             stats.onBucketClosed(*beforeSize, compressionStats);
         }
     }
-
-    return result;
 }
 
 write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
@@ -2405,12 +2413,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
-        auto output = performTimeseriesBucketCompression(opCtx, *closedBucket, request);
-        if (auto error = write_ops_exec::generateError(
-                opCtx, output.result.getStatus(), start + index, errors->size())) {
-            errors->emplace_back(std::move(*error));
-            return output.canContinue;
-        }
+        tryPerformTimeseriesBucketCompression(opCtx, *closedBucket, request);
     }
     return true;
 } catch (const DBException& ex) {
@@ -2419,14 +2422,14 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     throw;
 }
 
-TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
-    OperationContext* opCtx,
-    TimeseriesBatches* batches,
-    TimeseriesStmtIds&& stmtIds,
-    std::vector<write_ops::WriteError>* errors,
-    boost::optional<repl::OpTime>* opTime,
-    boost::optional<OID>* electionId,
-    const write_ops::InsertCommandRequest& request) {
+// Returns true if commit was successful, false otherwise. May also throw.
+bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
+                                       TimeseriesBatches* batches,
+                                       TimeseriesStmtIds&& stmtIds,
+                                       std::vector<write_ops::WriteError>* errors,
+                                       boost::optional<repl::OpTime>* opTime,
+                                       boost::optional<OID>* electionId,
+                                       const write_ops::InsertCommandRequest& request) {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
     std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
@@ -2439,7 +2442,7 @@ TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
     }
 
     if (batchesToCommit.empty()) {
-        return TimeseriesAtomicWriteResult::kSuccess;
+        return true;
     }
 
     // Sort by bucket so that preparing the commit for each batch cannot deadlock.
@@ -2465,7 +2468,7 @@ TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
             auto prepareCommitStatus = prepareCommit(bucketCatalog, batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
-                return TimeseriesAtomicWriteResult::kContinuableError;
+                return false;
             }
 
             if (batch.get()->numPreviouslyCommittedMeasurements == 0) {
@@ -2498,32 +2501,21 @@ TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
         auto result = write_ops_exec::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
         if (!result.isOK()) {
             abortStatus = result;
-            return TimeseriesAtomicWriteResult::kContinuableError;
+            return false;
         }
 
         getOpTimeAndElectionId(opCtx, opTime, electionId);
 
-        bool compressClosedBuckets = true;
         for (auto batch : batchesToCommit) {
             auto closedBucket = finish(
                 bucketCatalog, batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
             batch.get().reset();
 
-            if (!closedBucket || !compressClosedBuckets) {
+            if (!closedBucket) {
                 continue;
             }
 
-            // If this write closed a bucket, compress the bucket
-            auto ret = performTimeseriesBucketCompression(opCtx, *closedBucket, request);
-            if (!ret.result.isOK()) {
-                // Don't try to compress any other buckets if we fail. We're not allowed to
-                // do more write operations.
-                compressClosedBuckets = false;
-            }
-            if (!ret.canContinue) {
-                abortStatus = ret.result.getStatus();
-                return TimeseriesAtomicWriteResult::kNonContinuableError;
-            }
+            tryPerformTimeseriesBucketCompression(opCtx, *closedBucket, request);
         }
     } catch (const DBException& ex) {
         abortStatus = ex.toStatus();
@@ -2531,7 +2523,7 @@ TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
     }
 
     batchGuard.dismiss();
-    return TimeseriesAtomicWriteResult::kSuccess;
+    return true;
 }
 
 // For sharded time-series collections, we need to use the granularity from the config
@@ -2584,14 +2576,14 @@ void rebuildOptionsWithGranularityFromConfigServer(OperationContext* opCtx,
     }
 }
 
-std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */, bool /* canContinue */>
-insertIntoBucketCatalog(OperationContext* opCtx,
-                        size_t start,
-                        size_t numDocs,
-                        const std::vector<size_t>& indices,
-                        std::vector<write_ops::WriteError>* errors,
-                        bool* containsRetry,
-                        const write_ops::InsertCommandRequest& request) {
+std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> insertIntoBucketCatalog(
+    OperationContext* opCtx,
+    size_t start,
+    size_t numDocs,
+    const std::vector<size_t>& indices,
+    std::vector<write_ops::WriteError>* errors,
+    bool* containsRetry,
+    const write_ops::InsertCommandRequest& request) {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
     auto bucketsNs = makeTimeseriesBucketsNamespace(ns(request));
@@ -2625,7 +2617,6 @@ insertIntoBucketCatalog(OperationContext* opCtx,
 
     TimeseriesBatches batches;
     TimeseriesStmtIds stmtIds;
-    bool canContinue = true;
 
     auto insert = [&](size_t index) {
         invariant(start + index < request.getDocuments().size());
@@ -2770,22 +2761,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         // If this insert closed buckets, rewrite to be a compressed column. If we cannot
         // perform write operations at this point the bucket will be left uncompressed.
         for (const auto& closedBucket : insertResult.closedBuckets) {
-            if (!canContinue) {
-                break;
-            }
-
-            // If this write closed a bucket, compress the bucket
-            auto ret = performTimeseriesBucketCompression(opCtx, closedBucket, request);
-            if (auto error = write_ops_exec::generateError(
-                    opCtx, ret.result.getStatus(), start + index, errors->size())) {
-                // Bucket compression only fail when we may not try to perform any other
-                // write operation. When handleError() inside write_ops_exec.cpp return
-                // false.
-                errors->emplace_back(std::move(*error));
-                canContinue = false;
-                return false;
-            }
-            canContinue = ret.canContinue;
+            tryPerformTimeseriesBucketCompression(opCtx, closedBucket, request);
         }
 
         return true;
@@ -2796,12 +2772,12 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     } else {
         for (size_t i = 0; i < numDocs; i++) {
             if (!insert(i) && request.getOrdered()) {
-                return {std::move(batches), std::move(stmtIds), i, canContinue};
+                return {std::move(batches), std::move(stmtIds), i};
             }
         }
     }
 
-    return {std::move(batches), std::move(stmtIds), request.getDocuments().size(), canContinue};
+    return {std::move(batches), std::move(stmtIds), request.getDocuments().size()};
 }
 
 void getTimeseriesBatchResults(OperationContext* opCtx,
@@ -2870,30 +2846,25 @@ void getTimeseriesBatchResults(OperationContext* opCtx,
     }
 }
 
-TimeseriesAtomicWriteResult performOrderedTimeseriesWritesAtomically(
-    OperationContext* opCtx,
-    std::vector<write_ops::WriteError>* errors,
-    boost::optional<repl::OpTime>* opTime,
-    boost::optional<OID>* electionId,
-    bool* containsRetry,
-    const write_ops::InsertCommandRequest& request) {
-    auto [batches, stmtIds, numInserted, canContinue] = insertIntoBucketCatalog(
+bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
+                                              std::vector<write_ops::WriteError>* errors,
+                                              boost::optional<repl::OpTime>* opTime,
+                                              boost::optional<OID>* electionId,
+                                              bool* containsRetry,
+                                              const write_ops::InsertCommandRequest& request) {
+    auto [batches, stmtIds, numInserted] = insertIntoBucketCatalog(
         opCtx, 0, request.getDocuments().size(), {}, errors, containsRetry, request);
-    if (!canContinue) {
-        return TimeseriesAtomicWriteResult::kNonContinuableError;
-    }
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-    auto result = commitTimeseriesBucketsAtomically(
-        opCtx, &batches, std::move(stmtIds), errors, opTime, electionId, request);
-    if (result != TimeseriesAtomicWriteResult::kSuccess) {
-        return result;
+    if (!commitTimeseriesBucketsAtomically(
+            opCtx, &batches, std::move(stmtIds), errors, opTime, electionId, request)) {
+        return false;
     }
 
     getTimeseriesBatchResults(opCtx, batches, 0, batches.size(), true, errors, opTime, electionId);
 
-    return TimeseriesAtomicWriteResult::kSuccess;
+    return true;
 }
 
 /**
@@ -2915,16 +2886,13 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     bool* containsRetry,
     const write_ops::InsertCommandRequest& request,
     absl::flat_hash_map<int, int>& retryAttemptsForDup) {
-    auto [batches, bucketStmtIds, _, canContinue] =
+    auto [batches, bucketStmtIds, _] =
         insertIntoBucketCatalog(opCtx, start, numDocs, indices, errors, containsRetry, request);
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
+    bool canContinue = true;
     std::vector<size_t> docsToRetry;
-
-    if (!canContinue) {
-        return docsToRetry;
-    }
 
     size_t itr = 0;
     for (; itr < batches.size(); ++itr) {
@@ -3000,19 +2968,9 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       boost::optional<OID>* electionId,
                                       bool* containsRetry,
                                       const write_ops::InsertCommandRequest& request) {
-    auto result = performOrderedTimeseriesWritesAtomically(
-        opCtx, errors, opTime, electionId, containsRetry, request);
-    switch (result) {
-        case TimeseriesAtomicWriteResult::kSuccess:
-            return request.getDocuments().size();
-        case TimeseriesAtomicWriteResult::kNonContinuableError:
-            // If we can't continue, we know that 0 were inserted since this function should
-            // guarantee that the inserts are atomic.
-            return 0;
-        case TimeseriesAtomicWriteResult::kContinuableError:
-            break;
-        default:
-            MONGO_UNREACHABLE;
+    if (performOrderedTimeseriesWritesAtomically(
+            opCtx, errors, opTime, electionId, containsRetry, request)) {
+        return request.getDocuments().size();
     }
 
     for (size_t i = 0; i < request.getDocuments().size(); ++i) {
