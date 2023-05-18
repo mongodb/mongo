@@ -29,7 +29,11 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 
+#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 
@@ -47,6 +51,28 @@ void MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
     // read concern parameter.
     chunk.throwIfMoved();
+}
+
+// static
+void MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    if (!nss.isNormalCollection() && nss.coll() != "system.views" &&
+        !nss.isTimeseriesBucketsCollection()) {
+        return;
+    }
+
+    // TODO SERVER-58222: evaluate whether this is safe or whether acquiring the lock can block.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    Lock::DBLock dblock(opCtx, nss.dbName(), MODE_IS);
+
+    const auto scopedDss =
+        DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+    if (scopedDss->isMovePrimaryInProgress()) {
+        LOGV2(4908600, "assertNoMovePrimaryInProgress", logAttrs(nss));
+
+        uasserted(ErrorCodes::MovePrimaryInProgress,
+                  "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
+    }
 }
 
 }  // namespace mongo

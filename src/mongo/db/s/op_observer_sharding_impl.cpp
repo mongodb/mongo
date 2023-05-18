@@ -45,26 +45,6 @@ namespace {
 
 const auto getIsMigrating = OperationContext::declareDecoration<bool>();
 
-void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
-    if (!nss.isNormalCollection() && nss.coll() != "system.views" &&
-        !nss.isTimeseriesBucketsCollection()) {
-        return;
-    }
-
-    // TODO SERVER-58222: evaluate whether this is safe or whether acquiring the lock can block.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    Lock::DBLock dblock(opCtx, nss.dbName(), MODE_IS);
-
-    const auto scopedDss =
-        DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
-    if (scopedDss->isMovePrimaryInProgress()) {
-        LOGV2(4908600, "assertNoMovePrimaryInProgress", logAttrs(nss));
-
-        uasserted(ErrorCodes::MovePrimaryInProgress,
-                  "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
-    }
-}
-
 }  // namespace
 
 OpObserverShardingImpl::OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter)
@@ -95,7 +75,7 @@ void OpObserverShardingImpl::shardObserveInsertsOp(
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
-        assertNoMovePrimaryInProgress(opCtx, nss);
+        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
 
@@ -137,7 +117,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
-        assertNoMovePrimaryInProgress(opCtx, nss);
+        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
 
@@ -173,7 +153,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
-        assertNoMovePrimaryInProgress(opCtx, nss);
+        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
 

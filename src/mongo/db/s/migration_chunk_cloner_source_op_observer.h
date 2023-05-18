@@ -60,6 +60,11 @@ public:
                                                    const CollectionMetadata& metadata,
                                                    const BSONObj& shardKey,
                                                    const LogicalTime& atClusterTime);
+
+    /**
+     * Ensures that there is no movePrimary operation in progress for the given namespace.
+     */
+    static void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss);
 };
 
 }  // namespace mongo
