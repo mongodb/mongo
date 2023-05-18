@@ -73,10 +73,10 @@ function testPersistingConfiguration(conn) {
             tojson({dbName, collName, collUuid})}`);
 
     // Run a configureQueryAnalyzer command to disable query sampling. Verify that the command
-    // fails since query sampling is not even active.
+    // does not fail although query sampling is not even active.
     const mode0 = "off";
-    assert.commandFailedWithCode(conn.adminCommand({configureQueryAnalyzer: ns, mode: mode0}),
-                                 ErrorCodes.IllegalOperation);
+    const res0 = assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: mode0}));
+    assertConfigQueryAnalyzerResponse(res0, {mode: mode0} /* newConfig */);
     assertNoQueryAnalyzerConfigDoc(conn, ns);
 
     // Run a configureQueryAnalyzer command to enable query sampling.
@@ -151,10 +151,9 @@ function testPersistingConfiguration(conn) {
                                       {mode: mode6} /* newConfig */,
                                       {mode: mode5, sampleRate: sampleRate5} /* oldConfig */);
 
-    // Retry the previous configureQueryAnalyzer command. Verify that the 'stopTime' remains the
-    // same.
-    assert.commandFailedWithCode(conn.adminCommand({configureQueryAnalyzer: ns, mode: mode6}),
-                                 ErrorCodes.IllegalOperation);
+    // Retry the previous configureQueryAnalyzer command. Verify that the retry does not fail and
+    // that the 'stopTime' remains the same.
+    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: mode6}));
     assertQueryAnalyzerConfigDoc(
         conn, ns, collUuid, mode6, sampleRate5, doc5.startTime, doc6.stopTime);
 }

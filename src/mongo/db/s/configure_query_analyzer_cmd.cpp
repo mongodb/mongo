@@ -245,10 +245,10 @@ public:
                 if (preImageDoc.getCollectionUuid() == collUuid) {
                     response.setOldConfiguration(preImageDoc.getConfiguration());
                 }
-            } else {
-                uassert(ErrorCodes::IllegalOperation,
-                        "Attempted to disable query sampling but query sampling was not active",
-                        mode != QueryAnalyzerModeEnum::kOff);
+            } else if (mode != QueryAnalyzerModeEnum::kOff) {
+                LOGV2_WARNING(
+                    7724700,
+                    "Attempted to disable query sampling but query sampling was not active");
             }
 
             return response;

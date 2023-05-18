@@ -389,6 +389,8 @@ last-continuous:
     ticket: SERVER-76872
   - test_file: jstests/sharding/resharding_update_tag_zones_large.js
     ticket: SERVER-76988
+  - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
+    ticket: SERVER-77247
   suites: null
 last-lts:
   all:
@@ -862,4 +864,6 @@ last-lts:
     ticket: SERVER-76872
   - test_file: jstests/sharding/resharding_update_tag_zones_large.js
     ticket: SERVER-76988
+  - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
+    ticket: SERVER-77247
   suites: null

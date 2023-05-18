@@ -868,11 +868,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.disableQuerySampling = function disableQuerySampling(db, collName) {
         print("Starting disableQuerySampling state");
         const ns = db.getName() + "." + collName;
-        // If query sampling is off, this command is expected to fail with an IllegalOperation
-        // error.
-        assert.commandWorkedOrFailedWithCode(
-            db.adminCommand({configureQueryAnalyzer: ns, mode: "off"}),
-            ErrorCodes.IllegalOperation);
+        assert.commandWorked(db.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
         print("Finished disableQuerySampling state");
     };
 
