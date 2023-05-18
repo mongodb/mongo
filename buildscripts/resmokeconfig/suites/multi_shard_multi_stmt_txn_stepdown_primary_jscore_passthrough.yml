@@ -391,6 +391,7 @@ executor:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: CleanEveryN
     n: 20
   fixture:

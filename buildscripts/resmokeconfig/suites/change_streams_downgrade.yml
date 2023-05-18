@@ -402,6 +402,7 @@ executor:
       global_vars:
         TestData:
           checkCollectionCounts: true
+  - class: CheckOrphansDeleted
   fixture:
     class: ShardedClusterFixture
     mongos_options:

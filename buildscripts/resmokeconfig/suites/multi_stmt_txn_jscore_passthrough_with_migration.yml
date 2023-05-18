@@ -337,6 +337,7 @@ executor:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: DropShardedCollections
   - class: CleanEveryN
     n: 20

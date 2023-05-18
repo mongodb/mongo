@@ -188,6 +188,7 @@ executor:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: CleanEveryN
     n: 20
   fixture:

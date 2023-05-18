@@ -16,6 +16,7 @@ executor:
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   fixture:
     class: ShardedClusterFixture
     mongod_options:

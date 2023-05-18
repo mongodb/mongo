@@ -40,6 +40,7 @@ executor:
   # We don't execute dbHash or oplog consistency checks since there is only a single replica set
   # node.
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: CleanEveryN
     n: 20
   fixture:

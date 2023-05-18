@@ -393,6 +393,7 @@ executor:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
+  - class: CheckOrphansDeleted
   - class: ValidateCollections
     shell_options:
       global_vars:

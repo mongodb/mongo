@@ -67,6 +67,7 @@ executor:
       global_vars:
         TestData:
           checkCollectionCounts: true
+  - class: CheckOrphansDeleted
 matrix_suite: true
 selector:
   exclude_files:
