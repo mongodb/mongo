@@ -332,9 +332,9 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     return donorStateDoc;
 }
 
-SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx,
-                                       const DatabaseName& dbName,
-                                       const OpMsgRequest& request) {
+SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const OpMsgRequest& request) {
     // We need to check both donor and recipient access blockers in the case where two
     // migrations happen back-to-back before the old recipient state (from the first
     // migration) is garbage collected.
@@ -347,46 +347,50 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx,
 
     // Source to cancel the timeout if the operation completed in time.
     CancellationSource cancelTimeoutSource;
-    // Source to cancel waiting on the 'canReadFutures'.
-    CancellationSource cancelCanReadSource(opCtx->getCancellationToken());
+    // Source to cancel waiting on the canRunCommandFuture's.
+    CancellationSource cancelCanRunCommandSource(opCtx->getCancellationToken());
     const auto donorMtab = mtabPair->getDonorAccessBlocker();
     const auto recipientMtab = mtabPair->getRecipientAccessBlocker();
-    // A vector of futures where the donor access blocker's 'getCanReadFuture' will always precede
-    // the recipient's.
+    // A vector of futures where the donor access blocker's 'getCanRunCommandFuture' will always
+    // precede the recipient's.
     std::vector<ExecutorFuture<void>> futures;
     std::shared_ptr<executor::TaskExecutor> executor;
     if (donorMtab) {
-        auto canReadFuture = donorMtab->getCanReadFuture(opCtx, request.getCommandName());
-        if (canReadFuture.isReady()) {
-            auto status = canReadFuture.getNoThrow();
+        auto canRunCommandFuture =
+            donorMtab->getCanRunCommandFuture(opCtx, request.getCommandName());
+        if (canRunCommandFuture.isReady()) {
+            auto status = canRunCommandFuture.getNoThrow();
             donorMtab->recordTenantMigrationError(status);
             if (!recipientMtab) {
                 return status;
             }
         }
         executor = blockerRegistry.getAsyncBlockingOperationsExecutor();
-        futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
+        futures.emplace_back(std::move(canRunCommandFuture).semi().thenRunOn(executor));
     }
     if (recipientMtab) {
-        auto canReadFuture = recipientMtab->getCanReadFuture(opCtx, request.getCommandName());
-        if (canReadFuture.isReady()) {
-            auto status = canReadFuture.getNoThrow();
+        auto canRunCommandFuture =
+            recipientMtab->getCanRunCommandFuture(opCtx, request.getCommandName());
+        if (canRunCommandFuture.isReady()) {
+            auto status = canRunCommandFuture.getNoThrow();
             recipientMtab->recordTenantMigrationError(status);
             if (!donorMtab) {
                 return status;
             }
         }
         executor = blockerRegistry.getAsyncBlockingOperationsExecutor();
-        futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
+        futures.emplace_back(std::move(canRunCommandFuture).semi().thenRunOn(executor));
     }
 
     if (opCtx->hasDeadline()) {
         // Cancel waiting for operations if we timeout.
         executor->sleepUntil(opCtx->getDeadline(), cancelTimeoutSource.token())
-            .getAsync([cancelCanReadSource](auto) mutable { cancelCanReadSource.cancel(); });
+            .getAsync(
+                [cancelCanRunCommandSource](auto) mutable { cancelCanRunCommandSource.cancel(); });
     }
 
-    return future_util::withCancellation(whenAll(std::move(futures)), cancelCanReadSource.token())
+    return future_util::withCancellation(whenAll(std::move(futures)),
+                                         cancelCanRunCommandSource.token())
         .thenRunOn(executor)
         .then([cancelTimeoutSource, donorMtab, recipientMtab](std::vector<Status> results) mutable {
             cancelTimeoutSource.cancel();
@@ -416,26 +420,26 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx,
 
             return Status::OK();
         })
-        .onError<ErrorCodes::CallbackCanceled>(
-            [cancelTimeoutSource,
-             cancelCanReadSource,
-             donorMtab,
-             recipientMtab,
-             timeoutError = opCtx->getTimeoutError()](Status status) mutable {
-                auto isCanceledDueToTimeout = cancelTimeoutSource.token().isCanceled();
+        .onError<ErrorCodes::CallbackCanceled>([cancelTimeoutSource,
+                                                cancelCanRunCommandSource,
+                                                donorMtab,
+                                                recipientMtab,
+                                                timeoutError = opCtx->getTimeoutError()](
+                                                   Status status) mutable {
+            auto isCanceledDueToTimeout = cancelTimeoutSource.token().isCanceled();
 
-                if (!isCanceledDueToTimeout) {
-                    cancelTimeoutSource.cancel();
-                }
+            if (!isCanceledDueToTimeout) {
+                cancelTimeoutSource.cancel();
+            }
 
-                if (isCanceledDueToTimeout) {
-                    return Status(timeoutError,
-                                  "Blocked read timed out waiting for an internal data migration "
-                                  "to commit or abort");
-                }
+            if (isCanceledDueToTimeout) {
+                return Status(timeoutError,
+                              "Blocked command timed out waiting for an internal data migration "
+                              "to commit or abort");
+            }
 
-                return status.withContext("Canceled read blocked by internal data migration");
-            })
+            return status.withContext("Canceled command blocked by internal data migration");
+        })
         .semi();  // To require continuation in the user executor.
 }
 
@@ -656,7 +660,7 @@ bool inRecoveryMode(OperationContext* opCtx) {
     return memberState.startup() || memberState.startup2() || memberState.rollback();
 }
 
-bool shouldExcludeRead(OperationContext* opCtx) {
+bool shouldExclude(OperationContext* opCtx) {
     return repl::tenantMigrationInfo(opCtx) || opCtx->getClient()->isInDirectClient() ||
         (opCtx->getClient()->session() &&
          (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));

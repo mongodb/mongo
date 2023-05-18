@@ -63,16 +63,16 @@ void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc);
 
 /**
- * Checks if a request is allowed to read based on the tenant migration states of this node as a
+ * Checks if a command is allowed to run based on the tenant migration states of this node as a
  * donor or as a recipient. TenantMigrationCommitted is returned if the request needs to be
  * re-routed to the new owner of the tenant. If the tenant is currently being migrated and the
  * request needs to block, a future for when the request is unblocked is returned, and the promise
  * will be set for the returned future when the migration is committed or aborted. Note: for better
  * performance, check if the future is immediately ready.
  */
-SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx,
-                                       const DatabaseName& dbName,
-                                       const OpMsgRequest& request);
+SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const OpMsgRequest& request);
 
 /**
  * If the operation has read concern "linearizable", throws TenantMigrationCommitted error if the
@@ -133,9 +133,9 @@ void performNoopWrite(OperationContext* opCtx, StringData msg);
 bool inRecoveryMode(OperationContext* opCtx);
 
 /*
- * Returns true if a read should be excluded from access blocker filtering.
+ * Returns true if a command should be excluded from access blocker filtering.
  */
-bool shouldExcludeRead(OperationContext* opCtx);
+bool shouldExclude(OperationContext* opCtx);
 
 /**
  * Parse the 'TenantId' from the provided DatabaseName.

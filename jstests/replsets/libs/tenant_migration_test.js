@@ -713,8 +713,8 @@ TenantMigrationTest.DonorAccessState = {
 };
 
 TenantMigrationTest.RecipientAccessState = {
-    kReject: "reject",
-    kRejectBefore: "rejectBefore"
+    kRejectReadsAndWrites: "rejectReadsAndWrites",
+    kRejectReadsBefore: "rejectReadsBefore"
 };
 
 TenantMigrationTest.kConfigDonorsNS = "config.tenantMigrationDonors";

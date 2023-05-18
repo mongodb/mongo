@@ -135,13 +135,13 @@ Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationC
     MONGO_UNREACHABLE;
 }
 
-SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(OperationContext* opCtx,
-                                                                           StringData command) {
+SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanRunCommandFuture(
+    OperationContext* opCtx, StringData command) {
     // Exclude internal client requests
-    if (tenant_migration_access_blocker::shouldExcludeRead(opCtx)) {
+    if (tenant_migration_access_blocker::shouldExclude(opCtx)) {
         LOGV2_DEBUG(6397500,
                     1,
-                    "Internal tenant read got excluded from the MTAB filtering",
+                    "Internal tenant command got excluded from the MTAB filtering",
                     "migrationId"_attr = getMigrationId(),
                     "opId"_attr = opCtx->getOpID());
         return SharedSemiFuture<void>();
@@ -190,7 +190,7 @@ SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(Opera
 
             return SharedSemiFuture<void>(
                 Status(ErrorCodes::TenantMigrationCommitted,
-                       "Read must be re-routed to the new owner of this tenant"));
+                       "Command must be re-routed to the new owner of this tenant"));
 
         default:
             MONGO_UNREACHABLE;

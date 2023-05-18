@@ -71,17 +71,18 @@ Status TenantMigrationRecipientAccessBlocker::waitUntilCommittedOrAborted(Operat
     MONGO_UNREACHABLE;
 }
 
-SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
+SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanRunCommandFuture(
     OperationContext* opCtx, StringData command) {
     if (MONGO_unlikely(tenantMigrationRecipientNotRejectReads.shouldFail())) {
         return SharedSemiFuture<void>();
     }
 
-    if (tenant_migration_access_blocker::shouldExcludeRead(opCtx)) {
+    if (tenant_migration_access_blocker::shouldExclude(opCtx)) {
         LOGV2_DEBUG(5739900,
                     1,
-                    "Internal tenant read got excluded from the MTAB filtering",
+                    "Internal tenant command got excluded from the MTAB filtering",
                     "migrationId"_attr = getMigrationId(),
+                    "command"_attr = command,
                     "opId"_attr = opCtx->getOpID());
         return SharedSemiFuture<void>();
     }
@@ -97,29 +98,33 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
     }();
 
     stdx::lock_guard<Latch> lk(_mutex);
-    if (_state.isReject()) {
+    if (_state.isRejectReadsAndWrites()) {
+        // Something is likely wrong with the proxy if we end up here. Traffic should not be routed
+        // to the recipient while in the `kRejectReadsAndWrites` state.
         LOGV2_DEBUG(5749100,
                     1,
-                    "Tenant read is blocked on the recipient before migration completes",
+                    "Tenant command is blocked on the recipient before migration completes",
                     "migrationId"_attr = getMigrationId(),
                     "opId"_attr = opCtx->getOpID(),
                     "command"_attr = command);
         return SharedSemiFuture<void>(Status(
-            ErrorCodes::SnapshotTooOld, "Tenant read is not allowed before migration completes"));
+            ErrorCodes::IllegalOperation,
+            "Tenant command '{}' is not allowed before migration completes"_format(command)));
     }
-    invariant(_state.isRejectBefore());
+    invariant(_state.isRejectReadsBefore());
     invariant(_rejectBeforeTimestamp);
     if (atClusterTime && *atClusterTime < *_rejectBeforeTimestamp) {
         LOGV2_DEBUG(5749101,
                     1,
-                    "Tenant read is blocked on the recipient before migration completes",
+                    "Tenant command is blocked on the recipient before migration completes",
                     "migrationId"_attr = getMigrationId(),
                     "opId"_attr = opCtx->getOpID(),
                     "command"_attr = command,
                     "atClusterTime"_attr = *atClusterTime,
                     "rejectBeforeTimestamp"_attr = *_rejectBeforeTimestamp);
         return SharedSemiFuture<void>(Status(
-            ErrorCodes::SnapshotTooOld, "Tenant read is not allowed before migration completes"));
+            ErrorCodes::SnapshotTooOld,
+            "Tenant command '{}' is not allowed before migration completes"_format(command)));
     }
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
         // Speculative majority reads are only used for change streams (against the oplog
@@ -195,10 +200,10 @@ void TenantMigrationRecipientAccessBlocker::appendInfoForServerStatus(
 
 std::string TenantMigrationRecipientAccessBlocker::BlockerState::toString() const {
     switch (_state) {
-        case State::kReject:
-            return "reject";
-        case State::kRejectBefore:
-            return "rejectBefore";
+        case State::kRejectReadsAndWrites:
+            return "rejectReadsAndWrites";
+        case State::kRejectReadsBefore:
+            return "rejectReadsBefore";
         default:
             MONGO_UNREACHABLE;
     }
@@ -206,7 +211,7 @@ std::string TenantMigrationRecipientAccessBlocker::BlockerState::toString() cons
 
 void TenantMigrationRecipientAccessBlocker::startRejectingReadsBefore(const Timestamp& timestamp) {
     stdx::lock_guard<Latch> lk(_mutex);
-    _state.transitionToRejectBefore();
+    _state.transitionToRejectReadsBefore();
     if (!_rejectBeforeTimestamp || timestamp > *_rejectBeforeTimestamp) {
         LOGV2(5358100,
               "Tenant migration recipient starting to reject reads before timestamp",

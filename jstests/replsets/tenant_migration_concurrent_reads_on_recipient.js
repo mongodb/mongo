@@ -14,6 +14,8 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   # The error code for a rejected recipient command invoked during the reject phase was changed.
+ *   requires_fcv_71,
  * ]
  */
 
@@ -39,7 +41,8 @@ function runCommand(db, cmd, expectedError) {
         if (expectedError == ErrorCodes.SnapshotTooOld) {
             // Verify that SnapshotTooOld error is due to migration conflict not due to the read
             // timestamp being older than the oldest available timestamp.
-            assert.eq(res.errmsg, "Tenant read is not allowed before migration completes");
+            assert.eq(res.errmsg,
+                      "Tenant command 'find' is not allowed before migration completes");
         }
     } else {
         assert.commandWorked(res);
@@ -84,7 +87,7 @@ function testRejectAllReadsAfterCloningDone({testCase, dbName, collName, tenantM
             ? testCase.command(collName, getLastOpTime(node).ts)
             : testCase.command(collName);
         const db = node.getDB(dbName);
-        runCommand(db, command, ErrorCodes.SnapshotTooOld);
+        runCommand(db, command, ErrorCodes.IllegalOperation);
     });
 
     beforeFetchingTransactionsFp.off();
@@ -128,12 +131,10 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanRejectReadsBeforeTimestamp(
     // unspecified atClusterTime have read timestamp >= rejectReadsBeforeTimestamp.
     recipientRst.awaitLastOpCommitted();
 
-    const recipientStateDocNss = isShardMergeEnabled(recipientPrimary.getDB("admin"))
-        ? TenantMigrationTest.kConfigShardMergeRecipientsNS
-        : TenantMigrationTest.kConfigRecipientsNS;
-    const recipientDoc = recipientPrimary.getCollection(recipientStateDocNss).findOne({
-        _id: UUID(migrationOpts.migrationIdString),
-    });
+    const recipientDoc =
+        recipientPrimary.getCollection(tenantMigrationTest.configRecipientsNs).findOne({
+            _id: UUID(migrationOpts.migrationIdString),
+        });
     assert.lt(preMigrationTimestamp, recipientDoc.rejectReadsBeforeTimestamp);
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
@@ -203,10 +204,11 @@ function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingRejectReadsBefor
     nodes.forEach(node => {
         const db = node.getDB(dbName);
         if (testCase.requiresReadTimestamp) {
-            runCommand(
-                db, testCase.command(collName, getLastOpTime(node).ts), ErrorCodes.SnapshotTooOld);
+            runCommand(db,
+                       testCase.command(collName, getLastOpTime(node).ts),
+                       ErrorCodes.IllegalOperation);
         } else {
-            runCommand(db, testCase.command(collName), ErrorCodes.SnapshotTooOld);
+            runCommand(db, testCase.command(collName), ErrorCodes.IllegalOperation);
         }
     });
 
@@ -275,12 +277,10 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingRejectReadsBefore
     // unspecified atClusterTime have read timestamp >= rejectReadsBeforeTimestamp.
     recipientRst.awaitLastOpCommitted();
 
-    const recipientStateDocNss = isShardMergeEnabled(recipientPrimary.getDB("admin"))
-        ? TenantMigrationTest.kConfigShardMergeRecipientsNS
-        : TenantMigrationTest.kConfigRecipientsNS;
-    const recipientDoc = recipientPrimary.getCollection(recipientStateDocNss).findOne({
-        _id: UUID(migrationOpts.migrationIdString),
-    });
+    const recipientDoc =
+        recipientPrimary.getCollection(tenantMigrationTest.configRecipientsNs).findOne({
+            _id: UUID(migrationOpts.migrationIdString),
+        });
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
     nodes.forEach(node => {

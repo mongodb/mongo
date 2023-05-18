@@ -6,7 +6,8 @@
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
- *   requires_fcv_62,
+ *   # The error code for a rejected recipient command invoked during the reject phase was changed.
+ *   requires_fcv_71,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -72,7 +73,7 @@ if (recipientDoc) {
                                       .getTenantMigrationAccessBlocker(
                                           {recipientNode: initialSyncNode, tenantId: kTenantId})
                                       .recipient.state ==
-                                TenantMigrationTest.RecipientAccessState.kReject);
+                                TenantMigrationTest.RecipientAccessState.kRejectReadsAndWrites);
             }
             break;
         case TenantMigrationTest.RecipientState.kConsistent:
@@ -81,7 +82,7 @@ if (recipientDoc) {
                                       .getTenantMigrationAccessBlocker(
                                           {recipientNode: initialSyncNode, tenantId: kTenantId})
                                       .recipient.state ==
-                                TenantMigrationTest.RecipientAccessState.kRejectBefore);
+                                TenantMigrationTest.RecipientAccessState.kRejectReadsBefore);
                 assert.soon(() => bsonWoCompare(
                                       tenantMigrationTest
                                           .getTenantMigrationAccessBlocker(
@@ -93,7 +94,7 @@ if (recipientDoc) {
                                       .getTenantMigrationAccessBlocker(
                                           {recipientNode: initialSyncNode, tenantId: kTenantId})
                                       .recipient.state ==
-                                TenantMigrationTest.RecipientAccessState.kReject);
+                                TenantMigrationTest.RecipientAccessState.kRejectReadsAndWrites);
             }
             break;
         default:

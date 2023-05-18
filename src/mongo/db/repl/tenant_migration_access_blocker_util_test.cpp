@@ -334,12 +334,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientBlockerStarted) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -381,12 +382,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientAbortedAfterDataCopy) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -428,12 +430,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientCommittedAfterDataCopy) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -454,12 +457,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientLearnedFiles) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -480,12 +484,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientConsistent) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -510,18 +515,19 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientRejectBeforeTimestamp) {
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{15, 1});
-        auto readFutureAtClusterTime = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFutureAtClusterTime.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFutureAtClusterTime.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFutureAtClusterTime = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFutureAtClusterTime.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFutureAtClusterTime.get(),
+            DBException,
+            ErrorCodes::SnapshotTooOld,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -579,9 +585,9 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAbortingIndex) {
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
         ASSERT(mtab);
 
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         ASSERT_OK(mtab->checkIfCanWrite(Timestamp{10, 1}));
 
@@ -615,15 +621,15 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorBlocking) {
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{101, 1});
-        auto afterReadFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_FALSE(afterReadFuture.isReady());
+        auto afterCmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_FALSE(afterCmdFuture.isReady());
 
         ASSERT_EQ(mtab->checkIfCanWrite(Timestamp{101, 1}).code(),
                   ErrorCodes::TenantMigrationConflict);
@@ -659,16 +665,16 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorCommitted) {
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{90, 1});
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{102, 1});
-        auto afterReadFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(afterReadFuture.isReady());
-        ASSERT_EQ(afterReadFuture.getNoThrow().code(), ErrorCodes::TenantMigrationCommitted);
+        auto afterCmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(afterCmdFuture.isReady());
+        ASSERT_EQ(afterCmdFuture.getNoThrow().code(), ErrorCodes::TenantMigrationCommitted);
 
         ASSERT_EQ(mtab->checkIfCanWrite(Timestamp{102, 1}).code(),
                   ErrorCodes::TenantMigrationCommitted);
@@ -704,16 +710,16 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAborted) {
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{90, 1});
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{102, 1});
-        auto afterReadFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(afterReadFuture.isReady());
-        ASSERT_OK(afterReadFuture.getNoThrow());
+        auto afterCmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(afterCmdFuture.isReady());
+        ASSERT_OK(afterCmdFuture.getNoThrow());
 
         ASSERT_OK(mtab->checkIfCanWrite(Timestamp{102, 1}));
 

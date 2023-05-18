@@ -129,7 +129,7 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, NoopFunctions) {
     ASSERT_OK(mtab.checkIfCanBuildIndex());
 }
 
-TEST_F(TenantMigrationRecipientAccessBlockerTest, StateReject) {
+TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectReadsAndWrites) {
     TenantMigrationRecipientAccessBlocker mtab(getServiceContext(), getMigrationId());
 
     {
@@ -137,34 +137,38 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateReject) {
         mtab.appendInfoForServerStatus(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(),
                           BSON("migrationId" << getMigrationId() << "state"
-                                             << "reject"
+                                             << "rejectReadsAndWrites"
                                              << "ttlIsBlocked" << true));
     }
 
     // Default read concern.
-    ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
+    ASSERT_THROWS_CODE(mtab.getCanRunCommandFuture(opCtx(), "find").get(),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 
     // Majority read concern.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern);
-    ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
+    ASSERT_THROWS_CODE(mtab.getCanRunCommandFuture(opCtx(), "find").get(),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 
     // Snapshot read concern.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     opCtx()->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                     Timestamp(1, 1));
-    ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
+    ASSERT_THROWS_CODE(mtab.getCanRunCommandFuture(opCtx(), "find").get(),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 
     // Snapshot read concern with atClusterTime.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp(1, 1));
-    ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
+    ASSERT_THROWS_CODE(mtab.getCanRunCommandFuture(opCtx(), "find").get(),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 }
 
-TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
+TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectReadsBefore) {
     TenantMigrationRecipientAccessBlocker mtab(getServiceContext(), getMigrationId());
 
     mtab.startRejectingReadsBefore(Timestamp(1, 1));
@@ -173,7 +177,7 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
         mtab.appendInfoForServerStatus(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(),
                           BSON("migrationId" << getMigrationId() << "state"
-                                             << "rejectBefore"
+                                             << "rejectReadsBefore"
                                              << "rejectBeforeTimestamp" << Timestamp(1, 1)
                                              << "ttlIsBlocked" << true));
     }
@@ -185,28 +189,29 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
         mtab.appendInfoForServerStatus(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(),
                           BSON("migrationId" << getMigrationId() << "state"
-                                             << "rejectBefore"
+                                             << "rejectReadsBefore"
                                              << "rejectBeforeTimestamp" << Timestamp(2, 1)
                                              << "ttlIsBlocked" << true));
     }
 
     // Default read concern.
-    ASSERT_OK(mtab.getCanReadFuture(opCtx(), "find").getNoThrow());
+    ASSERT_OK(mtab.getCanRunCommandFuture(opCtx(), "find").getNoThrow());
 
     // Majority read concern.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern);
-    ASSERT_OK(mtab.getCanReadFuture(opCtx(), "find").getNoThrow());
+    ASSERT_OK(mtab.getCanRunCommandFuture(opCtx(), "find").getNoThrow());
 
     // Snapshot read at a later timestamp.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp(3, 1));
-    ASSERT_OK(mtab.getCanReadFuture(opCtx(), "find").getNoThrow());
+    ASSERT_OK(mtab.getCanRunCommandFuture(opCtx(), "find").getNoThrow());
 
     // Snapshot read at an earlier timestamp.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp(1, 1));
-    ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
+    ASSERT_THROWS_CODE(mtab.getCanRunCommandFuture(opCtx(), "find").get(),
+                       DBException,
+                       ErrorCodes::SnapshotTooOld);
 }
 
 }  // namespace repl

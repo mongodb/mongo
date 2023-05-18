@@ -8,6 +8,8 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   # The error code for a rejected recipient command invoked during the reject phase was changed.
+ *   requires_fcv_71,
  * ]
  */
 
@@ -67,14 +69,15 @@ function cleanup(dbName) {
     if (!isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
         // Write before cloning is done.
         assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}),
-                                     ErrorCodes.SnapshotTooOld);
+                                     ErrorCodes.IllegalOperation);
     }
 
     startOplogFetcherFp.off();
     beforeFetchingTransactionsFp.wait();
 
-    // Write after cloning is done should fail with SnapshotTooOld since no read is allowed.
-    assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}), ErrorCodes.SnapshotTooOld);
+    // Write after cloning is done should fail with IllegalOperation since no read is allowed.
+    assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}),
+                                 ErrorCodes.IllegalOperation);
 
     beforeFetchingTransactionsFp.off();
     waitForRejectReadsBeforeTsFp.wait();
@@ -127,7 +130,8 @@ function cleanup(dbName) {
     abortFp.off();
 
     // Write after the migration aborted.
-    assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}), ErrorCodes.SnapshotTooOld);
+    assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}),
+                                 ErrorCodes.IllegalOperation);
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 

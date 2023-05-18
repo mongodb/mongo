@@ -883,7 +883,7 @@ Future<void> InvokeCommand::run() {
                const auto dbName = _ecd->getInvocation()->ns().dbName();
                // TODO SERVER-53761: find out if we can do this more asynchronously. The client
                // Strand is locked to current thread in SessionWorkflow::Impl::startNewLoop().
-               tenant_migration_access_blocker::checkIfCanReadOrBlock(
+               tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
                    execContext->getOpCtx(), dbName, execContext->getRequest())
                    .get(execContext->getOpCtx());
                return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
@@ -902,7 +902,7 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
                auto execContext = _ecd->getExecutionContext();
                const auto dbName = _ecd->getInvocation()->ns().dbName();
                // TODO SERVER-53761: find out if we can do this more asynchronously.
-               tenant_migration_access_blocker::checkIfCanReadOrBlock(
+               tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
                    execContext->getOpCtx(), dbName, execContext->getRequest())
                    .get(execContext->getOpCtx());
                return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());

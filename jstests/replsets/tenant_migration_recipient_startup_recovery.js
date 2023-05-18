@@ -10,6 +10,8 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   # The error code for a rejected recipient command invoked during the reject phase was changed.
+ *   requires_fcv_71,
  * ]
  */
 
@@ -76,7 +78,7 @@ if (recipientDoc) {
                                       .getTenantMigrationAccessBlocker(
                                           {recipientNode: recipientPrimary, tenantId: kTenantId})
                                       .recipient.state ==
-                                TenantMigrationTest.RecipientAccessState.kReject);
+                                TenantMigrationTest.RecipientAccessState.kRejectReadsAndWrites);
             }
             break;
         case TenantMigrationTest.RecipientState.kConsistent:
@@ -85,7 +87,7 @@ if (recipientDoc) {
                                       .getTenantMigrationAccessBlocker(
                                           {recipientNode: recipientPrimary, tenantId: kTenantId})
                                       .recipient.state ==
-                                TenantMigrationTest.RecipientAccessState.kRejectBefore);
+                                TenantMigrationTest.RecipientAccessState.kRejectReadsBefore);
                 assert.soon(() =>
                                 bsonWoCompare(
                                     tenantMigrationTest
@@ -98,7 +100,7 @@ if (recipientDoc) {
                                       .getTenantMigrationAccessBlocker(
                                           {recipientNode: recipientPrimary, tenantId: kTenantId})
                                       .recipient.state ==
-                                TenantMigrationTest.RecipientAccessState.kReject);
+                                TenantMigrationTest.RecipientAccessState.kRejectReadsAndWrites);
             }
             break;
         default:
