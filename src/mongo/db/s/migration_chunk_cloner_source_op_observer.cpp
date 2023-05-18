@@ -29,4 +29,24 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 
-namespace mongo {}  // namespace mongo
+#include "mongo/s/chunk_manager.h"
+
+namespace mongo {
+
+// static
+void MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
+    OperationContext* opCtx,
+    const CollectionMetadata& metadata,
+    const BSONObj& shardKey,
+    const LogicalTime& atClusterTime) {
+    // We can assume the simple collation because shard keys do not support non-simple collations.
+    auto cmAtTimeOfWrite =
+        ChunkManager::makeAtTime(*metadata.getChunkManager(), atClusterTime.asTimestamp());
+    auto chunk = cmAtTimeOfWrite.findIntersectingChunkWithSimpleCollation(shardKey);
+
+    // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
+    // read concern parameter.
+    chunk.throwIfMoved();
+}
+
+}  // namespace mongo

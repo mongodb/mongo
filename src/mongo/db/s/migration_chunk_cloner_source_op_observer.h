@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/s/collection_metadata.h"
 
 namespace mongo {
 
@@ -45,6 +46,20 @@ namespace mongo {
  *
  * See ShardServerOpObserver.
  */
-class MigrationChunkClonerSourceOpObserver : public OpObserverNoop {};
+class MigrationChunkClonerSourceOpObserver : public OpObserverNoop {
+public:
+    /**
+     * Write operations do shard version checking, but if an update operation runs as part of a
+     * 'readConcern:snapshot' transaction, the router could have used the metadata at the snapshot
+     * time and yet set the latest shard version on the request. This is why the write can get
+     * routed to a shard which no longer owns the chunk being written to. In such cases, throw a
+     * MigrationConflict exception to indicate that the transaction needs to be rolled-back and
+     * restarted.
+     */
+    static void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
+                                                   const CollectionMetadata& metadata,
+                                                   const BSONObj& shardKey,
+                                                   const LogicalTime& atClusterTime);
+};
 
 }  // namespace mongo
