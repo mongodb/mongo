@@ -71,7 +71,8 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                                             feature_flags::gTimeseriesUpdatesSupport.isEnabled(
                                                 serverGlobalParams.featureCompatibility),
                                             collection)
-                                      : nullptr) {
+                                      : nullptr),
+      _isRequestToTimeseries(isRequestToTimeseries) {
     if (forgoOpCounterIncrements) {
         _expCtx->enabledCounters = false;
     }

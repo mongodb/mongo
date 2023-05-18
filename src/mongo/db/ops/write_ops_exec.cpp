@@ -1202,20 +1202,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, ns);
 
-    auto documentCounter = [&] {
-        if (source == OperationSource::kTimeseriesUpdate &&
-            !parsedUpdate.isEligibleForArbitraryTimeseriesUpdate()) {
-            return timeseries::numMeasurementsForBucketCounter(
-                collection.getCollectionPtr()->getTimeseriesOptions()->getTimeField());
-        }
-        return UpdateStageParams::DocumentCounter{};
-    }();
-
-    auto exec = uassertStatusOK(getExecutorUpdate(&curOp.debug(),
-                                                  collection,
-                                                  &parsedUpdate,
-                                                  boost::none /* verbosity */,
-                                                  std::move(documentCounter)));
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(&curOp.debug(), collection, &parsedUpdate, boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1581,20 +1569,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
-    auto documentCounter = [&] {
-        if (source == OperationSource::kTimeseriesDelete &&
-            !parsedDelete.isEligibleForArbitraryTimeseriesDelete()) {
-            return timeseries::numMeasurementsForBucketCounter(
-                collection.getCollectionPtr()->getTimeseriesOptions()->getTimeField());
-        }
-        return DeleteStageParams::DocumentCounter{};
-    }();
-
-    auto exec = uassertStatusOK(getExecutorDelete(&curOp.debug(),
-                                                  collection,
-                                                  &parsedDelete,
-                                                  boost::none /* verbosity */,
-                                                  std::move(documentCounter)));
+    auto exec = uassertStatusOK(
+        getExecutorDelete(&curOp.debug(), collection, &parsedDelete, boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());

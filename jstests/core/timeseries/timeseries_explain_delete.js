@@ -45,7 +45,7 @@ function testDeleteExplain({
     expectedNumUnpacked = null,
     expectedUsedIndexName = null
 }) {
-    assert(expectedDeleteStageName === "TS_MODIFY" || expectedDeleteStageName === "BATCHED_DELETE");
+    assert(expectedDeleteStageName === "TS_MODIFY" || expectedDeleteStageName === "DELETE");
 
     // Prepares a timeseries collection.
     const coll = testDB.getCollection(collNamePrefix + testCaseId++);
@@ -125,11 +125,11 @@ function testDeleteExplain({
             q: {},
             limit: 0,
         },
-        // If the delete query is empty, we should use the BATCHED_DELETE plan.
-        expectedDeleteStageName: "BATCHED_DELETE",
+        // If the delete query is empty, we should use the DELETE plan.
+        expectedDeleteStageName: "DELETE",
         expectedOpType: "deleteMany",
         expectedBucketFilter: closedBucketFilter,
-        expectedNumDeleted: 2,
+        expectedNumDeleted: 4,
     });
 })();
 

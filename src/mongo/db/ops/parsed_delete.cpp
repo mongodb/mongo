@@ -66,7 +66,8 @@ ParsedDelete::ParsedDelete(OperationContext* opCtx,
                                             feature_flags::gTimeseriesDeletesSupport.isEnabled(
                                                 serverGlobalParams.featureCompatibility),
                                             collection)
-                                      : nullptr) {}
+                                      : nullptr),
+      _isRequestToTimeseries(isTimeseriesDelete) {}
 
 Status ParsedDelete::parseRequest() {
     dassert(!_canonicalQuery.get());

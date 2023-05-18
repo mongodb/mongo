@@ -80,6 +80,10 @@ let otherShard = null;
  * Zero or more filters can be passed in as arguments.
  */
 function makeBucketFilter(...args) {
+    if (!args.length) {
+        return closedBucketFilter;
+    }
+
     return {$and: [closedBucketFilter].concat(Array.from(args))};
 }
 

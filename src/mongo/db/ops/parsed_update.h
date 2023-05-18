@@ -145,6 +145,10 @@ public:
      */
     bool isEligibleForArbitraryTimeseriesUpdate() const;
 
+    bool isRequestToTimeseries() const {
+        return _isRequestToTimeseries;
+    }
+
 private:
     /**
      * Parses the query portion of the update request.
@@ -185,6 +189,8 @@ private:
     // Contains the residual expression and the bucket-level expression that should be pushed down
     // to the bucket collection.
     std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesUpdateQueryExprs;
+
+    const bool _isRequestToTimeseries;
 };
 
 }  // namespace mongo
