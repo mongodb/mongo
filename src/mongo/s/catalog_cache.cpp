@@ -525,11 +525,6 @@ boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexIn
             if (acquireTries == kMaxInconsistentCollectionRefreshAttempts) {
                 throw;
             }
-
-            // TODO (SERVER-71278) Remove this handling of SnapshotUnavailable
-            if (ex.code() == ErrorCodes::SnapshotUnavailable) {
-                sleepmillis(100);
-            }
         }
 
         indexEntryFuture = _indexCache.acquireAsync(nss, CacheCausalConsistency::kLatestKnown);
