@@ -137,12 +137,16 @@ public:
     EvalFilterSelectivityResult transport(const PathDefault& node,
                                           CEType inputCard,
                                           EvalFilterSelectivityResult childResult) {
-        if (node.getDefault() == Constant::boolean(false)) {
-            // We have a {$exists: true} predicate on this path if we have a Constant[false] child
-            // here. Note that ${exists: false} is handled by the presence of a negation expression
-            // higher in the ABT.
-            childResult.selectivity = kDefaultExistsSel;
+        if (const auto* constPtr = node.getDefault().cast<Constant>();
+            constPtr && constPtr->isValueBool()) {
+            // We have a $exists predicate on this path. Constant[false] represents {$exists:
+            // true} whereas Constant[true] represents {$exists: false} here. Note that
+            // Constant[true] usually comes from NotPushdown which push down a higher negation
+            // through PathDefault.
+            const bool exists = !constPtr->getValueBool();
+            childResult.selectivity = exists ? kDefaultExistsSel : negateSel(kDefaultExistsSel);
         }
+
         return childResult;
     }
 

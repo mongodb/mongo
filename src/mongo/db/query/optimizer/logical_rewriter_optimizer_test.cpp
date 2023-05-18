@@ -1505,6 +1505,79 @@ TEST(LogicalRewriter, NotPushdownPathConstantNotsAreCancelled) {
         latest);
 }
 
+TEST(LogicalRewriter, NotPushdownPathDefault) {
+    // MQL: aggregate({$match:{ a: {$exists:false}}})
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_evalf(
+                _pconst(_unary("Not", _evalf(_get("a", _default(_cbool(false))), "scan_0"_var))),
+                "scan_0"_var))
+            .finish(_scan("scan_0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should push the Not down through PathConstant.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{scan_0}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathDefault []\n"
+        "|   Const [true]\n"
+        "Scan [coll, {scan_0}]\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownPathDefaultNested) {
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_evalf(
+                _pconst(_unary(
+                    "Not",
+                    _evalf(_default(_evalf(_default(_cbool(false)), "scan_0"_var)), "scan_0"_var))),
+                "scan_0"_var))
+            .finish(_scan("scan_0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should push the Not down through the nested PathConstant.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{scan_0}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathDefault []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathDefault []\n"
+        "|   Const [true]\n"
+        "Scan [coll, {scan_0}]\n",
+        latest);
+}
+
 TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
     // Example translation of {a: {$elemMatch: {b: {$ne: 2}}}}
     ABT scanNode = make<ScanNode>("scan_0", "coll");

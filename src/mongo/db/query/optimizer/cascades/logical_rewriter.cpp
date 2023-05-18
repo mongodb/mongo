@@ -747,6 +747,14 @@ public:
     };
     using Result = boost::optional<Simplified>;
 
+    Result operator()(const ABT& /*n*/, const Constant& constant, const bool negate) {
+        if (negate && constant.isValueBool()) {
+            return {
+                {true, make<Constant>(sbe::value::TypeTags::Boolean, !constant.getValueBool())}};
+        }
+        return {};
+    }
+
     Result operator()(const ABT& /*n*/, const PathGet& get, const bool negate) {
         if (auto simplified = get.getPath().visit(*this, negate)) {
             return {
@@ -775,6 +783,18 @@ public:
             return {{true,
                      make<PathConstant>(
                          make<UnaryOp>(Operations::Not, std::move(constant.getConstant())))}};
+        }
+        return {};
+    }
+
+    Result operator()(const ABT& /*n*/, const PathDefault& pathDefault, const bool negate) {
+        if (auto simplified = pathDefault.getDefault().visit(*this, negate)) {
+            return {{simplified->negated, make<PathDefault>(std::move(simplified->newNode))}};
+        } else if (negate) {
+            // We can still negate the inner expression.
+            return {{true,
+                     make<PathDefault>(
+                         make<UnaryOp>(Operations::Not, std::move(pathDefault.getDefault())))}};
         }
         return {};
     }
