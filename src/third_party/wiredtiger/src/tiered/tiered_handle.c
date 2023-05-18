@@ -885,8 +885,8 @@ __wt_tiered_tree_open(WT_SESSION_IMPL *session, const char *cfg[])
     /*
      * Set dhandle->handle with tiered tree structure, initialized.
      */
-    __wt_verbose(session, WT_VERB_TIERED, "TIERED_TREE_OPEN: Called %s", session->dhandle->name);
     WT_ASSERT(session, session->dhandle != NULL);
+    __wt_verbose(session, WT_VERB_TIERED, "TIERED_TREE_OPEN: Called %s", session->dhandle->name);
     WT_RET(__wt_metadata_cursor(session, &cursor));
     WT_ERR(__wt_tiered_name(
       session, session->dhandle, 0, WT_TIERED_NAME_OBJECT | WT_TIERED_NAME_PREFIX, &object));
