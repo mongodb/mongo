@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/reftracker_utils.h"
 
@@ -722,8 +723,8 @@ static void convertFilterToSargableNode(ABT::reference_type node,
 
 /**
  * Takes an expression or path and attempts to remove Not nodes by pushing them
- * down toward the leaves. We only remove a Not if we can combine it into a
- * PathCompare, or cancel it out with another Not.
+ * down toward the leaves. We push a Not if we can combine it into a PathCompare,
+ * push though PathConstant, or cancel it out with another Not.
  *
  * Caller provides:
  * - an input ABT
@@ -762,6 +763,18 @@ public:
 
         if (auto op = negateComparisonOp(comp.op())) {
             return {{true, make<PathCompare>(*op, comp.getVal())}};
+        }
+        return {};
+    }
+
+    Result operator()(const ABT& /*n*/, const PathConstant& constant, const bool negate) {
+        if (auto simplified = constant.getConstant().visit(*this, negate)) {
+            return {{simplified->negated, make<PathConstant>(std::move(simplified->newNode))}};
+        } else if (negate) {
+            // we can still negate the inner expression.
+            return {{true,
+                     make<PathConstant>(
+                         make<UnaryOp>(Operations::Not, std::move(constant.getConstant())))}};
         }
         return {};
     }

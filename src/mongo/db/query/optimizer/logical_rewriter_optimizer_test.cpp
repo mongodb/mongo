@@ -1388,6 +1388,123 @@ TEST(LogicalRewriter, NotPushdownComposeM) {
         latest);
 }
 
+TEST(LogicalRewriter, NotPushdownPathConstant) {
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_unary("Not",
+                           _evalf(_pconst(_binary("Gt", "10"_cint64, "100"_cint64)), "scan_0"_var)
+
+                               ))
+            .finish(_scan("scan_0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should push the Not down. If the child expression of a PathConstant cannot be further
+    // simplified, we negate the expression with UnaryOp [Not].
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{scan_0}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   UnaryOp [Not]\n"
+        "|   BinaryOp [Gt]\n"
+        "|   |   Const [100]\n"
+        "|   Const [10]\n"
+        "Scan [coll, {scan_0}]\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownPathConstantNested) {
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_evalf(
+                _pconst(_unary(
+                    "Not", _evalf(_pconst(_evalp(_get("a", _id()), "scan_0"_var)), "scan_0"_var))),
+                "scan_0"_var))
+            .finish(_scan("scan_0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should push the Not down through another PathConstant, until EvalPath.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{scan_0}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   UnaryOp [Not]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathIdentity []\n"
+        "Scan [coll, {scan_0}]\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownPathConstantNotsAreCancelled) {
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_evalf(
+                _pconst(_unary(
+                    "Not",
+                    _evalf(_pconst(_unary("Not",
+                                          _evalf(_pconst(_evalp(_get("a", _id()), "scan_0"_var)),
+                                                 "scan_0"_var))),
+                           "scan_0"_var))),
+                "scan_0"_var))
+            .finish(_scan("scan_0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should push the Not down and cancel out the Nots inside PathConstant.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{scan_0}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathConstant []\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathIdentity []\n"
+        "Scan [coll, {scan_0}]\n",
+        latest);
+}
+
 TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
     // Example translation of {a: {$elemMatch: {b: {$ne: 2}}}}
     ABT scanNode = make<ScanNode>("scan_0", "coll");
