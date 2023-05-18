@@ -29,6 +29,9 @@ const kOrderTypes = [
     }
 ];
 
+const numNodesPerRS = 2;
+const insertBatchSize = 1000;
+
 /**
  * Appends the field of the specified name and type to the given documents such that the field value
  * is identical across the documents.
@@ -234,8 +237,20 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, nu
             tojson({dbName, collName, currentShardKey, numDocs, testCase})}`);
 
         assert.commandWorked(coll.createIndex(testCase.indexKey));
+        // To reduce the insertion order noise caused by parallel oplog application on
+        // secondaries, insert the documents in multiple batches.
         const docs = makeDocuments(numDocs, fieldOpts);
-        assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: true}));
+        let currIndex = 0;
+        while (currIndex < docs.length) {
+            const endIndex = currIndex + insertBatchSize;
+            assert.commandWorked(db.runCommand({
+                insert: collName,
+                documents: docs.slice(currIndex, endIndex),
+                // Wait for secondaries to have replicated the writes.
+                writeConcern: {w: numNodesPerRS}
+            }));
+            currIndex = endIndex;
+        }
 
         const res =
             assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: testCase.shardKey}));
