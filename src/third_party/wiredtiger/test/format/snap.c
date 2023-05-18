@@ -633,9 +633,11 @@ snap_repeat(TINFO *tinfo, SNAP_OPS *snap)
 {
     WT_DECL_RET;
     WT_SESSION *session;
+    const char *rollback_reason;
 #define MAX_RETRY_ON_ROLLBACK WT_THOUSAND
     u_int max_retry;
 
+    rollback_reason = NULL;
     session = tinfo->session;
 
     /* Start a transaction with a read-timestamp and verify the record. */
@@ -659,6 +661,8 @@ snap_repeat(TINFO *tinfo, SNAP_OPS *snap)
             break;
         testutil_assertfmt(ret == WT_ROLLBACK, "operation failed: %d", ret);
 
+        rollback_reason = session->get_rollback_reason(session);
+
         testutil_check(session->rollback_transaction(session, NULL));
     }
 
@@ -667,14 +671,14 @@ snap_repeat(TINFO *tinfo, SNAP_OPS *snap)
      * This would cause the snapshot read to rollback even we retry many times. Give up and ignore
      * this case.
      */
-    if (max_retry >= MAX_RETRY_ON_ROLLBACK &&
-      strcmp(session->get_rollback_reason(session), TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION) == 0)
+    if (max_retry >= MAX_RETRY_ON_ROLLBACK && rollback_reason != NULL &&
+      strcmp(rollback_reason, TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION) == 0)
         WARN(
           "%s: %s", "snap repeat exceeds maximum retry", TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
-    else
+    else {
         testutil_assert(max_retry < MAX_RETRY_ON_ROLLBACK);
-
-    testutil_check(session->rollback_transaction(session, NULL));
+        testutil_check(session->rollback_transaction(session, NULL));
+    }
 }
 
 /*
