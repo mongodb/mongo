@@ -109,3 +109,8 @@ feature_flags:
     default: true
     version: 7.0
     shouldBeFCVGated: true
+  featureFlagMultipleGranularityDDLLocking:
+    description: "Feature flag for enabling multiple granularity DDL locking"
+    cpp_varname: feature_flags::gMultipleGranularityDDLLocking
+    default: false
+    shouldBeFCVGated: true
