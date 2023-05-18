@@ -153,6 +153,7 @@ env.Library(
         'migration_batch_fetcher.cpp',
         'migration_batch_inserter.cpp',
         'migration_chunk_cloner_source.cpp',
+        'migration_chunk_cloner_source_op_observer.cpp',
         'migration_coordinator.cpp',
         'migration_coordinator_document.idl',
         'migration_destination_manager.cpp',

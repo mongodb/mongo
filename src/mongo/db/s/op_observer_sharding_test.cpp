@@ -36,6 +36,7 @@
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -231,6 +232,7 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
     OpObserverRegistry opObserver;
     opObserver.addObserver(
         std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterImpl>()));
+    opObserver.addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
 
     OperationContext* opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kUnshardedNss, MODE_IX);

@@ -142,6 +142,7 @@
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_primary/move_primary_donor_service.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
@@ -1271,6 +1272,7 @@ void setUpObservers(ServiceContext* serviceContext) {
             ->registerPin(std::make_unique<ReshardingHistoryHook>());
         opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>(
             std::make_unique<OplogWriterTransactionProxy>(std::make_unique<OplogWriterImpl>())));
+        opObserverRegistry->addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
