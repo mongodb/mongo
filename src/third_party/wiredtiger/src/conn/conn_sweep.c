@@ -44,6 +44,13 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
           dhandle->timeofdeath != 0)
             continue;
 
+        /*
+         * Never close out the history store handle via sweep. It can cause a deadlock if eviction
+         * needs to re-open a handle to the history store while a checkpoint is getting started.
+         */
+        if (WT_IS_HS(dhandle))
+            continue;
+
         dhandle->timeofdeath = now;
         WT_STAT_CONN_INCR(session, dh_sweep_tod);
     }
