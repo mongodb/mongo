@@ -7,16 +7,15 @@ yamlEnv = env.Clone()
 yamlEnv.InjectThirdParty(libraries=['yaml'])
 
 mongobridge = env.Program(
-    target='mongobridge',
+    target="mongobridge",
     source=[
-        'bridge.cpp',
-        'bridge_commands.cpp',
-        'mongobridge_options.cpp',
-        'mongobridge_options.idl',
-        'mongobridge_options_init.cpp',
+        "bridge.cpp",
+        "bridge_commands.cpp",
+        "mongobridge_options.cpp",
+        "mongobridge_options.idl",
+        "mongobridge_options_init.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/transport/message_compressor',

@@ -57,7 +57,7 @@ class Locker {
 public:
     using LockTimeoutCallback = std::function<void()>;
 
-    virtual ~Locker();
+    virtual ~Locker() {}
 
     /**
      * Returns true if this is an instance of LockerNoop. Because LockerNoop doesn't implement many
@@ -570,7 +570,7 @@ public:
     }
 
 protected:
-    Locker();
+    Locker() {}
 
     /**
      * The number of callers that are guarding from lock interruptions.

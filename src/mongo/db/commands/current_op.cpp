@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/commands/current_op_common.h"
 
 #include "mongo/db/auth/action_type.h"
@@ -37,6 +39,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/stats/fill_locker_info.h"
 
 namespace mongo {
 

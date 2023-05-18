@@ -50,6 +50,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"

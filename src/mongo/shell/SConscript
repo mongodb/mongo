@@ -320,7 +320,6 @@ if not has_option('noshell') and jsEngine:
             # library to inject a static or mongo initializer to mongo,
             # please add that library as a private libdep of
             # mongo_initializers.
-            "$BUILD_DIR/mongo/db/concurrency/lock_manager",
             "$BUILD_DIR/mongo/s/write_ops/batch_write_types",
             "$BUILD_DIR/mongo/transport/transport_layer",
             "$BUILD_DIR/mongo/util/net/ssl_manager",

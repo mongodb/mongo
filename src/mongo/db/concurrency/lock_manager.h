@@ -63,6 +63,8 @@ public:
      * Retrieves the lock manager instance attached to this ServiceContext.
      * The lock manager is now a decoration on the service context and this is the accessor that
      * most callers should prefer outside of startup, lock internals, and debugger scripts.
+     * Using the ServiceContext and OperationContext versions where possible is preferable to
+     * getGlobalLockManager().
      */
     static LockManager* get(ServiceContext* service);
     static LockManager* get(ServiceContext& service);

@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/concurrency/lock_manager.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/lock_state.h"
 
 namespace mongo {
 

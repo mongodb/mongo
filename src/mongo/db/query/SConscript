@@ -275,18 +275,16 @@ env.Library(
 )
 
 env.Library(
-    target='query_test_service_context',
+    target="query_test_service_context",
     source=[
-        'query_test_service_context.cpp',
+        "query_test_service_context.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/session/logical_session_id',
-        'collation/collator_factory_mock',
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/session/logical_session_id",
+        "collation/collator_factory_mock",
     ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-    ],
+    LIBDEPS_PRIVATE=[],
 )
 
 env.Library(

@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/embedded/embedded.h"
 
 #include "mongo/base/initializer.h"
@@ -39,7 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/op_observer/op_observer_impl.h"

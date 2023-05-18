@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"

@@ -584,6 +584,8 @@ class MongoDBDumpLocks(gdb.Command):
         try:
             # Call into mongod, and dump the state of lock manager
             # Note that output will go to mongod's standard output, not the debugger output window
+            # Do not call mongo::getGlobalLockManager() due to the compiler optimizing this function in a very weird way
+            # See SERVER-72816 for more context
             gdb.execute(
                 "call mongo::LockManager::get((mongo::ServiceContext*) mongo::getGlobalServiceContext())->dump()",
                 from_tty=False, to_string=False)

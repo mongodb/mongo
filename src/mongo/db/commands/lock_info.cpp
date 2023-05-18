@@ -27,10 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include <map>
+
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 

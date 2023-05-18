@@ -37,29 +37,39 @@ env.Library(
 )
 
 env.Library(
+    target='lock_manager_defs',
+    source=[
+        'lock_manager_defs.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
+)
+
+env.Library(
     target='lock_manager',
     source=[
         'd_concurrency.cpp',
         'lock_manager.cpp',
-        'lock_manager_defs.cpp',
+        'lock_state.cpp',
         'lock_stats.cpp',
-        'locker.cpp',
-        'locker_impl.cpp',
         'replication_state_transition_lock_guard.cpp',
         'resource_catalog.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/concurrency_adjustment_parameters',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
+        '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/third_party/shim_boost',
+        'lock_manager_defs',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -79,7 +89,6 @@ env.Benchmark(
         'd_concurrency_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
         'lock_manager',
     ],
 )
@@ -90,8 +99,8 @@ env.CppUnitTest(
         'd_concurrency_test.cpp',
         'fast_map_noalloc_test.cpp',
         'lock_manager_test.cpp',
+        'lock_state_test.cpp',
         'lock_stats_test.cpp',
-        'locker_impl_test.cpp',
         'resource_catalog_test.cpp',
     ],
     LIBDEPS=[

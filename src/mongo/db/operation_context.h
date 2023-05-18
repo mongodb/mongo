@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
 #include <boost/optional.hpp>
+#include <cstddef>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
@@ -46,7 +49,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
@@ -59,7 +61,9 @@
 namespace mongo {
 
 class CurOp;
+class ProgressMeter;
 class ServiceContext;
+class StringData;
 
 namespace repl {
 class UnreplicatedWritesBlock;

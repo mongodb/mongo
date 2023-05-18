@@ -29,9 +29,11 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -174,27 +176,6 @@ Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
       _isOutermostLock(otherLock._isOutermostLock) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
     otherLock._result = LOCK_INVALID;
-}
-
-Lock::GlobalLock::~GlobalLock() {
-    // Preserve the original lock result which will be overridden by unlock().
-    auto lockResult = _result;
-    auto* locker = _opCtx->lockState();
-
-    if (isLocked()) {
-        // Abandon our snapshot if destruction of the GlobalLock object results in actually
-        // unlocking the global lock. Recursive locking and the two-phase locking protocol may
-        // prevent lock release.
-        const bool willReleaseLock = _isOutermostLock && !locker->inAWriteUnitOfWork();
-        if (willReleaseLock) {
-            _opCtx->recoveryUnit()->abandonSnapshot();
-        }
-        _unlock();
-    }
-
-    if (!_skipRSTLLock && (lockResult == LOCK_OK || lockResult == LOCK_WAITING)) {
-        locker->unlock(resourceIdReplicationStateTransitionLock);
-    }
 }
 
 void Lock::GlobalLock::_unlock() {

@@ -767,7 +767,7 @@ env.Library(
 )
 
 env.Library(
-    target='metadata_consistency_types_idl',
+    target="metadata_consistency_types_idl",
     source=[
         'metadata_consistency_types.idl',
     ],

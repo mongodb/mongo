@@ -150,7 +150,6 @@ env.CppUnitTest(
         "interval_simplify_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "optimizer",
         "unit_test_pipeline_utils",

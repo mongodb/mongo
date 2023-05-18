@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_impl.h"
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/concurrency/lock_state.h"
 
 #include <vector>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/flow_control.h"
@@ -136,12 +140,6 @@ AtomicWord<unsigned long long> idCounter(0);
 PartitionedInstanceWideLockStats globalStats;
 
 }  // namespace
-
-LockManager* getGlobalLockManager() {
-    auto serviceContext = getGlobalServiceContext();
-    invariant(serviceContext);
-    return LockManager::get(serviceContext);
-}
 
 bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
     switch (resId.getType()) {
@@ -1229,6 +1227,12 @@ public:
 //
 // Standalone functions
 //
+
+LockManager* getGlobalLockManager() {
+    auto serviceContext = getGlobalServiceContext();
+    invariant(serviceContext);
+    return LockManager::get(serviceContext);
+}
 
 void reportGlobalLockingStats(SingleThreadedLockStats* outStats) {
     globalStats.report(outStats);
