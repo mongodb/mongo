@@ -273,5 +273,76 @@ TEST_F(ObjectReplaceExecutorTest, NoLogBuilder) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
+TEST_F(ObjectReplaceExecutorTest, DuplicateIdFieldsCheck) {
+    BSONObj replacement = BSON("a"
+                               << "1"
+                               << "_id" << 1 << "_id" << 2 << "_id" << 3);
+    ObjectReplaceExecutor node(replacement);
+
+    mutablebson::Document doc(fromjson("{a: 1, _id: 1}"));
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Can't have multiple _id fields in one document");
+}
+
+TEST_F(ObjectReplaceExecutorTest, DuplicateIdFieldsCheckOnEmptyDoc) {
+    BSONObj replacement = BSON("a"
+                               << "1"
+                               << "_id" << 1 << "_id" << 2 << "_id" << 3);
+    ObjectReplaceExecutor node(replacement);
+
+    mutablebson::Document doc(fromjson(""));
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Can't have multiple _id fields in one document");
+}
+
+
+TEST_F(ObjectReplaceExecutorTest, DuplicateIdFieldsCheckOnInvalidDoc) {
+    BSONObj replacement = BSON("a"
+                               << "2"
+                               << "_id" << 4 << "_id" << 5 << "_id" << 6);
+    ObjectReplaceExecutor node(replacement);
+
+    BSONObj invalid = BSON("a"
+                           << "1"
+                           << "_id" << 1 << "_id" << 2 << "_id" << 3);
+    mutablebson::Document doc(invalid);
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Can't have multiple _id fields in one document");
+}
+
+TEST_F(ObjectReplaceExecutorTest, DuplicateIdFieldsCheckAllowsCorrection) {
+    ObjectReplaceExecutor node(fromjson("{a: 4, _id: 3}"));
+
+    BSONObj invalid = BSON("a"
+                           << "1"
+                           << "_id" << 1 << "_id" << 2 << "_id" << 3);
+    mutablebson::Document doc(invalid);
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
+    ASSERT_FALSE(result.noop);
+    ASSERT_EQUALS(fromjson("{a: 4, _id: 3}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 4, _id: 3}"), result.oplogEntry);
+}
+
+TEST_F(ObjectReplaceExecutorTest, DuplicateIdFieldsCheckAllowsNoop) {
+    BSONObj replacement = BSON("a"
+                               << "1"
+                               << "_id" << 1 << "_id" << 2 << "_id" << 3);
+    ObjectReplaceExecutor node(replacement);
+
+    mutablebson::Document doc(replacement);
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.noop);
+    ASSERT_EQUALS(replacement, doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_BINARY_EQ(fromjson("{}"), result.oplogEntry);
+}
+
 }  // namespace
 }  // namespace mongo

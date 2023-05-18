@@ -658,6 +658,48 @@ BSONObj _closeGoldenData(const BSONObj& input, void*) {
     return {};
 }
 
+/**
+ * This function is a light-weight BSON builder to support building an arbitrary BSON in shell.
+ * This function is particularly useful for testing invalid BSON object which is impossible to be
+ * constructed from JS shell environment.
+ *
+ * The field names and values in the `args` are in the order like: name1, value1, name2, value...
+ *
+ * args:
+ *   "0": string; field name for the first field
+ *   "1": any; value for the first field
+ *   "2": string; field name for the second field
+ *   "3": any; value for the second field
+ *   "4": ...
+ *
+ * e.g.
+ * > let bsonObj = _buildBsonObj("_id", 1, "a", 2, "foo", "bar");
+ * > printjson(bsonObj)
+ * { "_id" : 1, "a" : 2, "foo" : "bar" }
+ */
+BSONObj _buildBsonObj(const BSONObj& args, void*) {
+    ::mongo::BSONObjBuilder builder(64);
+    int fieldNum = 0;   // next field name in numeric form
+    BSONElement name;   // next pipe relative path
+    BSONElement value;  // next pipe relative path
+
+    do {
+        name = args.getField(std::to_string(fieldNum++));
+        value = args.getField(std::to_string(fieldNum++));
+        if (name.type() == BSONType::EOO) {
+            break;
+        }
+        uassert(7587900,
+                str::stream() << "BSON field name must be a string: " << name,
+                name.type() == BSONType::String);
+        uassert(7587901,
+                str::stream() << "Missing BSON field value: " << value,
+                value.type() != BSONType::EOO);
+        builder << name.str() << value;
+    } while (name.type() != BSONType::EOO);
+    return BSON("" << builder.obj());
+}
+
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_createSecurityToken", _createSecurityToken);
@@ -677,6 +719,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_openGoldenData", _openGoldenData);
     scope.injectNative("_writeGoldenData", _writeGoldenData);
     scope.injectNative("_closeGoldenData", _closeGoldenData);
+    scope.injectNative("_buildBsonObj", _buildBsonObj);
 
     installShellUtilsLauncher(scope);
     installShellUtilsExtended(scope);
