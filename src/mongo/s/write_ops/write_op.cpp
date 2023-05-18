@@ -235,16 +235,6 @@ void WriteOp::_updateOpState() {
 
 void WriteOp::cancelWrites(const write_ops::WriteError* why) {
     invariant(_state == WriteOpState_Pending || _state == WriteOpState_Ready);
-
-    for (auto& childOp : _childOps) {
-        if (childOp.state == WriteOpState_Pending) {
-            childOp.endpoint.reset(new ShardEndpoint(childOp.pendingWrite->endpoint));
-            if (why)
-                childOp.error = *why;
-            childOp.state = WriteOpState_Cancelled;
-        }
-    }
-
     _state = WriteOpState_Ready;
     _childOps.clear();
 }
