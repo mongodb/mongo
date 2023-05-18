@@ -86,20 +86,26 @@ scratch
 # binaries
 /docgen*
 /loadgen*
+/mongoed*
+/mongogrid*
+/mongoperf*
+/mongoshim*
+/mongosniff*
+/mongotrafficreader*
+
+# binaries from db-contrib-tool
+/ksdecode*
 /mongo*
+/mongoauditdecrypt*
 /mongobridge*
 /mongocryptd*
 /mongod*
-/mongoed*
-/mongogrid*
+/mongodecrypt*
 /mongokerberos*
 /mongoldap*
-/mongoperf*
+/mongoqd*
 /mongos*
-/mongoshim*
-/mongosniff*
 /mongotmock*
-/mongotrafficreader*
 /mqlrun*
 /wt*
 
