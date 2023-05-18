@@ -306,6 +306,9 @@ struct __wt_block {
     uint64_t frags;          /* Maximum frags in the file */
     uint8_t *fragfile;       /* Per-file frag tracking list */
     uint8_t *fragckpt;       /* Per-checkpoint frag tracking list */
+
+    /* Multi-file support */
+    uint32_t read_count; /* Count of active read requests using this block handle */
 };
 
 /*

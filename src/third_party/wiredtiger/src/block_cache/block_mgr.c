@@ -108,7 +108,7 @@ __bm_checkpoint(
      * written.
      *
      * We don't hold the handle array lock across fsync calls since those could be slow and that
-     * would block a concurrent thread opening a new block handle
+     * would block a concurrent thread opening a new block handle.
      */
     do {
         found = false;
@@ -174,9 +174,11 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, s
     if (checkpoint) {
         /*
          * Read-only objects are optionally mapped into memory instead of being read into cache
-         * buffers.
+         * buffers. This isn't supported for trees that use multiple files.
          */
-        WT_RET(__wt_blkcache_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
+        if (!bm->is_multi_handle)
+            WT_RET(
+              __wt_blkcache_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
 
         /*
          * If this handle is for a checkpoint, that is, read-only, there isn't a lot you can do with
@@ -577,7 +579,7 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 
 /*
  * __bm_switch_object --
- *     Switch the tiered object.
+ *     Switch the active handle to a different object.
  */
 static int
 __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
@@ -585,12 +587,16 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
     WT_BLOCK *block, *current;
     size_t root_addr_size;
 
+    /* The checkpoint lock protects against concurrent switches */
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock)
+    WT_ASSERT(session, bm->is_multi_handle);
+
     current = bm->block;
 
     /* We shouldn't ask to switch objects unless we actually need to switch objects */
     WT_ASSERT(session, current->objectid != objectid);
 
-    WT_RET(__wt_blkcache_get_handle(session, bm, objectid, &block));
+    WT_RET(__wt_blkcache_get_handle(session, bm, objectid, false, &block));
 
     __wt_verbose(
       session, WT_VERB_TIERED, "block manager switching from %s to %s", current->name, block->name);
@@ -602,14 +608,18 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
     current->sync_on_checkpoint = true;
 
     /*
-     * Swap out the block manager's default handler.
+     * Switch the active handle. We take the handle table lock to coordinate with a reader who is
+     * concurrently trying to read the old active handle.
      *
      * FIXME: it should not be possible for a thread of control to copy the WT_BM value in the btree
      * layer, sleep until after a subsequent switch and a subsequent a checkpoint that would discard
      * the WT_BM it copied, but it would be worth thinking through those scenarios in detail to be
      * sure there aren't any races.
      */
+    __wt_writelock(session, &bm->handle_array_lock);
     bm->block = block;
+    __wt_writeunlock(session, &bm->handle_array_lock);
+
     return (0);
 }
 
