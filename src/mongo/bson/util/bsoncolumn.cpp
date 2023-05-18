@@ -461,6 +461,7 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
         uassert(6067604, "Invalid BSON Column interleaved encoding", processed == 0);
         // This invalidates 'interleaved' reference, may no longer be dereferenced.
         Regular& regular = _mode.emplace<Regular>();
+        get<0>(regular.state.decoder).deltaOfDelta = false;
         regular.state.lastValue = _decompressed;
         _incrementRegular(regular);
         return;

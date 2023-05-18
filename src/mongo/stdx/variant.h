@@ -29,31 +29,31 @@
 
 #pragma once
 
-#include <mpark/variant.hpp>
+#include <variant>
 
 namespace mongo::stdx {
 
-using ::mpark::get;
-using ::mpark::get_if;
-using ::mpark::holds_alternative;
-using ::mpark::variant;
-using ::mpark::visit;
+using ::std::get;
+using ::std::get_if;
+using ::std::holds_alternative;
+using ::std::variant;
+using ::std::visit;
 
-using ::mpark::variant_alternative;
-using ::mpark::variant_alternative_t;
-using ::mpark::variant_size;
-using ::mpark::variant_size_v;
+using ::std::variant_alternative;
+using ::std::variant_alternative_t;
+using ::std::variant_size;
+using ::std::variant_size_v;
 
-constexpr auto variant_npos = ::mpark::variant_npos;
+constexpr auto variant_npos = ::std::variant_npos;
 
-using ::mpark::operator==;
-using ::mpark::operator!=;
-using ::mpark::operator<;
-using ::mpark::operator>;
-using ::mpark::operator<=;
-using ::mpark::operator>=;
+using ::std::operator==;
+using ::std::operator!=;
+using ::std::operator<;
+using ::std::operator>;
+using ::std::operator<=;
+using ::std::operator>=;
 
-using ::mpark::bad_variant_access;
-using ::mpark::monostate;
+using ::std::bad_variant_access;
+using ::std::monostate;
 
 }  // namespace mongo::stdx

@@ -334,7 +334,7 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
     switch (elem.type()) {
         case BSONType::Array: {
             pushToken("start array", ParserGen::token::START_ARRAY);
-            auto index = 0;
+            auto index = 0U;
             for (auto&& nestedElem : elem.embeddedObject()) {
                 ScopedLocationTracker arrayCtx{this, index++};
                 // For arrays, do not tokenize the field names.
@@ -483,7 +483,7 @@ BSONLexer::BSONLexer(BSONObj obj, ParserGen::token_type startingToken) {
     // array index. No need to tokenize the fieldname for that case.
     if (startingToken == ParserGen::token::START_PIPELINE) {
         pushToken("start array", ParserGen::token::START_ARRAY);
-        auto index = 0;
+        auto index = 0U;
         for (auto&& elem : obj) {
             ScopedLocationTracker stageCtx{this, index++};
             tokenize(elem, false);

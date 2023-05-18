@@ -170,10 +170,14 @@ public:
          * states.
          */
         struct DecodingState {
+            DecodingState();
+
             /**
              * Internal decoding state for types using 64bit aritmetic
              */
             struct Decoder64 {
+                Decoder64();
+
                 Simple8b<uint64_t>::Iterator pos;
                 int64_t lastEncodedValue = 0;
                 int64_t lastEncodedValueForDeltaOfDelta = 0;
@@ -437,4 +441,12 @@ private:
     // Reference counted allocator, used to allocate memory when materializing BSONElements.
     boost::intrusive_ptr<ElementStorage> _allocator;
 };
+
+// Avoid GCC/Clang compiler issues
+// See
+// https://stackoverflow.com/questions/53408962/try-to-understand-compiler-error-message-default-member-initializer-required-be
+inline BSONColumn::Iterator::DecodingState::DecodingState() = default;
+inline BSONColumn::Iterator::DecodingState::Decoder64::Decoder64() = default;
+
+
 }  // namespace mongo
