@@ -43,6 +43,7 @@ enum class OperationSource {
     kTimeseriesInsert,
     kTimeseriesUpdate,
     kTimeseriesDelete,
+    kTimeseriesBucketCompression
 };
 
 StringData toString(OperationSource source);
