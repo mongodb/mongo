@@ -336,7 +336,7 @@ private:
 
     std::unique_ptr<MockServiceEntryPoint> _makeServiceEntryPoint(ServiceContext* sc) {
         auto sep = std::make_unique<MockServiceEntryPoint>(sc);
-        sep->handleRequestCb = [=, this](OperationContext* opCtx, const Message& msg) {
+        sep->handleRequestCb = [=](OperationContext* opCtx, const Message& msg) {
             if (!gInitialUseDedicatedThread) {
                 // Simulates an async command implemented under the borrowed
                 // thread model. The returned future will be fulfilled while
@@ -359,7 +359,7 @@ private:
             }
             return _onMockEvent<Event::sepHandleRequest>(std::tie(opCtx, msg));
         };
-        sep->onEndSessionCb = [=, this](const std::shared_ptr<Session>& session) {
+        sep->onEndSessionCb = [=](const std::shared_ptr<Session>& session) {
             _onMockEvent<Event::sepEndSession>(std::tie(session));
         };
         sep->derivedOnClientDisconnectCb = [&](Client*) {

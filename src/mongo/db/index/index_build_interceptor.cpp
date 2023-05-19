@@ -307,11 +307,10 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     // Sorted index types may choose to disallow duplicates (enforcing an unique index). Columnar
     // indexes are not sorted and therefore cannot enforce uniqueness constraints. Only sorted
     // indexes will use this lambda passed through the IndexAccessMethod interface.
-    IndexAccessMethod::KeyHandlerFn onDuplicateKeyFn =
-        [=, this](const KeyString::Value& duplicateKey) {
-            return trackDups == TrackDuplicates::kTrack ? recordDuplicateKey(opCtx, duplicateKey)
-                                                        : Status::OK();
-        };
+    IndexAccessMethod::KeyHandlerFn onDuplicateKeyFn = [=](const KeyString::Value& duplicateKey) {
+        return trackDups == TrackDuplicates::kTrack ? recordDuplicateKey(opCtx, duplicateKey)
+                                                    : Status::OK();
+    };
 
     return _indexCatalogEntry->accessMethod()->applyIndexBuildSideWrite(
         opCtx, coll, operation, options, std::move(onDuplicateKeyFn), keysInserted, keysDeleted);
@@ -550,7 +549,7 @@ void IndexBuildInterceptor::_checkDrainPhaseFailPoint(OperationContext* opCtx,
                                                       FailPoint* fp,
                                                       long long iteration) const {
     fp->executeIf(
-        [=, this](const BSONObj& data) {
+        [=](const BSONObj& data) {
             LOGV2(4841800,
                   "Hanging index build during drain writes phase",
                   "iteration"_attr = iteration,

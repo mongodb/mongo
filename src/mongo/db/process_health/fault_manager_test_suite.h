@@ -283,7 +283,7 @@ public:
     }
 
     void waitForTransitionIntoState(FaultState state) {
-        assertSoon([=, this]() { return manager().getFaultState() == state; });
+        assertSoon([=]() { return manager().getFaultState() == state; });
     }
 
 private:

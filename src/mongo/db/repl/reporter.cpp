@@ -142,7 +142,7 @@ Status Reporter::trigger() {
     }
 
     auto scheduleResult =
-        _executor->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& args) {
+        _executor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {
             _prepareAndSendCommandCallback(args, true);
         });
 
@@ -252,7 +252,7 @@ void Reporter::_processResponseCallback(
             auto when = _executor->now() + _keepAliveInterval;
             bool fromTrigger = false;
             auto scheduleResult = _executor->scheduleWorkAt(
-                when, [=, this](const executor::TaskExecutor::CallbackArgs& args) {
+                when, [=](const executor::TaskExecutor::CallbackArgs& args) {
                     _prepareAndSendCommandCallback(args, fromTrigger);
                 });
             _status = scheduleResult.getStatus();

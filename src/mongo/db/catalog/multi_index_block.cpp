@@ -865,7 +865,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 collection,
                 dupsAllowed,
                 kYieldIterations,
-                [=, this](const KeyString::Value& duplicateKey) {
+                [=](const KeyString::Value& duplicateKey) {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
                     return writeConflictRetry(
@@ -1226,7 +1226,7 @@ Status MultiIndexBlock::_failPointHangDuringBuild(OperationContext* opCtx,
                                                   unsigned long long iteration) const {
     try {
         fp->executeIf(
-            [=, this, &doc](const BSONObj& data) {
+            [=, &doc](const BSONObj& data) {
                 LOGV2(20386,
                       "Hanging index build during collection scan phase",
                       "where"_attr = where,

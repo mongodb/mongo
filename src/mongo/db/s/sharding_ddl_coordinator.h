@@ -283,7 +283,7 @@ protected:
 
     template <typename Func>
     auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn) {
-        return [=, this] {
+        return [=] {
             const auto& currPhase = _doc.getPhase();
 
             if (currPhase > newPhase) {

@@ -748,7 +748,7 @@ public:
                                  boost::optional<Date_t> maxTime,
                                  WaitFn waitFn) {
             auto barrier = std::make_shared<unittest::Barrier>(2);
-            task = stdx::packaged_task<bool()>([=, this] {
+            task = stdx::packaged_task<bool()>([=] {
                 if (maxTime)
                     opCtx->setDeadlineByDate(*maxTime, ErrorCodes::ExceededTimeLimit);
                 stdx::unique_lock<Latch> lk(mutex);

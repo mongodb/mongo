@@ -217,7 +217,7 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
         _state = State::Migrating;
     }
 
-    _thread = stdx::thread([=, this] {
+    _thread = stdx::thread([=] {
         try {
             _retrieveSessionStateFromSource(service);
         } catch (const DBException& ex) {

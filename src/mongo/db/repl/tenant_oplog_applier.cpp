@@ -502,7 +502,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         if (thread == numOplogThreads - 1) {
             numOps = numOpsRemaining;
         }
-        _writerPool->schedule([=, this, &status = statusVector.at(thread)](auto scheduleStatus) {
+        _writerPool->schedule([=, &status = statusVector.at(thread)](auto scheduleStatus) {
             if (!scheduleStatus.isOK()) {
                 status = scheduleStatus;
             } else {
@@ -521,19 +521,18 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     // Dispatch noop writes for oplog entries from the same session into the same writer thread.
     size_t sessionThreadNum = 0;
     for (const auto& s : sessionOps) {
-        _writerPool->schedule(
-            [=, this, &status = statusVector.at(numOplogThreads + sessionThreadNum)](
-                auto scheduleStatus) {
-                if (!scheduleStatus.isOK()) {
-                    status = scheduleStatus;
-                } else {
-                    try {
-                        _writeSessionNoOpsForRange(s.second.begin(), s.second.end());
-                    } catch (const DBException& e) {
-                        status = e.toStatus();
-                    }
+        _writerPool->schedule([=, &status = statusVector.at(numOplogThreads + sessionThreadNum)](
+                                  auto scheduleStatus) {
+            if (!scheduleStatus.isOK()) {
+                status = scheduleStatus;
+            } else {
+                try {
+                    _writeSessionNoOpsForRange(s.second.begin(), s.second.end());
+                } catch (const DBException& e) {
+                    status = e.toStatus();
                 }
-            });
+            }
+        });
         sessionThreadNum++;
     }
 

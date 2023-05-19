@@ -78,14 +78,11 @@ if env.TargetOSIs('windows'):
             '/wd4003',
         ], )
 else:
-    env.Append(
-        CXXFLAGS=[
-            '-Wno-non-virtual-dtor',
-            '-Wno-invalid-offsetof',
-            '-Wno-sign-compare',
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
-            '-Wno-deprecated',
-        ], )
+    env.Append(CXXFLAGS=[
+        '-Wno-non-virtual-dtor',
+        '-Wno-invalid-offsetof',
+        '-Wno-sign-compare',
+    ], )
 
 # js/src, js/public and mfbt are the only required sources right now, that
 # could change in the future

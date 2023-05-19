@@ -411,10 +411,8 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     }
 
     // Schedule the next document batch insertion.
-    auto&& scheduleResult =
-        _scheduleDbWorkFn([=, this](const executor::TaskExecutor::CallbackArgs& cbd) {
-            insertDocumentsCallback(cbd);
-        });
+    auto&& scheduleResult = _scheduleDbWorkFn(
+        [=](const executor::TaskExecutor::CallbackArgs& cbd) { insertDocumentsCallback(cbd); });
 
     if (!scheduleResult.isOK()) {
         Status newStatus = scheduleResult.getStatus().withContext(

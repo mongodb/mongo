@@ -174,9 +174,9 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
                     << BSON(OplogEntryBase::kTimestampFieldName
                             << 1 << OplogEntryBase::kTermFieldName << 1)
                     << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal),
-        [=, this](const StatusWith<Fetcher::QueryResponse>& response,
-                  Fetcher::NextAction*,
-                  BSONObjBuilder*) {
+        [=](const StatusWith<Fetcher::QueryResponse>& response,
+            Fetcher::NextAction*,
+            BSONObjBuilder*) {
             return _firstOplogEntryFetcherCallback(response, candidate, earliestOpTimeSeen);
         },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
@@ -198,9 +198,9 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))
                     << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal),
-        [=, this](const StatusWith<Fetcher::QueryResponse>& response,
-                  Fetcher::NextAction*,
-                  BSONObjBuilder*) {
+        [=](const StatusWith<Fetcher::QueryResponse>& response,
+            Fetcher::NextAction*,
+            BSONObjBuilder*) {
             return _requiredOpTimeFetcherCallback(response, candidate, earliestOpTimeSeen, rbid);
         },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
@@ -401,7 +401,7 @@ Status SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime ea
     invariant(_state == State::kRunning);
     auto handle = _taskExecutor->scheduleRemoteCommand(
         {candidate, "admin", BSON("replSetGetRBID" << 1), nullptr, kFetcherTimeout},
-        [=, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
+        [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
             _rbidRequestCallback(candidate, earliestOpTimeSeen, rbidReply);
         });
     if (!handle.isOK()) {
