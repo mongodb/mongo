@@ -136,7 +136,7 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
                     }
                 },
                 [&](const std::int64_t& expireAfterSeconds) {
-                    if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+                    if (change_stream_serverless_helpers::isServerlessEnvironment()) {
                         validateStatus = {
                             ErrorCodes::CommandNotSupported,
                             "The 'changeStreamOptions.preAndPostImages.expireAfterSeconds' is "

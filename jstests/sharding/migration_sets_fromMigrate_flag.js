@@ -14,7 +14,7 @@
 //         delete op is done during chunk migration within the chunk range.
 //
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 (function() {
 "use strict";

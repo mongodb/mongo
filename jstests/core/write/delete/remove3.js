@@ -1,9 +1,9 @@
 // @tags: [requires_non_retryable_writes, requires_fastcount]
 
-t = db.remove3;
+let t = db.remove3;
 t.drop();
 
-for (i = 1; i <= 8; i++) {
+for (let i = 1; i <= 8; i++) {
     t.save({_id: i, x: i});
 }
 

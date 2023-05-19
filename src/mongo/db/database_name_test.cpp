@@ -44,15 +44,16 @@ TEST(DatabaseNameTest, MultitenancySupportDisabled) {
 
     ASSERT(!dbnWithoutTenant1.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.toString_forTest());
 
     TenantId tenantId(OID::gen());
     DatabaseName dbnWithTenant = DatabaseName::createDatabaseName_forTest(tenantId, "a");
     ASSERT(dbnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString());
-    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toStringWithTenantId());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant1.toString_forTest());
+    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"),
+                  dbnWithTenant.toStringWithTenantId_forTest());
 }
 
 TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
@@ -62,15 +63,16 @@ TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     DatabaseName dbnWithoutTenant = DatabaseName::createDatabaseName_forTest(boost::none, "a");
     ASSERT(!dbnWithoutTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.toString());
+    ASSERT_EQUALS(std::string("a"), dbnWithoutTenant.toString_forTest());
 
     TenantId tenantId(OID::gen());
     DatabaseName dbnWithTenant = DatabaseName::createDatabaseName_forTest(tenantId, "a");
     ASSERT(dbnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *dbnWithTenant.tenantId());
     ASSERT_EQUALS(std::string("a"), dbnWithTenant.db());
-    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString());
-    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"), dbnWithTenant.toStringWithTenantId());
+    ASSERT_EQUALS(std::string("a"), dbnWithTenant.toString_forTest());
+    ASSERT_EQUALS(std::string(tenantId.toString() + "_a"),
+                  dbnWithTenant.toStringWithTenantId_forTest());
 }
 
 TEST(DatabaseNameTest, VerifyEqualsOperator) {
@@ -122,14 +124,24 @@ TEST(DatabaseNameTest, VerifyCompareFunction) {
     ASSERT(tenantId1 < tenantId2);
 
     DatabaseName dbn1a = DatabaseName::createDatabaseName_forTest(tenantId1, "a");
+    DatabaseName dbn1A = DatabaseName::createDatabaseName_forTest(tenantId1, "A");
     DatabaseName dbn1b = DatabaseName::createDatabaseName_forTest(tenantId1, "b");
     DatabaseName dbn2a = DatabaseName::createDatabaseName_forTest(tenantId2, "a");
     DatabaseName dbn3a = DatabaseName::createDatabaseName_forTest(boost::none, "a");
+    DatabaseName dbn3A = DatabaseName::createDatabaseName_forTest(boost::none, "a");
 
-    ASSERT(dbn1a < dbn1b);
-    ASSERT(dbn1b < dbn2a);
-    ASSERT(dbn3a != dbn1a);
-    ASSERT(dbn1a != dbn2a);
+    ASSERT_LT(dbn1a, dbn1b);
+    ASSERT_LT(dbn1b, dbn2a);
+    ASSERT_NE(dbn3a, dbn1a);
+    ASSERT_NE(dbn1a, dbn2a);
+    ASSERT_LT(dbn3a, dbn1a);
+    ASSERT_LT(dbn3a, dbn2a);
+    ASSERT_GT(dbn2a, dbn1a);
+    ASSERT_TRUE(dbn1a.equalCaseInsensitive(dbn1a));
+    ASSERT_TRUE(dbn1a.equalCaseInsensitive(dbn1A));
+    ASSERT_FALSE(dbn1a.equalCaseInsensitive(dbn2a));
+    ASSERT_FALSE(dbn1a.equalCaseInsensitive(dbn3a));
+    ASSERT_TRUE(dbn3a.equalCaseInsensitive(dbn3A));
 }
 
 TEST(DatabaseNameTest, CheckDatabaseNameLogAttrs) {
@@ -140,13 +152,43 @@ TEST(DatabaseNameTest, CheckDatabaseNameLogAttrs) {
 
     ASSERT_EQUALS(1,
                   countBSONFormatLogLinesIsSubset(
-                      BSON("attr" << BSON("db" << dbWithTenant.toStringWithTenantId()))));
+                      BSON("attr" << BSON("db" << dbWithTenant.toStringWithTenantId_forTest()))));
 
     LOGV2(7448501, "Msg database:", "database"_attr = dbWithTenant);
     ASSERT_EQUALS(1,
-                  countBSONFormatLogLinesIsSubset(
-                      BSON("attr" << BSON("database" << dbWithTenant.toStringWithTenantId()))));
+                  countBSONFormatLogLinesIsSubset(BSON(
+                      "attr" << BSON("database" << dbWithTenant.toStringWithTenantId_forTest()))));
     stopCapturingLogMessages();
+}
+
+TEST(DatabaseNameTest, EmptyDbString) {
+    DatabaseName empty{};
+    ASSERT_EQ(empty.db(), "");
+    ASSERT_FALSE(empty.tenantId());
+    ASSERT_EQ(empty.toString_forTest(), "");
+    ASSERT_EQ(empty.toStringWithTenantId_forTest(), "");
+
+    DatabaseName emptyFromStringData =
+        DatabaseName::createDatabaseName_forTest(boost::none, StringData());
+    ASSERT_EQ(emptyFromStringData.db(), "");
+    ASSERT_FALSE(emptyFromStringData.tenantId());
+    ASSERT_EQ(emptyFromStringData.toString_forTest(), "");
+    ASSERT_EQ(emptyFromStringData.toStringWithTenantId_forTest(), "");
+
+    TenantId tenantId(OID::gen());
+    DatabaseName emptyWithTenantId = DatabaseName::createDatabaseName_forTest(tenantId, "");
+    ASSERT_EQ(emptyWithTenantId.db(), "");
+    ASSERT(emptyWithTenantId.tenantId());
+    ASSERT_EQ(emptyWithTenantId.toString_forTest(), "");
+    ASSERT_EQ(emptyWithTenantId.toStringWithTenantId_forTest(),
+              fmt::format("{}_", tenantId.toString()));
+}
+
+TEST(DatabaseNameTest, FromDataEquality) {
+    NamespaceString test{"foo"};
+    ASSERT_EQ(test.dbName(), DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
+    NamespaceString testTwo{DatabaseName::createDatabaseName_forTest(boost::none, "foo")};
+    ASSERT_EQ(testTwo.dbName(), DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
 }
 
 }  // namespace

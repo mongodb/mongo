@@ -49,7 +49,7 @@ assert.commandWorked(testDB.adminCommand(
     {configureFailPoint: 'WTWriteConflictExceptionForReads', mode: {activationProbability: 0.01}}));
 assert.commandWorked(testDB.adminCommand(
     {configureFailPoint: 'WTWriteConflictException', mode: {activationProbability: 0.01}}));
-res = benchRun(benchArgs);
+let res = benchRun(benchArgs);
 printjson({res});
 
 assert.commandWorked(

@@ -40,7 +40,6 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
@@ -111,13 +110,13 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a standalone mongod",
+                    "configureQueryAnalyzer command is not supported on a standalone mongod",
                     repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a multitenant replica set",
+                    "configureQueryAnalyzer command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
             uassert(ErrorCodes::IllegalOperation,
-                    "configQueryAnalyzer command is not supported on a configsvr mongod",
+                    "configureQueryAnalyzer command is not supported on a configsvr mongod",
                     !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             const auto& nss = ns();
@@ -246,10 +245,10 @@ public:
                 if (preImageDoc.getCollectionUuid() == collUuid) {
                     response.setOldConfiguration(preImageDoc.getConfiguration());
                 }
-            } else {
-                uassert(ErrorCodes::IllegalOperation,
-                        "Attempted to disable query sampling but query sampling was not active",
-                        mode != QueryAnalyzerModeEnum::kOff);
+            } else if (mode != QueryAnalyzerModeEnum::kOff) {
+                LOGV2_WARNING(
+                    7724700,
+                    "Attempted to disable query sampling but query sampling was not active");
             }
 
             return response;
@@ -289,10 +288,7 @@ public:
         return "Starts or stops collecting metrics about read and write queries against a "
                "collection.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ConfigureQueryAnalyzerCmd,
-                                       analyze_shard_key::gFeatureFlagAnalyzeShardKey);
+} configureQueryAnalyzerCmd;
 
 }  // namespace
 

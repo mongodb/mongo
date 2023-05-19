@@ -7,6 +7,9 @@
  *     # that migration by sending a new `moveChunk` command to the donor shard causing the test to
  *     # hang.
  *     does_not_support_stepdowns,
+ *     # Flaky with a config shard because the failovers it triggers trigger a retry from mongos,
+ *     # which can prevent the fail point from being unset and time out.
+ *     config_shard_incompatible,
  * ]
  */
 (function() {
@@ -64,12 +67,6 @@ let hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint =
     configureFailPoint(rs0Secondary, "hangInEnsureChunkVersionIsGreaterThanInterruptible");
 
 st.rs0.stepUp(rs0Secondary);
-
-// Wait for the config server to see the new primary.
-// TODO SERVER-74177 Remove this once retry on NotWritablePrimary is implemented.
-st.forEachConfigServer((conn) => {
-    awaitRSClientHosts(conn, st.rs0.getPrimary(), {ok: true, ismaster: true});
-});
 
 joinMoveChunk1();
 migrationCommitNetworkErrorFailpoint.off();

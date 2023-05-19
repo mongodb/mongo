@@ -3,11 +3,11 @@
 // remove.js
 // unit test for db remove
 
-t = db.removetest;
+let t = db.removetest;
 
 function f(n, dir) {
     t.createIndex({x: dir || 1});
-    for (i = 0; i < n; i++)
+    for (let i = 0; i < n; i++)
         t.save({x: 3, z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"});
 
     assert.eq(n, t.find().count());

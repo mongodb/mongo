@@ -1,14 +1,14 @@
 assert.eq.automsg("0", "new NumberLong()");
 
-n = new NumberLong(4);
+let n = new NumberLong(4);
 assert.eq.automsg("4", "n");
 assert.eq.automsg("4", "n.toNumber()");
 assert.eq.automsg("8", "n + 4");
 assert.eq.automsg("'NumberLong(4)'", "n.toString()");
 assert.eq.automsg("'NumberLong(4)'", "tojson( n )");
-a = {};
+let a = {};
 a.a = n;
-p = tojson(a);
+let p = tojson(a);
 assert.eq.automsg("'{ \"a\" : NumberLong(4) }'", "p");
 
 assert.eq.automsg("NumberLong(4 )", "eval( tojson( NumberLong( 4 ) ) )");

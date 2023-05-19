@@ -8,7 +8,7 @@
 // "expand" portion of the geo-lookup expands the 2d range in only one
 // direction (so points are required on either side of the expanding range)
 
-t = db.geo_fiddly_box;
+let t = db.geo_fiddly_box;
 
 t.drop();
 t.createIndex({loc: "2d"});
@@ -28,11 +28,11 @@ assert.eq(
 
 // Test normal lookup of a small square of points as a sanity check.
 
-epsilon = 0.0001;
-min = -1;
-max = 1;
-step = 1;
-numItems = 0;
+let epsilon = 0.0001;
+let min = -1;
+let max = 1;
+let step = 1;
+let numItems = 0;
 
 t.drop();
 t.createIndex({loc: "2d"}, {max: max + epsilon / 2, min: min - epsilon / 2});

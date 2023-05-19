@@ -397,17 +397,15 @@ function testAddShard() {
     }
 
     // Execute the test case teardown
-    st.s.adminCommand({removeShard: newShardName});
-    newReplicaSet.stopSet();
-}
+    for (const dbName of dbsOnNewReplicaSet) {
+        assert.commandWorked(st.getDB(dbName).dropDatabase());
+    }
 
-// TODO SERVER-69106 remove the logic to skip the test execution
-const historicalPlacementDataFeatureFlag = FeatureFlagUtil.isEnabled(
-    st.configRS.getPrimary().getDB('admin'), "HistoricalPlacementShardingCatalog");
-if (!historicalPlacementDataFeatureFlag) {
-    jsTestLog("Skipping as featureFlagHistoricalPlacementShardingCatalog is disabled");
-    st.stop();
-    return;
+    let res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
+    assert.eq('started', res.state);
+    res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
+    assert.eq('completed', res.state);
+    newReplicaSet.stopSet();
 }
 
 jsTest.log('Testing placement entries added by explicit DB creation');

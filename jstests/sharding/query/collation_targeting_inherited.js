@@ -208,11 +208,10 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
     let res = collCaseInsensitive.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
     assert(res.a === "foo" || res.a === "FOO");
-
-    // TODO: SERVER-69925 Implement explain for findAndModify.
-    // assert.throws(function() {
-    //     collCaseInsensitive.explain().findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
-    // });
+    explain =
+        collCaseInsensitive.explain().findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
+    assert.commandWorked(explain);
+    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 } else {
     // Sharded findAndModify on strings with non-simple collation inherited from the collection
     // default should fail, because findAndModify must target a single shard.
@@ -340,7 +339,9 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
     assert.eq(1, writeRes.nRemoved);
     let afterNumDocsMatch = collCaseInsensitive.find({a: "foo"}).collation(caseInsensitive).count();
     assert.eq(beforeNumDocsMatch - 1, afterNumDocsMatch);
-    // TODO: SERVER-69924 Implement explain for deleteOne
+    explain = collCaseInsensitive.explain().remove({a: "foo"}, {justOne: true});
+    assert.commandWorked(explain);
+    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
     // Re-insert documents for later test cases.
     collCaseInsensitive.insert(a_foo);
@@ -451,7 +452,9 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
     writeRes = assert.commandWorked(collCaseInsensitive.update({a: "foo"}, {$set: {b: 1}}));
     assert.eq(1, writeRes.nMatched);
-    // TODO: SERVER-69922 Implement explain for updateOne
+    explain = collCaseInsensitive.explain().update({a: "foo"}, {$set: {b: 1}});
+    assert.commandWorked(explain);
+    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 } else {
     // A single (non-multi) update must be single-shard or an exact-ID query. A query is exact-ID if
     // it

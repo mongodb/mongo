@@ -22,17 +22,17 @@ retryable_codes = [
 ]
 
 
-def is_retryable_error(exc):
+def is_retryable_error(exc, retryable_error_codes):
     if isinstance(exc, ConnectionFailure):
         return True
     if exc.has_error_label("RetryableWriteError"):
         return True
-    if isinstance(exc, OperationFailure) and exc.code in retryable_codes:
+    if isinstance(exc, OperationFailure) and exc.code in retryable_error_codes:
         return True
     return False
 
 
-def with_naive_retry(func, timeout=100):
+def with_naive_retry(func, timeout=100, extra_retryable_error_codes=None):
     """
     Retry execution of a provided function naively for up to `timeout` seconds.
 
@@ -41,7 +41,12 @@ def with_naive_retry(func, timeout=100):
 
     :param func: The function to execute
     :param timeout: The maximum amount of time to retry execution
+    :param extra_retryable_error_codes: List of additional error codes that should be considered retryable
     """
+
+    retryable_error_codes = set(retryable_codes)
+    if extra_retryable_error_codes:
+        retryable_error_codes.update(extra_retryable_error_codes)
 
     last_exc = None
     start = time.monotonic()
@@ -50,7 +55,7 @@ def with_naive_retry(func, timeout=100):
             return func()
         except PyMongoError as exc:
             last_exc = exc
-            if not is_retryable_error(exc):
+            if not is_retryable_error(exc, retryable_error_codes):
                 raise
         time.sleep(0.1)
 

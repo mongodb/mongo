@@ -35,6 +35,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 
 namespace mongo {
 namespace {
@@ -80,16 +81,32 @@ public:
             // Check if the receiving shard is still the primary for the database
             DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, fromNss.dbName());
 
-            // Acquiring the local part of the distributed locks for involved namespaces allows:
-            // - Serialize with sharded DDLs, ensuring no concurrent modifications of the
-            // collections.
-            // - Check safely if the target collection is sharded or not.
+            /**
+             * Acquiring the local part of the distributed locks for involved namespaces allows:
+             * - Serialize with sharded DDLs, ensuring no concurrent modifications of the
+             * collections.
+             * - Check safely if the target collection is sharded or not.
+             * Since we are not using the ShardingDDLCoordinator infrastructure we need to
+             * explicitly wait for all DDL coordinators to be recovered and to have re-acquired
+             * their DDL locks before to proceed.
+             * TODO SERVER-76463 remove call to 'waitForRecoveryCompletion'.
+             */
+            ShardingDDLCoordinatorService::getService(opCtx)->waitForRecoveryCompletion(opCtx);
             static constexpr StringData lockReason{"internalRenameCollection"_sd};
             auto ddlLockManager = DDLLockManager::get(opCtx);
             auto fromCollDDLLock = ddlLockManager->lock(
                 opCtx, fromNss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout);
-            auto toCollDDLLock = ddlLockManager->lock(
-                opCtx, toNss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout);
+
+            // If we are renaming a buckets collection in the $out stage, we must acquire a lock on
+            // the view namespace, instead of the buckets namespace. This lock avoids concurrent
+            // modifications, since users run operations on the view and not the buckets namespace
+            // and all time-series DDL operations take a lock on the view namespace.
+            auto toCollDDLLock = ddlLockManager->lock(opCtx,
+                                                      fromNss.isOutTmpBucketsCollection()
+                                                          ? toNss.getTimeseriesViewNamespace().ns()
+                                                          : toNss.ns(),
+                                                      lockReason,
+                                                      DDLLockManager::kDefaultLockTimeout);
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "cannot rename to sharded collection '"

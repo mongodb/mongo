@@ -316,9 +316,17 @@ public:
         return {key, contents};
     }
 
-    const std::pair<Key, Value>& current() final {
+    Key nextWithDeferredValue() override {
+        MONGO_UNREACHABLE;
+    }
+
+    Value getDeferredValue() override {
+        MONGO_UNREACHABLE;
+    }
+
+    const Key& current() final {
         tasserted(ErrorCodes::NotImplemented,
-                  "current() not implemented for ColumnStoreSorter::Iterator");
+                  "current() not implemented for ColumnStoreSorter::InMemoryIterator");
     }
 
     void openSource() final {}

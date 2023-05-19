@@ -80,6 +80,7 @@ selector:
 
   # TODO Undenylist (SERVER-38852).
   - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
 
   # serverStatus does not include transaction metrics on mongos.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
@@ -93,6 +94,10 @@ selector:
 
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
+
+  # The test may spuriously fail when run against sharded clusters, due to limitations of the
+  # infrastructure. See SERVER-77039 for full details.
+  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
   exclude_with_any_tags:
   - assumes_balancer_off
@@ -115,12 +120,12 @@ executor:
         TestData:
           runningWithBalancer: true
   hooks:
+  - class: CheckShardFilteringMetadata
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:

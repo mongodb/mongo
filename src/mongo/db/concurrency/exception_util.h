@@ -45,7 +45,10 @@ extern FailPoint skipWriteConflictRetries;
  * @param attempt - what attempt is this, 1 based
  * @param operation - e.g. "update"
  */
-void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns);
+void logWriteConflictAndBackoff(int attempt,
+                                StringData operation,
+                                StringData reason,
+                                StringData ns);
 
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            int attempts,
@@ -67,17 +70,26 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
                                                 StringData ns,
                                                 const TransactionTooLargeForCacheException& e);
 
+namespace error_details {
+/**
+ * A faster alternative to `iasserted`, designed to throw exceptions for unexceptional events on the
+ * critical execution path (e.g., `WriteConflict`).
+ */
+template <ErrorCodes::Error ec>
+[[noreturn]] void throwExceptionFor(std::string reason) {
+    throw ExceptionFor<ec>({ec, std::move(reason)});
+}
+}  // namespace error_details
+
 /**
  * A `WriteConflictException` is thrown if during a write, two or more operations conflict with each
  * other. For example if two operations get the same version of a document, and then both try to
  * modify that document, this exception will get thrown by one of them.
  */
 [[noreturn]] inline void throwWriteConflictException(StringData context) {
-    Status status{
-        ErrorCodes::WriteConflict,
-        str::stream() << "Caused by :: "_sd << context
-                      << " :: Please retry your operation or multi-document transaction."_sd};
-    iasserted(status);
+    error_details::throwExceptionFor<ErrorCodes::WriteConflict>(
+        "Caused by :: {} :: Please retry your operation or multi-document transaction."_format(
+            context));
 }
 
 /**
@@ -86,8 +98,8 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
  * be retried internally by the `writeConflictRetry` helper a finite number of times before
  * eventually being returned.
  */
-[[noreturn]] inline void throwTemporarilyUnavailableException(StringData context) {
-    iasserted({ErrorCodes::TemporarilyUnavailable, context});
+[[noreturn]] inline void throwTemporarilyUnavailableException(std::string context) {
+    error_details::throwExceptionFor<ErrorCodes::TemporarilyUnavailable>(std::move(context));
 }
 
 /**
@@ -96,8 +108,8 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
  * transaction state. This helps to avoid retrying, maybe indefinitely, a transaction which would
  * never be able to complete.
  */
-[[noreturn]] inline void throwTransactionTooLargeForCache(StringData context) {
-    iasserted({ErrorCodes::TransactionTooLargeForCache, context});
+[[noreturn]] inline void throwTransactionTooLargeForCache(std::string context) {
+    error_details::throwExceptionFor<ErrorCodes::TransactionTooLargeForCache>(std::move(context));
 }
 
 /**
@@ -114,7 +126,10 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
  * invocation of the argument function f without any exception handling and retry logic.
  */
 template <typename F>
-auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns, F&& f) {
+auto writeConflictRetry(OperationContext* opCtx,
+                        StringData opStr,
+                        const NamespaceStringOrUUID& nssOrUUID,
+                        F&& f) {
     invariant(opCtx);
     invariant(opCtx->lockState());
     invariant(opCtx->recoveryUnit());
@@ -129,7 +144,9 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
             return f();
         } catch (TemporarilyUnavailableException const& e) {
             if (opCtx->inMultiDocumentTransaction()) {
-                handleTemporarilyUnavailableExceptionInTransaction(opCtx, opStr, ns, e);
+                // TODO SERVER-76897: use nssOrUUID.toStringForLogging().
+                handleTemporarilyUnavailableExceptionInTransaction(
+                    opCtx, opStr, nssOrUUID.toStringForErrorMsg(), e);
             }
             throw;
         }
@@ -140,15 +157,18 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
     while (true) {
         try {
             return f();
-        } catch (WriteConflictException const&) {
+        } catch (WriteConflictException const& e) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            logWriteConflictAndBackoff(writeConflictAttempts, opStr, ns);
+            logWriteConflictAndBackoff(
+                writeConflictAttempts, opStr, e.reason(), nssOrUUID.toStringForErrorMsg());
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
         } catch (TemporarilyUnavailableException const& e) {
-            handleTemporarilyUnavailableException(opCtx, ++attemptsTempUnavailable, opStr, ns, e);
+            handleTemporarilyUnavailableException(
+                opCtx, ++attemptsTempUnavailable, opStr, nssOrUUID.toStringForErrorMsg(), e);
         } catch (TransactionTooLargeForCacheException const& e) {
-            handleTransactionTooLargeForCacheException(opCtx, &writeConflictAttempts, opStr, ns, e);
+            handleTransactionTooLargeForCacheException(
+                opCtx, &writeConflictAttempts, opStr, nssOrUUID.toStringForErrorMsg(), e);
         }
     }
 }

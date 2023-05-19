@@ -51,6 +51,7 @@ protected:
 protected:
     ServerParameter* _featureFlagBlender{nullptr};
     ServerParameter* _featureFlagSpoon{nullptr};
+    ServerParameter* _featureFlagFork{nullptr};
 };
 
 
@@ -197,6 +198,28 @@ TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
     }
     ASSERT_TRUE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+}
+
+// Test feature flags that should not be FCV Gated
+TEST_F(FeatureFlagTest, ShouldBeFCVGatedFalse) {
+    // Test that feature flag that is enabled and not FCV gated will return true for isEnabled.
+    // Test newest version
+    // (Generic FCV reference): feature flag test
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+
+    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled(serverGlobalParams.featureCompatibility));
+
+    // Test oldest version
+    // (Generic FCV reference): feature flag test
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+
+    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled(serverGlobalParams.featureCompatibility));
+
+    // Test uninitialized FCV
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+
+    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled(serverGlobalParams.featureCompatibility));
 }
 
 

@@ -134,7 +134,6 @@ let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavin
 TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(migrationOpts, {
     retryOnRetryableErrors: false,
     automaticForgetMigration: false,
-    enableDonorStartMigrationFsync: true
 }));
 
 // Allow the migration to complete and abort.

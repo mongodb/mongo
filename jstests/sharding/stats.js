@@ -30,7 +30,7 @@ s.adminCommand({shardcollection: "test.aaa", key: {_id: 1}});
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});  // this collection is actually used
 s.adminCommand({shardcollection: "test.zzz", key: {_id: 1}});
 
-N = 10000;
+let N = 10000;
 s.adminCommand({split: "test.foo", middle: {_id: N / 2}});
 s.adminCommand({
     moveChunk: "test.foo",
@@ -40,7 +40,7 @@ s.adminCommand({
 });
 
 var bulk = db.foo.initializeUnorderedBulkOp();
-for (i = 0; i < N; i++)
+for (let i = 0; i < N; i++)
     bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 
@@ -48,10 +48,10 @@ assert.commandWorked(bulk.execute());
 // totalIndexSize).
 assert.commandWorked(db.adminCommand({fsync: 1}));
 
-a = s.shard0.getDB("test");
-b = s.shard1.getDB("test");
+let a = s.shard0.getDB("test");
+let b = s.shard1.getDB("test");
 
-x = assert.commandWorked(db.foo.stats());
+let x = assert.commandWorked(db.foo.stats());
 assert.eq(N, x.count, "coll total count expected");
 assert.eq(db.foo.count(), x.count, "coll total count match");
 assert.eq(2, x.nchunks, "coll chunk num");
@@ -69,8 +69,8 @@ assert(!x.shards[s.shard1.shardName].indexDetails,
        'indexDetails should not be present in s.shard1.shardName: ' +
            tojson(x.shards[s.shard1.shardName]));
 
-a_extras = a.stats().objects - a.foo.count();
-b_extras = b.stats().objects - b.foo.count();
+let a_extras = a.stats().objects - a.foo.count();
+let b_extras = b.stats().objects - b.foo.count();
 print("a_extras: " + a_extras);
 print("b_extras: " + b_extras);
 
@@ -120,9 +120,9 @@ function collStatComp(stat_obj, stat_obj_scaled, scale, mongos) {
 }
 
 /* db.stats() tests */
-db_not_scaled = assert.commandWorked(db.stats());
-db_scaled_512 = assert.commandWorked(db.stats(512));
-db_scaled_1024 = assert.commandWorked(db.stats(1024));
+let db_not_scaled = assert.commandWorked(db.stats());
+let db_scaled_512 = assert.commandWorked(db.stats(512));
+let db_scaled_1024 = assert.commandWorked(db.stats(1024));
 
 for (var shard in db_not_scaled.raw) {
     dbStatComp(db_not_scaled.raw[shard], db_scaled_512.raw[shard], 512);
@@ -133,9 +133,9 @@ dbStatComp(db_not_scaled, db_scaled_512, 512);
 dbStatComp(db_not_scaled, db_scaled_1024, 1024);
 
 /* db.collection.stats() tests */
-coll_not_scaled = assert.commandWorked(db.foo.stats());
-coll_scaled_512 = assert.commandWorked(db.foo.stats(512));
-coll_scaled_1024 = assert.commandWorked(db.foo.stats(1024));
+let coll_not_scaled = assert.commandWorked(db.foo.stats());
+let coll_scaled_512 = assert.commandWorked(db.foo.stats(512));
+let coll_scaled_1024 = assert.commandWorked(db.foo.stats(1024));
 
 for (var shard in coll_not_scaled.shards) {
     collStatComp(coll_not_scaled.shards[shard], coll_scaled_512.shards[shard], 512, false);

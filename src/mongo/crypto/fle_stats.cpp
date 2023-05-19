@@ -50,6 +50,8 @@ FLEStatusSection::FLEStatusSection(TickSource* tickSource)
 
     _compactStats.setEsc(zeroStats);
     _compactStats.setEcoc(zeroECOC);
+    _cleanupStats.setEsc(zeroStats);
+    _cleanupStats.setEcoc(zeroECOC);
 }
 
 FLEStatusSection& FLEStatusSection::get() {
@@ -62,10 +64,19 @@ BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
     {
         CompactStats temp;
         {
-            stdx::lock_guard<Mutex> lock(_mutex);
+            stdx::lock_guard<Mutex> lock(_compactMutex);
             temp = _compactStats;
         }
         auto sub = BSONObjBuilder(builder.subobjStart("compactStats"));
+        temp.serialize(&sub);
+    }
+    {
+        CleanupStats temp;
+        {
+            stdx::lock_guard<Mutex> lock(_cleanupMutex);
+            temp = _cleanupStats;
+        }
+        auto sub = BSONObjBuilder(builder.subobjStart("cleanupStats"));
         temp.serialize(&sub);
     }
 

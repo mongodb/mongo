@@ -123,7 +123,7 @@ Status insertBatchAndHandleRetry(OperationContext* opCtx,
 
     // Try to insert the batch one-at-a-time because the batch failed all-at-once inserting.
     for (auto it = docs.cbegin(); it != docs.cend(); ++it) {
-        auto status = writeConflictRetry(opCtx, "batchInsertDocuments", nsOrUUID.toString(), [&] {
+        auto status = writeConflictRetry(opCtx, "batchInsertDocuments", nsOrUUID, [&] {
             auto status = insertFn(opCtx, it, it + 1);
             if (!status.isOK()) {
                 return status;

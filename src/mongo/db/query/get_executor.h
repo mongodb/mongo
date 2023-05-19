@@ -313,8 +313,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     OpDebug* opDebug,
     const ScopedCollectionAcquisition& coll,
     ParsedDelete* parsedDelete,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    DeleteStageParams::DocumentCounter&& documentCounter = nullptr);
+    boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
@@ -338,10 +337,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    VariantCollectionPtrOrAcquisition collection,
+    const ScopedCollectionAcquisition& coll,
     ParsedUpdate* parsedUpdate,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    UpdateStageParams::DocumentCounter&& documentCounter = nullptr);
+    boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Direction of collection scan plan executor returned by makeCollectionScanPlanExecutor() below.

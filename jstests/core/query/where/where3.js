@@ -3,7 +3,7 @@
 //     requires_scripting
 // ]
 
-t = db.where3;
+let t = db.where3;
 t.drop();
 
 t.save({returned_date: 5});

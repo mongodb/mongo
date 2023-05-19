@@ -4,7 +4,7 @@
 //   assumes_no_implicit_index_creation,
 // ]
 
-t = db.text_blogwild;
+let t = db.text_blogwild;
 t.drop();
 
 t.save({_id: 1, title: "my blog post", text: "this is a new blog i am writing. yay eliot"});
@@ -21,7 +21,7 @@ t.createIndex({dummy: "text"}, {weights: "$**"});
 // ensure listIndexes can handle a string-valued "weights"
 assert.eq(2, t.getIndexes().length);
 
-res = t.find({"$text": {"$search": "blog"}});
+let res = t.find({"$text": {"$search": "blog"}});
 assert.eq(3, res.length(), "A1");
 
 res = t.find({"$text": {"$search": "write"}});

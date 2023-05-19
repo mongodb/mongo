@@ -1,8 +1,8 @@
 
 'use strict';
 
-load("./jstests/multiVersion/libs/multi_rs.js");
-load("./jstests/replsets/rslib.js");
+load("jstests/multiVersion/libs/multi_rs.js");
+load("jstests/replsets/rslib.js");
 
 /**
  * Test that starts up a replica set with 2 nodes of version 'replSetVersion', inserts some data,

@@ -84,23 +84,22 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
 
-        #
-        # We've configured checkpoints to run every 5 seconds, sweep server to
-        # run every 2 seconds and idle time to be 6 seconds. It should take
-        # about 8 seconds for a handle to be closed. Sleep for double to be
-        # safe.
-        #
         uri = '%s.test' % self.uri
         self.session.create(uri, self.create_params)
 
         #
-        # Keep inserting data to keep at least one handle active and give
-        # checkpoint something to do.  Make sure checkpoint doesn't adjust
-        # the time of death for inactive handles.
+        # Keep inserting data to keep one handle active and give checkpoint
+        # something to do.  Make sure checkpoint doesn't adjust the time of
+        # death for inactive handles.
         #
         # Note that we do checkpoints inline because that has the side effect
         # of sweeping the session cache, which will allow handles to be
         # removed.
+        #
+        # We've configured the sweep server to run every second and the idle time
+        # to be 3 seconds. It should take about 4 seconds for a handle to be closed.
+        # Run a reasonable amount longer that this monitoring the statistics for
+        # open and removed files to track progress.
         #
         c = self.session.open_cursor(uri, None)
         k = 0

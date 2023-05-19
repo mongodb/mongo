@@ -47,7 +47,7 @@ var work = function() {
     assert.commandWorked(db.timeToStartTrigger.insert({_id: 1}));
 
     while (true) {
-        for (x = 0; x < 100; x++) {
+        for (let x = 0; x < 100; x++) {
             db["a" + x].insert({a: x});
         }
 

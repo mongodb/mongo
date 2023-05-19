@@ -1203,21 +1203,24 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 auto foreignResultSlot = _slotIdGenerator.generate();
                 auto foreignRecordIdSlot = _slotIdGenerator.generate();
 
-                auto foreignStage = makeS<ScanStage>(foreignColl->uuid(),
-                                                     foreignResultSlot,
-                                                     foreignRecordIdSlot,
-                                                     boost::none /* snapshotIdSlot */,
-                                                     boost::none /* indexIdentSlot */,
-                                                     boost::none /* indexKeySlot */,
-                                                     boost::none /* indexKeyPatternSlot */,
-                                                     boost::none /* tsSlot */,
-                                                     std::vector<std::string>{} /* fields */,
-                                                     makeSV() /* vars */,
-                                                     boost::none /* seekKeySlot */,
-                                                     true /* forward */,
-                                                     _yieldPolicy,
-                                                     eqLookupNode->nodeId(),
-                                                     ScanCallbacks{});
+                auto foreignStage =
+                    makeS<sbe::ScanStage>(foreignColl->uuid(),
+                                          foreignResultSlot,
+                                          foreignRecordIdSlot,
+                                          boost::none /* snapshotIdSlot */,
+                                          boost::none /* indexIdentSlot */,
+                                          boost::none /* indexKeySlot */,
+                                          boost::none /* indexKeyPatternSlot */,
+                                          boost::none /* oplogTsSlot */,
+                                          std::vector<std::string>{} /* scanFieldNames */,
+                                          makeSV() /* scanFieldSlots */,
+                                          boost::none /* seekRecordIdSlot */,
+                                          boost::none /* minRecordIdSlot */,
+                                          boost::none /* maxRecordIdSlot */,
+                                          true /* forward */,
+                                          _yieldPolicy,
+                                          eqLookupNode->nodeId(),
+                                          ScanCallbacks{});
 
                 return buildLookupStage(_state,
                                         eqLookupNode->lookupStrategy,

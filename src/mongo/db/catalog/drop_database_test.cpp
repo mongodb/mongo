@@ -68,12 +68,12 @@ class OpObserverMock : public OpObserverNoop {
 public:
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
 
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) override;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) override;
 
     std::set<DatabaseName> droppedDatabaseNames;
     std::set<NamespaceString> droppedCollectionNames;
@@ -93,10 +93,11 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              const CollectionDropType dropType) {
+                                              const CollectionDropType dropType,
+                                              bool markFromMigrate) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-    auto opTime =
-        OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, numRecords, dropType);
+    auto opTime = OpObserverNoop::onDropCollection(
+        opCtx, collectionName, uuid, numRecords, dropType, markFromMigrate);
     invariant(opTime.isNull());
     // Do not update 'droppedCollectionNames' if OpObserverNoop::onDropCollection() throws.
     droppedCollectionNames.insert(collectionName);
@@ -181,7 +182,7 @@ void DropDatabaseTest::tearDown() {
  * Creates a collection without any namespace restrictions.
  */
 void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
+    writeConflictRetry(opCtx, "testDropCollection", nss, [=] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
@@ -198,7 +199,7 @@ void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
  * Removes database from catalog, bypassing dropDatabase().
  */
 void _removeDatabaseFromCatalog(OperationContext* opCtx, StringData dbName) {
-    AutoGetDb autoDB(opCtx, DatabaseName{dbName}, MODE_X);
+    AutoGetDb autoDB(opCtx, DatabaseName::createDatabaseName_forTest(boost::none, dbName), MODE_X);
     auto db = autoDB.getDb();
     // dropDatabase can call awaitReplication more than once, so do not attempt to drop the database
     // twice.
@@ -220,7 +221,7 @@ TEST_F(DropDatabaseTest, DropDatabaseReturnsNotWritablePrimaryIfNotPrimary) {
     _createCollection(_opCtx.get(), _nss);
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
     ASSERT_TRUE(_opCtx->writesAreReplicated());
-    ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.db()));
+    ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.dbName()));
     ASSERT_EQUALS(ErrorCodes::NotWritablePrimary,
                   dropDatabaseForApplyOps(_opCtx.get(), _nss.dbName()));
 }
@@ -407,7 +408,7 @@ TEST_F(DropDatabaseTest,
         [this](OperationContext*, const repl::OpTime&) {
             ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
             ASSERT_TRUE(_opCtx->writesAreReplicated());
-            ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.db()));
+            ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.dbName()));
             return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
         });
 

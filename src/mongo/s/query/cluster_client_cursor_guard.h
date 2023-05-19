@@ -53,9 +53,12 @@ public:
      * necessary. May block waiting for remote cursor cleanup.
      *
      * If no cursor is owned, does nothing.
+     *
+     * If the cursor has been killed by a previous command, does nothing. hasBeenKilled() will be
+     * true if the cursor was killed while the cursor was checked out or in use with a Guard.
      */
     ~ClusterClientCursorGuard() {
-        if (_ccc && !_ccc->remotesExhausted()) {
+        if (_ccc && !_ccc->remotesExhausted() && !_ccc->hasBeenKilled()) {
             _ccc->kill(_opCtx);
         }
     }

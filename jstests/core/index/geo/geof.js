@@ -1,4 +1,4 @@
-t = db.geof;
+let t = db.geof;
 t.drop();
 
 // corners (dist ~0.98)

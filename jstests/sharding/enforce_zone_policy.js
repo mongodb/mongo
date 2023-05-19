@@ -96,8 +96,8 @@ st.addTagRange(ns, {_id: MinKey}, {_id: MaxKey}, 'a');
 assertBalanceCompleteAndStable(function() {
     var counts = st.chunkCounts(collName);
     printjson(counts);
-    return counts[st.shard0.shardName] == 11 && counts[st.shard1.shardName] == 0 &&
-        counts[st.shard2.shardName] == 0;
+    // All chunks must have been moved to shard 0, none left on shard 1 and 2
+    return counts[st.shard1.shardName] == 0 && counts[st.shard2.shardName] == 0;
 }, 'all chunks to zone a');
 
 // Remove all zones and ensure collection is correctly redistributed

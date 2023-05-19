@@ -10,7 +10,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load("./jstests/libs/chunk_manipulation_util.js");
+load("jstests/libs/chunk_manipulation_util.js");
 
 /**
  * @summary This function executes a count command with read preference "secondary" and returns the

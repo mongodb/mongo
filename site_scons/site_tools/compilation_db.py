@@ -23,6 +23,7 @@
 import json
 import SCons
 import itertools
+import shlex
 
 # Implements the ability for SCons to emit a compilation database for the MongoDB project. See
 # http://clang.llvm.org/docs/JSONCompilationDatabase.html for details on what a compilation
@@ -154,6 +155,7 @@ def CompilationDbEntryAction(target, source, env, **kw):
         "directory": env.Dir("#").abspath,
         "command": ' '.join(cmd_list),
         "file": str(env["__COMPILATIONDB_USOURCE"][0]),
+        "output": shlex.quote(' '.join([str(t) for t in env["__COMPILATIONDB_UTARGET"]])),
     }
 
     target[0].write(entry)

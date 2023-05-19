@@ -360,15 +360,16 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     int nShards = ccc->getNumRemotes();
 
     auto&& opDebug = CurOp::get(opCtx)->debug();
-    // Fill out the aggregation metrics in CurOp, and record telemetry metrics, before detaching the
-    // cursor from its opCtx.
+    // Fill out the aggregation metrics in CurOp, and record queryStats metrics, before detaching
+    // the cursor from its opCtx.
     opDebug.nShards = std::max(opDebug.nShards, nShards);
     opDebug.cursorExhausted = exhausted;
     opDebug.additiveMetrics.nBatches = 1;
+    CurOp::get(opCtx)->setEndOfOpMetrics(responseBuilder.numDocs());
     if (exhausted) {
-        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand(), responseBuilder.numDocs());
+        collectQueryStatsMongos(opCtx, ccc->getRequestShapifier());
     } else {
-        collectTelemetryMongos(opCtx, ccc, responseBuilder.numDocs());
+        collectQueryStatsMongos(opCtx, ccc);
     }
 
     ccc->detachFromOperationContext();

@@ -72,6 +72,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -1335,7 +1336,7 @@ void ShardMergeRecipientService::Instance::_processCommittedTransactionEntry(con
 
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
-        opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             // Write the no-op entry and update 'config.transactions'.
@@ -1468,7 +1469,7 @@ ShardMergeRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTim
         // re-create the collection.
         auto coordinator = repl::ReplicationCoordinator::get(opCtx.get());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
-        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.db())) {
+        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.dbName())) {
             uassertStatusOK(
                 Status(ErrorCodes::NotWritablePrimary,
                        "Recipient node is not primary, cannot clear oplog buffer collection."));
@@ -1573,8 +1574,7 @@ ShardMergeRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTim
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(*operationTime);
-    _client.get()->runCommand(
-        DatabaseName(boost::none, "admin"), cmd, readResult, QueryOption_SecondaryOk);
+    _client.get()->runCommand(DatabaseName::kAdmin, cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "Failed to wait for retryable writes pre-fetch result majority committed");
@@ -1592,8 +1592,8 @@ void ShardMergeRecipientService::Instance::_startOplogBuffer(OperationContext* o
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
     auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
-    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
-                                                                              oplogBufferNS.db())) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+            opCtx, oplogBufferNS.dbName())) {
         uassertStatusOK(
             Status(ErrorCodes::NotWritablePrimary, "Recipient node is no longer a primary."));
     }
@@ -1790,7 +1790,7 @@ ShardMergeRecipientService::Instance::_advanceMajorityCommitTsToBkpCursorCheckpo
 
     writeConflictRetry(opCtx,
                        "mergeRecipientWriteNoopToAdvanceStableTimestamp",
-                       NamespaceString::kRsOplogNamespace.ns(),
+                       NamespaceString::kRsOplogNamespace,
                        [&] {
                            if (token.isCanceled()) {
                                return;
@@ -2018,13 +2018,19 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
     OpType opType,
     const RegisterChangeCbk& registerChange) {
     const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << nss.toStringForErrorMsg() << " does not exist",
-            collection);
+            collection.exists());
 
-    writeConflictRetry(opCtx, "writeShardMergeRecipientStateDoc", nss.ns(), [&]() {
+    writeConflictRetry(opCtx, "writeShardMergeRecipientStateDoc", nss, [&]() {
         WriteUnitOfWork wunit(opCtx);
 
         if (registerChange)
@@ -2033,7 +2039,7 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
         const auto filter =
             BSON(TenantMigrationRecipientDocument::kIdFieldName << stateDoc.getId());
         auto updateResult = Helpers::upsert(opCtx,
-                                            nss,
+                                            collection,
                                             filter,
                                             stateDoc.toBSON(),
                                             /*fromMigrate=*/false);
@@ -2272,7 +2278,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
             str::stream() << nss.toStringForErrorMsg() << " does not exist",
             collection);
 
-    writeConflictRetry(opCtx, "markShardMergeStateDocGarbageCollectable", nss.ns(), [&]() {
+    writeConflictRetry(opCtx, "markShardMergeStateDocGarbageCollectable", nss, [&]() {
         WriteUnitOfWork wuow(opCtx);
         auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
         const auto originalRecordId =
@@ -2474,7 +2480,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::run(
                   "migrationId"_attr = getMigrationUUID(),
                   "status"_attr = status);
 
-            // We should only hit here on a stepdown or shudDown errors.
+            // We should only hit here on a stepdown or shutdown errors.
             invariant(ErrorCodes::isShutdownError(status) || ErrorCodes::isNotPrimaryError(status));
 
             stdx::lock_guard lk(_mutex);

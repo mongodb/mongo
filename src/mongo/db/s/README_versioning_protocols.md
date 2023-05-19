@@ -8,9 +8,9 @@ When a router uses its cached information to send a request to a shard, it attac
 
 When a shard receives the request, it will check this token to make sure that it matches the shard's local information. If it matches, then the request will proceed. If the version does not match, the shard will throw [an exception](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/stale_exception.h).
 
-When the router recieves this exception, it knows that the routing information must have changed, and so it will contact the config server to get more recent information before sending the request again.
+When the router recieves this exception, it knows that the routing information must have changed, and so it will [perform a refresh](#routing-information-refreshes) to get more recent information before sending the request again.
 
-The following diagram depicts a simple example of the shard versioning protocol in action.
+The following diagram depicts a simple example of the shard versioning protocol in action. It assumes that the router is a shard server primary, thus the refresh is simply fetching newer information from the config server.
 
 ```mermaid
 sequenceDiagram
@@ -83,3 +83,19 @@ A change in the collection generation indicates that the collection has changed 
 A placement version change indicates that something has changed about what data is placed on what shard. The most important operation that changes the placement version is migration, however split, merge and even some other operations change it as well, even though they don't actually move any data around. These changes are more targeted than generation changes, and will only cause the router to refresh if it is targeting a shard that was affected by the operation.
 #### Index Version Changes
 An index version change indicates that there has been some change in the global index information of the collection, such as from adding or removing a global index.
+
+## Routing Information Refreshes
+For sharded collections, there are two sets of information that compose the routing information - the chunk placement information and the collection index information. The config server is [authoritative](README_sharding_catalog.md#authoritative-containers) for the placement information, while both the shards and the config server are authoritative for the index information.
+
+When a router receives a stale config error, it will refresh whichever component is stale. If the router has an older CollectionGeneration or CollectionPlacement, it will refresh the placement information, whereas if it has an older IndexVersion, it will refresh the index information.
+
+### Placement Information Refreshes
+MongoS and shard primaries refresh their placement information from the config server. Shard secondaries, however, refresh from the shard primaries through a component called the Shard Server Catalog Cache Loader. When a shard primary refreshes from a config server, it persists the refreshed information to disk. This information is then replicated to secondaries who will refresh their cache from this on-disk information.
+
+#### Incremental and Full Refreshes
+A full refresh clears all cached information, and replaces the cache with the information that exists on the node’s source whereas an incremental refresh only replaces modified routing information from the node’s source.
+
+Incremental refreshes will happen whenever there has been a [placement version change](#placement-version-changes), while [collection generation changes](#generation-changes) will cause a full refresh.
+
+### Index Information Refreshes
+Index information refreshes are always done from the config server. The router will fetch the whole index information from the config server and replace what it has in its cache with the new information.

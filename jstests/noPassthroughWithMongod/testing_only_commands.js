@@ -49,7 +49,7 @@ const isBoundedSortEnabled = function(conn) {
 TestData.enableTestCommands = false;
 
 var conn = MongoRunner.runMongod({});
-for (i in testOnlyCommands) {
+for (let i in testOnlyCommands) {
     assertCmdNotFound(conn.getDB('test'), testOnlyCommands[i]);
 }
 assert.eq(isBoundedSortEnabled(conn), false);
@@ -59,7 +59,7 @@ MongoRunner.stopMongod(conn);
 TestData.enableTestCommands = true;
 
 var conn = MongoRunner.runMongod({});
-for (i in testOnlyCommands) {
+for (let i in testOnlyCommands) {
     assertCmdFound(conn.getDB('test'), testOnlyCommands[i]);
 }
 assert.eq(isBoundedSortEnabled(conn), true);

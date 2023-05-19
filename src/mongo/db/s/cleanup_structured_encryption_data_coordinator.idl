@@ -1,0 +1,90 @@
+# Copyright (C) 2023-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/commands/fle2_cleanup.idl"
+    - "mongo/db/s/sharding_ddl_coordinator.idl"
+
+enums:
+    CleanupStructuredEncryptionDataPhase:
+        description: "The current phase of the cleanupStructuredEncryptionData pipeline"
+        type: string
+        values:
+            kUnset: "unset"
+            kRenameEcocForCleanup: "rename-collections-for-cleanup"
+            kCleanupStructuredEncryptionData: "cleanup-structured-encryption-data"
+            kDropTempCollection: "drop-temp-collection"
+
+structs:
+    CleanupStructuredEncryptionDataState:
+        description: "Represents the state of the cleanupStructuredEncryptionData pipeline
+            for protocol version 2"
+        strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+        fields:
+            phase:
+                description: "Current phase"
+                type: CleanupStructuredEncryptionDataPhase
+                default: kUnset
+            skipCleanup:
+                description: "Whether to skip the cleanup operation"
+                type: bool
+                default: false
+            escNss:
+                description: "Collection containing insertions metadata"
+                type: namespacestring
+            ecocNss:
+                description: "Collection containing cleanup metadata to perform cleanup with"
+                type: namespacestring
+            ecocUuid:
+                description: "UUID of the collection identified by ecocNss"
+                type: uuid
+                optional: true
+            ecocRenameNss:
+                description: "Temporary name to use while performing cleanup"
+                type: namespacestring
+            ecocRenameUuid:
+                description: "UUID of the collection identified by ecocRenameNss"
+                type: uuid
+                optional: true
+            cleanupTokens:
+                description: "Cleanup tokens for the cleanup operation"
+                type: object_owned
+            escStats:
+                description: "Statistics for the ESC collection"
+                type: ECStats
+                optional: true
+            ecocStats:
+                description: "Statistics for the temporary ECOC collection"
+                type: ECOCStats
+                optional: true

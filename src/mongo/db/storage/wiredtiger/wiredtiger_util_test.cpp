@@ -35,6 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -113,7 +114,7 @@ private:
     WiredTigerOplogManager _oplogManager;
 };
 
-class WiredTigerUtilMetadataTest : public mongo::unittest::Test {
+class WiredTigerUtilMetadataTest : public mongo::ServiceContextTest {
 public:
     virtual void setUp() {
         _harnessHelper.reset(new WiredTigerUtilHarnessHelper(""));
@@ -298,7 +299,18 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.code());
 }
 
-TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
+class WiredTigerUtilTest : public mongo::ServiceContextTest {
+public:
+    void setUp() {
+        ServiceContextTest::setUp();
+    }
+
+    void tearDown() {
+        ServiceContextTest::tearDown();
+    }
+};
+
+TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
@@ -313,7 +325,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
 }
 
-TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
+TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
@@ -330,7 +342,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
 }
 
-TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
+TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
@@ -348,7 +360,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
 
-TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
+TEST_F(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
@@ -367,7 +379,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     ASSERT_EQUALS(0U, result.getValue());
 }
 
-TEST(WiredTigerUtilTest, ParseAPIMessages) {
+TEST_F(WiredTigerUtilTest, ParseAPIMessages) {
     // Custom event handler.
     WiredTigerEventHandler eventHandler;
 
@@ -402,7 +414,7 @@ TEST(WiredTigerUtilTest, ParseAPIMessages) {
     ASSERT_TRUE(foundWTMessage);
 }
 
-TEST(WiredTigerUtilTest, ParseCompactMessages) {
+TEST_F(WiredTigerUtilTest, ParseCompactMessages) {
     // Custom event handler.
     WiredTigerEventHandler eventHandler;
 
@@ -439,7 +451,7 @@ TEST(WiredTigerUtilTest, ParseCompactMessages) {
     ASSERT_TRUE(foundWTMessage);
 }
 
-TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
+TEST_F(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
 
@@ -465,7 +477,7 @@ TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     }
 }
 
-TEST(WiredTigerUtilTest, RemoveEncryptionFromConfigString) {
+TEST_F(WiredTigerUtilTest, RemoveEncryptionFromConfigString) {
     {  // Found at the middle.
         std::string input{
             "debug_mode=(table_logging=true,checkpoint_retention=4),encryption=(name=AES256-CBC,"

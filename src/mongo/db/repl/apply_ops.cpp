@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -99,7 +98,7 @@ Status _applyOps(OperationContext* opCtx,
             status = writeConflictRetry(
                 opCtx,
                 "applyOps",
-                nss.ns(),
+                nss,
                 [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode, &info, &dbName] {
                     BSONObjBuilder builder;
                     // Remove 'hash' field if it is set. A bit slow as it rebuilds the object.
@@ -150,7 +149,7 @@ Status _applyOps(OperationContext* opCtx,
                         }
                     }
 
-                    const auto collection = acquireCollection(
+                    auto collection = acquireCollection(
                         opCtx,
                         CollectionAcquisitionRequest(nss,
                                                      AcquisitionPrerequisites::kPretendUnsharded,
@@ -177,7 +176,6 @@ Status _applyOps(OperationContext* opCtx,
                     // application in the future.
                     const bool isDataConsistent = true;
                     return repl::applyOperation_inlock(opCtx,
-                                                       ctx.db(),
                                                        collection,
                                                        ApplierOperation{&entry},
                                                        alwaysUpsert,
@@ -258,8 +256,8 @@ Status applyOps(OperationContext* opCtx,
     }
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !replCoord->canAcceptWritesForDatabase(opCtx, dbName.toStringWithTenantId());
+    bool userInitiatedWritesAndNotPrimary =
+        opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
     if (userInitiatedWritesAndNotPrimary)
         return Status(ErrorCodes::NotWritablePrimary,

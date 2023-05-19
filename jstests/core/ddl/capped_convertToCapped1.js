@@ -17,21 +17,21 @@
  * ]
  */
 
-source = db.capped_convertToCapped1;
-dest = db.capped_convertToCapped1_clone;
+let source = db.capped_convertToCapped1;
+let dest = db.capped_convertToCapped1_clone;
 
 source.drop();
 dest.drop();
 
-N = 1000;
+let N = 1000;
 
-for (i = 0; i < N; ++i) {
+for (let i = 0; i < N; ++i) {
     source.save({i: i});
 }
 assert.eq(N, source.count());
 
 // should all fit
-res = db.runCommand(
+let res = db.runCommand(
     {cloneCollectionAsCapped: source.getName(), toCollection: dest.getName(), size: 100000});
 assert.commandWorked(res);
 assert.eq(source.count(), dest.count());

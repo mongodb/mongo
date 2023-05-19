@@ -81,13 +81,18 @@ public:
         OperationContext* opCtx,
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
+
+        SerializationContext serializationCtx = SerializationContext::stateCommandRequest();
+        serializationCtx.setTenantIdSource(opMsgRequest.getValidatedTenantId() != boost::none);
+
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
             opCtx,
             DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
                                           opMsgRequest.getDatabase()),
             opMsgRequest.body,
             explainVerbosity,
-            APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            APIParameters::get(opCtx).getAPIStrict().value_or(false),
+            serializationCtx);
 
         auto privileges = uassertStatusOK(
             auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
@@ -230,7 +235,8 @@ public:
             if (!_aggregationRequest.getExplain() && !_aggregationRequest.getExchange()) {
                 query_request_helper::validateCursorResponse(
                     reply->getBodyBuilder().asTempObj(),
-                    _aggregationRequest.getNamespace().tenantId());
+                    _aggregationRequest.getNamespace().tenantId(),
+                    _aggregationRequest.getSerializationContext());
             }
         }
 

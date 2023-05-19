@@ -6,6 +6,7 @@
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
 // ]
+load("jstests/libs/fixture_helpers.js");
 
 // Tests for the behavior of tailable cursors when a collection is dropped or the cursor is
 // otherwise invalidated.
@@ -26,8 +27,7 @@ const emptyBatchCursorId = assert
                                .commandWorked(db.runCommand(
                                    {find: collName, tailable: true, awaitData: true, batchSize: 0}))
                                .cursor.id;
-const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
-if (isMongos) {
+if (FixtureHelpers.isMongos(db)) {
     // Mongos will let you establish a cursor with batch size 0 and return to you before it
     // realizes the shard's cursor is exhausted. The next getMore should return a 0 cursor id
     // though.

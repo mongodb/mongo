@@ -17,6 +17,7 @@ __wt_bm_read(
   WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
     WT_BLOCK *block;
+    WT_DECL_RET;
     wt_off_t offset;
     uint32_t checksum, objectid, size;
 
@@ -26,28 +27,31 @@ __wt_bm_read(
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
+    if (bm->is_multi_handle)
+        /* Lookup the block handle */
+        WT_RET(__wt_blkcache_get_handle(session, bm, objectid, true, &block));
+
 #ifdef HAVE_DIAGNOSTIC
     /*
      * In diagnostic mode, verify the block we're about to read isn't on the available list, or for
-     * live systems, the discard list. This only applies if the block is in this object.
+     * the writable objects, the discard list.
      */
-    if (objectid == block->objectid)
-        WT_RET(__wt_block_misplaced(
-          session, block, "read", offset, size, bm->is_live, __PRETTY_FUNCTION__, __LINE__));
+    WT_ERR(__wt_block_misplaced(session, block, "read", offset, size,
+      bm->is_live && block == bm->block, __PRETTY_FUNCTION__, __LINE__));
 #endif
-
-    /* Swap file handles if reading from a different object. */
-    if (block->objectid != objectid)
-        WT_RET(__wt_blkcache_get_handle(session, bm, objectid, &block));
 
     /* Read the block. */
     __wt_capacity_throttle(session, size, WT_THROTTLE_READ);
-    WT_RET(__wt_block_read_off(session, block, buf, objectid, offset, size, checksum));
+    WT_ERR(__wt_block_read_off(session, block, buf, objectid, offset, size, checksum));
 
     /* Optionally discard blocks from the system's buffer cache. */
-    WT_RET(__wt_block_discard(session, block, (size_t)size));
+    WT_ERR(__wt_block_discard(session, block, (size_t)size));
 
-    return (0);
+err:
+    if (bm->is_multi_handle)
+        __wt_blkcache_release_handle(session, block);
+
+    return (ret);
 }
 
 /*

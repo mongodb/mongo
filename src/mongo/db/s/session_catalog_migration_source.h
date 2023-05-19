@@ -99,7 +99,7 @@ public:
      * from the constructor to allow the member functions of the SessionCatalogMigrationSource to be
      * called before the initialization step is finished.
      */
-    void init(OperationContext* opCtx);
+    void init(OperationContext* opCtx, const LogicalSessionId& migrationLsid);
 
     /**
      * Returns true if there are more oplog entries to fetch at this moment. Note that new writes

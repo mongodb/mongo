@@ -11,7 +11,7 @@
 //  CHECKSHARDINGINDEX TEST UTILS
 // -------------------------
 
-f = db.jstests_shardingindex;
+let f = db.jstests_shardingindex;
 f.drop();
 
 // -------------------------
@@ -22,7 +22,8 @@ f.drop();
 f.createIndex({x: 1, y: 1});
 assert.eq(0, f.count(), "1. initial count should be zero");
 
-res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+let res =
+    db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
 assert.eq(true, res.ok, "1a");
 
 f.save({x: 1, y: 1});

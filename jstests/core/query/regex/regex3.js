@@ -3,7 +3,7 @@
 //   assumes_read_concern_local,
 // ]
 
-t = db.regex3;
+let t = db.regex3;
 t.drop();
 
 assert.commandWorked(t.save({name: "eliot"}));

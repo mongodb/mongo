@@ -1,5 +1,5 @@
 
-t = db.in2;
+let t = db.in2;
 
 function go(name, index) {
     t.drop();

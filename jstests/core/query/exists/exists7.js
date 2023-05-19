@@ -2,7 +2,7 @@
 
 // Test that non boolean value types are allowed with $exists spec. SERVER-2322
 
-t = db.jstests_exists7;
+let t = db.jstests_exists7;
 t.drop();
 
 function testIntegerExistsSpec() {

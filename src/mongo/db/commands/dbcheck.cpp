@@ -71,7 +71,7 @@ repl::OpTime _logOp(OperationContext* opCtx,
     oplogEntry.setObject(obj);
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     return writeConflictRetry(
-        opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace, [&] {
             auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
             oplogEntry.setWallClockTime(clockSource->now());
 
@@ -292,7 +292,7 @@ std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(Operati
 class DbCheckJob : public BackgroundJob {
 public:
     DbCheckJob(const DatabaseName& dbName, std::unique_ptr<DbCheckRun> run)
-        : BackgroundJob(true), _done(false), _dbName(dbName.toString()), _run(std::move(run)) {}
+        : BackgroundJob(true), _done(false), _run(std::move(run)) {}
 
 protected:
     virtual std::string name() const override {
@@ -506,7 +506,6 @@ private:
 
     // Set if the job cannot proceed.
     bool _done;
-    std::string _dbName;
     std::unique_ptr<DbCheckRun> _run;
 
     StatusWith<BatchStats> _runBatch(OperationContext* opCtx,

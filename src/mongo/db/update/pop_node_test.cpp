@@ -113,7 +113,6 @@ TEST_F(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
     addIndexedPath("a.b");
     auto result = popNode.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: [1, 2, 3]}"), doc);
 
     assertOplogEntryIsNoop();
@@ -132,7 +131,6 @@ TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
     addIndexedPath("a.b.c");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
 
     assertOplogEntryIsNoop();
@@ -151,7 +149,6 @@ TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
     addIndexedPath("a.0");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
 
     assertOplogEntryIsNoop();
@@ -216,7 +213,6 @@ TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
     addIndexedPath("a.b");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
     assertOplogEntryIsNoop();
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
@@ -234,7 +230,6 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
     addIndexedPath("a.b");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {sa: {u: {b: []}}}}"));
@@ -253,7 +248,6 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
     addIndexedPath("a");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {sa: {u: {b: []}}}}"));
@@ -272,7 +266,6 @@ TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
     addIndexedPath("a.b.c");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {sa: {u: {b: [1, 2]}}}}"));
@@ -291,7 +284,6 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
     addIndexedPath("a.b");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {sa: {u: {b: [2, 3]}}}}"));
@@ -310,7 +302,6 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) 
     addIndexedPath("unrelated.path");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {sa: {u: {b: [2, 3]}}}}"));
@@ -328,7 +319,6 @@ TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
     setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
 
     assertOplogEntry(fromjson("{$v: 2, diff: {sa: {u: {b: [1, 2]}}}}"));
@@ -348,7 +338,6 @@ TEST_F(PopNodeTest, SucceedsWithNullLogBuilder) {
     setLogBuilderToNull();
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
@@ -421,7 +410,6 @@ TEST_F(PopNodeTest, NoopOnImmutablePathSucceeds) {
     addIndexedPath("a.b");
     auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
 
     assertOplogEntryIsNoop();

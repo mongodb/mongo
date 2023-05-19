@@ -71,7 +71,7 @@ public:
             typename DecorationContainer<DecoratedType>::template DecorationDescriptorWithType<T>(
                 std::move(declareDecoration(sizeof(T),
                                             std::alignment_of<T>::value,
-                                            &constructAt<T>,
+                                            getConstructorFn<T>(),
                                             nullptr,
                                             nullptr,
                                             getDestructorFn<T>())));
@@ -93,7 +93,7 @@ public:
             typename DecorationContainer<DecoratedType>::template DecorationDescriptorWithType<T>(
                 std::move(declareDecoration(sizeof(T),
                                             std::alignment_of<T>::value,
-                                            &constructAt<T>,
+                                            getConstructorFn<T>(),
                                             &copyConstructAt<T>,
                                             &copyAssignAt<T>,
                                             getDestructorFn<T>())));
@@ -131,6 +131,8 @@ public:
         using std::cend;
 
         for (; iter != cend(_decorationInfo); ++iter) {
+            if (!iter->constructor)
+                continue;
             iter->constructor(container->getDecoration(iter->descriptor));
         }
 
@@ -268,6 +270,14 @@ private:
     template <typename T>
     static void destroyAt(void* location) {
         static_cast<T*>(location)->~T();
+    }
+
+    template <typename T>
+    static constexpr DecorationConstructorFn getConstructorFn() {
+        if constexpr (std::is_trivially_constructible_v<T>)
+            return nullptr;
+        else
+            return &constructAt<T>;
     }
 
     template <typename T>

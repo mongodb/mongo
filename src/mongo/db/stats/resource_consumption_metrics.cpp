@@ -328,7 +328,7 @@ void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(StringDa
 }
 
 void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationContext* opCtx,
-                                                                  const std::string& dbName) {
+                                                                  const DatabaseName& dbName) {
     invariant(!isInScope());
     _dbName = dbName;
     _collecting = ScopedCollectionState::kInScopeCollecting;
@@ -366,7 +366,7 @@ void ResourceConsumption::MetricsCollector::incrementOneCursorSeek(StringData ur
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,
-                                                                    const std::string& dbName,
+                                                                    const DatabaseName& dbName,
                                                                     bool commandCollectsMetrics)
     : _opCtx(opCtx) {
 
@@ -415,9 +415,9 @@ ResourceConsumption& ResourceConsumption::get(OperationContext* opCtx) {
 }
 
 void ResourceConsumption::merge(OperationContext* opCtx,
-                                const std::string& dbName,
+                                const DatabaseName& dbName,
                                 const OperationMetrics& metrics) {
-    invariant(!dbName.empty());
+    invariant(!dbName.isEmpty());
 
     LOGV2_DEBUG(7527700,
                 1,
@@ -432,7 +432,7 @@ void ResourceConsumption::merge(OperationContext* opCtx,
     // inconsistent state is not impactful for the purposes of metrics collection, perform a
     // best-effort check so that we can record metrics for this operation.
     auto isPrimary = repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
-        opCtx, DatabaseName::kAdmin.toString());
+        opCtx, DatabaseName::kAdmin);
 
     AggregatedMetrics newMetrics;
     if (isPrimary) {
@@ -446,8 +446,9 @@ void ResourceConsumption::merge(OperationContext* opCtx,
     }
 
     // Add all metrics into the the globally-aggregated metrics.
+    const auto& dbNameStr = dbName.toStringWithTenantId();
     stdx::lock_guard<Mutex> lk(_mutex);
-    _dbMetrics[dbName] += newMetrics;
+    _dbMetrics[dbNameStr] += newMetrics;
     _cpuTime += newMetrics.cpuNanos;
 }
 

@@ -2,7 +2,7 @@
 
 // index skipping and previous index range negation
 
-t = db.jstests_or9;
+let t = db.jstests_or9;
 t.drop();
 
 t.createIndex({a: 1, b: 1});

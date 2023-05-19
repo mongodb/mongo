@@ -8,7 +8,7 @@
 
 assert("test" == db, "wrong database currently not test");
 
-dd = function(x) {
+let dd = function(x) {
     // print( x );
 };
 

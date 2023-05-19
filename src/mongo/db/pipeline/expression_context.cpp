@@ -77,7 +77,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         {},       // resolvedNamespaces
                         findCmd.getNamespaceOrUUID().uuid(),
                         findCmd.getLet(),
-                        mayDbProfile) {}
+                        mayDbProfile,
+                        findCmd.getSerializationContext()) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,
@@ -101,7 +102,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         std::move(resolvedNamespaces),
                         std::move(collUUID),
                         request.getLet(),
-                        mayDbProfile) {
+                        mayDbProfile,
+                        request.getSerializationContext()) {
 
     if (request.getIsMapReduceCommand()) {
         // mapReduce command JavaScript invocation is only subject to the server global
@@ -126,7 +128,8 @@ ExpressionContext::ExpressionContext(
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID,
     const boost::optional<BSONObj>& letParameters,
-    bool mayDbProfile)
+    bool mayDbProfile,
+    const SerializationContext& serializationCtx)
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
@@ -134,6 +137,7 @@ ExpressionContext::ExpressionContext(
                    !(opCtx && opCtx->readOnly())),  // Disallow disk use if in read-only mode.
       bypassDocumentValidation(bypassDocumentValidation),
       ns(ns),
+      serializationCtxt(serializationCtx),
       uuid(std::move(collUUID)),
       opCtx(opCtx),
       mongoProcessInterface(mongoProcessInterface),
@@ -242,7 +246,8 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     _resolvedNamespaces,
                                                     uuid,
                                                     boost::none /* letParameters */,
-                                                    mayDbProfile);
+                                                    mayDbProfile,
+                                                    SerializationContext());
 
     expCtx->inMongos = inMongos;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
@@ -263,6 +268,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->originalAggregateCommand = originalAggregateCommand.getOwned();
 
     expCtx->inLookup = inLookup;
+    expCtx->serializationCtxt = serializationCtxt;
 
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
@@ -272,58 +278,49 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
 void ExpressionContext::startExpressionCounters() {
     if (enabledCounters && !_expressionCounters) {
-        _expressionCounters = boost::make_optional<ExpressionCounters>({});
+        _expressionCounters = std::make_unique<ExpressionCounters>();
     }
 }
 
 void ExpressionContext::incrementMatchExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().matchExprCountersMap[name];
+        ++_expressionCounters->matchExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementAggExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().aggExprCountersMap[name];
+        ++_expressionCounters->aggExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementGroupAccumulatorExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().groupAccumulatorExprCountersMap[name];
+        ++_expressionCounters->groupAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementWindowAccumulatorExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.value().windowAccumulatorExprCountersMap[name];
+        ++_expressionCounters->windowAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::stopExpressionCounters() {
     if (enabledCounters && _expressionCounters) {
-        operatorCountersMatchExpressions.mergeCounters(
-            _expressionCounters.value().matchExprCountersMap);
-        operatorCountersAggExpressions.mergeCounters(
-            _expressionCounters.value().aggExprCountersMap);
+        operatorCountersMatchExpressions.mergeCounters(_expressionCounters->matchExprCountersMap);
+        operatorCountersAggExpressions.mergeCounters(_expressionCounters->aggExprCountersMap);
         operatorCountersGroupAccumulatorExpressions.mergeCounters(
-            _expressionCounters.value().groupAccumulatorExprCountersMap);
+            _expressionCounters->groupAccumulatorExprCountersMap);
         operatorCountersWindowAccumulatorExpressions.mergeCounters(
-            _expressionCounters.value().windowAccumulatorExprCountersMap);
+            _expressionCounters->windowAccumulatorExprCountersMap);
     }
-    _expressionCounters = boost::none;
+    _expressionCounters.reset();
 }
 
 void ExpressionContext::setUserRoles() {
     // Only set the value of $$USER_ROLES if it is referenced in the query.
-    // We need to check the FCV here because the $$USER_ROLES variable will always appear in the
-    // serialized command when one shard is sending a sub-query to another shard. The query will
-    // fail in the case where the shards are running different binVersions and one of them does not
-    // have a notion of this variable. This FCV check prevents this from happening, as the value of
-    // the variable is not set (and therefore not serialized) if the FCV is too old.
-    if (isSystemVarReferencedInQuery(Variables::kUserRolesId) &&
-        feature_flags::gFeatureFlagUserRoles.isEnabled(serverGlobalParams.featureCompatibility) &&
-        enableAccessToUserRoles.load()) {
+    if (isSystemVarReferencedInQuery(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {
         variables.defineUserRoles(opCtx);
     }
 }

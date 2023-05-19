@@ -173,7 +173,6 @@ protected:
 private:
     const std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
 
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
     RAIIServerParameterControllerForTest _inactiveThresholdController{
         "queryAnalysisSamplerInActiveThresholdSecs", inActiveThresholdSecs};
 };

@@ -58,7 +58,7 @@ assert.gt(topologyTime2, topologyTime1);
 assert.commandFailed(s.s0.adminCommand({removeshard: s.shard1.shardName}));
 
 // Should create a shard0002 shard
-var rs = new ReplSetTest({nodes: 1});
+const rs = new ReplSetTest({nodes: 1});
 rs.startSet({shardsvr: ""});
 rs.initiate();
 assert.commandWorked(s.s0.adminCommand({addshard: rs.getURL()}));

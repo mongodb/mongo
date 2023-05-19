@@ -1,5 +1,5 @@
 // SERVER-7322
-t = db.geo_exactfetch;
+let t = db.geo_exactfetch;
 t.drop();
 
 function test(indexname) {

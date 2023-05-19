@@ -16,7 +16,8 @@ import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.j
 import {
     getCertificateAndPrivateKey,
     isShardMergeEnabled,
-    makeX509OptionsForTest
+    kProtocolShardMerge,
+    makeX509OptionsForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/uuid_util.js");           // For extractUUIDFromObject().
@@ -64,7 +65,7 @@ function runRollbackAfterMigrationCommitted() {
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(kMigrationId),
         tenantIds: [kTenantId],
-        protocol: "shard merge",
+        protocol: kProtocolShardMerge,
         readPreference: kReadPreference
     };
 
@@ -156,20 +157,22 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
     const fpNewPrimary =
         configureFailPoint(newPrimary, "pauseBeforeRunTenantMigrationRecipientInstance");
 
-    function runRecipientForgetMigration(host, {
-        migrationIdString,
-        donorConnectionString,
-        tenantIds,
-        readPreference,
-        recipientCertificateForDonor
-    }) {
+    function runRecipientForgetMigration(host,
+                                         {
+                                             migrationIdString,
+                                             donorConnectionString,
+                                             tenantIds,
+                                             readPreference,
+                                             recipientCertificateForDonor
+                                         },
+                                         protocol) {
         const db = new Mongo(host);
         return db.adminCommand({
             recipientForgetMigration: 1,
             migrationId: UUID(migrationIdString),
             donorConnectionString,
             tenantIds: eval(tenantIds),
-            protocol: "shard merge",
+            protocol,
             decision: "committed",
             readPreference,
             recipientCertificateForDonor
@@ -177,13 +180,16 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
     }
 
     const recipientForgetMigrationThread =
-        new Thread(runRecipientForgetMigration, originalPrimary.host, {
-            migrationIdString: extractUUIDFromObject(kMigrationId),
-            donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-            tenantIds: tojson([kTenantId]),
-            readPreference: kReadPreference,
-            recipientCertificateForDonor
-        });
+        new Thread(runRecipientForgetMigration,
+                   originalPrimary.host,
+                   {
+                       migrationIdString: extractUUIDFromObject(kMigrationId),
+                       donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+                       tenantIds: tojson([kTenantId]),
+                       readPreference: kReadPreference,
+                       recipientCertificateForDonor
+                   },
+                   kProtocolShardMerge);
 
     // Run a delayed/retried recipientForgetMigration command after the state doc has been deleted.
     recipientForgetMigrationThread.start();

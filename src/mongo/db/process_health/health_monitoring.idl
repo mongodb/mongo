@@ -40,3 +40,4 @@ feature_flags:
         cpp_varname: gFeatureFlagHealthMonitoring
         default: true
         version: 5.3
+        shouldBeFCVGated: true

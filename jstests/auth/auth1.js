@@ -5,6 +5,7 @@
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
+let baseName;
 function setupTest() {
     print("START auth1.js");
     baseName = "jstests_auth_auth1";
@@ -16,14 +17,14 @@ function setupTest() {
 function runTest(m) {
     // these are used by read-only user
     db = m.getDB("test");
-    mro = new Mongo(m.host);
-    dbRO = mro.getDB("test");
-    tRO = dbRO[baseName];
+    let mro = new Mongo(m.host);
+    let dbRO = mro.getDB("test");
+    let tRO = dbRO[baseName];
 
     db.getSiblingDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]});
     db.getSiblingDB("admin").auth("root", "root");
 
-    t = db[baseName];
+    let t = db[baseName];
     t.drop();
 
     db.dropAllUsers();
@@ -51,7 +52,7 @@ function runTest(m) {
     assert(!db.auth("eliot", "eliot"), "auth succeeded with wrong password");
     assert(db.auth("eliot", "eliot2"), "auth failed");
 
-    for (i = 0; i < 1000; ++i) {
+    for (let i = 0; i < 1000; ++i) {
         t.save({i: i});
     }
     assert.eq(1000, t.count(), "A1");

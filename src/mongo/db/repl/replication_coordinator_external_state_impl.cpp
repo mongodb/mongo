@@ -420,16 +420,23 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 
         writeConflictRetry(opCtx,
                            "initiate oplog entry",
-                           NamespaceString::kRsOplogNamespace.toString(),
+                           NamespaceString::kRsOplogNamespace,
                            [this, &opCtx, &config] {
                                // Permit writing to the oplog before we step up to primary.
                                AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
                                Lock::GlobalWrite globalWrite(opCtx);
+                               auto coll = acquireCollection(
+                                   opCtx,
+                                   CollectionAcquisitionRequest(
+                                       NamespaceString::kSystemReplSetNamespace,
+                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       repl::ReadConcernArgs::get(opCtx),
+                                       AcquisitionPrerequisites::kWrite),
+                                   MODE_X);
                                {
                                    // Writes to 'local.system.replset' must be untimestamped.
                                    WriteUnitOfWork wuow(opCtx);
-                                   Helpers::putSingleton(
-                                       opCtx, NamespaceString::kSystemReplSetNamespace, config);
+                                   Helpers::putSingleton(opCtx, coll, config);
                                    wuow.commit();
                                }
                                {
@@ -499,15 +506,20 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx);
 
     LOGV2(6015309, "Logging transition to primary to oplog on stepup");
-    writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
-        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-        WriteUnitOfWork wuow(opCtx);
-        opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-            opCtx,
-            BSON(ReplicationCoordinator::newPrimaryMsgField
-                 << ReplicationCoordinator::newPrimaryMsg));
-        wuow.commit();
-    });
+    writeConflictRetry(
+        opCtx, "logging transition to primary to oplog", NamespaceString::kRsOplogNamespace, [&] {
+            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+            WriteUnitOfWork wuow(opCtx);
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                opCtx,
+                BSON(ReplicationCoordinator::newPrimaryMsgField
+                     << ReplicationCoordinator::newPrimaryMsg));
+            wuow.commit();
+        });
+    // As far as the storage system is concerned, we're still secondary here, and will be until we
+    // change readWriteAbility.  So new and resumed lock-free reads will read from lastApplied.  We
+    // just advanced lastApplied by writing the no-op, so we need to signal oplog waiters.
+    signalOplogWaiters();
     const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     fassert(28665, loadLastOpTimeAndWallTimeResult);
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
@@ -564,10 +576,7 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
     OperationContext* opCtx) {
     try {
         return writeConflictRetry(
-            opCtx,
-            "load replica set config",
-            NamespaceString::kSystemReplSetNamespace.ns(),
-            [opCtx] {
+            opCtx, "load replica set config", NamespaceString::kSystemReplSetNamespace, [opCtx] {
                 BSONObj config;
                 if (!Helpers::getSingleton(
                         opCtx, NamespaceString::kSystemReplSetNamespace, config)) {
@@ -588,12 +597,19 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                                                                          bool writeOplog) {
     try {
         writeConflictRetry(
-            opCtx, "save replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
+            opCtx, "save replica set config", NamespaceString::kSystemReplSetNamespace, [&] {
                 {
                     // Writes to 'local.system.replset' must be untimestamped.
                     WriteUnitOfWork wuow(opCtx);
-                    AutoGetCollection coll(opCtx, NamespaceString::kSystemReplSetNamespace, MODE_X);
-                    Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
+                    auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest(
+                            NamespaceString::kSystemReplSetNamespace,
+                            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                            repl::ReadConcernArgs::get(opCtx),
+                            AcquisitionPrerequisites::kWrite),
+                        MODE_X);
+                    Helpers::putSingleton(opCtx, coll, config);
                     wuow.commit();
                 }
 
@@ -620,18 +636,18 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
 Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
     OperationContext* opCtx, const BSONObj& config) try {
     writeConflictRetry(
-        opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace.ns(), [&] {
+        opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);
-            const auto coll =
+            auto coll =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
-                                      NamespaceString(NamespaceString::kSystemReplSetNamespace),
+                                      NamespaceString::kSystemReplSetNamespace,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_X);
             Helpers::emptyCollection(opCtx, coll);
-            Helpers::putSingleton(opCtx, NamespaceString::kSystemReplSetNamespace, config);
+            Helpers::putSingleton(opCtx, coll, config);
             wuow.commit();
         });
     return Status::OK();
@@ -652,21 +668,26 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
 
     // Make sure there's always a last vote document.
     try {
-        writeConflictRetry(
-            opCtx,
-            "create initial replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [opCtx] {
-                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_X);
-                BSONObj result;
-                bool exists =
-                    Helpers::getSingleton(opCtx, NamespaceString::kLastVoteNamespace, result);
-                if (!exists) {
-                    LastVote lastVote{OpTime::kInitialTerm, -1};
-                    Helpers::putSingleton(
-                        opCtx, NamespaceString::kLastVoteNamespace, lastVote.toBSON());
-                }
-            });
+        writeConflictRetry(opCtx,
+                           "create initial replica set lastVote",
+                           NamespaceString::kLastVoteNamespace,
+                           [opCtx] {
+                               auto coll = acquireCollection(
+                                   opCtx,
+                                   CollectionAcquisitionRequest(
+                                       NamespaceString::kLastVoteNamespace,
+                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       repl::ReadConcernArgs::get(opCtx),
+                                       AcquisitionPrerequisites::kWrite),
+                                   MODE_X);
+
+                               BSONObj result;
+                               bool exists = Helpers::getSingleton(opCtx, coll.nss(), result);
+                               if (!exists) {
+                                   LastVote lastVote{OpTime::kInitialTerm, -1};
+                                   Helpers::putSingleton(opCtx, coll, lastVote.toBSON());
+                               }
+                           });
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -678,10 +699,7 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteD
     OperationContext* opCtx) {
     try {
         return writeConflictRetry(
-            opCtx,
-            "load replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [opCtx] {
+            opCtx, "load replica set lastVote", NamespaceString::kLastVoteNamespace, [opCtx] {
                 BSONObj lastVoteObj;
                 if (!Helpers::getSingleton(
                         opCtx, NamespaceString::kLastVoteNamespace, lastVoteObj)) {
@@ -721,16 +739,20 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
             noInterrupt.emplace(opCtx->lockState());
 
         Status status = writeConflictRetry(
-            opCtx,
-            "save replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [&] {
+            opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
                 // Writes to non-replicated collections do not need concurrency control with the
                 // OplogApplier that never accesses them. Skip taking the PBWM.
                 ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
                     opCtx->lockState());
 
-                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_IX);
+                auto coll =
+                    acquireCollection(opCtx,
+                                      CollectionAcquisitionRequest(
+                                          NamespaceString::kLastVoteNamespace,
+                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          repl::ReadConcernArgs::get(opCtx),
+                                          AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
                 WriteUnitOfWork wunit(opCtx);
 
                 // We only want to replace the last vote document if the new last vote document
@@ -747,7 +769,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                     return oldLastVoteDoc.getStatus();
                 }
                 if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
-                    Helpers::putSingleton(opCtx, NamespaceString::kLastVoteNamespace, lastVoteObj);
+                    Helpers::putSingleton(opCtx, coll, lastVoteObj);
                 }
                 wunit.commit();
                 return Status::OK();
@@ -790,10 +812,9 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
 
         BSONObj oplogEntry;
 
-        if (!writeConflictRetry(
-                opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                    return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
-                })) {
+        if (!writeConflictRetry(opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace, [&] {
+                return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
+            })) {
             return StatusWith<OpTimeAndWallTime>(
                 ErrorCodes::NoMatchingDocument,
                 str::stream() << "Did not find any entries in "
@@ -985,11 +1006,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // Note, these must be done after the configOpTime is recovered via
             // ShardingStateRecovery::recover above, because they may trigger filtering metadata
             // refreshes which should use the recovered configOpTime.
-            // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern. The
-            // feature flag is used to turn on new range deleter on startup.
-            if (!mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-                migrationutil::resubmitRangeDeletionsOnStepUp(_service);
-            }
             migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
             migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 

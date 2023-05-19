@@ -45,6 +45,18 @@ server_parameters:
             gte: 1
         default: 10
 
+    preImagesCollectionTruncateMarkersMinBytes:
+        description: >-
+            Server parameter that specifies the minimum number of bytes contained in each
+            truncate marker. This is only of use if featureFlagUseUnreplicatedTruncatesForDeletions is
+            enabled
+        set_at: startup
+        cpp_varname: gPreImagesCollectionTruncateMarkersMinBytes
+        cpp_vartype: int32_t
+        default: 33_554_432  # 32 MiB
+        validator:
+            gt: 0
+
 structs:
     ChangeStreamPreImageId:
         description: Uniquely identifies a pre-image for a given node or replica set.

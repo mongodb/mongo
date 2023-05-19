@@ -13,7 +13,7 @@
 "use strict";
 
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});

@@ -14,10 +14,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    runTenantMigrationCommand,
-    tryAbortMigrationAsync
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {tryAbortMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
@@ -81,7 +78,7 @@ const tenantMigrationTest =
     const tryAbortThread = new Thread(tryAbortMigrationAsync,
                                       {migrationIdString: migrationId1, tenantId: tenantId},
                                       donorRstArgs,
-                                      runTenantMigrationCommand);
+                                      true /* retryOnRetryableErrors */);
     tryAbortThread.start();
 
     // Wait for donorAbortMigration command to start.

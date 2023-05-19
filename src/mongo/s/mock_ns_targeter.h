@@ -82,7 +82,7 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         std::set<ChunkRange>* chunkRanges = nullptr) const override {
-        return _targetQuery(itemRef.getUpdate().getQ(), chunkRanges);
+        return _targetQuery(itemRef.getUpdateRef().getFilter(), chunkRanges);
     }
 
     /**
@@ -94,7 +94,7 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         std::set<ChunkRange>* chunkRanges = nullptr) const override {
-        return _targetQuery(itemRef.getDelete().getQ(), chunkRanges);
+        return _targetQuery(itemRef.getDeleteRef().getFilter(), chunkRanges);
     }
 
     std::vector<ShardEndpoint> targetAllShards(

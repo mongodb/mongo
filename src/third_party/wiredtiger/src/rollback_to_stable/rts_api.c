@@ -44,6 +44,9 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
     txn_global = &conn->txn_global;
     dryrun = conn->rts->dryrun;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     /*
      * Rollback to stable should ignore tombstones in the history store since it needs to scan the
      * entire table sequentially.

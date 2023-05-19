@@ -156,23 +156,9 @@ public:
                                   const MultikeyPaths& multikeyPaths) const = 0;
 
     /**
-     * Returns whether this index is ready for queries. This is potentially unsafe in that it does
-     * not consider whether the index is visible or ready in the current storage snapshot. For
-     * that, use isReadyInMySnapshot() or isPresentInMySnapshot().
+     * Returns whether this index is ready for queries.
      */
     virtual bool isReady() const = 0;
-
-    /**
-     * Safely check whether this index is visible in the durable catalog in the current storage
-     * snapshot.
-     */
-    virtual bool isPresentInMySnapshot(OperationContext* opCtx) const = 0;
-
-    /**
-     * Check whether this index is ready in the durable catalog in the current storage snapshot. It
-     * is unsafe to call this if isPresentInMySnapshot() has not also been checked.
-     */
-    virtual bool isReadyInMySnapshot(OperationContext* opCtx) const = 0;
 
     /**
      * Returns true if this index is not ready, and it is not currently in the process of being

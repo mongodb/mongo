@@ -91,19 +91,19 @@ public:
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
+                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                   const WriteConcernOptions& wc,
                   boost::optional<OID> targetEpoch) override;
 
     Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             const NamespaceString& ns,
-                            std::vector<BSONObj>&& objs,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                             const WriteConcernOptions& wc,
                             boost::optional<OID> targetEpoch) override;
 
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    BatchedObjects&& batch,
+                                    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,
@@ -115,7 +115,6 @@ public:
         const NamespaceString& targetNs,
         bool dropTarget,
         bool stayTemp,
-        bool allowBuckets,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) override;
 
@@ -123,10 +122,10 @@ public:
                           const DatabaseName& dbName,
                           const BSONObj& cmdObj) override;
 
-    void createTimeseries(OperationContext* opCtx,
-                          const NamespaceString& ns,
-                          const BSONObj& options,
-                          bool createView) override;
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) override;
 
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;
 

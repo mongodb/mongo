@@ -395,10 +395,6 @@ private:
     std::unique_ptr<transport::TransportLayer> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
-    // TODO SERVER-75830: This Mutex used to be at hierarcichal acquisition level 3. We temporary
-    // removed the level because it is sometimes acquired as part of task-scheduling when
-    // lower-level mutexes (like the ConnectionPool's) are held.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::_mutex");
     const ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::shared_ptr<ConnectionPool> _pool;

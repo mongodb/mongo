@@ -15,13 +15,13 @@ mkdir(recordingDir);
 
 // Create the options and run mongod
 var opts = {auth: "", setParameter: "trafficRecordingDirectory=" + recordingDir};
-m = MongoRunner.runMongod(opts);
+let m = MongoRunner.runMongod(opts);
 
 // Get the port of the host
 var serverPort = m.port;
 
 // Create necessary users
-adminDB = m.getDB("admin");
+let adminDB = m.getDB("admin");
 const testDB = m.getDB("test");
 const coll = testDB.getCollection("foo");
 adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});

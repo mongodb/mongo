@@ -599,17 +599,6 @@ private:
                                                            DDLCoordinatorTypeEnum::kDropDatabase);
         }
 
-        // TODO SERVER-68373 remove once 7.0 becomes last LTS
-        if (isDowngrading &&
-            mongo::gFeatureFlagFLE2CompactForProtocolV2
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            // Drain the QE compact coordinator because it persists state that is
-            // not backwards compatible with earlier versions.
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData);
-        }
-
         if (isUpgrading) {
             _createShardingIndexCatalogIndexes(
                 opCtx, requestedVersion, NamespaceString::kShardIndexCatalogNamespace);
@@ -1082,97 +1071,6 @@ private:
                         !hasShardingIndexCatalogEntries);
             }
         }
-
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
-            serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-            if (feature_flags::gTimeseriesScalabilityImprovements
-                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
-                for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                    catalog::forEachCollectionFromDb(
-                        opCtx,
-                        dbName,
-                        MODE_S,
-                        [&](const Collection* collection) {
-                            auto tsOptions = collection->getTimeseriesOptions();
-                            invariant(tsOptions);
-
-                            auto indexCatalog = collection->getIndexCatalog();
-                            auto indexIt = indexCatalog->getIndexIterator(
-                                opCtx,
-                                IndexCatalog::InclusionPolicy::kReady |
-                                    IndexCatalog::InclusionPolicy::kUnfinished);
-
-                            // Check and fail to downgrade if the time-series collection has a
-                            // partial, TTL index.
-                            while (indexIt->more()) {
-                                auto indexEntry = indexIt->next();
-                                if (indexEntry->descriptor()->isPartial()) {
-                                    // TODO (SERVER-67659): Remove partial, TTL index check once
-                                    // FCV 7.0 becomes last-lts.
-                                    uassert(
-                                        ErrorCodes::CannotDowngrade,
-                                        str::stream()
-                                            << "Cannot downgrade the cluster when there are "
-                                               "secondary "
-                                               "TTL indexes with partial filters on time-series "
-                                               "collections. Drop all partial, TTL indexes on "
-                                               "time-series collections before downgrading. First "
-                                               "detected incompatible index name: '"
-                                            << indexEntry->descriptor()->indexName()
-                                            << "' on collection: '"
-                                            << collection->ns()
-                                                   .getTimeseriesViewNamespace()
-                                                   .toStringForErrorMsg()
-                                            << "'",
-                                        !indexEntry->descriptor()->infoObj().hasField(
-                                            IndexDescriptor::kExpireAfterSecondsFieldName));
-                                }
-                            }
-
-                            // Check the time-series options for a default granularity. Fail the
-                            // downgrade if the bucketing parameters are custom values.
-                            uassert(
-                                ErrorCodes::CannotDowngrade,
-                                str::stream()
-                                    << "Cannot downgrade the cluster when there are time-series "
-                                       "collections with custom bucketing parameters. In order to "
-                                       "downgrade, the time-series collection(s) must be updated "
-                                       "with a granularity of 'seconds', 'minutes' or 'hours'. "
-                                       "First detected incompatible collection: '"
-                                    << collection->ns()
-                                           .getTimeseriesViewNamespace()
-                                           .toStringForErrorMsg()
-                                    << "'",
-                                tsOptions->getGranularity().has_value());
-
-                            return true;
-                        },
-                        [&](const Collection* collection) {
-                            return collection->getTimeseriesOptions() != boost::none;
-                        });
-                }
-            }
-
-            // Block downgrade for collections with encrypted fields
-            // TODO SERVER-67760: Remove once FCV 7.0 becomes last-lts.
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_X, [&](const Collection* collection) {
-                        auto& efc = collection->getCollectionOptions().encryptedFieldConfig;
-
-                        uassert(ErrorCodes::CannotDowngrade,
-                                str::stream() << "Cannot downgrade the cluster as collection "
-                                              << collection->ns().toStringForErrorMsg()
-                                              << " has 'encryptedFields' with range indexes",
-                                !(efc.has_value() &&
-                                  hasQueryType(efc.get(), QueryTypeEnum::RangePreview)));
-                        return true;
-                    });
-            }
-        }
     }
 
     // Remove cluster parameters from the clusterParameters collections which are not enabled on
@@ -1575,14 +1473,6 @@ private:
     // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
     void _finalizeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
-        }
-
         // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
             feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
@@ -1596,17 +1486,6 @@ private:
         }
 
         _maybeRemoveOldAuditConfig(opCtx, requestedVersion);
-
-        // TODO SERVER-68373: Remove once 7.0 becomes last LTS
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            mongo::gFeatureFlagFLE2CompactForProtocolV2.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible);
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible);
-        }
     }
 
 } setFeatureCompatibilityVersionCommand;

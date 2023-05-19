@@ -73,6 +73,7 @@ executor:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: CleanEveryN
     n: 20
 matrix_suite: true
@@ -133,7 +134,6 @@ selector:
   - requires_fastcount
   - requires_dbstats
   - requires_collstats
-  - requires_datasize
   - operations_longer_than_stepdown_interval
   - uses_parallel_shell
   - cannot_run_during_upgrade_downgrade

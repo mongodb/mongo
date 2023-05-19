@@ -60,7 +60,7 @@ bool canInitializeServices();
  * Returns true if the target environment (replica-set or sharded-cluster) supports running change
  * stream in the serverless, false otherwise.
  */
-bool canRunInTargetEnvironment();
+bool isServerlessEnvironment();
 
 /**
  * Returns an internal tenant id that will be used for testing purposes. This tenant id will not

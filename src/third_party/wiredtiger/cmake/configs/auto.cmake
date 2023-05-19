@@ -243,6 +243,19 @@ config_lib(
 )
 
 config_lib(
+    HAVE_LIBCXX
+    "stdc++ library exists."
+    LIB "stdc++"
+)
+
+config_lib(
+    HAVE_LIBACCEL_CONFIG
+    "accel-config library exists."
+    LIB "accel-config"
+)
+
+
+config_lib(
     HAVE_LIBLZ4
     "lz4 library exists."
     LIB "lz4"
@@ -268,6 +281,13 @@ config_lib(
     "zstd library exists."
     LIB "zstd"
     HEADER "zstd.h"
+)
+
+config_lib(
+    HAVE_LIBQPL
+    "qpl library exists."
+    LIB "qpl"
+    HEADER "qpl/qpl.h"
 )
 
 config_lib(

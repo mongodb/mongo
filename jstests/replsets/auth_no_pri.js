@@ -3,7 +3,7 @@
 'use strict';
 
 var NODE_COUNT = 3;
-var rs = new ReplSetTest({"nodes": NODE_COUNT, keyFile: "jstests/libs/key1"});
+const rs = new ReplSetTest({"nodes": NODE_COUNT, keyFile: "jstests/libs/key1"});
 var nodes = rs.startSet();
 rs.initiate();
 

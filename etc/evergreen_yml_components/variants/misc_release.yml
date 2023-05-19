@@ -8,7 +8,7 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -18,6 +18,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     multiversion_platform: amazon2
     multiversion_edition: targeted
     has_packages: true
@@ -45,7 +46,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -74,7 +74,7 @@ buildvariants:
       archive-mongocryptd-debug
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -84,6 +84,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -109,7 +110,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common
@@ -142,7 +142,8 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -168,7 +169,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -204,11 +204,12 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2
     multiversion_edition: enterprise
@@ -304,43 +305,42 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: amazon2022
-  display_name: Amazon Linux 2022
+- name: amazon2023
+  display_name: Amazon Linux 2023
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2022-small
+  - amazon2023.0-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: x86_64-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+    push_arch: x86_64-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2022-large
-    compile_variant: amazon2022
+    large_distro_name: amazon2023.0-large
+    compile_variant: amazon2023
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -354,37 +354,37 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-amazon2022
-  display_name: "Enterprise Amazon Linux 2022"
+- name: enterprise-amazon2023
+  display_name: "Enterprise Amazon Linux 2023"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - amazon2022-small
+  - amazon2023.0-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: x86_64-enterprise-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    push_arch: x86_64-enterprise-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
-    multiversion_platform: amazon2022
+    multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: x86_64
     packager_script: packager_enterprise.py
     packager_arch: x86_64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: enterprise
     scons_cache_scope: shared
-    compile_variant: enterprise-amazon2022
+    compile_variant: enterprise-amazon2023
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: .aggregation !.feature_flag_guarded
@@ -397,7 +397,7 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns
   - name: .concurrency .large !.ubsan !.no_txns
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: config_fuzzer_concurrency
   - name: config_fuzzer_jsCore
   - name: disk_wiredtiger
@@ -406,7 +406,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .jscore .common !jsCore !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -418,17 +418,17 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -444,46 +444,46 @@ buildvariants:
   - name: .stitch
   - name: .crypt
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: .publish_crypt
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: server_selection_json_test_TG
     distros:
-    - amazon2022-large
+    - amazon2023.0-large
   - name: test_packages
     distros:
     - ubuntu2204-large
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: amazon2022-arm64
-  display_name: Amazon Linux 2022 arm64
+- name: amazon2023-arm64
+  display_name: Amazon Linux 2023 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2022-arm64-small
+  - amazon2023.0-arm64-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: aarch64-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
+    push_arch: aarch64-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon2022-arm64-large
-    compile_variant: amazon2022-arm64
+    large_distro_name: amazon2023.0-arm64-large
+    compile_variant: amazon2023-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: sharding_auth_gen
@@ -491,13 +491,12 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency .common
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -511,37 +510,37 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-amazon2022-arm64
-  display_name: "Enterprise Amazon Linux 2022 arm64"
+- name: enterprise-amazon2023-arm64
+  display_name: "Enterprise Amazon Linux 2023 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
-  - amazon2022-arm64-small
+  - amazon2023.0-arm64-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: aarch64-enterprise-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    push_arch: aarch64-enterprise-amazon2023
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
-    multiversion_platform: amazon2022
+    multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
     packager_script: packager_enterprise.py
     packager_arch: aarch64
-    packager_distro: amazon2022
+    packager_distro: amazon2023
     repo_edition: enterprise
     scons_cache_scope: shared
-    compile_variant: enterprise-amazon2022-arm64
+    compile_variant: enterprise-amazon2023-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: .aggregation !.feature_flag_guarded
@@ -554,18 +553,18 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns
   - name: .concurrency .large !.ubsan !.no_txns
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .jscore .common !jsCore !.feature_flag_guarded
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
@@ -578,17 +577,17 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -604,16 +603,16 @@ buildvariants:
   - name: .stitch
   - name: .crypt
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: .publish_crypt
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: server_selection_json_test_TG
     distros:
-    - amazon2022-arm64-large
+    - amazon2023.0-arm64-large
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
@@ -630,12 +629,13 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian10
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     multiversion_platform: debian10
     multiversion_edition: targeted
     has_packages: true
@@ -663,7 +663,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -700,7 +699,8 @@ buildvariants:
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -728,7 +728,6 @@ buildvariants:
     - debian10-large
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -757,7 +756,8 @@ buildvariants:
       MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: debian11
     multiversion_edition: targeted
     has_packages: true
@@ -785,7 +785,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -821,7 +820,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -845,7 +845,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -873,7 +872,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -901,7 +901,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -924,10 +923,12 @@ buildvariants:
   run_on:
   - rhel76-test
   expansions:
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     compile_variant: rhel76_compile_rhel70
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -951,10 +952,11 @@ buildvariants:
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
-      --excludeWithAnyTags=requires_os_access
+      --excludeWithAnyTags=requires_os_access,requires_latch_analyzer
     compile_variant: ubi8
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -981,7 +983,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_edition: targeted
     has_packages: true
@@ -1009,7 +1012,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -1046,7 +1048,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CFLAGS="-fno-gnu-unique"
@@ -1166,7 +1169,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -1192,7 +1196,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1227,7 +1230,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1254,7 +1258,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
@@ -1285,8 +1288,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel90
     multiversion_edition: targeted
     has_packages: true
@@ -1314,7 +1317,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common !.multiversion
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1342,8 +1344,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel90
     multiversion_edition: enterprise
@@ -1377,7 +1379,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -1414,7 +1415,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -1440,7 +1442,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1475,7 +1476,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1503,7 +1505,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
@@ -1544,7 +1545,8 @@ buildvariants:
       -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -1575,7 +1577,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: multiversion_gen
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1613,7 +1614,8 @@ buildvariants:
       -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1636,7 +1638,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -1672,7 +1673,8 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1693,7 +1695,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -1722,7 +1723,8 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: suse15
     multiversion_edition: targeted
     has_packages: true
@@ -1749,7 +1751,6 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -1781,9 +1782,10 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -1811,7 +1813,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: .powercycle
   - name: replica_sets_gen
@@ -1852,13 +1853,14 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -1891,7 +1893,6 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .ocsp
@@ -1928,11 +1929,12 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -1957,7 +1959,6 @@ buildvariants:
   - name: fle
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -1989,7 +1990,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2027,7 +2029,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
     has_packages: true
@@ -2054,7 +2057,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   # - name: multiversion_gen
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
@@ -2084,7 +2086,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -2111,7 +2114,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   # - name: multiversion_gen
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
@@ -2148,7 +2150,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2180,7 +2183,6 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2215,7 +2217,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2247,7 +2250,6 @@ buildvariants:
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2281,7 +2283,8 @@ buildvariants:
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2309,7 +2312,6 @@ buildvariants:
   - name: fle
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -2340,7 +2342,8 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2377,8 +2380,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -2404,7 +2407,6 @@ buildvariants:
   - name: fle
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
@@ -2433,8 +2435,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2477,12 +2479,13 @@ buildvariants:
       MONGO_DISTMOD=windows
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
+      --use-diagnostic-latches=off
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
     compile_variant: windows
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -2542,6 +2545,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
+      --use-diagnostic-latches=off
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -2605,7 +2609,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -2616,6 +2620,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: macos
   tasks:
@@ -2636,7 +2641,6 @@ buildvariants:
   - name: .jstestfuzz .interrupt
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
-  - name: .logical_session_cache .one_sec
   - name: .query_fuzzer
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
@@ -2652,7 +2656,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: push
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: macos-arm64
   display_name: macOS arm64
@@ -2660,7 +2663,7 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -2671,6 +2674,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: macos-arm64
   tasks:
@@ -2691,7 +2695,6 @@ buildvariants:
   - name: .jstestfuzz .interrupt
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
-  - name: .logical_session_cache .one_sec
   - name: .query_fuzzer
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
@@ -2707,7 +2710,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: push
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -2717,7 +2719,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -2733,6 +2735,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos
   tasks:
@@ -2745,7 +2748,6 @@ buildvariants:
   # - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2753,7 +2755,6 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-macos-arm64
   display_name: Enterprise macOS arm64
@@ -2763,7 +2764,7 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -2779,6 +2780,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
+      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos-arm64
   tasks:
@@ -2790,7 +2792,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -2798,7 +2799,6 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64-grpc
   display_name: "Enterprise RHEL 8.2 arm64 GRPC"
@@ -2809,12 +2809,14 @@ buildvariants:
   - rhel82-arm64-large
   stepback: false
   expansions:
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     compile_flags: >-
       --ssl
       --dbg=on
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
       --link-model=dynamic
       ENABLE_GRPC_BUILD=1
       --use-libunwind=off
@@ -2825,3 +2827,39 @@ buildvariants:
     - name: compile_test_and_package_parallel_unittest_stream_TG
     - name: compile_test_and_package_parallel_core_stream_TG
     - name: compile_test_and_package_parallel_dbtest_stream_TG
+
+- name: enterprise-amazon2-streams
+  display_name: "Amazon Linux 2 enterprise build with streams"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-test
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-amazon2-streams
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --streams-release-build
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise-streams
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    compile_variant: enterprise-amazon2-streams
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - amazon2-build
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping

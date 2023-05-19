@@ -47,10 +47,12 @@ using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
-ShardingTestFixtureCommon::ShardingTestFixtureCommon() {
+ShardingTestFixtureCommon::ShardingTestFixtureCommon() : _tempDir("sharding_test_fixture_common") {
     auto service = getServiceContext();
     service->registerClientObserver(
         std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
+
+    storageGlobalParams.dbpath = _tempDir.path();
 }
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {

@@ -29,7 +29,7 @@ exec_timeout_secs: 21600 # 6 hrs
 
 functions:
 
-  "get project" :
+  "get project":
     command: git.get_project
     params:
       directory: wiredtiger
@@ -52,6 +52,7 @@ functions:
   "fetch mongo-tests repo" :
     command: shell.exec
     params:
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -74,6 +75,7 @@ functions:
   "import wiredtiger into mongo" :
     command: shell.exec
     params:
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -249,6 +251,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -427,6 +430,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -437,6 +441,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -474,6 +479,7 @@ functions:
     # Delete unnecessary data from the upload.
     - command: shell.exec
       params:
+        shell: bash
         script: |
           rm -rf wiredtiger/cmake_build/examples
           rm -rf wiredtiger/cmake_build/bench
@@ -515,6 +521,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/bench/wt2853_perf"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -524,6 +531,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -533,6 +541,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -546,16 +555,25 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/format"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
+        # Fail, show the configuration file.
+        fail() {
+          echo "======= FAILURE =========="
+          [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG
+          exit 1
+        }
+
         for i in $(seq ${times|1}); do
-          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${extra_args|} || ( [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG ) 2>&1
+          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${extra_args|} || fail
         done
   "format test predictable":
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/format"
+      shell: bash
       script: |
         # To test predictable replay, we run test/format three times with the same data seed
         # each time, and compare the keys and values found in the WT home directories.
@@ -608,6 +626,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/format"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -619,6 +638,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/format"
+      shell: bash
       script: |
         # To make sure we have plenty of flush_tier calls, we set the flush frequency high
         # and the time between checkpoints low. We specify only using tables, as that's the
@@ -635,6 +655,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/manydbs"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -643,6 +664,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/thread"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -651,6 +673,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/csuite"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -689,6 +712,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/csuite/schema_abort"
+      shell: bash
       script: |
         # Get a random value with leading zeroes removed, /bin/sh version.
         rando() {
@@ -771,6 +795,7 @@ functions:
   "cleanup":
     command: shell.exec
     params:
+      shell: bash
       script: |
         rm -rf "wiredtiger"
         rm -rf "wiredtiger.tgz"
@@ -779,6 +804,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build"
+      shell: bash
       script: |
         set -o verbose
 
@@ -812,6 +838,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -825,6 +852,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/checkpoint"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -834,6 +862,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/checkpoint"
+      shell: bash
       script: |
         # Get a random value with leading zeroes removed, /bin/sh version.
         rando() {
@@ -939,6 +968,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -952,6 +982,7 @@ functions:
   "convert-to-atlas-evergreen-format":
     - command: shell.exec
       params:
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -1003,6 +1034,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: "wiredtiger"
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -1022,12 +1054,22 @@ functions:
     command: shell.exec
     params:
       working_dir: "wiredtiger/bench/workgen/runner"
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
         for i in $(seq ${times|15}); do
             ${test_env_vars|} ${python_binary|python3} split_stress.py
         done
+
+  "build and push antithesis container":
+    command: subprocess.exec
+    params:
+      working_dir: wiredtiger/tools/antithesis
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "./build_and_push_containers.sh"
 
 #######################################
 #               Variables             #
@@ -1456,6 +1498,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -1470,6 +1513,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -1850,6 +1894,16 @@ tasks:
       - func: "csuite test"
         vars:
           test_name: incr_backup
+
+  - name: csuite-random-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: random
 
   - name: csuite-random-abort-test
     tags: ["pull_request"]
@@ -2781,23 +2835,14 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/dist"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
             sh -x s_all -A -E 2>&1
-
-  - name: s-string
-    # Run the script with "-r" option to remove no-longer-needed words in s_string.ok
-    # This task only needs to be scheduled every a few months. A failure can remind us
-    # to keep the s_string.ok word list up-to-date.
-    commands:
-      - func: "get project"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/dist"
-          script: |
-            set -o errexit
-            set -o verbose
+            # Run s_string with the "-r" option to remove no-longer-needed words from s_string.ok
+            # This is run separately from s_all as it can be too proactive when run as part of 
+            # developers local workflow, but needs to be run in PR builds before the code is merged.
             sh s_string -r 2>&1
 
   - name: s-outdated-fixmes
@@ -2809,6 +2854,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/dist"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -2823,6 +2869,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/bench/wtperf"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -2838,6 +2885,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/test/fops"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -2874,6 +2922,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/bench/tiered"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -2908,6 +2957,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -2926,6 +2976,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3042,6 +3093,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3053,6 +3105,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3092,6 +3145,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/dist"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3119,6 +3173,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/test/syscall"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3160,14 +3215,15 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
             ${test_env_vars|} test/unittest/unittests
       - command: shell.exec
         params:
-          shell: bash
           working_dir: "wiredtiger/cmake_build"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3350,6 +3406,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3482,6 +3539,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/test/csuite"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3548,6 +3606,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/bench/wtperf"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3576,6 +3635,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/tools/memory-model-test"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3817,6 +3877,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/test/evergreen"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3913,6 +3974,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/bench/workgen/runner"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3932,6 +3994,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/bench/workgen/runner"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -5237,18 +5300,22 @@ tasks:
 #     Antithesis Integration          #
 #######################################
 
-  - name: build-and-push-antithesis-containers
+  - name: debug-have-diagnostic
     tags: ["antithesis"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
-      - command: subprocess.exec
-        params:
-          working_dir: wiredtiger/tools/antithesis
-          binary: bash
-          add_expansions_to_env: true
-          args:
-          - "./build_and_push_containers.sh"
+      - func: "build and push antithesis container"
+
+  - name: release-with-debug-have-diagnostic
+    tags: ["antithesis"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=1
+      - func: "build and push antithesis container"
 
 #######################################
 #            Buildvariants            #
@@ -5647,6 +5714,7 @@ buildvariants:
     # Remove that configuration here and let MacOS use the default Xcode toolchain instead.
     # We'll explicitly use the python3 in /usr/bin, we use the same in configuring cmake.
     CMAKE_TOOLCHAIN_FILE:
+    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     python_binary: '/usr/bin/python3'
     smp_command: -j $(sysctl -n hw.logicalcpu)
     cmake_generator: "Unix Makefiles"
@@ -5861,6 +5929,6 @@ buildvariants:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     make_command: ninja
   tasks:
-    - name: build-and-push-antithesis-containers
+    - name: ".antithesis"
       cron: 0 0 * * 4 # once a week (Thursday midnight UTC)
       patchable: false

@@ -1,4 +1,4 @@
-t = db.regex8;
+let t = db.regex8;
 t.drop();
 
 t.insert({_id: 1, a: "abc"});

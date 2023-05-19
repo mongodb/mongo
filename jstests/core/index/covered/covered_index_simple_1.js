@@ -12,13 +12,13 @@ load("jstests/libs/analyze_plan.js");
 
 var coll = db.getCollection("covered_simple_1");
 coll.drop();
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     coll.insert({foo: i});
 }
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     coll.insert({foo: i});
 }
-for (i = 0; i < 5; i++) {
+for (let i = 0; i < 5; i++) {
     coll.insert({bar: i});
 }
 coll.insert({foo: "string"});

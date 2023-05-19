@@ -1,4 +1,4 @@
-t = db.objid2;
+let t = db.objid2;
 t.drop();
 
 t.save({_id: 517, a: "hello"});

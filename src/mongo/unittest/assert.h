@@ -45,6 +45,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/logv2/log_debug.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -440,7 +441,6 @@ public:
                                     StringData a,
                                     StringData b);
 
-
     // Use a single implementation (identical to the templated one) for all pointer and array types.
     // Note: this is selected instead of the StringData overload for char* and string literals
     // because they are supposed to compare pointers, not contents.
@@ -450,16 +450,18 @@ public:
                                     StringData bExpression,
                                     const void* a,
                                     const void* b);
-    TEMPLATE(typename A, typename B)
-    REQUIRES(!(std::is_convertible_v<A, StringData> && std::is_convertible_v<B, StringData>)&&  //
-             !(std::is_pointer_v<A> && std::is_pointer_v<B>)&&                                  //
-             !(std::is_array_v<A> && std::is_array_v<B>))
-    static ComparisonAssertion make(const char* theFile,
-                                    unsigned theLine,
-                                    StringData aExpression,
-                                    StringData bExpression,
-                                    const A& a,
-                                    const B& b) {
+
+    template <typename A, typename B>
+    requires(                                                                              //
+        !(std::is_convertible_v<A, StringData> && std::is_convertible_v<B, StringData>)&&  //
+        !(std::is_pointer_v<A> && std::is_pointer_v<B>)&&                                  //
+        !(std::is_array_v<A> && std::is_array_v<B>))                                       //
+        static ComparisonAssertion make(const char* theFile,
+                                        unsigned theLine,
+                                        StringData aExpression,
+                                        StringData bExpression,
+                                        const A& a,
+                                        const B& b) {
         return ComparisonAssertion(theFile, theLine, aExpression, bExpression, a, b);
     }
 

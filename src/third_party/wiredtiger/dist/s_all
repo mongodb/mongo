@@ -85,6 +85,7 @@ run "sh ./s_typedef -b"
 run "python test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
+run "python3 primitive_check.py" "--warning-only"
 
 COMMANDS="
 2>&1 ./s_define > ${t_pfx}s_define

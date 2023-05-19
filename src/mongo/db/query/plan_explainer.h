@@ -124,15 +124,6 @@ public:
         ExplainOptions::Verbosity verbosity) const = 0;
 
     /**
-     * Serializes plan cache entry debug info into the provided BSONObjBuilder. The output format is
-     * intended to be human readable, and useful for debugging query performance problems related to
-     * the plan cache.
-     */
-    virtual std::vector<PlanStatsDetails> getCachedPlanStats(
-        const plan_cache_debug_info::DebugInfo& debugInfo,
-        ExplainOptions::Verbosity verbosity) const = 0;
-
-    /**
      * Returns an object containing what query knobs the planner hit during plan enumeration.
      */
     PlanEnumeratorExplainInfo getEnumeratorInfo() const {

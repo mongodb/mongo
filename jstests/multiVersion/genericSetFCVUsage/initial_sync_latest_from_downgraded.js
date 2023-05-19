@@ -5,7 +5,7 @@
 
 'use strict';
 
-load("./jstests/multiVersion/libs/initial_sync.js");
+load("jstests/multiVersion/libs/initial_sync.js");
 
 let newSecondaryVersion = "latest";
 

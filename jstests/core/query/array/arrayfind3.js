@@ -1,4 +1,4 @@
-t = db.arrayfind3;
+let t = db.arrayfind3;
 t.drop();
 
 t.save({a: [1, 2]});

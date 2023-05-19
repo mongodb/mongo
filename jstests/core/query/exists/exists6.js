@@ -1,6 +1,6 @@
 // SERVER-393 Test indexed matching with $exists.
 
-t = db.jstests_exists6;
+let t = db.jstests_exists6;
 t.drop();
 
 t.createIndex({b: 1});

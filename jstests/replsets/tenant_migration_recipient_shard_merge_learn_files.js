@@ -8,6 +8,8 @@
  *   requires_persistence,
  *   serverless,
  *   featureFlagShardMerge,
+ *   # The error code for a rejected recipient command invoked during the reject phase was changed.
+ *   requires_fcv_71,
  * ]
  */
 
@@ -54,8 +56,7 @@ const migrationOpts = {
 };
 
 jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);
-assert.commandWorked(
-    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 waitInFailPoint.wait();
 
@@ -72,7 +73,7 @@ tenantMigrationTest.assertRecipientNodesInExpectedState({
     migrationId: migrationUuid,
     tenantId: tenantId.str,
     expectedState: TenantMigrationTest.ShardMergeRecipientState.kLearnedFilenames,
-    expectedAccessState: TenantMigrationTest.RecipientAccessState.kReject
+    expectedAccessState: TenantMigrationTest.RecipientAccessState.kRejectReadsAndWrites
 });
 
 waitInFailPoint.off();

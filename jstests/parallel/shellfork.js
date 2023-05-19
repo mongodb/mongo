@@ -1,16 +1,16 @@
 load('jstests/libs/parallelTester.js');
 
-a = fork(function(a, b) {
+let a = fork(function(a, b) {
     return a / b;
 }, 10, 2);
 a.start();
-b = fork(function(a, b, c) {
+let b = fork(function(a, b, c) {
     return a + b + c;
 }, 18, " is a ", "multiple of 3");
-makeFunny = function(text) {
+let makeFunny = function(text) {
     return text + " ha ha!";
 };
-c = fork(makeFunny, "paisley");
+let c = fork(makeFunny, "paisley");
 c.start();
 b.start();
 b.join();
@@ -18,7 +18,7 @@ assert.eq(5, a.returnData());
 assert.eq("18 is a multiple of 3", b.returnData());
 assert.eq("paisley ha ha!", c.returnData());
 
-z = fork(function(a) {
+let z = fork(function(a) {
     load('jstests/libs/parallelTester.js');
     var y = fork(function(a) {
         return a + 1;
@@ -29,7 +29,7 @@ z = fork(function(a) {
 z.start();
 assert.eq(7, z.returnData());
 
-t = 1;
+let t = 1;
 z = new Thread(function() {
     assert(typeof (t) == "undefined", "t not undefined");
     t = 5;

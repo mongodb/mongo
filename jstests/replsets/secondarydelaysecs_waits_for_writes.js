@@ -12,7 +12,7 @@
 // ]
 load("jstests/replsets/rslib.js");
 
-doTest = function(signal) {
+let doTest = function(signal) {
     var name = "secondaryDelaySecs";
     var host = getHostName();
 
@@ -67,7 +67,7 @@ doTest = function(signal) {
     /************* Part 2 *******************/
 
     // how about if we add a new server?  will it sync correctly?
-    conn = replTest.add();
+    let conn = replTest.add();
 
     config = primary.getSiblingDB("local").system.replset.findOne();
     printjson(config);

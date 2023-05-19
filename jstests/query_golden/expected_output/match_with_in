@@ -20,6 +20,7 @@
 {  "_id" : 9,  "a" : {  "c" : 1 } }
 Collection count: 14
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$in" : [ null ] } } } ]
 [jsTest] ----

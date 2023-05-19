@@ -147,8 +147,7 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& dbName : allDbs) {
-        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
-            auto coll = *collIt;
+        for (auto&& coll : catalog->range(dbName)) {
             if (!coll) {
                 break;
             }
@@ -212,7 +211,7 @@ void openCatalog(OperationContext* opCtx,
 
     // Remove catalogId mappings for larger timestamp than 'stableTimestamp'.
     CollectionCatalog::write(opCtx, [stableTimestamp](CollectionCatalog& catalog) {
-        catalog.cleanupForCatalogReopen(stableTimestamp);
+        catalog.catalogIdTracker().rollback(stableTimestamp);
     });
 
     // Ignore orphaned idents because this function is used during rollback and not at

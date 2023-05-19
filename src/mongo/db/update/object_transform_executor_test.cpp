@@ -55,7 +55,6 @@ TEST_F(ObjectTransformExecutorTest, Noop) {
     mutablebson::Document doc(input);
     auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{}"), result.oplogEntry);
@@ -67,7 +66,6 @@ TEST_F(ObjectTransformExecutorTest, NoneNoop) {
     mutablebson::Document doc(fromjson("{a: 1, b: 2}"));
     auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{}"), result.oplogEntry);
@@ -85,7 +83,6 @@ TEST_F(ObjectTransformExecutorTest, Replace) {
     mutablebson::Document doc(from);
     auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(to, doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_BINARY_EQ(to, result.oplogEntry);
@@ -103,7 +100,6 @@ TEST_F(ObjectTransformExecutorTest, ShouldSucceedWhenImmutableIdIsNotModified) {
     addImmutablePath("_id");
     auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(to, doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_BINARY_EQ(to, result.oplogEntry);
@@ -186,7 +182,6 @@ TEST_F(ObjectTransformExecutorTest, CanAddImmutableField) {
     addImmutablePath("a.b");
     auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: {b: 1}}"), result.oplogEntry);
@@ -200,7 +195,6 @@ TEST_F(ObjectTransformExecutorTest, CanAddImmutableId) {
     addImmutablePath("_id");
     auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{_id: 0}"), result.oplogEntry);

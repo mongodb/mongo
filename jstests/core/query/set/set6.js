@@ -3,13 +3,10 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.set6;
+let t = db.set6;
 t.drop();
 
-x = {
-    _id: 1,
-    r: new DBRef("foo", new ObjectId())
-};
+let x = {_id: 1, r: new DBRef("foo", new ObjectId())};
 t.insert(x);
 assert.eq(x, t.findOne(), "A");
 

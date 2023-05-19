@@ -918,12 +918,9 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
     /*
      * If we find a key with a timestamp larger than or equal to the specified timestamp then the
      * specified timestamp must be mixed mode.
-     *
-     * FIXME-WT-10017: Change this back to WT_ASSERT_ALWAYS once WT-10017 is resolved. WT-10017 will
-     * resolve a known issue where this assert fires for column store configurations.
      */
-    WT_ASSERT(session, ts == 1 || ts == WT_TS_NONE);
-
+    WT_ASSERT_ALWAYS(
+      session, ts == 1 || ts == WT_TS_NONE, "out-of-order timestamp update detected");
     /*
      * Fail the eviction if we detect any timestamp ordering issue and the error flag is set. We
      * cannot modify the history store to fix the update's timestamps as it may make the history
@@ -1079,7 +1076,7 @@ err:
 
 /*
  * __hs_delete_record --
- *     Delete an update from the history store if it is not obsolete
+ *     Delete an update from the history store if it is not obsolete.
  */
 static int
 __hs_delete_record(
@@ -1104,9 +1101,21 @@ __hs_delete_record(
     WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_before(session, r->hs_cursor), true);
     /* It's possible the value in the history store becomes obsolete concurrently. */
     if (ret == WT_NOTFOUND) {
-        WT_ASSERT(session, tombstone != NULL && __wt_txn_upd_visible_all(session, tombstone));
+        /*
+         * The history store update may not exist even if there is no tombstone associated with it
+         * as this update may have already been removed by rollback to stable.
+         */
+        WT_ASSERT(session, tombstone == NULL || __wt_txn_upd_visible_all(session, tombstone));
         ret = 0;
     } else {
+        /*
+         * We have found a record that is not obsolete. However, we only want to delete a record if
+         * it has a stop timestamp greater than the start timestamp of the update.
+         */
+        __wt_hs_upd_time_window(r->hs_cursor, &hs_tw);
+        if (hs_tw->stop_ts <= upd->start_ts)
+            goto done;
+
         /*
          * If we're deleting a record that is already in the history store this implies we're
          * rolling back a prepared transaction and need to pull the history store update back into
@@ -1114,7 +1123,6 @@ __hs_delete_record(
          * retrieved the correct update from the history store.
          */
         if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_HS_VALIDATE)) {
-            __wt_hs_upd_time_window(r->hs_cursor, &hs_tw);
             WT_ASSERT_ALWAYS(session,
               hs_tw->start_txn == WT_TXN_NONE || hs_tw->start_txn == upd->txnid,
               "Retrieved wrong update from history store: start txn id mismatch");
@@ -1150,7 +1158,7 @@ err:
 
 /*
  * __wt_hs_delete_updates --
- *     Delete the updates from the history store
+ *     Delete the updates from the history store.
  */
 int
 __wt_hs_delete_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r)

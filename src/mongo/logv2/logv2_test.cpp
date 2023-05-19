@@ -41,7 +41,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/composite_backend.h"
@@ -462,8 +461,7 @@ class LogV2TypesTest : public LogV2Test {
 public:
     using LogV2Test::LogV2Test;
     LogV2TypesTest() : LogV2Test() {
-        detail::setGetTenantIDCallback(
-            [this]() -> boost::optional<TenantId> { return this->tenant; });
+        detail::setGetTenantIDCallback([this]() -> std::string { return this->tenant.toString(); });
     }
     ~LogV2TypesTest() {
         detail::setGetTenantIDCallback(nullptr);
@@ -481,7 +479,7 @@ public:
     }
 
     auto lastBSONElement() {
-        ASSERT_EQUALS(BSONObj(bson.back().data()).getField(kTenantFieldName).str(),
+        ASSERT_EQUALS(BSONObj(bson.back().data()).getField(kTenantFieldName).String(),
                       tenant.toString());
         return BSONObj(bson.back().data()).getField(kAttributesFieldName).Obj().getField("name"_sd);
     }

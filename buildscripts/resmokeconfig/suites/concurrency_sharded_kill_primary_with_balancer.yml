@@ -139,6 +139,7 @@ selector:
   - jstests/concurrency/fsm_workloads/collmod.js
   - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
   - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
   - jstests/concurrency/fsm_workloads/invalidated_cursors.js
   - jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js
   - jstests/concurrency/fsm_workloads/view_catalog.js
@@ -198,11 +199,11 @@ executor:
     shard_stepdown: true
     use_action_permitted_file: true
     kill: true
+  - class: CheckShardFilteringMetadata
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
     shell_options:
       global_vars:

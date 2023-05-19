@@ -496,15 +496,19 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
         }
 
         auto value = [&] {
+            if (doc.hasField(kIndexKeyFieldName)) {
+                return dotted_path_support::extractElementsBasedOnTemplate(
+                    doc.getObjectField(kIndexKeyFieldName).replaceFieldNames(shardKey), shardKey);
+            }
             if (doc.hasField(kDocFieldName)) {
                 return dotted_path_support::extractElementsBasedOnTemplate(
                     doc.getObjectField(kDocFieldName), shardKey);
-            } else if (doc.hasField(kIndexKeyFieldName)) {
-                return dotted_path_support::extractElementsBasedOnTemplate(
-                    doc.getObjectField(kIndexKeyFieldName).replaceFieldNames(shardKey), shardKey);
-            } else
-                uasserted(7588600,
-                          str::stream() << "Found a document with unexpected format " << doc);
+            }
+            uasserted(7588600,
+                      str::stream() << "Failed to look up documents for most common shard key "
+                                       "values. This is likely caused by concurrent deletions. "
+                                       "Please try running the analyzeShardKey command again. "
+                                    << doc);
         }();
         if (value.objsize() > maxSizeBytesPerValue) {
             value = truncateBSONObj(value, maxSizeBytesPerValue);
@@ -542,9 +546,15 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         return metrics;
     }
 
-    if (KeyPattern::isHashedKeyPattern(shardKey) && shardKey.nFields() == 1) {
-        metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
-        metrics.setRecordIdCorrelationCoefficient(0);
+    if (KeyPattern::isHashedKeyPattern(shardKey)) {
+        if (shardKey.nFields() == 1 || shardKey.firstElement().valueStringDataSafe() == "hashed") {
+            metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
+            metrics.setRecordIdCorrelationCoefficient(0);
+        } else {
+            // The monotonicity cannot be inferred from the recordIds in the index since hashing
+            // introduces randomness.
+            metrics.setType(MonotonicityTypeEnum::kUnknown);
+        }
         return metrics;
     }
 

@@ -96,10 +96,10 @@ commands:
                 - privilege: # $planCacheStats
                     resource_pattern: exact_namespace
                     action_type: planCacheRead
-                - privilege: # $telemetry
-                    agg_stage: telemetry
+                - privilege: # $queryStats
+                    agg_stage: queryStats
                     resource_pattern: cluster
-                    action_type: telemetryRead
+                    action_type: queryStatsRead
                 - privilege: # $changeStream
                     resource_pattern: exact_namespace
                     action_type: changeStream
@@ -283,12 +283,6 @@ commands:
                 cpp_name: passthroughToShard
                 optional: true
                 stability: unstable
-            # TODO SERVER-65369: $_generateV2ResumeTokens can be removed after 7.0.
-            $_generateV2ResumeTokens:
-                description: "Internal parameter to signal whether v2 resume tokens should be generated."
-                type: optionalBool
-                cpp_name: generateV2ResumeTokens
-                stability: internal
             encryptionInformation:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation

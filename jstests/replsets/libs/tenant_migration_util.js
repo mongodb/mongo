@@ -2,6 +2,8 @@
  * Utilities for testing tenant migrations.
  */
 export const kExternalKeysNs = "config.external_validation_keys";
+export const kProtocolShardMerge = "shard merge";
+export const kProtocolMultitenantMigrations = "multitenant migrations";
 
 /**
  * Returns true if feature flag 'featureFlagShardMerge' is enabled, false otherwise.
@@ -26,35 +28,6 @@ function shouldUseMergeTenantIds(db) {
         assert.commandWorked(db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
 
     return MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "6.3") >= 0;
-}
-
-/**
- * Construct a donorStartMigration command object with protocol: "shard merge" if the feature
- * flag is enabled.
- */
-export function donorStartMigrationWithProtocol(cmd, db) {
-    // If we don't pass "protocol" and shard merge is enabled, we set the protocol to
-    // "shard merge". Otherwise, the provided protocol is used, which defaults to
-    // "multitenant migrations" if not provided.
-    if (cmd["protocol"] === undefined && isShardMergeEnabled(db)) {
-        const cmdCopy = Object.assign({}, cmd);
-
-        if (shouldUseMergeTenantIds(db)) {
-            cmdCopy.tenantIds = cmdCopy.tenantIds || [ObjectId(cmdCopy.tenantId)];
-        }
-
-        delete cmdCopy.tenantId;
-        cmdCopy.protocol = "shard merge";
-        return cmdCopy;
-    } else if (cmd["protocol"] == "shard merge") {
-        const cmdCopy = Object.assign({}, cmd);
-        delete cmdCopy.tenantId;
-        return cmdCopy;
-    } else {
-        const cmdCopy = Object.assign({}, cmd);
-        delete cmdCopy.tenantIds;
-        return cmdCopy;
-    }
 }
 
 /**
@@ -138,35 +111,31 @@ export function isMigrationCompleted(res) {
  * fixture.
  */
 export async function runMigrationAsync(migrationOpts, donorRstArgs, opts = {}) {
-    const {isMigrationCompleted, makeMigrationCertificatesForTest, runTenantMigrationCommand} =
+    const {isMigrationCompleted, makeMigrationCertificatesForTest, runDonorStartMigrationCommand} =
         await import("jstests/replsets/libs/tenant_migration_util.js");
     load("jstests/replsets/rslib.js");  // createRst
 
     const {
         retryOnRetryableErrors = false,
-        enableDonorStartMigrationFsync = false,
     } = opts;
 
     const donorRst = createRst(donorRstArgs, retryOnRetryableErrors);
     const migrationCertificates = makeMigrationCertificatesForTest();
-    const cmdObj = {
-        donorStartMigration: 1,
-        migrationId: UUID(migrationOpts.migrationIdString),
-        tenantId: migrationOpts.tenantId,
-        tenantIds: eval(migrationOpts.tenantIds),
-        recipientConnectionString: migrationOpts.recipientConnString,
-        readPreference: migrationOpts.readPreference || {mode: "primary"},
-        donorCertificateForRecipient: migrationOpts.donorCertificateForRecipient ||
-            migrationCertificates.donorCertificateForRecipient,
-        recipientCertificateForDonor: migrationOpts.recipientCertificateForDonor ||
-            migrationCertificates.recipientCertificateForDonor,
-    };
 
-    return runTenantMigrationCommand(cmdObj, donorRst, {
-        retryOnRetryableErrors,
-        enableDonorStartMigrationFsync,
-        shouldStopFunc: isMigrationCompleted
-    });
+    return runDonorStartMigrationCommand(
+        {
+            migrationId: UUID(migrationOpts.migrationIdString),
+            tenantId: migrationOpts.tenantId,
+            tenantIds: eval(migrationOpts.tenantIds),
+            recipientConnectionString: migrationOpts.recipientConnString,
+            readPreference: migrationOpts.readPreference || {mode: "primary"},
+            donorCertificateForRecipient: migrationOpts.donorCertificateForRecipient ||
+                migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationOpts.recipientCertificateForDonor ||
+                migrationCertificates.recipientCertificateForDonor,
+        },
+        donorRst,
+        {retryOnRetryableErrors, shouldStopFunc: isMigrationCompleted});
 }
 
 /**
@@ -216,6 +185,36 @@ export async function tryAbortMigrationAsync(
 }
 
 /**
+ * Runs the donorStartMigration command against the primary of the provided replica set. Will
+ * automatically assign the correct 'protocol' and 'tenantId'/'tenantIds' based on the provided
+ * 'protocol' and/or currently enabled feature flags.
+ */
+export function runDonorStartMigrationCommand(migrationOpts, rst, {
+    retryOnRetryableErrors = false,
+    shouldStopFunc = () => true,
+} = {}) {
+    // If we don't pass "protocol" and shard merge is enabled, we set the protocol to
+    // "shard merge". Otherwise, the provided protocol is used, which defaults to
+    // "multitenant migrations" if not provided.
+    const db = rst.getPrimary().getDB("admin");
+    const cmd = Object.assign({donorStartMigration: 1}, migrationOpts);
+    if (cmd["protocol"] === undefined && isShardMergeEnabled(db)) {
+        if (shouldUseMergeTenantIds(db)) {
+            cmd.tenantIds = cmd.tenantIds || [ObjectId(cmd.tenantId)];
+        }
+
+        delete cmd.tenantId;
+        cmd.protocol = kProtocolShardMerge;
+    } else if (cmd["protocol"] == kProtocolShardMerge) {
+        delete cmd.tenantId;
+    } else {
+        delete cmd.tenantIds;
+    }
+
+    return runTenantMigrationCommand(cmd, rst, {retryOnRetryableErrors, shouldStopFunc});
+}
+
+/**
  * Runs the given tenant migration command against the primary of the given replica set until
  * the command succeeds or fails with a non-retryable error (if 'retryOnRetryableErrors' is
  * true) or until 'shouldStopFunc' returns true. Returns the last response.
@@ -223,52 +222,37 @@ export async function tryAbortMigrationAsync(
 export function runTenantMigrationCommand(cmdObj, rst, {
     retryOnRetryableErrors = false,
     shouldStopFunc = () => true,
-    enableDonorStartMigrationFsync = false
 } = {}) {
     let primary = rst.getPrimary();
-    let localCmdObj = cmdObj;
-    let run = () => primary.adminCommand(localCmdObj);
-    if (Object.keys(cmdObj)[0] === "donorStartMigration") {
-        run = () => {
-            const adminDB = primary.getDB("admin");
-            localCmdObj = donorStartMigrationWithProtocol(cmdObj, adminDB);
-            if (enableDonorStartMigrationFsync) {
-                rst.awaitLastOpCommitted();
-                assert.commandWorked(primary.adminCommand({fsync: 1}));
-            }
-            return primary.adminCommand(localCmdObj);
-        };
-    }
-
     let res;
     assert.soon(() => {
         try {
             // Note: assert.commandWorked() considers command responses with embedded
             // writeErrors and WriteConcernErrors as a failure even if the command returned
-            // "ok: 1". And, admin commands(like, donorStartMigration)
-            // doesn't generate writeConcernErros or WriteErrors. So, it's safe to wrap up
-            // run() with assert.commandWorked() here. However, in few scenarios, like
-            // Mongo.prototype.recordRerouteDueToTenantMigration(), it's not safe to wrap up
-            // run() with commandWorked() as retrying on retryable writeConcernErrors can
-            // cause the retry attempt to fail with writeErrors.
+            // "ok: 1". And, admin commands(like, donorStartMigration) doesn't generate
+            // writeConcernErros or WriteErrors. So, it's safe to wrap the command invocation with
+            // assert.commandWorked() here. However, in few scenarios, like
+            // Mongo.prototype.recordRerouteDueToTenantMigration(), it's not safe to wrap the
+            // command invocation with commandWorked() as retrying on retryable writeConcernErrors
+            // can cause the retry attempt to fail with writeErrors.
             res = undefined;
             // In some tests we expects the command to fail due to a network error. We want to
             // catch the error OR the unhandled exception here and return the error to the
             // caller to assert on the result. Otherwise if this is not a network exception
             // it will be caught in the outter catch and either be retried or thrown.
-            res = executeNoThrowNetworkError(() => run());
+            res = executeNoThrowNetworkError(() => primary.adminCommand(cmdObj));
             assert.commandWorked(res);
             return shouldStopFunc(res);
         } catch (e) {
             if (retryOnRetryableErrors && isRetryableError(e)) {
                 jsTestLog(`Retryable error running runTenantMigrationCommand. Command: ${
-                    tojson(localCmdObj)}, Error: ${tojson(e)}`);
+                    tojson(cmdObj)}, Error: ${tojson(e)}`);
 
                 primary = rst.getPrimary();
                 return false;
             }
             jsTestLog(`Error running runTenantMigrationCommand. Command: ${
-                tojson(localCmdObj)}, Error: ${tojson(e)}`);
+                tojson(cmdObj)}, Error: ${tojson(e)}`);
 
             // If res is defined, return true to exit assert.soon and return res to the caller.
             // Otherwise rethrow e to propagate it to the caller.

@@ -94,7 +94,11 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeWaitingUntilMajorityOpTime);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUnregisteringAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failSetUpResumeIndexBuild);
 MONGO_FAIL_POINT_DEFINE(failIndexBuildWithError);
+MONGO_FAIL_POINT_DEFINE(failIndexBuildWithErrorInSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangInRemoveIndexBuildEntryAfterCommitOrAbort);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
+MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
+MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
 
 IndexBuildsCoordinator::IndexBuildsSSS::IndexBuildsSSS()
     : ServerStatusSection("indexBuilds"),
@@ -369,10 +373,9 @@ repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
     BSONObj oplogEntryBSON;
     // This operation does not perform any writes, but the index building code is sensitive to
     // exceptions and we must protect it from unanticipated write conflicts from reads.
-    writeConflictRetry(
-        opCtx, "getLatestOplogOpTime", NamespaceString::kRsOplogNamespace.ns(), [&]() {
-            invariant(Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
-        });
+    writeConflictRetry(opCtx, "getLatestOplogOpTime", NamespaceString::kRsOplogNamespace, [&]() {
+        invariant(Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntryBSON));
+    });
 
     auto optime = repl::OpTime::parseFromOplogEntry(oplogEntryBSON);
     invariant(optime.isOK(),
@@ -1076,7 +1079,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     // proceeding with building them.
     if (indexBuildOptions.applicationMode == ApplicationMode::kInitialSync) {
         auto dbAndUUID = NamespaceStringOrUUID(nss.db().toString(), collUUID);
-        writeConflictRetry(opCtx, "IndexBuildsCoordinator::applyStartIndexBuild", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "IndexBuildsCoordinator::applyStartIndexBuild", nss, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             AutoGetCollection coll(opCtx, dbAndUUID, MODE_X);
@@ -1409,6 +1412,8 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         AutoGetCollection indexBuildEntryColl(
             opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
 
+        hangAbortIndexBuildByBuildUUIDAfterLocks.pauseWhileSet();
+
         // If we are using two-phase index builds and are no longer primary after receiving an
         // abort, we cannot replicate an abortIndexBuild oplog entry. Continue holding the RSTL to
         // check the replication state and to prevent any state transitions from happening while
@@ -1681,6 +1686,12 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
             const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
             AutoGetCollection autoColl(opCtx, dbAndUUID, MODE_IX);
 
+            // The index build hasn't yet completed its initial setup, and persisted state like
+            // commit quorum information is absent. There's nothing to do here.
+            if (replState->isSettingUp()) {
+                return;
+            }
+
             // The index build might have committed or aborted while looping and not holding the
             // collection lock. Re-checking if it is still active after taking locks would not solve
             // the issue, as build can still be registered as active, even if it is in an aborted or
@@ -1693,6 +1704,8 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                 // This reads from system.indexBuilds collection to see if commit quorum got
                 // satisfied.
                 try {
+                    hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum.pauseWhileSet();
+
                     if (_signalIfCommitQuorumIsSatisfied(opCtx, replState)) {
                         // The index build has been signalled to commit. As retrying skipped records
                         // during step-up is done to prevent waiting until commit time, if the build
@@ -1701,12 +1714,20 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                         return;
                     }
                 } catch (DBException& ex) {
+                    // If the operation context is interrupted (shutdown, stepdown, killOp), stop
+                    // the verification process and exit.
+                    opCtx->checkForInterrupt();
+
                     fassert(31440, ex.toStatus());
                 }
             }
 
             try {
-                // Only checks if key generation is valid, does not actually insert.
+                // Unlike the primary, secondaries cannot fail immediately when detecting key
+                // generation errors; they instead temporarily store them in the 'skipped records'
+                // table, to validate them on commit. As an optimisation to potentially detect
+                // errors earlier, check the table on step-up. Unlike during commit, we only check
+                // key generation here, we do not actually insert the keys.
                 uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
                     opCtx,
                     replState->buildUUID,
@@ -1714,13 +1735,12 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                     IndexBuildsManager::RetrySkippedRecordMode::kKeyGeneration));
 
             } catch (const DBException& ex) {
-                // Shutdown or replication state change might happen while iterating the index
-                // builds. In both cases, the opCtx is interrupted, in which case we want to stop
-                // the verification process and exit. This might also be the case for a killOp.
+                // If the operation context is interrupted (shutdown, stepdown, killOp), stop the
+                // verification process and exit.
                 opCtx->checkForInterrupt();
 
-                // All other errors must be due to key generation. We can abort the build early as
-                // it would eventually fail anyways during the commit phase retry.
+                // All other errors must be due to key generation. Abort the build now, instead of
+                // failing later during the commit phase retry.
                 auto status = ex.toStatus().withContext("Skipped records retry failed on step-up");
                 abortIndexBuildByBuildUUID(
                     opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, status.reason());
@@ -2151,7 +2171,8 @@ StatusWith<std::tuple<Lock::DBLock,
                       repl::ReplicationStateTransitionLockGuard>>
 IndexBuildsCoordinator::_acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
                                                            ReplIndexBuildState* replState,
-                                                           bool retry) {
+                                                           bool retry,
+                                                           bool collLockTimeout) {
 
     while (true) {
         // Skip the check for sharding's critical section check as it can only be acquired during a
@@ -2162,8 +2183,20 @@ IndexBuildsCoordinator::_acquireExclusiveLockWithRSTLRetry(OperationContext* opC
                                             /*.skipRSTLLock=*/true};
         Lock::DBLock dbLock{opCtx, replState->dbName, MODE_IX, Date_t::max(), lockOptions};
 
-        CollectionNamespaceOrUUIDLock collLock{
-            opCtx, {replState->dbName, replState->collectionUUID}, MODE_X};
+        Date_t collLockDeadline = Date_t::max();
+        if (collLockTimeout) {
+            collLockDeadline = Date_t::now() + Milliseconds{100};
+        }
+
+        boost::optional<CollectionNamespaceOrUUIDLock> collLock;
+        try {
+            collLock.emplace(opCtx,
+                             NamespaceStringOrUUID{replState->dbName, replState->collectionUUID},
+                             MODE_X,
+                             collLockDeadline);
+        } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
+            return ex.toStatus();
+        }
 
         // If we can't acquire the RSTL within a given time period, there is an active state
         // transition and we should release our locks and try again. We would otherwise introduce a
@@ -2194,7 +2227,7 @@ IndexBuildsCoordinator::_acquireExclusiveLockWithRSTLRetry(OperationContext* opC
             continue;
         }
 
-        return std::make_tuple(std::move(dbLock), std::move(collLock), std::move(rstl));
+        return std::make_tuple(std::move(dbLock), std::move(collLock.value()), std::move(rstl));
     }
 }
 
@@ -2260,7 +2293,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
             // the catalog update when it uses the timestamp from the startIndexBuild, rather than
             // the commitIndexBuild, oplog entry.
             writeConflictRetry(
-                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss.ns(), [&] {
+                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss, [&] {
                     WriteUnitOfWork wuow(opCtx);
                     createIndexesOnEmptyCollection(opCtx, collection, filteredSpecs, false);
                     wuow.commit();
@@ -2295,6 +2328,9 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     std::shared_ptr<ReplIndexBuildState> replState,
     Timestamp startTimestamp,
     const IndexBuildOptions& indexBuildOptions) {
+
+    hangIndexBuildOnSetupBeforeTakingLocks.pauseWhileSet(opCtx);
+
     auto [dbLock, collLock, rstl] =
         std::move(_acquireExclusiveLockWithRSTLRetry(opCtx, replState.get()).getValue());
 
@@ -2398,8 +2434,6 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
                 opCtx, collection, replState->indexSpecs, replState->buildUUID, onInitFn, options));
         }
-        // Mark the index build setup as complete, from now on cleanup is required on failure/abort.
-        replState->completeSetup();
     } catch (DBException& ex) {
         _indexBuildsManager.abortIndexBuild(
             opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
@@ -2418,14 +2452,39 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         throw;
     }
 
-    if (isIndexBuildResumable(opCtx, *replState, indexBuildOptions)) {
-        // We should only set this value if this is a hybrid index build.
-        invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
+    // Mark the index build setup as complete, from now on cleanup is required on failure/abort.
+    // _setUpIndexBuildInner must not throw after this point, or risk secondaries getting stuck
+    // applying the 'startIndexBuild' oplog entry, because throwing here would cause the node to
+    // vote for abort and subsequently await the 'abortIndexBuild' entry before fulfilling the start
+    // promise, while the oplog applier is waiting for the start promise.
+    replState->completeSetup();
 
-        // After the interceptors are set, get the latest optime in the oplog that could have
-        // contained a write to this collection. We need to be holding the collection lock in X mode
-        // so that we ensure that there are not any uncommitted transactions on this collection.
-        replState->setLastOpTimeBeforeInterceptors(getLatestOplogOpTime(opCtx));
+    // Failing to establish lastOpTime before interceptors is not fatal, the index build will
+    // continue as non-resumable. The build can continue as non-resumable even if this step
+    // succeeds, if it timeouts during the wait for majority read concern on the timestamp
+    // established here.
+    try {
+        if (isIndexBuildResumable(opCtx, *replState, indexBuildOptions)) {
+            // We should only set this value if this is a hybrid index build.
+            invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
+
+            // After the interceptors are set, get the latest optime in the oplog that could have
+            // contained a write to this collection. We need to be holding the collection lock in X
+            // mode so that we ensure that there are not any uncommitted transactions on this
+            // collection.
+            replState->setLastOpTimeBeforeInterceptors(getLatestOplogOpTime(opCtx));
+        }
+    } catch (DBException& ex) {
+        // It is fine to let the build continue even if we are interrupted, interrupt check before
+        // actually starting the build will trigger the abort, after having signalled the start
+        // promise.
+        LOGV2(7484300,
+              "Index build: failed to setup index build resumability, will continue as "
+              "non-resumable.",
+              "buildUUID"_attr = replState->buildUUID,
+              logAttrs(replState->dbName),
+              "collectionUUID"_attr = replState->collectionUUID,
+              "reason"_attr = ex.toStatus());
     }
 
     return PostSetupAction::kContinueIndexBuild;
@@ -2497,14 +2556,6 @@ void IndexBuildsCoordinator::_runIndexBuild(
     }
     auto replState = invariant(swReplState);
 
-    // Try to set index build state to in-progress, if it has been aborted or interrupted then
-    // signal any waiters and return early.
-    auto tryStartStatus = replState->tryStart(opCtx);
-    if (!tryStartStatus.isOK()) {
-        replState->sharedPromise.setError(tryStartStatus);
-        return;
-    }
-
     // Add build UUID to lock manager diagnostic output.
     auto locker = opCtx->lockState();
     auto oldLockerDebugInfo = locker->getDebugInfo();
@@ -2567,6 +2618,21 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
                                                   const IndexBuildOptions& indexBuildOptions,
                                                   const Status& status) {
 
+    if (!replState->isAbortCleanUpRequired()) {
+        // The index build aborted at an early stage before the 'startIndexBuild' oplog entry is
+        // replicated: members replicating from this sync source are not aware of this index
+        // build, nor has any build state been persisted locally. Unregister the index build
+        // locally. In two phase index builds, any conditions causing secondaries to fail setting up
+        // an index build (which must have succeeded in the primary) are assumed to eventually cause
+        // the node to crash, so we do not attempt to verify this is a primary.
+        LOGV2(7564400,
+              "Index build: unregistering without cleanup",
+              "buildUUD"_attr = replState->buildUUID,
+              "error"_attr = status);
+        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+        return;
+    }
+
     if (!status.isA<ErrorCategory::ShutdownError>()) {
         try {
             // It is still possible to get a shutdown request while trying to clean-up. All shutdown
@@ -2576,7 +2642,12 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
 
             if (status.code() == ErrorCodes::DataCorruptionDetected) {
                 indexBuildsSSS.failedDueToDataCorruption.addAndFetch(1);
-                LOGV2(7333600, "Index build: data corruption detected", "status"_attr = status);
+                LOGV2(7333600,
+                      "Index build: data corruption detected",
+                      "buildUUID"_attr = replState->buildUUID,
+                      logAttrs(replState->dbName),
+                      "collectionUUID"_attr = replState->collectionUUID,
+                      "error"_attr = status);
             }
 
             if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
@@ -2606,22 +2677,44 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterNonShutdownFailure(
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
 
+    invariant(replState->isAbortCleanUpRequired());
+
     // The index builder thread can abort on its own if it is interrupted by a user killop. This
     // would prevent us from taking locks. Use a new OperationContext to abort the index build.
     runOnAlternateContext(
         opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
-            ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
-            // Skip RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
-            // taking a strong collection lock. See SERVER-42621.
-            Lock::DBLockSkipOptions lockOptions{/*.skipFlowControlTicket=*/false,
-                                                /*.skipRSTLLock=*/true};
-            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX, Date_t::max(), lockOptions);
+            // TODO (SERVER-76935): Remove collection lock timeout and abort state check loop.
+            // To avoid potential deadlocks with concurrent external aborts, which hold the
+            // collection MODE_X lock while waiting for this thread to signal its exit, the
+            // collection lock is acquired with a timeout, and retried only if the build is not
+            // already aborted (externally).
+            while (!replState->isAborted()) {
+                try {
+                    ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(
+                        abortCtx->lockState());
+                    // Skip RSTL to avoid deadlocks with prepare conflicts and state transitions
+                    // caused by taking a strong collection lock. See SERVER-42621.
+                    Lock::DBLockSkipOptions lockOptions{/*.skipFlowControlTicket=*/false,
+                                                        /*.skipRSTLLock=*/true};
+                    Lock::DBLock dbLock(
+                        abortCtx, replState->dbName, MODE_IX, Date_t::max(), lockOptions);
 
-            const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-            CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
-            AutoGetCollection indexBuildEntryColl(
-                abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
+                    const NamespaceStringOrUUID dbAndUUID(replState->dbName,
+                                                          replState->collectionUUID);
+                    CollectionNamespaceOrUUIDLock collLock(
+                        abortCtx, dbAndUUID, MODE_X, Date_t::now() + Milliseconds{100});
+                    AutoGetCollection indexBuildEntryColl(
+                        abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+                    _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
+                } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+                    LOGV2(7677700,
+                          "Unable to acquire collection lock within the timeout, a concurrent "
+                          "abort might be waiting for the builder thread to exit. Rechecking if "
+                          "self abort is still required.",
+                          "buildUUID"_attr = replState->buildUUID);
+                    continue;
+                }
+            }
         });
 }
 
@@ -2632,21 +2725,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
 
-    // We can only get here when there is no external abort, after a failure. If the operation has
-    // been killed, it must have been from a killop. In which case we cannot continue and try to
-    // vote, because we want the voting itself to be killable. Continue and try to abort as primary
-    // or crash.
-    if (!opCtx->isKillPending() &&
-        feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        if (ErrorCodes::NotWritablePrimary == status && !replState->isAbortCleanUpRequired()) {
-            // Clean up if the error happens due to stepdown before 'startIndexBuild' oplog entry is
-            // replicated. Other nodes will not be aware of this index build, so trying to signal
-            // for abort to the new primary cannot succeed.
-            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
-            return;
-        }
-    }
+    invariant(replState->isAbortCleanUpRequired());
 
     // Use a new OperationContext to abort the index build since our current opCtx may be
     // interrupted. This is still susceptible to shutdown interrupts, but in that case, on server
@@ -2683,20 +2762,33 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(
                     abortCtx->lockState());
 
-                // Take RSTL to observe and prevent replication state from changing. This is done
-                // with the release/reacquire strategy to avoid deadlock with prepared txns.
-                auto [dbLock, collLock, rstl] = std::move(
-                    _acquireExclusiveLockWithRSTLRetry(abortCtx, replState.get()).getValue());
+                // TODO (SERVER-76935): Remove collection lock timeout and abort state check loop.
+                // To avoid potential deadlocks with concurrent external aborts, which hold the
+                // collection MODE_X lock while waiting for this thread to signal its exit, the
+                // collection lock is acquired with a timeout, and retried only if the build is not
+                // already aborted (externally).
+                while (!replState->isAborted()) {
+                    // Take RSTL to observe and prevent replication state from changing. This is
+                    // done with the release/reacquire strategy to avoid deadlock with prepared
+                    // txns.
+                    auto swLocks = _acquireExclusiveLockWithRSTLRetry(
+                        abortCtx, replState.get(), /*retry=*/true, /*collLockTimeout=*/true);
+                    if (!swLocks.isOK()) {
+                        LOGV2_DEBUG(
+                            7677701,
+                            1,
+                            "Index build: lock acquisition for self-abort failed, will retry.",
+                            "buildUUD"_attr = replState->buildUUID,
+                            "error"_attr = swLocks.getStatus());
+                        continue;
+                    }
 
-                const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-                auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
-                if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
-                    if (replState->isSettingUp()) {
-                        // Clean up if the error happens before StartIndexBuild oplog entry
-                        // is replicated during startup or stepdown.
-                        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
-                        return;
-                    } else {
+                    auto [dbLock, collLock, rstl] = std::move(swLocks.getValue());
+
+                    const NamespaceStringOrUUID dbAndUUID(replState->dbName,
+                                                          replState->collectionUUID);
+                    auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
+                    if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
                         // Index builds may not fail on secondaries. If a primary replicated
                         // an abortIndexBuild oplog entry, then this index build would have
                         // received an IndexBuildAborted error code.
@@ -2706,11 +2798,11 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                                                    << "; Database: "
                                                    << replState->dbName.toStringForErrorMsg()));
                     }
-                }
 
-                AutoGetCollection indexBuildEntryColl(
-                    abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
+                    AutoGetCollection indexBuildEntryColl(
+                        abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+                    _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
+                }
             }
         });
 }
@@ -2723,6 +2815,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // This Status stays unchanged unless we catch an exception in the following try-catch block.
     auto status = Status::OK();
     try {
+        // Try to set index build state to in-progress, if it has been aborted or interrupted the
+        // attempt will fail.
+        replState->setInProgress(opCtx);
 
         hangAfterInitializingIndexBuild.pauseWhileSet(opCtx);
         failIndexBuildWithError.executeIf(
@@ -2768,16 +2863,36 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         }
     }
 
+    // Replace the status with the replica set index build state.
+    // This returns a meaningful error message to the createIndexes caller in case of an external
+    // abort, e.g. a secondary voting to abort the index build. Not doing so would return a generic,
+    // not too helpful "operation was interrupted" error message, because the 'voteAbortIndexBuild'
+    // command kills the index build's operation context.
+    if (replState->isAborted()) {
+        status.addContext(replState->getAbortStatus().reason());
+    }
+
     // If the index build has already been cleaned-up because it encountered an error, there is no
     // work to do. If feature flag IndexBuildGracefulErrorHandling is not enabled, the most routine
     // case is for this to be due to a self-abort caused by constraint checking during the commit
-    // phase. When the flag is enabled, constraint violations cause the index build to abort
-    // immediately on primaries, and an async external abort is requested.
+    // phase. When the flag is enabled, constraint violations cause the index build to fail
+    // immediately, but is not yet set to aborted, so an external async abort will be requested
+    // later on. It is also possible the build was concurrently aborted, between the detection of
+    // the failure and this check here, in which case we exit early.
     if (replState->isAborted()) {
         if (ErrorCodes::isTenantMigrationError(replState->getAbortStatus()))
             uassertStatusOK(replState->getAbortStatus());
         uassertStatusOK(status);
     }
+
+    // TODO (SERVER-76935): Remove collection lock timeout.
+    // It is also possible for the concurrent abort to happen after the check. This is an issue as
+    // external aborters hold the collection MODE_X lock while waiting for this thread to signal the
+    // promise, but if this thread proceeds beyond this check first it will try to acquire the
+    // collection lock before signaling the promise, potentially creating a deadlock. This is worked
+    // around by adding a timeout to the collection lock in the self-abort path, and rechecking if
+    // the build was aborted externally on timeout.
+
 
     // We do not hold a collection lock here, but we are protected against the collection being
     // dropped while the index build is still registered for the collection -- until abortIndexBuild
@@ -3114,6 +3229,16 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
     const IndexBuildOptions& indexBuildOptions) {
     indexBuildsSSS.drainSideWritesTablePreCommit.addAndFetch(1);
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+
+    failIndexBuildWithErrorInSecondDrain.executeIf(
+        [](const BSONObj& data) {
+            uasserted(data["error"].safeNumberInt(),
+                      "failIndexBuildWithErrorInSecondDrain failpoint triggered");
+        },
+        [&](const BSONObj& data) {
+            return UUID::parse(data["buildUUID"]) == replState->buildUUID;
+        });
+
     // Perform the second drain while stopping writes on the collection.
     {
         // Skip RSTL to avoid deadlocks with prepare conflicts and state transitions. See

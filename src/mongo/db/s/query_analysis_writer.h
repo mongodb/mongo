@@ -173,22 +173,28 @@ public:
                                           const BSONObj& filter,
                                           const BSONObj& collation);
 
-    ExecutorFuture<void> addUpdateQuery(const UUID& sampleId,
+    ExecutorFuture<void> addUpdateQuery(OperationContext* opCtx,
+                                        const UUID& sampleId,
                                         const write_ops::UpdateCommandRequest& updateCmd,
                                         int opIndex);
-    ExecutorFuture<void> addUpdateQuery(const write_ops::UpdateCommandRequest& updateCmd,
+    ExecutorFuture<void> addUpdateQuery(OperationContext* opCtx,
+                                        const write_ops::UpdateCommandRequest& updateCmd,
                                         int opIndex);
 
-    ExecutorFuture<void> addDeleteQuery(const UUID& sampleId,
+    ExecutorFuture<void> addDeleteQuery(OperationContext* opCtx,
+                                        const UUID& sampleId,
                                         const write_ops::DeleteCommandRequest& deleteCmd,
                                         int opIndex);
-    ExecutorFuture<void> addDeleteQuery(const write_ops::DeleteCommandRequest& deleteCmd,
+    ExecutorFuture<void> addDeleteQuery(OperationContext* opCtx,
+                                        const write_ops::DeleteCommandRequest& deleteCmd,
                                         int opIndex);
 
     ExecutorFuture<void> addFindAndModifyQuery(
-        const UUID& sampleId, const write_ops::FindAndModifyCommandRequest& findAndModifyCmd);
-    ExecutorFuture<void> addFindAndModifyQuery(
+        OperationContext* opCtx,
+        const UUID& sampleId,
         const write_ops::FindAndModifyCommandRequest& findAndModifyCmd);
+    ExecutorFuture<void> addFindAndModifyQuery(
+        OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyCmd);
 
     ExecutorFuture<void> addDiff(const UUID& sampleId,
                                  const NamespaceString& nss,

@@ -138,9 +138,8 @@ public:
     /**
      * Finds an element in the cache by key.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    iterator find(const KeyType& key) {
+    template <typename KeyType>
+    requires IsComparable<KeyType> iterator find(const KeyType& key) {
         return promote(key);
     }
 
@@ -153,9 +152,9 @@ public:
      * the find(...) method above will prevent the LRUCache from functioning
      * properly.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    const_iterator cfind(const KeyType& key) const {
+    template <typename KeyType>
+    requires IsComparable<KeyType> const_iterator cfind(const KeyType& key)
+    const {
         auto it = _map.find(key);
         return (it == _map.end()) ? end() : const_iterator(it->second);
     }
@@ -164,9 +163,8 @@ public:
      * Promotes the element matching the given key, if one exists in the cache,
      * to the least recently used element.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    iterator promote(const KeyType& key) {
+    template <typename KeyType>
+    requires IsComparable<KeyType> iterator promote(const KeyType& key) {
         auto it = _map.find(key);
         return (it == _map.end()) ? end() : promote(it->second);
     }
@@ -201,8 +199,8 @@ public:
      * Removes the element in the cache stored for this key, if one
      * exists. Returns the count of elements erased.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     typename Map::size_type erase(const KeyType& key) {
         auto it = _map.find(key);
         if (it == _map.end()) {
@@ -237,8 +235,8 @@ public:
      * If the given key has a matching element stored in the cache, returns true.
      * Otherwise, returns false.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     bool hasKey(const KeyType& key) const {
         return _map.find(key) != _map.end();
     }
@@ -296,8 +294,8 @@ public:
         return _list.cend();
     }
 
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     typename Map::size_type count(const KeyType& key) const {
         return _map.count(key);
     }

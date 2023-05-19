@@ -1,6 +1,6 @@
 load("jstests/libs/fts.js");
 
-t = db.text5;
+let t = db.text5;
 t.drop();
 
 t.save({_id: 1, x: [{a: "az"}, {a: "b"}, {a: "x"}], y: ["c", "d", "m"], z: 1});

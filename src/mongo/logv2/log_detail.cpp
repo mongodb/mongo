@@ -35,7 +35,6 @@
 #include <io.h>
 #endif
 
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain.h"
@@ -218,12 +217,12 @@ void _doLogImpl(int32_t id,
                     attrs)));
 
         if (auto fn = getTenantID()) {
-            if (auto tenant = fn()) {
+            auto tenant = fn();
+            if (!tenant.empty()) {
                 record.attribute_values().insert(
                     attributes::tenant(),
                     boost::log::attribute_value(
-                        new boost::log::attributes::attribute_value_impl<TenantId>(
-                            tenant.value())));
+                        new boost::log::attributes::attribute_value_impl<std::string>(tenant)));
             }
         }
 

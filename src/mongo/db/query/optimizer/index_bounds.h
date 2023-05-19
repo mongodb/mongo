@@ -186,8 +186,13 @@ public:
 // Unions and conjunctions of individual compound intervals.
 using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
 
+/**
+ * An input binding and a path to be applied over the input binding. Used in conjunction with a
+ * PartialSchemaRequirement to indicate which values a requirement should be applied to. The path
+ * should only contain Get, Traverse, and Id path elements.
+ */
 struct PartialSchemaKey {
-    // The default construct sets the path to PathIdentity and the projectionName to boost::none.
+    // The default constructor sets the path to PathIdentity and the projectionName to boost::none.
     PartialSchemaKey();
 
     PartialSchemaKey(ABT path);
@@ -199,13 +204,19 @@ struct PartialSchemaKey {
         return !(*this == other);
     }
 
-    // Referred, or input projection name.
+    // Referred, or input projection name. May be boost::none while constructing
+    // PartialSchemaRequirements, before it is known which projection the path should be applied to.
     boost::optional<ProjectionName> _projectionName;
 
     // (Partially determined) path.
     ABT _path;
 };
 
+/**
+ * Represents a constraint on the schema in the collection. Used in conjunction with a
+ * PartialSchemKey to apply an interval constraint to some value and optionally bind the
+ * output to a projection.
+ */
 class PartialSchemaRequirement {
 public:
     PartialSchemaRequirement(boost::optional<ProjectionName> boundProjectionName,
@@ -237,15 +248,33 @@ private:
 /**
  * This comparator is used to compare paths with Get, Traverse, and Id.
  */
-struct IndexPath3WComparator {
+struct IndexPathLessComparator {
     bool operator()(const ABT& path1, const ABT& path2) const;
 };
 
-using IndexPathSet = std::set<ABT, IndexPath3WComparator>;
+using IndexPathSet = std::set<ABT, IndexPathLessComparator>;
 
-struct PartialSchemaKeyLessComparator {
-    bool operator()(const PartialSchemaKey& k1, const PartialSchemaKey& k2) const;
+struct PartialSchemaKeyComparator {
+    struct Less {
+        bool operator()(const PartialSchemaKey& k1, const PartialSchemaKey& k2) const;
+    };
+
+    struct Cmp3W {
+        int operator()(const PartialSchemaKey& k1, const PartialSchemaKey& k2) const;
+    };
 };
+struct PartialSchemaRequirementComparator {
+    struct Less {
+        bool operator()(const PartialSchemaRequirement& req1,
+                        const PartialSchemaRequirement& req2) const;
+    };
+
+    struct Cmp3W {
+        int operator()(const PartialSchemaRequirement& req1,
+                       const PartialSchemaRequirement& req2) const;
+    };
+};
+
 
 /**
  * Used to track cardinality estimates per predicate inside a PartialSchemaRequirement. The order of
@@ -253,7 +282,7 @@ struct PartialSchemaKeyLessComparator {
  */
 using PartialSchemaKeyCE = std::vector<std::pair<PartialSchemaKey, CEType>>;
 
-using PartialSchemaKeySet = std::set<PartialSchemaKey, PartialSchemaKeyLessComparator>;
+using PartialSchemaKeySet = std::set<PartialSchemaKey, PartialSchemaKeyComparator::Less>;
 
 // Requirements which are not satisfied directly by an IndexScan, PhysicalScan or Seek (e.g. using
 // an index field, or scan field). The index refers to the underlying entry in the

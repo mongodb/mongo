@@ -191,8 +191,7 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
     let blockFp =
         configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
 
-    assert.commandWorked(
-        tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     blockFp.wait();
 
     // At a very slow machine, there is a chance that a TTL cycle happened at the donor

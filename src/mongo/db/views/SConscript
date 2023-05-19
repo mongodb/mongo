@@ -7,6 +7,7 @@ env = env.Clone()
 env.Library(
     target='views',
     source=[
+        'util.cpp',
         'view.cpp',
         'view_graph.cpp',
     ],
@@ -41,17 +42,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-    ],
-)
-
-env.Library(
-    target='util',
-    source=[
-        'util.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-        'views',
     ],
 )
 

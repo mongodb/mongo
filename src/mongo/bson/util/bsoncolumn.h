@@ -33,54 +33,76 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/simple8b.h"
+#include "mongo/stdx/variant.h"
 
 #include <deque>
 #include <memory>
 #include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
+
 namespace mongo {
 
 /**
- * The BSONColumn class represents a reference to a BSONElement of BinDataType 7, which can
- * efficiently store any BSONArray and also allows for missing values. At a high level, two
- * optimizations are applied:
- *   - implied field names: do not store decimal keys representing index keys.
- *   - delta compression using Simple-8b: store difference between subsequent scalars of the same
- * type
+ * The BSONColumn class represents an implementation to interpret a BSONElement of BinDataType 7,
+ * which can efficiently store any BSONArray in a compact representation. The format has the
+ * following high-level features and capabilities:
+ *   - implied field names: decimal keys representing index keys are not stored.
+ *   - type specific delta/delta-of-delta compression stored using Simple-8b: difference between
+ *     subsequent scalars of the same type are stored with as few bits as possible.
+ *   - doubles are scaled and rounded to nearest integer for efficient storage.
+ *   - internal encoding for missing values.
+ *   - run-length-encoding for efficient storage of large number of repeated values
+ *   - object/array compression where scalars are internally stored as separate interleaved
+ *     BSONColumn compressed binary streams.
  *
- * The BSONColumn will not take ownership of the BinData element, but otherwise implements
- * an interface similar to BSONObj. Because iterators over the BSONColumn need to rematerialize
- * deltas, they use additional storage owned by the BSONColumn for this. As all iterators will
- * create new delta's in the same order, they share a single ElementStore, with a worst-case memory
- * usage bounded to a total size on the order of that of the size of the expanded BSONColumn.
+ * The BSONColumn will not take ownership of the provided binary, but otherwise implements an
+ * interface similar to BSONObj.
  *
- * All iterators are invalidated when moving the BSONColumn.
+ * Iterators over the BSONColumn need to materialize BSONElement from deltas and use additional
+ * storage owned by the BSONColumn. All BSONElements returned remain valid while the BSONColumn is
+ * kept in scope. Multiple passes grows memory usage which is not free'd until the BSONColumn goes
+ * out of scope or the release() function is called.
+ *
+ * Thread safety: The BSONColumn class is generally NOT thread-safe, unless declared otherwise. This
+ * also applies to functions declared 'const'.
  */
 class BSONColumn {
+private:
+    class ElementStorage;
+
 public:
-    BSONColumn(BSONElement bin);
-    BSONColumn(BSONBinData bin, StringData name);
+    BSONColumn(const char* buffer, size_t size);
+    explicit BSONColumn(BSONElement bin);
+    explicit BSONColumn(BSONBinData bin);
 
     /**
-     * Forward iterator type to access BSONElement from BSONColumn.
+     * Input iterator type to access BSONElement from BSONColumn.
      *
-     * Default-constructed BSONElement (EOO type) represent missing value.
-     * Returned BSONElement are owned by BSONColumn instance and should not be kept after the
-     * BSONColumn instance goes out of scope.
+     * A default-constructed BSONElement (EOO type) represents a missing value. Returned
+     * BSONElements are owned by the BSONColumn instance and should not be kept after the BSONColumn
+     * instance goes out of scope.
+     *
+     * Iterator can be used either as an STL iterator with begin() and end() or as a non-STL
+     * iterator via begin() and incrementing until more() returns false.
      */
     class Iterator {
     public:
         friend class BSONColumn;
 
         // typedefs expected in iterators
-        using iterator_category = std::forward_iterator_tag;
+        using iterator_category = std::input_iterator_tag;
         using difference_type = ptrdiff_t;
         using value_type = BSONElement;
         using pointer = const BSONElement*;
         using reference = const BSONElement&;
 
+        // Constructs an end iterator
+        Iterator() = default;
+
         reference operator*() const {
-            return _column->_decompressed.at(_index);
+            return _decompressed;
         }
         pointer operator->() const {
             return &operator*();
@@ -89,31 +111,28 @@ public:
         // pre-increment operator
         Iterator& operator++();
 
-        // post-increment operator
-        Iterator operator++(int);
+        bool operator==(const Iterator& rhs) const {
+            return _index == rhs._index;
+        }
+        bool operator!=(const Iterator& rhs) const {
+            return !operator==(rhs);
+        }
 
-        bool operator==(const Iterator& rhs) const;
-        bool operator!=(const Iterator& rhs) const;
-
-        // Move this Iterator to a new BSONColumn instance. Should only be used when moving
-        // BSONColumn instances and we want to re-attach the iterator to the new instance without
-        // losing position
-        Iterator moveTo(BSONColumn& column);
+        /**
+         * Returns true if iterator may be incremented. Equivalent to comparing not equal with the
+         * end iterator.
+         */
+        bool more() const {
+            return _control != _end;
+        }
 
     private:
-        Iterator(BSONColumn& column, const char* pos, const char* end);
-
-        // Initializes Iterator and makes it ready for iteration. Provided index must be 0 or point
-        // to a full literal.
-        void _initialize(size_t index);
+        // Constructs a begin iterator
+        Iterator(boost::intrusive_ptr<ElementStorage> allocator, const char* pos, const char* end);
 
         // Initialize sub-object interleaving from current control byte position. Must be on a
         // interleaved start byte.
         void _initializeInterleaving();
-
-        // Helpers to increment the iterator in regular and interleaved mode.
-        void _incrementRegular();
-        void _incrementInterleaved();
 
         // Handles EOO when in regular mode. Iterator is set to end.
         void _handleEOO();
@@ -127,31 +146,23 @@ public:
         // Returns number of Simple-8b blocks from control byte
         static uint8_t _numSimple8bBlocks(char control);
 
-        // Pointer to BSONColumn this Iterator is created from, this will be stale when moving the
-        // BSONColumn. All iterators are invalidated on move!
-        BSONColumn* _column;
+        // Sentinel to represent end iterator
+        static constexpr uint32_t kEndIndex = 0xFFFFFFFF;
+
+        // Current iterator value
+        BSONElement _decompressed;
 
         // Current iterator position
-        size_t _index = 0;
+        uint32_t _index = kEndIndex;
 
         // Current control byte on iterator position
-        const char* _control;
+        const char* _control = nullptr;
 
         // End of BSONColumn memory block, we may not dereference any memory past this.
-        const char* _end;
+        const char* _end = nullptr;
 
-        // Helper to create Simple8b decoding iterators for 64bit and 128bit value types.
-        // previousValue is used in case the first Simple8b block is RLE and this value will then be
-        // used for the RLE repeat.
-        template <typename T>
-        struct Decoder {
-            Decoder(const char* buf, size_t size, const boost::optional<T>& previousValue)
-                : s8b(buf, size, previousValue), pos(s8b.begin()), end(s8b.end()) {}
-
-            Simple8b<T> s8b;
-            typename Simple8b<T>::Iterator pos;
-            typename Simple8b<T>::Iterator end;
-        };
+        // Allocator to use when materializing elements
+        boost::intrusive_ptr<ElementStorage> _allocator;
 
         /**
          * Decoding state for decoding compressed binary into BSONElement. It is detached from the
@@ -159,74 +170,98 @@ public:
          * states.
          */
         struct DecodingState {
+            DecodingState();
+
+            /**
+             * Internal decoding state for types using 64bit aritmetic
+             */
+            struct Decoder64 {
+                Decoder64();
+
+                Simple8b<uint64_t>::Iterator pos;
+                int64_t lastEncodedValue = 0;
+                int64_t lastEncodedValueForDeltaOfDelta = 0;
+                uint8_t scaleIndex;
+                bool deltaOfDelta;
+            };
+
+            /**
+             * Internal decoding state for types using 128bit aritmetic
+             */
+            struct Decoder128 {
+                Simple8b<uint128_t>::Iterator pos;
+                int128_t lastEncodedValue = 0;
+            };
+
             struct LoadControlResult {
                 BSONElement element;
                 int size;
-                bool full;
             };
 
             // Loads a literal
-            void _loadLiteral(const BSONElement& elem);
+            void loadUncompressed(const BSONElement& elem);
 
             // Loads current control byte
-            LoadControlResult _loadControl(BSONColumn& column,
-                                           const char* buffer,
-                                           const char* end,
-                                           const BSONElement* current);
+            LoadControlResult loadControl(ElementStorage& allocator,
+                                          const char* buffer,
+                                          const char* end);
 
             // Loads delta value
-            BSONElement _loadDelta(BSONColumn& column,
-                                   const boost::optional<uint64_t>& delta,
-                                   const BSONElement* current);
-            BSONElement _loadDelta(BSONColumn& column,
-                                   const boost::optional<uint128_t>& delta,
-                                   const BSONElement* current);
-
-            // Decoders, only one should be instantiated at a time.
-            boost::optional<Decoder<uint64_t>> _decoder64;
-            boost::optional<Decoder<uint128_t>> _decoder128;
+            BSONElement loadDelta(ElementStorage& allocator, Decoder64& decoder);
+            BSONElement loadDelta(ElementStorage& allocator, Decoder128& decoder);
 
             // Last encoded values used to calculate delta and delta-of-delta
-            BSONType _lastType;
-            bool _deltaOfDelta;
-            BSONElement _lastValue;
-            int64_t _lastEncodedValue64 = 0;
-            int64_t _lastEncodedValueForDeltaOfDelta = 0;
-            int128_t _lastEncodedValue128 = 0;
-
-            // Current scale index
-            uint8_t _scaleIndex;
+            BSONElement lastValue;
+            stdx::variant<Decoder64, Decoder128> decoder = Decoder64{};
         };
 
-        // Decoding states. Interleaved mode is active when '_states' is not empty. When in regular
-        // mode we use '_state'.
-        DecodingState _state;
-        std::vector<DecodingState> _states;
+        /**
+         * Internal state for regular decoding mode (decoding of scalars)
+         */
+        struct Regular {
+            DecodingState state;
+        };
 
-        // Interleaving reference object read when encountered the interleaving start control byte.
-        // We setup a decoding state for each scalar field in this object. The object hierarchy is
-        // used to re-construct with full objects with the correct hierachy to the user.
-        BSONObj _interleavedReferenceObj;
+        /**
+         * Internal state for interleaved decoding mode (decoding of objects/arrays)
+         */
+        struct Interleaved {
+            std::vector<DecodingState> states;
 
-        // Indicates if decoding states should be opened when encountering arrays
-        bool _interleavedArrays;
+            // Interleaving reference object read when encountered the interleaving start control
+            // byte. We setup a decoding state for each scalar field in this object. The object
+            // hierarchy is used to re-construct with full objects with the correct hierachy to the
+            // user.
+            BSONObj referenceObj;
 
-        // Type for root object/reference object. May be Object or Array.
-        BSONType _interleavedRootType;
+            // Indicates if decoding states should be opened when encountering arrays
+            bool arrays;
+
+            // Type for root object/reference object. May be Object or Array.
+            BSONType rootType;
+        };
+
+        // Helpers to increment the iterator in regular and interleaved mode.
+        void _incrementRegular(Regular& regular);
+        void _incrementInterleaved(Interleaved& interleaved);
+
+        stdx::variant<Regular, Interleaved> _mode = Regular{};
     };
 
     /**
-     * Forward iterator access.
+     * Input iterator access.
      *
      * Iterator value is EOO when element is skipped.
      *
      * Iterators materialize compressed BSONElement as they iterate over the compressed binary.
-     * It is NOT safe to do this from multiple threads concurrently.
+     * Grows memory usage for this BSONColumn.
+     *
+     * It is NOT safe to call this or iterate from multiple threads concurrently.
      *
      * Throws if invalid encoding is encountered.
      */
-    Iterator begin();
-    Iterator end();
+    Iterator begin() const;
+    Iterator end() const;
 
     /**
      * Element lookup by index
@@ -234,34 +269,28 @@ public:
      * Returns EOO if index represent skipped element.
      * Returns boost::none if index is out of bounds.
      *
-     * O(1) time complexity if element has been previously accessed
-     * O(N) time complexity otherwise
+     * O(N) time complexity
      *
-     * Materializes compressed BSONElement as needed. It is NOT safe to do this from multiple
-     * threads concurrently.
+     * Materializes BSONElement as needed and grows memory usage for this BSONColumn.
+     *
+     * It is NOT safe to call this from multiple threads concurrently.
      *
      * Throws if invalid encoding is encountered.
      */
-    boost::optional<const BSONElement&> operator[](size_t index);
+    boost::optional<BSONElement> operator[](size_t index) const;
 
     /**
      * Number of elements stored in this BSONColumn
      *
-     * O(1) time complexity if BSONColumn is fully decompressed (iteration reached end).
-     * O(N) time complexity otherwise, will fully decompress BSONColumn.
+     * O(N) time complexity
      *
-     * * Throws if invalid encoding is encountered.
-     */
-    size_t size();
+     * Materializes BSONElements internally and grows memory usage for this BSONColumn.
 
-    /**
-     * Field name that this BSONColumn represents.
+     * It is NOT safe to call this from multiple threads concurrently.
      *
-     * O(1) time complexity
+     * Throws if invalid encoding is encountered.
      */
-    StringData name() const {
-        return _name;
-    }
+    size_t size() const;
 
     // Scans the compressed BSON Column format to efficiently determine if the
     // column contains an element of type `elementType`.
@@ -270,12 +299,23 @@ public:
     // TODO SERVER-74926: add interleaved support
     bool contains_forTest(BSONType elementType) const;
 
+    /**
+     * Releases memory that has been used to materialize BSONElements for this BSONColumn.
+     *
+     * The returned reference counted pointer holds are reference to the previously materialized
+     * BSONElements and can be used to extend their lifetime over the BSONColumn.
+     *
+     * It is NOT safe to call this from multiple threads concurrently.
+     */
+    boost::intrusive_ptr<ElementStorage> release();
+
 private:
     /**
      * BSONElement storage, owns materialised BSONElement returned by BSONColumn.
      * Allocates memory in blocks which double in size as they grow.
      */
-    class ElementStorage {
+    class ElementStorage
+        : public boost::intrusive_ref_counter<ElementStorage, boost::thread_unsafe_counter> {
     public:
         /**
          * "Writable" BSONElement. Provides access to a writable pointer for writing the value of
@@ -388,29 +428,25 @@ private:
     };
 
     /**
-     * Validates the BSONColumn on init(). Should be the last call in the constructor when all
+     * Validates the BSONColumn on construction, should be the last call in the constructor when all
      * members are initialized.
      */
-    void _init();
+    void _initialValidate();
 
     struct SubObjectAllocator;
-
-    std::deque<BSONElement> _decompressed;
-    ElementStorage _elementStorage;
 
     const char* _binary;
     int _size;
 
-    struct DecodingStartPosition {
-        void setIfLarger(size_t index, const char* control);
-
-        const char* _control = nullptr;
-        size_t _index = 0;
-    };
-    DecodingStartPosition _maxDecodingStartPos;
-
-    bool _fullyDecompressed = false;
-
-    std::string _name;
+    // Reference counted allocator, used to allocate memory when materializing BSONElements.
+    boost::intrusive_ptr<ElementStorage> _allocator;
 };
+
+// Avoid GCC/Clang compiler issues
+// See
+// https://stackoverflow.com/questions/53408962/try-to-understand-compiler-error-message-default-member-initializer-required-be
+inline BSONColumn::Iterator::DecodingState::DecodingState() = default;
+inline BSONColumn::Iterator::DecodingState::Decoder64::Decoder64() = default;
+
+
 }  // namespace mongo

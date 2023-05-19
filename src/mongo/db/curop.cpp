@@ -29,31 +29,26 @@
 
 // CHECK_LOG_REDACTION
 
-
 #include "mongo/db/curop.h"
-
-#include "mongo/util/duration.h"
-#include <iomanip>
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/json.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/telemetry.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/namespace_string_util.h"
@@ -80,6 +75,7 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
         cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(dbName)).firstElement());
     return newCmdObj;
 }
+
 }  // namespace
 
 /**
@@ -187,7 +183,7 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
     return _curopStack(opCtx).top();
 }
 
-void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
+void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      Client* client,
                                      bool truncateOps,
                                      bool backtraceMode,
@@ -214,8 +210,9 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
 
     // Fill out the rest of the BSONObj with opCtx specific details.
     infoBuilder->appendBool("active", client->hasAnyActiveCurrentOp());
-    infoBuilder->append("currentOpTime",
-                        opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
+    infoBuilder->append(
+        "currentOpTime",
+        expCtx->opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
 
     auto authSession = AuthorizationSession::get(client);
     // Depending on whether the authenticated user is the same user which ran the command,
@@ -265,7 +262,11 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
             lsid->serialize(&lsidBuilder);
         }
 
-        CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
+        tassert(7663403,
+                str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
+                              << expCtx->ns.ns(),
+                expCtx->serializationCtxt != SerializationContext::stateDefault());
+        CurOp::get(clientOpCtx)->reportState(infoBuilder, expCtx->serializationCtxt, truncateOps);
     }
 
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
@@ -341,6 +342,15 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
     _nss = std::move(nss);
 }
 
+void CurOp::setEndOfOpMetrics(long long nreturned) {
+    _debug.additiveMetrics.nreturned = nreturned;
+    // executionTime is set with the final executionTime in completeAndLogOperation, but for
+    // telemetry collection we want it set before incrementing cursor metrics using OpDebug's
+    // AdditiveMetrics. The value set here will be overwritten later in
+    // completeAndLogOperation.
+    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+}
+
 void CurOp::setMessage_inlock(StringData message) {
     if (_progressMeter.isActive()) {
         LOGV2_ERROR(20527,
@@ -393,8 +403,10 @@ TickSource::Tick CurOp::startTime() {
 
 void CurOp::done() {
     _end = _tickSource->getTicks();
+}
 
-    if (_cpuTimer) {
+void CurOp::calculateCpuTime() {
+    if (_cpuTimer && _debug.cpuTime == Nanoseconds::zero()) {
         _debug.cpuTime = _cpuTimer->getElapsed();
     }
 }
@@ -471,6 +483,12 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
     if (filter) {
+        // Calculate this operation's CPU time before deciding whether logging/profiling is
+        // necessary only if it is needed for filtering.
+        if (filter->dependsOn("cpuNanos")) {
+            calculateCpuTime();
+        }
+
         bool passesFilter = filter->matches(opCtx, _debug, *this);
 
         shouldLogSlowOp = passesFilter;
@@ -484,6 +502,13 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
             opCtx, component, Milliseconds(executionTimeMillis), Milliseconds(slowMs));
 
         shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
+    }
+
+    // Defer calculating the CPU time until we know that we actually are going to write it to
+    // the logs or profiler. The CPU time may have been determined earlier if it was a dependency
+    // of 'filter' in which case this is a no-op.
+    if (forceLog || shouldLogSlowOp || _dbprofile >= 2) {
+        calculateCpuTime();
     }
 
     if (forceLog || shouldLogSlowOp) {
@@ -685,7 +710,9 @@ BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor* cursor,
     return serialized;
 }
 
-void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
+void CurOp::reportState(BSONObjBuilder* builder,
+                        const SerializationContext& serializationContext,
+                        bool truncateOps) {
     auto opCtx = this->opCtx();
     auto start = _start.load();
     if (start) {
@@ -696,7 +723,7 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
     }
 
     builder->append("op", logicalOpToString(_logicalOp));
-    builder->append("ns", NamespaceStringUtil::serialize(_nss));
+    builder->append("ns", NamespaceStringUtil::serialize(_nss, serializationContext));
 
     bool omitAndRedactInformation = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
     builder->append("redacted", omitAndRedactInformation);
@@ -810,9 +837,8 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
 
     if (auto start = _waitForWriteConcernStart.load(); start > 0) {
         auto end = _waitForWriteConcernEnd.load();
-        auto elapsedTimeTotal =
-            duration_cast<Microseconds>(debug().waitForWriteConcernDurationMillis);
-        elapsedTimeTotal += computeElapsedTimeTotal(start, end);
+        auto elapsedTimeTotal = _atomicWaitForWriteConcernDurationMillis.load();
+        elapsedTimeTotal += duration_cast<Milliseconds>(computeElapsedTimeTotal(start, end));
         builder->append("waitForWriteConcernDurationMillis",
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }

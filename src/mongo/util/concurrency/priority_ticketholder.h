@@ -51,91 +51,6 @@ enum class QueueType : unsigned int { kLowPriority = 0, kNormalPriority = 1, Num
 class Ticket;
 
 /**
- * This SimplePriorityTicketQueue implements a queue policy that separates normal and low priority
- * operations into separate queues. Normal priority operations are always scheduled ahead of low
- * priority ones, except when a positive lowPriorityBypassThreshold is provided. This parameter
- * specifies how often a waiting low-priority operation should skip the queue and be scheduled ahead
- * of waiting normal priority operations.
- */
-class SimplePriorityTicketQueue : public TicketQueue {
-public:
-    SimplePriorityTicketQueue(int lowPriorityBypassThreshold)
-        : _lowPriorityBypassThreshold(lowPriorityBypassThreshold) {}
-
-    bool empty() const final {
-        return _normal.empty() && _low.empty();
-    }
-
-    void push(std::shared_ptr<TicketWaiter> val) final {
-        if (val->context->getPriority() == AdmissionContext::Priority::kLow) {
-            _low.push(std::move(val));
-            return;
-        }
-        invariant(val->context->getPriority() == AdmissionContext::Priority::kNormal);
-        _normal.push(std::move(val));
-    }
-
-    std::shared_ptr<TicketWaiter> pop() final {
-        if (!_normal.empty() && !_low.empty() && _lowPriorityBypassThreshold.load() > 0 &&
-            _lowPriorityBypassCount.fetchAndAdd(1) % _lowPriorityBypassThreshold.load() == 0) {
-            auto front = std::move(_low.front());
-            _low.pop();
-            _expeditedLowPriorityAdmissions.addAndFetch(1);
-            return front;
-        }
-        if (!_normal.empty()) {
-            auto front = std::move(_normal.front());
-            _normal.pop();
-            return front;
-        }
-        auto front = std::move(_low.front());
-        _low.pop();
-        return front;
-    }
-
-    /**
-     * Number of times low priority operations are expedited for ticket admission over normal
-     * priority operations.
-     */
-    std::int64_t expedited() const {
-        return _expeditedLowPriorityAdmissions.loadRelaxed();
-    }
-
-    /**
-     * Returns the number of times the low priority queue is bypassed in favor of dequeuing from the
-     * normal priority queue when a ticket becomes available.
-     */
-    std::int64_t bypassed() const {
-        return _lowPriorityBypassCount.loadRelaxed();
-    }
-
-    void updateLowPriorityAdmissionBypassThreshold(int32_t newBypassThreshold) {
-        _lowPriorityBypassThreshold.store(newBypassThreshold);
-    }
-
-private:
-    /**
-     * Limits the number times the low priority queue is non-empty and bypassed in favor of the
-     * normal priority queue for the next ticket admission.
-     */
-    AtomicWord<std::int32_t> _lowPriorityBypassThreshold;
-
-    /**
-     * Number of times ticket admission is expedited for low priority operations.
-     */
-    AtomicWord<std::int64_t> _expeditedLowPriorityAdmissions{0};
-
-    /**
-     * Counts the number of times normal operations are dequeued over operations queued in the low
-     * priority queue. We explicitly use an unsigned type here because rollover is desired.
-     */
-    AtomicWord<std::uint64_t> _lowPriorityBypassCount{0};
-
-    std::queue<std::shared_ptr<TicketWaiter>> _normal;
-    std::queue<std::shared_ptr<TicketWaiter>> _low;
-};
-
-/**
  * A PriorityTicketHolder supports queueing and prioritization of operations based on
  * AdmissionContext::Priority.
  *
@@ -193,9 +108,7 @@ private:
     }
 
     std::array<QueueStats, static_cast<unsigned int>(QueueType::NumQueues)> _stats;
-
-    std::unique_ptr<TicketPool> _pool;
-
     ServiceContext* _serviceContext;
+    TicketPool<SimplePriorityTicketQueue> _pool;
 };
 }  // namespace mongo

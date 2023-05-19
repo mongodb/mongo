@@ -830,6 +830,39 @@ class WiredTigerTestCase(unittest.TestCase):
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         bkp_cursor.close()
 
+    # Set a Python breakpoint.  When this function is called,
+    # the python debugger will be called as described here:
+    #   https://docs.python.org/3/library/pdb.html
+    #
+    # This can be used instead of the Python built-in "breakpoint",
+    # so that the terminal has proper I/O and a prompt appears, etc.
+    #
+    # Since the actual breakpoint is in this method, the developer will
+    # probably need to single step to get back to their calling function.
+    def breakpoint(self):
+        import pdb, sys
+        # Restore I/O to the controlling tty so we can
+        # run the debugger.
+        if os.name == "nt":
+            # No solution has been tested here.
+            pass
+        else:
+            sys.stdin = open('/dev/tty', 'r')
+            sys.stdout = open('/dev/tty', 'w')
+            sys.stderr = open('/dev/tty', 'w')
+        self.printOnce("""
+        ********
+        You are now in the python debugger, type "help" for more information.
+        Typing "s" will single step, returning you to the calling function. Common commands:
+          list            -   show python source code
+          s               -   single step
+          n               -   next step
+          b file:number   -   set a breakpoint
+          p variable      -   print the value of a variable
+          c               -   continue
+        ********""")
+        pdb.set_trace()
+
     @contextmanager
     def expectedStdout(self, expect):
         self.captureout.check(self)

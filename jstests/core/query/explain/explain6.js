@@ -6,7 +6,7 @@
 // Basic test which checks the number of documents returned, keys examined, and documents
 // examined as reported by explain.
 
-t = db.jstests_explain6;
+let t = db.jstests_explain6;
 t.drop();
 
 t.createIndex({a: 1, b: 1});
@@ -15,7 +15,7 @@ t.createIndex({b: 1, a: 1});
 t.save({a: 0, b: 1});
 t.save({a: 1, b: 0});
 
-explain = t.find({a: {$gte: 0}, b: {$gte: 0}}).explain(true);
+let explain = t.find({a: {$gte: 0}, b: {$gte: 0}}).explain(true);
 
 assert.eq(2, explain.executionStats.nReturned);
 assert.eq(2, explain.executionStats.totalKeysExamined);

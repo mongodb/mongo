@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
@@ -87,7 +88,6 @@ MONGO_FAIL_POINT_DEFINE(throwWCEDuringTxnCollCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
-MONGO_FAIL_POINT_DEFINE(allowSystemViewsDrop);
 
 // When active, a column index will be created for all new collections. This is used for the column
 // index JS test passthrough suite. Other passthroughs work by overriding javascript methods on the
@@ -138,7 +138,7 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
 
-    if (dbname.size() >= 64)
+    if (dbname.size() > DatabaseName::kMaxDatabaseNameLength)
         return Status(ErrorCodes::BadValue, "db name is too long");
 
     if (dbname.find('.') != std::string::npos)
@@ -367,35 +367,8 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     invariant(nss.dbName() == _name);
 
-    // Returns true if the supplied namespace 'nss' is a system collection that can be dropped,
-    // false otherwise.
-    auto isDroppableSystemCollection = [](const auto& nss) {
-        return nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
-            nss == NamespaceString::kKeysCollectionNamespace ||
-            nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
-            nss.isChangeStreamPreImagesCollection() ||
-            nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection() ||
-            nss.isSystemDotJavascript() || nss.isSystemStatsCollection();
-    };
-
-    if (nss.isSystem()) {
-        if (nss.isSystemDotProfile()) {
-            if (catalog->getDatabaseProfileLevel(_name) != 0)
-                return Status(ErrorCodes::IllegalOperation,
-                              "turn off profiling before dropping system.profile collection");
-        } else if (nss.isSystemDotViews()) {
-            if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
-                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, _name);
-                uassert(ErrorCodes::CommandFailed,
-                        str::stream() << "cannot drop collection " << nss.toStringForErrorMsg()
-                                      << " when time-series collections are present.",
-                        viewStats && viewStats->userTimeseries == 0);
-            }
-        } else if (!isDroppableSystemCollection(nss)) {
-            return Status(ErrorCodes::IllegalOperation,
-                          str::stream()
-                              << "can't drop system collection " << nss.toStringForErrorMsg());
-        }
+    if (const auto droppable = isDroppableCollection(opCtx, nss); !droppable.isOK()) {
+        return droppable;
     }
 
     return dropCollectionEvenIfSystem(opCtx, nss, dropOpTime, markFromMigrate);

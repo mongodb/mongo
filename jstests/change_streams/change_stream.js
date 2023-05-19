@@ -10,8 +10,6 @@ load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
                                                    // assert[Valid|Invalid]ChangeStreamNss.
 
-const isMongos = FixtureHelpers.isMongos(db);
-
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");
 assertDropAndRecreateCollection(db, "t2");
@@ -33,7 +31,7 @@ checkArgFails([1, 2, "invalid", {x: 1}]);
 assertInvalidChangeStreamNss("admin", "testColl");
 assertInvalidChangeStreamNss("config", "testColl");
 // Not allowed to access 'local' database through mongos.
-if (!isMongos) {
+if (!FixtureHelpers.isMongos(db)) {
     assertInvalidChangeStreamNss("local", "testColl");
 }
 

@@ -134,14 +134,6 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    bool isPresentInMySnapshot(OperationContext* opCtx) const override {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    bool isReadyInMySnapshot(OperationContext* opCtx) const override {
-        MONGO_UNIMPLEMENTED;
-    }
-
     bool isFrozen() const override {
         MONGO_UNIMPLEMENTED;
     }

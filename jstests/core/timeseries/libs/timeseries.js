@@ -63,6 +63,11 @@ var TimeseriesTest = class {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "BucketUnpackWithSort");
     }
 
+    // TODO SERVER-68058 remove this helper.
+    static arbitraryUpdatesEnabled(conn) {
+        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesUpdatesSupport");
+    }
+
     /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].

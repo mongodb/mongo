@@ -2,7 +2,7 @@
 (function() {
 var t = db.duplIndexTest;
 t.drop();
-docs = [];
+let docs = [];
 for (var i = 0; i < 10000; i++) {
     docs.push({name: "foo", z: {a: 17, b: 4}, i: i});
 }

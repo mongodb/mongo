@@ -83,15 +83,17 @@ __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
 }
 
 /*
- * __wt_block_extend --
+ * __block_extend --
  *     Extend the file.
  */
 static inline int
-__wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FH *fh, wt_off_t offset,
+__block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FH *fh, wt_off_t offset,
   size_t align_size, bool *release_lockp)
 {
     WT_DECL_RET;
     WT_FILE_HANDLE *handle;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
 
     /*
      * The locking in this function is messy: by definition, the live system is locked when we're
@@ -272,7 +274,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     }
     ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
     if (ret == 0)
-        ret = __wt_block_extend(session, block, fh, offset, align_size, &local_locked);
+        ret = __block_extend(session, block, fh, offset, align_size, &local_locked);
     if (local_locked)
         __wt_spin_unlock(session, &block->live_lock);
     WT_RET(ret);

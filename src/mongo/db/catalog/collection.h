@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
@@ -798,5 +799,26 @@ inline ValidationActionEnum validationActionOrDefault(
 inline ValidationLevelEnum validationLevelOrDefault(boost::optional<ValidationLevelEnum> level) {
     return level.value_or(ValidationLevelEnum::strict);
 }
+
+/**
+ * Returns a collator for the user-specified collation 'userCollation'.
+ *
+ * Note: The caller should check if 'userCollation' is not empty since the empty 'userCollation'
+ * has the special meaning that the query follows the collection default collation that exists.
+ */
+inline std::unique_ptr<CollatorInterface> getUserCollator(OperationContext* opCtx,
+                                                          const BSONObj& userCollation) {
+    tassert(7542402, "Empty user collation", !userCollation.isEmpty());
+    return uassertStatusOK(
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(userCollation));
+}
+
+/**
+ * Resolves the collator to either the user-specified collation or, if none was specified, to
+ * the collection-default collation and also returns a flag indicating whether the user-provided
+ * collation matches the collection default collation.
+ */
+std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
+resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection);
 
 }  // namespace mongo

@@ -93,8 +93,6 @@ const recipientPrimaryTestDB = recipientPrimary.getDB(kDbName);
 const donorSecondaryTestDB = donorRst.getSecondary().getDB(kDbName);
 const recipientSecondaryTestDB = recipientRst.getSecondary().getDB(kDbName);
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-
 createUsers(donorRst);
 createUsers(recipientRst);
 
@@ -137,6 +135,7 @@ recipientSecondaryTestDB.logout();
 assert.eq(1, donorAdminDB.auth(kAdminUser.name, kAdminUser.pwd));
 assert.eq(1, recipientAdminDB.auth(kAdminUser.name, kAdminUser.pwd));
 
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),

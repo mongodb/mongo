@@ -993,6 +993,12 @@ public:
         MONGO_UNREACHABLE;
         return false;
     }
+
+    // Since the user management commands do not affect user data, we should allow these commands
+    // even if the user does not have the direct shard operations action type.
+    bool shouldSkipDirectConnectionChecks() const final {
+        return true;
+    }
 };
 
 

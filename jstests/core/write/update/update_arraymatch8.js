@@ -9,7 +9,7 @@
 // SERVER-7511
 
 // array.$.name
-t = db.jstests_update_arraymatch8;
+let t = db.jstests_update_arraymatch8;
 t.drop();
 t.createIndex({'array.name': 1});
 t.insert({'array': [{'name': 'old'}]});
@@ -51,7 +51,7 @@ assert(!t.findOne({'array.name': 'old'}));
 // // array.12.name
 t = db.jstests_update_arraymatch8;
 t.drop();
-arr = new Array();
+let arr = new Array();
 for (var i = 0; i < 20; i++) {
     arr.push({'name': 'old'});
 }

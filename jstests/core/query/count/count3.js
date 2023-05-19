@@ -1,5 +1,5 @@
 
-t = db.count3;
+let t = db.count3;
 
 t.drop();
 

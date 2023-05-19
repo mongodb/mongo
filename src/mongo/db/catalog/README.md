@@ -1135,6 +1135,16 @@ index build does not need to be the same node that decides to commit it.
 See [Index Builds in Replicated Environments - MongoDB
 Manual](https://docs.mongodb.com/master/core/index-creation/#index-builds-in-replicated-environments).
 
+Server 7.1 introduces the following improvements:
+
+* Index builds abort immediately after detecting errors other than duplicate key
+violations. Before 7.1, index builds aborted the index build close to
+completion, potentially long after detection.
+* A secondary member can abort a two-phase index build. Before 7.1, a secondary was forced
+to crash instead. See the [Voting for Abort](#voting-for-abort) section.
+* Index builds are cancelled if there isn't enough storage space available. See the
+  [Disk Space](#disk-space) section.
+
 ### Commit Quorum
 
 The purpose of `commitQuorm` is to ensure secondaries are ready to commit an index build quickly.
@@ -1158,10 +1168,10 @@ data on a collection and performed the first drain of side-writes. Voting is imp
 `voteCommitIndexBuild` command, and is persisted as a write to the replicated
 `config.system.indexBuilds` collection.
 
-While waiting for a commit decision, primaries and secondaries continue recieving and applying new
+While waiting for a commit decision, primaries and secondaries continue receiving and applying new
 side writes. When a quorum is reached, the current primary, under a collection X lock, will check
-all index constraints. If there are errors, it will replicate an `abortIndexBuild` oplog entry. If
-the index build is successful, it will replicate a `commitIndexBuild` oplog entry.
+the remaining index constraints. If there are errors, it will replicate an `abortIndexBuild` oplog
+entry. If the index build is successful, it will replicate a `commitIndexBuild` oplog entry.
 
 Secondaries that were not included in the commit quorum and receive a `commitIndexBuild` oplog entry
 will block replication until their index build is complete.
@@ -1172,6 +1182,28 @@ server command.
 
 See
 [IndexBuildsCoordinator::_waitForNextIndexBuildActionAndCommit](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator_mongod.cpp#L632).
+
+### Voting for Abort
+
+As of 7.1, a secondary can abort a two-phase index build by sending a `voteAbortIndexBuild` signal
+to the primary. In contrast, before 7.1 it was forced to crash. Common causes for aborting the index
+build are a killOp on the index build or running low on storage space.
+The primary, upon receiving a vote to abort the index build from a secondary, will replicate an
+`abortIndexBuild` oplog entry. This will cause all secondaries to gracefully abort the index build,
+even if a specific secondary had already voted to commit the index build.
+
+Note that once a secondary has voted to commit the index build, it cannot retract the vote. In the
+unlikely event that a secondary has voted for commit and for some reason it must abort while waiting
+for the primary to replicate a `commitIndexBuild` oplog entry, the secondary is forced to crash.
+
+### Disk Space
+
+As of 7.1, an index build can abort due to a replica set member running low on disk space. This
+applies both to primary and secondary nodes. Additionally, on a primary the index build won't start
+if the available disk space is low.
+The minimum amount of disk space is controlled by
+[indexBuildMinAvailableDiskSpaceMB](https://github.com/mongodb/mongo/blob/406e69f6f5dee8b698c4e4308de2e9e5cef6c12c/src/mongo/db/storage/two_phase_index_build_knobs.idl#L71)
+which defaults to 500MB.
 
 ## Resumable Index Builds
 
@@ -1631,7 +1663,7 @@ Flow Control is only concerned whether an operation is 'immediate' priority and 
 * `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate' priority.
 * `kLow` - It's of low importance that the operation acquires a ticket in Execution Admission Control. Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Admission Control.
 
-Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/db/concurrency/lock_state.h#L428) RAII.
+Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L747) RAII.
 
 ### Developer Guidelines for Declaring Low Admission Priority
 Developers must evaluate the consequences of each low priority operation from falling too far behind, and implement safeguards to avoid any undesirable behaviors for excessive delays in low priority operations.
@@ -1730,7 +1762,7 @@ by another configurable constant (the ticket "multiplier" constant). This produc
 of tickets to be assigned in the next period.
 
 When the Flow Control mechanism is disabled, the ticket refresher mechanism always allows one
-billion flow control ticket acquisitions per second. The Flow Control mechanism can be disabled via 
+billion flow control ticket acquisitions per second. The Flow Control mechanism can be disabled via
 a server parameter. Additionally, the mechanism is disabled on nodes that cannot accept writes.
 
 Criteria #2 and #3 are determined using a sampling mechanism that periodically stores the necessary

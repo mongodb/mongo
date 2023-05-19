@@ -344,7 +344,7 @@ functions:
             set -o igncr
           fi;
 
-          # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
+          # set_goenv provides set_goenv()
           . ./set_goenv.sh
           GOROOT="" set_goenv || exit
           go version
@@ -354,7 +354,7 @@ functions:
               build_tools="$build_tools mongoreplay"
           fi
           for i in $build_tools; do
-              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
+              go build -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
               "../../../../../mongodb/bin/$i${exe|}" --version
           done
     - command: shell.exec
@@ -1120,7 +1120,7 @@ tasks:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short"
           # Logkeeper dataset with FCV set to 6.0
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.3.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.0.tgz"
 
   - name: initialsync-logkeeper-short-fcbis
     priority: 5
@@ -1130,7 +1130,7 @@ tasks:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short-fcbis"
           # Logkeeper dataset with FCV set to 6.0
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.3.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.0.tgz"
 
   - name: initialsync-logkeeper
     priority: 5
@@ -1162,7 +1162,7 @@ tasks:
           test_control: "initialsync-logkeeper-short-s3-update"
           mongodb_setup: "initialsync-logkeeper-short-s3-update"
           # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.3.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.0.tgz"
 
   - name: initialsync-logkeeper-snapshot-update
     priority: 5
@@ -1547,6 +1547,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
         install-mongocryptd
     run_on:
       - "amazon2-xlarge"
@@ -1579,6 +1580,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
         --allocator=system
         --enable-free-mon=off
         --enterprise-features=fle,search
@@ -1740,6 +1742,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
       compile_variant: -rhel70
     run_on:
       - rhel70-large
@@ -1990,6 +1993,84 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: *classic_engine_tasks
 
+  - name: linux-standalone-sampling-bonsai.2022-11
+    display_name: Linux Standalone (Bonsai with Sampling CE) 2022-11
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_tasks
+
+  - name: linux-intel-standalone-sampling-bonsai
+    display_name: Linux Intel Standalone (Bonsai with Sampling CE)
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_tasks
+
+  - name: linux-intel-1-node-replSet-sampling-bonsai
+    display_name: Linux Intel 1-Node ReplSet (Bonsai with Sampling CE)
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-1-node-replSet-sampling-bonsai.2022-11
+    display_name: Linux 1-Node ReplSet (Bonsai with Sampling CE) 2022-11
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_1nodereplset_tasks
+
   - name: linux-1-node-replSet-classic-query-engine.2022-11
     display_name: Linux 1-Node ReplSet (Classic Query Engine) 2022-11
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
@@ -2225,6 +2306,8 @@ buildvariants:
       - name: crud_workloads_majority
       - name: mixed_workloads
       - name: tpcc
+      - name: linkbench
+      - name: linkbench2
 
   - name: linux-shard-lite-fle.2022-11
     display_name: Linux Shard Lite FLE 2022-11
@@ -2988,7 +3071,7 @@ buildvariants:
       infrastructure_provisioning: initialsync-logkeeper
       workload_setup: 2022-11
       # EBS logkeeper snapshot with FCV set to 6.0
-      snapshotId: snap-0e28e73fe0f1c503a
+      snapshotId: snap-0eca13ca4935455a2
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -3015,7 +3098,7 @@ buildvariants:
   #    infrastructure_provisioning_release: 2022-11
   #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
   #    # Update this to latest snapshot after each LTS release.
-  #    snapshotId: snap-0e28e73fe0f1c503a
+  #    snapshotId: snap-0eca13ca4935455a2
   #    platform: linux
   #    authentication: disabled
   #    storageEngine: wiredTiger
@@ -3101,6 +3184,38 @@ buildvariants:
       - name: crud_workloads_w1
       - name: mixed_workloads
       - name: tpcc
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-3-node-replSet-disable-execution-control
+    display_name: Linux 3-Node ReplSet 2022-11 (Execution Control Off)
+    cron: *linux-3-node-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-disable-execution-control
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_agg_merge_wordcount
+      - name: industry_benchmarks
+      - name: linkbench2
+      - name: misc_workloads
+      - name: mixed_workloads
+      - name: snapshot_reads
+      - name: tpcc
+      - name: ycsb_60GB
 
   - &linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm.2023-01
@@ -3249,6 +3364,17 @@ buildvariants:
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
 
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-sampling-bonsai-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory (Bonsai with Sampling CE).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
   - <<: *linux-microbenchmarks-repl-arm
     name: linux-microbenchmarks-repl-all-feature-flags-arm.2023-01
     display_name: MicroBenchmarks Arm 1-Node ReplSet inMemory (all feature flags).2023-01
@@ -3324,6 +3450,17 @@ buildvariants:
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-intel
+    name: linux-microbenchmarks-standalone-sampling-bonsai.2023-01
+    display_name: MicroBenchmarks Intel Standalone inMemory (Bonsai with Sampling CE).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-intel-expansions
+      mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here

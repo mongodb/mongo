@@ -72,7 +72,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -98,6 +98,7 @@
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/fallback_op_observer.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -141,6 +142,7 @@
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_primary/move_primary_donor_service.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
@@ -187,7 +189,6 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/timeseries/timeseries_op_observer.h"
-#include "mongo/db/transaction/internal_transactions_reap_service.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/ttl.h"
@@ -820,6 +821,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 "maintenance and no other clients are connected. The TTL collection monitor will "
                 "not start because of this. For more info see "
                 "http://dochub.mongodb.org/core/ttlcollections");
+
+            if (gAllowUnsafeUntimestampedWrites &&
+                !repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+                LOGV2_WARNING_OPTIONS(
+                    7692300,
+                    {logv2::LogTag::kStartupWarnings},
+                    "Replica set member is in standalone mode. Performing any writes will result "
+                    "in them being untimestamped. If a write is to an existing document, the "
+                    "document's history will be overwritten with the new value since the beginning "
+                    "of time. This can break snapshot isolation within the storage engine.");
+            }
         } else {
             startTTLMonitor(serviceContext);
         }
@@ -917,7 +929,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
 
-    if (analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */) &&
+    if (analyze_shard_key::supportsSamplingQueries(serviceContext) &&
         serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onStartup();
     }
@@ -1233,14 +1245,10 @@ void setUpReplication(ServiceContext* serviceContext) {
         ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
 
-        // The check below ignores the FCV because FCV is not initialized until after the replica
-        // set is initiated.
-        if (analyze_shard_key::isFeatureFlagEnabled(true /* ignoreFCV */)) {
-            analyze_shard_key::QueryAnalysisClient::get(serviceContext)
-                .setTaskExecutor(
-                    serviceContext,
-                    ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext));
-        }
+        analyze_shard_key::QueryAnalysisClient::get(serviceContext)
+            .setTaskExecutor(
+                serviceContext,
+                ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext));
     }
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
@@ -1264,6 +1272,7 @@ void setUpObservers(ServiceContext* serviceContext) {
             ->registerPin(std::make_unique<ReshardingHistoryHook>());
         opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>(
             std::make_unique<OplogWriterTransactionProxy>(std::make_unique<OplogWriterImpl>())));
+        opObserverRegistry->addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
@@ -1301,6 +1310,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         }
     }
 
+    opObserverRegistry->addObserver(std::make_unique<FallbackOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<TimeSeriesOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
     opObserverRegistry->addObserver(
@@ -1323,10 +1333,6 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, (), ("SSLManager"))
 (InitializerContext* context) {
     isSSLServer = true;
 }
-#endif
-
-#if !defined(__has_feature)
-#define __has_feature(x) 0
 #endif
 
 // NOTE: This function may be called at any time after registerShutdownTask is called below. It
@@ -1432,7 +1438,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         lsc->joinOnShutDown();
     }
 
-    if (analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */)) {
+    if (analyze_shard_key::supportsSamplingQueries(serviceContext)) {
         LOGV2_OPTIONS(7350601, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
     }
@@ -1580,7 +1586,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     migrationUtilExecutor->shutdown();
     migrationUtilExecutor->join();
 
-    if (ShardingState::get(serviceContext)->enabled()) {
+    if (Grid::get(serviceContext)->isShardingInitialized()) {
         // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as the
         // CatalogCache may try to schedule work on CatalogCacheLoader and fail.
         LOGV2_OPTIONS(6773201, {LogComponent::kSharding}, "Shutting down the CatalogCache");
@@ -1735,8 +1741,6 @@ int mongod_main(int argc, char* argv[]) {
     setUpReplication(service);
     setUpObservers(service);
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
-    SessionCatalog::get(service)->setOnEagerlyReapedSessionsFn(
-        InternalTransactionsReapService::onEagerlyReapedSessions);
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

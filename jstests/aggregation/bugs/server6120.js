@@ -1,6 +1,6 @@
 // Value::coerceToBool() is consistent with BSONElement::trueValue().  SERVER-6120
 
-t = db.jstests_aggregation_server6120;
+let t = db.jstests_aggregation_server6120;
 t.drop();
 
 t.save({object: {a: 1}});

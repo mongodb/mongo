@@ -35,6 +35,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/session.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 
@@ -134,6 +135,9 @@ protected:
 private:
     // Keeps the lifetime of the operation context
     ServiceContext::UniqueOperationContext _opCtxHolder;
+
+    // The temporary dbpath for the tests in this fixture.
+    unittest::TempDir _tempDir;
 };
 
 }  // namespace mongo

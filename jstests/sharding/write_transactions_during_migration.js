@@ -3,7 +3,7 @@
  * new writes are being sent to the source shard.
  */
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 /**
  * Test outline:

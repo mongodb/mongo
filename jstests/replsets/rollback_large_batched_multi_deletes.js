@@ -1,7 +1,7 @@
 /**
  * Tests that a multi-oplog batched multi delete operation can be rolled back.
  * @tags: [
- *   requires_fcv_70,
+ *   requires_fcv_71,
  *   requires_replication,
  * ]
  */
@@ -65,8 +65,7 @@ const nodeOptions = {
 };
 const rollbackTest = new RollbackTest(jsTestName(), /*replSet=*/ undefined, nodeOptions);
 
-if (!FeatureFlagUtil.isEnabled(rollbackTest.getPrimary(),
-                               "InternalWritesAreReplicatedTransactionally")) {
+if (!FeatureFlagUtil.isEnabled(rollbackTest.getPrimary(), "LargeBatchedOperations")) {
     jsTestLog('Skipping test because required feature flag is not enabled.');
     rollbackTest.stop();
     return;

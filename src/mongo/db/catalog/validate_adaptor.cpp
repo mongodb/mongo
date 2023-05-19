@@ -668,12 +668,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             }
 
             if (_validateState->fixErrors()) {
-                writeConflictRetry(
-                    opCtx, "corrupt record removal", _validateState->nss().ns(), [&] {
-                        WriteUnitOfWork wunit(opCtx);
-                        rs->deleteRecord(opCtx, record->id);
-                        wunit.commit();
-                    });
+                writeConflictRetry(opCtx, "corrupt record removal", _validateState->nss(), [&] {
+                    WriteUnitOfWork wunit(opCtx);
+                    rs->deleteRecord(opCtx, record->id);
+                    wunit.commit();
+                });
                 results->repaired = true;
                 results->numRemovedCorruptRecords++;
                 _numRecords--;

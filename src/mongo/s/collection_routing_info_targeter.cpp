@@ -52,6 +52,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
@@ -82,8 +83,8 @@ CounterMetric updateOneOpStyleBroadcastWithExactIDCount(
  *            or
  *          coll.update({x: 1}, [{$addFields: {y: 2}}])
  */
-void validateUpdateDoc(const write_ops::UpdateOpEntry& updateDoc) {
-    const auto& updateMod = updateDoc.getU();
+void validateUpdateDoc(const UpdateRef updateRef) {
+    const auto& updateMod = updateRef.getUpdateMods();
     if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
         return;
     }
@@ -108,7 +109,7 @@ void validateUpdateDoc(const write_ops::UpdateOpEntry& updateDoc) {
 
     uassert(ErrorCodes::InvalidOptions,
             "Replacement-style updates cannot be {multi:true}",
-            updateType == UpdateType::kModifier || !updateDoc.getMulti());
+            updateType == UpdateType::kModifier || !updateRef.getMulti());
 }
 
 /**
@@ -385,7 +386,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // to have a missing '_id', and if the '_id' exists in the query, it will be emplaced in the
     // replacement document for targeting purposes.
 
-    const auto& updateOp = itemRef.getUpdate();
+    const auto& updateOp = itemRef.getUpdateRef();
     const bool isMulti = updateOp.getMulti();
 
     if (isMulti) {
@@ -416,7 +417,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                                                                itemRef.getLegacyRuntimeConstants());
 
     const bool isUpsert = updateOp.getUpsert();
-    auto query = updateOp.getQ();
+    auto query = updateOp.getFilter();
 
     if (_isRequestOnTimeseriesViewNamespace) {
         uassert(ErrorCodes::NotImplemented,
@@ -447,7 +448,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
 
     validateUpdateDoc(updateOp);
     const auto updateExpr =
-        getUpdateExprForTargeting(expCtx, shardKeyPattern, query, updateOp.getU());
+        getUpdateExprForTargeting(expCtx, shardKeyPattern, query, updateOp.getUpdateMods());
 
     // Utility function to target an update by shard key, and to handle any potential error results.
     auto targetByShardKey = [this, &collation, &chunkRanges, isUpsert, isMulti](
@@ -498,7 +499,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
         // based on it.
-        if (updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement) {
+        if (updateOp.getUpdateMods().type() == write_ops::UpdateModification::Type::kReplacement) {
             if (chunkRanges) {
                 chunkRanges->clear();
             }
@@ -533,7 +534,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     OperationContext* opCtx, const BatchItemRef& itemRef, std::set<ChunkRange>* chunkRanges) const {
-    const auto& deleteOp = itemRef.getDelete();
+    const auto& deleteOp = itemRef.getDeleteRef();
     const auto collation = write_ops::collationOf(deleteOp);
 
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
@@ -547,7 +548,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         deleteManyCount.increment(1);
     }
 
-    BSONObj deleteQuery = deleteOp.getQ();
+    BSONObj deleteQuery = deleteOp.getFilter();
     BSONObj shardKey;
     if (_cri.cm.isSharded()) {
         if (_isRequestOnTimeseriesViewNamespace) {

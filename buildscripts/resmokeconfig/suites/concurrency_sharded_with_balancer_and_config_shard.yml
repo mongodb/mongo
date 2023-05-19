@@ -80,6 +80,7 @@ selector:
 
   # TODO Undenylist (SERVER-38852).
   - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
 
   # serverStatus does not include transaction metrics on mongos.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
@@ -100,8 +101,6 @@ selector:
   # mongos has no system.profile collection.
   - requires_profiling
   - assumes_unsharded_collection
-  # TODO SERVER-73279: Remove after branching 7.0 and a config shard can be downgraded.
-  - multiversion_incompatible
 
 executor:
   archive:
@@ -117,12 +116,12 @@ executor:
         TestData:
           runningWithBalancer: true
   hooks:
+  - class: CheckShardFilteringMetadata
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
-  - class: CheckShardFilteringMetadata
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:

@@ -3,12 +3,10 @@
 //   requires_non_retryable_writes,
 // ]
 
-t = db.getCollection("basic2");
+let t = db.getCollection("basic2");
 t.drop();
 
-o = {
-    n: 2
-};
+let o = {n: 2};
 t.save(o);
 
 assert.eq(1, t.find().count());

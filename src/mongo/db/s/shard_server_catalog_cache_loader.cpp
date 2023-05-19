@@ -453,7 +453,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
     }();
 
     return ExecutorFuture<void>(_executor)
-        .then([=]() {
+        .then([=, this]() {
             ThreadClient tc("ShardServerCatalogCacheLoader::getChunksSince",
                             getGlobalServiceContext());
             auto context = _contexts.makeOperationContext(*tc);
@@ -695,11 +695,6 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
                               "duration"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
-
-    // Disallow reading on an older snapshot because this relies on being able to read the
-    // side effects of writes during secondary replication after being signalled from the
-    // CollectionPlacementVersionLogOpHandler.
-    BlockSecondaryReadsDuringBatchApplication_DONT_USE secondaryReadsBlockBehindReplication(opCtx);
 
     return _getCompletePersistedMetadataForSecondarySinceVersion(
         opCtx, nss, catalogCacheSinceVersion);
@@ -1336,6 +1331,17 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
     // Keep trying to load the metadata until we get a complete view without updates being
     // concurrently applied.
     while (true) {
+        // Disallow reading on an older snapshot because this relies on being able to read the
+        // side effects of writes during secondary replication after being signalled from the
+        // CollectionPlacementVersionLogOpHandler.
+        BlockSecondaryReadsDuringBatchApplication_DONT_USE secondaryReadsBlockBehindReplication(
+            opCtx);
+
+        // Taking the PBWM and blocking on admission control can lead to deadlock with prepared
+        // transactions, so have internal refresh operations skip admission control
+        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                            AdmissionContext::Priority::kImmediate);
+
         const auto beginRefreshState = [&]() {
             while (true) {
                 auto notif = _namespaceNotifications.createNotification(nss);

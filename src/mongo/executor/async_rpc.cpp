@@ -59,7 +59,7 @@ public:
         auto targetsUsed = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
             .thenRunOn(proxyExec)
-            .then([dbName,
+            .then([dbName = dbName.toString(),
                    cmdBSON,
                    opCtx,
                    exec = std::move(exec),
@@ -70,7 +70,7 @@ public:
                           "Successful targeting implies there are hosts to target.");
                 *targetsUsed = targets;
                 executor::RemoteCommandRequestOnAny executorRequest(
-                    targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
+                    targets, dbName, cmdBSON, rpc::makeEmptyMetadata(), opCtx);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token, std::move(baton));
             })
             .onError([targetsUsed](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {

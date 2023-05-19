@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/json.h"
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/document_diff_calculator.h"
@@ -85,7 +86,6 @@ protected:
         applyParams.insert = _insert;
         applyParams.fromOplogApplication = _fromOplogApplication;
         applyParams.validateForStorage = _validateForStorage;
-        applyParams.indexData = _indexData.get();
         applyParams.modifiedPaths = &_modifiedPaths;
         applyParams.logMode = ApplyParams::LogMode::kGenerateOplogEntry;
         return applyParams;

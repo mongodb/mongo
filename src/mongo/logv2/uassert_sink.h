@@ -35,6 +35,7 @@
 #include <boost/log/sinks.hpp>
 
 #include "mongo/logv2/bson_formatter.h"
+#include "mongo/logv2/plain_formatter.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::logv2 {

@@ -73,17 +73,11 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             GetClusterParameterInvocation invocation;
 
-            if (gFeatureFlagClusterWideConfigM2.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                // Refresh cached cluster server parameters via a majority read from the config
-                // servers.
-                uassertStatusOK(
-                    ClusterServerParameterRefresher::get(opCtx)->refreshParameters(opCtx));
+            // Refresh cached cluster server parameters via a majority read from the config
+            // servers.
+            uassertStatusOK(ClusterServerParameterRefresher::get(opCtx)->refreshParameters(opCtx));
 
-                return invocation.getCachedParameters(opCtx, request());
-            }
-
-            return invocation.getDurableParameters(opCtx, request());
+            return invocation.getCachedParameters(opCtx, request());
         }
 
     private:

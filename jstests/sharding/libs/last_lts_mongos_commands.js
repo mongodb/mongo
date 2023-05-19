@@ -6,7 +6,6 @@
 const commandsRemovedFromMongosSinceLastLTS = [
     "repairShardedCollectionChunksHistory",
     // last-continuos
-    "availableQueryOptions",  // TODO SERVER-67689: remove this once 7.0 becomes last-lts
     "getLastError",
     "getnonce",
     "driverOIDTest",
@@ -20,7 +19,6 @@ const commandsAddedToMongosSinceLastLTS = [
     "_clusterWriteWithoutShardKey",
     "abortReshardCollection",
     "analyze",
-    "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "appendOplogNote",
     "bulkWrite",
     "checkMetadataConsistency",
@@ -29,7 +27,6 @@ const commandsAddedToMongosSinceLastLTS = [
     "commitReshardCollection",
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",
-    "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "coordinateCommitTransaction",
     "createSearchIndexes",
     "dropSearchIndex",
@@ -40,6 +37,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "moveRange",
     "oidcListKeys",
     "oidcRefreshKeys",
+    "resetPlacementHistory",  // TODO (SERVER-68217): remove item from array.
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",

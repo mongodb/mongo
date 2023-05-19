@@ -103,6 +103,13 @@ components:
     local_directory_path: src/third_party/SafeInt
     team_owner: "Service Architecture"
 
+  derickr/timelib:
+    homepage_url: https://github.com/derickr/timelib
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/timelib
+    team_owner: "Query"
+
   discover-python:
     homepage_url: https://pypi.org/project/discover/
     open_hub_url: N/A
@@ -358,13 +365,6 @@ components:
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/python-subunit-0.0.16
     is_test_only: true
     team_owner: "Wiredtiger"
-
-  timelib:
-    homepage_url: https://github.com/derickr/timelib
-    open_hub_url: N/A
-    release_monitoring_id: -1
-    local_directory_path: src/third_party/timelib
-    team_owner: "Query"
 
   unicode:
     homepage_url: http://www.unicode.org

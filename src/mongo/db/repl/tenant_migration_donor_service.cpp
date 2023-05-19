@@ -34,6 +34,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
+#include "mongo/db//shard_role.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
@@ -528,10 +529,17 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
                pauseTenantMigrationBeforeInsertingDonorStateDoc.pauseWhileSet(opCtx);
 
-               AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
+               auto collection =
+                   acquireCollection(opCtx,
+                                     CollectionAcquisitionRequest(
+                                         _stateDocumentsNS,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite),
+                                     MODE_IX);
 
                writeConflictRetry(
-                   opCtx, "TenantMigrationDonorInsertStateDoc", _stateDocumentsNS.ns(), [&] {
+                   opCtx, "TenantMigrationDonorInsertStateDoc", _stateDocumentsNS, [&] {
                        const auto filter =
                            BSON(TenantMigrationDonorDocument::kIdFieldName << _migrationUuid);
                        const auto updateMod = [&]() {
@@ -539,7 +547,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
                            return BSON("$setOnInsert" << _stateDoc.toBSON());
                        }();
                        auto updateResult = Helpers::upsert(
-                           opCtx, _stateDocumentsNS, filter, updateMod, /*fromMigrate=*/false);
+                           opCtx, collection, filter, updateMod, /*fromMigrate=*/false);
 
                        // '$setOnInsert' update operator can never modify an existing on-disk state
                        // doc.
@@ -586,7 +594,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        collection);
 
                writeConflictRetry(
-                   opCtx, "TenantMigrationDonorUpdateStateDoc", _stateDocumentsNS.ns(), [&] {
+                   opCtx, "TenantMigrationDonorUpdateStateDoc", _stateDocumentsNS, [&] {
                        WriteUnitOfWork wuow(opCtx);
 
                        const auto originalRecordId = Helpers::findOne(
@@ -698,12 +706,19 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
 
                pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable.pauseWhileSet(opCtx);
 
-               AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
+               auto collection =
+                   acquireCollection(opCtx,
+                                     CollectionAcquisitionRequest(
+                                         _stateDocumentsNS,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite),
+                                     MODE_IX);
 
                writeConflictRetry(
                    opCtx,
                    "TenantMigrationDonorMarkStateDocAsGarbageCollectable",
-                   _stateDocumentsNS.ns(),
+                   _stateDocumentsNS,
                    [&] {
                        const auto filter =
                            BSON(TenantMigrationDonorDocument::kIdFieldName << _migrationUuid);
@@ -712,7 +727,7 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
                            return _stateDoc.toBSON();
                        }();
                        auto updateResult = Helpers::upsert(
-                           opCtx, _stateDocumentsNS, filter, updateMod, /*fromMigrate=*/false);
+                           opCtx, collection, filter, updateMod, /*fromMigrate=*/false);
 
                        invariant(updateResult.numDocsModified == 1);
                    });

@@ -142,7 +142,7 @@ public:
 
 
             try {
-                writeConflictRetry(opCtx, "addingKey", _ns.ns(), [&] {
+                writeConflictRetry(opCtx, "addingKey", _ns, [&] {
                     WriteUnitOfWork wunit(opCtx);
                     static_cast<T*>(this)->insertKey(builder, data);
                     wunit.commit();

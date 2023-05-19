@@ -201,5 +201,36 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     }
 }
 
+void addCollectionExecutionStats(ExecutionStatsController stats, const ExecutionStats& collStats) {
+    stats.incNumBucketInserts(collStats.numBucketInserts.load());
+    stats.incNumBucketUpdates(collStats.numBucketUpdates.load());
+    stats.incNumBucketsOpenedDueToMetadata(collStats.numBucketsOpenedDueToMetadata.load());
+    stats.incNumBucketsClosedDueToCount(collStats.numBucketsClosedDueToCount.load());
+    stats.incNumBucketsClosedDueToSchemaChange(collStats.numBucketsClosedDueToSchemaChange.load());
+    stats.incNumBucketsClosedDueToSize(collStats.numBucketsClosedDueToSize.load());
+    stats.incNumBucketsClosedDueToCachePressure(
+        collStats.numBucketsClosedDueToCachePressure.load());
+    stats.incNumBucketsClosedDueToTimeForward(collStats.numBucketsClosedDueToTimeForward.load());
+    stats.incNumBucketsClosedDueToTimeBackward(collStats.numBucketsClosedDueToTimeBackward.load());
+    stats.incNumBucketsClosedDueToMemoryThreshold(
+        collStats.numBucketsClosedDueToMemoryThreshold.load());
+    stats.incNumBucketsClosedDueToReopening(collStats.numBucketsClosedDueToReopening.load());
+    stats.incNumBucketsArchivedDueToMemoryThreshold(
+        collStats.numBucketsArchivedDueToMemoryThreshold.load());
+    stats.incNumBucketsArchivedDueToTimeBackward(
+        collStats.numBucketsArchivedDueToTimeBackward.load());
+    stats.incNumCommits(collStats.numCommits.load());
+    stats.incNumWaits(collStats.numWaits.load());
+    stats.incNumMeasurementsCommitted(collStats.numMeasurementsCommitted.load());
+    stats.incNumBucketsReopened(collStats.numBucketsReopened.load());
+    stats.incNumBucketsKeptOpenDueToLargeMeasurements(
+        collStats.numBucketsKeptOpenDueToLargeMeasurements.load());
+    stats.incNumBucketsFetched(collStats.numBucketsFetched.load());
+    stats.incNumBucketsQueried(collStats.numBucketsQueried.load());
+    stats.incNumBucketFetchesFailed(collStats.numBucketFetchesFailed.load());
+    stats.incNumBucketQueriesFailed(collStats.numBucketQueriesFailed.load());
+    stats.incNumBucketReopeningsFailed(collStats.numBucketReopeningsFailed.load());
+    stats.incNumDuplicateBucketsReopened(collStats.numDuplicateBucketsReopened.load());
+}
 
 }  // namespace mongo::timeseries::bucket_catalog

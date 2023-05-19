@@ -284,7 +284,7 @@ public:
          * When called, resource consumption metrics should be recorded for this operation. Clears
          * any metrics from previous collection periods.
          */
-        void beginScopedCollecting(OperationContext* opCtx, const std::string& dbName);
+        void beginScopedCollecting(OperationContext* opCtx, const DatabaseName& dbName);
 
         /**
          * When called, sets state that a ScopedMetricsCollector is in scope, but is not recording
@@ -319,7 +319,7 @@ public:
             return _hasCollectedMetrics;
         }
 
-        const std::string& getDbName() const {
+        const DatabaseName& getDbName() const {
             return _dbName;
         }
 
@@ -328,12 +328,12 @@ public:
          * Metrics due to the Collector stopping without being associated with any database yet.
          */
         OperationMetrics& getMetrics() {
-            invariant(!_dbName.empty(), "observing Metrics before a dbName has been set");
+            invariant(!_dbName.isEmpty(), "observing Metrics before a dbName has been set");
             return _metrics;
         }
 
         const OperationMetrics& getMetrics() const {
-            invariant(!_dbName.empty(), "observing Metrics before a dbName has been set");
+            invariant(!_dbName.isEmpty(), "observing Metrics before a dbName has been set");
             return _metrics;
         }
 
@@ -437,7 +437,7 @@ public:
         };
         ScopedCollectionState _collecting = ScopedCollectionState::kInactive;
         bool _hasCollectedMetrics = false;
-        std::string _dbName;
+        DatabaseName _dbName;
         OperationMetrics _metrics;
         bool _paused = false;
     };
@@ -450,9 +450,9 @@ public:
     class ScopedMetricsCollector {
     public:
         ScopedMetricsCollector(OperationContext* opCtx,
-                               const std::string& dbName,
+                               const DatabaseName& dbName,
                                bool commandCollectsMetrics);
-        ScopedMetricsCollector(OperationContext* opCtx, const std::string& dbName)
+        ScopedMetricsCollector(OperationContext* opCtx, const DatabaseName& dbName)
             : ScopedMetricsCollector(opCtx, dbName, true) {}
         ~ScopedMetricsCollector();
 
@@ -495,9 +495,9 @@ public:
     /**
      * Returns whether the database's metrics should be collected.
      */
-    static bool shouldCollectMetricsForDatabase(StringData dbName) {
-        if (dbName == DatabaseName::kAdmin.db() || dbName == DatabaseName::kConfig.db() ||
-            dbName == DatabaseName::kLocal.db()) {
+    static bool shouldCollectMetricsForDatabase(const DatabaseName& dbName) {
+        if (dbName == DatabaseName::kAdmin || dbName == DatabaseName::kConfig ||
+            dbName == DatabaseName::kLocal) {
             return false;
         }
         return true;
@@ -526,7 +526,9 @@ public:
      *
      * The database name must not be an empty string.
      */
-    void merge(OperationContext* opCtx, const std::string& dbName, const OperationMetrics& metrics);
+    void merge(OperationContext* opCtx,
+               const DatabaseName& dbName,
+               const OperationMetrics& metrics);
 
     /**
      * Returns a copy of the per-database metrics map.

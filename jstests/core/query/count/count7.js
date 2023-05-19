@@ -2,7 +2,7 @@
 
 // Check normal count matching and deduping.
 
-t = db.jstests_count7;
+let t = db.jstests_count7;
 t.drop();
 
 t.createIndex({a: 1});

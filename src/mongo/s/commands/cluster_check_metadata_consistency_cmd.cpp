@@ -59,10 +59,12 @@ stdx::unordered_set<ShardId> getAllDbPrimaryShards(OperationContext* opCtx) {
         opCtx, aggRequest, {repl::ReadConcernLevel::kMajorityReadConcern});
 
     stdx::unordered_set<ShardId> shardIds;
-    shardIds.reserve(aggResponse.size());
+    shardIds.reserve(aggResponse.size() + 1);
     for (auto&& responseEntry : aggResponse) {
         shardIds.insert(responseEntry.firstElement().str());
     }
+    // The config server is authoritative for config database
+    shardIds.insert(ShardId::kConfigServerId);
     return shardIds;
 }
 
@@ -236,7 +238,14 @@ public:
 
             ccc->detachFromOperationContext();
 
+            auto&& opDebug = CurOp::get(opCtx)->debug();
+            opDebug.nShards = ccc->getNumRemotes();
+            opDebug.additiveMetrics.nBatches = 1;
+            opDebug.additiveMetrics.nreturned = firstBatch.size();
+
             if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
+                opDebug.cursorExhausted = true;
+
                 CursorInitialReply resp;
                 InitialResponseCursor initRespCursor{std::move(firstBatch)};
                 initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
@@ -264,6 +273,9 @@ public:
                     cursorType,
                     ClusterCursorManager::CursorLifetime::Mortal,
                     authUser));
+
+            // Record the cursorID in CurOp.
+            opDebug.cursorid = clusterCursorId;
 
             CursorInitialReply resp;
             InitialResponseCursor initRespCursor{std::move(firstBatch)};

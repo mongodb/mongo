@@ -36,8 +36,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.bucketPrefix = "system.buckets.";
 
-    $config.data.timeField = 't';
     $config.data.metaField = 'm';
+    $config.data.timeField = 't';
 
     $config.data.generateMetaFieldValueForInitialInserts = () => {
         return Math.floor(Random.rand() * $config.data.numMetaCount);
@@ -63,8 +63,8 @@ var $config = extendWorkload($config, function($config, $super) {
             const metaVal = this.generateMetaFieldValueForInsertStage(this.tid);
             const doc = {
                 _id: new ObjectId(),
-                [this.timeField]: new Date(timer),
                 [this.metaField]: metaVal,
+                [this.timeField]: new Date(timer),
                 f: metaVal,
             };
             assertAlways.commandWorked(db[collName].insert(doc));
@@ -143,8 +143,8 @@ var $config = extendWorkload($config, function($config, $super) {
         const verifyBucketIndex = (bucketIndex) => {
             const unpackStage = {
                 "$_internalUnpackBucket": {
-                    "timeField": this.timeField,
                     "metaField": this.metaField,
+                    "timeField": this.timeField,
                     "bucketMaxSpanSeconds": NumberInt(3600)
                 }
             };
@@ -175,7 +175,7 @@ var $config = extendWorkload($config, function($config, $super) {
         db[this.nonShardCollName].drop();
 
         assertAlways.commandWorked(db.createCollection(
-            collName, {timeseries: {timeField: this.timeField, metaField: this.metaField}}));
+            collName, {timeseries: {metaField: this.metaField, timeField: this.timeField}}));
         cluster.shardCollection(db[collName], {t: 1}, false);
 
         // Create indexes to verify index integrity during the teardown state.
@@ -196,8 +196,8 @@ var $config = extendWorkload($config, function($config, $super) {
             const metaVal = this.generateMetaFieldValueForInitialInserts(i);
             const doc = {
                 _id: new ObjectId(),
-                [this.timeField]: new Date(currentTimeStamp),
                 [this.metaField]: metaVal,
+                [this.timeField]: new Date(currentTimeStamp),
                 f: metaVal,
             };
             bulk.insert(doc);

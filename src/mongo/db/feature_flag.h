@@ -52,7 +52,7 @@ class FeatureFlag {
     friend class FeatureFlagServerParameter;
 
 public:
-    FeatureFlag(bool enabled, StringData versionString);
+    FeatureFlag(bool enabled, StringData versionString, bool shouldBeFCVGated);
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version.
@@ -126,6 +126,7 @@ private:
 private:
     bool _enabled;
     multiversion::FeatureCompatibilityVersion _version;
+    bool _shouldBeFCVGated;
 };
 
 /**

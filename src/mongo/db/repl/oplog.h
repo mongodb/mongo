@@ -42,7 +42,6 @@
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session/logical_session_id.h"
 
 namespace mongo {
@@ -120,28 +119,6 @@ void createOplog(OperationContext* opCtx,
 void createOplog(OperationContext* opCtx);
 
 /**
- * Log insert(s) to the local oplog.
- * Returns the OpTime of every insert.
- * @param oplogEntryTemplate: a template used to generate insert oplog entries. Callers must set the
- * "ns", "ui", "fromMigrate" and "wall" fields before calling this function. This function will then
- * augment the template with the "op" (which is set to kInsert), "lsid" and "txnNumber" fields if
- * necessary.
- * @param begin/end: first/last InsertStatement to be inserted. This function iterates from begin to
- * end and generates insert oplog entries based on the augmented oplogEntryTemplate with the "ts",
- * "t", "o", "prevOpTime" and "stmtId" fields replaced by the content of each InsertStatement
- * defined by the begin-end range.
- * @param fromMigrate: a list of 'fromMigrate' values for the inserts.
- *
- */
-std::vector<OpTime> logInsertOps(OperationContext* opCtx,
-                                 MutableOplogEntry* oplogEntryTemplate,
-                                 std::vector<InsertStatement>::const_iterator begin,
-                                 std::vector<InsertStatement>::const_iterator end,
-                                 const std::vector<bool>& fromMigrate,
-                                 const ShardingWriteRouter& shardingWriteRouter,
-                                 const CollectionPtr& collectionPtr);
-
-/**
  * Returns the optime of the oplog entry written to the oplog.
  * Returns a null optime if oplog was not modified.
  */
@@ -198,7 +175,10 @@ using IncrementOpsAppliedStatsFn = std::function<void()>;
 class OplogApplication {
 public:
     static constexpr StringData kInitialSyncOplogApplicationMode = "InitialSync"_sd;
+    // This only being used in 'applyOps' command when sent by client.
     static constexpr StringData kRecoveringOplogApplicationMode = "Recovering"_sd;
+    static constexpr StringData kStableRecoveringOplogApplicationMode = "StableRecovering"_sd;
+    static constexpr StringData kUnstableRecoveringOplogApplicationMode = "UnstableRecovering"_sd;
     static constexpr StringData kSecondaryOplogApplicationMode = "Secondary"_sd;
     static constexpr StringData kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
 
@@ -207,9 +187,12 @@ public:
         kInitialSync,
 
         // Used when we are applying oplog operations to recover the database state following an
-        // unclean shutdown, or when we are recovering from the oplog after we rollback to a
+        // clean/unclean shutdown, or when we are recovering from the oplog after we rollback to a
         // checkpoint.
-        kRecovering,
+        // If recovering from a unstable stable checkpoint.
+        kUnstableRecovering,
+        // If recovering from a stable checkpoint.~
+        kStableRecovering,
 
         // Used when a secondary node is applying oplog operations from the primary during steady
         // state replication.
@@ -220,9 +203,20 @@ public:
         kApplyOpsCmd
     };
 
+    static bool inRecovering(Mode mode) {
+        return mode == Mode::kUnstableRecovering || mode == Mode::kStableRecovering;
+    }
+
     static StringData modeToString(Mode mode);
 
     static StatusWith<Mode> parseMode(const std::string& mode);
+
+    // Server will crash on oplog application failure during recovery from stable checkpoint in the
+    // test environment.
+    static void checkOnOplogFailureForRecovery(OperationContext* opCtx,
+                                               const mongo::NamespaceString& nss,
+                                               const mongo::BSONObj& oplogEntry,
+                                               const std::string& errorMsg);
 };
 
 inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {
@@ -248,8 +242,7 @@ void logOplogConstraintViolation(OperationContext* opCtx,
  * Returns failure status if the op was an update that could not be applied.
  */
 Status applyOperation_inlock(OperationContext* opCtx,
-                             Database* db,
-                             const ScopedCollectionAcquisition& collectionAcquisition,
+                             ScopedCollectionAcquisition& collectionAcquisition,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,

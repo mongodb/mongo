@@ -250,11 +250,11 @@ public:
      *  The returned value may be invalid by the time the caller gets to access it, if 'invalidate'
      *  is called for 'key'.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>&& std::is_constructible_v<Key, KeyType>)
-    SharedSemiFuture<ValueHandle> acquireAsync(
-        const KeyType& key,
-        CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
+    template <typename KeyType>
+    requires(IsComparable<KeyType>&& std::is_constructible_v<Key, KeyType>)
+        SharedSemiFuture<ValueHandle> acquireAsync(
+            const KeyType& key,
+            CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
 
         // Fast path
         if (auto cachedValue = _cache.get(key, causalConsistency))
@@ -294,12 +294,11 @@ public:
      * NOTES:
      *  This is a potentially blocking method.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    ValueHandle acquire(
-        OperationContext* opCtx,
-        const KeyType& key,
-        CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
+    template <typename KeyType>
+    requires IsComparable<KeyType> ValueHandle
+    acquire(OperationContext* opCtx,
+            const KeyType& key,
+            CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
         return acquireAsync(key, causalConsistency).get(opCtx);
     }
 
@@ -310,9 +309,8 @@ public:
      * Doesn't attempt to lookup, and so doesn't block, but this means it will ignore any
      * in-progress keys or keys whose time in store is newer than what is currently cached.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    ValueHandle peekLatestCached(const KeyType& key) {
+    template <typename KeyType>
+    requires IsComparable<KeyType> ValueHandle peekLatestCached(const KeyType& key) {
         return {_cache.get(key, CacheCausalConsistency::kLatestCached)};
     }
 
@@ -401,8 +399,8 @@ public:
      * Returns true if the passed 'newTimeInStore' is greater than the time of the currently cached
      * value or if no value is cached for 'key'.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     bool advanceTimeInStore(const KeyType& key, const Time& newTime) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
@@ -421,8 +419,8 @@ public:
      * In essence, the invalidate+ calls serve as an externally induced "barrier" for the affected
      * keys.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     void invalidateKey(const KeyType& key) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())

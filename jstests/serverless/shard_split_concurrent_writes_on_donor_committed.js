@@ -25,7 +25,6 @@ TestData.skipCheckDBHashes = true;
 const test = new ShardSplitTest({
     quickGarbageCollection: true,
     allowStaleReadsOnDonor: true,
-    initiateWithShortElectionTimeout: true
 });
 
 const donorPrimary = test.getDonorPrimary();
@@ -129,8 +128,7 @@ const operation = test.createSplitOperation(tenantIds);
 
 setupTestsBeforeMigration();
 
-assert.commandWorked(
-    operation.commit({retryOnRetryableErrors: false}, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(operation.commit({retryOnRetryableErrors: false}));
 
 runTestsAfterMigration();
 ShardSplitTest.checkShardSplitAccessBlocker(donorPrimary, kTenantID, {

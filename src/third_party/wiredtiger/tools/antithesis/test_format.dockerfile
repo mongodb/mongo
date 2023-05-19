@@ -6,6 +6,7 @@ RUN mkdir -p /data/RUNDIR
 COPY cmake_build/test/format/t bin/test/format/
 COPY tools/voidstar/lib/libvoidstar.so tools/voidstar/lib/
 COPY cmake_build/libwiredtiger.so.11.2.0 bin/
+COPY cmake_build/wt bin/
 RUN mkdir -p bin/ext/encryptors/rotn
 COPY cmake_build/ext/encryptors/rotn/libwiredtiger_rotn.so bin/ext/encryptors/rotn
 RUN mkdir -p bin/ext/collators/reverse
@@ -24,3 +25,4 @@ COPY tools/antithesis/test.sh bin/
 COPY cmake_build/VERSION /data/
 RUN apt-get update
 RUN apt-get install -y libsnappy-dev gdb lz4 zstd
+RUN echo "export LD_LIBRARY_PATH=/opt/bin:/opt/tools/voidstar/lib:$LD_LIBRARY_PATH" >> /root/.bashrc

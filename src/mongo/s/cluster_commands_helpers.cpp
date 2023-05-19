@@ -220,7 +220,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        DatabaseName{dbName},
+        DatabaseNameUtil::deserialize(boost::none, dbName),
         requests,
         readPref,
         retryPolicy);

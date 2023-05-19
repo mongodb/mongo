@@ -104,18 +104,8 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
                     str::stream() << "Could not remove database metadata from config server for '"
                                   << dbName << "'.");
 
-                // pre-check to guarantee idempotence: in case of a retry, the placement history
-                // entry may already exist
-                if (deleteDatabaseEntryResponse.getN() == 0) {
-                    BatchedCommandResponse noOp;
-                    noOp.setN(0);
-                    noOp.setStatus(Status::OK());
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOp));
-                }
-
                 const auto currentTime = VectorClock::get(opCtx)->getTime();
                 const auto currentTimestamp = currentTime.clusterTime().asTimestamp();
-
                 NamespacePlacementType placementInfo(NamespaceString(dbName), currentTimestamp, {});
 
                 write_ops::InsertCommandRequest insertPlacementEntry(
@@ -148,7 +138,7 @@ public:
         : _opCtx(opCtx), _dbName(std::move(dbName)), _reason(std::move(reason)) {
         // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
         // directly
-        DatabaseName databaseName(boost::none, _dbName);
+        DatabaseName databaseName = DatabaseNameUtil::deserialize(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
@@ -161,7 +151,7 @@ public:
         UninterruptibleLockGuard guard(_opCtx->lockState());  // NOLINT.
         // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
         // directly
-        DatabaseName databaseName(boost::none, _dbName);
+        DatabaseName databaseName = DatabaseNameUtil::deserialize(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
@@ -289,7 +279,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
 }
 
 void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
-    DatabaseName dbName(boost::none, _dbName);
+    DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     scopedDss->clearDbInfo(opCtx);
@@ -375,7 +365,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     const auto& nss = coll.getNss();
                     LOGV2_DEBUG(5494505, 2, "Dropping collection", logAttrs(nss));
 
-                    sharding_ddl_util::stopMigrations(opCtx, nss, coll.getUuid());
+                    _updateSession(opCtx);
+                    sharding_ddl_util::stopMigrations(
+                        opCtx, nss, coll.getUuid(), getCurrentSession());
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);
@@ -428,7 +420,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     }
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
-                    dropDatabaseParticipantCmd.setDbName(DatabaseName{_dbName});
+                    dropDatabaseParticipantCmd.setDbName(
+                        DatabaseNameUtil::deserialize(boost::none, _dbName));
                     const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                         dropDatabaseParticipantCmd.toBSON({}));
 
@@ -515,7 +508,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 FlushDatabaseCacheUpdatesWithWriteConcern flushDbCacheUpdatesCmd(
                     _dbName.toString());
                 flushDbCacheUpdatesCmd.setSyncFromConfig(true);
-                flushDbCacheUpdatesCmd.setDbName(DatabaseName{_dbName});
+                flushDbCacheUpdatesCmd.setDbName(
+                    DatabaseNameUtil::deserialize(boost::none, _dbName));
 
                 IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
                 sharding_ddl_util::sendAuthenticatedCommandToShards(

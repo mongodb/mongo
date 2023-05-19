@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/ops/parsed_writes_common.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -50,10 +51,11 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField);
  * Translates the given update on the time-series collection to an update on the time-series
  * collection's underlying buckets collection. Creates and returns a translated UpdateModification
  * where all occurrences of metaField in updateMod are replaced with the literal "meta". Requires
- * that updateMod is an update document and that the given metaField is not empty.
+ * that updateMod is an update document and that the given metaField is not empty. Returns an
+ * invalid status if the update cannot be translated.
  */
-write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
-                                              StringData metaField);
+StatusWith<write_ops::UpdateModification> translateUpdate(
+    const write_ops::UpdateModification& updateMod, boost::optional<StringData> metaField);
 
 /**
  * Returns the function to use to count the number of documents updated or deleted.
@@ -76,4 +78,64 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
     const BSONObj& writeQuery);
+
+// Type requirement 1 for isTimeseries()
+template <typename T>
+constexpr bool isRequestableWithTimeseriesBucketNamespace = requires(const T& t) {
+    t.getNamespace();
+    t.getIsTimeseriesNamespace();
+};
+
+// Type requirement 2 for isTimeseries()
+template <typename T>
+constexpr bool isRequestableOnUserTimeseriesNamespace = requires(const T& t) {
+    t.getNsString();
+};
+
+// Disjuction of type requirements for isTimeseries()
+template <typename T>
+constexpr bool isRequestableOnTimeseries =
+    isRequestableWithTimeseriesBucketNamespace<T> || isRequestableOnUserTimeseriesNamespace<T>;
+
+/**
+ * Returns a pair of (whether 'request' is made on a timeseries collection and the timeseries
+ * system bucket collection namespace if so).
+ *
+ * If the 'request' is not made on a timeseries collection, the second element of the pair is same
+ * as the namespace of the 'request'.
+ */
+template <typename T>
+requires isRequestableOnTimeseries<T> std::pair<bool, NamespaceString> isTimeseries(
+    OperationContext* opCtx, const T& request) {
+    const auto [nss, bucketNss] = [&] {
+        if constexpr (isRequestableWithTimeseriesBucketNamespace<T>) {
+            auto nss = request.getNamespace();
+            uassert(5916400,
+                    "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
+                    "system.buckets namespace",
+                    !request.getIsTimeseriesNamespace() || nss.isTimeseriesBucketsCollection());
+            return request.getIsTimeseriesNamespace()
+                ? std::pair{nss, nss}
+                : std::pair{nss, nss.makeTimeseriesBucketsNamespace()};
+        } else {
+            auto nss = request.getNsString();
+            return std::pair{
+                nss,
+                nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace()};
+        }
+    }();
+
+    // If the buckets collection exists now, the time-series insert path will check for the
+    // existence of the buckets collection later on with a lock.
+    // If this check is concurrent with the creation of a time-series collection and the buckets
+    // collection does not yet exist, this check may return false unnecessarily. As a result, an
+    // insert attempt into the time-series namespace will either succeed or fail, depending on who
+    // wins the race.
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
+    bool isTimeseries = (coll && coll->getTimeseriesOptions());
+
+    return {isTimeseries, isTimeseries ? bucketNss : nss};
+}
 }  // namespace mongo::timeseries

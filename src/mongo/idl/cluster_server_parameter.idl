@@ -87,15 +87,11 @@ structs:
                 default: 0
 
 feature_flags:
-    featureFlagClusterWideConfigM2:
-        description: Mechanism for cluster-wide configuration options, milestone 2
-        cpp_varname: gFeatureFlagClusterWideConfigM2
-        default: true
-        version: 6.1
     featureFlagClusterWideToaster:
         description: Feature flag for testing use of feature flags with CW server params
         cpp_varname: gFeatureFlagClusterWideToaster
         default: false
+        shouldBeFCVGated: true
 
 server_parameters:
     testIntClusterParameter:

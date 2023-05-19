@@ -11,7 +11,7 @@ metadata:
 				distribution paths: 
 			indexes: 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 
 -- OUTPUT:
 Root [{combinedProjection_0}]
@@ -35,7 +35,7 @@ metadata:
 				distribution paths: 
 			indexes: 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 
 -- OUTPUT:
 Root [{combinedProjection_0}]
@@ -65,7 +65,7 @@ metadata:
 				distribution paths: 
 			indexes: 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 
 -- OUTPUT:
 Root [{combinedProjection_0}]
@@ -89,7 +89,7 @@ metadata:
 				distribution paths: 
 			indexes: 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 
 -- OUTPUT:
 Root [{combinedProjection_0}]

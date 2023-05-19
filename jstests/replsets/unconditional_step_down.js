@@ -158,7 +158,7 @@ function runStepsDowntoRemoved(params) {
 runStepDownTest({
     testMsg: "reconfig command",
     stepDownFn: () => {
-        load("./jstests/replsets/rslib.js");
+        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
 
         var oldMasterId = rst.getNodeId(primary);
@@ -176,7 +176,7 @@ runStepDownTest({
 runStepDownTest({
     testMsg: "reconfig via heartbeat",
     stepDownFn: () => {
-        load("./jstests/replsets/rslib.js");
+        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
 
         var oldMasterId = rst.getNodeId(primary);
@@ -194,7 +194,7 @@ runStepDownTest({
 runStepsDowntoRemoved({
     testMsg: "reconfig via heartbeat - primary to removed",
     stepDownFn: () => {
-        load("./jstests/replsets/rslib.js");
+        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
 
         var oldMasterId = rst.getNodeId(primary);
@@ -213,7 +213,7 @@ runStepsDowntoRemoved({
 runStepDownTest({
     testMsg: "stepdown via heartbeat",
     stepDownFn: () => {
-        load("./jstests/replsets/rslib.js");
+        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
 
         var newMasterId = rst.getNodeId(secondary);

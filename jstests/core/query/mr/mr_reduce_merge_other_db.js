@@ -23,7 +23,7 @@ const outDb = db.getMongo().getDB(outDbStr);
 const outColl = outDb[outCollStr];
 
 const mapFn = function() {
-    for (i = 0; i < this.a.length; i++)
+    for (let i = 0; i < this.a.length; i++)
         emit(this.a[i], 1);
 };
 const reduceFn = function(k, vs) {

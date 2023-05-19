@@ -1,7 +1,7 @@
 // When a migration between shard0 and shard1 is about to enter the commit phase, a commit command
 // with different migration session ID is rejected.
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 (function() {
 "use strict";

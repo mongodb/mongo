@@ -239,7 +239,7 @@ class ResourceId {
 public:
     ResourceId() : _fullHash(0) {}
     ResourceId(ResourceType type, const NamespaceString& nss)
-        : _fullHash(fullHash(type, hashStringData(nss.toStringWithTenantId()))) {
+        : _fullHash(fullHash(type, hashStringData(nss.toStringForResourceId()))) {
         verifyNoResourceMutex(type);
     }
     ResourceId(ResourceType type, const DatabaseName& dbName)

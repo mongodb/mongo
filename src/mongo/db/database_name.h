@@ -103,8 +103,10 @@ public:
     };
 
 #define DBNAME_CONSTANT(id, db) static const ConstantProxy id;
-#include "database_name_reserved.def.h"
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
 #undef DBNAME_CONSTANT
+
+    static constexpr size_t kMaxDatabaseNameLength = 63;
 
     /**
      * Constructs an empty DatabaseName.
@@ -112,50 +114,58 @@ public:
     DatabaseName() = default;
 
     /**
-     * Constructs a DatabaseName from the given tenantId and database name.
-     * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
-     * the dbName is a valid db name.
+     * This function constructs a DatabaseName without checking for presence of TenantId. It
+     * must only be used by auth systems which are not yet tenant aware.
+     *
+     * TODO SERVER-76294 Remove this function. Any remaining call sites must be changed to use a
+     * function on DatabaseNameUtil.
      */
-    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString)
-        : _tenantId(std::move(tenantId)), _dbString(dbString.toString()) {
-        uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in a db name: " + _dbString,
-                dbString.find('.') == std::string::npos);
-
-        uassert(ErrorCodes::InvalidNamespace,
-                "database names cannot have embedded null characters",
-                dbString.find('\0') == std::string::npos);
+    static DatabaseName createDatabaseNameForAuth(const boost::optional<TenantId>& tenantId,
+                                                  StringData dbString) {
+        return DatabaseName(tenantId, dbString);
     }
 
+    /**
+     * This function constructs a DatabaseName without checking for presence of TenantId.
+     *
+     * MUST only be used for tests.
+     */
     static DatabaseName createDatabaseName_forTest(boost::optional<TenantId> tenantId,
                                                    StringData dbString) {
         return DatabaseName(tenantId, dbString);
     }
 
-    /**
-     * Prefer to use the constructor above.
-     * TODO SERVER-65456 Remove this constructor.
-     */
-    explicit DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
-        : DatabaseName(std::move(tenantId), dbName) {}
+    boost::optional<TenantId> tenantId() const {
+        if (!_hasTenantId()) {
+            return boost::none;
+        }
 
-    const boost::optional<TenantId>& tenantId() const {
-        return _tenantId;
+        return TenantId{OID::from(&_data[kDataOffset])};
     }
 
     StringData db() const {
-        return _dbString;
+        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        return StringData{_data.data() + offset, _data.size() - offset};
     }
 
-    std::string toString() const {
-        return db().toString();
+    bool isEmpty() const {
+        return _data.size() == kDataOffset;
     }
 
     std::string toStringWithTenantId() const {
-        if (_tenantId)
-            return str::stream() << *_tenantId << '_' << _dbString;
+        if (_hasTenantId()) {
+            return str::stream() << TenantId{OID::from(&_data[kDataOffset])} << "_" << db();
+        }
 
-        return _dbString;
+        return db().toString();
+    }
+
+    /**
+     * Method to be used only for unit tests.
+     * It will always return a tenant prefixed dbname.
+     */
+    std::string toStringWithTenantId_forTest() const {
+        return toStringWithTenantId();
     }
 
     /**
@@ -173,8 +183,19 @@ public:
         return dbName.toStringWithTenantId();
     }
 
+    /**
+     * This function returns the DatabaseName as a string, ignoring the tenantId.
+     *
+     * MUST only be used for tests.
+     */
+    std::string toString_forTest() const {
+        return toString();
+    }
+
     bool equalCaseInsensitive(const DatabaseName& other) const {
-        return (_tenantId == other._tenantId) && boost::iequals(toString(), other.toString());
+        return StringData{_data.data() + kDataOffset, _data.size() - kDataOffset}
+            .equalCaseInsensitive(
+                StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
     }
 
     friend std::ostream& operator<<(std::ostream& stream, const DatabaseName& tdb) {
@@ -185,36 +206,46 @@ public:
         return builder << tdb.toString();
     }
 
-    friend bool operator==(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() == b._lens();
+    int compare(const DatabaseName& other) const {
+        if (_hasTenantId() && !other._hasTenantId()) {
+            return 1;
+        }
+
+        if (other._hasTenantId() && !_hasTenantId()) {
+            return -1;
+        }
+
+        return StringData{_data.data() + kDataOffset, _data.size() - kDataOffset}.compare(
+            StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
     }
 
-    friend bool operator!=(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() != b._lens();
+    friend bool operator==(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs._data == rhs._data;
     }
 
-    friend bool operator<(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() < b._lens();
+    friend bool operator!=(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs._data != rhs._data;
     }
 
-    friend bool operator>(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() > b._lens();
+    friend bool operator<(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) < 0;
     }
 
-    friend bool operator<=(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() <= b._lens();
+    friend bool operator<=(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) <= 0;
     }
 
-    friend bool operator>=(const DatabaseName& a, const DatabaseName& b) {
-        return a._lens() >= b._lens();
+    friend bool operator>(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) > 0;
+    }
+
+    friend bool operator>=(const DatabaseName& lhs, const DatabaseName& rhs) {
+        return lhs.compare(rhs) >= 0;
     }
 
     template <typename H>
     friend H AbslHashValue(H h, const DatabaseName& obj) {
-        if (obj._tenantId) {
-            return H::combine(std::move(h), obj._tenantId.get(), obj._dbString);
-        }
-        return H::combine(std::move(h), obj._dbString);
+        return H::combine(std::move(h), obj._data);
     }
 
     friend auto logAttrs(const DatabaseName& obj) {
@@ -222,12 +253,63 @@ public:
     }
 
 private:
-    std::tuple<const boost::optional<TenantId>&, const std::string&> _lens() const {
-        return std::tie(_tenantId, _dbString);
+    friend class NamespaceString;
+    friend class NamespaceStringOrUUID;
+    friend class DatabaseNameUtil;
+
+    /**
+     * Constructs a DatabaseName from the given tenantId and database name.
+     * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
+     * the dbName is a valid db name.
+     */
+    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
+        uassert(ErrorCodes::InvalidNamespace,
+                "'.' is an invalid character in a db name: " + dbString,
+                dbString.find('.') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                "database names cannot have embedded null characters",
+                dbString.find('\0') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("db name must be at most {} characters, found: {}",
+                            kMaxDatabaseNameLength,
+                            dbString.size()),
+                dbString.size() <= kMaxDatabaseNameLength);
+
+        uint8_t details = dbString.size() & kDatabaseNameOffsetEndMask;
+        size_t dbStartIndex = kDataOffset;
+        if (tenantId) {
+            dbStartIndex += OID::kOIDSize;
+            details |= kTenantIdMask;
+        }
+
+        _data.resize(dbStartIndex + dbString.size());
+        *reinterpret_cast<uint8_t*>(_data.data()) = details;
+        if (tenantId) {
+            std::memcpy(_data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
+        }
+        if (!dbString.empty()) {
+            std::memcpy(_data.data() + dbStartIndex, dbString.rawData(), dbString.size());
+        }
     }
 
-    boost::optional<TenantId> _tenantId = boost::none;
-    std::string _dbString;
+    std::string toString() const {
+        return db().toString();
+    }
+
+    static constexpr size_t kDataOffset = sizeof(uint8_t);
+    static constexpr uint8_t kTenantIdMask = 0x80;
+    static constexpr uint8_t kDatabaseNameOffsetEndMask = 0x7F;
+
+    inline bool _hasTenantId() const {
+        return static_cast<uint8_t>(_data.front()) & kTenantIdMask;
+    }
+
+    // Private constructor for NamespaceString to construct DatabaseName from its own internal data
+    struct TrustedInitTag {};
+    DatabaseName(std::string data, TrustedInitTag) : _data(std::move(data)) {}
+
+    // Same in-memory layout as NamespaceString, see documentation in its header
+    std::string _data{'\0'};
 };
 
 // The `constexpr` definitions for `DatabaseName::ConstantProxy` static data members are below. See
@@ -235,14 +317,14 @@ private:
 // namespace_string.h for more details.
 namespace dbname_detail::const_proxy_shared_states {
 #define DBNAME_CONSTANT(id, db) constexpr inline DatabaseName::ConstantProxy::SharedState id{db};
-#include "database_name_reserved.def.h"
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
 #undef DBNAME_CONSTANT
 }  // namespace dbname_detail::const_proxy_shared_states
 
 #define DBNAME_CONSTANT(id, db)                                    \
     constexpr inline DatabaseName::ConstantProxy DatabaseName::id{ \
         &dbname_detail::const_proxy_shared_states::id};
-#include "database_name_reserved.def.h"
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
 #undef DBNAME_CONSTANT
 
 }  // namespace mongo

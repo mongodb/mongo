@@ -1,7 +1,7 @@
 // Test the downgrade of a replica set succeeds, while reads and writes continue.
 
-load('./jstests/multiVersion/libs/multi_rs.js');
-load('./jstests/libs/test_background_ops.js');
+load('jstests/multiVersion/libs/multi_rs.js');
+load('jstests/libs/test_background_ops.js');
 
 let newVersion = "latest";
 

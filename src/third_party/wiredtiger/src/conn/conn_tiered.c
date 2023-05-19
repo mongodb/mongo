@@ -112,6 +112,9 @@ __tier_flush_meta(
     WT_RET(__wt_scr_alloc(session, 512, &buf));
     dhandle = &tiered->iface;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     newconfig = obj_value = NULL;
     WT_ERR(__wt_meta_track_on(session));
     tracking = true;
@@ -207,6 +210,12 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
         if (ret == ENOENT)
             ret = 0;
         else {
+            /*
+             * Continue with the error ignored if we've been told to do that.
+             */
+            if (ret != 0 &&
+              FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE))
+                ret = 0;
             WT_ERR(ret);
 
             /*

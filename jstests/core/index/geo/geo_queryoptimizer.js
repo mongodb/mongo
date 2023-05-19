@@ -1,4 +1,4 @@
-t = db.geo_qo1;
+let t = db.geo_qo1;
 t.drop();
 
 t.createIndex({loc: "2d"});

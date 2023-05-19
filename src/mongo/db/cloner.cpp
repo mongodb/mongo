@@ -94,7 +94,7 @@ struct DefaultClonerImpl::BatchHandler {
     void operator()(DBClientCursor& cursor) {
         boost::optional<Lock::DBLock> dbLock;
         // TODO SERVER-63111 Once the Cloner holds a DatabaseName obj, use _dbName directly
-        DatabaseName dbName(boost::none, _dbName);
+        DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
         dbLock.emplace(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning collection "
@@ -108,7 +108,7 @@ struct DefaultClonerImpl::BatchHandler {
         auto catalog = CollectionCatalog::get(opCtx);
         auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
-            writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "createCollection", nss, [&] {
                 opCtx->checkForInterrupt();
 
                 WriteUnitOfWork wunit(opCtx);
@@ -144,7 +144,7 @@ struct DefaultClonerImpl::BatchHandler {
 
                 // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use _dbName
                 // directly
-                DatabaseName dbName(boost::none, _dbName);
+                DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
                 dbLock.emplace(opCtx, dbName, MODE_X);
 
                 // Check if everything is still all right.
@@ -190,7 +190,7 @@ struct DefaultClonerImpl::BatchHandler {
             verify(collection);
             ++numSeen;
 
-            writeConflictRetry(opCtx, "cloner insert", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "cloner insert", nss, [&] {
                 opCtx->checkForInterrupt();
 
                 WriteUnitOfWork wunit(opCtx);
@@ -302,7 +302,7 @@ void DefaultClonerImpl::_copyIndexes(OperationContext* opCtx,
     }
 
     auto fromMigrate = false;
-    writeConflictRetry(opCtx, "_copyIndexes", nss.ns(), [&] {
+    writeConflictRetry(opCtx, "_copyIndexes", nss, [&] {
         WriteUnitOfWork wunit(opCtx);
         IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
             opCtx, collection, indexesToBuild, fromMigrate);
@@ -349,7 +349,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
     const std::vector<CreateCollectionParams>& createCollectionParams,
     const std::string& dbName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const DatabaseName tenantDbName(boost::none, dbName);
+    const DatabaseName tenantDbName = DatabaseNameUtil::deserialize(boost::none, dbName);
     auto db = databaseHolder->openDb(opCtx, tenantDbName);
     invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName, MODE_X));
 
@@ -367,7 +367,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
         const NamespaceString nss(dbName, params.collectionName);
 
         uassertStatusOK(userAllowedCreateNS(opCtx, nss));
-        Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+        Status status = writeConflictRetry(opCtx, "createCollection", nss, [&] {
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
@@ -418,7 +418,8 @@ Status DefaultClonerImpl::_createCollectionsForDb(
 
             {
                 OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                    unsafeCreateCollection(opCtx);
+                    unsafeCreateCollection(opCtx,
+                                           /* forceCSRAsUnknownAfterCollectionCreation */ true);
                 Status createStatus = db->userCreateNS(
                     opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);
                 if (!createStatus.isOK()) {
@@ -497,8 +498,9 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::getListOfCollections(
     }
     // Gather the list of collections to clone
     // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use dBName directly
-    std::list<BSONObj> initialCollections = getConn()->getCollectionInfos(
-        DatabaseName(boost::none, dBName), ListCollectionsFilter::makeTypeCollectionFilter());
+    std::list<BSONObj> initialCollections =
+        getConn()->getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, dBName),
+                                      ListCollectionsFilter::makeTypeCollectionFilter());
     return _filterCollectionsForClone(dBName, initialCollections);
 }
 
@@ -551,14 +553,14 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
 
     {
         // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use dBName directly
-        DatabaseName dbName(boost::none, dBName);
+        DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, dBName);
         Lock::DBLock dbXLock(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning database " << dBName
                               << " (after getting list of collections to clone)",
                 !opCtx->writesAreReplicated() ||
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
-                                                                                         dBName));
+                                                                                         dbName));
 
         auto status = _createCollectionsForDb(opCtx, createCollectionParams, dBName);
         if (!status.isOK()) {

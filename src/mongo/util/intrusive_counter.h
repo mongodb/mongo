@@ -29,12 +29,11 @@
 
 #pragma once
 
+#include <atomic>  // NOLINT
 #include <boost/intrusive_ptr.hpp>
 #include <cstdlib>
 
-#include "mongo/base/string_data.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/allocator.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 
@@ -67,13 +66,13 @@ public:
         // See this for a description of why relaxed is OK here. It is also used in libc++.
         // http://www.boost.org/doc/libs/1_66_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters.discussion
         ptr->_count.fetch_add(1, std::memory_order_relaxed);
-    };
+    }
 
     friend void intrusive_ptr_release(const RefCountable* ptr) {
         if (ptr->_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
             delete ptr;
         }
-    };
+    }
 
 protected:
     /**
@@ -101,41 +100,4 @@ boost::intrusive_ptr<T> make_intrusive(Args&&... args) {
     ptr->threadUnsafeIncRefCountTo(1);
     return boost::intrusive_ptr<T>(ptr, /*add ref*/ false);
 }
-
-/// This is an immutable reference-counted string
-class RCString : public RefCountable {
-public:
-    const char* c_str() const {
-        return reinterpret_cast<const char*>(this) + sizeof(RCString);
-    }
-    int size() const {
-        return _size;
-    }
-    StringData stringData() const {
-        return StringData(c_str(), _size);
-    }
-
-    static boost::intrusive_ptr<const RCString> create(StringData s);
-
-// MSVC: C4291: 'declaration' : no matching operator delete found; memory will not be freed if
-// initialization throws an exception
-// We simply rely on the default global placement delete since a local placement delete would be
-// ambiguous for some compilers
-#pragma warning(push)
-#pragma warning(disable : 4291)
-    void operator delete(void* ptr) {
-        free(ptr);
-    }
-#pragma warning(pop)
-
-private:
-    // these can only be created by calling create()
-    RCString(){};
-    void* operator new(size_t objSize, size_t realSize) {
-        return mongoMalloc(realSize);
-    }
-
-    int _size;  // does NOT include trailing NUL byte.
-    // char[_size+1] array allocated past end of class
-};
 }  // namespace mongo

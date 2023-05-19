@@ -142,7 +142,7 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(const WildcardAccessM
                                                            const IndexBounds& indexBounds,
                                                            MultikeyMetadataAccessStats* stats) {
     return writeConflictRetry(
-        opCtx, "wildcard multikey path retrieval", "", [&]() -> std::set<FieldRef> {
+        opCtx, "wildcard multikey path retrieval", NamespaceString(), [&]() -> std::set<FieldRef> {
             stats->numSeeks = 0;
             stats->keysExamined = 0;
             auto cursor = wam->newCursor(opCtx);
@@ -355,7 +355,7 @@ static std::pair<BSONObj, BSONObj> buildMetadataKeyRange(const BSONObj& keyPatte
 std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
                                               OperationContext* opCtx,
                                               MultikeyMetadataAccessStats* stats) {
-    return writeConflictRetry(opCtx, "wildcard multikey path retrieval", "", [&]() {
+    return writeConflictRetry(opCtx, "wildcard multikey path retrieval", NamespaceString(), [&]() {
         tassert(7354611, "stats must be non-null", stats);
         stats->numSeeks = 0;
         stats->keysExamined = 0;

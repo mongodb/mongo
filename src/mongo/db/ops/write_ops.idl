@@ -151,6 +151,8 @@ structs:
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding size
+    # estimation functions in 'write_ops.cpp'. 
     WriteCommandRequestBase:
         description: "Contains basic information included by all write commands"
         strict: false
@@ -206,18 +208,18 @@ structs:
                 optional: true
                 stability: unstable
             $_originalQuery:
-                description: "The original write query. This is used for updateOne/deleteOne 
-                              without shard key during the write phase of the two phase protocol in 
-                              order to make sure the shard key query analysis stores the correct 
+                description: "The original write query. This is used for updateOne/deleteOne
+                              without shard key during the write phase of the two phase protocol in
+                              order to make sure the shard key query analysis stores the correct
                               client query."
                 type: object
                 optional: true
                 cpp_name: originalQuery
                 stability: internal
             $_originalCollation:
-                description: "The original write query. This is used for updateOne/deleteOne 
-                              without shard key during the write phase of the two phase protocol in 
-                              order to make sure the shard key query analysis stores the correct 
+                description: "The original write query. This is used for updateOne/deleteOne
+                              without shard key during the write phase of the two phase protocol in
+                              order to make sure the shard key query analysis stores the correct
                               client collation."
                 type: object
                 optional: true
@@ -283,7 +285,7 @@ structs:
                 optional: true
                 stability: unstable
             $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
-                description: "Set to true if shard key updates are allowed without the full shard 
+                description: "Set to true if shard key updates are allowed without the full shard
                               key in the query."
                 type: optionalBool
                 cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
@@ -363,7 +365,8 @@ structs:
                 stability: unstable
 
 commands:
-
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding insert
+    # size estimation functions in 'write_ops.cpp'.
     insert:
         description: "Parser for the 'insert' command."
         command_name: insert
@@ -386,6 +389,8 @@ commands:
                 supports_doc_sequence: true
                 stability: stable
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding update
+    # size estimation functions in 'write_ops.cpp'. 
     update:
         description: "Parser for the 'update' command."
         command_name: update
@@ -421,6 +426,8 @@ commands:
                 optional: true
                 stability: stable
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding delete
+    # size estimation functions in 'write_ops.cpp'. 
     delete:
         description: "Parser for the 'delete' command."
         command_name: delete
@@ -575,27 +582,32 @@ commands:
                 optional: true
                 stability: unstable
             $_originalQuery:
-                description: "The original write query. This is used for findAndModify without shard 
-                              key during the write phase of the two phase protocol in order to make 
-                              sure the shard key query analysis stores the correct client 
+                description: "The original write query. This is used for findAndModify without shard
+                              key during the write phase of the two phase protocol in order to make
+                              sure the shard key query analysis stores the correct client
                               query."
                 type: object
                 optional: true
                 cpp_name: originalQuery
                 stability: internal
             $_originalCollation:
-                description: "The original collation. This is used for findAndModify without shard 
-                              key during the write phase of the two phase protocol in order to make 
-                              sure the shard key query analysis stores the correct client 
+                description: "The original collation. This is used for findAndModify without shard
+                              key during the write phase of the two phase protocol in order to make
+                              sure the shard key query analysis stores the correct client
                               collation."
                 type: object
                 optional: true
                 cpp_name: originalCollation
                 stability: internal
             $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
-                description: "Set to true if shard key updates are allowed without the full shard 
+                description: "Set to true if shard key updates are allowed without the full shard
                               key in the query."
                 type: optionalBool
                 cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
                 stability: internal
-            
+            isTimeseriesNamespace:
+                description: "This flag is set to true when the write command was originally sent
+                              to the time-series view, but got rewritten to target time-series
+                              buckets namespace."
+                type: optionalBool
+                stability: internal

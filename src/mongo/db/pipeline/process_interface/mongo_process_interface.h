@@ -84,7 +84,7 @@ public:
      *   2. write_ops::UpdateModification - either the new document we want to upsert or insert into
      *      the collection (i.e. a 'classic' replacement update), or the pipeline to run to compute
      *      the new document.
-     *   3. boost::optional<BSONObj> - for pipeline-style updated, specifies variables that can be
+     *   3. boost::optional<BSONObj> - for pipeline-style updates, specifies variables that can be
      *      referred to in the pipeline performing the custom update.
      */
     using BatchObject =
@@ -112,8 +112,19 @@ public:
     public:
         virtual ~WriteSizeEstimator() = default;
 
-        virtual int estimateInsertSizeBytes(const BSONObj& insert) const = 0;
+        /**
+         * Set of functions which estimate the entire size of a write command except for the array
+         * of write statements themselves.
+         */
+        virtual int estimateInsertHeaderSize(
+            const write_ops::InsertCommandRequest& insertReq) const = 0;
+        virtual int estimateUpdateHeaderSize(
+            const write_ops::UpdateCommandRequest& updateReq) const = 0;
 
+        /**
+         * Set of functions which estimate the size of a single write statement.
+         */
+        virtual int estimateInsertSizeBytes(const BSONObj& insert) const = 0;
         virtual int estimateUpdateSizeBytes(const BatchObject& batchObject,
                                             UpsertType type) const = 0;
     };
@@ -168,34 +179,35 @@ public:
     virtual void updateClientOperationTime(OperationContext* opCtx) const = 0;
 
     /**
-     * Inserts 'objs' into 'ns' and returns an error Status if the insert fails. If 'targetEpoch' is
-     * set, throws ErrorCodes::StaleEpoch if the targeted collection does not have the same epoch or
-     * the epoch changes during the course of the insert.
+     * Executes 'insertCommand' against 'ns' and returns an error Status if the insert fails. If
+     * 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the targeted collection does not have
+     * the same epoch or the epoch changes during the course of the insert.
      */
     virtual Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           const NamespaceString& ns,
-                          std::vector<BSONObj>&& objs,
+                          std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                           const WriteConcernOptions& wc,
                           boost::optional<OID> targetEpoch) = 0;
 
     virtual Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    std::vector<BSONObj>&& objs,
+                                    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                                     const WriteConcernOptions& wc,
                                     boost::optional<OID> targetEpoch) = 0;
     /**
-     * Updates the documents matching 'queries' with the objects 'updates'. Returns an error Status
-     * if any of the updates fail, otherwise returns an 'UpdateResult' objects with the details of
-     * the update operation.  If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the targeted
-     * collection does not have the same epoch, or if the epoch changes during the update.
+     * Executes the updates described by 'updateCommand'. Returns an error Status if any of the
+     * updates fail, otherwise returns an 'UpdateResult' objects with the details of the update
+     * operation.  If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the targeted collection
+     * does not have the same epoch, or if the epoch changes during the update.
      */
-    virtual StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            const NamespaceString& ns,
-                                            BatchedObjects&& batch,
-                                            const WriteConcernOptions& wc,
-                                            UpsertType upsert,
-                                            bool multi,
-                                            boost::optional<OID> targetEpoch) = 0;
+    virtual StatusWith<UpdateResult> update(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& ns,
+        std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
+        const WriteConcernOptions& wc,
+        UpsertType upsert,
+        bool multi,
+        boost::optional<OID> targetEpoch) = 0;
 
     /**
      * Returns index usage statistics for each index on collection 'ns' along with additional
@@ -279,7 +291,6 @@ public:
         const NamespaceString& targetNs,
         bool dropTarget,
         bool stayTemp,
-        bool allowBuckets,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) = 0;
 
@@ -290,12 +301,13 @@ public:
     virtual void createCollection(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   const BSONObj& cmdObj) = 0;
-
-    virtual void createTimeseries(OperationContext* opCtx,
-                                  const NamespaceString& ns,
-                                  const BSONObj& options,
-                                  bool createView) = 0;
-
+    /**
+     * Creates the view backing a time-series collection.
+     */
+    virtual void createTimeseriesView(OperationContext* opCtx,
+                                      const NamespaceString& ns,
+                                      const BSONObj& cmdObj,
+                                      const TimeseriesOptions& userOpts) = 0;
 
     /**
      * Runs createIndexes on the given database for the given index specs. If running on a shardsvr

@@ -46,12 +46,9 @@ emptyChangeStream(changeStream);
 jsTest.log(
     'The shard_collection_coordinator at second attempt (after failure) should not report drop events for orphaned');
 {
-    configureFailPoint(st.shard0,
-                       'failAtCommitCreateCollectionCoordinator',
-                       data = {},
-                       failPointMode = {times: 1});
+    configureFailPoint(st.shard0, 'failAtCommitCreateCollectionCoordinator', {}, {times: 1});
 
-    collectionName = dbName + '.coll';
+    let collectionName = dbName + '.coll';
     assert.commandWorked(st.s.adminCommand(
         {shardCollection: collectionName, key: {_id: "hashed"}, numInitialChunks: 10}));
 

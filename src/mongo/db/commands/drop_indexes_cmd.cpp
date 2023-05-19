@@ -31,7 +31,6 @@
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/drop_indexes_gen.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -192,7 +192,7 @@ public:
         std::vector<BSONObj> all;
         {
             std::vector<std::string> indexNames;
-            writeConflictRetry(opCtx, "listIndexes", toReIndexNss.ns(), [&] {
+            writeConflictRetry(opCtx, "listIndexes", toReIndexNss, [&] {
                 indexNames.clear();
                 acquisition.getCollectionPtr()->getAllIndexes(&indexNames);
             });
@@ -201,7 +201,7 @@ public:
 
             for (size_t i = 0; i < indexNames.size(); i++) {
                 const std::string& name = indexNames[i];
-                BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss.ns(), [&] {
+                BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss, [&] {
                     return acquisition.getCollectionPtr()->getIndexSpec(name);
                 });
 
@@ -241,7 +241,7 @@ public:
         indexer->setIndexBuildMethod(IndexBuildMethod::kForeground);
         StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
                                                             "Uninitialized");
-        writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
+        writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             CollectionWriter collection(opCtx, &acquisition);
             collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
@@ -274,7 +274,7 @@ public:
 
         uassertStatusOK(indexer->checkConstraints(opCtx, acquisition.getCollectionPtr()));
 
-        writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
+        writeConflictRetry(opCtx, "commitReIndex", toReIndexNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             CollectionWriter collection(opCtx, &acquisition);
             uassertStatusOK(indexer->commit(opCtx,

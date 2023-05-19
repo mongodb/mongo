@@ -589,7 +589,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             return false;
         }
 
-        ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->db().toString());
+        ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->dbName());
 
         if (info.isClustered()) {
             return _deleteExpiredWithCollscan(opCtx, ttlCollectionCache, coll);

@@ -5,7 +5,7 @@
 
 // Test modifier operations on numerically equivalent string field names.  SERVER-4776
 
-t = db.jstests_updatek;
+let t = db.jstests_updatek;
 
 t.drop();
 t.save({_id: 0, '1': {}, '01': {}});

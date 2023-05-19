@@ -1736,7 +1736,7 @@ TEST(Accumulators, CovarianceWithRandomVariables) {
     assertCovariance<AccumulatorCovarianceSamp>(&expCtx, randomVariables, boost::none);
 }
 // Test serialization with redaction
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -1749,8 +1749,8 @@ Value parseAndSerializeAccumExpr(
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.redactIdentifiers = true;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.applyHmacToIdentifiers = true;
+    options.identifierHmacPolicy = applyHmacForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto expr = func(expCtx.get(), obj.firstElement(), expCtx->variablesParseState);
     return expr->serialize(options);
@@ -1765,8 +1765,8 @@ Document parseAndSerializeAccum(
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.redactIdentifiers = true;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.applyHmacToIdentifiers = true;
+    options.identifierHmacPolicy = applyHmacForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     VariablesParseState vps = expCtx->variablesParseState;
 

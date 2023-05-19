@@ -446,12 +446,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWithIdHack(
     OperationContext* opCtx,
-    VariantCollectionPtrOrAcquisition coll,
+    const ScopedCollectionAcquisition& collection,
     const UpdateStageParams& params,
     const IndexDescriptor* descriptor,
     const BSONObj& key,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
-    const auto& collectionPtr = coll.getCollectionPtr();
+    const auto& collectionPtr = collection.getCollectionPtr();
     invariant(collectionPtr);
     auto ws = std::make_unique<WorkingSet>();
 
@@ -462,16 +462,15 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
         std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collectionPtr, descriptor);
 
     const bool isUpsert = params.request->isUpsert();
-    auto root =
-        (isUpsert ? std::make_unique<UpsertStage>(
-                        expCtx.get(), params, ws.get(), collectionPtr, idHackStage.release())
-                  : std::make_unique<UpdateStage>(
-                        expCtx.get(), params, ws.get(), collectionPtr, idHackStage.release()));
+    auto root = (isUpsert ? std::make_unique<UpsertStage>(
+                                expCtx.get(), params, ws.get(), collection, idHackStage.release())
+                          : std::make_unique<UpdateStage>(
+                                expCtx.get(), params, ws.get(), collection, idHackStage.release()));
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
                                                 std::move(root),
-                                                coll,
+                                                &collection,
                                                 yieldPolicy,
                                                 false /* whether owned BSON must be returned */);
     invariant(executor.getStatus());

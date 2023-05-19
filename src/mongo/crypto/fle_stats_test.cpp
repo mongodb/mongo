@@ -64,6 +64,12 @@ protected:
         IDLParserContext("compactStats"),
         BSON("ecoc" << BSON("deleted" << 1 << "read" << 1) << "esc"
                     << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)));
+
+    CleanupStats cleanupStats = CleanupStats::parse(
+        IDLParserContext("cleanupStats"),
+        BSON("ecoc" << BSON("deleted" << 1 << "read" << 1) << "esc"
+                    << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)));
+
     std::unique_ptr<TickSourceMock<Milliseconds>> tickSource;
     std::unique_ptr<FLEStatusSection> instance;
     OperationContextNoop opCtx;
@@ -76,6 +82,8 @@ TEST_F(FLEStatsTest, NoopStats) {
     auto obj = instance->generateSection(&opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
+    ASSERT_TRUE(obj.hasField("cleanupStats"));
+    ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["cleanupStats"].Obj());
     ASSERT_FALSE(obj.hasField("emuBinaryStats"));
 }
 
@@ -88,6 +96,21 @@ TEST_F(FLEStatsTest, CompactStats) {
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_NE(zeroStats.toBSON(), obj["compactStats"].Obj());
     ASSERT_BSONOBJ_EQ(compactStats.toBSON(), obj["compactStats"].Obj());
+    ASSERT_TRUE(obj.hasField("cleanupStats"));
+    ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["cleanupStats"].Obj());
+    ASSERT_FALSE(obj.hasField("emuBinaryStats"));
+}
+
+TEST_F(FLEStatsTest, CleanupStats) {
+    instance->updateCleanupStats(cleanupStats);
+
+    ASSERT_TRUE(instance->includeByDefault());
+
+    auto obj = instance->generateSection(&opCtx, BSONElement());
+    ASSERT_TRUE(obj.hasField("compactStats"));
+    ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
+    ASSERT_TRUE(obj.hasField("cleanupStats"));
+    ASSERT_BSONOBJ_EQ(cleanupStats.toBSON(), obj["cleanupStats"].Obj());
     ASSERT_FALSE(obj.hasField("emuBinaryStats"));
 }
 
@@ -102,6 +125,8 @@ TEST_F(FLEStatsTest, BinaryEmuStatsAreEmptyWithoutTesting) {
     auto obj = instance->generateSection(&opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
+    ASSERT_TRUE(obj.hasField("cleanupStats"));
+    ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["cleanupStats"].Obj());
     ASSERT_FALSE(obj.hasField("emuBinaryStats"));
 }
 
@@ -121,6 +146,8 @@ TEST_F(FLEStatsTest, BinaryEmuStatsArePopulatedWithTesting) {
     auto obj = instance->generateSection(&opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
+    ASSERT_TRUE(obj.hasField("cleanupStats"));
+    ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["cleanupStats"].Obj());
     ASSERT_TRUE(obj.hasField("emuBinaryStats"));
     ASSERT_EQ(1, obj["emuBinaryStats"]["calls"].Long());
     ASSERT_EQ(1, obj["emuBinaryStats"]["suboperations"].Long());

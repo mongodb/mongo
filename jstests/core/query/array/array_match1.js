@@ -1,4 +1,4 @@
-t = db.array_match1;
+let t = db.array_match1;
 t.drop();
 
 t.insert({_id: 1, a: [5, 5]});

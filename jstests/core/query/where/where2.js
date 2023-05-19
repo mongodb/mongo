@@ -3,7 +3,7 @@
 //   requires_scripting,
 // ]
 
-t = db.getCollection("where2");
+let t = db.getCollection("where2");
 t.drop();
 
 t.save({a: 1});

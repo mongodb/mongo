@@ -1,4 +1,4 @@
-t = db.geo_s2meridian;
+let t = db.geo_s2meridian;
 t.drop();
 t.createIndex({geo: "2dsphere"});
 
@@ -8,18 +8,15 @@ t.createIndex({geo: "2dsphere"});
  * that runs along the meridian.
  */
 
-meridianCrossingLine = {
+let meridianCrossingLine = {
     geo: {type: "LineString", coordinates: [[-178.0, 10.0], [178.0, 10.0]]}
 };
 
 assert.commandWorked(t.insert(meridianCrossingLine));
 
-lineAlongMeridian = {
-    type: "LineString",
-    coordinates: [[180.0, 11.0], [180.0, 9.0]]
-};
+let lineAlongMeridian = {type: "LineString", coordinates: [[180.0, 11.0], [180.0, 9.0]]};
 
-result = t.find({geo: {$geoIntersects: {$geometry: lineAlongMeridian}}});
+let result = t.find({geo: {$geoIntersects: {$geometry: lineAlongMeridian}}});
 assert.eq(result.itcount(), 1);
 
 t.drop();
@@ -29,21 +26,15 @@ t.createIndex({geo: "2dsphere"});
  * on the meridian, and immediately on either side, and confirm that a poly
  * covering all of them returns them all.
  */
-pointOnNegativeSideOfMeridian = {
-    geo: {type: "Point", coordinates: [-179.0, 1.0]}
-};
-pointOnMeridian = {
-    geo: {type: "Point", coordinates: [180.0, 1.0]}
-};
-pointOnPositiveSideOfMeridian = {
-    geo: {type: "Point", coordinates: [179.0, 1.0]}
-};
+let pointOnNegativeSideOfMeridian = {geo: {type: "Point", coordinates: [-179.0, 1.0]}};
+let pointOnMeridian = {geo: {type: "Point", coordinates: [180.0, 1.0]}};
+let pointOnPositiveSideOfMeridian = {geo: {type: "Point", coordinates: [179.0, 1.0]}};
 
 t.insert(pointOnMeridian);
 t.insert(pointOnNegativeSideOfMeridian);
 t.insert(pointOnPositiveSideOfMeridian);
 
-meridianCrossingPoly = {
+let meridianCrossingPoly = {
     type: "Polygon",
     coordinates: [[[-178.0, 10.0], [178.0, 10.0], [178.0, -10.0], [-178.0, -10.0], [-178.0, 10.0]]]
 };
@@ -58,15 +49,9 @@ t.createIndex({geo: "2dsphere"});
  * closer, but across the meridian, and confirm they both come back, and
  * that the order is correct.
  */
-pointOnNegativeSideOfMerid = {
-    name: "closer",
-    geo: {type: "Point", coordinates: [-179.0, 0.0]}
-};
+let pointOnNegativeSideOfMerid = {name: "closer", geo: {type: "Point", coordinates: [-179.0, 0.0]}};
 
-pointOnPositiveSideOfMerid = {
-    name: "farther",
-    geo: {type: "Point", coordinates: [176.0, 0.0]}
-};
+let pointOnPositiveSideOfMerid = {name: "farther", geo: {type: "Point", coordinates: [176.0, 0.0]}};
 
 t.insert(pointOnNegativeSideOfMerid);
 t.insert(pointOnPositiveSideOfMerid);

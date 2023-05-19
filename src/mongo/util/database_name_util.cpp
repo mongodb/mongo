@@ -60,6 +60,11 @@ std::string DatabaseNameUtil::serializeForStorage(const DatabaseName& dbName,
     return dbName.toStringWithTenantId();
 }
 
+std::string DatabaseNameUtil::serializeForCatalog(const DatabaseName& dbName,
+                                                  const SerializationContext& context) {
+    return dbName.toStringWithTenantId();
+}
+
 std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
                                                    const SerializationContext& context) {
     // tenantId came from either a $tenant field or security token
@@ -88,8 +93,8 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
     }
 }
 
-
-DatabaseName parseDbNameFromStringExpectTenantIdInMultitenancyMode(StringData dbName) {
+DatabaseName DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(
+    StringData dbName) {
     if (!gMultitenancySupport) {
         return DatabaseName(boost::none, dbName);
     }
@@ -115,7 +120,7 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
                                            StringData db,
                                            const SerializationContext& context) {
     if (db.empty()) {
-        return DatabaseName();
+        return DatabaseName(tenantId, "");
     }
 
     if (!gMultitenancySupport) {
@@ -144,7 +149,7 @@ DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> t
         return DatabaseName(std::move(tenantId), db);
     }
 
-    auto dbName = parseDbNameFromStringExpectTenantIdInMultitenancyMode(db);
+    auto dbName = DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(db);
     // TenantId could be prefixed, or passed in separately (or both) and namespace is always
     // constructed with the tenantId separately.
     if (tenantId != boost::none) {
@@ -193,6 +198,14 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
         massert(8423388, "TenantId must be set", dbName.tenantId() != boost::none);
 
     return dbName;
+}
+
+DatabaseName DatabaseNameUtil::deserializeForCatalog(StringData db,
+                                                     const SerializationContext& context) {
+    // TenantId always prefix in the passed `db` for durable catalog. This method below checks for
+    // multitenancy and will either return a DatabaseName with (tenantId, nonPrefixedDb) or
+    // (none, prefixedDb).
+    return DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(db);
 }
 
 }  // namespace mongo

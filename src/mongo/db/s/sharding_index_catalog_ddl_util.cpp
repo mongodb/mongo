@@ -57,8 +57,8 @@ void deleteShardingIndexCatalogEntries(OperationContext* opCtx,
 }
 
 
-const ScopedCollectionAcquisition& getAcquisitionForNss(
-    const std::vector<ScopedCollectionAcquisition>& acquisitions, const NamespaceString& nss) {
+ScopedCollectionAcquisition& getAcquisitionForNss(
+    std::vector<ScopedCollectionAcquisition>& acquisitions, const NamespaceString& nss) {
     auto it = std::find_if(acquisitions.begin(), acquisitions.end(), [&nss](auto& acquisition) {
         return acquisition.nss() == nss;
     });
@@ -74,13 +74,13 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "RenameCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             boost::optional<UUID> toUuid;
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection fromToColl(
                 opCtx, fromNss, MODE_IX, AutoGetCollection::Options{}.secondaryNssOrUUIDs({toNss}));
-            const auto acquisitions = acquireCollections(
+            auto acquisitions = acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -181,14 +181,27 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
     indexCatalogEntry.setIndexCollectionUUID(indexCollectionUUID);
 
     writeConflictRetry(
-        opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace.ns(), [&]() {
+        opCtx, "AddIndexCatalogEntry", NamespaceString::kShardIndexCatalogNamespace, [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, userCollectionNss, MODE_IX);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
+            auto acquisitions = acquireCollections(
+                opCtx,
+                {CollectionAcquisitionRequest(
+                     NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
+                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                     repl::ReadConcernArgs::get(opCtx),
+                     AcquisitionPrerequisites::kWrite),
+                 CollectionAcquisitionRequest(
+                     NamespaceString(NamespaceString::kShardIndexCatalogNamespace),
+                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                     repl::ReadConcernArgs::get(opCtx),
+                     AcquisitionPrerequisites::kWrite)},
+                MODE_IX);
+
+            auto& collsColl = getAcquisitionForNss(
+                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl =
+                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
 
             {
                 // First get the document to check the index version if the document already exists
@@ -198,7 +211,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                          << ShardAuthoritativeCollectionType::kUuidFieldName << collectionUUID);
                 BSONObj collectionDoc;
                 bool docExists =
-                    Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
+                    Helpers::findOne(opCtx, collsColl.getCollectionPtr(), query, collectionDoc);
                 if (docExists) {
                     auto collection = ShardAuthoritativeCollectionType::parse(
                         IDLParserContext("AddIndexCatalogEntry"), collectionDoc);
@@ -225,10 +238,8 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                          << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
-                mongo::update(opCtx, collsColl.getDb(), request);
+                mongo::update(opCtx, collsColl, request);
             }
-
-            AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
 
             {
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
@@ -236,7 +247,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                 auto idStr = format(FMT_STRING("{}_{}"), collectionUUID.toString(), name);
                 builder.append("_id", idStr);
                 uassertStatusOK(collection_internal::insertDocument(opCtx,
-                                                                    idxColl.getCollection(),
+                                                                    idxColl.getCollectionPtr(),
                                                                     InsertStatement{builder.obj()},
                                                                     nullptr,
                                                                     false));
@@ -245,7 +256,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
             opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
                 opCtx,
                 userCollectionNss,
-                idxColl->uuid(),
+                idxColl.uuid(),
                 ShardingIndexCatalogInsertEntry(indexCatalogEntry).toBSON());
             wunit.commit();
         });
@@ -259,15 +270,29 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "RemoveShardingIndexCatalogEntryFromCollection",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
+            auto acquisitions = acquireCollections(
+                opCtx,
+                {CollectionAcquisitionRequest(
+                     NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
+                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                     repl::ReadConcernArgs::get(opCtx),
+                     AcquisitionPrerequisites::kWrite),
+                 CollectionAcquisitionRequest(
+                     NamespaceString(NamespaceString::kShardIndexCatalogNamespace),
+                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                     repl::ReadConcernArgs::get(opCtx),
+                     AcquisitionPrerequisites::kWrite)},
+                MODE_IX);
+
+            auto& collsColl = getAcquisitionForNss(
+                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl =
+                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+
             {
                 // First get the document to check the index version if the document already exists
                 const auto query =
@@ -275,7 +300,7 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                          << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
                 BSONObj collectionDoc;
                 bool docExists =
-                    Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
+                    Helpers::findOne(opCtx, collsColl.getCollectionPtr(), query, collectionDoc);
                 if (docExists) {
                     auto collection = ShardAuthoritativeCollectionType::parse(
                         IDLParserContext("RemoveIndexCatalogEntry"), collectionDoc);
@@ -301,17 +326,8 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                          << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
-                mongo::update(opCtx, collsColl.getDb(), request);
+                mongo::update(opCtx, collsColl, request);
             }
-
-            const auto idxColl =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest(
-                                      NamespaceString(NamespaceString::kShardIndexCatalogNamespace),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                      repl::ReadConcernArgs::get(opCtx),
-                                      AcquisitionPrerequisites::kWrite),
-                                  MODE_IX);
 
             {
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
@@ -339,22 +355,36 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "ReplaceCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
-            AutoGetCollection collsColl(opCtx,
-                                        NamespaceString::kShardCollectionCatalogNamespace,
-                                        MODE_IX,
-                                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                            {NamespaceString::kShardIndexCatalogNamespace}));
+            auto acquisitions = acquireCollections(
+                opCtx,
+                {CollectionAcquisitionRequest(
+                     NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
+                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                     repl::ReadConcernArgs::get(opCtx),
+                     AcquisitionPrerequisites::kWrite),
+                 CollectionAcquisitionRequest(
+                     NamespaceString(NamespaceString::kShardIndexCatalogNamespace),
+                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                     repl::ReadConcernArgs::get(opCtx),
+                     AcquisitionPrerequisites::kWrite)},
+                MODE_IX);
+
+            auto& collsColl = getAcquisitionForNss(
+                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl =
+                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+
             {
                 const auto query =
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName
                          << nss.ns() << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
                 BSONObj collectionDoc;
                 bool docExists =
-                    Helpers::findOne(opCtx, collsColl.getCollection(), query, collectionDoc);
+                    Helpers::findOne(opCtx, collsColl.getCollectionPtr(), query, collectionDoc);
                 if (docExists) {
                     auto collection = ShardAuthoritativeCollectionType::parse(
                         IDLParserContext("ReplaceIndexCatalogEntry"), collectionDoc);
@@ -383,17 +413,9 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                     << ShardAuthoritativeCollectionType::kIndexVersionFieldName << indexVersion));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
-                mongo::update(opCtx, collsColl.getDb(), request);
+                mongo::update(opCtx, collsColl, request);
             }
 
-            const auto idxColl =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest(
-                                      NamespaceString(NamespaceString::kShardIndexCatalogNamespace),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                      repl::ReadConcernArgs::get(opCtx),
-                                      AcquisitionPrerequisites::kWrite),
-                                  MODE_IX);
             {
                 // Clear old indexes.
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
@@ -429,13 +451,13 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
     writeConflictRetry(
         opCtx,
         "DropCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             boost::optional<UUID> collectionUUID;
             WriteUnitOfWork wunit(opCtx);
             Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
             Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-            const auto acquisitions = acquireCollections(
+            auto acquisitions = acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),
@@ -474,9 +496,6 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
                 mongo::deleteObjects(opCtx, collsColl, query, true);
             }
 
-            // AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace,
-            // MODE_IX);
-
             {
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 deleteShardingIndexCatalogEntries(opCtx, idxColl, *collectionUUID);
@@ -497,11 +516,11 @@ void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
     writeConflictRetry(
         opCtx,
         "ClearCollectionShardingIndexCatalog",
-        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        NamespaceString::kShardIndexCatalogNamespace,
         [&]() {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection userColl(opCtx, nss, MODE_IX);
-            const auto acquisitions = acquireCollections(
+            auto acquisitions = acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(
                      NamespaceString(NamespaceString::kShardCollectionCatalogNamespace),

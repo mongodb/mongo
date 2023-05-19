@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 const runParallelMoveChunk = (numThreads) => {
     // For startParallelOps to write its state

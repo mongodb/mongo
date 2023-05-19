@@ -6,16 +6,12 @@
  * This workload implicitly assumes that its tid range is [0, $config.threadCount). This isn't
  * guaranteed to be true when it is run in parallel with other workloads.
  *
- * TODO (SERVER-76445): Re-enable analyze_shard_key.js in suites with chunk migration and/or
- * stepdown/kill/terminate.
  * @tags: [
  *  requires_fcv_70,
  *  featureFlagUpdateOneWithoutShardKey,
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
- *  does_not_support_stepdowns,
- *  assumes_balancer_off
  * ]
  */
 load("jstests/concurrency/fsm_libs/extend_workload.js");
@@ -103,11 +99,6 @@ var $config = extendWorkload($config, function($config, $super) {
                 key: {[this.currentShardKeyFieldName]: 1, [this.candidateShardKeyFieldName]: 1},
                 unique: isUnique
             }];
-            // For a compound hashed shard key, the exact shard key index is needed for determining
-            // the monotonicity.
-            if (isHashed) {
-                indexSpecs.push({name: "exact_index", key: shardKey});
-            }
         } else {
             shardKey = {[this.candidateShardKeyFieldName]: isHashed ? "hashed" : 1};
             indexSpecs = [{
@@ -197,6 +188,7 @@ var $config = extendWorkload($config, function($config, $super) {
     /**
      * Generates and inserts initial documents.
      */
+    $config.data.insertBatchSize = 1000;
     $config.data.generateInitialDocuments = function generateInitialDocuments(
         db, collName, cluster) {
         this.numInitialDocuments = 0;
@@ -231,12 +223,17 @@ var $config = extendWorkload($config, function($config, $super) {
 
         assert.commandWorked(
             db.runCommand({createIndexes: collName, indexes: this.shardKeyOptions.indexSpecs}));
-        assert.commandWorked(db.runCommand({insert: collName, documents: docs}));
-
-        // Wait for the documents to get replicated to all nodes so that a analyzeShardKey command
-        // runs immediately after this can assert on the metrics regardless of which nodes it
-        // targets.
-        cluster.awaitReplication();
+        // To reduce the insertion order noise caused by parallel oplog application on
+        // secondaries, insert the documents in multiple batches.
+        let currIndex = 0;
+        while (currIndex < docs.length) {
+            const endIndex = currIndex + this.insertBatchSize;
+            assert.commandWorked(db.runCommand(
+                {insert: collName, documents: docs.slice(currIndex, endIndex), ordered: true}));
+            currIndex = endIndex;
+            // Wait for secondaries to have replicated the writes.
+            cluster.awaitReplication();
+        }
 
         print(`Set up collection that have the following shard key to analyze ${tojson({
             shardKeyOptions: this.shardKeyOptions,
@@ -608,6 +605,12 @@ var $config = extendWorkload($config, function($config, $super) {
                   `point documents after the TTL deletions had started. ${tojsononeline(err)}`);
             return true;
         }
+        if (err.code == 7588600) {
+            print(`Failed to analyze the shard key because the document for one of the most ` +
+                  `common shard key values got deleted while the command was running. ${
+                      tojsononeline(err)}`);
+            return err;
+        }
         return false;
     };
 
@@ -871,11 +874,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.disableQuerySampling = function disableQuerySampling(db, collName) {
         print("Starting disableQuerySampling state");
         const ns = db.getName() + "." + collName;
-        // If query sampling is off, this command is expected to fail with an IllegalOperation
-        // error.
-        assert.commandWorkedOrFailedWithCode(
-            db.adminCommand({configureQueryAnalyzer: ns, mode: "off"}),
-            ErrorCodes.IllegalOperation);
+        assert.commandWorked(db.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
         print("Finished disableQuerySampling state");
     };
 
@@ -951,8 +950,13 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db.runCommand(cmdObj);
         try {
             assert.commandWorked(res);
-            assert.eq(res.nModified, 1, {cmdObj, res});
-            assert.eq(res.n, 1, {cmdObj, res});
+            if (res.n == 0) {
+                // TODO: Make this state always validate the response after BF-28440 is resolved.
+                assert(TestData.runningWithBalancer);
+            } else {
+                assert.eq(res.nModified, 1, {cmdObj, res});
+                assert.eq(res.n, 1, {cmdObj, res});
+            }
         } catch (e) {
             if (!this.isAcceptableUpdateError(res) &&
                 !(res.hasOwnProperty("writeErrors") &&
@@ -977,7 +981,12 @@ var $config = extendWorkload($config, function($config, $super) {
         };
         print("Starting remove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
-        assert.eq(res.n, 1, {cmdObj, res});
+        if (res.n == 0) {
+            // TODO: Make this state always validate the response after BF-28440 is resolved.
+            assert(TestData.runningWithBalancer);
+        } else {
+            assert.eq(res.n, 1, {cmdObj, res});
+        }
         // Insert a random document to restore the original number of documents.
         assert.commandWorked(
             db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
@@ -1001,8 +1010,13 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db.runCommand(cmdObj);
         try {
             assert.commandWorked(res);
-            assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
-            assert.eq(res.lastErrorObject.updatedExisting, true, {cmdObj, res});
+            if (res.lastErrorObject.n == 0) {
+                // TODO: Make this state always validate the response after BF-28440 is resolved.
+                assert(TestData.runningWithBalancer);
+            } else {
+                assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+                assert.eq(res.lastErrorObject.updatedExisting, true, {cmdObj, res});
+            }
         } catch (e) {
             if (!this.isAcceptableUpdateError(res)) {
                 throw e;
@@ -1025,7 +1039,12 @@ var $config = extendWorkload($config, function($config, $super) {
         };
         print("Starting findAndModifyRemove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
-        assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+        if (res.lastErrorObject.n == 0) {
+            // TODO: Make this state always validate the response after BF-28440 is resolved.
+            assert(TestData.runningWithBalancer);
+        } else {
+            assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+        }
         // Insert a random document to restore the original number of documents.
         assert.commandWorked(
             db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));

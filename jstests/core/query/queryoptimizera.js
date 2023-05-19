@@ -9,8 +9,8 @@
 // constraint is printed at appropriate times.  SERVER-5353
 
 function numWarnings() {
-    logs = db.adminCommand({getLog: "global"}).log;
-    ret = 0;
+    let logs = db.adminCommand({getLog: "global"}).log;
+    let ret = 0;
     logs.forEach(function(x) {
         if (x.match(warningMatchRegexp)) {
             ++ret;
@@ -19,23 +19,23 @@ function numWarnings() {
     return ret;
 }
 
-collectionNameIndex = 0;
+let collectionNameIndex = 0;
 
 // Generate a collection name not already present in the log.
 do {
-    testCollectionName = 'jstests_queryoptimizera__' + collectionNameIndex++;
-    warningMatchString =
+    var testCollectionName = 'jstests_queryoptimizera__' + collectionNameIndex++;
+    var warningMatchString =
         'unindexed _id query on capped collection.*collection: test.' + testCollectionName;
-    warningMatchRegexp = new RegExp(warningMatchString);
+    var warningMatchRegexp = new RegExp(warningMatchString);
 
 } while (numWarnings() > 0);
 
-t = db[testCollectionName];
+let t = db[testCollectionName];
 t.drop();
 
-notCappedCollectionName = testCollectionName + '_notCapped';
+let notCappedCollectionName = testCollectionName + '_notCapped';
 
-notCapped = db.getSiblingDB("local").getCollection(notCappedCollectionName);
+let notCapped = db.getSiblingDB("local").getCollection(notCappedCollectionName);
 notCapped.drop();
 
 assert.commandWorked(db.createCollection(testCollectionName, {capped: true, size: 1000}));
@@ -45,14 +45,14 @@ assert.commandWorked(
 t.insert({});
 notCapped.insert({});
 
-oldNumWarnings = 0;
+let oldNumWarnings = 0;
 
 function assertNoNewWarnings() {
     assert.eq(oldNumWarnings, numWarnings());
 }
 
 function assertNewWarning() {
-    newNumWarnings = numWarnings();
+    let newNumWarnings = numWarnings();
     // Ensure that newNumWarnings > oldNumWarnings.  It's not safe to test that oldNumWarnings + 1
     // == newNumWarnings, because a (simulated) page fault exception may cause multiple messages to
     // be logged instead of only one.

@@ -10,7 +10,7 @@
 
 load("jstests/libs/fail_point_util.js");
 
-rst = new ReplSetTest({nodes: 1});
+let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 

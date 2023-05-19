@@ -2335,7 +2335,7 @@ class TestBinder(testcase.IDLTestcase):
         # type: () -> None
         """Test feature flag checks around version."""
 
-        # feature flag can default to false without a version
+        # feature flag can default to false without a version (shouldBeFCVGated can be true or false)
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2343,9 +2343,20 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: false
+                    shouldBeFCVGated: false
             """))
 
-        # feature flag can default to true with a version
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    shouldBeFCVGated: true
+            """))
+
+        # if shouldBeFCVGated: true, feature flag can default to true with a version
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2354,9 +2365,21 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     version: 123
+                    shouldBeFCVGated: true
             """))
 
-        # true is only allowed with a version
+        # if shouldBeFCVGated: false, we do not need a version
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    shouldBeFCVGated: false
+            """))
+
+        # if shouldBeFCVGated: true and default: true, a version is required
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2364,9 +2387,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: true
+                    shouldBeFCVGated: true
             """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION)
 
-        # false is not allowed with a version
+        # false is not allowed with a version and shouldBeFCVGated: true
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2375,7 +2399,32 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: false
                     version: 123
+                    shouldBeFCVGated: true
             """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+
+        # false is not allowed with a version and shouldBeFCVGated: false
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    version: 123
+                    shouldBeFCVGated: false
+            """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+
+        # if shouldBeFCVGated is false, a version is not allowed
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    version: 123
+                    shouldBeFCVGated: false
+            """), idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION)
 
     def test_access_check(self):
         # type: () -> None
@@ -2668,11 +2717,11 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_literal: true
+                            query_shape: literal
                             type: string
                         field2:
                             type: bool
-                            query_shape_literal: false
+                            query_shape: parameter
         """))
 
         self.assert_bind_fail(
@@ -2687,7 +2736,7 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                         field2:
                             type: bool
-                            query_shape_literal: false
+                            query_shape: parameter
         """), idl.errors.ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL)
 
         self.assert_bind_fail(
@@ -2701,7 +2750,7 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                         field2:
                             type: bool
-                            query_shape_literal: false
+                            query_shape: parameter
         """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
         # Validating query_shape_anonymize relies on std::string
@@ -2731,10 +2780,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: string
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """))
 
@@ -2746,10 +2795,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: array<string>
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """))
 
@@ -2757,17 +2806,13 @@ class TestBinder(testcase.IDLTestcase):
             basic_types + textwrap.dedent("""
             structs:
                 struct1:
-                    query_shape_component: true
                     strict: true
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: false
+                            query_shape: blah
                             type: string
-                        field2:
-                            query_shape_literal: false
-                            type: bool
-        """), idl.errors.ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE)
+        """), idl.errors.ERROR_ID_QUERY_SHAPE_INVALID_VALUE)
 
         self.assert_bind_fail(
             basic_types + textwrap.dedent("""
@@ -2778,10 +2823,10 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: bool
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """), idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY)
 
@@ -2794,29 +2839,12 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_anonymize: true
+                            query_shape: anonymize
                             type: array<bool>
                         field2:
-                            query_shape_literal: false
+                            query_shape: parameter
                             type: bool
         """), idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY)
-
-        self.assert_bind_fail(
-            basic_types + textwrap.dedent("""
-            structs:
-                struct1:
-                    query_shape_component: true
-                    strict: true
-                    description: ""
-                    fields:
-                        field1:
-                            query_shape_anonymize: true
-                            query_shape_literal: true
-                            type: string
-                        field2:
-                            query_shape_literal: false
-                            type: bool
-        """), idl.errors.ERROR_ID_CANNOT_BE_LITERAL_AND_FIELDPATH)
 
         self.assert_bind_fail(
             basic_types + textwrap.dedent("""
@@ -2826,7 +2854,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_literal: true
+                            query_shape: literal
                             type: string
             """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
@@ -2847,8 +2875,66 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             type: StructZero
                             description: ""
-                            query_shape_literal: true
+                            query_shape: literal
             """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
+
+    # pylint: disable=invalid-name
+    def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(self):
+        # type: () -> None
+        """Negative struct tests for unsafe_dangerous_disable_extra_field_duplicate_checks."""
+
+        # Setup some common types
+        test_preamble = self.common_types + \
+            textwrap.dedent("""
+            structs:
+                danger:
+                    description: foo
+                    strict: false
+                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
+                    fields:
+                        foo: string
+        """)
+
+        # Test strict and unsafe_dangerous_disable_extra_field_duplicate_checks are not allowed
+        self.assert_bind_fail(
+            test_preamble + indent_text(
+                1,
+                textwrap.dedent("""
+                danger1:
+                    description: foo
+                    strict: true
+                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
+                    fields:
+                        foo: string
+            """)), idl.errors.ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED)
+
+        # Test inheritance is prohibited through structs
+        self.assert_bind_fail(
+            test_preamble + indent_text(
+                1,
+                textwrap.dedent("""
+                danger2:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                        d1: danger
+            """)), idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED)
+
+        # Test inheritance is prohibited through commands
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+            commands:
+                dangerc:
+                    description: foo
+                    namespace: ignored
+                    command_name: dangerc
+                    strict: false
+                    api_version: ""
+                    fields:
+                        foo: string
+                        d1: danger
+            """), idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED)
 
 
 if __name__ == '__main__':

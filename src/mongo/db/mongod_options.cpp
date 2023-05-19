@@ -344,6 +344,23 @@ Status storeMongodOptions(const moe::Environment& params) {
         return ret;
     }
 
+    boost::optional<std::map<std::string, std::string>> setParameterMap;
+    if (params.count("setParameter")) {
+        setParameterMap.emplace(params["setParameter"].as<std::map<std::string, std::string>>());
+    }
+
+    auto checkConflictWithSetParameter = [&setParameterMap](const std::string& configName,
+                                                            const std::string& parameterName) {
+        if (setParameterMap && setParameterMap->find(parameterName) != setParameterMap->end()) {
+            return Status(ErrorCodes::BadValue,
+                          fmt::format("Conflicting server setting and setParameter, only one of "
+                                      "the two should be used: config={}, setParameter={}",
+                                      configName,
+                                      parameterName));
+        }
+        return Status::OK();
+    };
+
     // TODO: Integrate these options with their setParameter counterparts
     if (params.count("security.authSchemaVersion")) {
         return Status(ErrorCodes::BadValue,
@@ -406,6 +423,11 @@ Status storeMongodOptions(const moe::Environment& params) {
 
     if (params.count("storage.syncPeriodSecs")) {
         storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
+        Status conflictStatus =
+            checkConflictWithSetParameter("storage.syncPeriodSecs", "syncdelay");
+        if (!conflictStatus.isOK()) {
+            return conflictStatus;
+        }
     }
 
     if (params.count("storage.directoryPerDB")) {
@@ -424,12 +446,10 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (params.count("storage.journal.commitIntervalMs")) {
         auto journalCommitIntervalMs = params["storage.journal.commitIntervalMs"].as<int>();
         storageGlobalParams.journalCommitIntervalMs.store(journalCommitIntervalMs);
-        if (journalCommitIntervalMs < 1 ||
-            journalCommitIntervalMs > StorageGlobalParams::kMaxJournalCommitIntervalMs) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "--journalCommitInterval out of allowed range (1-"
-                              << StorageGlobalParams::kMaxJournalCommitIntervalMs << "ms)");
+        Status conflictStatus = checkConflictWithSetParameter("storage.journal.commitIntervalMs",
+                                                              "journalCommitInterval");
+        if (!conflictStatus.isOK()) {
+            return conflictStatus;
         }
     }
 

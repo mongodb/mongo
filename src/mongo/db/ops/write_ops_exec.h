@@ -49,6 +49,7 @@ class DeleteRequest;
 class OpDebug;
 class ParsedUpdate;
 class PlanExecutor;
+class UpdateRequest;
 
 namespace write_ops_exec {
 
@@ -115,7 +116,7 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
                                       bool remove,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
-                                      ParsedUpdate* parsedUpdate);
+                                      const UpdateRequest* updateRequest);
 
 /**
  * Executes a findAndModify with remove:true, the returned document is placed into docFound (if

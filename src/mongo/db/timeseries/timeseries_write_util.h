@@ -54,6 +54,19 @@ BSONObj makeNewDocumentForWrite(
     const boost::optional<TimeseriesOptions>& options,
     const boost::optional<const StringData::ComparatorInterface*>& comparator);
 
+std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
+    const std::vector<BSONObj>& measurements,
+    const NamespaceString& nss,
+    const TimeseriesOptions& options,
+    const StringData::ComparatorInterface* comparator);
+
+/**
+ * Returns an update request to the bucket when the 'measurements' is non-empty. Otherwise, returns
+ * a delete request to the bucket.
+ */
+stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
+    const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements);
+
 /**
  * Performs modifications atomically for a user command on a time-series collection.
  *
@@ -62,12 +75,12 @@ BSONObj makeNewDocumentForWrite(
  *
  * All the modifications are written and replicated atomically.
  */
-Status performAtomicWrites(OperationContext* opCtx,
-                           const CollectionPtr& coll,
-                           const RecordId& recordId,
-                           const stdx::variant<write_ops::UpdateCommandRequest,
-                                               write_ops::DeleteCommandRequest>& modificationOp,
-                           const std::vector<write_ops::InsertCommandRequest>& insertOps,
-                           bool fromMigrate,
-                           StmtId stmtId);
+void performAtomicWrites(OperationContext* opCtx,
+                         const CollectionPtr& coll,
+                         const RecordId& recordId,
+                         const stdx::variant<write_ops::UpdateCommandRequest,
+                                             write_ops::DeleteCommandRequest>& modificationOp,
+                         const std::vector<write_ops::InsertCommandRequest>& insertOps,
+                         bool fromMigrate,
+                         StmtId stmtId);
 }  // namespace mongo::timeseries

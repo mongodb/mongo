@@ -5,46 +5,59 @@
 [jsTest] note: Should be optimized to Neq
 [jsTest] ----
 
-Operators used: [ "Neq" ]
+Operators used: 
+[ "Neq" ]
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "one.one.one.many" : { "$ne" : 7 } } } ]
 [jsTest] note: Should stay as Not Traverse Eq
 [jsTest] ----
 
-Operators used: [ "Not", "Eq" ]
+Operators used: 
+[ "Not", "Eq" ]
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many.one.one.one" : { "$ne" : 7 } } } ]
 [jsTest] note: Should stay as Not Traverse Eq
 [jsTest] ----
 
-Operators used: [ "Not", "Eq" ]
+Operators used: 
+[ "Not", "Eq" ]
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many.one.one.many" : { "$ne" : 7 } } } ]
 [jsTest] note: Should stay as Not Traverse Eq
 [jsTest] ----
 
-Operators used: [ "Not", "Eq" ]
+Operators used: 
+[ "Not", "Eq" ]
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many.many.many.many" : { "$ne" : 7 } } } ]
 [jsTest] note: Should stay as Not Traverse Eq
 [jsTest] ----
 
-Operators used: [ "Not", "Eq" ]
+Operators used: 
+[ "Not", "Eq" ]
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many" : { "$elemMatch" : { "one.one.one" : { "$ne" : 7 } } } } } ]
 [jsTest] note: Should be optimized to Neq
 [jsTest] ----
 
-Operators used: [ "Neq" ]
+Operators used: 
+[ "Neq" ]
+
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many.one" : { "$elemMatch" : { "one.one" : { "$ne" : 7 } } } } } ]
 [jsTest] note: Should be optimized to Neq
 [jsTest] ----
 
-Operators used: [ "Neq" ]
+Operators used: 
+[ "Neq" ]

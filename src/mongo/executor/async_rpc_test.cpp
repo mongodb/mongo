@@ -453,7 +453,7 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
 TEST_F(AsyncRPCTestFixture, SuccessfulFind) {
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto opCtxHolder = makeOperationContext();
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     FindCommandRequest findCmd(nss);
@@ -765,7 +765,7 @@ TEST_F(AsyncRPCTestFixture, SendTxnCommandWithoutTxnRouterAppendsNoTxnFields) {
     auto opCtxHolder = makeOperationContext();
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, opCtxHolder.get(), readPref, getExecutorPtr(), testHost);
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     FindCommandRequest findCmd(nss);
@@ -798,7 +798,7 @@ TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
@@ -864,7 +864,7 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnSuccess)
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
@@ -927,7 +927,7 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnRemoteEr
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
@@ -989,7 +989,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
@@ -1055,7 +1055,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsRemoteError) {
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.
@@ -1092,7 +1092,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsLocalError) {
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
         shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
-    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     // Set up the transaction metadata.

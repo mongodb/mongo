@@ -7,13 +7,13 @@
 //   requires_scripting,
 // ]
 
-t = db.jstests_js3;
+let t = db.jstests_js3;
 
-debug = function(s) {
+let debug = function(s) {
     // printjson( s );
 };
 
-for (z = 0; z < 2; z++) {
+for (let z = 0; z < 2; z++) {
     debug(z);
 
     t.drop();
@@ -23,7 +23,7 @@ for (z = 0; z < 2; z++) {
         t.createIndex({i: 1});
     }
 
-    for (i = 0; i < 1000; i++)
+    for (let i = 0; i < 1000; i++)
         t.save({
             i: i,
             z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -57,17 +57,17 @@ for (z = 0; z < 2; z++) {
 
     debug("before indexed find");
 
-    arr = t.find({
-               $where: function() {
-                   return obj.i == 7 || obj.i == 8;
-               }
-           }).toArray();
+    let arr = t.find({
+                   $where: function() {
+                       return obj.i == 7 || obj.i == 8;
+                   }
+               }).toArray();
     debug(arr);
     assert.eq(2, arr.length);
 
     debug("after indexed find");
 
-    for (i = 1000; i < 2000; i++)
+    for (let i = 1000; i < 2000; i++)
         t.save({
             i: i,
             z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

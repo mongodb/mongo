@@ -128,7 +128,7 @@ repos:
     repos:
       - yum/amazon/2/mongodb-org
 
-  - name: amazon2022
+  - name: amazon2023
     type: rpm
     edition: org
     bucket: repo.mongodb.org
@@ -376,7 +376,7 @@ repos:
     repos:
       - yum/amazon/2/mongodb-enterprise
 
-  - name: amazon2022
+  - name: amazon2023
     type: rpm
     edition: enterprise
     bucket: repo.mongodb.com

@@ -10,8 +10,8 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
- *   # The currentOp output field 'lastDurableState' was changed from an enum value to a string.
- *   requires_fcv_70,
+ *   # The error code for a rejected recipient command invoked during the reject phase was changed.
+ *   requires_fcv_71,
  * ]
  */
 
@@ -72,7 +72,7 @@ recipientRst.nodes.forEach(node => {
     };
     const res = db.runCommand(cmd);
     assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld, tojson(cmd));
-    assert.eq(res.errmsg, "Tenant read is not allowed before migration completes");
+    assert.eq(res.errmsg, "Tenant command 'find' is not allowed before migration completes");
 });
 
 jsTestLog("Running a back-to-back migration");
@@ -100,8 +100,9 @@ waitAfterCreatingMtab.wait();
 // Check that the current serverStatus reflects the recipient access blocker.
 const mtabStatus = tenantMigrationTest.getTenantMigrationAccessBlocker(
     {donorNode: donor2Primary, tenantId: kTenantId});
-assert.eq(
-    mtabStatus.recipient.state, TenantMigrationTest.RecipientAccessState.kRejectBefore, mtabStatus);
+assert.eq(mtabStatus.recipient.state,
+          TenantMigrationTest.RecipientAccessState.kRejectReadsBefore,
+          mtabStatus);
 assert(mtabStatus.recipient.hasOwnProperty("rejectBeforeTimestamp"), mtabStatus);
 
 const res = assert.commandWorked(
@@ -147,7 +148,7 @@ newDonorRst.nodes.forEach(node => {
     };
     const res = db.runCommand(cmd);
     assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld, tojson(cmd));
-    assert.eq(res.errmsg, "Tenant read is not allowed before migration completes");
+    assert.eq(res.errmsg, "Tenant command 'find' is not allowed before migration completes");
 });
 
 waitAfterCreatingMtab.off();

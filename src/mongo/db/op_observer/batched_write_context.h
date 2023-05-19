@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/transaction/transaction_operations.h"
 
 namespace mongo {

@@ -116,7 +116,7 @@ structs:
                 type: indexHint
                 default: mongo::BSONObj()
                 stability: unstable
-            let:
+            constants:
                 description: "Specifies constant values that can be referred to in the pipeline
                               performing a custom update."
                 type: object
@@ -172,12 +172,6 @@ structs:
                 description: "Specifies the hint to use for the operation."
                 type: indexHint
                 default: mongo::BSONObj()
-                stability: unstable
-            let:
-                description: "Specifies constant values that can be referred to in the pipeline
-                              performing a custom update."
-                type: object
-                optional: true
                 stability: unstable
             collation:
                 description: "Specifies the collation to use for the operation."
@@ -328,3 +322,9 @@ commands:
                 type: array<int>
                 optional: true
                 stability: unstable
+            let:
+                description: "Specifies constant values."
+                type: object
+                optional: true
+                stability: unstable
+

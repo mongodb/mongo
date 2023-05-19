@@ -93,7 +93,7 @@ int64_t setReplyItems(OperationContext* opCtx,
 
     for (const auto& dbName : dbNames) {
         if (authorizedDatabases &&
-            !as->isAuthorizedForAnyActionOnAnyResourceInDB(dbName.toString())) {
+            !as->isAuthorizedForAnyActionOnAnyResourceInDB(DatabaseNameUtil::serialize(dbName))) {
             // We don't have listDatabases on the cluster or find on this database.
             continue;
         }
@@ -118,7 +118,7 @@ int64_t setReplyItems(OperationContext* opCtx,
                 continue;
             }
 
-            writeConflictRetry(opCtx, "sizeOnDisk", dbName.toString(), [&] {
+            writeConflictRetry(opCtx, "sizeOnDisk", NamespaceString(dbName), [&] {
                 size = storageEngine->sizeOnDiskForDb(opCtx, dbName);
             });
             item.setSizeOnDisk(size);

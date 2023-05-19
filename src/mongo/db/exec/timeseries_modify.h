@@ -34,8 +34,63 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
+#include "mongo/db/exec/update_stage.h"
 
 namespace mongo {
+
+struct TimeseriesModifyParams {
+    TimeseriesModifyParams(const DeleteStageParams* deleteParams)
+        : isUpdate(false),
+          isMulti(deleteParams->isMulti),
+          fromMigrate(deleteParams->fromMigrate),
+          isExplain(deleteParams->isExplain),
+          returnDeleted(deleteParams->returnDeleted),
+          stmtId(deleteParams->stmtId),
+          canonicalQuery(deleteParams->canonicalQuery) {}
+
+    TimeseriesModifyParams(const UpdateStageParams* updateParams)
+        : isUpdate(true),
+          isMulti(updateParams->request->isMulti()),
+          fromMigrate(updateParams->request->source() == OperationSource::kFromMigrate),
+          isExplain(updateParams->request->explain()),
+          canonicalQuery(updateParams->canonicalQuery),
+          isFromOplogApplication(updateParams->request->isFromOplogApplication()),
+          updateDriver(updateParams->driver) {
+        tassert(7314203,
+                "timeseries updates should only have one stmtId",
+                updateParams->request->getStmtIds().size() == 1);
+        stmtId = updateParams->request->getStmtIds().front();
+    }
+
+    // Is this an update or a delete operation?
+    bool isUpdate;
+
+    // Is this a multi update/delete?
+    bool isMulti;
+
+    // Is this command part of a migrate operation that is essentially like a no-op when the
+    // cluster is observed by an external client.
+    bool fromMigrate;
+
+    // Are we explaining a command rather than actually executing it?
+    bool isExplain;
+
+    // Should we return the deleted document?
+    bool returnDeleted = false;
+
+    // The stmtId for this particular command.
+    StmtId stmtId = kUninitializedStmtId;
+
+    // The parsed query predicate for this command. Not owned here.
+    CanonicalQuery* canonicalQuery;
+
+    // True if this command was triggered by the application of an oplog entry.
+    bool isFromOplogApplication = false;
+
+    // Contains the logic for applying mods to documents. Only present for updates. Not owned. Must
+    // outlive the TimeseriesModifyStage.
+    UpdateDriver* updateDriver = nullptr;
+};
 
 /**
  * Unpacks time-series bucket documents and writes the modified documents.
@@ -43,15 +98,15 @@ namespace mongo {
  * The stage processes one bucket at a time, unpacking all the measurements and writing the output
  * bucket in a single doWork() call.
  */
-class TimeseriesModifyStage final : public RequiresMutableCollectionStage {
+class TimeseriesModifyStage final : public RequiresWritableCollectionStage {
 public:
     static const char* kStageType;
 
     TimeseriesModifyStage(ExpressionContext* expCtx,
-                          std::unique_ptr<DeleteStageParams> params,
+                          TimeseriesModifyParams&& params,
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child,
-                          const CollectionPtr& coll,
+                          const ScopedCollectionAcquisition& coll,
                           BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate);
 
@@ -69,12 +124,8 @@ public:
 
     PlanStage::StageState doWork(WorkingSetID* id);
 
-    bool _isDeleteMulti() {
-        return _params->isMulti;
-    }
-
-    bool _isDeleteOne() {
-        return !_isDeleteMulti();
+    bool containsDotsAndDollarsField() const {
+        return _params.isUpdate && _params.updateDriver->containsDotsAndDollarsField();
     }
 
 protected:
@@ -85,13 +136,32 @@ protected:
     void doRestoreStateRequiresCollection() final;
 
 private:
+    bool _isMultiWrite() const {
+        return _params.isMulti;
+    }
+
+    bool _isSingletonWrite() const {
+        return !_isMultiWrite();
+    }
+
+    /**
+     * Builds insert requests based on the measurements needing to be updated.
+     */
+    std::pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>> _buildInsertOps(
+        const std::vector<BSONObj>& matchedMeasurements,
+        std::vector<BSONObj>& unchangedMeasurements);
+
     /**
      * Writes the modifications to a bucket.
+     *
+     * Returns the pair of (whether the write was successful, the stage state to propagate).
      */
-    PlanStage::StageState _writeToTimeseriesBuckets(
+    template <typename F>
+    std::pair<bool, PlanStage::StageState> _writeToTimeseriesBuckets(
+        ScopeGuard<F>& bucketFreer,
         WorkingSetID bucketWsmId,
-        const std::vector<BSONObj>& unchangedMeasurements,
-        const std::vector<BSONObj>& deletedMeasurements,
+        std::vector<BSONObj>&& unchangedMeasurements,
+        const std::vector<BSONObj>& modifiedMeasurements,
         bool bucketFromMigrate);
 
     /**
@@ -109,7 +179,12 @@ private:
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
 
-    std::unique_ptr<DeleteStageParams> _params;
+    /**
+     * Prepares returning a deleted measurement.
+     */
+    void _prepareToReturnDeletedMeasurement(WorkingSetID& out, BSONObj measurement);
+
+    TimeseriesModifyParams _params;
 
     WorkingSet* _ws;
 
@@ -119,7 +194,7 @@ private:
 
     BucketUnpacker _bucketUnpacker;
 
-    // Determines the measurements to delete from this bucket, and by inverse, those to keep
+    // Determines the measurements to modify in this bucket, and by inverse, those to keep
     // unmodified. This predicate can be null if we have a meta-only or empty predicate on singleton
     // deletes or updates.
     std::unique_ptr<MatchExpression> _residualPredicate;
@@ -139,5 +214,9 @@ private:
     // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
     // established. This can be set when a write fails or when a fetch fails.
     WorkingSetID _retryBucketId = WorkingSet::INVALID_ID;
+
+    // Stores the deleted document when a deleteOne with returnDeleted: true is requested and we
+    // need to yield.
+    boost::optional<BSONObj> _deletedMeasurementToReturn = boost::none;
 };
 }  //  namespace mongo

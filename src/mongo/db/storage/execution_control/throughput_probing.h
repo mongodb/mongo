@@ -67,18 +67,20 @@ private:
     void _probeUp(double throughput);
     void _probeDown(double throughput);
 
-    void _setConcurrency(int32_t concurrency);
+    void _setConcurrency(double concurrency);
 
-    int32_t _stableConcurrency;
+    // This value is split between reads and writes based on the read/write ratio.
+    double _stableConcurrency;
     double _stableThroughput = 0;
     ProbingState _state = ProbingState::kStable;
+    Timer _timer;
 
-    int64_t _prevNumFinishedProcessing = 0;
+    int64_t _prevNumFinishedProcessing = -1;
 
     struct Stats {
         void serialize(BSONObjBuilder& builder) const;
 
-        AtomicWord<double> throughput;
+        AtomicWord<int64_t> opsPerSec;
         AtomicWord<int64_t> timesDecreased;
         AtomicWord<int64_t> timesIncreased;
         AtomicWord<int64_t> totalAmountDecreased;

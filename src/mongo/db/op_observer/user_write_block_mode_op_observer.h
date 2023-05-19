@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
 
 namespace mongo {
 
@@ -37,7 +37,7 @@ namespace mongo {
  * OpObserver for user write blocking. On write operations, checks whether the current global user
  * write blocking state allows the write, and uasserts if not.
  */
-class UserWriteBlockModeOpObserver final : public OpObserver {
+class UserWriteBlockModeOpObserver final : public OpObserverNoop {
     UserWriteBlockModeOpObserver(const UserWriteBlockModeOpObserver&) = delete;
     UserWriteBlockModeOpObserver& operator=(const UserWriteBlockModeOpObserver&) = delete;
 
@@ -54,7 +54,8 @@ public:
                    std::vector<InsertStatement>::const_iterator first,
                    std::vector<InsertStatement>::const_iterator last,
                    std::vector<bool> fromMigrate,
-                   bool defaultFromMigrate) final;
+                   bool defaultFromMigrate,
+                   InsertsOpStateAccumulator* opAccumulator = nullptr) final;
 
     void onInsertGlobalIndexKey(OperationContext* opCtx,
                                 const NamespaceString& globalIndexNss,
@@ -113,12 +114,12 @@ public:
 
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
 
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) final;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) final;
 
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
@@ -128,23 +129,23 @@ public:
 
     // onRenameCollection is only for renaming to a nonexistent target NS, so we need
     // preRenameCollection too.
-    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
-                                     bool stayTemp) final;
+                                     bool stayTemp,
+                                     bool markFromMigrate) final;
 
-    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) final;
+                            bool stayTemp,
+                            bool markFromMigrate) final;
 
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
@@ -160,122 +161,31 @@ public:
                        const CollectionPtr& coll,
                        const BSONObj& doc) final;
 
-    // Noop operations (don't perform any check).
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 
-    // Unchecked because sharded collection indexes catalog are modified from internal commands.
-    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const UUID& uuid,
-                                                BSONObj indexDoc) final {}
+    // Noop operations below with explanations (don't perform any check).
 
-    // Unchecked because global indexes are created from internal commands.
-    void onCreateGlobalIndex(OperationContext* opCtx,
-                             const NamespaceString& globalIndexNss,
-                             const UUID& globalIndexUUID) final{};
+    // onModifyCollectionShardingIndexCatalog() is unchecked because sharded collection indexes
+    // catalog are modified from internal commands.
 
-    void onDropGlobalIndex(OperationContext* opCtx,
-                           const NamespaceString& globalIndexNss,
-                           const UUID& globalIndexUUID,
-                           long long numKeys) final{};
+    // onCreateGlobalIndex() and onDropGlobalIndex() are unchecked because global indexes are
+    // created from internal commands.
 
-    // Index builds committing can be left unchecked since we kill any active index builds before
-    // enabling write blocking. This means any index build which gets to the commit phase while
-    // write blocking is active was started and hit the onStartIndexBuild hook with write blocking
-    // active, and thus must be allowed under user write blocking.
-    void onCommitIndexBuild(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const UUID& collUUID,
-                            const UUID& indexBuildUUID,
-                            const std::vector<BSONObj>& indexes,
-                            bool fromMigrate) final {}
+    // Index builds committing (onCommitIndexBuild()) can be left unchecked since we kill any active
+    // index builds before enabling write blocking. This means any index build which gets to the
+    // commit phase while write blocking is active was started and hit the onStartIndexBuild hook
+    // with write blocking active, and thus must be allowed under user write blocking.
 
-    // At the moment we are leaving the onAbortIndexBuilds as unchecked. This is because they can be
-    // called from both user and internal codepaths, and we don't want to risk throwing an assert
-    // for the internal paths.
-    void onAbortIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final {}
+    // At the moment we are leaving the onAbortIndexBuildSinglePhase() and onAbortIndexBuild() as
+    // unchecked. This is because they can be called from both user and internal codepaths, and
+    // we don't want to risk throwing an assert for the internal paths.
 
-    void onAbortIndexBuild(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const UUID& collUUID,
-                           const UUID& indexBuildUUID,
-                           const std::vector<BSONObj>& indexes,
-                           const Status& cause,
-                           bool fromMigrate) final {}
+    // We don't need to check postRenameCollection() and preRenameCollection (they are in the same
+    // WUOW).
 
-    void onInternalOpMessage(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const boost::optional<UUID>& uuid,
-                             const BSONObj& msgObj,
-                             const boost::optional<BSONObj> o2MsgObj,
-                             const boost::optional<repl::OpTime> preImageOpTime,
-                             const boost::optional<repl::OpTime> postImageOpTime,
-                             const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                             const boost::optional<OplogSlot> slot) final {}
-
-    // We don't need to check this and preRenameCollection (they are in the same WUOW).
-    void postRenameCollection(OperationContext* opCtx,
-                              const NamespaceString& fromCollection,
-                              const NamespaceString& toCollection,
-                              const UUID& uuid,
-                              const boost::optional<UUID>& dropTargetUUID,
-                              bool stayTemp) final {}
-
-    // The transaction commit related hooks don't need to be checked, because all of the operations
-    // inside the transaction are checked and they all execute in one WUOW.
-    void onApplyOps(OperationContext* opCtx,
-                    const DatabaseName& dbName,
-                    const BSONObj& applyOpCmd) final {}
-
-    void onEmptyCapped(OperationContext* opCtx,
-                       const NamespaceString& collectionName,
-                       const UUID& uuid) final {}
-
-    void onTransactionStart(OperationContext* opCtx) final {}
-
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations) final {}
-
-    void onPreparedTransactionCommit(
-        OperationContext* opCtx,
-        OplogSlot commitOplogEntryOpTime,
-        Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept final {}
-
-    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
-        OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
-        const TransactionOperations& transactionOperations,
-        Date_t wallClockTime) final {
-        return nullptr;
-    }
-
-    void onTransactionPrepare(
-        OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
-        const TransactionOperations& transactionOperations,
-        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
-        size_t numberOfPrePostImagesToWrite,
-        Date_t wallClockTime) final {}
-
-    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
-                                        const std::vector<repl::OplogEntry>& statements,
-                                        const repl::OpTime& prepareOpTime) final {}
-
-    void onTransactionAbort(OperationContext* opCtx,
-                            boost::optional<OplogSlot> abortOplogEntryOpTime) final {}
-
-    void onBatchedWriteStart(OperationContext* opCtx) final {}
-
-    void onBatchedWriteCommit(OperationContext* opCtx) final {}
-
-    void onBatchedWriteAbort(OperationContext* opCtx) final {}
-
-    void onMajorityCommitPointUpdate(ServiceContext* service,
-                                     const repl::OpTime& newCommitPoint) final {}
-
+    // The on*Transaction*() transaction commit related hooks don't need to be checked, because all
+    // of the operations inside the transaction are checked and they all execute in one WUOW.
 private:
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
-
     // uasserts that a write to the given namespace is allowed under the current user write blocking
     // setting.
     void _checkWriteAllowed(OperationContext* opCtx, const NamespaceString& nss);

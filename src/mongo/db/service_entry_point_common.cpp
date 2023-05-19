@@ -54,6 +54,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/initialize_api_parameters.h"
+#include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time_validator.h"
@@ -75,13 +76,12 @@
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_entry_point_common.h"
-#include "mongo/db/session/initialize_operation_session_info.h"
-#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/stats/api_version_metrics.h"
@@ -106,6 +106,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
@@ -122,7 +123,6 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotPrimaryInCommandDispatch);
-MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
@@ -499,6 +499,10 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
                                          bool isInternalClient,
                                          const repl::OpTime& lastOpBeforeRun,
                                          const repl::OpTime& lastOpAfterRun) {
+    if (!code && !wcCode) {
+        return;
+    }
+
     auto errorLabels = getErrorLabels(opCtx,
                                       sessionOptions,
                                       commandName,
@@ -746,6 +750,10 @@ private:
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
     bool _refreshedCatalogCache = false;
+    // Keep a static variable to track the last time a warning about direct shard connections was
+    // logged.
+    static Mutex _staticMutex;
+    static Date_t _lastDirectConnectionWarningTime;
 };
 
 class RunCommandImpl {
@@ -875,7 +883,7 @@ Future<void> InvokeCommand::run() {
                const auto dbName = _ecd->getInvocation()->ns().dbName();
                // TODO SERVER-53761: find out if we can do this more asynchronously. The client
                // Strand is locked to current thread in SessionWorkflow::Impl::startNewLoop().
-               tenant_migration_access_blocker::checkIfCanReadOrBlock(
+               tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
                    execContext->getOpCtx(), dbName, execContext->getRequest())
                    .get(execContext->getOpCtx());
                return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
@@ -894,7 +902,7 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
                auto execContext = _ecd->getExecutionContext();
                const auto dbName = _ecd->getInvocation()->ns().dbName();
                // TODO SERVER-53761: find out if we can do this more asynchronously.
-               tenant_migration_access_blocker::checkIfCanReadOrBlock(
+               tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
                    execContext->getOpCtx(), dbName, execContext->getRequest())
                    .get(execContext->getOpCtx());
                return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
@@ -1439,6 +1447,9 @@ Future<void> RunCommandAndWaitForWriteConcern::_checkWriteConcern() {
     return Status::OK();
 }
 
+Mutex ExecCommandDatabase::_staticMutex = MONGO_MAKE_LATCH("DirectShardConnectionTimer");
+Date_t ExecCommandDatabase::_lastDirectConnectionWarningTime = Date_t();
+
 void ExecCommandDatabase::_initiateCommand() {
     auto opCtx = _execContext->getOpCtx();
     auto& request = _execContext->getRequest();
@@ -1459,7 +1470,7 @@ void ExecCommandDatabase::_initiateCommand() {
         _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.value());
     }
 
-    if (isHello()) {
+    if (MONGO_unlikely(isHello())) {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
@@ -1467,21 +1478,12 @@ void ExecCommandDatabase::_initiateCommand() {
         ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem, isInternalClient);
     }
 
-    auto& apiParams = APIParameters::get(opCtx);
-    auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
     if (auto clientMetadata = ClientMetadata::get(client)) {
+        auto& apiParams = APIParameters::get(opCtx);
+        auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
         auto appName = clientMetadata->getApplicationName().toString();
         apiVersionMetrics.update(appName, apiParams);
     }
-
-    sleepMillisAfterCommandExecutionBegins.execute([&](const BSONObj& data) {
-        auto numMillis = data["millis"].numberInt();
-        auto commands = data["commands"].Obj().getFieldNames<std::set<std::string>>();
-        // Only sleep for one of the specified commands.
-        if (commands.find(command->getName()) != commands.end()) {
-            mongo::sleepmillis(numMillis);
-        }
-    });
 
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
@@ -1508,7 +1510,10 @@ void ExecCommandDatabase::_initiateCommand() {
     // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should
     // not contribute to resource consumption metrics.
     const bool collect = command->collectsResourceConsumptionMetrics() && !_isInternalClient();
-    _scopedMetrics.emplace(opCtx, dbname, collect);
+    _scopedMetrics.emplace(
+        opCtx,
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
+        collect);
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
@@ -1550,7 +1555,7 @@ void ExecCommandDatabase::_initiateCommand() {
                 topLevelFields.insert(fieldName).second);
     }
 
-    if (CommandHelpers::isHelpRequest(helpField)) {
+    if (MONGO_unlikely(CommandHelpers::isHelpRequest(helpField))) {
         CurOp::get(opCtx)->ensureStarted();
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
@@ -1570,8 +1575,9 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     _invocation->checkAuthorization(opCtx, request);
-
-    const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
+    const auto dbName =
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
+    const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1589,7 +1595,7 @@ void ExecCommandDatabase::_initiateCommand() {
         bool couldHaveOptedIn =
             allowed == Command::AllowedOnSecondary::kOptIn && !inMultiDocumentTransaction;
         bool optedIn = couldHaveOptedIn && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
-        bool canRunHere = commandCanRunHere(opCtx, dbname, command, inMultiDocumentTransaction);
+        bool canRunHere = commandCanRunHere(opCtx, dbName, command, inMultiDocumentTransaction);
         if (!canRunHere && couldHaveOptedIn) {
             const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"_sd
                                                      : "not master and slaveOk=false"_sd;
@@ -1605,7 +1611,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
         if (!command->maintenanceOk() &&
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-            !replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname) &&
+            !replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName) &&
             !replCoord->getMemberState().secondary()) {
 
             uassert(ErrorCodes::NotPrimaryOrSecondary,
@@ -1629,7 +1635,7 @@ void ExecCommandDatabase::_initiateCommand() {
             repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
             uassert(ErrorCodes::NotWritablePrimary,
                     "Cannot start a transaction in a non-primary state",
-                    replCoord->canAcceptWritesForDatabase(opCtx, dbname));
+                    replCoord->canAcceptWritesForDatabase(opCtx, dbName));
         }
     }
 
@@ -1649,35 +1655,39 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
-    // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on the
-    // OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a getMore
-    // command, where it is used to communicate the maximum time to wait for new inserts on tailable
-    // cursors, not as a deadline for the operation.
-    // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will require
-    // introducing a new 'max await time' parameter for getMore, and eventually banning maxTimeMS
-    // altogether on a getMore command.
-    const auto maxTimeMS = Milliseconds{uassertStatusOK(parseMaxTimeMS(cmdOptionMaxTimeMSField))};
-    const auto maxTimeMSOpOnly =
-        Milliseconds{uassertStatusOK(parseMaxTimeMS(maxTimeMSOpOnlyField))};
+    if (cmdOptionMaxTimeMSField || maxTimeMSOpOnlyField) {
+        // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
+        // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a
+        // getMore command, where it is used to communicate the maximum time to wait for new inserts
+        // on tailable cursors, not as a deadline for the operation.
+        //
+        // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
+        // require introducing a new 'max await time' parameter for getMore, and eventually banning
+        // maxTimeMS altogether on a getMore command.
+        const auto maxTimeMS =
+            Milliseconds{uassertStatusOK(parseMaxTimeMS(cmdOptionMaxTimeMSField))};
+        const auto maxTimeMSOpOnly =
+            Milliseconds{uassertStatusOK(parseMaxTimeMS(maxTimeMSOpOnlyField))};
 
-    if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
-        command->getLogicalOp() != LogicalOp::opGetMore) {
-        uassert(40119,
-                "Illegal attempt to set operation deadline within DBDirectClient",
-                !opCtx->getClient()->isInDirectClient());
+        if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
+            command->getLogicalOp() != LogicalOp::opGetMore) {
+            uassert(40119,
+                    "Illegal attempt to set operation deadline within DBDirectClient",
+                    !opCtx->getClient()->isInDirectClient());
 
-        // The "hello" command should not inherit the deadline from the user op it is operating as a
-        // part of as that can interfere with replica set monitoring and host selection.
-        const bool ignoreMaxTimeMSOpOnly = isHello();
+            // The "hello" command should not inherit the deadline from the user op it is operating
+            // as a part of as that can interfere with replica set monitoring and host selection.
+            const bool ignoreMaxTimeMSOpOnly = isHello();
 
-        if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > Milliseconds::zero() &&
-            (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS)) {
-            opCtx->storeMaxTimeMS(maxTimeMS);
-            opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMSOpOnly,
-                                     ErrorCodes::MaxTimeMSExpired);
-        } else if (maxTimeMS > Milliseconds::zero()) {
-            opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
-                                     ErrorCodes::MaxTimeMSExpired);
+            if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > Milliseconds::zero() &&
+                (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS)) {
+                opCtx->storeMaxTimeMS(maxTimeMS);
+                opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMSOpOnly,
+                                         ErrorCodes::MaxTimeMSExpired);
+            } else if (maxTimeMS > Milliseconds::zero()) {
+                opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
+                                         ErrorCodes::MaxTimeMSExpired);
+            }
         }
     }
 
@@ -1711,28 +1721,68 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (startTransaction) {
         _setLockStateForTransaction(opCtx);
-    }
 
-    // Remember whether or not this operation is starting a transaction, in case something later in
-    // the execution needs to adjust its behavior based on this.
-    opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
+        // Remember whether or not this operation is starting a transaction, in case something later
+        // in the execution needs to adjust its behavior based on this.
+        opCtx->setIsStartingMultiDocumentTransaction(true);
+    }
 
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
     enforceRequireAPIVersion(opCtx, command);
 
+    // Check that the client has the directShardOperations role if this is a direct operation to a
+    // shard.
+    if (command->requiresAuth() && ShardingState::get(opCtx)->enabled() &&
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gCheckForDirectShardOperations.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bool clusterHasTwoOrMoreShards = [&]() {
+            if (feature_flags::gClusterCardinalityParameter.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+                auto* clusterCardinalityParam =
+                    clusterParameters
+                        ->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+                            "shardedClusterCardinalityForDirectConns");
+                return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
+            }
+            return false;
+        }();
+        if (clusterHasTwoOrMoreShards && !command->shouldSkipDirectConnectionChecks()) {
+            const bool authIsEnabled = AuthorizationManager::get(opCtx->getServiceContext()) &&
+                AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled();
+
+            const bool hasDirectShardOperations = !authIsEnabled ||
+                ((AuthorizationSession::get(opCtx->getClient()) != nullptr &&
+                  AuthorizationSession::get(opCtx->getClient())
+                      ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                         ActionType::issueDirectShardOperations)));
+
+            if (!hasDirectShardOperations) {
+                bool timeUpdated = false;
+                auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
+                {
+                    stdx::lock_guard<Latch> lk(_staticMutex);
+                    if ((currentTime - _lastDirectConnectionWarningTime) > Hours(1)) {
+                        _lastDirectConnectionWarningTime = currentTime;
+                        timeUpdated = true;
+                    }
+                }
+                if (timeUpdated) {
+                    LOGV2_WARNING(
+                        7553700,
+                        "Command should not be run via a direct connection to a shard without the "
+                        "directShardOperations role. Please connect via a router.",
+                        "command"_attr = request.getCommandName());
+                }
+                ShardingStatistics::get(opCtx).unauthorizedDirectShardOperations.addAndFetch(1);
+            }
+        }
+    }
+
     if (!opCtx->getClient()->isInDirectClient() &&
         readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
         (iAmPrimary || (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
-        // If a timeseries collection is sharded, only the buckets collection would be sharded. We
-        // expect all versioned commands to be sent over 'system.buckets' namespace. But it is
-        // possible that a stale mongos may send the request over a view namespace. In this case, we
-        // initialize the 'OperationShardingState' with buckets namespace.
-        auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
-        // Hold reference to the catalog for collection lookup without locks to be safe.
-        auto catalog = CollectionCatalog::get(opCtx);
-        auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-        auto namespaceForSharding =
-            (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
         boost::optional<ShardVersion> shardVersion;
         if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
             shardVersion = ShardVersion::parse(shardVersionElem);
@@ -1743,8 +1793,21 @@ void ExecCommandDatabase::_initiateCommand() {
             databaseVersion = DatabaseVersion(databaseVersionElem.Obj());
         }
 
-        OperationShardingState::setShardRole(
-            opCtx, namespaceForSharding, shardVersion, databaseVersion);
+        if (shardVersion || databaseVersion) {
+            // If a timeseries collection is sharded, only the buckets collection would be sharded.
+            // We expect all versioned commands to be sent over 'system.buckets' namespace. But it
+            // is possible that a stale mongos may send the request over a view namespace. In this
+            // case, we initialize the 'OperationShardingState' with buckets namespace.
+            auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
+            // Hold reference to the catalog for collection lookup without locks to be safe.
+            auto catalog = CollectionCatalog::get(opCtx);
+            auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
+            auto namespaceForSharding =
+                (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
+
+            OperationShardingState::setShardRole(
+                opCtx, namespaceForSharding, shardVersion, databaseVersion);
+        }
     }
 
     _scoped = _execContext->behaviors->scopedOperationCompletionShardingActions(opCtx);

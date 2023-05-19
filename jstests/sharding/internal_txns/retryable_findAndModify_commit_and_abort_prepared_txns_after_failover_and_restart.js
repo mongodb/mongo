@@ -19,11 +19,7 @@ TestData.skipCheckDBHashes = true;
 load("jstests/replsets/rslib.js");
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
-function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
-    runFindAndModifyWithPreOrPostImage,
-    abortTxnAfterFailover,
-    enableFindAndModifyImageCollection
-}) {
+function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
     jsTest.log("Testing with options " + tojson(testOpts));
 
     const sessionUUID = UUID();

@@ -31,10 +31,6 @@
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
 namespace mongo::optimizer::ce {
-// Invalid estimate - an arbitrary negative value used for initialization.
-constexpr SelectivityType kInvalidSel{-1.0};
-constexpr CEType kInvalidEstimate{-1.0};
-
 constexpr SelectivityType kDefaultFilterSel{0.1};
 constexpr SelectivityType kDefaultExistsSel{0.70};
 

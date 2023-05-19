@@ -7,6 +7,8 @@
  */
 (function() {
 "use strict";
+load("jstests/libs/fixture_helpers.js");
+
 var dbName = 'dbstats_not_blocked_by_txn';
 var mydb = db.getSiblingDB(dbName);
 
@@ -16,8 +18,7 @@ mydb.createCollection("foo", {writeConcern: {w: "majority"}});
 var session = db.getMongo().startSession();
 var sessionDb = session.getDatabase(dbName);
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
-if (isMongos) {
+if (FixtureHelpers.isMongos(db)) {
     // Before starting the transaction below, access the collection so it can be implicitly
     // sharded and force all shards to refresh their database versions because the refresh
     // requires an exclusive lock and would block behind the transaction.

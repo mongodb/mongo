@@ -3,7 +3,7 @@
 //   requires_scripting,
 // ]
 
-t = db.jstests_js8;
+let t = db.jstests_js8;
 t.drop();
 
 t.save({a: 1, b: [2, 3, 4]});

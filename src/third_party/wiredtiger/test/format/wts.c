@@ -177,6 +177,8 @@ configure_timing_stress(char **p, size_t max)
         CONFIG_APPEND(*p, ",history_store_search");
     if (GV(STRESS_HS_SWEEP))
         CONFIG_APPEND(*p, ",history_store_sweep_race");
+    if (GV(STRESS_PREPARE_RESOLUTION))
+        CONFIG_APPEND(*p, ",prepare_resolution");
     if (GV(STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE))
         CONFIG_APPEND(*p, ",sleep_before_read_overflow_onpage");
     if (GV(STRESS_SPLIT_1))
@@ -292,7 +294,7 @@ configure_tiered_storage(const char *home, char **p, size_t max, char *ext_cfg, 
     opts.absolute_bucket_dir = true;
 
     testutil_tiered_storage_configuration(
-      &opts, tiered_cfg, sizeof(tiered_cfg), ext_cfg, ext_cfg_size);
+      &opts, home, tiered_cfg, sizeof(tiered_cfg), ext_cfg, ext_cfg_size);
     CONFIG_APPEND(*p, ",%s", tiered_cfg);
 }
 

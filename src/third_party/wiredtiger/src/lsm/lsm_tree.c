@@ -284,6 +284,8 @@ int
 __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     __wt_epoch(session, &chunk->create_time);
 
     WT_RET(__wt_spin_init(session, &chunk->timestamp_spinlock, "LSM chunk timestamp"));
@@ -705,6 +707,8 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
     uint32_t chunks_moved, nchunks, new_id;
     bool first_switch;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     __wt_lsm_tree_writelock(session, lsm_tree);
 
     nchunks = lsm_tree->nchunks;
@@ -949,6 +953,9 @@ __wt_lsm_tree_truncate(WT_SESSION_IMPL *session, const char *name, const char *c
     bool locked;
 
     WT_UNUSED(cfg);
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
 
     chunk = NULL;
     WT_NOT_READ(locked, false);

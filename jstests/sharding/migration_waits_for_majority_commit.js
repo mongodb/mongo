@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/write_concern_util.js");
 
 // Set up a sharded cluster with two shards, two chunks, and one document in one of the chunks.

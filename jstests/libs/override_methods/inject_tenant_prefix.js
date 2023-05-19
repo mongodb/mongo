@@ -320,6 +320,19 @@ function extractTenantMigrationError(resObj, errorCode) {
             }
         }
     }
+
+    // BulkWrite command has errors contained in a cursor response. The error will always be
+    // in the first batch of the cursor response since getMore is not allowed to run with
+    // tenant migration / shard merge suites.
+    if (resObj.cursor) {
+        if (resObj.cursor.firstBatch) {
+            for (let opRes of resObj.cursor.firstBatch) {
+                if (opRes.code && opRes.code == errorCode) {
+                    return {code: opRes.code, errmsg: opRes.errmsg};
+                }
+            }
+        }
+    }
     return null;
 }
 
@@ -390,6 +403,15 @@ function modifyCmdObjForRetry(cmdObj, resObj) {
             retryOps = cmdObj.deletes.slice(resObj.writeErrors[0].index);
         }
         cmdObj.deletes = retryOps;
+    }
+
+    if (cmdObj.bulkWrite) {
+        let retryOps = [];
+        // For bulkWrite tenant migration errors always act as if they are executed as
+        // `ordered:true` meaning we will have to retry every op from the one that errored.
+        retryOps =
+            cmdObj.ops.slice(resObj.cursor.firstBatch[resObj.cursor.firstBatch.length - 1].idx);
+        cmdObj.ops = retryOps;
     }
 }
 
@@ -533,6 +555,7 @@ function runCommandRetryOnTenantMigrationErrors(
     let nModified = 0;
     let upserted = [];
     let nonRetryableWriteErrors = [];
+    let bulkWriteResponse = {};
     const isRetryableWrite =
         cmdObjWithTenantId.txnNumber && !cmdObjWithTenantId.hasOwnProperty("autocommit");
 
@@ -575,6 +598,31 @@ function runCommandRetryOnTenantMigrationErrors(
         // Add/modify the shells's n, nModified, upserted, and writeErrors, unless this command is
         // part of a retryable write.
         if (!isRetryableWrite) {
+            // bulkWrite case.
+            if (cmdObjWithTenantId.bulkWrite) {
+                // First attempt store the whole response.
+                if (numAttempts == 1) {
+                    bulkWriteResponse = resObj;
+                } else {
+                    // The last item from the previous response is guaranteed to be a
+                    // tenant migration error. Remove it to append the retried response.
+                    let newIdx = bulkWriteResponse.cursor.firstBatch.pop().idx;
+                    // Iterate over new response and change the indexes to start with newIdx.
+                    for (let opRes of resObj.cursor.firstBatch) {
+                        opRes.idx = newIdx;
+                        newIdx += 1;
+                    }
+
+                    // Add the new responses (with modified indexes) onto the original responses.
+                    bulkWriteResponse.cursor.firstBatch =
+                        bulkWriteResponse.cursor.firstBatch.concat(resObj.cursor.firstBatch);
+
+                    // Add new numErrors onto old numErrors. Subtract one to account for the
+                    // tenant migration error that was popped off.
+                    bulkWriteResponse.numErrors += resObj.numErrors - 1;
+                }
+            }
+
             if (resObj.n) {
                 n += resObj.n;
             }
@@ -706,6 +754,9 @@ function runCommandRetryOnTenantMigrationErrors(
                 }
                 if (nonRetryableWriteErrors.length > 0) {
                     resObj.writeErrors = nonRetryableWriteErrors;
+                }
+                if (cmdObjWithTenantId.bulkWrite) {
+                    resObj = bulkWriteResponse;
                 }
             }
             return resObj;

@@ -453,11 +453,14 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
         }
     };
     generateTestCasesForOperations(OplogApplication::Mode::kSecondary, {}, true);
-    generateTestCasesForOperations(OplogApplication::Mode::kRecovering, {}, true);
+    generateTestCasesForOperations(OplogApplication::Mode::kUnstableRecovering, {}, true);
+    generateTestCasesForOperations(OplogApplication::Mode::kStableRecovering, {}, true);
     generateTestCasesForOperations(OplogApplication::Mode::kInitialSync, {}, false);
     const auto kFromMigrate{true};
     generateTestCasesForOperations(OplogApplication::Mode::kSecondary, kFromMigrate, false);
-    generateTestCasesForOperations(OplogApplication::Mode::kRecovering, kFromMigrate, false);
+    generateTestCasesForOperations(
+        OplogApplication::Mode::kUnstableRecovering, kFromMigrate, false);
+    generateTestCasesForOperations(OplogApplication::Mode::kStableRecovering, kFromMigrate, false);
     generateTestCasesForOperations(OplogApplication::Mode::kInitialSync, kFromMigrate, false);
 
     int docId{0};
@@ -586,11 +589,11 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantRequireTenantIDFa
     auto tid{TenantId(OID::gen())};
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.foo");
 
-    auto op =
-        BSON("op"
-             << "c"
-             << "ns" << nss.getCommandNS().toStringWithTenantId() << "wall" << Date_t() << "o"
-             << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss.getCommandNS().toStringWithTenantId_forTest() << "wall"
+                   << Date_t() << "o" << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1)
+                   << "ui" << UUID::gen());
 
 
     bool applyCmdCalled = false;
@@ -714,8 +717,8 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantRequireTenantIDFa
     const NamespaceString targetNss =
         NamespaceString::createNamespaceString_forTest(tid, "test.bar");
 
-    auto oRename = BSON("renameCollection" << sourceNss.toStringWithTenantId() << "to"
-                                           << targetNss.toStringWithTenantId());
+    auto oRename = BSON("renameCollection" << sourceNss.toStringWithTenantId_forTest() << "to"
+                                           << targetNss.toStringWithTenantId_forTest());
 
     repl::createCollection(_opCtx.get(), sourceNss, {});
     // createCollection uses an actual opTime, so we must generate an actually opTime in the future.
@@ -749,8 +752,8 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantAcrossTenantsRequ
 
     ASSERT_NE(sourceNss, wrongTargetNss);
 
-    auto oRename = BSON("renameCollection" << sourceNss.toStringWithTenantId() << "to"
-                                           << wrongTargetNss.toStringWithTenantId());
+    auto oRename = BSON("renameCollection" << sourceNss.toStringWithTenantId_forTest() << "to"
+                                           << wrongTargetNss.toStringWithTenantId_forTest());
 
     repl::createCollection(_opCtx.get(), sourceNss, {});
     // createCollection uses an actual opTime, so we must generate an actually opTime in the future.
@@ -1472,7 +1475,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionAllAt
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
         _writerPool.get());
 
     // Apply both inserts and the commit in a single batch.  We expect no oplog entries to
@@ -1839,8 +1842,8 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
         _cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "c"
-                                           << "ns" << _nss.toStringWithTenantId() << "ui" << *_uuid
-                                           << "o" << BSON("create" << _nss.coll())))
+                                           << "ns" << _nss.toStringWithTenantId_forTest() << "ui"
+                                           << *_uuid << "o" << BSON("create" << _nss.coll())))
                         << "partialTxn" << true),
         _lsid,
         _txnNum,
@@ -1852,8 +1855,8 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
         _cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns" << _nss.toStringWithTenantId() << "ui" << *_uuid
-                                           << "o" << BSON("_id" << 1)))
+                                           << "ns" << _nss.toStringWithTenantId_forTest() << "ui"
+                                           << *_uuid << "o" << BSON("_id" << 1)))
                         << "partialTxn" << true),
         _lsid,
         _txnNum,
@@ -2168,7 +2171,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
         _writerPool.get());
 
     // Apply a batch with the insert operations.  This should have no effect, because this is
@@ -2423,7 +2426,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
         _writerPool.get());
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
@@ -3696,10 +3699,6 @@ public:
         // secondary index creation does not. We use an UnreplicatedWritesBlock to avoid
         // timestamping any of the catalog setup.
         repl::UnreplicatedWritesBlock noRep(_opCtx.get());
-        MongoDSessionCatalog::set(
-            _opCtx->getServiceContext(),
-            std::make_unique<MongoDSessionCatalog>(
-                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx.get());
         mongoDSessionCatalog->onStepUp(_opCtx.get());

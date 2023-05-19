@@ -4,7 +4,7 @@
 
 (function() {
 "use strict";
-load('./jstests/multiVersion/libs/multi_rs.js');
+load('jstests/multiVersion/libs/multi_rs.js');
 
 const lastLTSVersion = "last-lts";
 const latestVersion = "latest";

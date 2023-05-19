@@ -64,7 +64,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const std::vector<ShardId>& reshardedCollectionPlacement);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
-                              const ReshardingCoordinatorDocument& coordinatorDoc);
+                              const ReshardingCoordinatorDocument& coordinatorDoc,
+                              TxnNumber txnNumber);
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           ReshardingMetrics* metrics,

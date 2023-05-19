@@ -7,7 +7,7 @@
 
 load("jstests/replsets/rslib.js");
 
-var rs = new ReplSetTest({name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}});
+const rs = new ReplSetTest({name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}});
 var nodes = rs.startSet();
 rs.initiate();
 

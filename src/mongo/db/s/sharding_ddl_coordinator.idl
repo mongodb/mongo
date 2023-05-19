@@ -52,8 +52,6 @@ enums:
             # TODO SERVER-73627: Remove once 7.0 becomes last LTS.
             kDropCollectionPre70Compatible: "dropCollection"
             kRenameCollection: "renameCollection_V2"
-            # TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-            kRenameCollectionPre63Compatible: "renameCollection"
             kCreateCollection: "createCollection_V3"
             # TODO SERVER-68008: Remove once 7.0 becomes last LTS
             kCreateCollectionPre61Compatible: "createCollection_V2"
@@ -65,10 +63,7 @@ enums:
             kReshardCollection: "reshardCollection"
             # Note: the V3 refers to the coordinator version, not the FLE2 protocol version
             kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V3"
-            # TODO SERVER-68373: Remove once 7.0 becomes last LTS
-            kCompactStructuredEncryptionDataPre70Compatible: "compactStructuredEncryptionData_V2"
-            # TODO SERVER-68373 remove once 7.0 becomes last LTS
-            kCompactStructuredEncryptionDataPre61Compatible: "compactStructuredEncryptionData"
+            kCleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
 
 types:
     ForwardableOperationMetadata:

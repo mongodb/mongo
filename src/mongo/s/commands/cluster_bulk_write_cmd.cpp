@@ -101,9 +101,6 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) final {
-            uasserted(ErrorCodes::CommandNotSupported,
-                      "BulkWrite on mongos is not currently supported.");
-
             uassert(
                 ErrorCodes::CommandNotSupported,
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
@@ -131,7 +128,8 @@ public:
             const auto& req = request();
             auto reqObj = unparsedRequest().body;
 
-            const NamespaceString cursorNss = NamespaceString::makeBulkWriteNSS();
+            const NamespaceString cursorNss =
+                NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
             ClusterClientCursorParams params(cursorNss,
                                              APIParameters::get(opCtx),
                                              ReadPreferenceSetting::get(opCtx),
@@ -173,8 +171,8 @@ public:
                 numRepliesInFirstBatch++;
                 responseSizeTracker.add(nextObj);
             }
+            CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
             if (numRepliesInFirstBatch == replyItems.size()) {
-                collectTelemetryMongos(opCtx, reqObj, numRepliesInFirstBatch);
                 return BulkWriteCommandReply(
                     BulkWriteCommandResponseCursor(
                         0, std::vector<BulkWriteReplyItem>(std::move(replyItems))),
@@ -183,7 +181,6 @@ public:
 
             ccc->detachFromOperationContext();
             ccc->incNBatches();
-            collectTelemetryMongos(opCtx, ccc, numRepliesInFirstBatch);
 
             auto authUser =
                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();

@@ -182,6 +182,13 @@ public:
                                 OperationContextSession::CheckInReason reason);
     void checkOutUnscopedSession(OperationContext* opCtx);
 
+    /**
+     * Returns a function that should be used to determine when a session can be eagerly reaped from
+     * the SessionCatalog on a mongod.
+     */
+    SessionCatalog::ScanSessionsCallbackFn makeSessionWorkerFnForEagerReap(
+        TxnNumber clientTxnNumberStarted, SessionCatalog::Provenance provenance);
+
 private:
     std::unique_ptr<MongoDSessionCatalogTransactionInterface> _ti;
 };

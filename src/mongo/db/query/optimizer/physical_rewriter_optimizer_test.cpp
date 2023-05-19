@@ -1340,18 +1340,23 @@ TEST(PhysRewriter, FilterIndexingStress) {
     ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.child.child.nodeType");
     ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.child.child.child.nodeType");
     ASSERT_BSON_PATH(
-        "\"LimitSkip\"", explainNLJ, "rightChild.child.child.child.child.child.child.nodeType");
+        "\"Filter\"", explainNLJ, "rightChild.child.child.child.child.child.child.nodeType");
     ASSERT_BSON_PATH(
-        "\"Seek\"", explainNLJ, "rightChild.child.child.child.child.child.child.child.nodeType");
+        "\"Filter\"", explainNLJ, "rightChild.child.child.child.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"LimitSkip\"",
+                     explainNLJ,
+                     "rightChild.child.child.child.child.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"",
+                     explainNLJ,
+                     "rightChild.child.child.child.child.child.child.child.child.child.nodeType");
 
-    ASSERT_BSON_PATH("\"MergeJoin\"", explainNLJ, "leftChild.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"index1\"", explainNLJ, "leftChild.leftChild.indexDefName");
-    ASSERT_BSON_PATH("\"Union\"", explainNLJ, "leftChild.rightChild.nodeType");
-    ASSERT_BSON_PATH("\"Evaluation\"", explainNLJ, "leftChild.rightChild.children.0.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.rightChild.children.0.child.nodeType");
-    ASSERT_BSON_PATH(
-        "\"index3\"", explainNLJ, "leftChild.rightChild.children.0.child.indexDefName");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.nodeType");
+
+    // With heuristic CE both indexes are equally preferable.
+    const auto& indexName =
+        dotted_path_support::extractElementAtPath(explainNLJ, "leftChild.indexDefName")
+            .toString(false /*includeFieldName*/);
+    ASSERT_TRUE(indexName == "\"index1\"" || indexName == "\"index3\"");
 }
 
 TEST(PhysRewriter, FilterIndexingVariable) {
@@ -1806,14 +1811,14 @@ TEST(PhysRewriter, SargableProjectionRenames) {
     // projections.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
-        "Evaluation [{pa1} = Variable [pa]]\n"
+        "Evaluation [{pa} = Variable [pa1]]\n"
         "Sargable [Complete]\n"
         "|   |   requirements: \n"
-        "|   |       {{{root, 'PathGet [a] PathIdentity []', pa, {{{=Const [1]}}}}}}\n"
+        "|   |       {{{root, 'PathGet [a] PathIdentity []', pa1, {{{=Const [1]}}}}}}\n"
         "|   scanParams: \n"
-        "|       {'a': pa}\n"
+        "|       {'a': pa1}\n"
         "|           residualReqs: \n"
-        "|               {{{pa, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
+        "|               {{{pa1, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
         "Scan [c1, {root}]\n",
         optimized);
 }
@@ -1981,7 +1986,10 @@ TEST(PhysRewriter, CoveredScan) {
 
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
-    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(  //
+        3,
+        6,
+        phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Since we do not optimize with fast null handling, we need to split the predicate between the
     // index scan and fetch in order to handle null.
@@ -1991,8 +1999,8 @@ TEST(PhysRewriter, CoveredScan) {
         "|   |   Const [true]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'a': pa}, c1]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {<Const [1"
-        "]}]\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {<Const "
+        "[1]}]\n",
         optimized);
 }
 

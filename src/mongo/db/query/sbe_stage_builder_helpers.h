@@ -518,7 +518,7 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
                                                      sbe::value::SlotId recordIdSlot,
                                                      std::vector<std::string> fields,
                                                      sbe::value::SlotVector fieldSlots,
-                                                     sbe::value::SlotId seekKeySlot,
+                                                     sbe::value::SlotId seekRecordIdSlot,
                                                      sbe::value::SlotId snapshotIdSlot,
                                                      sbe::value::SlotId indexIdentSlot,
                                                      sbe::value::SlotId indexKeySlot,

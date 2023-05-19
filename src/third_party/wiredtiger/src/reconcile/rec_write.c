@@ -112,21 +112,26 @@ err:
      * (it's just a statistic).
      */
     session->reconcile_timeline.reconcile_finish = __wt_clock(session);
-    if (WT_CLOCKDIFF_SEC(session->reconcile_timeline.hs_wrapup_finish,
-          session->reconcile_timeline.hs_wrapup_start) > conn->rec_maximum_hs_wrapup_seconds)
-        conn->rec_maximum_hs_wrapup_seconds =
-          WT_CLOCKDIFF_SEC(session->reconcile_timeline.hs_wrapup_finish,
+    if (WT_CLOCKDIFF_MS(session->reconcile_timeline.hs_wrapup_finish,
+          session->reconcile_timeline.hs_wrapup_start) > conn->rec_maximum_hs_wrapup_milliseconds)
+        conn->rec_maximum_hs_wrapup_milliseconds =
+          WT_CLOCKDIFF_MS(session->reconcile_timeline.hs_wrapup_finish,
             session->reconcile_timeline.hs_wrapup_start);
-    if (WT_CLOCKDIFF_SEC(session->reconcile_timeline.image_build_finish,
-          session->reconcile_timeline.image_build_start) > conn->rec_maximum_image_build_seconds)
-        conn->rec_maximum_image_build_seconds =
-          WT_CLOCKDIFF_SEC(session->reconcile_timeline.image_build_finish,
+    if (WT_CLOCKDIFF_MS(session->reconcile_timeline.image_build_finish,
+          session->reconcile_timeline.image_build_start) >
+      conn->rec_maximum_image_build_milliseconds)
+        conn->rec_maximum_image_build_milliseconds =
+          WT_CLOCKDIFF_MS(session->reconcile_timeline.image_build_finish,
             session->reconcile_timeline.image_build_start);
     if (WT_CLOCKDIFF_SEC(session->reconcile_timeline.reconcile_finish,
-          session->reconcile_timeline.reconcile_start) > conn->rec_maximum_seconds)
-        conn->rec_maximum_seconds = WT_CLOCKDIFF_SEC(session->reconcile_timeline.reconcile_finish,
-          session->reconcile_timeline.reconcile_start);
-
+          session->reconcile_timeline.reconcile_start) > conn->rec_maximum_milliseconds)
+        conn->rec_maximum_milliseconds =
+          WT_CLOCKDIFF_MS(session->reconcile_timeline.reconcile_finish,
+            session->reconcile_timeline.reconcile_start);
+    if (session->reconcile_timeline.total_reentry_hs_eviction_time >
+      conn->cache->reentry_hs_eviction_ms)
+        conn->cache->reentry_hs_eviction_ms =
+          session->reconcile_timeline.total_reentry_hs_eviction_time;
     return (ret);
 }
 
@@ -177,6 +182,9 @@ __reconcile_post_wrapup(
     WT_BTREE *btree;
 
     btree = S2BT(session);
+
+    /* Ensure that we own the lock before unlocking the page, as we unlock it unconditionally. */
+    WT_ASSERT_SPINLOCK_OWNED(session, &page->modify->page_lock);
 
     page->modify->flags = 0;
 
@@ -246,6 +254,9 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     btree = S2BT(session);
     page = ref->page;
 
+    if (*page_lockedp)
+        WT_ASSERT_SPINLOCK_OWNED(session, &page->modify->page_lock);
+
     /* Save the eviction state. */
     __reconcile_save_evict_state(session, ref, flags);
 
@@ -253,7 +264,9 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     WT_RET(__rec_init(session, ref, flags, salvage, &session->reconcile));
     r = session->reconcile;
 
-    session->reconcile_timeline.image_build_start = __wt_clock(session);
+    /* Only update if we are in the first entry into eviction. */
+    if (!session->evict_timeline.reentry_hs_eviction)
+        session->reconcile_timeline.image_build_start = __wt_clock(session);
 
     /* Reconcile the page. */
     switch (page->type) {
@@ -282,7 +295,8 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
         break;
     }
 
-    session->reconcile_timeline.image_build_finish = __wt_clock(session);
+    if (!session->evict_timeline.reentry_hs_eviction)
+        session->reconcile_timeline.image_build_finish = __wt_clock(session);
 
     /*
      * If we failed, don't bail out yet; we still need to update stats and tidy up.
@@ -367,6 +381,22 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
     mod = page->modify;
 
     /*
+     * Track the page's maximum transaction ID (used to decide if we can evict a clean page and
+     * discard its history).
+     */
+    mod->rec_max_txn = r->max_txn;
+    mod->rec_max_timestamp = r->max_ts;
+
+    /*
+     * Track the tree's maximum transaction ID (used to decide if it's safe to discard the tree) and
+     * maximum timestamp.
+     */
+    if (WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
+        btree->rec_max_txn = r->max_txn;
+    if (btree->rec_max_timestamp < r->max_ts)
+        btree->rec_max_timestamp = r->max_ts;
+
+    /*
      * Set the page's status based on whether or not we cleaned the page.
      */
     if (r->leave_dirty) {
@@ -392,27 +422,6 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
           !F_ISSET(r, WT_REC_EVICT) ||
             (F_ISSET(r, WT_REC_HS | WT_REC_IN_MEMORY) || WT_IS_METADATA(btree->dhandle)));
     } else {
-        /*
-         * Track the page's maximum transaction ID (used to decide if we can evict a clean page and
-         * discard its history).
-         */
-        mod->rec_max_txn = r->max_txn;
-        mod->rec_max_timestamp = r->max_ts;
-
-        /*
-         * Track the tree's maximum transaction ID (used to decide if it's safe to discard the
-         * tree). Reconciliation for eviction is multi-threaded, only update the tree's maximum
-         * transaction ID when doing a checkpoint. That's sufficient, we only care about the maximum
-         * transaction ID of current updates in the tree, and checkpoint visits every dirty page in
-         * the tree.
-         */
-        if (!F_ISSET(r, WT_REC_EVICT)) {
-            if (WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
-                btree->rec_max_txn = r->max_txn;
-            if (btree->rec_max_timestamp < r->max_ts)
-                btree->rec_max_timestamp = r->max_ts;
-        }
-
         /*
          * We set the page state to mark it as having been dirtied for the first time prior to
          * reconciliation. A failed atomic cas indicates that an update has taken place during

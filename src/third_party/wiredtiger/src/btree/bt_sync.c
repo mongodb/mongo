@@ -20,6 +20,8 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_TXN *txn;
     u_int i;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
+
     mod = ref->page->modify;
     txn = session->txn;
 
@@ -182,8 +184,11 @@ __sync_page_skip(
      * FIXME: Read internal pages from non-logged tables when the remove/truncate
      * operation is performed using no timestamp.
      */
+
     if (addr.type == WT_ADDR_LEAF_NO ||
-      (!F_ISSET(S2BT(session), WT_BTREE_LOGGED) && addr.ta.newest_stop_durable_ts == WT_TS_NONE)) {
+      (addr.ta.newest_stop_durable_ts == WT_TS_NONE &&
+        (F_ISSET(S2C(session), WT_CONN_CKPT_CLEANUP_SKIP_INT) ||
+          !F_ISSET(S2BT(session), WT_BTREE_LOGGED)))) {
         __wt_verbose_debug2(
           session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
         WT_STAT_CONN_DATA_INCR(session, cc_pages_walk_skipped);
@@ -438,6 +443,22 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                     __wt_checkpoint_progress(session, false);
             }
         }
+
+        /*
+         * During normal checkpoints, mark the tree dirty if the btree has modifications that are
+         * not visible to the checkpoint. There is a drawback in this approach as we compare the
+         * btree's maximum transaction id with the checkpoint snap_min and it is possible that this
+         * transaction may be visible to the checkpoint, but still, we mark the tree as dirty if
+         * there is a long-running transaction in the database.
+         *
+         * Do not mark the tree dirty if there is no change to stable timestamp compared to the last
+         * checkpoint.
+         */
+        if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT) &&
+          (btree->rec_max_txn >= txn->snap_min ||
+            (conn->txn_global.checkpoint_timestamp != conn->txn_global.last_ckpt_timestamp &&
+              btree->rec_max_timestamp > conn->txn_global.checkpoint_timestamp)))
+            __wt_tree_modify_set(session);
         break;
     case WT_SYNC_CLOSE:
     case WT_SYNC_DISCARD:

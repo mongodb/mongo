@@ -124,6 +124,9 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
     __wt_verbose(session, WT_VERB_BLOCK, "close: %s", block->name == NULL ? "" : block->name);
 
+    /* We shouldn't have any read requests in progress. */
+    WT_ASSERT(session, block->read_count == 0);
+
     /* If we failed during allocation, the block won't have been linked. */
     if (block->linked) {
         hash = __wt_hash_city64(block->name, strlen(block->name));

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -38,7 +35,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/bson_extract_optime.h"
@@ -82,7 +79,6 @@
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace repl {
@@ -1561,7 +1557,7 @@ protected:
         bool force, Milliseconds waitTime, Milliseconds stepDownTime) {
         using PromisedClientAndOperation = stdx::promise<SharedClientAndOperation>;
         auto task = stdx::packaged_task<boost::optional<Status>(PromisedClientAndOperation)>(
-            [=](PromisedClientAndOperation operationPromise) -> boost::optional<Status> {
+            [=, this](PromisedClientAndOperation operationPromise) -> boost::optional<Status> {
                 auto result = SharedClientAndOperation::make(getServiceContext());
                 operationPromise.set_value(result);
                 try {
@@ -2019,7 +2015,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     {
         // We can't take writes yet since we're still in drain mode.
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
     }
 
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
@@ -2044,7 +2040,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     // in drain mode.
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+        ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
     }
 
     // Now complete drain mode and ensure that we become capable of taking writes.
@@ -2053,7 +2049,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
 class StepDownTestWithUnelectableNode : public StepDownTest {
@@ -2941,7 +2937,7 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     // This is the important check, that we stepped back up when aborting the stepdown command
     // attempt.
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
 // Test that if a stepdown command is blocked waiting for secondaries to catch up when an
@@ -3001,7 +2997,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
 TEST_F(ReplCoordTest, GetReplicationModeNone) {

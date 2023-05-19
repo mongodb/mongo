@@ -33,8 +33,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/util/concepts.h"
-
 namespace mongo::optimizer {
 namespace algebra {
 
@@ -66,19 +64,17 @@ class OpFixedArity : public OpNodeStorage<Slot, Arity> {
     using Base = OpNodeStorage<Slot, Arity>;
 
 public:
-    TEMPLATE(typename... Ts)
-    REQUIRES(sizeof...(Ts) == Arity)
-    OpFixedArity(Ts&&... vals) : Base({std::forward<Ts>(vals)...}) {}
+    template <typename... Ts>
+    requires(sizeof...(Ts) == Arity) OpFixedArity(Ts&&... vals)
+        : Base({std::forward<Ts>(vals)...}) {}
 
-    TEMPLATE(int I)
-    REQUIRES(I >= 0 && I < Arity)
-    auto& get() noexcept {
+    template <int I>
+    requires(I >= 0 && I < Arity) auto& get() noexcept {
         return this->_nodes[I];
     }
 
-    TEMPLATE(int I)
-    REQUIRES(I >= 0 && I < Arity)
-    const auto& get() const noexcept {
+    template <int I>
+    requires(I >= 0 && I < Arity) const auto& get() const noexcept {
         return this->_nodes[I];
     }
 };

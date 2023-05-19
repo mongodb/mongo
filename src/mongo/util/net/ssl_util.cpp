@@ -62,6 +62,22 @@ StatusWith<StringData> findPEMBlob(StringData blob,
     return StringData(blob.rawData() + headerPosition, trailerPosition - headerPosition);
 }
 
+
+StatusWith<std::string> readPEMFile(StringData fileName) {
+    // Calling `toString()` is necessary as `fileName` does not have to be null-terminated.
+    std::ifstream pemFile(fileName.toString(), std::ios::binary);
+    if (!pemFile.is_open()) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("Failed to open PEM file: {}", fileName));
+    }
+
+    std::string buf((std::istreambuf_iterator<char>(pemFile)), std::istreambuf_iterator<char>());
+
+    pemFile.close();
+
+    return buf;
+}
+
 }  // namespace ssl_util
 
 }  // namespace mongo

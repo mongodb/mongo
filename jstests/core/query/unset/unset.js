@@ -1,10 +1,7 @@
-t = db.unset;
+let t = db.unset;
 t.drop();
 
-orig = {
-    _id: 1,
-    emb: {}
-};
+let orig = {_id: 1, emb: {}};
 t.insert(orig);
 
 t.update({_id: 1}, {$unset: {'emb.a': 1}});

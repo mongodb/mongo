@@ -29,8 +29,8 @@ for (var test = 0; test < numTests; test++) {
             x = x[0];
         }
 
-        xp = x * Math.cos(rotation) - y * Math.sin(rotation);
-        yp = y * Math.cos(rotation) + x * Math.sin(rotation);
+        let xp = x * Math.cos(rotation) - y * Math.sin(rotation);
+        let yp = y * Math.cos(rotation) + x * Math.sin(rotation);
 
         var scaleX = (bounds[1] - bounds[0]) / 360;
         var scaleY = (bounds[1] - bounds[0]) / 360;
@@ -121,12 +121,13 @@ for (var test = 0; test < numTests; test++) {
         }
     }
 
-    turtlePaths = [];
+    let turtlePaths = [];
     for (var t = 0; t < numTurtles; t++) {
-        turtlePath = [];
+        let turtlePath = [];
 
         var nextSeg = function(currTurtle, prevTurtle) {
             var pathX = currTurtle[0];
+            let pathY;
 
             if (currTurtle[1] < prevTurtle[1]) {
                 pathX = currTurtle[0] + 1;
@@ -150,15 +151,15 @@ for (var test = 0; test < numTests; test++) {
         };
 
         for (var s = 1; s < turtles[t].length; s++) {
-            currTurtle = turtles[t][s];
-            prevTurtle = turtles[t][s - 1];
+            let currTurtle = turtles[t][s];
+            let prevTurtle = turtles[t][s - 1];
 
             turtlePath.push(nextSeg(currTurtle, prevTurtle));
         }
 
         for (var s = turtles[t].length - 2; s >= 0; s--) {
-            currTurtle = turtles[t][s];
-            prevTurtle = turtles[t][s + 1];
+            let currTurtle = turtles[t][s];
+            let prevTurtle = turtles[t][s + 1];
 
             turtlePath.push(nextSeg(currTurtle, prevTurtle));
         }
@@ -169,7 +170,7 @@ for (var test = 0; test < numTests; test++) {
         var lastTurtle = turtles[t][turtles[t].length - 1];
         grid[lastTurtle[0]][lastTurtle[1]] = undefined;
 
-        fixedTurtlePath = [];
+        let fixedTurtlePath = [];
         for (var s = 1; s < turtlePath.length; s++) {
             if (turtlePath[s - 1][0] == turtlePath[s][0] &&
                 turtlePath[s - 1][1] == turtlePath[s][1]) {
@@ -236,7 +237,7 @@ for (var test = 0; test < numTests; test++) {
 
     t.insert({loc: allPointsIn});
     t.insert({loc: allPointsOut});
-    allPoints = allPointsIn.concat(allPointsOut);
+    let allPoints = allPointsIn.concat(allPointsOut);
     t.insert({loc: allPoints});
 
     print("Points : ");

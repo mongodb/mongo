@@ -25,7 +25,6 @@ selector:
   # collStats is not causally consistent
   - requires_collstats
   - requires_dbstats
-  - requires_datasize
   - requires_sharding
   # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
   # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results

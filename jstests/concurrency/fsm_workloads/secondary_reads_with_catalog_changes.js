@@ -2,6 +2,7 @@
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');       // for extendWorkload
 load('jstests/concurrency/fsm_workloads/secondary_reads.js');  // for $config
+load("jstests/libs/sbe_assert_error_override.js");             // Override error-code-checking APIs.
 
 /**
  * secondary_reads_with_catalog_changes.js

@@ -60,7 +60,6 @@ function prepareSecurityToken(conn) {
 const kCmdsAllowedWithSecurityToken = new Set([
     `abortTransaction`,
     `aggregate`,
-    `availableQueryOptions`,
     `buildinfo`,
     `buildinfo`,
     `collMod`,

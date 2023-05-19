@@ -29,6 +29,9 @@
 
 #include "mongo/db/s/config/initial_split_policy.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/curop.h"
@@ -149,6 +152,67 @@ StringMap<std::vector<ShardId>> buildTagsToShardIdsMap(OperationContext* opCtx,
     return tagToShardIds;
 }
 
+/**
+ * Returns a set of split points to ensure that chunk boundaries will align with the zone
+ * ranges.
+ */
+BSONObjSet extractSplitPointsFromZones(const ShardKeyPattern& shardKey,
+                                       const boost::optional<std::vector<TagsType>>& zones) {
+    auto splitPoints = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+
+    if (!zones) {
+        return splitPoints;
+    }
+
+    for (const auto& zone : *zones) {
+        splitPoints.insert(zone.getMinKey());
+        splitPoints.insert(zone.getMaxKey());
+    }
+
+    const auto keyPattern = shardKey.getKeyPattern();
+    splitPoints.erase(keyPattern.globalMin());
+    splitPoints.erase(keyPattern.globalMax());
+
+    return splitPoints;
+}
+
+/*
+ * Returns a map mapping shard id to a set of zone tags.
+ */
+stdx::unordered_map<ShardId, stdx::unordered_set<std::string>> buildShardIdToTagsMap(
+    OperationContext* opCtx, const std::vector<ShardKeyRange>& shards) {
+    stdx::unordered_map<ShardId, stdx::unordered_set<std::string>> shardIdToTags;
+    if (shards.empty()) {
+        return shardIdToTags;
+    }
+
+    // Get all docs in config.shards through a query instead of going through the shard registry
+    // because we need the zones as well
+    const auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto shardDocs = uassertStatusOK(
+        configServer->exhaustiveFindOnConfig(opCtx,
+                                             ReadPreferenceSetting(ReadPreference::Nearest),
+                                             repl::ReadConcernLevel::kMajorityReadConcern,
+                                             NamespaceString::kConfigsvrShardsNamespace,
+                                             BSONObj(),
+                                             BSONObj(),
+                                             boost::none));
+    uassert(
+        7661502, str::stream() << "Could not find any shard documents", !shardDocs.docs.empty());
+
+    for (const auto& shard : shards) {
+        shardIdToTags[shard.getShard()] = {};
+    }
+
+    for (const auto& shardDoc : shardDocs.docs) {
+        auto parsedShard = uassertStatusOK(ShardType::fromBSON(shardDoc));
+        for (const auto& tag : parsedShard.getTags()) {
+            shardIdToTags[ShardId(parsedShard.getName())].insert(tag);
+        }
+    }
+
+    return shardIdToTags;
+}
 }  // namespace
 
 std::vector<BSONObj> InitialSplitPolicy::calculateHashedSplitPoints(
@@ -647,7 +711,7 @@ BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* op
         }
     }
 
-    auto splitPoints = _extractSplitPointsFromZones(shardKey);
+    auto splitPoints = extractSplitPointsFromZones(shardKey, _zones);
     if (splitPoints.size() < static_cast<size_t>(_numInitialChunks - 1)) {
         // The BlockingResultsMerger underlying the $mergeCursors stage records how long was
         // spent waiting for samples from the donor shards. It doing so requires the CurOp
@@ -719,25 +783,6 @@ InitialSplitPolicy::ShardCollectionConfig SamplingBasedSplitPolicy::createFirstC
     return {std::move(chunks)};
 }
 
-BSONObjSet SamplingBasedSplitPolicy::_extractSplitPointsFromZones(const ShardKeyPattern& shardKey) {
-    auto splitPoints = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-
-    if (!_zones) {
-        return splitPoints;
-    }
-
-    for (const auto& zone : *_zones) {
-        splitPoints.insert(zone.getMinKey());
-        splitPoints.insert(zone.getMaxKey());
-    }
-
-    const auto keyPattern = shardKey.getKeyPattern();
-    splitPoints.erase(keyPattern.globalMin());
-    splitPoints.erase(keyPattern.globalMax());
-
-    return splitPoints;
-}
-
 void SamplingBasedSplitPolicy::_appendSplitPointsFromSample(BSONObjSet* splitPoints,
                                                             const ShardKeyPattern& shardKey,
                                                             int nToAppend) {
@@ -806,7 +851,7 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                                                     std::move(resolvedNamespaces),
                                                     boost::none); /* collUUID */
 
-    expCtx->tempDir = storageGlobalParams.dbpath + "/tmp";
+    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
     return std::make_unique<PipelineDocumentSource>(
         Pipeline::makePipeline(rawPipeline, expCtx, opts), samplesPerChunk - 1);
@@ -835,6 +880,128 @@ boost::optional<BSONObj> SamplingBasedSplitPolicy::PipelineDocumentSource::getNe
     }
 
     return val->toBson();
+}
+
+ShardDistributionSplitPolicy ShardDistributionSplitPolicy::make(
+    OperationContext* opCtx,
+    const ShardKeyPattern& shardKey,
+    std::vector<ShardKeyRange> shardDistribution,
+    boost::optional<std::vector<TagsType>> zones) {
+    uassert(7661501, "ShardDistribution should not be empty", shardDistribution.size() > 0);
+    return ShardDistributionSplitPolicy(shardDistribution, zones);
+}
+
+ShardDistributionSplitPolicy::ShardDistributionSplitPolicy(
+    std::vector<ShardKeyRange>& shardDistribution, boost::optional<std::vector<TagsType>> zones)
+    : _shardDistribution(std::move(shardDistribution)), _zones(std::move(zones)) {}
+
+InitialSplitPolicy::ShardCollectionConfig ShardDistributionSplitPolicy::createFirstChunks(
+    OperationContext* opCtx,
+    const ShardKeyPattern& shardKeyPattern,
+    const SplitPolicyParams& params) {
+    const auto& keyPattern = shardKeyPattern.getKeyPattern();
+    if (_zones) {
+        for (auto& zone : *_zones) {
+            zone.setMinKey(keyPattern.extendRangeBound(zone.getMinKey(), false));
+            zone.setMaxKey(keyPattern.extendRangeBound(zone.getMaxKey(), false));
+        }
+    }
+
+    auto splitPoints = extractSplitPointsFromZones(shardKeyPattern, _zones);
+    std::vector<ChunkType> chunks;
+    uassert(ErrorCodes::InvalidOptions,
+            "ShardDistribution without min/max is not supported.",
+            _shardDistribution[0].getMin());
+
+    unsigned long shardDistributionIdx = 0;
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    const auto validAfter = currentTime.clusterTime().asTimestamp();
+    ChunkVersion version({OID::gen(), validAfter}, {1, 0});
+    for (const auto& splitPoint : splitPoints) {
+        _appendChunks(params, splitPoint, keyPattern, shardDistributionIdx, version, chunks);
+    }
+    _appendChunks(
+        params, keyPattern.globalMax(), keyPattern, shardDistributionIdx, version, chunks);
+
+    if (_zones) {
+        _checkShardsMatchZones(opCtx, chunks, *_zones);
+    }
+
+    return {std::move(chunks)};
+}
+
+void ShardDistributionSplitPolicy::_appendChunks(const SplitPolicyParams& params,
+                                                 const BSONObj& splitPoint,
+                                                 const KeyPattern& keyPattern,
+                                                 unsigned long& shardDistributionIdx,
+                                                 ChunkVersion& version,
+                                                 std::vector<ChunkType>& chunks) {
+    while (shardDistributionIdx < _shardDistribution.size()) {
+        auto shardMin =
+            keyPattern.extendRangeBound(*_shardDistribution[shardDistributionIdx].getMin(), false);
+        auto shardMax =
+            keyPattern.extendRangeBound(*_shardDistribution[shardDistributionIdx].getMax(), false);
+        auto lastChunkMax =
+            chunks.empty() ? keyPattern.globalMin() : chunks.back().getRange().getMax();
+        /* When we compare a defined shard range with a splitPoint, there are three cases:
+         * 1. The whole shard range is on the left side of the splitPoint -> Add this shard as a
+         * whole chunk and move to next shard.
+         * 2. The splitPoint is in the middle of the shard range. -> Append (shardMin,
+         * splitPoint) as a chunk and move to next split point.
+         * 3. The whole shard range is on the right side of the splitPoint -> Move to the next
+         * splitPoint.
+         * This algorithm relies on the shardDistribution is continuous and complete to be
+         * correct, which is validated in the cmd handler.
+         */
+        if (SimpleBSONObjComparator::kInstance.evaluate(shardMin < splitPoint)) {
+            // The whole shard range is on the left side of the splitPoint.
+            if (SimpleBSONObjComparator::kInstance.evaluate(shardMax <= splitPoint)) {
+                appendChunk(params,
+                            lastChunkMax,
+                            shardMax,
+                            &version,
+                            _shardDistribution[shardDistributionIdx].getShard(),
+                            &chunks);
+                lastChunkMax = shardMax;
+                shardDistributionIdx++;
+            } else {  // The splitPoint is in the middle of the shard range.
+                appendChunk(params,
+                            lastChunkMax,
+                            splitPoint,
+                            &version,
+                            _shardDistribution[shardDistributionIdx].getShard(),
+                            &chunks);
+                lastChunkMax = splitPoint;
+                return;
+            }
+        } else {  // The whole shard range is on the right side of the splitPoint.
+            return;
+        }
+    }
+}
+
+void ShardDistributionSplitPolicy::_checkShardsMatchZones(
+    OperationContext* opCtx,
+    const std::vector<ChunkType>& chunks,
+    const std::vector<mongo::TagsType>& zones) {
+    ZoneInfo zoneInfo;
+    auto shardIdToTags = buildShardIdToTagsMap(opCtx, _shardDistribution);
+    for (const auto& zone : zones) {
+        uassertStatusOK(
+            zoneInfo.addRangeToZone({zone.getMinKey(), zone.getMaxKey(), zone.getTag()}));
+    }
+
+    for (const auto& chunk : chunks) {
+        auto zoneFromCmdParameter = zoneInfo.getZoneForChunk({chunk.getMin(), chunk.getMax()});
+        auto iter = shardIdToTags.find(chunk.getShard());
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Specified zones and shardDistribution are conflicting with the "
+                                 "existing shard/zone, shard "
+                              << chunk.getShard() << "doesn't belong to zone "
+                              << zoneFromCmdParameter,
+                iter != shardIdToTags.end() &&
+                    iter->second.find(zoneFromCmdParameter) != iter->second.end());
+    }
 }
 
 }  // namespace mongo

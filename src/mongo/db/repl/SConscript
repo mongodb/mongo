@@ -82,7 +82,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/index_build_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
@@ -101,7 +100,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/transaction/transaction',
@@ -1763,6 +1761,7 @@ if wiredtiger:
             'rollback_impl_test.cpp',
             'scatter_gather_test.cpp',
             'shard_merge_recipient_op_observer_test.cpp',
+            'shard_merge_recipient_service_test.cpp',
             'speculative_majority_read_info_test.cpp',
             'split_horizon_test.cpp',
             'split_prepare_session_manager_test.cpp',
@@ -1780,7 +1779,6 @@ if wiredtiger:
             'tenant_migration_recipient_access_blocker_test.cpp',
             'tenant_migration_recipient_entry_helpers_test.cpp',
             'tenant_migration_recipient_service_test.cpp',
-            'tenant_migration_recipient_service_shard_merge_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -1848,6 +1846,7 @@ if wiredtiger:
             'primary_only_service_test_fixture',
             'repl_coordinator_impl',
             'repl_server_parameters',
+            'replica_set_aware_service',
             'replica_set_messages',
             'replication_consistency_markers_impl',
             'replication_process',
@@ -2032,8 +2031,13 @@ env.Library(
         'hello_command',
     ],
 )
-
-env.Library(
+wait_for_majority_service_env = env.Clone()
+# TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+wait_for_majority_service_env.Append(
+    CXXFLAGS=[] if wait_for_majority_service_env.TargetOSIs('windows') else [
+        '-Wno-deprecated',
+    ], )
+wait_for_majority_service_env.Library(
     target='wait_for_majority_service',
     source=[
         'wait_for_majority_service.cpp',

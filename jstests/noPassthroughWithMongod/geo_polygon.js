@@ -2,14 +2,14 @@
 // @tags: [SERVER-40561]
 //
 
-t = db.geo_polygon4;
+let t = db.geo_polygon4;
 t.drop();
 
-num = 0;
+let num = 0;
 var bulk = t.initializeUnorderedBulkOp();
-for (x = -180; x < 180; x += .5) {
-    for (y = -180; y < 180; y += .5) {
-        o = {_id: num++, loc: [x, y]};
+for (let x = -180; x < 180; x += .5) {
+    for (let y = -180; y < 180; y += .5) {
+        let o = {_id: num++, loc: [x, y]};
         bulk.insert(o);
     }
 }

@@ -234,7 +234,16 @@ var queryConfigChunks = function(st) {
         }
     };
     var reduceFunction = function(key, values) {
-        return {chunks: values.length};
+        // We may be re-reducing values that have already been partially reduced. In that case, we
+        // expect to see an object like {chunks: <count>} in the array of input values.
+        const numValues = values.reduce(function(acc, currentValue) {
+            if (typeof currentValue === "object") {
+                return acc + currentValue.chunks;
+            } else {
+                return acc + 1;
+            }
+        }, 0);
+        return {chunks: numValues};
     };
     result = configDB.chunks.mapReduce(
         mapFunction,
@@ -330,7 +339,16 @@ var queryUserCreated = function(database) {
         emit(this.g, 1);
     };
     var reduceFunction = function(key, values) {
-        return {count: values.length};
+        // We may be re-reducing values that have already been partially reduced. In that case, we
+        // expect to see an object like {count: <count>} in the array of input values.
+        const numValues = values.reduce(function(acc, currentValue) {
+            if (typeof currentValue === "object") {
+                return acc + currentValue.count;
+            } else {
+                return acc + 1;
+            }
+        }, 0);
+        return {count: numValues};
     };
     result = userColl.mapReduce(mapFunction, reduceFunction, {out: {inline: 1}});
     assert.eq(result.ok, 1);

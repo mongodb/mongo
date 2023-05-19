@@ -9,7 +9,8 @@
 {  "a" : [ 2 ] }
 {  "a" : [ 2, 3, 4 ] }
 nReturned: 4
-Plan skeleton: {
+Plan skeleton: 
+{
 	"queryPlanner" : {
 		"winningPlan" : {
 			"optimizerPlan" : {
@@ -34,6 +35,7 @@ Plan skeleton: {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$lt" : 2 } } }, { "$unset" : "_id" } ]
 [jsTest] ----
@@ -41,7 +43,8 @@ Plan skeleton: {
 {  "a" : [ 1, 2, 3, 4 ] }
 {  "a" : [ 1, 3 ] }
 nReturned: 2
-Plan skeleton: {
+Plan skeleton: 
+{
 	"queryPlanner" : {
 		"winningPlan" : {
 			"optimizerPlan" : {

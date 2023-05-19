@@ -137,12 +137,16 @@ public:
     EvalFilterSelectivityResult transport(const PathDefault& node,
                                           CEType inputCard,
                                           EvalFilterSelectivityResult childResult) {
-        if (node.getDefault() == Constant::boolean(false)) {
-            // We have a {$exists: true} predicate on this path if we have a Constant[false] child
-            // here. Note that ${exists: false} is handled by the presence of a negation expression
-            // higher in the ABT.
-            childResult.selectivity = kDefaultExistsSel;
+        if (const auto* constPtr = node.getDefault().cast<Constant>();
+            constPtr && constPtr->isValueBool()) {
+            // We have a $exists predicate on this path. Constant[false] represents {$exists:
+            // true} whereas Constant[true] represents {$exists: false} here. Note that
+            // Constant[true] usually comes from NotPushdown which push down a higher negation
+            // through PathDefault.
+            const bool exists = !constPtr->getValueBool();
+            childResult.selectivity = exists ? kDefaultExistsSel : negateSel(kDefaultExistsSel);
         }
+
         return childResult;
     }
 
@@ -165,7 +169,7 @@ private:
     SelectivityType disjunctionSel(const SelectivityType left, const SelectivityType right) {
         // We sum the selectivities and subtract the overlapping part so that it's only counted
         // once.
-        return left + right - left * right;
+        return negateSel(negateSel(left) * negateSel(right));
     }
 };
 
@@ -173,8 +177,9 @@ class HeuristicTransport {
 public:
     CEType transport(const ScanNode& node, CEType /*bindResult*/) {
         // Default cardinality estimate.
-        const CEType metadataCE = _metadata._scanDefs.at(node.getScanDefName()).getCE();
-        return (metadataCE < 0.0) ? kDefaultCard : metadataCE;
+        const boost::optional<CEType>& metadataCE =
+            _metadata._scanDefs.at(node.getScanDefName()).getCE();
+        return metadataCE.get_value_or(kDefaultCard);
     }
 
     CEType transport(const ValueScanNode& node, CEType /*bindResult*/) {

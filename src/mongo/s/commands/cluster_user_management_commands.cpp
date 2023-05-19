@@ -240,7 +240,7 @@ public:
             BSONObjBuilder builder;
             const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
                 opCtx,
-                cmd.getDbName().toString(),
+                DatabaseNameUtil::serialize(cmd.getDbName()),
                 applyReadWriteConcern(
                     opCtx,
                     this,

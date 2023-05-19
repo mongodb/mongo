@@ -30,8 +30,8 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     }
 
     let request = {insert: collName, documents: batch, writeConcern: {w: 1}, ordered: false};
-    res = assert.commandFailedWithCode(primaryDB[collName].runCommand(request),
-                                       ErrorCodes.TenantMigrationCommitted);
+    let res = assert.commandFailedWithCode(primaryDB[collName].runCommand(request),
+                                           ErrorCodes.TenantMigrationCommitted);
 
     return res;
 }

@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/index/expression_keys_private.h"
 
 #include <algorithm>
+#include <s2.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -687,4 +687,27 @@ TEST_F(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
     assertMultikeyPathsEqual(MultikeyPaths{{0U}, MultikeyComponents{}}, actualMultikeyPaths);
 }
 
+// Test which verifies that the rounding functions used by s2 follow 'round to even' rounding
+// behavior.
+TEST_F(S2KeyGeneratorTest, VerifyS2RoundingBehavior) {
+    const double roundDownToEven = 2.5;
+    ASSERT_EQ(2, MathUtil::FastIntRound(roundDownToEven));
+    ASSERT_EQ(2LL, MathUtil::FastInt64Round(roundDownToEven));
+
+    const double roundUpToEven = 3.5;
+    ASSERT_EQ(4, MathUtil::FastIntRound(roundUpToEven));
+    ASSERT_EQ(4LL, MathUtil::FastInt64Round(roundUpToEven));
+
+    const double roundDownToEvenNegative = -3.5;
+    ASSERT_EQ(-4, MathUtil::FastIntRound(roundDownToEvenNegative));
+    ASSERT_EQ(-4LL, MathUtil::FastInt64Round(roundDownToEvenNegative));
+
+    const double roundUpToEvenNegative = -2.5;
+    ASSERT_EQ(-2, MathUtil::FastIntRound(roundUpToEvenNegative));
+    ASSERT_EQ(-2LL, MathUtil::FastInt64Round(roundUpToEvenNegative));
+
+    const double point = 944920918.5;
+    ASSERT_EQ(944920918, MathUtil::FastIntRound(point));
+    ASSERT_EQ(944920918LL, MathUtil::FastInt64Round(point));
+}
 }  // namespace

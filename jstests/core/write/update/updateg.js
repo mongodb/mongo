@@ -5,7 +5,7 @@
 
 // SERVER-3370 check modifiers with field name characters comparing less than '.' character.
 
-t = db.jstests_updateg;
+let t = db.jstests_updateg;
 
 t.drop();
 t.update({}, {'$inc': {'all.t': 1, 'all-copy.t': 1}}, true);

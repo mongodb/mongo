@@ -11,7 +11,7 @@
 (function() {
 "use strict";
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
+load("jstests/libs/fixture_helpers.js");
 
 const session = db.getMongo().startSession();
 const sessionDb = session.getDatabase("admin");
@@ -53,7 +53,7 @@ nonRetryableWriteCommands.forEach(function(command) {
         [50768, 50889]);
 });
 
-if (!isMongos) {
+if (!FixtureHelpers.isMongos(db)) {
     nonRetryableWriteCommandsMongodOnly.forEach(function(command) {
         jsTest.log("Testing command: " + tojson(command));
         assert.commandFailedWithCode(

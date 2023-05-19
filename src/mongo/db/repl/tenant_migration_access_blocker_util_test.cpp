@@ -58,7 +58,8 @@ static const UUID kMigrationId = UUID::gen();
 class TenantMigrationAccessBlockerUtilTest : public ServiceContextTest {
 public:
     const TenantId kTenantId = TenantId(OID::gen());
-    const DatabaseName kTenantDB = DatabaseName(kTenantId.toString() + "_ db");
+    const DatabaseName kTenantDB =
+        DatabaseName::createDatabaseName_forTest(boost::none, kTenantId.toString() + "_ db");
 
     void setUp() {
         _opCtx = makeOperationContext();
@@ -175,24 +176,28 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseForUnr
 }
 
 TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseAfterRemoveWithBoth) {
+    auto recipientId = UUID::gen();
     auto recipientMtab =
-        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), UUID::gen());
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), recipientId);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, recipientMtab);
 
+    auto donorId = UUID::gen();
     auto donorMtab =
-        std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), UUID::gen());
+        std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), donorId);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
 
     // Remove donor, should still be a migration.
     TenantMigrationAccessBlockerRegistry::get(getServiceContext())
-        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+        .removeAccessBlockersForMigration(donorId,
+                                          TenantMigrationAccessBlocker::BlockerType::kDonor);
     ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
 
     // Remove recipient, there should be no migration.
     TenantMigrationAccessBlockerRegistry::get(getServiceContext())
-        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        .removeAccessBlockersForMigration(recipientId,
+                                          TenantMigrationAccessBlocker::BlockerType::kRecipient);
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
 }
 
@@ -221,7 +226,8 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveShardMergeFalseAfterRemove
 
     // Remove recipient, there should be no migration.
     TenantMigrationAccessBlockerRegistry::get(getServiceContext())
-        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        .removeAccessBlockersForMigration(migrationId,
+                                          TenantMigrationAccessBlocker::BlockerType::kRecipient);
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
     ASSERT_FALSE(
         tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), DatabaseName::kAdmin));
@@ -328,12 +334,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientBlockerStarted) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -375,12 +382,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientAbortedAfterDataCopy) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -422,12 +430,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientCommittedAfterDataCopy) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -448,12 +457,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientLearnedFiles) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -474,12 +484,13 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientConsistent) {
                         .getTenantMigrationAccessBlockerForTenantId(
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
         ASSERT(mtab);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFuture.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFuture.get(),
+            DBException,
+            ErrorCodes::IllegalOperation,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -504,18 +515,19 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientRejectBeforeTimestamp) {
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{15, 1});
-        auto readFutureAtClusterTime = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFutureAtClusterTime.isReady());
-        ASSERT_THROWS_CODE_AND_WHAT(readFutureAtClusterTime.get(),
-                                    DBException,
-                                    ErrorCodes::SnapshotTooOld,
-                                    "Tenant read is not allowed before migration completes");
+        auto cmdFutureAtClusterTime = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFutureAtClusterTime.isReady());
+        ASSERT_THROWS_CODE_AND_WHAT(
+            cmdFutureAtClusterTime.get(),
+            DBException,
+            ErrorCodes::SnapshotTooOld,
+            "Tenant command 'dummyCmd' is not allowed before migration completes");
     }
 }
 
@@ -573,9 +585,9 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAbortingIndex) {
                             tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
         ASSERT(mtab);
 
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         ASSERT_OK(mtab->checkIfCanWrite(Timestamp{10, 1}));
 
@@ -609,15 +621,15 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorBlocking) {
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{101, 1});
-        auto afterReadFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_FALSE(afterReadFuture.isReady());
+        auto afterCmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_FALSE(afterCmdFuture.isReady());
 
         ASSERT_EQ(mtab->checkIfCanWrite(Timestamp{101, 1}).code(),
                   ErrorCodes::TenantMigrationConflict);
@@ -653,16 +665,16 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorCommitted) {
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{90, 1});
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{102, 1});
-        auto afterReadFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(afterReadFuture.isReady());
-        ASSERT_EQ(afterReadFuture.getNoThrow().code(), ErrorCodes::TenantMigrationCommitted);
+        auto afterCmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(afterCmdFuture.isReady());
+        ASSERT_EQ(afterCmdFuture.getNoThrow().code(), ErrorCodes::TenantMigrationCommitted);
 
         ASSERT_EQ(mtab->checkIfCanWrite(Timestamp{102, 1}).code(),
                   ErrorCodes::TenantMigrationCommitted);
@@ -698,16 +710,16 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAborted) {
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{90, 1});
-        auto readFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(readFuture.isReady());
-        ASSERT_OK(readFuture.getNoThrow());
+        auto cmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(cmdFuture.isReady());
+        ASSERT_OK(cmdFuture.getNoThrow());
 
         repl::ReadConcernArgs::get(opCtx()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         repl::ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp{102, 1});
-        auto afterReadFuture = mtab->getCanReadFuture(opCtx(), "dummyCmd");
-        ASSERT_TRUE(afterReadFuture.isReady());
-        ASSERT_OK(afterReadFuture.getNoThrow());
+        auto afterCmdFuture = mtab->getCanRunCommandFuture(opCtx(), "dummyCmd");
+        ASSERT_TRUE(afterCmdFuture.isReady());
+        ASSERT_OK(afterCmdFuture.getNoThrow());
 
         ASSERT_OK(mtab->checkIfCanWrite(Timestamp{102, 1}));
 

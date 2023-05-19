@@ -52,7 +52,8 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              std::vector<InsertStatement>::const_iterator first,
                                              std::vector<InsertStatement>::const_iterator last,
                                              std::vector<bool> fromMigrate,
-                                             bool defaultFromMigrate) {
+                                             bool defaultFromMigrate,
+                                             InsertsOpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
     if (!defaultFromMigrate) {
@@ -173,8 +174,8 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void UserWriteBlockModeOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                                          const RollbackObserverInfo& rbInfo) {
+void UserWriteBlockModeOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                         const RollbackObserverInfo& rbInfo) {
     if (rbInfo.rollbackNamespaces.find(NamespaceString::kUserWritesCriticalSectionsNamespace) !=
         rbInfo.rollbackNamespaces.end()) {
         UserWritesRecoverableCriticalSectionService::get(opCtx)->recoverRecoverableCriticalSections(
@@ -232,7 +233,8 @@ repl::OpTime UserWriteBlockModeOpObserver::onDropCollection(OperationContext* op
                                                             const NamespaceString& collectionName,
                                                             const UUID& uuid,
                                                             std::uint64_t numRecords,
-                                                            CollectionDropType dropType) {
+                                                            CollectionDropType dropType,
+                                                            bool markFromMigrate) {
     _checkWriteAllowed(opCtx, collectionName);
     return repl::OpTime();
 }
@@ -252,7 +254,8 @@ repl::OpTime UserWriteBlockModeOpObserver::preRenameCollection(
     const UUID& uuid,
     const boost::optional<UUID>& dropTargetUUID,
     std::uint64_t numRecords,
-    bool stayTemp) {
+    bool stayTemp,
+    bool markFromMigrate) {
     _checkWriteAllowed(opCtx, fromCollection);
     _checkWriteAllowed(opCtx, toCollection);
     return repl::OpTime();
@@ -264,7 +267,8 @@ void UserWriteBlockModeOpObserver::onRenameCollection(OperationContext* opCtx,
                                                       const UUID& uuid,
                                                       const boost::optional<UUID>& dropTargetUUID,
                                                       std::uint64_t numRecords,
-                                                      bool stayTemp) {
+                                                      bool stayTemp,
+                                                      bool markFromMigrate) {
     _checkWriteAllowed(opCtx, fromCollection);
     _checkWriteAllowed(opCtx, toCollection);
 }

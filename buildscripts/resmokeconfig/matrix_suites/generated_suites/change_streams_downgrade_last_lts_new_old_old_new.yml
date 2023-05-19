@@ -67,6 +67,7 @@ executor:
       global_vars:
         TestData:
           checkCollectionCounts: true
+  - class: CheckOrphansDeleted
 matrix_suite: true
 selector:
   exclude_files:
@@ -264,7 +265,6 @@ selector:
   - requires_fastcount
   - requires_dbstats
   - requires_collstats
-  - requires_datasize
   - uses_parallel_shell
   - requires_profiling
   - requires_capped

@@ -40,11 +40,11 @@ const MetadataView& MockServerContext::getClientMetadata() const {
 }
 
 Date_t MockServerContext::getDeadline() const {
-    return _stream->_deadline;
+    return _stream->_rpcCancellationState->getDeadline();
 }
 
 void MockServerContext::tryCancel() {
-    _stream->close();
+    _stream->cancel(::grpc::Status::CANCELLED);
 }
 
 bool MockServerContext::isCancelled() const {

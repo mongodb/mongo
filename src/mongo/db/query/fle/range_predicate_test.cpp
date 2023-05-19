@@ -111,8 +111,6 @@ protected:
 };
 
 TEST_F(RangePredicateRewriteTest, MatchRangeRewrite_NoStub) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
-
     std::vector<PrfBlock> allTags = {{1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}};
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -126,8 +124,6 @@ TEST_F(RangePredicateRewriteTest, MatchRangeRewrite_NoStub) {
 }
 
 TEST_F(RangePredicateRewriteTest, MatchRangeRewrite_Stub) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
-
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     auto payload = fromjson("{x: [1, 2, 3, 4, 5, 6, 7, 8, 9]}");
@@ -159,8 +155,6 @@ TEST_F(RangePredicateRewriteTest, MatchRangeRewrite_Stub) {
 }
 
 TEST_F(RangePredicateRewriteTest, AggRangeRewrite_Stub) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
-
     auto ops = {"$gt", "$lt", "$gte", "$lte"};
     for (auto& op : ops) {
         auto input = fromjson(str::stream() << "{" << op << ": [\"$age\", {$literal: [1, 2, 3]}]}");

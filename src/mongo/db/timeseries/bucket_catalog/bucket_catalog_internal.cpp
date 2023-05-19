@@ -109,11 +109,11 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
 }
 }  // namespace
 
-StripeNumber getStripeNumber(const BucketKey& key) {
+StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes) {
     if (MONGO_unlikely(alwaysUseSameBucketCatalogStripe.shouldFail())) {
         return 0;
     }
-    return key.hash % BucketCatalog::kNumberOfStripes;
+    return key.hash % numberOfStripes;
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
@@ -631,7 +631,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto stripeNumber = getStripeNumber(key);
+    auto stripeNumber = getStripeNumber(key, catalog.numberOfStripes);
 
     InsertResult result;
     result.catalogEra = getCurrentEra(catalog.bucketStateRegistry);

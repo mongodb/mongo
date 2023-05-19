@@ -48,7 +48,7 @@
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/background.h"
@@ -124,7 +124,10 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planSummary(_exec->getPlanExplainer().getPlanSummary()),
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
-      _telemetryStoreKey(CurOp::get(operationUsingCursor)->debug().telemetryStoreKey),
+      _queryStatsStoreKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsStoreKeyHash),
+      _queryStatsStoreKey(CurOp::get(operationUsingCursor)->debug().queryStatsStoreKey),
+      _queryStatsRequestShapifier(
+          std::move(CurOp::get(operationUsingCursor)->debug().queryStatsRequestShapifier)),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->debug().shouldOmitDiagnosticInformation),
       _opKey(operationUsingCursor->getOperationKey()) {
@@ -158,12 +161,13 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         return;
     }
 
-    if (_telemetryStoreKey && opCtx) {
-        telemetry::writeTelemetry(opCtx,
-                                  _telemetryStoreKey,
-                                  getOriginatingCommandObj(),
-                                  _metrics.executionTime.value_or(Microseconds{0}).count(),
-                                  _metrics.nreturned.value_or(0));
+    if (_queryStatsStoreKeyHash && opCtx) {
+        query_stats::writeQueryStats(opCtx,
+                                     _queryStatsStoreKeyHash,
+                                     _queryStatsStoreKey,
+                                     std::move(_queryStatsRequestShapifier),
+                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                     _metrics.nreturned.value_or(0));
     }
 
     if (now) {
@@ -393,27 +397,20 @@ void startClientCursorMonitor() {
     getClientCursorMonitor(getGlobalServiceContext()).go();
 }
 
-void collectTelemetryMongod(OperationContext* opCtx,
-                            ClientCursorPin& pinnedCursor,
-                            long long nreturned) {
-    auto curOp = CurOp::get(opCtx);
-    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
-    pinnedCursor->incrementCursorMetrics(curOp->debug().additiveMetrics);
+void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
+    pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
-void collectTelemetryMongod(OperationContext* opCtx,
-                            const BSONObj& originatingCommand,
-                            long long nreturned) {
-    auto curOp = CurOp::get(opCtx);
-    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
-
+void collectQueryStatsMongod(OperationContext* opCtx,
+                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
-    auto& opDebug = curOp->debug();
-    telemetry::writeTelemetry(
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    query_stats::writeQueryStats(
         opCtx,
-        opDebug.telemetryStoreKey,
-        originatingCommand,
+        opDebug.queryStatsStoreKeyHash,
+        opDebug.queryStatsStoreKey,
+        std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
         opDebug.additiveMetrics.nreturned.value_or(0));
 }

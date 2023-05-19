@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.arrayfind2;
+let t = db.arrayfind2;
 t.drop();
 
 function go(prefix) {

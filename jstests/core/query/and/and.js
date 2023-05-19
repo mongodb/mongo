@@ -4,7 +4,7 @@
 //     requires_scripting
 // ]
 
-t = db.jstests_and;
+let t = db.jstests_and;
 t.drop();
 
 t.save({a: [1, 2]});

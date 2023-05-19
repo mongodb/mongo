@@ -276,13 +276,7 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
                             repl::ReplicationCoordinator::Mode::modeReplSet);
 
-                if (hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::RangePreview)) {
-                    uassert(
-                        6775220,
-                        "Queryable Encryption Range support is only supported when FCV supports "
-                        "6.1",
-                        gFeatureFlagFLE2Range.isEnabled(serverGlobalParams.featureCompatibility));
-                }
+                FLEUtil::checkEFCForECC(cmd.getEncryptedFields().get());
             }
 
             if (auto timeseries = cmd.getTimeseries()) {

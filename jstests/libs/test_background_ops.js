@@ -132,8 +132,8 @@ var startParallelOps = function(mongo, proc, args, context) {
         var args = stored.args;
         eval("args = " + args);
 
-        result = undefined;
-        err = undefined;
+        let result = undefined;
+        let err = undefined;
 
         try {
             result = operation.apply(null, args);
@@ -186,7 +186,7 @@ var startParallelOps = function(mongo, proc, args, context) {
 
         rawJoin(options);
 
-        result = getResult(mongo, procName);
+        let result = getResult(mongo, procName);
 
         assert.neq(result, null);
 
@@ -232,7 +232,7 @@ var RandomFunctionContext = function(context) {
 
     Random.randShardKeyValue = function(shardKey) {
         var keyValue = {};
-        for (field in shardKey) {
+        for (let field in shardKey) {
             keyValue[field] = Random.randInt(1, 100);
         }
 
@@ -241,7 +241,7 @@ var RandomFunctionContext = function(context) {
 
     Random.randCluster = function() {
         var numShards = 2;  // Random.randInt( 1, 10 )
-        var rs = false;     // Random.randBool()
+        const rs = false;   // Random.randBool()
         var st = new ShardingTest({shards: numShards, mongos: 4, other: {rs: rs}});
 
         return st;

@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
+#include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_op_observer.h"
@@ -149,6 +150,7 @@ public:
             auto opObserver = std::make_unique<OpObserverRegistry>();
             opObserver->addObserver(
                 std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterMock>()));
+            opObserver->addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
             opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
             return opObserver;
         }());

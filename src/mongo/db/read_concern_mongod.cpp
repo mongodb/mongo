@@ -473,7 +473,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
 
     {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-        if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
+        if (!replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin)) {
             return {ErrorCodes::NotWritablePrimary,
                     "No longer primary when waiting for linearizable read concern"};
         }
@@ -489,10 +489,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
         }
 
         writeConflictRetry(
-            opCtx,
-            "waitForLinearizableReadConcern",
-            NamespaceString::kRsOplogNamespace.ns(),
-            [&opCtx] {
+            opCtx, "waitForLinearizableReadConcern", NamespaceString::kRsOplogNamespace, [&opCtx] {
                 WriteUnitOfWork uow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
                     opCtx,

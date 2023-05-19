@@ -271,10 +271,27 @@ structs:
         description: "A struct representing the information needed for a resharding pipeline to
                       determine which documents belong to a particular shard."
         strict: true
+        query_shape_component: true
         fields:
             recipientShardId:
                 type: shard_id
                 description: "The id of the recipient shard."
+                query_shape: anonymize
             reshardingKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
+                query_shape: custom
+    ShardKeyRange:
+        description: "A struct to represent the key ranges of shards."
+        fields:
+            min:
+                type: object_owned
+                description: "The min key of this shard key range."
+                optional: true
+            max:
+                type: object_owned
+                description: "The max key of this shard key range."
+                optional: true
+            shard:
+                type: shard_id
+                description: "Id of the shard for this shard key range."

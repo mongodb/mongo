@@ -2,7 +2,7 @@
 //   requires_fastcount,
 // ]
 
-t = db.jstests_exists;
+let t = db.jstests_exists;
 t.drop();
 
 t.save({});

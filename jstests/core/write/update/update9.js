@@ -1,8 +1,8 @@
 
-t = db.update9;
+let t = db.update9;
 t.drop();
 
-orig = {
+let orig = {
     "_id": 1,
     "question": "a",
     "choices": {"1": {"choice": "b"}, "0": {"choice": "c"}},

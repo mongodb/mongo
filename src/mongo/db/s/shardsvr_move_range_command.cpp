@@ -211,6 +211,13 @@ public:
                     opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
             }());
 
+            long long totalDocsCloned =
+                ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load();
+            long long totalBytesCloned =
+                ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load();
+            long long totalCloneTime =
+                ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load();
+
             MigrationSourceManager migrationSourceManager(
                 opCtx, std::move(request), std::move(writeConcern), donorConnStr, recipientHost);
 
@@ -219,6 +226,23 @@ public:
             migrationSourceManager.enterCriticalSection();
             migrationSourceManager.commitChunkOnRecipient();
             migrationSourceManager.commitChunkMetadataOnConfig();
+
+            long long docsCloned =
+                ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load() - totalDocsCloned;
+            long long bytesCloned =
+                ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load() - totalBytesCloned;
+            long long cloneTime =
+                ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load() -
+                totalCloneTime;
+            auto migrationId = migrationSourceManager.getMigrationId();
+
+            LOGV2(7627801,
+                  "Migration finished",
+                  "migrationId"_attr = migrationId ? migrationId->toString() : "",
+                  "totalTimeMillis"_attr = migrationSourceManager.getOpTimeMillis(),
+                  "docsCloned"_attr = docsCloned,
+                  "bytesCloned"_attr = bytesCloned,
+                  "cloneTime"_attr = cloneTime);
         }
     };
 

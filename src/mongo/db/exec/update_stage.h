@@ -85,7 +85,7 @@ private:
  *
  * Callers of doWork() must be holding a write lock.
  */
-class UpdateStage : public RequiresMutableCollectionStage {
+class UpdateStage : public RequiresWritableCollectionStage {
     UpdateStage(const UpdateStage&) = delete;
     UpdateStage& operator=(const UpdateStage&) = delete;
 
@@ -95,7 +95,7 @@ public:
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
-                const CollectionPtr& collection,
+                const ScopedCollectionAcquisition& collection,
                 PlanStage* child);
 
     bool isEOF() override;
@@ -117,7 +117,7 @@ protected:
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
-                const CollectionPtr& collection);
+                const ScopedCollectionAcquisition& collection);
 
     void doSaveStateRequiresCollection() final {
         _preWriteFilter.saveState();
@@ -143,9 +143,6 @@ protected:
     // These get reused for each update.
     mutablebson::Document& _doc;
     mutablebson::DamageVector _damages;
-
-    // Cached collection sharding description. It is reset when restoring from a yield.
-    write_stage_common::CachedShardingDescription _cachedShardingCollectionDescription;
 
 private:
     /**
@@ -186,8 +183,7 @@ private:
      * been updated to a value belonging to a chunk that is not owned by this shard. We cannot apply
      * this update atomically.
      */
-    void checkUpdateChangesExistingShardKey(const ShardingWriteRouter& shardingWriteRouter,
-                                            const BSONObj& newObj,
+    void checkUpdateChangesExistingShardKey(const BSONObj& newObj,
                                             const Snapshotted<BSONObj>& oldObj);
 
     void checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,

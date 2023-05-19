@@ -7,7 +7,7 @@
 
 // Tests that _id will exist in all updated docs.
 
-t = db.jstests_updatem;
+let t = db.jstests_updatem;
 t.drop();
 
 // new _id from insert (upsert:true)

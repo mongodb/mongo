@@ -29,30 +29,32 @@
 
 #pragma once
 
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/s/database_version.h"
 
 namespace mongo {
 
 /**
- * Structure used to declare all the prerequsites that the catalog needs to meet in order for an
+ * Structure used to declare all the prerequisites that the catalog needs to meet in order for an
  * acquisition of a namespace to succeed.
  */
 struct CollectionOrViewAcquisitionRequest {
     /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
+     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
+     * relationship between NSS and UUID.
      */
     CollectionOrViewAcquisitionRequest(
-        NamespaceString nss,
+        NamespaceStringOrUUID nssOrUUID,
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nss),
+        : nss(nssOrUUID.nss()),
+          dbname(nssOrUUID.dbName()),
+          uuid(nssOrUUID.uuid()),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -71,24 +73,6 @@ struct CollectionOrViewAcquisitionRequest {
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
         : nss(nss),
           uuid(uuid),
-          placementConcern(placementConcern),
-          readConcern(readConcern),
-          operationType(operationType),
-          viewMode(viewMode) {}
-
-    /**
-     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
-     * relationship between NSS and UUID.
-     */
-    CollectionOrViewAcquisitionRequest(
-        NamespaceStringOrUUID nssOrUUID,
-        PlacementConcern placementConcern,
-        repl::ReadConcernArgs readConcern,
-        AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nssOrUUID.nss()),
-          dbname(nssOrUUID.dbName()),
-          uuid(nssOrUUID.uuid()),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -118,13 +102,14 @@ struct CollectionOrViewAcquisitionRequest {
 
 struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest {
     /**
-     * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
+     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
+     * relationship between NSS and UUID.
      */
-    CollectionAcquisitionRequest(NamespaceString nss,
+    CollectionAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
                                  PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
                                  AcquisitionPrerequisites::OperationType operationType)
-        : CollectionOrViewAcquisitionRequest(nss,
+        : CollectionOrViewAcquisitionRequest(nssOrUUID,
                                              placementConcern,
                                              readConcern,
                                              operationType,
@@ -141,20 +126,6 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
                                  AcquisitionPrerequisites::OperationType operationType)
         : CollectionOrViewAcquisitionRequest(nss,
                                              uuid,
-                                             placementConcern,
-                                             readConcern,
-                                             operationType,
-                                             AcquisitionPrerequisites::kMustBeCollection) {}
-
-    /**
-     * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
-     * relationship between NSS and UUID.
-     */
-    CollectionAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
-                                 PlacementConcern placementConcern,
-                                 repl::ReadConcernArgs readConcern,
-                                 AcquisitionPrerequisites::OperationType operationType)
-        : CollectionOrViewAcquisitionRequest(nssOrUUID,
                                              placementConcern,
                                              readConcern,
                                              operationType,
@@ -199,14 +170,14 @@ public:
      * Returns whether the acquisition found a collection or the collection didn't exist.
      */
     bool exists() const {
-        return bool(_acquiredCollection.prerequisites.uuid);
+        return bool(_acquiredCollection.collectionPtr);
     }
 
     /**
      * Returns the UUID of the acquired collection, but this operation is only allowed if the
      * collection `exists()`, otherwise this method will invariant.
      */
-    const UUID& uuid() const;
+    UUID uuid() const;
 
     // Access to services associated with the specified collection top to bottom on the hierarchical
     // stack
@@ -217,10 +188,7 @@ public:
     const boost::optional<ScopedCollectionFilter>& getShardingFilter() const;
 
     // Local catalog services
-
-    const CollectionPtr& getCollectionPtr() const {
-        return _acquiredCollection.collectionPtr;
-    }
+    const CollectionPtr& getCollectionPtr() const;
 
 private:
     friend class ScopedLocalCatalogWriteFence;
@@ -375,4 +343,28 @@ boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperat
 void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                                                    YieldedTransactionResources&& yieldedResources);
 
+namespace shard_role_details {
+class SnapshotAttempt {
+public:
+    SnapshotAttempt(OperationContext* opCtx,
+                    const std::vector<NamespaceStringOrUUID>& acquisitionRequests)
+        : _opCtx{opCtx}, _acquisitionRequests(acquisitionRequests) {}
+
+    ~SnapshotAttempt();
+
+    void snapshotInitialState();
+
+    void openStorageSnapshot();
+
+    [[nodiscard]] std::shared_ptr<const CollectionCatalog> getConsistentCatalog();
+
+private:
+    OperationContext* _opCtx;
+    const std::vector<NamespaceStringOrUUID>& _acquisitionRequests;
+    bool _openedSnapshot = false;
+    bool _successful = false;
+    boost::optional<long long> _replTermBeforeSnapshot;
+    boost::optional<std::shared_ptr<const CollectionCatalog>> _catalogBeforeSnapshot;
+};
+}  // namespace shard_role_details
 }  // namespace mongo

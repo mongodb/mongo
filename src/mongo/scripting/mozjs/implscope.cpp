@@ -67,11 +67,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 namespace mongo {
 
 // Generated symbols for JS files

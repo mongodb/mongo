@@ -96,6 +96,17 @@ public:
     }
 
     /**
+     * Hash function compatible with absl::Hash with an absl::unordered_{map,set} keyed with
+     * boost::optional<TenantId>.
+     */
+    template <typename H>
+    friend H AbslHashValue(H h, const boost::optional<TenantId>& tenantId) {
+        if (tenantId)
+            h = H::combine(std::move(h), tenantId->_oid);
+        return H::combine(std::move(h), tenantId.has_value());
+    }
+
+    /**
      * Parse tenant id from BSON. The function is used by IDL parsers.
      */
     static TenantId parseFromBSON(const BSONElement& elem);
@@ -107,6 +118,9 @@ public:
     void serializeToBSON(BSONArrayBuilder* builder) const;
 
 private:
+    friend class NamespaceString;
+    friend class DatabaseName;
+
     OID _oid;
 };
 

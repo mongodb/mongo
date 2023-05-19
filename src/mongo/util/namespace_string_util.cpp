@@ -37,9 +37,10 @@
 namespace mongo {
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
-                                           const SerializationContext& context) {
+                                           const SerializationContext& context,
+                                           const SerializationOptions& options) {
     if (!gMultitenancySupport)
-        return ns.toString();
+        return options.serializeIdentifier(ns.toString());
 
     // TODO SERVER-74284: uncomment to redirect command-sepcific serialization requests
     // if (context.getSource() == SerializationContext::Source::Command &&
@@ -47,7 +48,11 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
     //     return serializeForCommands(ns, context);
 
     // if we're not serializing a Command Reply, use the default serializing rules
-    return serializeForStorage(ns, context);
+    return options.serializeIdentifier(serializeForStorage(ns, context));
+}
+
+std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) {
+    return ns.toStringWithTenantId();
 }
 
 std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
@@ -189,6 +194,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
     const boost::optional<TenantId>& tenantId, StringData db, StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{tenantId, db, coll};
+    }
+
     if (coll.empty())
         return deserialize(tenantId, db);
 
@@ -201,6 +210,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(const DatabaseName& dbName,
                                                                StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{dbName, coll};
+    }
+
     if (coll.empty()) {
         return NamespaceString(dbName);
     }
@@ -219,6 +232,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
     const boost::optional<TenantId>& tenantId, StringData db, StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{tenantId, db, coll};
+    }
+
     if (coll.empty())
         return deserialize(tenantId, db);
 
@@ -231,6 +248,10 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
 
 NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(const DatabaseName& dbName,
                                                            StringData coll) {
+    if (!gMultitenancySupport) {
+        return NamespaceString{dbName, coll};
+    }
+
     if (coll.empty())
         return NamespaceString(dbName);
 

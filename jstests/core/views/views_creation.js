@@ -152,4 +152,8 @@ assert.commandFailedWithCode(viewsDB.runCommand({
 // Test that creating a view when there is already a collection with the same name fails.
 assert.commandFailedWithCode(viewsDB.runCommand({create: "collection", viewOn: "collection"}),
                              ErrorCodes.NamespaceExists);
+
+// Ensure we accept a view with a name of greater than 64 characters (the maximum dbname length).
+assert.commandWorked(viewsDB.createView(
+    "longNamedView", "Queries_IdentityView_UnindexedLargeInMatching0_BackingCollection", []));
 }());

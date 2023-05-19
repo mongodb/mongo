@@ -72,15 +72,20 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
 
         // Empty parts of the path, ".."?
         for (size_t i = 0; i < newFieldRef->numParts(); ++i) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "Field " << patternEl.fieldNameStringData()
-                                  << " contains empty parts",
-                    !newFieldRef->getPart(i).empty());
+            const StringData part = newFieldRef->getPart(i);
 
             uassert(ErrorCodes::BadValue,
                     str::stream() << "Field " << patternEl.fieldNameStringData()
+                                  << " contains empty parts",
+                    !part.empty());
+
+            // Reject a shard key that has a field name that starts with '$' or contains parts that
+            // start with '$' unless the part is a DBRef (i.e. is equal to '$id', '$db' or '$ref').
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field " << patternEl.fieldNameStringData()
                                   << " contains parts that start with '$'",
-                    !newFieldRef->getPart(i).startsWith("$"));
+                    !part.startsWith("$") ||
+                        (i != 0 && (part == "$db" || part == "$id" || part == "$ref")));
         }
 
         // Numeric and ascending (1.0), or "hashed" with exactly hashed field.

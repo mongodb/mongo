@@ -59,7 +59,7 @@ PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
 
           // Always allow writes on standalone and secondary nodes.
           const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
-          return !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin.toString());
+          return !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
       }()) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
@@ -129,21 +129,6 @@ void PreWriteFilter::logFromMigrate(const Document& doc,
                 "op"_attr = opKind,
                 logAttrs(collNs),
                 "record"_attr = doc);
-}
-
-void CachedShardingDescription::restoreState() {
-    _collectionDescription.reset();
-}
-
-const ScopedCollectionDescription& CachedShardingDescription::getCollectionDescription(
-    OperationContext* opCtx) {
-    if (!_collectionDescription) {
-        const auto scopedCss =
-            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, _nss);
-        _collectionDescription = scopedCss->getCollectionDescription(opCtx);
-    }
-
-    return *_collectionDescription;
 }
 
 bool ensureStillMatches(const CollectionPtr& collection,

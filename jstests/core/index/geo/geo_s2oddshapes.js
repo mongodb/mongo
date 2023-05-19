@@ -96,7 +96,7 @@ outsidePoint = {
 t.insert(insidePoint);
 t.insert(outsidePoint);
 
-smallPoly = {
+let smallPoly = {
     type: "Polygon",
     coordinates: [[[0.0, -0.01], [0.015, -0.01], [0.015, 0.01], [0.0, 0.01], [0.0, -0.01]]]
 };

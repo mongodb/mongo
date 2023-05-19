@@ -76,11 +76,11 @@ public:
                             LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator
                             std::make_shared<StubMongoProcessInterface>(),
-                            {},    // resolvedNamespaces
-                            {},    // collUUID
-                            {},    // let
-                            false  // mayDbProfile
-          ) {
+                            {},     // resolvedNamespaces
+                            {},     // collUUID
+                            {},     // let
+                            false,  // mayDbProfile
+                            SerializationContext()) {
         // If there is an existing global ServiceContext, adopt it. Otherwise, create a new context.
         // Similarly, we create a new OperationContext or adopt an existing context as appropriate.
         if (hasGlobalServiceContext()) {
@@ -127,11 +127,11 @@ public:
                             LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator
                             std::make_shared<StubMongoProcessInterface>(),
-                            {},    // resolvedNamespaces
-                            {},    // collUUID
-                            {},    // let
-                            false  // mayDbProfile
-                            ),
+                            {},     // resolvedNamespaces
+                            {},     // collUUID
+                            {},     // let
+                            false,  // mayDbProfile
+                            SerializationContext()),
           _serviceContext(opCtx->getServiceContext()) {
         // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
         _setTimeZoneDatabase();
@@ -172,8 +172,8 @@ public:
                             {},  // resolvedNamespaces
                             {},  // collUUID
                             letParameters,
-                            false  // mayDbProfile
-                            ),
+                            false,  // mayDbProfile
+                            SerializationContext()),
           _serviceContext(opCtx->getServiceContext()) {
         // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
         _setTimeZoneDatabase();

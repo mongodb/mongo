@@ -858,8 +858,6 @@ public:
         // `durableTimestamp`.
         void _commitSplitPreparedTxnOnPrimary(OperationContext* opCtx,
                                               repl::SplitPrepareSessionManager* splitPrepareManager,
-                                              const LogicalSessionId& sessionId,
-                                              const TxnNumber& txnNumber,
                                               const Timestamp& commitTimestamp,
                                               const Timestamp& durableTimestamp);
 
@@ -876,9 +874,7 @@ public:
         // split the storage writes into multiple RecoveryUnits. This method will be invoked by a
         // primary such that it looks for all recovery units and aborts them.
         void _abortSplitPreparedTxnOnPrimary(OperationContext* opCtx,
-                                             repl::SplitPrepareSessionManager* splitPrepareManager,
-                                             const LogicalSessionId& sessionId,
-                                             const TxnNumber& txnNumber);
+                                             repl::SplitPrepareSessionManager* splitPrepareManager);
 
         // Factors out code for clarity from _abortActiveTransaction.
         void _finishAbortingActiveTransaction(OperationContext* opCtx,

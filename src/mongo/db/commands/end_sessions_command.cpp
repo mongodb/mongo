@@ -60,6 +60,12 @@ public:
         return "end a set of logical sessions";
     }
 
+    // We should allow users to end sessions even if the user does not have the direct shard roles
+    // action type.
+    bool shouldSkipDirectConnectionChecks() const final {
+        return true;
+    }
+
     /**
      * Drivers may implicitly call {endSessions:...} for unauthenticated clients.
      * Don't bother auditing when this happens.

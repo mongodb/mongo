@@ -1,6 +1,6 @@
 // $substr returns an empty string if the position argument is out of bounds.  SERVER-6186
 
-t = db.jstests_aggregation_server6186;
+let t = db.jstests_aggregation_server6186;
 t.drop();
 
 t.save({});
@@ -23,8 +23,8 @@ function assertSubstr(string, pos, n) {
 }
 
 function checkVariousSubstrings(string) {
-    for (pos = 0; pos < 5; ++pos) {
-        for (n = -2; n < 7; ++n) {
+    for (let pos = 0; pos < 5; ++pos) {
+        for (let n = -2; n < 7; ++n) {
             assertSubstr(string, pos, n);
         }
     }

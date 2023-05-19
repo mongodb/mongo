@@ -67,8 +67,7 @@ function testRejectBlockedWritesAfterMigrationAborted(testCase, testOpts) {
         new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, tenantId, 1);
 
     // Run the command after the migration enters the blocking state.
-    assert.commandWorked(
-        tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     resumeMigrationThread.start();
     blockingFp.wait();
 

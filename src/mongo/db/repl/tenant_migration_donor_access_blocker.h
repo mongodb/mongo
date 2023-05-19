@@ -111,14 +111,14 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  * blocked inside handleTenantMigrationConflict instead of checkIfCanWrite because writes must not
  * block between being assigned an OpTime and committing.
  *
- * Every command calls getCanReadFuture (via tenant_migration_access_blocker::checkIfCanReadOrBlock)
- * at some point after waiting for readConcern. If the migration has committed, the method will
- * return TenantMigrationCommitted if the command is in the commandDenyListAfterMigration. If the
- * migration has aborted, the method will return an OK status and the command can just proceed.
- * Otherwise, if the command has afterClusterTime or atClusterTime >= blockTimestamp, the promise
- * will remain unfulfilled until the migration either commits (in which case
- * TenantMigrationCommitted will be returned) or aborts (in which case an OK status will be returned
- * and the reads will be unblocked).
+ * Every command calls getCanRunCommand (via
+ * tenant_migration_access_blocker::checkIfCanRunCommandOrBlock) at some point after waiting for
+ * readConcern. If the migration has committed, the method will return TenantMigrationCommitted if
+ * the command is in the commandDenyListAfterMigration. If the migration has aborted, the method
+ * will return an OK status and the command can just proceed. Otherwise, if the command has
+ * afterClusterTime or atClusterTime >= blockTimestamp, the promise will remain unfulfilled until
+ * the migration either commits (in which case TenantMigrationCommitted will be returned) or aborts
+ * (in which case an OK status will be returned and the command will be unblocked).
  *
  * Linearizable reads call checkIfLinearizableReadWasAllowed after doing the noop write at the end
  * the reads. The method returns TenantMigrationCommitted if the migration has committed, and an
@@ -126,6 +126,12 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  * tenant's data can occur on the donor after the blockTimestamp, so a linearizable read only needs
  * to be rejected if it is possible that some writes have been accepted by the recipient (i.e. the
  * migration has committed).
+ *
+ * When opening new change streams without a resume token the server needs to pick a start time to
+ * avoid reprocessing events that happened before the change stream was opened. This is usually the
+ * optime of the last committed write in the oplog. However, while in the kBlockingWrites and
+ * kBlockingWritesAndReads states, the latest global oplog time might wind up after the
+ * blockTimestamp, so we to delay these commands by calling assertCanOpenChangeStream.
  *
  * Change stream getMore commands call assertCanGetMoreChangeStream. After a commit normal getMores
  * are allowed to proceed and drain the cursors, but change stream cursors are infinite and can't be
@@ -161,10 +167,10 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  * "blockTimestamp".
  *
  * At this point:
- * - Reads on the node that have already passed getCanReadFuture must have a clusterTime before
+ * - Reads on the node that have already passed getCanRunCommand must have a clusterTime before
  *   the blockTimestamp, since the write at blockTimestamp hasn't committed yet (i.e., there's still
  *   an oplog hole at blockTimestamp).
- * - Reads on the node that have not yet passed getCanReadFuture will end up blocking.
+ * - Reads on the node that have not yet passed getCanRunCommand will end up blocking.
  *
  * If the "start blocking" write aborts or the write rolls back via replication rollback, the node
  * calls rollBackStartBlocking.
@@ -195,13 +201,19 @@ public:
     Status waitUntilCommittedOrAborted(OperationContext* opCtx) final;
 
     Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) final;
-    SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx, StringData command) final;
+    SharedSemiFuture<void> getCanRunCommandFuture(OperationContext* opCtx,
+                                                  StringData command) final;
 
     //
     // Called by index build user threads before acquiring an index build slot, and again right
     // after registering the build.
     //
     Status checkIfCanBuildIndex() final;
+
+    /**
+     * Checks if opening change streams should fail.
+     */
+    Status checkIfCanOpenChangeStream() final;
 
     /**
      * Returns error status if "getMore" command of a change stream should fail.

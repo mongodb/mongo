@@ -4,7 +4,7 @@
 //     requires_scripting,
 // ]
 
-t = db.jstests_countb;
+let t = db.jstests_countb;
 t.drop();
 
 t.createIndex({a: 1});

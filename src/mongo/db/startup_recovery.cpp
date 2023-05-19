@@ -121,7 +121,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
 
-        writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
+        writeConflictRetry(opCtx, "insertFCVDocument", fcvNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             uassertStatusOK(collection_internal::insertDocument(
                 opCtx, fcvColl, InsertStatement(fcvDoc.toBSON()), nullptr /* OpDebug */, false));
@@ -212,8 +212,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   EnsureIndexPolicy ensureIndexPolicy) {
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = *collIt;
+    for (auto&& coll : catalog->range(dbName)) {
         if (!coll) {
             break;
         }
@@ -233,7 +232,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                   logAttrs(*coll));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
                 auto writableCollection =
-                    catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, collIt.uuid());
+                    catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, coll->uuid());
                 auto status = buildMissingIdIndex(opCtx, writableCollection);
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,

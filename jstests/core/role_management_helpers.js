@@ -13,7 +13,7 @@
 // It is not a comprehensive test of the functionality of the role manipulation commands
 
 function assertHasRole(rolesArray, roleName, roleDB) {
-    for (i in rolesArray) {
+    for (let i in rolesArray) {
         var curRole = rolesArray[i];
         if (curRole.role == roleName && curRole.db == roleDB) {
             return;
@@ -23,7 +23,7 @@ function assertHasRole(rolesArray, roleName, roleDB) {
 }
 
 function assertHasPrivilege(privilegeArray, privilege) {
-    for (i in privilegeArray) {
+    for (let i in privilegeArray) {
         var curPriv = privilegeArray[i];
         if (curPriv.resource.cluster == privilege.resource.cluster &&
             curPriv.resource.anyResource == privilege.resource.anyResource &&
@@ -31,7 +31,7 @@ function assertHasPrivilege(privilegeArray, privilege) {
             curPriv.resource.collection == privilege.resource.collection) {
             // Same resource
             assert.eq(curPriv.actions.length, privilege.actions.length);
-            for (k in curPriv.actions) {
+            for (let k in curPriv.actions) {
                 assert.eq(curPriv.actions[k], privilege.actions[k]);
             }
             return;

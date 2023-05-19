@@ -184,11 +184,15 @@ TEST(BalancerSettingsType, AllValidBalancerModeOptions) {
 }
 
 TEST(BalancerSettingsType, InvalidBalancerModeOption) {
-    ASSERT_EQ(ErrorCodes::BadValue,
-              BalancerSettingsType::fromBSON(BSON("mode"
-                                                  << "BAD"))
-                  .getStatus()
-                  .code());
+    startCapturingLogMessages();
+    ASSERT_EQ(BalancerSettingsType::kOff,
+              assertGet(BalancerSettingsType::fromBSON(BSON("mode"
+                                                            << "BAD")))
+                  .getMode());
+    stopCapturingLogMessages();
+    ASSERT_EQ(1,
+              countTextFormatLogLinesContaining(
+                  "Balancer turned off because currently set balancing mode is not valid"));
 }
 
 TEST(BalancerSettingsType, BalancingWindowStartLessThanStop) {

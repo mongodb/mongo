@@ -46,7 +46,8 @@ void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator first,
                                      std::vector<InsertStatement>::const_iterator last,
                                      std::vector<bool> fromMigrate,
-                                     bool defaultFromMigrate) {
+                                     bool defaultFromMigrate,
+                                     InsertsOpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
     if (!nss.isTimeseriesBucketsCollection()) {
@@ -106,14 +107,15 @@ void TimeSeriesOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void TimeSeriesOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-    timeseries::bucket_catalog::clear(bucketCatalog, dbName.db());
+    timeseries::bucket_catalog::clear(bucketCatalog, dbName);
 }
 
 repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
                                                     const NamespaceString& collectionName,
                                                     const UUID& uuid,
                                                     std::uint64_t numRecords,
-                                                    CollectionDropType dropType) {
+                                                    CollectionDropType dropType,
+                                                    bool markFromMigrate) {
     if (collectionName.isTimeseriesBucketsCollection()) {
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
         timeseries::bucket_catalog::clear(bucketCatalog,
@@ -123,8 +125,8 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-void TimeSeriesOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                                  const RollbackObserverInfo& rbInfo) {
+void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                 const RollbackObserverInfo& rbInfo) {
     stdx::unordered_set<NamespaceString> timeseriesNamespaces;
     for (const auto& ns : rbInfo.rollbackNamespaces) {
         if (ns.isTimeseriesBucketsCollection()) {

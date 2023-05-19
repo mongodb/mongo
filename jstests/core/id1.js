@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.id1;
+let t = db.id1;
 t.drop();
 
 t.save({_id: {a: 1, b: 2}, x: "a"});

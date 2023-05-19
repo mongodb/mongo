@@ -1,14 +1,14 @@
 // @tags: [requires_fastcount]
 
-t = db.query1;
+let t = db.query1;
 t.drop();
 
 t.save({num: 1});
 t.save({num: 3});
 t.save({num: 4});
 
-num = 0;
-total = 0;
+let num = 0;
+let total = 0;
 
 t.find().forEach(function(z) {
     num++;

@@ -54,6 +54,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
+#include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_settings.h"
@@ -464,18 +465,8 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
             }
         }
 
-        auto explainer = stdx::visit(
-            OverloadedVisitor{[](const plan_ranker::StatsDetails&) {
-                                  return plan_explainer_factory::make(nullptr);
-                              },
-                              [](const plan_ranker::SBEStatsDetails&) {
-                                  return plan_explainer_factory::make(nullptr, nullptr, nullptr);
-                              }},
-            debugInfo.decision->stats);
-        auto plannerStats =
-            explainer->getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);
-        auto execStats =
-            explainer->getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kExecStats);
+        auto plannerStats = getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);
+        auto execStats = getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kExecStats);
 
         invariant(plannerStats.size() > 0);
         out->append("cachedPlan", plannerStats[0].first);

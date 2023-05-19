@@ -3,13 +3,10 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.updated;
+let t = db.updated;
 t.drop();
 
-o = {
-    _id: Math.random(),
-    items: [null, null, null, null]
-};
+let o = {_id: Math.random(), items: [null, null, null, null]};
 
 t.insert(o);
 assert.docEq(o, t.findOne(), "A1");

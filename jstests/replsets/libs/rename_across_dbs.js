@@ -165,6 +165,7 @@ var RenameAcrossDatabasesTest = function(options) {
         _testLog('Checking oplogs and dbhashes after renaming collection.');
         replTest.awaitReplication();
         replTest.checkOplogs(testName);
+        replTest.checkPreImageCollection(testName);
         replTest.checkReplicatedDataHashes(testName);
 
         _testLog('Test completed. Stopping replica set.');

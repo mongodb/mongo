@@ -1,6 +1,6 @@
 // Test that weird polygons work SERVER-3725
 
-t = db.geo_polygon5;
+let t = db.geo_polygon5;
 t.drop();
 
 t.insert({loc: [0, 0]});

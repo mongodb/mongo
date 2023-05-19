@@ -215,15 +215,12 @@ void ReplIndexBuildState::completeSetup() {
     _cleanUpRequired = true;
 }
 
-Status ReplIndexBuildState::tryStart(OperationContext* opCtx) {
+void ReplIndexBuildState::setInProgress(OperationContext* opCtx) {
     stdx::lock_guard lk(_mutex);
     // The index build might have been aborted/interrupted before reaching this point. Trying to
     // transtion to kInProgress would be an error.
-    auto interruptCheck = opCtx->checkForInterruptNoAssert();
-    if (interruptCheck.isOK()) {
-        _indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
-    }
-    return interruptCheck;
+    opCtx->checkForInterrupt();
+    _indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
 }
 
 void ReplIndexBuildState::setVotedForCommitReadiness(OperationContext* opCtx) {
@@ -551,11 +548,6 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
         auto targetOpCtx = target->getOperationContext();
 
         LOGV2(7419400, "Forcefully aborting index build", "buildUUID"_attr = buildUUID);
-
-        // If there is a pending voteCommitIndexBuild request, cancel it and clear the callback.
-        // Otherwise the index build will try to issue a voteAbortIndexBuild, and set the callback
-        // handle, while the previous one is still valid.
-        _cancelAndClearVoteRequestCbk(lk, opCtx);
 
         // We don't pass IndexBuildAborted as the interruption error code because that would imply
         // that we are taking responsibility for cleaning up the index build, when in fact the index

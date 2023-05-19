@@ -98,7 +98,7 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-std::unique_ptr<CommonProcessInterface::WriteSizeEstimator>
+std::unique_ptr<MongoProcessInterface::WriteSizeEstimator>
 MongosProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
                                               const NamespaceString& ns) const {
     return std::make_unique<TargetPrimaryWriteSizeEstimator>();
@@ -259,13 +259,13 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocumentLocally(
 }
 
 BSONObj MongosProcessInterface::_reportCurrentOpForClient(
-    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Client* client,
     CurrentOpTruncateMode truncateOps,
     CurrentOpBacktraceMode backtraceMode) const {
     BSONObjBuilder builder;
 
-    CurOp::reportCurrentOpForClient(opCtx,
+    CurOp::reportCurrentOpForClient(expCtx,
                                     client,
                                     (truncateOps == CurrentOpTruncateMode::kTruncateOps),
                                     (backtraceMode == CurrentOpBacktraceMode::kIncludeBacktrace),

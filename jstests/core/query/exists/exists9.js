@@ -1,6 +1,6 @@
 // SERVER-393 Test exists with various empty array and empty object cases.
 
-t = db.jstests_exists9;
+let t = db.jstests_exists9;
 t.drop();
 
 // Check existence of missing nested field.

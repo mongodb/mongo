@@ -3,7 +3,7 @@
 //
 //
 
-load('./jstests/multiVersion/libs/verify_versions.js');
+load('jstests/multiVersion/libs/verify_versions.js');
 
 (function() {
 "use strict";

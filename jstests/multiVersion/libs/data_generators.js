@@ -300,7 +300,7 @@ function DataGenerator() {
     }
 
     // Data we are using as a source for our testing
-    testData = [
+    let testData = [
         GenFlatObjectAllTypesHardCoded(),
         GenFlatObjectAllTypes(0),
         GenFlatObjectAllTypes(2),
@@ -398,7 +398,7 @@ function IndexDataGenerator(options) {
 
             // Find the character (index into keyChars) that we currently have at this position, set
             // this position to the next character in the keyChars sequence
-            keyCharsIndex = keyChars.search(currentKey[currentKeyIndex]);
+            var keyCharsIndex = keyChars.search(currentKey[currentKeyIndex]);
             currentKey = setCharAt(
                 currentKey, currentKeyIndex, keyChars[(keyCharsIndex + 1) % keyChars.length]);
             currentKeyIndex = currentKeyIndex + 1;
@@ -519,7 +519,7 @@ function IndexDataGenerator(options) {
         return GenIndexOptions(seed);
     }
 
-    testIndexes = [
+    let testIndexes = [
         // Single Field Indexes
         {"spec": GenSingleFieldIndex(1), "options": GenIndexOptions(0)},
         {"spec": GenSingleFieldIndex(0), "options": GenIndexOptions(1)},

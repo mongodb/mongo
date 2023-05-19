@@ -143,7 +143,7 @@ bool RenameParticipantInstance::hasSameOptions(const BSONObj& participantDoc) {
     const auto otherDoc = RenameCollectionParticipantDocument::parse(
         IDLParserContext("RenameCollectionParticipantDocument"), participantDoc);
 
-    const auto& selfReq = _doc.getRenameCollectionRequest().toBSON();
+    const auto& selfReq = _request.toBSON();
     const auto& otherReq = otherDoc.getRenameCollectionRequest().toBSON();
 
     return SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq);

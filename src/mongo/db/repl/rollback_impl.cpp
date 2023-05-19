@@ -529,15 +529,23 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
             sessionTxnRecord.setLastWriteDate(wallClockTime);
         }
         const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
-        writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss, [&] {
             opCtx->recoveryUnit()->allowOneUntimestampedWrite();
-            AutoGetCollection collection(opCtx, nss, MODE_IX);
+            auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      nss,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
             auto filter = BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON());
             UnreplicatedWritesBlock uwb(opCtx);
             // Perform an untimestamped write so that it will not be rolled back on recovering
             // to the 'stableTimestamp' if we were to crash. This is safe because this update is
             // meant to be consistent with the 'stableTimestamp' and not the common point.
-            Helpers::upsert(opCtx, nss, filter, sessionTxnRecord.toBSON(), /*fromMigrate=*/false);
+            Helpers::upsert(
+                opCtx, collection, filter, sessionTxnRecord.toBSON(), /*fromMigrate=*/false);
         });
     }
     // Take a stable checkpoint so that writes to the 'config.transactions' table are
@@ -667,7 +675,7 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // transactions were aborted (i.e. the in-memory counts were rolled-back) before computing
     // collection counts, reconstruct the prepared transactions now, adding on any additional counts
     // to the now corrected record store.
-    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
+    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kStableRecovering);
 }
 
 void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
@@ -1356,7 +1364,15 @@ Status RollbackImpl::_triggerOpObserver(OperationContext* opCtx) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
     LOGV2(21610, "Triggering the rollback op observer");
-    opCtx->getServiceContext()->getOpObserver()->onReplicationRollback(opCtx, _observerInfo);
+
+    // Any exceptions thrown from onReplicationRollback() indicates a rollback failure that may
+    // have led us to some inconsistent on-disk or memory state, so we crash instead.
+    try {
+        opCtx->getServiceContext()->getOpObserver()->onReplicationRollback(opCtx, _observerInfo);
+    } catch (const DBException& ex) {
+        fassert(6050902, ex.toStatus());
+    }
+
     return Status::OK();
 }
 

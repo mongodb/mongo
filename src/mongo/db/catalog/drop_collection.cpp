@@ -58,6 +58,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
+MONGO_FAIL_POINT_DEFINE(allowSystemViewsDrop);
 
 /**
  * Checks that the collection has the 'expectedUUID' if given.
@@ -370,7 +371,7 @@ Status _dropCollection(OperationContext* opCtx,
                        boost::optional<UUID> dropIfUUIDNotMatching = boost::none) {
 
     try {
-        return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
+        return writeConflictRetry(opCtx, "drop", collectionName, [&] {
             // If a change collection is to be dropped, that is, the change streams are being
             // disabled for a tenant, acquire exclusive tenant lock.
             AutoGetDb autoDb(opCtx,
@@ -452,7 +453,7 @@ Status _dropCollection(OperationContext* opCtx,
                         // Drop the buckets collection in its own writeConflictRetry so that if
                         // it throws a WCE, only the buckets collection drop is retried.
                         writeConflictRetry(
-                            opCtx, "drop", bucketsNs.ns(), [opCtx, db, &bucketsNs, fromMigrate] {
+                            opCtx, "drop", bucketsNs, [opCtx, db, &bucketsNs, fromMigrate] {
                                 WriteUnitOfWork wuow(opCtx);
                                 db->dropCollectionEvenIfSystem(opCtx, bucketsNs, {}, fromMigrate)
                                     .ignore();
@@ -583,7 +584,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         LOGV2(20333, "Hanging drop collection before lock acquisition while fail point is set");
         hangDropCollectionBeforeLockAcquisition.pauseWhileSet();
     }
-    return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
+    return writeConflictRetry(opCtx, "drop", collectionName, [&] {
         AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_IX);
         Database* db = autoDb.getDb();
         if (!db) {
@@ -686,6 +687,41 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
         opCtx, dbName, MODE_X, callback, [&](const Collection* collection) {
             return collection->getCollectionOptions().temp;
         });
+}
+
+Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    if (!nss.isSystem()) {
+        return Status::OK();
+    }
+
+    auto isDroppableSystemCollection = [](const auto& nss) {
+        return nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
+            nss == NamespaceString::kKeysCollectionNamespace ||
+            nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
+            nss.isChangeStreamPreImagesCollection() ||
+            nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection() ||
+            nss.isSystemDotJavascript() || nss.isSystemStatsCollection();
+    };
+
+    if (nss.isSystemDotProfile()) {
+        if (CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()) != 0)
+            return Status(ErrorCodes::IllegalOperation,
+                          "turn off profiling before dropping system.profile collection");
+    } else if (nss.isSystemDotViews()) {
+        if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
+            const auto viewStats =
+                CollectionCatalog::get(opCtx)->getViewStatsForDatabase(opCtx, nss.dbName());
+            uassert(ErrorCodes::CommandFailed,
+                    "cannot drop collection {} when time-series collections are present"_format(
+                        nss.toStringForErrorMsg()),
+                    viewStats && viewStats->userTimeseries == 0);
+        }
+    } else if (!isDroppableSystemCollection(nss)) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "cannot drop system collection {}"_format(nss.toStringForErrorMsg()));
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

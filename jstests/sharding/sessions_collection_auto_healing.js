@@ -63,7 +63,7 @@ var mongosConfig = mongos.getDB("config");
 }
 
 // Test-wide: add a shard
-var rs = new ReplSetTest({nodes: 1});
+const rs = new ReplSetTest({nodes: 1});
 rs.startSet({shardsvr: ""});
 rs.initiate();
 

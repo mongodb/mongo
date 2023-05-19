@@ -231,8 +231,22 @@ public:
     // Unowned objects are only valid until next call to any method
 
     virtual bool more() = 0;
+    /**
+     * Returns the new key-value pair.
+     */
     virtual std::pair<Key, Value> next() = 0;
-    virtual const std::pair<Key, Value>& current() = 0;
+
+    /**
+     * The following two methods are used together. nextWithDeferredValue() returns the next key. It
+     * must be followed by a call to getDeferredValue(), to return the pending deferred value,
+     * before calling next() or nextWithDeferredValue() again. This is intended specifically to
+     * avoid allocating memory for the value if the caller eventually decides to abandon the
+     * iterator and never consume any more values from it.
+     */
+    virtual Key nextWithDeferredValue() = 0;
+    virtual Value getDeferredValue() = 0;
+
+    virtual const Key& current() = 0;
 
     virtual ~SortIteratorInterface() {}
 

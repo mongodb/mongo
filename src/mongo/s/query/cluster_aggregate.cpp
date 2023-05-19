@@ -56,7 +56,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -138,16 +138,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         uuid);
 
     mergeCtx->inMongos = true;
-
-    // If the request explicity specified NOT to use v2 resume tokens for change streams, set this
-    // on the expCtx. We only ever expect to see an explicit value during testing.
-    if (request.getGenerateV2ResumeTokens().has_value()) {
-        // If $_generateV2ResumeTokens was specified, we must be testing and it must be false.
-        uassert(6528201,
-                "Invalid request for v2 resume tokens",
-                getTestCommandsEnabled() && !request.getGenerateV2ResumeTokens());
-        mergeCtx->changeStreamTokenVersion = 1;
-    }
 
     // Serialize the 'AggregateCommandRequest' and save it so that the original command can be
     // reconstructed for dispatch to a new shard, which is sometimes necessary for change streams
@@ -334,7 +324,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
 
     if (!shouldDoFLERewrite) {
-        telemetry::registerAggRequest(request, opCtx);
+        query_stats::registerAggRequest(request, opCtx);
     }
 
     // If the routing table is not already taken by the higher level, fill it now.

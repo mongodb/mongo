@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <list>
+#include <queue>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/admission_context.h"
@@ -64,7 +64,6 @@ struct TicketWaiter {
 class TicketQueue {
 public:
     virtual ~TicketQueue(){};
-    virtual bool empty() const = 0;
     virtual void push(std::shared_ptr<TicketWaiter>) = 0;
     virtual std::shared_ptr<TicketWaiter> pop() = 0;
 };
@@ -75,23 +74,109 @@ public:
  */
 class FifoTicketQueue : public TicketQueue {
 public:
-    bool empty() const {
-        return _queue.empty();
-    }
-
     void push(std::shared_ptr<TicketWaiter> val) {
-        _queue.push_back(std::move(val));
+        _queue.push(std::move(val));
     }
 
     std::shared_ptr<TicketWaiter> pop() {
+        if (_queue.empty()) {
+            return nullptr;
+        }
         auto front = std::move(_queue.front());
-        _queue.pop_front();
+        _queue.pop();
         return front;
     }
 
 private:
-    std::list<std::shared_ptr<TicketWaiter>> _queue;
+    std::queue<std::shared_ptr<TicketWaiter>> _queue;
 };
+
+/**
+ * This SimplePriorityTicketQueue implements a queue policy that separates normal and low priority
+ * operations into separate queues. Normal priority operations are always scheduled ahead of low
+ * priority ones, except when a positive lowPriorityBypassThreshold is provided. This parameter
+ * specifies how often a waiting low-priority operation should skip the queue and be scheduled ahead
+ * of waiting normal priority operations.
+ */
+class SimplePriorityTicketQueue : public TicketQueue {
+public:
+    SimplePriorityTicketQueue(int lowPriorityBypassThreshold)
+        : _lowPriorityBypassThreshold(lowPriorityBypassThreshold) {}
+
+    void push(std::shared_ptr<TicketWaiter> val) final {
+        if (val->context->getPriority() == AdmissionContext::Priority::kLow) {
+            _low.push(std::move(val));
+            return;
+        }
+        invariant(val->context->getPriority() == AdmissionContext::Priority::kNormal);
+        _normal.push(std::move(val));
+    }
+
+    std::shared_ptr<TicketWaiter> pop() final {
+        auto normalQueued = !_normal.empty();
+        auto lowQueued = !_low.empty();
+        if (!normalQueued && !lowQueued) {
+            return nullptr;
+        }
+        if (normalQueued && lowQueued && _lowPriorityBypassThreshold.load() > 0 &&
+            _lowPriorityBypassCount.fetchAndAdd(1) % _lowPriorityBypassThreshold.load() == 0) {
+            auto front = std::move(_low.front());
+            _low.pop();
+            _expeditedLowPriorityAdmissions.addAndFetch(1);
+            return front;
+        }
+        if (normalQueued) {
+            auto front = std::move(_normal.front());
+            _normal.pop();
+            return front;
+        }
+        auto front = std::move(_low.front());
+        _low.pop();
+        return front;
+    }
+
+    /**
+     * Number of times low priority operations are expedited for ticket admission over normal
+     * priority operations.
+     */
+    std::int64_t expedited() const {
+        return _expeditedLowPriorityAdmissions.loadRelaxed();
+    }
+
+    /**
+     * Returns the number of times the low priority queue is bypassed in favor of dequeuing from the
+     * normal priority queue when a ticket becomes available.
+     */
+    std::int64_t bypassed() const {
+        return _lowPriorityBypassCount.loadRelaxed();
+    }
+
+    void updateLowPriorityAdmissionBypassThreshold(int32_t newBypassThreshold) {
+        _lowPriorityBypassThreshold.store(newBypassThreshold);
+    }
+
+private:
+    /**
+     * Limits the number times the low priority queue is non-empty and bypassed in favor of the
+     * normal priority queue for the next ticket admission.
+     */
+    AtomicWord<std::int32_t> _lowPriorityBypassThreshold;
+
+    /**
+     * Number of times ticket admission is expedited for low priority operations.
+     */
+    AtomicWord<std::int64_t> _expeditedLowPriorityAdmissions{0};
+
+    /**
+     * Counts the number of times normal operations are dequeued over operations queued in the low
+     * priority queue. We explicitly use an unsigned type here because rollover is desired.
+     */
+    AtomicWord<std::uint64_t> _lowPriorityBypassCount{0};
+
+    std::queue<std::shared_ptr<TicketWaiter>> _normal;
+    std::queue<std::shared_ptr<TicketWaiter>> _low;
+};
+
 
 /**
  * A TicketPool holds tickets and queues waiters in the provided TicketQueue. The TicketPool
@@ -99,9 +184,12 @@ private:
  *
  * All public functions are thread-safe except where explicitly stated otherwise.
  */
+template <class Queue>
 class TicketPool {
 public:
-    TicketPool(int numTickets, std::unique_ptr<TicketQueue> queue);
+    template <typename... Args>
+    TicketPool(int numTickets, Args&&... args)
+        : _available(numTickets), _queued(0), _waiters(std::forward<Args>(args)...) {}
 
     /**
      * Attempt to acquire a ticket without blocking. Returns true if a ticket was granted.
@@ -117,12 +205,6 @@ public:
      * Releases a ticket to the pool. Will will wake a waiter, if there are any queued operations.
      */
     void release();
-
-    /**
-     * If there are queued operations, releases a ticket and returns true. Otherwise, does nothing
-     * and returns false.
-     */
-    bool releaseIfWaiters();
 
     /**
      * Returns the number of tickets available.
@@ -142,8 +224,12 @@ public:
      * Provides direct access to the underlying queue. Callers must ensure they only use thread-safe
      * functions.
      */
-    TicketQueue* getQueue() {
-        return _waiters.get();
+    const Queue& getQueue() const {
+        return _waiters;
+    }
+
+    Queue& getQueue() {
+        return _waiters;
     }
 
 private:
@@ -167,6 +253,6 @@ private:
     // This mutex protects the _waiters queue by preventing items from being added and removed, but
     // does not protect the elements of the queue.
     Mutex _mutex = MONGO_MAKE_LATCH("TicketPool::_mutex");
-    std::unique_ptr<TicketQueue> _waiters;
+    Queue _waiters;
 };
 }  // namespace mongo

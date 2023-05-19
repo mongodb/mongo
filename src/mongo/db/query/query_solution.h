@@ -148,7 +148,7 @@ struct QuerySolutionNode {
     std::string toString() const;
 
     /**
-     * What stage should this be transcribed to?  See stage_types.h.
+     * What stage should this node be transcribed to?  See stage_types.h.
      */
     virtual StageType getType() const = 0;
 
@@ -453,6 +453,11 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
         return false;
     }
 
+    // Tells whether this scan will be performed as a clustered collection scan in SBE.
+    bool doSbeClusteredCollectionScan() const {
+        return (isClustered && !isOplog && (minRecord || maxRecord || resumeAfterRecordId));
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     // Name of the namespace.
@@ -492,7 +497,14 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // Assert that the specified timestamp has not fallen off the oplog or change collection.
     boost::optional<Timestamp> assertTsHasNotFallenOff = boost::none;
 
+    // Scan direction: 1 means forward; -1 means reverse.
     int direction{1};
+
+    // Tells whether the collection is clustered (which includes oplog collections).
+    bool isClustered = false;
+
+    // Tells whether the collection is an oplog.
+    bool isOplog = false;
 
     // By default, includes the minRecord and maxRecord when present.
     CollectionScanParams::ScanBoundInclusion boundInclusion =
@@ -502,6 +514,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     bool shouldWaitForOplogVisibility = false;
 
     // Once the first matching document is found, assume that all documents after it must match.
+    // This is useful for oplog queries where we know we will see records ordered by the ts field.
     bool stopApplyingFilterAfterFirstMatch = false;
 
     // Whether the collection scan should have low storage admission priority.
@@ -823,7 +836,7 @@ struct ReturnKeyNode : public QuerySolutionNode {
                   std::vector<FieldPath> sortKeyMetaFields)
         : QuerySolutionNode(std::move(child)), sortKeyMetaFields(std::move(sortKeyMetaFields)) {}
 
-    StageType getType() const final {
+    virtual StageType getType() const {
         return STAGE_RETURN_KEY;
     }
 
@@ -913,7 +926,7 @@ public:
 struct ProjectionNodeDefault final : ProjectionNode {
     using ProjectionNode::ProjectionNode;
 
-    StageType getType() const final {
+    virtual StageType getType() const {
         return STAGE_PROJECTION_DEFAULT;
     }
 
@@ -935,7 +948,7 @@ struct ProjectionNodeCovered final : ProjectionNode {
         : ProjectionNode(std::move(child), fullExpression, std::move(proj)),
           coveredKeyObj(std::move(coveredKeyObj)) {}
 
-    StageType getType() const final {
+    virtual StageType getType() const {
         return STAGE_PROJECTION_COVERED;
     }
 
@@ -956,7 +969,7 @@ struct ProjectionNodeCovered final : ProjectionNode {
 struct ProjectionNodeSimple final : ProjectionNode {
     using ProjectionNode::ProjectionNode;
 
-    StageType getType() const final {
+    virtual StageType getType() const {
         return STAGE_PROJECTION_SIMPLE;
     }
 
@@ -968,7 +981,7 @@ struct ProjectionNodeSimple final : ProjectionNode {
 };
 
 struct SortKeyGeneratorNode : public QuerySolutionNode {
-    StageType getType() const final {
+    virtual StageType getType() const {
         return STAGE_SORT_KEY_GENERATOR;
     }
 
@@ -1043,7 +1056,7 @@ private:
  * Represents sort algorithm that can handle any kind of input data.
  */
 struct SortNodeDefault final : public SortNode {
-    virtual StageType getType() const override {
+    virtual StageType getType() const {
         return STAGE_SORT_DEFAULT;
     }
 
@@ -1332,7 +1345,7 @@ struct EofNode : public QuerySolutionNodeWithSortSet {
 struct TextOrNode : public OrNode {
     TextOrNode() {}
 
-    StageType getType() const override {
+    virtual StageType getType() const {
         return STAGE_TEXT_OR;
     }
 
@@ -1344,7 +1357,7 @@ struct TextMatchNode : public QuerySolutionNodeWithSortSet {
     TextMatchNode(IndexEntry index, std::unique_ptr<fts::FTSQuery> ftsQuery, bool wantTextScore)
         : index(std::move(index)), ftsQuery(std::move(ftsQuery)), wantTextScore(wantTextScore) {}
 
-    StageType getType() const override {
+    virtual StageType getType() const {
         return STAGE_TEXT_MATCH;
     }
 
@@ -1406,7 +1419,7 @@ struct GroupNode : public QuerySolutionNode {
         needsAnyMetadata = deps.getNeedsAnyMetadata();
     }
 
-    StageType getType() const override {
+    virtual StageType getType() const {
         return STAGE_GROUP;
     }
 
@@ -1505,7 +1518,7 @@ struct EqLookupNode : public QuerySolutionNode {
           idxEntry(std::move(idxEntry)),
           shouldProduceBson(shouldProduceBson) {}
 
-    StageType getType() const override {
+    virtual StageType getType() const {
         return STAGE_EQ_LOOKUP;
     }
 
@@ -1581,7 +1594,7 @@ struct SentinelNode : public QuerySolutionNode {
 
     SentinelNode() {}
 
-    StageType getType() const override {
+    virtual StageType getType() const {
         return STAGE_SENTINEL;
     }
 

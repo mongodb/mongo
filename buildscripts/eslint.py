@@ -19,6 +19,7 @@ import sys
 import tarfile
 import tempfile
 import threading
+import platform
 from typing import Optional
 import urllib.error
 import urllib.parse
@@ -50,14 +51,17 @@ ESLINT_VERSION = "8.28.0"
 # Name of ESLint as a binary.
 ESLINT_PROGNAME = "eslint"
 
+# Arch of running system
+ARCH = platform.machine() if platform.machine() != "aarch64" else "arm64"
+
 # URL location of our provided ESLint binaries.
 ESLINT_HTTP_LINUX_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/eslint-" + \
-                           ESLINT_VERSION + "-linux.tar.gz"
+                           ESLINT_VERSION + "-linux-" + ARCH + ".tar.gz"
 ESLINT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/eslint-" + \
                             ESLINT_VERSION + "-darwin.tar.gz"
 
 # Path in the tarball to the ESLint binary.
-ESLINT_SOURCE_TAR_BASE = string.Template(ESLINT_PROGNAME + "-$platform-$arch")
+ESLINT_SOURCE_TAR_BASE = string.Template(ESLINT_PROGNAME + "-$operating_system-$arch")
 
 LOGGER = structlog.get_logger(__name__)
 
@@ -76,15 +80,15 @@ def extract_eslint(tar_path, target_file):
     tarfp.close()
 
 
-def get_eslint_from_cache(dest_file, platform, arch):
+def get_eslint_from_cache(dest_file, operating_system, arch):
     """Get ESLint binary from mongodb's cache."""
     # Get URL
-    if platform == "Linux":
+    if operating_system == "Linux":
         url = ESLINT_HTTP_LINUX_CACHE
-    elif platform == "Darwin":
+    elif operating_system == "Darwin":
         url = ESLINT_HTTP_DARWIN_CACHE
     else:
-        raise ValueError('ESLint is not available as a binary for ' + platform)
+        raise ValueError('ESLint is not available as a binary for ' + operating_system)
 
     dest_dir = tempfile.gettempdir()
     temp_tar_file = os.path.join(dest_dir, "temp.tar.gz")
@@ -94,7 +98,8 @@ def get_eslint_from_cache(dest_file, platform, arch):
     urllib.request.urlretrieve(url, temp_tar_file)
 
     print("Extracting ESLint %s to %s" % (ESLINT_VERSION, dest_file))
-    eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(platform=platform, arch=arch)
+    eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(operating_system=operating_system,
+                                                        arch=arch)
     extract_eslint(temp_tar_file, eslint_distfile)
     shutil.move(eslint_distfile, dest_file)
 
@@ -108,7 +113,7 @@ class ESLint(object):
 
         # Initialize ESLint configuration information
         if sys.platform.startswith("linux"):
-            self.arch = "x86_64"
+            self.arch = ARCH
             self.tar_path = None
         elif sys.platform == "darwin":
             self.arch = "x86_64"

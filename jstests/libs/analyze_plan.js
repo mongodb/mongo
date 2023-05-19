@@ -606,3 +606,37 @@ function flattenQueryPlanTree(winningPlan) {
     stages.reverse();
     return stages;
 }
+
+/**
+ * Assert that a command plan has no FETCH stage or if the stage is present, it has no filter.
+ */
+function assertNoFetchFilter({coll, cmdObj}) {
+    const plan = assert.commandWorked(coll.runCommand({explain: cmdObj}));
+    const winningPlan = getWinningPlan(plan.queryPlanner);
+    const fetch = getPlanStage(winningPlan, "FETCH");
+    assert((fetch === null || !fetch.hasOwnProperty("filter")),
+           "Unexpected fetch: " + tojson(fetch));
+    return winningPlan;
+}
+
+/**
+ * Assert that a find plan has a FETCH stage with expected filter and returns a specified number of
+ * results.
+ */
+function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) {
+    const exp = coll.find(predicate).explain("executionStats");
+    const plan = getWinningPlan(exp.queryPlanner);
+    const fetch = getPlanStage(plan, "FETCH");
+    assert(fetch !== null, "Missing FETCH stage " + plan);
+    assert(fetch.hasOwnProperty("filter"),
+           "Expected filter in the fetch stage, got " + tojson(fetch));
+    assert.eq(expectedFilter,
+              fetch.filter,
+              "Expected filter " + tojson(expectedFilter) + " got " + tojson(fetch.filter));
+
+    if (nReturned !== null) {
+        assert.eq(exp.executionStats.nReturned,
+                  nReturned,
+                  "Expected " + nReturned + " documents, got " + exp.executionStats.nReturned);
+    }
+}

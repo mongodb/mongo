@@ -17,6 +17,7 @@ TestData.skipCheckDBHashes = true;
 const st = new ShardingTest({shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}}});
 const rst = st.rs0;
 const primary = rst.getPrimary();
+const nodes = rst.nodes;
 if (primary !== nodes[0]) {
     st.stop();
     return;  // For simplicity.

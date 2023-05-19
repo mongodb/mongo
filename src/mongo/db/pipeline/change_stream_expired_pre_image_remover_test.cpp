@@ -32,6 +32,7 @@
 #include "mongo/db/change_stream_options_manager.h"
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
@@ -86,7 +87,7 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithVa
 
     auto currentTime = Date_t::now();
     auto receivedExpireAfterSeconds =
-        change_stream_pre_image_helpers::getPreImageExpirationTime(opCtx.get(), currentTime);
+        change_stream_pre_image_util::getPreImageExpirationTime(opCtx.get(), currentTime);
     ASSERT(receivedExpireAfterSeconds);
     ASSERT_EQ(*receivedExpireAfterSeconds, currentTime - Seconds(expireAfterSeconds));
 }
@@ -96,7 +97,7 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithUn
 
     auto currentTime = Date_t::now();
     auto receivedExpireAfterSeconds =
-        change_stream_pre_image_helpers::getPreImageExpirationTime(opCtx.get(), currentTime);
+        change_stream_pre_image_util::getPreImageExpirationTime(opCtx.get(), currentTime);
     ASSERT_FALSE(receivedExpireAfterSeconds);
 }
 
@@ -108,14 +109,14 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithOf
 
     auto currentTime = Date_t::now();
     auto receivedExpireAfterSeconds =
-        change_stream_pre_image_helpers::getPreImageExpirationTime(opCtx.get(), currentTime);
+        change_stream_pre_image_util::getPreImageExpirationTime(opCtx.get(), currentTime);
     ASSERT_FALSE(receivedExpireAfterSeconds);
 }
 }  // namespace
 
-class PreImagesTruncateMarkersTest : public ServiceContextMongoDTest {
+class PreImagesTruncateMarkersPerCollectionTest : public ServiceContextMongoDTest {
 protected:
-    explicit PreImagesTruncateMarkersTest() : ServiceContextMongoDTest() {
+    explicit PreImagesTruncateMarkersPerCollectionTest() : ServiceContextMongoDTest() {
         ChangeStreamOptionsManager::create(getServiceContext());
     }
 
@@ -159,7 +160,7 @@ protected:
     RecordId generatePreImageRecordId(Timestamp timestamp) {
         const UUID uuid{UUID::gen()};
         ChangeStreamPreImageId preImageId(uuid, timestamp, 0);
-        return change_stream_pre_image_helpers::toRecordId(preImageId);
+        return change_stream_pre_image_util::toRecordId(preImageId);
     }
 
 
@@ -167,10 +168,10 @@ protected:
         const UUID uuid{UUID::gen()};
         Timestamp timestamp{wallTime};
         ChangeStreamPreImageId preImageId(uuid, timestamp, 0);
-        return change_stream_pre_image_helpers::toRecordId(preImageId);
+        return change_stream_pre_image_util::toRecordId(preImageId);
     }
 
-    bool hasExcessMarkers(OperationContext* opCtx, PreImagesTruncateMarkers& markers) {
+    bool hasExcessMarkers(OperationContext* opCtx, PreImagesTruncateMarkersPerCollection& markers) {
         return markers._hasExcessMarkers(opCtx);
     }
 
@@ -180,7 +181,7 @@ protected:
         NamespaceString arbitraryNss =
             NamespaceString::createNamespaceString_forTest("test", "coll");
 
-        writeConflictRetry(opCtx, "createCollection", arbitraryNss.ns(), [&] {
+        writeConflictRetry(opCtx, "createCollection", arbitraryNss, [&] {
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collRaii(opCtx, arbitraryNss, MODE_X);
             invariant(!collRaii);
@@ -213,7 +214,7 @@ protected:
 // When 'expireAfterSeconds' is on, defaults to comparing the 'lastRecord's wallTime with
 // the current time - 'expireAfterSeconds',  which is already tested as a part of the
 // ChangeStreamPreImageExpirationPolicyTest.
-TEST_F(PreImagesTruncateMarkersTest, hasExcessMarkersExpiredAfterSecondsOff) {
+TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasExcessMarkersExpiredAfterSecondsOff) {
     auto opCtxPtr = cc().makeOperationContext();
     auto opCtx = opCtxPtr.get();
 
@@ -239,13 +240,13 @@ TEST_F(PreImagesTruncateMarkersTest, hasExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkers markers(
+    PreImagesTruncateMarkersPerCollection markers(
         boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
+TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
     auto opCtxPtr = cc().makeOperationContext();
     auto opCtx = opCtxPtr.get();
 
@@ -271,13 +272,13 @@ TEST_F(PreImagesTruncateMarkersTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkers markers(
+    PreImagesTruncateMarkersPerCollection markers(
         boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersTest, serverlessHasNoExcessMarkers) {
+TEST_F(PreImagesTruncateMarkersPerCollectionTest, serverlessHasNoExcessMarkers) {
     int64_t expireAfterSeconds = 1000;
     auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
     serverlessSetExpireAfterSeconds(tenantId, expireAfterSeconds);
@@ -291,12 +292,12 @@ TEST_F(PreImagesTruncateMarkersTest, serverlessHasNoExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkers markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerCollection markers(tenantId, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersTest, serverlessHasExcessMarkers) {
+TEST_F(PreImagesTruncateMarkersPerCollectionTest, serverlessHasExcessMarkers) {
     int64_t expireAfterSeconds = 1;
     auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
     serverlessSetExpireAfterSeconds(tenantId, expireAfterSeconds);
@@ -310,21 +311,21 @@ TEST_F(PreImagesTruncateMarkersTest, serverlessHasExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkers markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerCollection markers(tenantId, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersTest, RecordIdToPreImageTimstampRetrieval) {
+TEST_F(PreImagesTruncateMarkersPerCollectionTest, RecordIdToPreImageTimstampRetrieval) {
     // Basic case.
     {
         Timestamp ts0(Date_t::now());
         int64_t applyOpsIndex = 0;
 
         ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
-        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+        auto preImageRecordId = change_stream_pre_image_util::toRecordId(preImageId);
 
-        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        auto ts1 = change_stream_pre_image_util::getPreImageTimestamp(preImageRecordId);
         ASSERT_EQ(ts0, ts1);
     }
 
@@ -334,9 +335,9 @@ TEST_F(PreImagesTruncateMarkersTest, RecordIdToPreImageTimstampRetrieval) {
         int64_t applyOpsIndex = 0;
 
         ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
-        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+        auto preImageRecordId = change_stream_pre_image_util::toRecordId(preImageId);
 
-        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        auto ts1 = change_stream_pre_image_util::getPreImageTimestamp(preImageRecordId);
         ASSERT_EQ(ts0, ts1);
     }
 
@@ -346,9 +347,9 @@ TEST_F(PreImagesTruncateMarkersTest, RecordIdToPreImageTimstampRetrieval) {
         int64_t applyOpsIndex = 0;
 
         ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
-        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+        auto preImageRecordId = change_stream_pre_image_util::toRecordId(preImageId);
 
-        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        auto ts1 = change_stream_pre_image_util::getPreImageTimestamp(preImageRecordId);
         ASSERT_EQ(ts0, ts1);
     }
 
@@ -363,9 +364,9 @@ TEST_F(PreImagesTruncateMarkersTest, RecordIdToPreImageTimstampRetrieval) {
         int64_t applyOpsIndex = std::numeric_limits<int64_t>::max();
 
         ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
-        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+        auto preImageRecordId = change_stream_pre_image_util::toRecordId(preImageId);
 
-        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        auto ts1 = change_stream_pre_image_util::getPreImageTimestamp(preImageRecordId);
         ASSERT_EQ(ts0, ts1);
     }
 
@@ -375,9 +376,9 @@ TEST_F(PreImagesTruncateMarkersTest, RecordIdToPreImageTimstampRetrieval) {
         int64_t applyOpsIndex = std::numeric_limits<int64_t>::max();
 
         ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
-        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+        auto preImageRecordId = change_stream_pre_image_util::toRecordId(preImageId);
 
-        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        auto ts1 = change_stream_pre_image_util::getPreImageTimestamp(preImageRecordId);
         ASSERT_EQ(ts0, ts1);
     }
 }

@@ -9,7 +9,7 @@ load("jstests/sharding/movechunk_include.js");
 var st = setupMoveChunkTest({});
 
 var shards = [st.shard0, st.shard1];
-for (i in shards) {
+for (let i in shards) {
     var dbpath = shards[i].adminCommand("getCmdLineOpts").parsed.storage.dbPath;
     var hasMoveChunkDir = 0 !=
         ls(dbpath)

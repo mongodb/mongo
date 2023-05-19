@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection, requires_fastcount]
 
-t = db.find_and_modify4;
+let t = db.find_and_modify4;
 t.drop();
 
 // this is the best way to build auto-increment

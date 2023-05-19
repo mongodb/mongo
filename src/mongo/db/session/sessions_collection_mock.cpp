@@ -35,8 +35,8 @@
 namespace mongo {
 
 MockSessionsCollectionImpl::MockSessionsCollectionImpl()
-    : _refresh([=](const LogicalSessionRecordSet& sessions) { _refreshSessions(sessions); }),
-      _remove([=](const LogicalSessionIdSet& sessions) { _removeRecords(sessions); }) {}
+    : _refresh([=, this](const LogicalSessionRecordSet& sessions) { _refreshSessions(sessions); }),
+      _remove([=, this](const LogicalSessionIdSet& sessions) { _removeRecords(sessions); }) {}
 
 void MockSessionsCollectionImpl::setRefreshHook(RefreshHook hook) {
     _refresh = std::move(hook);
@@ -47,10 +47,10 @@ void MockSessionsCollectionImpl::setRemoveHook(RemoveHook hook) {
 }
 
 void MockSessionsCollectionImpl::clearHooks() {
-    _refresh = [=](const LogicalSessionRecordSet& sessions) {
+    _refresh = [=, this](const LogicalSessionRecordSet& sessions) {
         _refreshSessions(sessions);
     };
-    _remove = [=](const LogicalSessionIdSet& sessions) {
+    _remove = [=, this](const LogicalSessionIdSet& sessions) {
         _removeRecords(sessions);
     };
 }

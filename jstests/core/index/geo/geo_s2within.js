@@ -1,18 +1,15 @@
 // Test some cases that might be iffy with $within, mostly related to polygon w/holes.
-t = db.geo_s2within;
+let t = db.geo_s2within;
 t.drop();
 t.createIndex({geo: "2dsphere"});
 
-somepoly = {
-    "type": "Polygon",
-    "coordinates": [[[40, 5], [40, 6], [41, 6], [41, 5], [40, 5]]]
-};
+let somepoly = {"type": "Polygon", "coordinates": [[[40, 5], [40, 6], [41, 6], [41, 5], [40, 5]]]};
 
 t.insert({geo: {"type": "LineString", "coordinates": [[40.1, 5.1], [40.2, 5.2]]}});
 // This is only partially contained within the polygon.
 t.insert({geo: {"type": "LineString", "coordinates": [[40.1, 5.1], [42, 7]]}});
 
-res = t.find({"geo": {"$within": {"$geometry": somepoly}}});
+let res = t.find({"geo": {"$within": {"$geometry": somepoly}}});
 assert.eq(res.itcount(), 1);
 
 t.drop();

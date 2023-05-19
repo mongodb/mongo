@@ -216,7 +216,10 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
       _chunkRange(std::move(chunk)),
       _keyPattern(shardKey) {}
 
-void SessionCatalogMigrationSource::init(OperationContext* opCtx) {
+void SessionCatalogMigrationSource::init(OperationContext* opCtx,
+                                         const LogicalSessionId& migrationLsid) {
+    const auto migrationLsidWithoutTxnNumber = castToParentSessionId(migrationLsid);
+
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     // Skip internal sessions for retryable writes with aborted or in progress transactions since
@@ -254,6 +257,16 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx) {
             // txnNumber.
             continue;
         }
+
+        if (parentSessionId == migrationLsidWithoutTxnNumber) {
+            // Skip session id matching the migration lsid as they are only for used for rejecting
+            // old migration source from initiating range deleter on the destination. Sending
+            // these sessions to the other side has a potential to deadlock as the destination
+            // will also try to checkout the same session for almost the entire duration of
+            // the migration.
+            continue;
+        }
+
         lastTxnSession = LastTxnSession{parentSessionId, parentTxnNumber};
 
         if (!txnRecord.getLastWriteOpTime().isNull()) {
@@ -267,7 +280,7 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx) {
         writeConflictRetry(
             opCtx,
             "session migration initialization majority commit barrier",
-            NamespaceString::kRsOplogNamespace.ns(),
+            NamespaceString::kRsOplogNamespace,
             [&] {
                 const auto message = BSON("sessionMigrateCloneStart" << _ns.ns());
 
@@ -671,13 +684,21 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                           repl::OplogEntry::CommandType::kApplyOps);
                 const auto sessionId = *nextNewWriteOplog.getSessionId();
 
-                // The opTimes for transactions inside internal sessions for non-retryable writes
-                // should never get added to the opTime queue since those transactions are not
-                // retryable so there is no need to transfer their write history to the
-                // recipient.
-                invariant(!isInternalSessionForNonRetryableWrite(sessionId),
-                          "Cannot add op time for a non-retryable internal transaction to the "
-                          "session migration op time queue");
+                if (isInternalSessionForNonRetryableWrite(sessionId)) {
+                    dassert(0,
+                            str::stream() << "Cannot add op time for a non-retryable "
+                                             "internal transaction to the "
+                                             "session migration op time queue - "
+                                          << "session id:" << sessionId << " oplog entry: "
+                                          << redact(nextNewWriteOplog.toBSONForLogging()));
+
+                    // Transactions inside internal sessions for non-retryable writes are not
+                    // retryable so there is no need to transfer their write history to the
+                    // recipient.
+                    _newWriteOpTimeList.pop_front();
+                    lk.unlock();
+                    return _fetchNextNewWriteOplog(opCtx);
+                }
 
                 if (isInternalSessionForRetryableWrite(sessionId)) {
                     // Derive retryable write oplog entries from this retryable internal

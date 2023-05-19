@@ -839,10 +839,9 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     auto indexes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nssOrUUID.dbName().toString(),
+                                              DatabaseNameUtil::serialize(nssOrUUID.dbName()),
                                               cmd,
                                               Milliseconds(-1)));
-
     for (auto&& spec : indexes.docs) {
         if (spec[IndexDescriptor::kClusteredFieldName]) {
             // The 'clustered' index is implicitly created upon clustered collection creation.
@@ -885,7 +884,7 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
     auto infosRes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nssOrUUID.dbName().toString(),
+                                              DatabaseNameUtil::serialize(nssOrUUID.dbName()),
                                               cmd,
                                               Milliseconds(-1)));
 
@@ -1058,10 +1057,9 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                               << collectionByUUID->ns().toStringForErrorMsg());
             }
 
-            // We do not have a collection by this name. Create the collection with the donor's
-            // options.
+            // We do not have a collection by this name. Create it with the donor's options.
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
+                unsafeCreateCollection(opCtx, /* forceCSRAsUnknownAfterCollectionCreation */ true);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions collectionOptions = uassertStatusOK(
                 CollectionOptions::parse(collectionOptionsAndIndexes.options,
@@ -1713,7 +1711,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                 uassertStatusOK(rs->goingToDelete(fullObj));
             }
 
-            writeConflictRetry(opCtx, "transferModsDeletes", _nss.ns(), [&] {
+            writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {
                 deleteObjects(opCtx,
                               collection,
                               id,
@@ -1732,11 +1730,17 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
             totalDocs++;
-            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            auto collection = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(_nss,
+                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite),
+                MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.toStringForErrorMsg()
                                   << " was dropped in the middle of the migration",
-                    autoColl.getCollection());
+                    collection.exists());
 
             BSONObj updatedDoc = i.next().Obj();
 
@@ -1765,8 +1769,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
             }
 
             // We are in write lock here, so sure we aren't killing
-            writeConflictRetry(opCtx, "transferModsUpdates", _nss.ns(), [&] {
-                auto res = Helpers::upsert(opCtx, _nss, updatedDoc, true);
+            writeConflictRetry(opCtx, "transferModsUpdates", _nss, [&] {
+                auto res = Helpers::upsert(opCtx, collection, updatedDoc, true);
                 if (!res.upsertedId.isEmpty()) {
                     changeInOrphans++;
                 }

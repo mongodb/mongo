@@ -51,6 +51,7 @@ using SortPatternPart = mongo::SortPattern::SortPatternPart;
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(overrideMemoryLimitForSpill);
 
 /**
  * Does a sort pattern contain a path that has been modified?
@@ -240,7 +241,14 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
     if (sortBy) {
         for (const auto& part : *sortBy) {
-            combined.push_back(part);
+            // Check and filter out the partition by field within the sort field. The partition
+            // field is already added to the combined sort field variable. As the partition only
+            // contains documents that have the same value in the partition key an additional sort
+            // over that field does not change the order or the documents within the partition.
+            // Hence a sort by $partion does not change the sort order.
+            if (!simplePartitionBy || *simplePartitionBy != part.fieldPath) {
+                combined.push_back(part);
+            }
         }
     }
 
@@ -482,7 +490,13 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             throw;
         }
 
-        if (!_memoryTracker.withinMemoryLimit() && _memoryTracker._allowDiskUse) {
+        bool inMemoryLimit = _memoryTracker.withinMemoryLimit();
+        overrideMemoryLimitForSpill.execute([&](const BSONObj& data) {
+            _numDocsProcessed++;
+            inMemoryLimit = _numDocsProcessed <= data["maxDocsBeforeSpill"].numberInt();
+        });
+
+        if (!inMemoryLimit && _memoryTracker._allowDiskUse) {
             // Attempt to spill where possible.
             _iterator.spillToDisk();
         }

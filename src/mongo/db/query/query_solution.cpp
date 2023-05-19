@@ -352,6 +352,8 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     copy->name = this->name;
     copy->tailable = this->tailable;
     copy->direction = this->direction;
+    copy->isClustered = this->isClustered;
+    copy->isOplog = this->isOplog;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
     copy->assertTsHasNotFallenOff = this->assertTsHasNotFallenOff;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;

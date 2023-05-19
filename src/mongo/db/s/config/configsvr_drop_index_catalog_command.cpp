@@ -86,11 +86,10 @@ void dropIndexInTransaction(OperationContext* opCtx,
     }()});
 
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
     txn_api::SyncTransactionWithRetries txn(
         opCtx,
-        sleepInlineExecutor,
+        executor,
         TransactionParticipantResourceYielder::make("dropIndexCatalogEntry"),
         inlineExecutor);
 

@@ -11,7 +11,7 @@ var primary = replTest.getPrimary().getDB(name);
 var secondary = replTest.getSecondary().getDB(name);
 
 // populate the collection
-for (i = 0; i < 5; i++) {
+for (let i = 0; i < 5; i++) {
     primary.coll.insert({x: i});
 }
 replTest.awaitReplication();

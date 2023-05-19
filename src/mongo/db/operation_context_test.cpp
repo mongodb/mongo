@@ -43,7 +43,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_debug.h"
-#include "mongo/stdx/future.h"
+#include "mongo/stdx/future.h"  // IWYU pragma: keep
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -748,7 +748,7 @@ public:
                                  boost::optional<Date_t> maxTime,
                                  WaitFn waitFn) {
             auto barrier = std::make_shared<unittest::Barrier>(2);
-            task = stdx::packaged_task<bool()>([=] {
+            task = stdx::packaged_task<bool()>([=, this] {
                 if (maxTime)
                     opCtx->setDeadlineByDate(*maxTime, ErrorCodes::ExceededTimeLimit);
                 stdx::unique_lock<Latch> lk(mutex);
@@ -1116,6 +1116,9 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
     auto client = makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
 
+    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
+        opCtx.get(), nullptr, NamespaceString::createNamespaceString_forTest("foo.bar"_sd)));
+
     for (auto truncateOps : {true, false}) {
         for (auto backtraceMode : {true, false}) {
             BSONObjBuilder bobNoOpCtx, bobKilledOpCtx;
@@ -1129,14 +1132,14 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
 
                 // Generate report in absence of any opCtx
                 CurOp::reportCurrentOpForClient(
-                    opCtx.get(), threadClient.get(), truncateOps, backtraceMode, &bobNoOpCtx);
+                    expCtx, threadClient.get(), truncateOps, backtraceMode, &bobNoOpCtx);
 
                 auto threadOpCtx = threadClient->makeOperationContext();
                 getServiceContext()->killAndDelistOperation(threadOpCtx.get());
 
                 // Generate report in presence of a killed opCtx
                 CurOp::reportCurrentOpForClient(
-                    opCtx.get(), threadClient.get(), truncateOps, backtraceMode, &bobKilledOpCtx);
+                    expCtx, threadClient.get(), truncateOps, backtraceMode, &bobKilledOpCtx);
             });
 
             thread.join();

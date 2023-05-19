@@ -406,10 +406,8 @@ def _parse_field(ctxt, name, node):
                 _RuleDesc('bool_scalar'),
             "forward_from_shards":
                 _RuleDesc('bool_scalar'),
-            "query_shape_literal":
-                _RuleDesc('required_bool_scalar'),
-            "query_shape_anonymize":
-                _RuleDesc('required_bool_scalar'),
+            "query_shape":
+                _RuleDesc('scalar'),
         })
 
     return field
@@ -582,6 +580,7 @@ def _parse_struct(ctxt, spec, name, node):
             "is_command_reply": _RuleDesc('bool_scalar'),
             "is_generic_cmd_list": _RuleDesc('scalar'),
             "query_shape_component": _RuleDesc('bool_scalar'),
+            "unsafe_dangerous_disable_extra_field_duplicate_checks": _RuleDesc("bool_scalar"),
         })
 
     # PyLint has difficulty with some iterables: https://github.com/PyCQA/pylint/issues/3105
@@ -985,6 +984,9 @@ def _parse_feature_flag(ctxt, spec, name, node):
                           mapping_parser_func=_parse_expression),
             "version":
                 _RuleDesc('scalar'),
+            "shouldBeFCVGated":
+                _RuleDesc('scalar_or_mapping', _RuleDesc.REQUIRED,
+                          mapping_parser_func=_parse_expression),
         })
 
     spec.feature_flags.append(param)

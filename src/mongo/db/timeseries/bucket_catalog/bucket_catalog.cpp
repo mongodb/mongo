@@ -407,10 +407,9 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns) {
     clear(catalog, [ns](const NamespaceString& bucketNs) { return bucketNs == ns; });
 }
 
-void clear(BucketCatalog& catalog, StringData dbName) {
-    clear(catalog, [dbName = dbName.toString()](const NamespaceString& bucketNs) {
-        return bucketNs.db() == dbName;
-    });
+void clear(BucketCatalog& catalog, const DatabaseName& dbName) {
+    clear(catalog,
+          [dbName](const NamespaceString& bucketNs) { return bucketNs.dbName() == dbName; });
 }
 
 void appendExecutionStats(const BucketCatalog& catalog,

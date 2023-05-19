@@ -6,7 +6,7 @@
 
 // Test for SERVER-2746
 
-coll = db.geo10;
+let coll = db.geo10;
 coll.drop();
 
 assert.commandWorked(db.geo10.createIndex({c: '2d', t: 1}, {min: 0, max: Math.pow(2, 40)}));

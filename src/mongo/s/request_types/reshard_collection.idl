@@ -72,6 +72,10 @@ commands:
         type: uuid
         description: "The expected UUID of the collection."
         optional: true
+      shardDistribution:
+        type: array<ShardKeyRange>
+        description: "The key ranges for the new shard key. This should be continuous and complete."
+        optional: true
 
   _configsvrReshardCollection:
     command_name: _configsvrReshardCollection
@@ -107,4 +111,8 @@ commands:
         description: >-
           "Mapping of chunk ranges to be used as the initial split output. This is only for 
           testing purposes."
+        optional: true
+      shardDistribution:
+        type: array<ShardKeyRange>
+        description: "The key ranges for the new shard key. This should be continuous and complete."
         optional: true

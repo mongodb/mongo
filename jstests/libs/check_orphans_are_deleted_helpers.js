@@ -46,14 +46,12 @@ var CheckOrphansAreDeletedHelpers = (function() {
                             adminDB
                                 .aggregate([
                                     {$currentOp: {idleCursors: true, allUsers: true}},
-                                    {$match: {type: 'idleCursor', ns: ns}}
+                                    {$match: {type: 'idleCursor'}}
                                 ])
                                 .toArray();
-                        print("Idle cursors on " + ns + " @ " + shardId + ": " +
-                              tojson(idleCursors));
+                        print("Idle cursors on shard " + shardId + ": " + tojson(idleCursors));
                     } catch (e) {
-                        print("Failed to get idle cursors for " + ns + " @ " + shardId + ": " +
-                              tojson(e));
+                        print("Failed to get idle cursors on shard " + shardId + ": " + tojson(e));
                     }
 
                     return 'timed out waiting for rangeDeletions on ' + ns + ' to be empty @ ' +

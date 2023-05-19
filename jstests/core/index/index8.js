@@ -12,14 +12,14 @@
 // Test key uniqueness
 (function() {
 
-t = db.jstests_index8;
+let t = db.jstests_index8;
 t.drop();
 
 t.createIndex({a: 1});
 t.createIndex({b: 1}, true);
 t.createIndex({c: 1}, [false, "cIndex"]);
 
-checkIndexes = function(num) {
+let checkIndexes = function(num) {
     const indexes = t.getIndexes();
     assert.eq(4, indexes.length);
 

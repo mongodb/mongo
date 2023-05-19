@@ -97,20 +97,32 @@ err:
 
 /*
  * __blkcache_find_open_handle --
- *     If the block manager's handle array already has an entry for the given object, return it.
+ *     If the block manager's handle array already has an entry for the given object, return it. If
+ *     caller is going to read from the handle, increment the read count while we have the handle
+ *     table locked.
  */
 static void
-__blkcache_find_open_handle(WT_BM *bm, uint32_t objectid, WT_BLOCK **blockp)
+__blkcache_find_open_handle(WT_BM *bm, uint32_t objectid, bool reading, WT_BLOCK **blockp)
 {
     u_int i;
 
+    /* Must be called with minimum of a read lock on bm->handle_array_lock. */
+
     *blockp = NULL;
 
-    for (i = 0; i < bm->handle_array_next; i++)
-        if (bm->handle_array[i]->objectid == objectid) {
-            *blockp = bm->handle_array[i];
-            break;
-        }
+    /* Fast path if the active handle is the one we're looking for */
+    if (bm->block->objectid == objectid)
+        *blockp = bm->block;
+    else
+        /* Look for matching object in handle array */
+        for (i = 0; i < bm->handle_array_next; i++)
+            if (bm->handle_array[i]->objectid == objectid) {
+                *blockp = bm->handle_array[i];
+                break;
+            }
+
+    if (reading && *blockp != NULL)
+        __wt_atomic_add32(&(*blockp)->read_count, 1);
 }
 
 /*
@@ -118,22 +130,20 @@ __blkcache_find_open_handle(WT_BM *bm, uint32_t objectid, WT_BLOCK **blockp)
  *     Get a cached block handle for an object, creating it if it doesn't exist.
  */
 int
-__wt_blkcache_get_handle(WT_SESSION_IMPL *session, WT_BM *bm, uint32_t objectid, WT_BLOCK **blockp)
+__wt_blkcache_get_handle(
+  WT_SESSION_IMPL *session, WT_BM *bm, uint32_t objectid, bool reading, WT_BLOCK **blockp)
 {
     WT_BLOCK *new_handle;
     WT_DECL_RET;
 
     *blockp = NULL;
 
-    /* We should never be looking for the current active file. */
-    WT_ASSERT(session, bm->block->objectid != objectid);
-
     /*
      * Check the block handle array for the object. We don't have to check the name because we can
      * only reference objects in our name space.
      */
     __wt_readlock(session, &bm->handle_array_lock);
-    __blkcache_find_open_handle(bm, objectid, blockp);
+    __blkcache_find_open_handle(bm, objectid, reading, blockp);
     __wt_readunlock(session, &bm->handle_array_lock);
 
     if (*blockp != NULL)
@@ -145,13 +155,20 @@ __wt_blkcache_get_handle(WT_SESSION_IMPL *session, WT_BM *bm, uint32_t objectid,
     /* We need a write lock to add a new entry to the handle array. */
     __wt_writelock(session, &bm->handle_array_lock);
 
-    /* Check to see if the object was added while we opened it. */
-    __blkcache_find_open_handle(bm, objectid, blockp);
+    /*
+     * Check to see if the object was added while we opened it. If the object was added, we should
+     * get back the same handle we already have.
+     */
+    __blkcache_find_open_handle(bm, objectid, reading, blockp);
+    WT_ASSERT(session, *blockp == NULL || *blockp == new_handle);
 
     if (*blockp == NULL) {
         /* Allocate space to store the new handle and insert it in the array. */
         WT_ERR(__wt_realloc_def(
           session, &bm->handle_array_allocated, bm->handle_array_next + 1, &bm->handle_array));
+
+        if (reading)
+            __wt_atomic_add32(&new_handle->read_count, 1);
 
         bm->handle_array[bm->handle_array_next++] = new_handle;
         *blockp = new_handle;
@@ -165,4 +182,15 @@ err:
         WT_TRET(__wt_bm_close_block(session, new_handle));
 
     return (ret);
+}
+
+/*
+ * __wt_blkcache_release_handle --
+ *     Update block handle when a read operation completes.
+ */
+void
+__wt_blkcache_release_handle(WT_SESSION_IMPL *session, WT_BLOCK *block)
+{
+    WT_ASSERT(session, block->read_count > 0);
+    __wt_atomic_sub32(&block->read_count, 1);
 }

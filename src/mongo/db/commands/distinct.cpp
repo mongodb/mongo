@@ -180,12 +180,16 @@ public:
                 OpMsgRequestBuilder::createWithValidatedTenancyScope(
                     nss.dbName(), request.validatedTenancyScope, viewAggregation.getValue())
                     .body;
+            // TODO SERVER-75930: expose serializatonContext from when ParseDistinct calls
+            // ParseDistinctRequest, and pass it onto parseFromBSON to override
+            // parse(IDLParseContext&, BSONObj&) call
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
                 viewAggCmd,
                 verbosity,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                APIParameters::get(opCtx).getAPIStrict().value_or(false),
+                SerializationContext::stateCommandRequest());
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.

@@ -43,12 +43,12 @@ public:
         StringData commandName,
         bool useClusterClient) {
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
         // If a sharded mongod is acting as a mongos, it will need special routing behaviors.
         if (useClusterClient) {
+            auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
             return txn_api::SyncTransactionWithRetries(
                 opCtx,
-                sleepInlineExecutor,
+                executor,
                 TransactionParticipantResourceYielder::make(commandName),
                 inlineExecutor,
                 std::make_unique<txn_api::details::SEPTransactionClient>(
@@ -61,7 +61,7 @@ public:
 
         return txn_api::SyncTransactionWithRetries(
             opCtx,
-            sleepInlineExecutor,
+            executor,
             TransactionParticipantResourceYielder::make(commandName),
             inlineExecutor);
     }

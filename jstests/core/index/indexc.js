@@ -1,5 +1,5 @@
 
-t = db.indexc;
+let t = db.indexc;
 t.drop();
 
 const startMillis = new Date().getTime();
@@ -7,7 +7,7 @@ for (var i = 1; i < 100; i++) {
     var d = new Date(startMillis + i);
     t.save({a: i, ts: d, cats: [i, i + 1, i + 2]});
     if (i == 51)
-        mid = d;
+        var mid = d;
 }
 
 assert.eq(50, t.find({ts: {$lt: mid}}).itcount(), "A");

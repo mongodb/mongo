@@ -3,13 +3,10 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.set4;
+let t = db.set4;
 t.drop();
 
-orig = {
-    _id: 1,
-    a: [{x: 1}]
-};
+let orig = {_id: 1, a: [{x: 1}]};
 t.insert(orig);
 
 t.update({}, {$set: {'a.0.x': 2, 'foo.bar': 3}});

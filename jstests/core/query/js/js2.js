@@ -2,10 +2,10 @@
 //   requires_non_retryable_writes
 //]
 
-t = db.jstests_js2;
+let t = db.jstests_js2;
 t.remove({});
 
-t2 = db.jstests_js2_2;
+let t2 = db.jstests_js2_2;
 t2.remove({});
 
 assert.eq(0, t2.find().length(), "A");

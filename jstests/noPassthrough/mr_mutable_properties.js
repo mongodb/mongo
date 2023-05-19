@@ -17,15 +17,30 @@ const map = function() {
 };
 
 const reduce = function(key, values) {
-    // set property on receiver
+    // Deal with the possibility that the input 'values' may have already been partially reduced.
+    values = values.reduce(function(acc, current) {
+        if (current.hasOwnProperty("food")) {
+            return acc.concat(current.food);
+        } else {
+            acc.push(current);
+            return acc;
+        }
+    }, []);
+
+    // Set property on receiver.
     this.feed = {beat: 1};
 
-    // set property on key arg
+    // Set property on key arg.
     key.fed = {mochi: 1};
 
-    // push properties onto values array arg
-    values.push(this.feed);
-    values.push(key.fed);
+    // Push properties onto values array arg, if they are not present in the array already due to
+    // an earlier reduction.
+    if (!values.some(obj => obj.hasOwnProperty("beat"))) {
+        values.push(this.feed);
+    }
+    if (!values.some(obj => obj.hasOwnProperty("mochi"))) {
+        values.push(key.fed);
+    }
 
     // modify each value in the (modified) array arg
     values.forEach(function(val) {

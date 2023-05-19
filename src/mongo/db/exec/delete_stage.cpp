@@ -86,7 +86,7 @@ DeleteStage::DeleteStage(const char* stageType,
                          WorkingSet* ws,
                          const ScopedCollectionAcquisition& collection,
                          PlanStage* child)
-    : RequiresMutableCollectionStage(stageType, expCtx, collection.getCollectionPtr()),
+    : RequiresWritableCollectionStage(stageType, expCtx, collection),
       _params(std::move(params)),
       _ws(ws),
       _preWriteFilter(opCtx(), collection.nss()),

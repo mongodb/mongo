@@ -104,7 +104,7 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                                                     << "insert"));
 
     return BSON("aggregate" << collection << "pipeline" << pipelineBuilder.arr() << "cursor"
-                            << BSONObj());
+                            << BSONObj() << "allowDiskUse" << false);
 }
 
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {

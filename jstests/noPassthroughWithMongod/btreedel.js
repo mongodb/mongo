@@ -1,7 +1,7 @@
 // btreedel.js
 // @tags: [SERVER-32869]
 
-t = db.foo;
+let t = db.foo;
 t.remove({});
 
 var bulk = t.initializeUnorderedBulkOp();
@@ -30,8 +30,8 @@ t.remove({_id: {$gt: 200000, $lt: 600000}});
 print("3");
 print(d.hasNext());
 
-n = 0;
-last = {};
+let n = 0;
+let last = {};
 printjson(c.next());
 while (c.hasNext()) {
     n++;

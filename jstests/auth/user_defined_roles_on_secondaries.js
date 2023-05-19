@@ -48,7 +48,7 @@ function assertListContainsRole(list, role, msg) {
         if (list[i].role == role.role && list[i].db == role.db)
             return;
     }
-    doassert("Could not find value " + tojson(val) + " in " + tojson(list) +
+    doassert("Could not find value " + tojson(role) + " in " + tojson(list) +
              (msg ? ": " + msg : ""));
 }
 

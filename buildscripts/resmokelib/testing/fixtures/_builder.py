@@ -1,12 +1,8 @@
 """Utilities for constructing fixtures that may span multiple versions."""
-import io
 import logging
-import os
 import threading
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Type
-
-from git import Repo
 
 import buildscripts.resmokelib.config as config
 import buildscripts.resmokelib.utils.registry as registry
@@ -24,12 +20,11 @@ MONGO_REPO_LOCATION = "."
 FIXTURE_DIR = "buildscripts/resmokelib/testing/fixtures"
 RETRIEVE_DIR = "build/multiversionfixtures"
 RETRIEVE_LOCK = threading.Lock()
-MULTIVERSION_CLASS_SUFFIX = "_multiversion_class_suffix"
 
 _BUILDERS = {}  # type: ignore
 
 
-def make_fixture(class_name, logger, job_num, *args, **kwargs):
+def make_fixture(class_name, logger, job_num, *args, enable_feature_flags=True, **kwargs):
     """Provide factory function for creating Fixture instances."""
 
     fixturelib = FixtureLib()
@@ -43,7 +38,7 @@ def make_fixture(class_name, logger, job_num, *args, **kwargs):
 
     # Special case MongoDFixture or _MongosFixture for now since we only add one option.
     # If there's more logic, we should add a builder class for them.
-    if class_name in ["MongoDFixture", "_MongoSFixture"]:
+    if class_name in ["MongoDFixture", "_MongoSFixture"] and enable_feature_flags:
         return _FIXTURES[class_name](logger, job_num, fixturelib, *args,
                                      add_feature_flags=bool(config.ENABLED_FEATURE_FLAGS), **kwargs)
 
@@ -162,7 +157,7 @@ class ReplSetBuilder(FixtureBuilder):
         self._mutate_kwargs(kwargs)
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
-        mongod_classes, mongod_executables, mongod_binary_versions = self._get_mongod_assets(
+        mongod_class, mongod_executables, mongod_binary_versions = self._get_mongod_assets(
             kwargs, mixed_bin_versions, old_bin_version)
 
         replset = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args, **kwargs)
@@ -180,7 +175,7 @@ class ReplSetBuilder(FixtureBuilder):
             return replset
 
         for node_index in range(replset.num_nodes):
-            node = self._new_mongod(replset, node_index, mongod_executables, mongod_classes,
+            node = self._new_mongod(replset, node_index, mongod_executables, mongod_class,
                                     mongod_binary_versions[node_index], is_multiversion)
             replset.install_mongod(node)
 
@@ -188,7 +183,7 @@ class ReplSetBuilder(FixtureBuilder):
             if not replset.initial_sync_node:
                 replset.initial_sync_node_idx = replset.num_nodes
                 replset.initial_sync_node = self._new_mongod(replset, replset.initial_sync_node_idx,
-                                                             mongod_executables, mongod_classes,
+                                                             mongod_executables, mongod_class,
                                                              BinVersionEnum.NEW, is_multiversion)
 
         return replset
@@ -240,19 +235,13 @@ class ReplSetBuilder(FixtureBuilder):
                  and the list of binary versions
         """
         executables = {BinVersionEnum.NEW: kwargs["mongod_executable"]}
-        classes = {BinVersionEnum.NEW: cls.LATEST_MONGOD_CLASS}
+        _class = cls.LATEST_MONGOD_CLASS
 
         # Default to NEW for all bin versions; may be overridden below.
         binary_versions = [BinVersionEnum.NEW for _ in range(kwargs["num_nodes"])]
 
         if mixed_bin_versions is not None:
             from buildscripts.resmokelib import multiversionconstants
-            old_shell_version = {
-                config.MultiversionOptions.LAST_LTS:
-                    multiversionconstants.LAST_LTS_MONGO_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS:
-                    multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY,
-            }[old_bin_version]
 
             old_mongod_version = {
                 config.MultiversionOptions.LAST_LTS:
@@ -262,13 +251,9 @@ class ReplSetBuilder(FixtureBuilder):
             }[old_bin_version]
 
             executables[BinVersionEnum.OLD] = old_mongod_version
-            classes[BinVersionEnum.OLD] = f"{cls.LATEST_MONGOD_CLASS}{MULTIVERSION_CLASS_SUFFIX}"
             binary_versions = [x for x in mixed_bin_versions]
 
-            load_version(version_path_suffix=MULTIVERSION_CLASS_SUFFIX,
-                         shell_path=old_shell_version)
-
-        return classes, executables, binary_versions
+        return _class, executables, binary_versions
 
     @staticmethod
     def _get_fcv(is_multiversion: bool, old_bin_version: Optional[str]) -> str:
@@ -293,7 +278,7 @@ class ReplSetBuilder(FixtureBuilder):
 
     @staticmethod
     def _new_mongod(replset: ReplicaSetFixture, replset_node_index: int,
-                    executables: Dict[str, str], classes: Dict[str, str], cur_version: str,
+                    executables: Dict[str, str], _class: str, cur_version: str,
                     is_multiversion: bool) -> FixtureContainer:
         """Make a fixture container with configured mongod fixture(s) in it.
 
@@ -303,7 +288,7 @@ class ReplSetBuilder(FixtureBuilder):
         :param replset: replica set fixture
         :param replset_node_index: the index of node in replica set
         :param executables: dict with a new and the old (if multiversion) mongod executable names
-        :param classes: dict with a new and the old (if multiversion) mongod fixture names
+        :param _class: str with the mongod fixture name
         :param cur_version: old or new version
         :param is_multiversion: whether we are in multiversion mode
         :return: fixture container with configured mongod fixture(s) in it
@@ -315,10 +300,11 @@ class ReplSetBuilder(FixtureBuilder):
         old_fixture = None
 
         if is_multiversion:
-            old_fixture = make_fixture(classes[BinVersionEnum.OLD], mongod_logger, replset.job_num,
-                                       mongod_executable=executables[BinVersionEnum.OLD],
-                                       mongod_options=mongod_options,
-                                       preserve_dbpath=replset.preserve_dbpath)
+            # We do not run old versions with feature flags enabled
+            old_fixture = make_fixture(
+                _class, mongod_logger, replset.job_num, enable_feature_flags=False,
+                mongod_executable=executables[BinVersionEnum.OLD], mongod_options=mongod_options,
+                preserve_dbpath=replset.preserve_dbpath)
 
             # Assign the same port for old and new fixtures so upgrade/downgrade can be done without
             # changing the replicaset config.
@@ -326,7 +312,7 @@ class ReplSetBuilder(FixtureBuilder):
 
         new_fixture_mongod_options = replset.get_options_for_mongod(replset_node_index)
 
-        new_fixture = make_fixture(classes[BinVersionEnum.NEW], mongod_logger, replset.job_num,
+        new_fixture = make_fixture(_class, mongod_logger, replset.job_num,
                                    mongod_executable=executables[BinVersionEnum.NEW],
                                    mongod_options=new_fixture_mongod_options,
                                    preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port)
@@ -341,40 +327,6 @@ def get_package_name(dir_path: str) -> str:
     :return: python package name
     """
     return dir_path.replace('/', '.').replace("\\", ".")
-
-
-def load_version(version_path_suffix=None, shell_path=None):
-    """Load the last_lts/last_continuous fixtures."""
-    with RETRIEVE_LOCK, registry.suffix(version_path_suffix):
-        # Only one thread needs to retrieve the fixtures.
-        retrieve_dir = os.path.relpath(os.path.join(RETRIEVE_DIR, version_path_suffix))
-        if not os.path.exists(retrieve_dir):
-            try:
-                # Avoid circular import
-                import buildscripts.resmokelib.run.generate_multiversion_exclude_tags as gen_tests
-                commit = gen_tests.get_backports_required_hash_for_shell_version(
-                    mongo_shell_path=shell_path)
-            except FileNotFoundError as err:
-                print("Error running the mongo shell, please ensure it's in your $PATH: ", err)
-                raise
-            retrieve_fixtures(retrieve_dir, commit)
-
-        package_name = get_package_name(retrieve_dir)
-        autoloader.load_all_modules(name=package_name, path=[retrieve_dir])  # type: ignore
-
-
-def retrieve_fixtures(directory, commit):
-    """Populate a directory with the fixture files corresponding to a commit."""
-    repo = Repo(MONGO_REPO_LOCATION)
-    real_commit = repo.commit(commit)
-    tree = real_commit.tree / FIXTURE_DIR
-
-    os.makedirs(directory, exist_ok=True)
-
-    for blob in tree.blobs:
-        output = os.path.join(directory, blob.name)
-        with io.BytesIO(blob.data_stream.read()) as retrieved, open(output, "w") as file:
-            file.write(retrieved.read().decode("utf-8"))
 
 
 class ShardedClusterBuilder(FixtureBuilder):
@@ -395,8 +347,8 @@ class ShardedClusterBuilder(FixtureBuilder):
         self._mutate_kwargs(kwargs)
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
-        mongos_classes, mongos_executables = self._get_mongos_assets(kwargs, mixed_bin_versions,
-                                                                     old_bin_version)
+        mongos_class, mongos_executables = self._get_mongos_assets(kwargs, mixed_bin_versions,
+                                                                   old_bin_version)
 
         sharded_cluster = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args,
                                                           **kwargs)
@@ -417,7 +369,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         sharded_cluster.install_configsvr(config_svr)
 
         for mongos_index in range(kwargs["num_mongos"]):
-            mongos = self._new_mongos(sharded_cluster, mongos_executables, mongos_classes,
+            mongos = self._new_mongos(sharded_cluster, mongos_executables, mongos_class,
                                       mongos_index, kwargs["num_mongos"], is_multiversion)
             sharded_cluster.install_mongos(mongos)
 
@@ -478,16 +430,10 @@ class ShardedClusterBuilder(FixtureBuilder):
         """
 
         executables = {BinVersionEnum.NEW: kwargs["mongos_executable"]}
-        classes = {BinVersionEnum.NEW: cls.LATEST_MONGOS_CLASS}
+        _class = cls.LATEST_MONGOS_CLASS
 
         if mixed_bin_versions is not None:
             from buildscripts.resmokelib import multiversionconstants
-            old_shell_version = {
-                config.MultiversionOptions.LAST_LTS:
-                    multiversionconstants.LAST_LTS_MONGO_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS:
-                    multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY,
-            }[old_bin_version]
 
             old_mongos_version = {
                 config.MultiversionOptions.LAST_LTS:
@@ -497,12 +443,7 @@ class ShardedClusterBuilder(FixtureBuilder):
             }[old_bin_version]
 
             executables[BinVersionEnum.OLD] = old_mongos_version
-            classes[BinVersionEnum.OLD] = f"{cls.LATEST_MONGOS_CLASS}{MULTIVERSION_CLASS_SUFFIX}"
-
-            load_version(version_path_suffix=MULTIVERSION_CLASS_SUFFIX,
-                         shell_path=old_shell_version)
-
-        return classes, executables
+        return _class, executables
 
     @staticmethod
     def _new_configsvr(sharded_cluster: ShardedClusterFixture, is_multiversion: bool,
@@ -556,7 +497,7 @@ class ShardedClusterBuilder(FixtureBuilder):
 
     @staticmethod
     def _new_mongos(sharded_cluster: ShardedClusterFixture, executables: Dict[str, str],
-                    classes: Dict[str, str], mongos_index: int, total: int,
+                    _class: str, mongos_index: int, total: int,
                     is_multiversion: bool) -> FixtureContainer:
         """Make a fixture container with configured mongos fixture(s) in it.
 
@@ -565,7 +506,7 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         :param sharded_cluster: sharded cluster fixture we are configuring mongos for
         :param executables: dict with a new and the old (if multiversion) mongos executable names
-        :param classes: dict with a new and the old (if multiversion) mongos fixture names
+        :param _class: str with the mongos fixture name
         :param mongos_index: the index of mongos
         :param total: total number of mongos
         :param is_multiversion: whether we are in multiversion mode
@@ -578,15 +519,16 @@ class ShardedClusterBuilder(FixtureBuilder):
         old_fixture = None
 
         if is_multiversion:
+            # We do not run old versions with feature flags enabled
             old_fixture = make_fixture(
-                classes[BinVersionEnum.OLD], mongos_logger, sharded_cluster.job_num,
+                _class, mongos_logger, sharded_cluster.job_num, enable_feature_flags=False,
                 mongos_executable=executables[BinVersionEnum.OLD], **mongos_kwargs)
 
         # We can't restart mongos since explicit ports are not supported.
         new_fixture_mongos_kwargs = sharded_cluster.get_mongos_kwargs()
-        new_fixture = make_fixture(
-            classes[BinVersionEnum.NEW], mongos_logger, sharded_cluster.job_num,
-            mongos_executable=executables[BinVersionEnum.NEW], **new_fixture_mongos_kwargs)
+        new_fixture = make_fixture(_class, mongos_logger, sharded_cluster.job_num,
+                                   mongos_executable=executables[BinVersionEnum.NEW],
+                                   **new_fixture_mongos_kwargs)
 
         # Always spin up an old mongos if in multiversion mode given mongos is the last thing in the update path.
         return FixtureContainer(new_fixture, old_fixture,

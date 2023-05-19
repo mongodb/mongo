@@ -1098,38 +1098,6 @@ DEATH_TEST(WiredTigerRecordStoreTest,
     testTruncateRange(100, 4, 3);
 }
 
-TEST(WiredTigerRecordStoreTest, RangeTruncateAllTest) {
-    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
-
-    auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
-
-    auto opCtx = harnessHelper->newOperationContext();
-
-    static constexpr auto kNumRecordsToInsert = 100;
-    for (int i = 0; i < kNumRecordsToInsert; i++) {
-        auto recordId = insertBSONWithSize(opCtx.get(), wtrs, Timestamp(1, 0), 100);
-        ASSERT_OK(recordId);
-    }
-
-    auto sizePerRecord = wtrs->dataSize(opCtx.get()) / wtrs->numRecords(opCtx.get());
-
-    {
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(wtrs->rangeTruncate(opCtx.get(),
-                                      RecordId(),
-                                      RecordId(),
-                                      -(sizePerRecord * kNumRecordsToInsert),
-                                      -kNumRecordsToInsert));
-        ASSERT_EQ(wtrs->dataSize(opCtx.get()), 0);
-        ASSERT_EQ(wtrs->numRecords(opCtx.get()), 0);
-        wuow.commit();
-    }
-
-    auto cursor = wtrs->getCursor(opCtx.get(), true);
-    ASSERT_FALSE(cursor->next());
-}
-
 TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());

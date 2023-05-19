@@ -149,6 +149,7 @@ void scanDocument(const mutablebson::Document& doc,
                   const bool allowTopLevelDollarPrefixes,
                   const bool shouldValidate,
                   bool* containsDotsAndDollarsField) {
+    bool hasId = false;
     auto currElem = doc.root().leftChild();
     while (currElem.ok()) {
         if (currElem.getFieldName() == idFieldName && shouldValidate) {
@@ -164,6 +165,8 @@ void scanDocument(const mutablebson::Document& doc,
             } else {
                 uassertStatusOK(storageValidIdField(currElem.getValue()));
             }
+            uassert(ErrorCodes::BadValue, "Can't have multiple _id fields in one document", !hasId);
+            hasId = true;
         } else {
             // Validate this child element.
             const auto deep = true;

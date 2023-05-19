@@ -9,6 +9,7 @@ import uuid
 
 from bson.binary import Binary, UUID_SUBTYPE
 from pymongo.errors import OperationFailure, PyMongoError
+from functools import partial
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import tenant_migration
@@ -599,7 +600,7 @@ class _TenantMigrationThread(threading.Thread):
             for database in res["databases"]:
                 db_name = database["name"]
                 if db_name.startswith(self._tenant_id + "_"):
-                    recipient_client.drop_database(db_name)
+                    with_naive_retry(partial(recipient_client.drop_database, db_name))
         except PyMongoError as err:
             self.logger.exception(
                 f"Error dropping databases for tenant '{self._tenant_id}' on replica set '{migration_opts.get_recipient_name()}': '{str(err)}'."

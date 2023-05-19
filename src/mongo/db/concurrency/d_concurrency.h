@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <climits>  // For UINT_MAX
-
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/timer.h"
@@ -246,24 +244,7 @@ public:
 
         GlobalLock(GlobalLock&&);
 
-        ~GlobalLock() {
-            // Preserve the original lock result which will be overridden by unlock().
-            auto lockResult = _result;
-            if (isLocked()) {
-                // Abandon our snapshot if destruction of the GlobalLock object results in actually
-                // unlocking the global lock. Recursive locking and the two-phase locking protocol
-                // may prevent lock release.
-                const bool willReleaseLock = _isOutermostLock &&
-                    !(_opCtx->lockState() && _opCtx->lockState()->inAWriteUnitOfWork());
-                if (willReleaseLock) {
-                    _opCtx->recoveryUnit()->abandonSnapshot();
-                }
-                _unlock();
-            }
-            if (!_skipRSTLLock && (lockResult == LOCK_OK || lockResult == LOCK_WAITING)) {
-                _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
-            }
-        }
+        ~GlobalLock();
 
         bool isLocked() const {
             return _result == LOCK_OK;

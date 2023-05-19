@@ -503,7 +503,6 @@ protected:
     const UUID collUuid2 = UUID::gen();
 
 private:
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
     bool _originalIsMongos;
 };
 
@@ -524,12 +523,6 @@ TEST_F(QueryAnalysisSamplerTest, CanGetOnConfigServer) {
 
 DEATH_TEST_F(QueryAnalysisSamplerTest, CannotGetOnStandaloneMongod, "invariant") {
     setUpRole(ClusterRole::None, false /* isReplEnabled */);
-    QueryAnalysisSampler::get(operationContext());
-}
-
-DEATH_TEST_F(QueryAnalysisSamplerTest, CannotGetIfFeatureFlagNotEnabled, "invariant") {
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey",
-                                                                false};
     QueryAnalysisSampler::get(operationContext());
 }
 

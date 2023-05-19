@@ -2,7 +2,7 @@
 
 Random.setRandomSeed();
 
-t = db.test_index_check9;
+let t = db.test_index_check9;
 
 function doIt() {
     t.drop();
@@ -16,7 +16,7 @@ function doIt() {
     }
 
     var fields = ['a', 'b', 'c', 'd', 'e'];
-    n = Random.randInt(5) + 1;
+    let n = Random.randInt(5) + 1;
     var idx = sort();
 
     var chars = "abcdefghijklmnopqrstuvwxyz";
@@ -40,7 +40,7 @@ function doIt() {
             return Random.randInt(10);
         } else {
             var len = Random.randInt(10);
-            buf = "";
+            let buf = "";
             for (var i = 0; i < len; ++i) {
                 buf += chars.charAt(Random.randInt(chars.length));
             }
@@ -95,9 +95,9 @@ function doIt() {
             }
         }
         s = sort();
-        c1 = t.find(spec, {_id: null}).sort(s).hint(idx).toArray();
-        c2 = t.find(spec, {_id: null}).sort(s).hint({$natural: 1}).toArray();
-        count = t.count(spec);
+        let c1 = t.find(spec, {_id: null}).sort(s).hint(idx).toArray();
+        let c2 = t.find(spec, {_id: null}).sort(s).hint({$natural: 1}).toArray();
+        let count = t.count(spec);
         assert.eq(c1, c2);
         assert.eq(c2.length, count);
     }

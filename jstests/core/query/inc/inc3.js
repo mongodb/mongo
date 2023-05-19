@@ -3,7 +3,7 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.inc3;
+let t = db.inc3;
 
 t.drop();
 t.save({_id: 1, z: 1, a: 1});

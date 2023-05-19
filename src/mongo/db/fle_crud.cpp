@@ -240,12 +240,12 @@ std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoS(
     OperationContext* opCtx) {
 
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto fleInlineCrudExecutor = std::make_shared<executor::InlineExecutor>();
 
     return std::make_shared<txn_api::SyncTransactionWithRetries>(
         opCtx,
-        fleInlineCrudExecutor->getSleepableExecutor(
-            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()),
+        executor,
         TransactionRouterResourceYielder::makeForLocalHandoff(),
         fleInlineCrudExecutor);
 }
@@ -405,7 +405,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     uint32_t numDocs = 0;
     write_ops::WriteCommandReplyBase writeBase;
 
-    // TODO: Remove with SERVER-73714
+    // This is an optimization for single-document unencrypted inserts.
     if (documents.size() == 1) {
         auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(documents[0]);
         if (serverPayload.size() == 0) {

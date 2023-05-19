@@ -502,7 +502,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         if (thread == numOplogThreads - 1) {
             numOps = numOpsRemaining;
         }
-        _writerPool->schedule([=, &status = statusVector.at(thread)](auto scheduleStatus) {
+        _writerPool->schedule([=, this, &status = statusVector.at(thread)](auto scheduleStatus) {
             if (!scheduleStatus.isOK()) {
                 status = scheduleStatus;
             } else {
@@ -521,18 +521,19 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     // Dispatch noop writes for oplog entries from the same session into the same writer thread.
     size_t sessionThreadNum = 0;
     for (const auto& s : sessionOps) {
-        _writerPool->schedule([=, &status = statusVector.at(numOplogThreads + sessionThreadNum)](
-                                  auto scheduleStatus) {
-            if (!scheduleStatus.isOK()) {
-                status = scheduleStatus;
-            } else {
-                try {
-                    _writeSessionNoOpsForRange(s.second.begin(), s.second.end());
-                } catch (const DBException& e) {
-                    status = e.toStatus();
+        _writerPool->schedule(
+            [=, this, &status = statusVector.at(numOplogThreads + sessionThreadNum)](
+                auto scheduleStatus) {
+                if (!scheduleStatus.isOK()) {
+                    status = scheduleStatus;
+                } else {
+                    try {
+                        _writeSessionNoOpsForRange(s.second.begin(), s.second.end());
+                    } catch (const DBException& e) {
+                        status = e.toStatus();
+                    }
                 }
-            }
-        });
+            });
         sessionThreadNum++;
     }
 
@@ -884,7 +885,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
         }
 
         writeConflictRetry(
-            opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace, [&] {
                 WriteUnitOfWork wuow(opCtx.get());
 
                 // Write the pre/post image entry, if it exists.
@@ -931,36 +932,35 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
     AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
     auto tenantLocks = _acquireIntentExclusiveTenantLocks(opCtx.get(), begin, end);
 
-    writeConflictRetry(
-        opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            WriteUnitOfWork wuow(opCtx.get());
-            for (auto iter = begin; iter != end; iter++) {
-                const auto& entry = *iter->first;
-                if (isResumeTokenNoop(entry)) {
-                    // We don't want to write noops for resume token noop oplog entries. They would
-                    // not be applied in a change stream anyways.
-                    continue;
-                }
-                // We don't need to link no-ops entries for operations done outside of a session.
-                const boost::optional<OpTime> preImageOpTime = boost::none;
-                const boost::optional<OpTime> postImageOpTime = boost::none;
-                const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
-                opObserver->onInternalOpMessage(
-                    opCtx.get(),
-                    entry.getNss(),
-                    entry.getUuid(),
-                    {},  // Empty 'o' field.
-                    entry.getEntry().toBSON(),
-                    // We link the no-ops together by recipient op time the same way the actual ops
-                    // were linked together by donor op time.  This is to allow retryable writes
-                    // and changestreams to find the ops they need.
-                    preImageOpTime,
-                    postImageOpTime,
-                    prevWriteOpTimeInTransaction,
-                    *iter->second);
+    writeConflictRetry(opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace, [&] {
+        WriteUnitOfWork wuow(opCtx.get());
+        for (auto iter = begin; iter != end; iter++) {
+            const auto& entry = *iter->first;
+            if (isResumeTokenNoop(entry)) {
+                // We don't want to write noops for resume token noop oplog entries. They would
+                // not be applied in a change stream anyways.
+                continue;
             }
-            wuow.commit();
-        });
+            // We don't need to link no-ops entries for operations done outside of a session.
+            const boost::optional<OpTime> preImageOpTime = boost::none;
+            const boost::optional<OpTime> postImageOpTime = boost::none;
+            const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
+            opObserver->onInternalOpMessage(
+                opCtx.get(),
+                entry.getNss(),
+                entry.getUuid(),
+                {},  // Empty 'o' field.
+                entry.getEntry().toBSON(),
+                // We link the no-ops together by recipient op time the same way the actual ops
+                // were linked together by donor op time.  This is to allow retryable writes
+                // and changestreams to find the ops they need.
+                preImageOpTime,
+                postImageOpTime,
+                prevWriteOpTimeInTransaction,
+                *iter->second);
+        }
+        wuow.commit();
+    });
 }
 std::vector<Lock::TenantLock> TenantOplogApplier::_acquireIntentExclusiveTenantLocks(
     OperationContext* opCtx,

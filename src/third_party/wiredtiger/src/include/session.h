@@ -53,6 +53,12 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 /* Maximum number of buckets to visit during a regular cursor sweep. */
 #define WT_SESSION_CURSOR_SWEEP_MAX 64
 
+/* Invalid session ID. */
+#define WT_SESSION_ID_INVALID 0xffffffff
+
+/* A fake session ID for when we need to refer to a session that is actually NULL. */
+#define WT_SESSION_ID_NULL 0xfffffffe
+
 /*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
@@ -151,6 +157,7 @@ struct __wt_session_impl {
         uint64_t hs_wrapup_start;
         uint64_t hs_wrapup_finish;
         uint64_t reconcile_finish;
+        uint64_t total_reentry_hs_eviction_time;
     } reconcile_timeline;
 
     /*
@@ -159,7 +166,10 @@ struct __wt_session_impl {
      */
     struct __wt_evict_timeline {
         uint64_t evict_start;
+        uint64_t reentry_hs_evict_start;
+        uint64_t reentry_hs_evict_finish;
         uint64_t evict_finish;
+        bool reentry_hs_eviction;
     } evict_timeline;
 
     WT_ITEM err; /* Error buffer */

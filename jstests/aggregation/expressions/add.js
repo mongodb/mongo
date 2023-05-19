@@ -1,5 +1,7 @@
 (function() {
 "use strict";
+load("jstests/aggregation/extras/utils.js");        // For assertErrorCode and assertErrMsgContains.
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 // In SERVER-63012, translation of $add expression into sbe now defaults the translation of $add
 // with no operands to a zero integer constant.
@@ -43,4 +45,49 @@ let addResult = coll.aggregate([{$project: {add: {$add: queryArr}}}]).toArray();
 let sumResult = coll.aggregate([{$project: {sum: {$sum: queryArr}}}]).toArray();
 assert.neq(addResult[0]["add"], sumResult[0]["sum"]);
 assert.eq(addResult[0]["add"], arr.reduce((a, b) => a + b));
+
+assert.eq(true, coll.drop());
+// Doubles are rounded to int64 when added to Date
+assert.commandWorked(coll.insert({_id: 0, lhs: new Date(1683794065002), rhs: 0.5}));
+assert.commandWorked(coll.insert({_id: 1, lhs: new Date(1683794065002), rhs: 1.4}));
+assert.commandWorked(coll.insert({_id: 2, lhs: new Date(1683794065002), rhs: 1.5}));
+assert.commandWorked(coll.insert({_id: 3, lhs: new Date(1683794065002), rhs: 1.7}));
+// Decimals are rounded to int64, when tie rounded to even, when added to Date
+assert.commandWorked(
+    coll.insert({_id: 4, lhs: new Date(1683794065002), rhs: new NumberDecimal("1.4")}));
+assert.commandWorked(
+    coll.insert({_id: 5, lhs: new Date(1683794065002), rhs: new NumberDecimal("1.5")}));
+assert.commandWorked(
+    coll.insert({_id: 6, lhs: new Date(1683794065002), rhs: new NumberDecimal("1.7")}));
+assert.commandWorked(
+    coll.insert({_id: 7, lhs: new Date(1683794065002), rhs: new NumberDecimal("2.5")}));
+
+let result1 =
+    coll.aggregate([{$project: {sum: {$add: ["$lhs", "$rhs"]}}}, {$sort: {_id: 1}}]).toArray();
+assert.eq(result1[0].sum, new Date(1683794065003));
+assert.eq(result1[1].sum, new Date(1683794065003));
+assert.eq(result1[2].sum, new Date(1683794065004));
+assert.eq(result1[3].sum, new Date(1683794065004));
+assert.eq(result1[4].sum, new Date(1683794065003));
+assert.eq(result1[5].sum, new Date(1683794065004));
+assert.eq(result1[6].sum, new Date(1683794065004));
+assert.eq(result1[7].sum, new Date(1683794065004));
+
+coll.drop();
+
+assert.commandWorked(coll.insert([{
+    _id: 0,
+    veryBigPositiveLong: NumberLong("9223372036854775806"),
+    veryBigPositiveDouble: 9223372036854775806,
+    veryBigPositiveDecimal: NumberDecimal("9223372036854775806")
+}]));
+
+let pipeline = [{$project: {res: {$add: [new Date(10), "$veryBigPositiveLong"]}}}];
+assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
+
+pipeline = [{$project: {res: {$add: [new Date(10), "$veryBigPositiveDouble"]}}}];
+assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
+
+pipeline = [{$project: {res: {$add: [new Date(10), "$veryBigPositiveDecimal"]}}}];
+assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
 }());

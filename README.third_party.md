@@ -31,6 +31,7 @@ a notice will be included in
 | [GPerfTools]               | BSD-3-Clause      | 2.9.1             |                      |                ✗                |
 | [gRPC]                     | Apache-2.0        | 1.46.6            |                      |                ✗                |
 | [ICU4]                     | ICU               | 57.1              |          ✗           |                ✗                |
+| [immer]                    | BSL-1.0           | d98a68c           |                      |                ✗                |
 | [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 1      |                      |                ✗                |
 | [JSON-Schema-Test-Suite]   | MIT               | 728066f9c5        |                      |                                 |
 | [libstemmer]               | BSD-3-Clause      | Unknown           |          ✗           |                ✗                |
@@ -66,6 +67,7 @@ a notice will be included in
 [fmt]: http://fmtlib.net/
 [GPerfTools]: https://github.com/gperftools/gperftools
 [ICU4]: http://site.icu-project.org/download/
+[immer]: https://github.com/arximboldi/immer
 [Intel Decimal FP Library]: https://software.intel.com/en-us/articles/intel-decimal-floating-point-math-library
 [JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite
 [libstemmer]: https://github.com/snowballstem/snowball

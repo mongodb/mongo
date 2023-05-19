@@ -230,7 +230,7 @@ private:
 
     // Flag indicating whether this bucket is closed, as determined by the presence of the
     // 'control.closed' field.
-    bool _closedBucket;
+    bool _closedBucket = false;
 
     // Map <name, BSONElement> for the computed meta field projections. Updated for
     // every bucket upon reset().

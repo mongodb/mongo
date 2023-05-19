@@ -15,7 +15,7 @@
  * ]
  */
 
-t = db.capped_empty;
+let t = db.capped_empty;
 t.drop();
 
 db.createCollection(t.getName(), {capped: true, size: 100});

@@ -43,12 +43,10 @@ public:
         StringData commandName,
         bool useClusterClient) {
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
-            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
         return txn_api::SyncTransactionWithRetries(
             opCtx,
-            sleepInlineExecutor,
+            executor,
             TransactionRouterResourceYielder::makeForLocalHandoff(),
             inlineExecutor);
     }

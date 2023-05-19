@@ -56,7 +56,13 @@ void statsToBSON(const QuerySolutionNode* node,
         return;
     }
 
-    bob->append("stage", stageTypeToString(node->getType()));
+    StageType nodeType = node->getType();
+    if ((nodeType == STAGE_COLLSCAN) &&
+        static_cast<const CollectionScanNode*>(node)->doSbeClusteredCollectionScan()) {
+        bob->append("stage", sbeClusteredCollectionScanToString());
+    } else {
+        bob->append("stage", stageTypeToString(node->getType()));
+    }
     bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
 
     // Display the BSON representation of the filter, if there is one.
@@ -477,28 +483,6 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         res.push_back(buildPlanStatsDetails(
             candidate.solution.get(), *stats, execPlanDebugInfo, boost::none, verbosity));
     }
-    return res;
-}
-
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getCachedPlanStats(
-    const plan_cache_debug_info::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
-    const auto& decision = *debugInfo.decision;
-    std::vector<PlanStatsDetails> res;
-
-    auto&& stats = decision.getStats<mongo::sbe::PlanStageStats>();
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        for (auto&& planStats : stats.candidatePlanStats) {
-            invariant(planStats);
-            res.push_back(
-                buildPlanStatsDetails(nullptr, *planStats, boost::none, boost::none, verbosity));
-        }
-    } else {
-        // At the "queryPlanner" verbosity we only need to provide details about the winning plan
-        // when explaining from the plan cache.
-        invariant(verbosity == ExplainOptions::Verbosity::kQueryPlanner);
-        res.push_back({stats.serializedWinningPlan, boost::none});
-    }
-
     return res;
 }
 

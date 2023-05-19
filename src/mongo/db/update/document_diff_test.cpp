@@ -141,16 +141,13 @@ void runTest(TestOptions* options) {
         std::vector<BSONObj> diffs;
         diffs.reserve(options->documents.size() - 1);
         for (size_t i = 1; i < options->documents.size(); ++i) {
-            const auto diffOutput =
-                computeOplogDiff(preDoc,
-                                 options->documents[i],
-                                 update_oplog_entry::kSizeOfDeltaOplogEntryMetadata,
-                                 nullptr);
+            const auto diffOutput = computeOplogDiff(
+                preDoc, options->documents[i], update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
 
             ASSERT(diffOutput);
-            diffs.push_back(diffOutput->diff);
+            diffs.push_back(*diffOutput);
             const auto postObj = applyDiffTestHelper(
-                preDoc, diffOutput->diff, options->mustCheckExistenceForInsertOperations);
+                preDoc, *diffOutput, options->mustCheckExistenceForInsertOperations);
             ASSERT_BSONOBJ_BINARY_EQ(options->documents[i], postObj);
 
             if (options->mustCheckExistenceForInsertOperations) {
@@ -158,7 +155,7 @@ void runTest(TestOptions* options) {
                 ASSERT_BSONOBJ_BINARY_EQ(
                     postObj,
                     applyDiffTestHelper(
-                        postObj, diffOutput->diff, options->mustCheckExistenceForInsertOperations));
+                        postObj, *diffOutput, options->mustCheckExistenceForInsertOperations));
             }
 
             preDoc = options->documents[i];

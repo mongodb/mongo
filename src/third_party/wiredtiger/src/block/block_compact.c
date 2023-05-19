@@ -123,7 +123,7 @@ __block_compact_skip_internal(WT_SESSION_IMPL *session, WT_BLOCK *block, bool es
     WT_EXT *ext;
     wt_off_t avail_eighty, avail_ninety, off, size, eighty, ninety;
 
-    /* IMPORTANT: We assume here that block->live_lock is locked. */
+    WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
 
     /* Sum the available bytes in the initial 80% and 90% of the file. */
     avail_eighty = avail_ninety = avail_bytes_before_start_offset;
@@ -653,6 +653,8 @@ __block_dump_file_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
     wt_off_t decile[10], percentile[100], size;
     uintmax_t bucket_size;
     u_int i;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
 
     el = &block->live.avail;
     size = block->size;

@@ -789,4 +789,4 @@ var _kill_sessions_api_module = (function() {
 })();
 
 // Globals
-KillSessionsTestHelper = _kill_sessions_api_module.KillSessionsTestHelper;
+var KillSessionsTestHelper = _kill_sessions_api_module.KillSessionsTestHelper;

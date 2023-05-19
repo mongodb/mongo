@@ -70,6 +70,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -110,33 +111,6 @@ bool shouldSkipOutput(OperationContext* opCtx) {
     return writeConcern.isUnacknowledged() &&
         (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE ||
          writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET);
-}
-
-/**
- * Returns true if 'ns' is a time-series collection. That is, this namespace is backed by a
- * time-series buckets collection.
- */
-template <class Request>
-bool isTimeseries(OperationContext* opCtx, const Request& request) {
-    uassert(5916400,
-            "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
-            "system.buckets namespace",
-            !request.getIsTimeseriesNamespace() ||
-                request.getNamespace().isTimeseriesBucketsCollection());
-    const auto bucketNss = request.getIsTimeseriesNamespace()
-        ? request.getNamespace()
-        : request.getNamespace().makeTimeseriesBucketsNamespace();
-
-    // If the buckets collection exists now, the time-series insert path will check for the
-    // existence of the buckets collection later on with a lock.
-    // If this check is concurrent with the creation of a time-series collection and the buckets
-    // collection does not yet exist, this check may return false unnecessarily. As a result, an
-    // insert attempt into the time-series namespace will either succeed or fail, depending on who
-    // wins the race.
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-    return (coll && coll->getTimeseriesOptions());
 }
 
 /**
@@ -284,6 +258,11 @@ public:
         }
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
+            // On debug builds, verify that the estimated size of the insert command is at least as
+            // large as the size of the actual, serialized insert command. This ensures that the
+            // logic which estimates the size of insert commands is correct.
+            dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
+
             doTransactionValidationForWrites(opCtx, ns());
             if (request().getEncryptionInformation().has_value()) {
                 // Flag set here and in fle_crud.cpp since this only executes on a mongod.
@@ -298,7 +277,7 @@ public:
                 }
             }
 
-            if (isTimeseries(opCtx, request())) {
+            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
@@ -456,6 +435,11 @@ public:
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {
+            // On debug builds, verify that the estimated size of the update command is at least as
+            // large as the size of the actual, serialized update command. This ensures that the
+            // logic which estimates the size of update commands is correct.
+            dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
+
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
@@ -467,22 +451,13 @@ public:
                 }
             }
 
-            if (isTimeseries(opCtx, request())) {
+            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
                 uassert(ErrorCodes::OperationNotSupportedInTransaction,
                         str::stream() << "Cannot perform a multi-document transaction on a "
                                          "time-series collection: "
                                       << ns().toStringForErrorMsg(),
                         !opCtx->inMultiDocumentTransaction());
                 source = OperationSource::kTimeseriesUpdate;
-            }
-
-            // On debug builds, verify that the estimated size of the updates are at least as large
-            // as the actual, serialized size. This ensures that the logic that estimates the size
-            // of deletes for batch writes is correct.
-            if constexpr (kDebugBuild) {
-                for (auto&& updateOp : request().getUpdates()) {
-                    invariant(write_ops::verifySizeEstimate(updateOp));
-                }
             }
 
             long long nModified = 0;
@@ -558,8 +533,10 @@ public:
                     "explained write batches must be of size 1",
                     request().getUpdates().size() == 1);
 
+            auto [isRequestToTimeseries, nss] = timeseries::isTimeseries(opCtx, request());
+
             UpdateRequest updateRequest(request().getUpdates()[0]);
-            updateRequest.setNamespaceString(request().getNamespace());
+            updateRequest.setNamespaceString(nss);
             if (shouldDoFLERewrite(request())) {
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
@@ -580,19 +557,42 @@ public:
 
             const ExtensionsCallbackReal extensionsCallback(opCtx,
                                                             &updateRequest.getNamespaceString());
-            ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-            uassertStatusOK(parsedUpdate.parseRequest());
 
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
-            const auto collection = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest::fromOpCtx(
-                    opCtx, request().getNamespace(), AcquisitionPrerequisites::kWrite),
-                MODE_IX);
+            const auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+
+            if (isRequestToTimeseries) {
+                uassert(ErrorCodes::NamespaceNotFound,
+                        "Could not find time-series buckets collection for write explain",
+                        collection.getCollectionPtr());
+                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
+                uassert(ErrorCodes::InvalidOptions,
+                        "Time-series buckets collection is missing time-series options",
+                        timeseriesOptions);
+
+                const auto& requestHint = request().getUpdates()[0].getHint();
+                if (timeseries::isHintIndexKey(requestHint)) {
+                    updateRequest.setHint(
+                        uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                            *timeseriesOptions, requestHint)));
+                }
+            }
+
+            ParsedUpdate parsedUpdate(opCtx,
+                                      &updateRequest,
+                                      extensionsCallback,
+                                      collection.getCollectionPtr(),
+                                      false /* forgoOpCounterIncrements */,
+                                      isRequestToTimeseries);
+            uassertStatusOK(parsedUpdate.parseRequest());
 
             auto exec = uassertStatusOK(getExecutorUpdate(
-                &CurOp::get(opCtx)->debug(), &collection, &parsedUpdate, verbosity));
+                &CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(exec.get(),
                                    collection.getCollectionPtr(),
@@ -670,6 +670,11 @@ public:
         }
 
         write_ops::DeleteCommandReply typedRun(OperationContext* opCtx) final try {
+            // On debug builds, verify that the estimated size of the deletes are at least as large
+            // as the actual, serialized size. This ensures that the logic that estimates the size
+            // of deletes for batch writes is correct.
+            dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
+
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
@@ -683,18 +688,10 @@ public:
                 }
             }
 
-            if (isTimeseries(opCtx, request())) {
+            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
                 source = OperationSource::kTimeseriesDelete;
             }
 
-            // On debug builds, verify that the estimated size of the deletes are at least as large
-            // as the actual, serialized size. This ensures that the logic that estimates the size
-            // of deletes for batch writes is correct.
-            if constexpr (kDebugBuild) {
-                for (auto&& deleteOp : request().getDeletes()) {
-                    invariant(write_ops::verifySizeEstimate(deleteOp));
-                }
-            }
 
             auto reply = write_ops_exec::performDeletes(opCtx, request(), source);
             populateReply(opCtx,
@@ -727,15 +724,7 @@ public:
                     request().getDeletes().size() == 1);
 
             auto deleteRequest = DeleteRequest{};
-            auto isRequestToTimeseries = isTimeseries(opCtx, request());
-            auto nss = [&] {
-                auto nss = request().getNamespace();
-                if (!isRequestToTimeseries) {
-                    return nss;
-                }
-                return nss.isTimeseriesBucketsCollection() ? nss
-                                                           : nss.makeTimeseriesBucketsNamespace();
-            }();
+            auto [isRequestToTimeseries, nss] = timeseries::isTimeseries(opCtx, request());
             deleteRequest.setNsString(nss);
             deleteRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));

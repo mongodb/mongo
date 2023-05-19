@@ -40,7 +40,6 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/baton.h"
-#include "mongo/util/concepts.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"

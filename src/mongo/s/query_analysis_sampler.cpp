@@ -108,7 +108,7 @@ QueryAnalysisSampler& QueryAnalysisSampler::get(OperationContext* opCtx) {
 }
 
 QueryAnalysisSampler& QueryAnalysisSampler::get(ServiceContext* serviceContext) {
-    invariant(analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */));
+    invariant(analyze_shard_key::supportsSamplingQueries(serviceContext));
     return getQueryAnalysisSampler(serviceContext);
 }
 

@@ -76,7 +76,9 @@ public:
     }
 
     boost::optional<Record> seekExact(const RecordId& id) override {
-        return Record{};
+        boost::optional<Record> result;
+        result.emplace();
+        return result;
     }
     boost::optional<Record> seekNear(const RecordId& id) override {
         return boost::none;

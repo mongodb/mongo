@@ -5,7 +5,7 @@
 // to run:
 //   ./mongo jstests/<this-file>
 
-contains = function(arr, obj) {
+let contains = function(arr, obj) {
     var i = arr.length;
     while (i--) {
         if (arr[i] === obj) {

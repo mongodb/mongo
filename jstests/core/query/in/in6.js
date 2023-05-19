@@ -1,4 +1,4 @@
-t = db.jstests_in6;
+let t = db.jstests_in6;
 t.drop();
 
 t.save({});

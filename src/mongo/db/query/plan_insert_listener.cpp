@@ -123,6 +123,7 @@ void waitForInserts(OperationContext* opCtx,
             planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
         }
     });
+    notifier->doneWaiting(opCtx);
 
     uassertStatusOK(yieldResult);
 }

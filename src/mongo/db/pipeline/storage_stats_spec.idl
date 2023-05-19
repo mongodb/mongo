@@ -43,16 +43,16 @@ structs:
         type: safeInt
         optional: true
         validator: { gte: 1 }
-        query_shape_literal: true
+        query_shape: literal
       verbose:
         type: optionalBool
         default: false
-        query_shape_literal: false
+        query_shape: parameter
       waitForLock:
         type: optionalBool
         default: true
-        query_shape_literal: false
+        query_shape: parameter
       numericOnly:
         type: optionalBool
         default: false
-        query_shape_literal: false
+        query_shape: parameter

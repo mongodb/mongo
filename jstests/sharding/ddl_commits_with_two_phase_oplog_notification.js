@@ -10,26 +10,24 @@
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/parallel_shell_helpers.js');
 
-const kPrepareCommit = 0;
-const kCommitSuccessful = 1;
-
 const st = new ShardingTest({shards: 2, chunkSize: 1});
 
 function verifyOpEntriesForDatabaseOnRS(dbName, isImported, dbPrimaryShard, replicaSet) {
     const primaryNodeOplog = replicaSet.getPrimary().getDB('local').oplog.rs;
 
-    const generatedOpEntries = primaryNodeOplog.find({'o.msg.createDatabase': dbName}).toArray();
-    assert.eq(2, generatedOpEntries.length);
+    const latestInternalOpEntries =
+        primaryNodeOplog.find({op: 'n', ns: dbName}).sort({ts: -1}).limit(2).toArray().reverse();
+    assert.eq(2, latestInternalOpEntries.length);
 
-    const prepareCommitEntry = generatedOpEntries[0];
-    assert.eq(dbName, prepareCommitEntry.o2.createDatabase);
-    assert.eq(kPrepareCommit, prepareCommitEntry.o2.phase);
+    const prepareCommitEntry = latestInternalOpEntries[0];
+    assert.eq(dbName, prepareCommitEntry.o.msg.createDatabasePrepare);
+    assert.eq(dbName, prepareCommitEntry.o2.createDatabasePrepare);
     assert.eq(isImported, prepareCommitEntry.o2.isImported);
     assert.eq(dbPrimaryShard, prepareCommitEntry.o2.primaryShard);
 
-    const commitSuccessfulEntry = generatedOpEntries[1];
+    const commitSuccessfulEntry = latestInternalOpEntries[1];
+    assert.eq(dbName, commitSuccessfulEntry.o.msg.createDatabase);
     assert.eq(dbName, commitSuccessfulEntry.o2.createDatabase);
-    assert.eq(kCommitSuccessful, commitSuccessfulEntry.o2.phase);
     assert.eq(isImported, commitSuccessfulEntry.o2.isImported);
     assert.eq(undefined, commitSuccessfulEntry.o2.primaryShard);
 }

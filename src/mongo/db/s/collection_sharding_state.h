@@ -90,10 +90,14 @@ public:
 
         ScopedCollectionShardingState(Lock::ResourceLock lock, CollectionShardingState* css);
 
+        // Constructor without the ResourceLock.
+        // Important: Only for use in non-shard servers!
+        ScopedCollectionShardingState(CollectionShardingState* css);
+
         static ScopedCollectionShardingState acquireScopedCollectionShardingState(
             OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
 
-        Lock::ResourceLock _lock;
+        boost::optional<Lock::ResourceLock> _lock;
         CollectionShardingState* _css;
     };
     static ScopedCollectionShardingState assertCollectionLockedAndAcquire(
@@ -110,11 +114,6 @@ public:
      * Reports all collections which have filtering information associated.
      */
     static void appendInfoForShardingStateCommand(OperationContext* opCtx, BSONObjBuilder* builder);
-
-    /**
-     * Attaches info for server status.
-     */
-    static void appendInfoForServerStatus(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Returns the namespace to which this CSS corresponds.
@@ -203,11 +202,6 @@ public:
      * Appends information about the shard version of the collection.
      */
     virtual void appendShardVersion(BSONObjBuilder* builder) const = 0;
-
-    /**
-     * Returns the number of ranges scheduled for deletion on the collection.
-     */
-    virtual size_t numberOfRangesScheduledForDeletion() const = 0;
 };
 
 /**

@@ -30,7 +30,7 @@ const rst = new ReplSetTest({
         setParameter: {
             queryAnalysisSamplerConfigurationRefreshSecs,
             queryAnalysisWriterIntervalSecs,
-            logComponentVerbosity: tojson({sharding: 2})
+            logComponentVerbosity: tojson({sharding: 3})
         },
     }
 });

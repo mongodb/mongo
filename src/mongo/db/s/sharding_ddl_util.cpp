@@ -269,6 +269,7 @@ write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
 void setAllowMigrations(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const boost::optional<UUID>& expectedCollectionUUID,
+                        const boost::optional<OperationSessionInfo>& osi,
                         bool allowMigrations) {
     ConfigsvrSetAllowMigrations configsvrSetAllowMigrationsCmd(nss, allowMigrations);
     configsvrSetAllowMigrationsCmd.setCollectionUUID(expectedCollectionUUID);
@@ -278,7 +279,8 @@ void setAllowMigrations(OperationContext* opCtx,
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin.toString(),
-            CommandHelpers::appendMajorityWriteConcern(configsvrSetAllowMigrationsCmd.toBSON({})),
+            CommandHelpers::appendMajorityWriteConcern(
+                configsvrSetAllowMigrationsCmd.toBSON(osi ? osi->toBSON() : BSONObj())),
             Shard::RetryPolicy::kIdempotent  // Although ConfigsvrSetAllowMigrations is not really
                                              // idempotent (because it will cause the collection
                                              // version to be bumped), it is safe to be retried.
@@ -550,7 +552,7 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
 void shardedRenameMetadata(OperationContext* opCtx,
                            const std::shared_ptr<Shard>& configShard,
                            ShardingCatalogClient* catalogClient,
-                           CollectionType& fromCollType,
+                           CollectionType fromCollType,
                            const NamespaceString& toNss,
                            const WriteConcernOptions& writeConcern) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
@@ -587,30 +589,8 @@ void shardedRenameMetadata(OperationContext* opCtx,
     updateTags(opCtx, configShard, fromNss, toNss, writeConcern);
 
     auto renamedCollPlacementInfo = [&]() {
-        // Retrieve the latest placement document about "FROM" prior to its deletion (which will
-        // have left an entry with an empty set of shards).
-        auto query = BSON(NamespacePlacementType::kNssFieldName
-                          << fromNss.ns() << NamespacePlacementType::kShardsFieldName
-                          << BSON("$ne" << BSONArray()));
-
-        auto queryResponse =
-            uassertStatusOK(configShard->exhaustiveFindOnConfig(
-                                opCtx,
-                                ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
-                                repl::ReadConcernLevel::kMajorityReadConcern,
-                                NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                query,
-                                BSON(NamespacePlacementType::kTimestampFieldName << -1) /*sort*/,
-                                1 /*limit*/))
-                .docs;
-
-        if (!queryResponse.empty()) {
-            return NamespacePlacementType::parse(IDLParserContext("shardedRenameMetadata"),
-                                                 queryResponse.back());
-        }
-
-        // Persisted placement information may be unavailable as a consequence of FCV
-        // transitions. Use the content of config.chunks as a fallback.
+        // Use the content of config.chunks to obtain the placement of the collection being renamed.
+        // The request is equivalent to 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'.
         DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
         distinctRequest.setKey(ChunkType::shard.name());
         distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << fromUUID));
@@ -790,14 +770,16 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
 
 void stopMigrations(OperationContext* opCtx,
                     const NamespaceString& nss,
-                    const boost::optional<UUID>& expectedCollectionUUID) {
-    setAllowMigrations(opCtx, nss, expectedCollectionUUID, false);
+                    const boost::optional<UUID>& expectedCollectionUUID,
+                    const boost::optional<OperationSessionInfo>& osi) {
+    setAllowMigrations(opCtx, nss, expectedCollectionUUID, osi, false);
 }
 
 void resumeMigrations(OperationContext* opCtx,
                       const NamespaceString& nss,
-                      const boost::optional<UUID>& expectedCollectionUUID) {
-    setAllowMigrations(opCtx, nss, expectedCollectionUUID, true);
+                      const boost::optional<UUID>& expectedCollectionUUID,
+                      const boost::optional<OperationSessionInfo>& osi) {
+    setAllowMigrations(opCtx, nss, expectedCollectionUUID, osi, true);
 }
 
 bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
@@ -897,11 +879,16 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // passed Operation context. We opt for creating a new one to avoid any possible side
     // effects.
     auto newClient = opCtx->getServiceContext()->makeClient("ShardingCatalogTransaction");
+
     AuthorizationSession::get(newClient.get())->grantInternalAuthorization(newClient.get());
     AlternativeClientRegion acr(newClient);
 
+    auto newOpCtxHolder = cc().makeOperationContext();
+    auto newOpCtx = newOpCtxHolder.get();
+    newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     // if executor is provided, use it, otherwise use the fixed executor
-    const auto& executor = [&inputExecutor, ctx = opCtx]() {
+    const auto& executor = [&inputExecutor, ctx = newOpCtx]() {
         if (inputExecutor)
             return inputExecutor;
 
@@ -909,21 +896,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     }();
 
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    // if osi is provided, use it. Otherwise, use the one from the opCtx.
-    auto newOpCtxHolder = cc().makeOperationContext();
-    auto newOpCtx = newOpCtxHolder.get();
-    newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-    if (osi.getSessionId()) {
-        newOpCtx->setLogicalSessionId(*osi.getSessionId());
-        newOpCtx->setTxnNumber(*osi.getTxnNumber());
-    } else if (opCtx->getLogicalSessionId()) {
-        newOpCtx->setLogicalSessionId(*opCtx->getLogicalSessionId());
-        newOpCtx->setTxnNumber(*opCtx->getTxnNumber());
-    }
-    newOpCtx->setWriteConcern(writeConcern);
     // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
     // routed to the CSRS.
     auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
@@ -935,6 +908,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
             return nullptr;
         }
 
+        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
         return std::make_unique<txn_api::details::SEPTransactionClient>(
             newOpCtx,
             inlineExecutor,
@@ -943,8 +917,15 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
                 newOpCtx->getServiceContext()));
     }();
 
+    if (osi.getSessionId()) {
+        newOpCtx->setLogicalSessionId(*osi.getSessionId());
+        newOpCtx->setTxnNumber(*osi.getTxnNumber());
+    }
+
+    newOpCtx->setWriteConcern(writeConcern);
+
     txn_api::SyncTransactionWithRetries txn(newOpCtx,
-                                            sleepInlineExecutor,
+                                            executor,
                                             nullptr /*resourceYielder*/,
                                             inlineExecutor,
                                             std::move(customTxnClient));

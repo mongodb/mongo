@@ -3,15 +3,12 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-t = db.updateb;
+let t = db.updateb;
 t.drop();
 
 t.update({"x.y": 2}, {$inc: {a: 7}}, true);
 
-correct = {
-    a: 7,
-    x: {y: 2}
-};
-got = t.findOne();
+let correct = {a: 7, x: {y: 2}};
+let got = t.findOne();
 delete got._id;
 assert.docEq(correct, got, "A");

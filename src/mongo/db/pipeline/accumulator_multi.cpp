@@ -168,7 +168,8 @@ template <MinMaxSense s>
 AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->sbeGroupCompatibility =
+        std::min(expCtx->sbeGroupCompatibility, SbeCompatibility::flagGuarded);
     auto name = [] {
         if constexpr (s == MinMaxSense::kMin) {
             return AccumulatorMinN::getName();
@@ -255,7 +256,8 @@ template <FirstLastSense v>
 AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext* const expCtx,
                                                               BSONElement elem,
                                                               VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->sbeGroupCompatibility =
+        std::min(expCtx->sbeGroupCompatibility, SbeCompatibility::flagGuarded);
     auto name = [] {
         if constexpr (v == Sense::kFirst) {
             return AccumulatorFirstN::getName();
@@ -484,12 +486,13 @@ Document AccumulatorTopBottomN<sense, single>::serialize(
 }
 
 template <TopBottomSense sense>
-std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionContext* const expCtx,
-                                                                   BSONObj sortBy) {
+std::tuple<SortPattern, BSONArray, bool> parseAccumulatorTopBottomNSortBy(
+    ExpressionContext* const expCtx, BSONObj sortBy) {
 
     SortPattern sortPattern(sortBy, expCtx);
     BSONArrayBuilder sortFieldsExpBab;
     BSONObjIterator sortByBoi(sortBy);
+    bool hasMeta = false;
     for (const auto& part : sortPattern) {
         const auto fieldName = sortByBoi.next().fieldNameStringData();
         if (part.expression) {
@@ -500,21 +503,26 @@ std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionCon
             // sortFields array contains the data we need for sorting.
             const auto serialized = part.expression->serialize(false);
             sortFieldsExpBab.append(serialized.getDocument().toBson());
+            hasMeta = true;
         } else {
             sortFieldsExpBab.append((StringBuilder() << "$" << fieldName).str());
         }
     }
-    return {sortPattern, sortFieldsExpBab.arr()};
+    return {sortPattern, sortFieldsExpBab.arr(), hasMeta};
 }
 
 template <TopBottomSense sense, bool single>
 AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
     auto name = AccumulatorTopBottomN<sense, single>::getName();
     const auto [n, output, sortBy] =
         accumulatorNParseArgs<single>(expCtx, elem, name.rawData(), true, vps);
-    auto [sortPattern, sortFieldsExp] = parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
+    auto [sortPattern, sortFieldsExp, hasMeta] =
+        parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
+
+    auto sbeCompatibility =
+        hasMeta ? SbeCompatibility::notCompatible : SbeCompatibility::flagGuarded;
+    expCtx->sbeGroupCompatibility = std::min(expCtx->sbeGroupCompatibility, sbeCompatibility);
 
     // Construct argument expression. If given sortBy: {field1: 1, field2: 1} it will be shaped like
     // {output: <output expression>, sortFields: ["$field1", "$field2"]}. This projects out only the
@@ -534,7 +542,7 @@ template <TopBottomSense sense, bool single>
 boost::intrusive_ptr<AccumulatorState> AccumulatorTopBottomN<sense, single>::create(
     ExpressionContext* expCtx, BSONObj sortBy, bool isRemovable) {
     return make_intrusive<AccumulatorTopBottomN<sense, single>>(
-        expCtx, parseAccumulatorTopBottomNSortBy<sense>(expCtx, sortBy).first, isRemovable);
+        expCtx, std::get<0>(parseAccumulatorTopBottomNSortBy<sense>(expCtx, sortBy)), isRemovable);
 }
 
 template <TopBottomSense sense, bool single>

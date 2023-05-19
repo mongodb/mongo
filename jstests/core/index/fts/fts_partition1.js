@@ -1,6 +1,6 @@
 load("jstests/libs/fts.js");
 
-t = db.text_parition1;
+let t = db.text_parition1;
 t.drop();
 
 t.insert({_id: 1, x: 1, y: "foo"});
@@ -19,7 +19,7 @@ assert.throws(function() {
 
 assert.eq([1], queryIDS(t, "foo", {x: 1}));
 
-res = t.find({"$text": {"$search": "foo"}, x: 1}, {score: {"$meta": "textScore"}});
+let res = t.find({"$text": {"$search": "foo"}, x: 1}, {score: {"$meta": "textScore"}});
 assert(res[0].score > 0, tojson(res.toArray()));
 
 // repeat "search" with "language" specified, SERVER-8999

@@ -30,7 +30,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/s/request_types/get_historical_placement_info_gen.h"
+#include "mongo/s/request_types/placement_history_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 

@@ -1,5 +1,5 @@
 
-t = db.set2;
+let t = db.set2;
 t.drop();
 
 t.save({_id: 1, x: true, y: {x: true}});

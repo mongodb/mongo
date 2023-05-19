@@ -97,9 +97,7 @@ void deleteTenantDataWhenMergeAborts(OperationContext* opCtx,
             IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(db->name());
 
             auto catalog = CollectionCatalog::get(opCtx);
-            for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx);
-                 ++collIt) {
-                auto collection = *collIt;
+            for (auto&& collection : catalog->range(db->name())) {
                 if (!collection) {
                     break;
                 }
@@ -160,10 +158,13 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                                      migrationId);
                 });
 
-                auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
-                    opCtx->getServiceContext(), migrationId);
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .add(recipientStateDoc.getTenantIds(), mtab);
+                auto& registry =
+                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
+                for (const auto& tenantId : recipientStateDoc.getTenantIds()) {
+                    registry.add(tenantId,
+                                 std::make_shared<TenantMigrationRecipientAccessBlocker>(
+                                     opCtx->getServiceContext(), migrationId));
+                }
                 opCtx->recoveryUnit()->onRollback([migrationId](OperationContext* opCtx) {
                     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                         .removeAccessBlockersForMigration(
@@ -240,11 +241,15 @@ void onTransitioningToConsistent(OperationContext* opCtx,
     assertImportDoneMarkerLocalCollectionExists(opCtx, recipientStateDoc.getId());
     if (recipientStateDoc.getRejectReadsBeforeTimestamp()) {
         opCtx->recoveryUnit()->onCommit([recipientStateDoc](OperationContext* opCtx, auto _) {
-            auto mtab = tenant_migration_access_blocker::getRecipientAccessBlockerForMigration(
-                opCtx->getServiceContext(), recipientStateDoc.getId());
-            invariant(mtab);
-            mtab->startRejectingReadsBefore(
-                recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+            auto mtabVector =
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getRecipientAccessBlockersForMigration(recipientStateDoc.getId());
+            invariant(!mtabVector.empty());
+            for (auto& mtab : mtabVector) {
+                invariant(mtab);
+                mtab->startRejectingReadsBefore(
+                    recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+            }
         });
     }
 }
@@ -262,12 +267,15 @@ void onTransitioningToCommitted(OperationContext* opCtx,
 
     if (markedGCAfterMigrationStart) {
         opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {
-            auto mtab = tenant_migration_access_blocker::getRecipientAccessBlockerForMigration(
-                opCtx->getServiceContext(), migrationId);
-            invariant(mtab);
-            // Once the migration is committed and state doc is marked garbage collectable,
-            // the TTL deletions should be unblocked for the imported donor collections.
-            mtab->stopBlockingTTL();
+            auto mtabVector = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                                  .getRecipientAccessBlockersForMigration(migrationId);
+            invariant(!mtabVector.empty());
+            for (auto& mtab : mtabVector) {
+                invariant(mtab);
+                // Once the migration is committed and state doc is marked garbage collectable,
+                // the TTL deletions should be unblocked for the imported donor collections.
+                mtab->stopBlockingTTL();
+            }
 
             ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                 .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
@@ -353,7 +361,8 @@ void ShardMergeRecipientOpObserver::onInserts(OperationContext* opCtx,
                                               std::vector<InsertStatement>::const_iterator first,
                                               std::vector<InsertStatement>::const_iterator last,
                                               std::vector<bool> fromMigrate,
-                                              bool defaultFromMigrate) {
+                                              bool defaultFromMigrate,
+                                              InsertsOpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kShardMergeRecipientsNamespace) {
         onShardMergeRecipientsNssInsert(opCtx, first, last);
         return;
@@ -457,7 +466,8 @@ repl::OpTime ShardMergeRecipientOpObserver::onDropCollection(OperationContext* o
                                                              const NamespaceString& collectionName,
                                                              const UUID& uuid,
                                                              std::uint64_t numRecords,
-                                                             const CollectionDropType dropType) {
+                                                             const CollectionDropType dropType,
+                                                             bool markFromMigrate) {
     if (collectionName == NamespaceString::kShardMergeRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
 

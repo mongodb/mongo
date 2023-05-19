@@ -36,7 +36,6 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 
@@ -292,12 +291,10 @@ void processSampledDiffs(OperationContext* opCtx,
 
 }  // namespace
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(
-    _analyzeShardKeyReadWriteDistribution,
-    DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse,
-    DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson,
-    AllowedWithApiStrict::kNeverInVersion1,
-    analyze_shard_key::gFeatureFlagAnalyzeShardKey);
+REGISTER_DOCUMENT_SOURCE(_analyzeShardKeyReadWriteDistribution,
+                         DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse,
+                         DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 boost::intrusive_ptr<DocumentSource>
 DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(
@@ -314,13 +311,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(
 
 Value DocumentSourceAnalyzeShardKeyReadWriteDistribution::serialize(
     SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        // TODO: SERVER-76208 support query shapification for IDL types like KeyPattern with custom
-        // serializers.
-        MONGO_UNIMPLEMENTED_TASSERT(7484305);
-    }
-
-    return Value(Document{{getSourceName(), _spec.toBSON()}});
+    return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
 }
 
 DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution::doGetNext() {

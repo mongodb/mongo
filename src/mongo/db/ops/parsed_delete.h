@@ -150,6 +150,10 @@ public:
      */
     bool isEligibleForArbitraryTimeseriesDelete() const;
 
+    bool isRequestToTimeseries() const {
+        return _isRequestToTimeseries;
+    }
+
 private:
     // Transactional context.  Not owned by us.
     OperationContext* _opCtx;
@@ -166,6 +170,8 @@ private:
     // Contains the bucket-level expression and the residual expression and the bucket-level
     // expresion should be pushed down to the bucket collection.
     std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesDeleteQueryExprs;
+
+    const bool _isRequestToTimeseries;
 };
 
 }  // namespace mongo

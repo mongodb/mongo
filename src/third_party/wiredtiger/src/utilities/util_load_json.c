@@ -147,16 +147,16 @@ json_kvraw_append(WT_SESSION *session, JSON_INPUT_STATE *ins, const char *str, s
 
     if (len > 0) {
         needsize = strlen(ins->kvraw) + len + 2;
-        if ((tmp = malloc(needsize)) == NULL)
+        if ((tmp = util_malloc(needsize)) == NULL)
             return (util_err(session, errno, NULL));
         WT_ERR(__wt_snprintf(tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str));
-        free(ins->kvraw);
+        util_free(ins->kvraw);
         ins->kvraw = tmp;
     }
     return (0);
 
 err:
-    free(tmp);
+    util_free(tmp);
     return (util_err(session, ret, NULL));
 }
 
@@ -182,7 +182,7 @@ json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
         goto err;
     }
     resultlen += 1;
-    if ((result = malloc((size_t)resultlen)) == NULL) {
+    if ((result = util_malloc((size_t)resultlen)) == NULL) {
         ret = util_err(session, errno, NULL);
         goto err;
     }
@@ -197,7 +197,7 @@ json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 err:
         if (ret == 0)
             ret = EINVAL;
-        free(result);
+        util_free(result);
         *resultp = NULL;
     }
     return (ret);
@@ -256,7 +256,7 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp, uint32_t
         nfield = 0;
         JSON_EXPECT(session, ins, '{');
         if (ins->kvraw == NULL) {
-            if ((ins->kvraw = malloc(1)) == NULL) {
+            if ((ins->kvraw = util_malloc(1)) == NULL) {
                 ret = util_err(session, errno, NULL);
                 goto err;
             }
@@ -356,7 +356,7 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
     JSON_EXPECT(session, ins, '{');
     while (json_peek(session, ins) == 's') {
         JSON_EXPECT(session, ins, 's');
-        tableuri = realloc(tableuri, ins->toklen);
+        tableuri = util_realloc(tableuri, ins->toklen);
         if ((ret = __wt_snprintf(
                tableuri, ins->toklen, "%.*s", (int)(ins->toklen - 2), ins->tokstart + 1)) != 0) {
             ret = util_err(session, ret, NULL);
@@ -420,7 +420,7 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
                 if ((ret = json_data(session, ins, &cl, flags)) != 0)
                     goto err;
                 config_list_free(&cl);
-                free(ins->kvraw);
+                util_free(ins->kvraw);
                 ins->kvraw = NULL;
                 config_list_free(&cl);
                 break;
@@ -447,7 +447,7 @@ err:
             ret = EINVAL;
     }
     config_list_free(&cl);
-    free(tableuri);
+    util_free(tableuri);
     return (ret);
 }
 
@@ -575,7 +575,7 @@ util_load_json(WT_SESSION *session, const char *filename, uint32_t flags)
         ret = json_top_level(session, &instate, flags);
     }
 
-    free(instate.line.mem);
-    free(instate.kvraw);
+    util_free(instate.line.mem);
+    util_free(instate.kvraw);
     return (ret);
 }

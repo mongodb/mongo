@@ -429,21 +429,21 @@ private:
             case NumberInt:
             case NumberLong:
                 if (overflow::add(longTotal, valToAdd.coerceToLong(), &longTotal)) {
-                    uasserted(ErrorCodes::Overflow, "date overflow in $add");
+                    uasserted(ErrorCodes::Overflow, "date overflow");
                 }
                 break;
             case NumberDouble: {
                 using limits = std::numeric_limits<long long>;
                 double doubleToAdd = valToAdd.coerceToDouble();
                 uassert(ErrorCodes::Overflow,
-                        "date overflow in $add",
+                        "date overflow",
                         // The upper bound is exclusive because it rounds up when it is cast to
                         // a double.
                         doubleToAdd >= static_cast<double>(limits::min()) &&
                             doubleToAdd < static_cast<double>(limits::max()));
 
                 if (overflow::add(longTotal, llround(doubleToAdd), &longTotal)) {
-                    uasserted(ErrorCodes::Overflow, "date overflow in $add");
+                    uasserted(ErrorCodes::Overflow, "date overflow");
                 }
                 break;
             }
@@ -454,7 +454,7 @@ private:
                 std::int64_t longToAdd = decimalToAdd.toLong(&signalingFlags);
                 if (signalingFlags != Decimal128::SignalingFlag::kNoFlag ||
                     overflow::add(longTotal, longToAdd, &longTotal)) {
-                    uasserted(ErrorCodes::Overflow, "date overflow in $add");
+                    uasserted(ErrorCodes::Overflow, "date overflow");
                 }
                 break;
             }
@@ -2446,23 +2446,6 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
         variableValidation::validateNameForUserRead(varName);
         auto varId = vps.getVariable(varName);
 
-        bool queryFeatureAllowedUserRoles = varId == Variables::kUserRolesId
-            ? (!expCtx->maxFeatureCompatibilityVersion ||
-               feature_flags::gFeatureFlagUserRoles.isEnabledOnVersion(
-                   *expCtx->maxFeatureCompatibilityVersion))
-            : true;
-
-        uassert(
-            ErrorCodes::QueryFeatureNotAllowed,
-            // We would like to include the current version and the required minimum version in this
-            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
-            // dependency cycle (see SERVER-31968).
-            str::stream()
-                << "$$USER_ROLES is not allowed in the current feature compatibility version. See "
-                << feature_compatibility_version_documentation::kCompatibilityLink
-                << " for more information.",
-            queryFeatureAllowedUserRoles);
-
         // If the variable we are parsing is a system variable, then indicate that we have seen it.
         if (!Variables::isUserDefinedVariable(varId)) {
             expCtx->setSystemVarReferencedInQuery(varId);
@@ -2608,7 +2591,7 @@ Value ExpressionFieldPath::serialize(SerializationOptions options) const {
     auto [prefix, path] = getPrefixAndPath(_fieldPath);
     // First handles special cases for redaction of system variables. User variables will fall
     // through to the default full redaction case.
-    if (options.redactIdentifiers && prefix.length() == 2) {
+    if (options.applyHmacToIdentifiers && prefix.length() == 2) {
         if (path.getPathLength() == 1 && Variables::isBuiltin(_variable)) {
             // Nothing to redact for builtin variables.
             return Value(prefix + path.fullPath());
@@ -2664,6 +2647,21 @@ std::unique_ptr<Expression> ExpressionFieldPath::copyWithSubstitution(
         }
     }
     return nullptr;
+}
+
+bool ExpressionFieldPath::isRenameableByAnyPrefixNameIn(
+    const StringMap<std::string>& renameList) const {
+    if (_variable != Variables::kRootId || _fieldPath.getPathLength() == 1) {
+        return false;
+    }
+
+    FieldRef path(getFieldPathWithoutCurrentPrefix().fullPath());
+    for (const auto& rename : renameList) {
+        if (FieldRef oldName(rename.first); oldName.isPrefixOfOrEqualTo(path)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 monotonic::State ExpressionFieldPath::getMonotonicState(const FieldPath& sortedFieldPath) const {
@@ -2956,8 +2954,8 @@ Value ExpressionLet::serialize(SerializationOptions options) const {
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {
         auto key = it->second.name;
-        if (options.redactIdentifiers) {
-            key = options.identifierRedactionPolicy(key);
+        if (options.applyHmacToIdentifiers) {
+            key = options.identifierHmacPolicy(key);
         }
         vars[key] = it->second.expression->serialize(options);
     }
@@ -5693,14 +5691,45 @@ StatusWith<Value> ExpressionSubtract::apply(Value lhs, Value rhs) {
     } else if (lhs.nullish() || rhs.nullish()) {
         return Value(BSONNULL);
     } else if (lhs.getType() == Date) {
-        if (rhs.getType() == Date) {
-            return Value(durationCount<Milliseconds>(lhs.getDate() - rhs.getDate()));
-        } else if (rhs.numeric()) {
-            return Value(lhs.getDate() - Milliseconds(rhs.coerceToLong()));
-        } else {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream()
-                              << "can't $subtract " << typeName(rhs.getType()) << " from Date");
+        BSONType rhsType = rhs.getType();
+        switch (rhsType) {
+            case Date:
+                return Value(durationCount<Milliseconds>(lhs.getDate() - rhs.getDate()));
+            case NumberInt:
+            case NumberLong: {
+                long long longDiff = lhs.getDate().toMillisSinceEpoch();
+                if (overflow::sub(longDiff, rhs.coerceToLong(), &longDiff)) {
+                    return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+                }
+                return Value(Date_t::fromMillisSinceEpoch(longDiff));
+            }
+            case NumberDouble: {
+                using limits = std::numeric_limits<long long>;
+                long long longDiff = lhs.getDate().toMillisSinceEpoch();
+                double doubleRhs = rhs.coerceToDouble();
+                // check the doubleRhs should not exceed int64 limit and result will not overflow
+                if (doubleRhs < static_cast<double>(limits::min()) ||
+                    doubleRhs >= static_cast<double>(limits::max()) ||
+                    overflow::sub(longDiff, llround(doubleRhs), &longDiff)) {
+                    return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+                }
+                return Value(Date_t::fromMillisSinceEpoch(longDiff));
+            }
+            case NumberDecimal: {
+                long long longDiff = lhs.getDate().toMillisSinceEpoch();
+                Decimal128 decimalRhs = rhs.coerceToDecimal();
+                std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+                std::int64_t longRhs = decimalRhs.toLong(&signalingFlags);
+                if (signalingFlags != Decimal128::SignalingFlag::kNoFlag ||
+                    overflow::sub(longDiff, longRhs, &longDiff)) {
+                    return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+                }
+                return Value(Date_t::fromMillisSinceEpoch(longDiff));
+            }
+            default:
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << "can't $subtract " << typeName(rhs.getType()) << " from Date");
         }
     } else {
         return Status(ErrorCodes::TypeMismatch,

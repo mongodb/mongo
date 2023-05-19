@@ -66,7 +66,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
             coll && !coll->empty());
 
     return NamespaceStringUtil::parseNamespaceFromRequest(
-        spec.getDb().value_or(DatabaseName(tenantId, "")), *coll);
+        spec.getDb().value_or(DatabaseNameUtil::deserialize(tenantId, "")), *coll);
 }
 
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,

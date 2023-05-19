@@ -270,12 +270,12 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
     }
 
-    plan_cache_util::updatePlanCache(expCtx()->opCtx,
-                                     MultipleCollectionAccessor(collection()),
-                                     _cachingMode,
-                                     *_query,
-                                     std::move(ranking),
-                                     _candidates);
+    plan_cache_util::updatePlanCacheFromCandidates(expCtx()->opCtx,
+                                                   MultipleCollectionAccessor(collection()),
+                                                   _cachingMode,
+                                                   *_query,
+                                                   std::move(ranking),
+                                                   _candidates);
     removeRejectedPlans();
 
     return Status::OK();

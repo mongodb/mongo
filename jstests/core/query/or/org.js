@@ -2,7 +2,7 @@
 
 // SERVER-2282 $or de duping with sparse indexes
 
-t = db.jstests_org;
+let t = db.jstests_org;
 t.drop();
 
 t.createIndex({a: 1}, {sparse: true});

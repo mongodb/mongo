@@ -98,4 +98,28 @@ void Collection::Factory::set(ServiceContext* service,
     factory = std::move(newFactory);
 }
 
+std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
+resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection) {
+    if (!collection || !collection->getDefaultCollator()) {
+        if (userCollation.isEmpty()) {
+            return {nullptr, ExpressionContext::CollationMatchesDefault::kNoDefault};
+        } else {
+            return {getUserCollator(opCtx, userCollation),
+                    ExpressionContext::CollationMatchesDefault::kNoDefault};
+        }
+    }
+
+    auto defaultCollator = collection->getDefaultCollator()->clone();
+    if (userCollation.isEmpty()) {
+        return {std::move(defaultCollator), ExpressionContext::CollationMatchesDefault::kYes};
+    }
+    auto userCollator = getUserCollator(opCtx, userCollation);
+
+    if (CollatorInterface::collatorsMatch(defaultCollator.get(), userCollator.get())) {
+        return {std::move(defaultCollator), ExpressionContext::CollationMatchesDefault::kYes};
+    } else {
+        return {std::move(userCollator), ExpressionContext::CollationMatchesDefault::kNo};
+    }
+}
+
 }  // namespace mongo

@@ -1061,9 +1061,18 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
 }
 
 uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx) const {
+    // Unfinished index builds are excluded to avoid a potential deadlock when trying to collect
+    // statistics from the index table while the index build is in the bulk load phase. See
+    // SERVER-77018. This should not be too impactful as:
+    // - During the collection scan phase, the index table is unused.
+    // - During the bulk load phase, getFreeStorageBytes will probably return EBUSY, as the ident is
+    //  in use by the index builder. (And worst case results in the deadlock).
+    // - It might be possible to return meaningful data post bulk-load, but reusable bytes should be
+    //  low anyways as the collection has been bulk loaded. Additionally, this would be a inaccurate
+    //  anyways as the build is in progress.
+    // - Once the index build is finished, this will be eventually accounted for.
     const auto idxCatalog = getIndexCatalog();
-    auto indexIt = idxCatalog->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+    auto indexIt = idxCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
 
     uint64_t totalSize = 0;
     while (indexIt->more()) {

@@ -132,10 +132,6 @@ namespace mongo {
 
 using logv2::LogComponent;
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 // Failpoint for disabling replicaSetChangeConfigServerUpdateHook calls on signaled mongos.
 MONGO_FAIL_POINT_DEFINE(failReplicaSetChangeConfigServerUpdateHook);
 
@@ -329,11 +325,8 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             lsc->joinOnShutDown();
         }
 
-        if (analyze_shard_key::isFeatureFlagEnabled()) {
-            LOGV2_OPTIONS(
-                6973901, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
-            analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
-        }
+        LOGV2_OPTIONS(6973901, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
+        analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
 
         ReplicaSetMonitor::shutdown();
 
@@ -369,6 +362,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
+            LOGV2_OPTIONS(7698300, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
             pool->shutdownAndJoin();
         }
 
@@ -377,6 +371,13 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (Grid::get(serviceContext)->isShardingInitialized()) {
+            // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as
+            // the CatalogCache may try to schedule work on CatalogCacheLoader and fail.
+            LOGV2_OPTIONS(7698301, {LogComponent::kSharding}, "Shutting down the CatalogCache");
+            Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
+
+            LOGV2_OPTIONS(
+                7698302, {LogComponent::kSharding}, "Shutting down the CatalogCacheLoader");
             CatalogCacheLoader::get(serviceContext).shutDown();
         }
 
@@ -812,9 +813,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator::start(serviceContext, opCtx);
-    if (gFeatureFlagClusterWideConfigM2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        ClusterServerParameterRefresher::start(serviceContext, opCtx);
-    }
+
+    ClusterServerParameterRefresher::start(serviceContext, opCtx);
 
     if (audit::initializeSynchronizeJob) {
         audit::initializeSynchronizeJob(serviceContext);

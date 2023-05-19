@@ -89,23 +89,17 @@ reshardingTest.withReshardingInBackground(
         // Check for reshardBegin event on both donors.
         const expectedReshardBeginEvent = {
             reshardingUUID: reshardingUUID,
-            operationType: "reshardBegin"
+            operationType: "reshardBegin",
+            ns: {db: kDbName, coll: collName},
         };
 
         const reshardBeginDonor0Event =
             cstDonor0.getNextChanges(changeStreamsCursorDonor0, 1, false /* skipFirstBatch */);
 
-        // The 'ns' field was added after 6.0, so the field will be absent when running on a 6.0
-        // mongod. Delete the field so that the test can run on a mixed version suite.
-        //
-        // TODO SERVER-66645: Remove this line after branching for 7.0.
-        delete reshardBeginDonor0Event[0].ns;
-
         assertChangeStreamEventEq(reshardBeginDonor0Event[0], expectedReshardBeginEvent);
 
         const reshardBeginDonor1Event =
             cstDonor1.getNextChanges(changeStreamsCursorDonor1, 1, false /* skipFirstBatch */);
-        delete reshardBeginDonor1Event[0].ns;
         assertChangeStreamEventEq(reshardBeginDonor1Event[0], expectedReshardBeginEvent);
     },
     {
@@ -113,19 +107,21 @@ reshardingTest.withReshardingInBackground(
             // Check for reshardDoneCatchUp event on the recipient.
             const expectedReshardDoneCatchUpEvent = {
                 reshardingUUID: reshardingUUID,
-                operationType: "reshardDoneCatchUp"
+                operationType: "reshardDoneCatchUp",
             };
 
             const reshardDoneCatchUpEvent = cstRecipient0.getNextChanges(
-                changeStreamsCursorRecipient0, 1, false /* skipFirstBatch */);
+                changeStreamsCursorRecipient0, 1, false /* skipFirstBatch */)[0];
 
-            // The 'ns' field was added after 6.0, so the field will be absent when running on a 6.0
-            // mongod. Delete the field so that the test can run on a mixed version suite.
-            //
-            // TODO SERVER-66645: Remove this line after branching for 7.0.
-            delete reshardDoneCatchUpEvent[0].ns;
+            // Ensure that the 'reshardingDoneCatchUp' event has an 'ns' field of the format
+            // '{ns: kDbName, coll: "system.resharding.<>"}.
+            assert(reshardDoneCatchUpEvent.ns, reshardDoneCatchUpEvent);
+            assert.eq(reshardDoneCatchUpEvent.ns.db, kDbName, reshardDoneCatchUpEvent);
+            assert(reshardDoneCatchUpEvent.ns.coll.startsWith("system.resharding."),
+                   reshardDoneCatchUpEvent);
+            delete reshardDoneCatchUpEvent.ns;
 
-            assertChangeStreamEventEq(reshardDoneCatchUpEvent[0], expectedReshardDoneCatchUpEvent);
+            assertChangeStreamEventEq(reshardDoneCatchUpEvent, expectedReshardDoneCatchUpEvent);
         }
     });
 

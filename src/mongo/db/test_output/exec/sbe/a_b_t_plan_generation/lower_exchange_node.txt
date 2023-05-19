@@ -21,7 +21,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [0] exchange [s2, s3] 1 hash 
 [1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
-[2] scan s1 none none none none none [] @"<collUUID>" true false 
+[2] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower exchange node of type Centralized ====
 -- INPUT:
@@ -44,7 +44,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [0] exchange [s2, s3] 1 bcast 
 [1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
-[2] scan s1 none none none none none [] @"<collUUID>" true false 
+[2] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower exchange node of type RoundRobin ====
 -- INPUT:
@@ -67,7 +67,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [0] exchange [s2, s3] 1 round 
 [1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
-[2] scan s1 none none none none none [] @"<collUUID>" true false 
+[2] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower exchange node of type Replicated ====
 -- INPUT:
@@ -90,4 +90,4 @@ PhysicalScan [{'<root>': scan0}, collName]
 [0] exchange [s2, s3] 1 bcast 
 [1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
-[2] scan s1 none none none none none [] @"<collUUID>" true false 
+[2] scan s1 none none none none none none none [] @"<collUUID>" true false 

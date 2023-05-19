@@ -287,7 +287,8 @@ EventChainAndWaitingTest::~EventChainAndWaitingTest() {
 }
 
 void EventChainAndWaitingTest::run() {
-    executor->onEvent(goEvent, [=](const TaskExecutor::CallbackArgs& cbData) { onGo(cbData); })
+    executor
+        ->onEvent(goEvent, [=, this](const TaskExecutor::CallbackArgs& cbData) { onGo(cbData); })
         .status_with_transitional_ignore();
     executor->signalEvent(goEvent);
     executor->waitForEvent(goEvent);
@@ -340,8 +341,9 @@ void EventChainAndWaitingTest::onGo(const TaskExecutor::CallbackArgs& cbData) {
         return;
     }
 
-    cbHandle = executor->onEvent(
-        goEvent, [=](const TaskExecutor::CallbackArgs& cbData) { onGoAfterTriggered(cbData); });
+    cbHandle = executor->onEvent(goEvent, [=, this](const TaskExecutor::CallbackArgs& cbData) {
+        onGoAfterTriggered(cbData);
+    });
     if (!cbHandle.isOK()) {
         status1 = cbHandle.getStatus();
         executor->shutdown();

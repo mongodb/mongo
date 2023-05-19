@@ -167,7 +167,7 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
     }
     invariant(frameStack.size() == 1);
     // Append '$db' which shouldn't contain tenantid.
-    frameStack.top().second.append("$db", dbName.toString());
+    frameStack.top().second.append("$db", dbName.toString_forTest());
     // If encrypt request, append '$tenant' which contains tenantid.
     if (encrypt && dbName.tenantId() && !object.hasField("$tenant")) {
         dbName.tenantId()->serializeToBSON("$tenant", &frameStack.top().second);
@@ -240,8 +240,9 @@ EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionR
     auto& request = params.request;
     auto commandName = request.getCommandName().toString();
     const DatabaseName dbName = request.body.hasField("$tenant")
-        ? DatabaseName(TenantId(request.body["$tenant"].OID()), request.getDatabase())
-        : DatabaseName(boost::none, request.getDatabase());
+        ? DatabaseNameUtil::deserialize(TenantId(request.body["$tenant"].OID()),
+                                        request.getDatabase())
+        : DatabaseName::createDatabaseName_forTest(boost::none, request.getDatabase());
 
     if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==
         std::end(kEncryptedCommands)) {

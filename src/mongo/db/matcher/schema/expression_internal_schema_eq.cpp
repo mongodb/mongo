@@ -67,7 +67,7 @@ BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide(
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged && _rhsElem.isABSONObj()) {
         BSONObjBuilder eqObj;
         BSONObjBuilder exprSpec(eqObj.subobjStart(kName));
-        opts.redactObjToBuilder(&exprSpec, _rhsElem.Obj());
+        opts.addHmacedObjToBuilder(&exprSpec, _rhsElem.Obj());
         exprSpec.done();
         return eqObj.obj();
     }

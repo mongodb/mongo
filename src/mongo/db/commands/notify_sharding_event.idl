@@ -75,7 +75,6 @@ structs:
             phase:
                 description: "The sub-phase of the event being notified."
                 type: CommitPhase
-                optional: true          
                 
 commands:
     _shardsvrNotifyShardingEvent:

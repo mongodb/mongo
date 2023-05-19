@@ -322,5 +322,18 @@ std::vector<std::shared_ptr<Instance>> getReshardingStateMachines(OperationConte
     return result;
 }
 
+/**
+ * Validate the shardDistribution parameter in reshardCollection cmd, which should satisfy the
+ * following properties:
+ * - The shardKeyRanges should be continuous and cover the full data range.
+ * - Every shardKeyRange should be on the same key.
+ * - A shardKeyRange should either have no min/max or have a min/max pair.
+ * - All shardKeyRanges in the array should have the same min/max pattern.
+ * Not satisfying the rules above will cause an uassert failure.
+ */
+void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistribution,
+                               OperationContext* opCtx,
+                               const ShardKeyPattern& keyPattern);
+
 }  // namespace resharding
 }  // namespace mongo

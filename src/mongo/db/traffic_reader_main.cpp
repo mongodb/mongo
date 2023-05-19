@@ -45,7 +45,7 @@
 #include "mongo/util/text.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/program_options.hpp>
+#include <boost/program_options.hpp>  // IWYU pragma: keep
 
 using namespace mongo;
 

@@ -109,6 +109,20 @@ protected:
     BSONObj _makeTimeseriesOptionsForCreate() const override;
 };
 
+class BucketCatalogInMultitenancyEnv : public BucketCatalogTest {
+protected:
+    void setUp() override;
+
+private:
+    boost::optional<RAIIServerParameterControllerForTest> __multitenancyController;
+
+protected:
+    NamespaceString _tenant1Ns1 =
+        NamespaceString::createNamespaceString_forTest({TenantId(OID::gen())}, "db1", "coll1");
+    NamespaceString _tenant2Ns1 =
+        NamespaceString::createNamespaceString_forTest({TenantId(OID::gen())}, "db1", "coll1");
+};
+
 void BucketCatalogTest::setUp() {
     CatalogTestFixture::setUp();
 
@@ -116,6 +130,21 @@ void BucketCatalogTest::setUp() {
     _bucketCatalog = &BucketCatalog::get(_opCtx);
 
     for (const auto& ns : {_ns1, _ns2, _ns3}) {
+        ASSERT_OK(createCollection(
+            _opCtx,
+            ns.dbName(),
+            BSON("create" << ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
+    }
+}
+
+void BucketCatalogInMultitenancyEnv::setUp() {
+    __multitenancyController.emplace("multitenancySupport", true);
+    CatalogTestFixture::setUp();
+
+    _opCtx = operationContext();
+    _bucketCatalog = &BucketCatalog::get(_opCtx);
+
+    for (const auto& ns : {_tenant1Ns1, _tenant2Ns1}) {
         ASSERT_OK(createCollection(
             _opCtx,
             ns.dbName(),
@@ -272,7 +301,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     }
     auto bucket = std::move(res.getValue());
 
-    auto stripeNumber = internal::getStripeNumber(key);
+    auto stripeNumber = internal::getStripeNumber(key, _bucketCatalog->numberOfStripes);
 
     // Register the reopened bucket with the catalog.
     auto& stripe = _bucketCatalog->stripes[stripeNumber];
@@ -393,6 +422,44 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
          {result1.getValue().batch, result2.getValue().batch, result3.getValue().batch}) {
         _commit(batch, 0);
     }
+}
+
+TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
+    BucketCatalog temporaryBucketCatalog(/*numberOfStripes=*/1);
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch1 = result1.getValue().batch;
+    auto result2 = insert(_opCtx,
+                          temporaryBucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch2 = result2.getValue().batch;
+
+    // Inserts should be into different buckets (and therefore batches) because they went through
+    // different bucket catalogs.
+    ASSERT_NE(batch1, batch2);
+
+    // Committing one bucket should only return the one document in that bucket and should not
+    // affect the other bucket.
+    ASSERT(claimWriteBatchCommitRights(*batch1));
+    ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
+    ASSERT_EQ(batch1->measurements.size(), 1);
+    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
+    finish(*_bucketCatalog, batch1, {});
+
+    ASSERT(claimWriteBatchCommitRights(*batch2));
+    ASSERT_OK(prepareCommit(temporaryBucketCatalog, batch2));
+    ASSERT_EQ(batch2->measurements.size(), 1);
+    ASSERT_EQ(batch2->numPreviouslyCommittedMeasurements, 0);
+    finish(temporaryBucketCatalog, batch2, {});
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
@@ -548,11 +615,25 @@ TEST_F(BucketCatalogTest, ClearDatabaseBuckets) {
     _insertOneAndCommit(_ns2, 0);
     _insertOneAndCommit(_ns3, 0);
 
-    clear(*_bucketCatalog, _ns1.db());
+    clear(*_bucketCatalog, _ns1.dbName());
 
     _insertOneAndCommit(_ns1, 0);
     _insertOneAndCommit(_ns2, 0);
     _insertOneAndCommit(_ns3, 1);
+}
+
+TEST_F(BucketCatalogInMultitenancyEnv, ClearDatabaseBuckets) {
+    _insertOneAndCommit(_tenant1Ns1, 0);
+    _insertOneAndCommit(_tenant2Ns1, 0);
+
+    // Clear the buckets for the database of tenant1.
+    clear(*_bucketCatalog, _tenant1Ns1.dbName());
+    _insertOneAndCommit(_tenant1Ns1, 0);
+    _insertOneAndCommit(_tenant2Ns1, 1);
+
+    // Clear the buckets for the database of tenant2.
+    clear(*_bucketCatalog, _tenant2Ns1.dbName());
+    _insertOneAndCommit(_tenant2Ns1, 0);
 }
 
 TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {

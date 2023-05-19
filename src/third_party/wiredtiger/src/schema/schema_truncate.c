@@ -100,6 +100,9 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
     WT_DECL_RET;
     const char *tablename;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     tablename = uri;
 
     if (WT_PREFIX_MATCH(uri, "file:"))
@@ -126,7 +129,10 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
 
 /*
  * __wt_range_truncate --
- *     Truncate of a cursor range, default implementation.
+ *     Truncate of a cursor range, default implementation. This truncate takes explicit cursors
+ *     rather than a truncate information structure since it is used to implement truncate for
+ *     column groups within a complex table, and those use different cursors than the API level
+ *     truncate tracks.
  */
 int
 __wt_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
@@ -156,30 +162,30 @@ __wt_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
  *     WT_SESSION::truncate with a range.
  */
 int
-__wt_schema_range_truncate(WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop,
-  WT_ITEM *orig_start_key, WT_ITEM *orig_stop_key, bool local_start)
+__wt_schema_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_DATA_SOURCE *dsrc;
     WT_DECL_RET;
+    WT_SESSION_IMPL *session;
     const char *uri;
 
-    uri = start->internal_uri;
+    session = trunc_info->session;
+    uri = trunc_info->uri;
 
     if (WT_STREQ(uri, WT_HS_URI))
-        ret = __wt_curhs_range_truncate(start, stop);
+        ret = __wt_curhs_range_truncate(trunc_info);
     else if (WT_PREFIX_MATCH(uri, "file:")) {
-        WT_ERR(__cursor_needkey(start));
-        if (stop != NULL)
-            WT_ERR(__cursor_needkey(stop));
-        WT_WITH_BTREE(session, CUR2BT(start),
-          ret = __wt_btcur_range_truncate((WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop,
-            orig_start_key, orig_stop_key, local_start));
+        WT_ERR(__cursor_needkey(trunc_info->start));
+        if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_STOP))
+            WT_ERR(__cursor_needkey(trunc_info->stop));
+        WT_WITH_BTREE(
+          session, CUR2BT(trunc_info->start), ret = __wt_btcur_range_truncate(trunc_info));
     } else if (WT_PREFIX_MATCH(uri, "table:"))
-        ret = __wt_table_range_truncate((WT_CURSOR_TABLE *)start, (WT_CURSOR_TABLE *)stop);
+        ret = __wt_table_range_truncate(trunc_info);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL && dsrc->range_truncate != NULL)
-        ret = dsrc->range_truncate(dsrc, &session->iface, start, stop);
+        ret = dsrc->range_truncate(dsrc, &session->iface, trunc_info->start, trunc_info->stop);
     else
-        ret = __wt_range_truncate(start, stop);
+        ret = __wt_range_truncate(trunc_info->start, trunc_info->stop);
 err:
     return (ret);
 }

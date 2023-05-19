@@ -9,6 +9,7 @@
 //   # migration hook.
 //   tenant_migration_incompatible,
 // ]
+load("jstests/libs/fixture_helpers.js");
 
 // Tests for accessing logLevel server parameter using getParameter/setParameter commands
 // and shell helpers.
@@ -165,8 +166,7 @@ assert(!result,
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, redactEncryptedFields: old.redactEncryptedFields}));
 
-const isMongos = (db.hello().msg === 'isdbgrid');
-if (!isMongos) {
+if (!FixtureHelpers.isMongos(db)) {
     //
     // oplogFetcherSteadyStateMaxFetcherRestarts
     //

@@ -1,11 +1,11 @@
-t = db.all2;
+let t = db.all2;
 t.drop();
 
 t.save({a: [{x: 1}, {x: 2}]});
 t.save({a: [{x: 2}, {x: 3}]});
 t.save({a: [{x: 3}, {x: 4}]});
 
-state = "no index";
+let state = "no index";
 
 function check(n, q, e) {
     assert.eq(n, t.find(q).count(), tojson(q) + " " + e + " count " + state);

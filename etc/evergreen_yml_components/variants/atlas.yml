@@ -18,10 +18,12 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -54,7 +56,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough

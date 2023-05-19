@@ -30,9 +30,9 @@ primarycol.drop();
 primarydb.createCollection(primarycol.getName());
 
 // create new collection. insert 24 docs, aged at one-hour intervalss
-now = (new Date()).getTime();
+let now = (new Date()).getTime();
 var bulk = primarycol.initializeUnorderedBulkOp();
-for (i = 0; i < 24; i++) {
+for (let i = 0; i < 24; i++) {
     bulk.insert({x: new Date(now - (3600 * 1000 * i))});
 }
 assert.commandWorked(bulk.execute());

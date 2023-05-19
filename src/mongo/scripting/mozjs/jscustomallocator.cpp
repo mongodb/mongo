@@ -49,10 +49,6 @@
 #define MONGO_NO_MALLOC_USABLE_SIZE
 #endif
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 /**
  * This shim interface (which controls dynamic allocation within SpiderMonkey),
  * consciously uses std::malloc and friends over mongoMalloc. It does this

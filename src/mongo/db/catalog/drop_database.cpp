@@ -71,8 +71,8 @@ Status _checkNssAndReplState(OperationContext* opCtx, Database* db, const Databa
     }
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !replCoord->canAcceptWritesForDatabase(opCtx, dbName.toStringWithTenantId());
+    bool userInitiatedWritesAndNotPrimary =
+        opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotWritablePrimary,
@@ -104,7 +104,7 @@ void _finishDropDatabase(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
     }
 
-    writeConflictRetry(opCtx, "dropDatabase_database", dbName.toString(), [&] {
+    writeConflictRetry(opCtx, "dropDatabase_database", NamespaceString(dbName), [&] {
         // We need to replicate the dropDatabase oplog entry and clear the collection catalog in the
         // same transaction. This is to prevent stepdown from interrupting between these two
         // operations and leaving this node in an inconsistent state.
@@ -262,7 +262,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                   logAttrs(dbName),
                   "namespace"_attr = nss);
 
-            writeConflictRetry(opCtx, "dropDatabase_views_collection", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "dropDatabase_views_collection", nss, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 fassert(7193701, db->dropCollectionEvenIfSystem(opCtx, nss));
                 wunit.commit();
@@ -273,9 +273,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
         catalog = CollectionCatalog::get(opCtx);
 
         std::vector<NamespaceString> collectionsToDrop;
-        for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx);
-             ++collIt) {
-            auto collection = *collIt;
+        for (auto&& collection : catalog->range(db->name())) {
             if (!collection) {
                 break;
             }
@@ -323,7 +321,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                     catalog->lookupCollectionByNamespace(opCtx, nss)->uuid());
             }
 
-            writeConflictRetry(opCtx, "dropDatabase_collection", nss.ns(), [&] {
+            writeConflictRetry(opCtx, "dropDatabase_collection", nss, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 // A primary processing this will assign a timestamp when the operation is written
                 // to the oplog. As stated above, a secondary processing must only observe
@@ -441,8 +439,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                                     << numCollectionsToDrop << " collection(s).");
     }
 
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !replCoord->canAcceptWritesForDatabase(opCtx, dbName.toStringWithTenantId());
+    bool userInitiatedWritesAndNotPrimary =
+        opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,

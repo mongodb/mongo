@@ -55,6 +55,10 @@ class ContinuousStepdown(interface.Hook):
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousStepdown.DESCRIPTION)
 
         self._fixture = fixture
+        if hasattr(fixture, "config_shard") and fixture.config_shard is not None and shard_stepdown:
+            # If the config server is a shard, shard_stepdown implies config_stepdown.
+            config_stepdown = shard_stepdown
+
         self._config_stepdown = config_stepdown
         self._shard_stepdown = shard_stepdown
         self._stepdown_interval_secs = float(stepdown_interval_ms) / 1000

@@ -11,6 +11,8 @@
 load("jstests/libs/collection_drop_recreate.js");
 // For ChangeStreamMultitenantReplicaSetTest.
 load("jstests/serverless/libs/change_collection_util.js");
+// For FeatureFlagUtil.
+load("jstests/libs/feature_flag_util.js");
 
 const getTenantConnection = ChangeStreamMultitenantReplicaSetTest.getTenantConnection;
 
@@ -21,7 +23,12 @@ const kVeryShortPreImageExpirationIntervalSecs = 1;
 // enabled and run expired pre-image removal job every 'kPreImageRemovalJobSleepSecs' seconds.
 const rst = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 2,
-    setParameter: {expiredChangeStreamPreImageRemovalJobSleepSecs: kPreImageRemovalJobSleepSecs}
+    setParameter: {
+        expiredChangeStreamPreImageRemovalJobSleepSecs: kPreImageRemovalJobSleepSecs,
+        // If 'UseUnreplicatedTruncatesForDeletions' feature flag is enabled, the test expects
+        // documents to be removed 1 by 1.
+        preImagesCollectionTruncateMarkersMinBytes: 1,
+    }
 });
 
 // Hard code a tenant ids such that tenants can be identified deterministically.
@@ -119,10 +126,21 @@ assert.soon(() => (getPreImageCount(connTenant1) === 0),
             "Expecting 0 pre-images on tenant1, found " + getPreImageCount(connTenant1));
 assert.eq(stocks.length, getPreImageCount(connTenant2));
 
-// Verify that the changes to pre-image collections are replicated correctly.
-rst.awaitReplication();
-assert.eq(0, getPreImageCount(connTenant1Secondary));
-assert.eq(stocks.length, getPreImageCount(connTenant2Secondary));
+// Verify the pre-images collections are eventually in sync between the secondary and primary.
+if (FeatureFlagUtil.isPresentAndEnabled(connTenant1Secondary.getDB(jsTestName()),
+                                        "UseUnreplicatedTruncatesForDeletions")) {
+    assert.soonNoExcept(() => {
+        assert.eq(0, getPreImageCount(connTenant1Secondary));
+        assert.eq(stocks.length, getPreImageCount(connTenant2Secondary));
+        return true;
+    });
+} else {
+    // Replicated deletes ensure the secondary and primary will instantly be in sync after awaiting
+    // replication.
+    rst.awaitReplication();
+    assert.eq(0, getPreImageCount(connTenant1Secondary));
+    assert.eq(stocks.length, getPreImageCount(connTenant2Secondary));
+}
 
 // Wait long enough for the purging job to finish. The pre-images of 'tenant2' should still not
 // expire.
@@ -134,9 +152,17 @@ setExpireAfterSeconds(connTenant2, kVeryShortPreImageExpirationIntervalSecs);
 assert.soon(() => (getPreImageCount(connTenant2) === 0),
             "Expecting 0 pre-images on tenant2, found " + getPreImageCount(connTenant2));
 
-// Verify that the changes to pre-image collections are replicated correctly.
-rst.awaitReplication();
-assert.eq(0, getPreImageCount(connTenant2Secondary));
+// Ensure pre-images are expired on the secondary.
+if (FeatureFlagUtil.isPresentAndEnabled(connTenant2Secondary.getDB(jsTestName()),
+                                        "UseUnreplicatedTruncatesForDeletions")) {
+    assert.soonNoExcept(() => {
+        assert.eq(0, getPreImageCount(connTenant2Secondary));
+        return true;
+    });
+} else {
+    rst.awaitReplication();
+    assert.eq(0, getPreImageCount(connTenant2Secondary));
+}
 
 rst.stopSet();
 }());

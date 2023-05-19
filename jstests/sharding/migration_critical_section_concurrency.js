@@ -1,7 +1,7 @@
 // This test ensures that if one collection is its migration critical section, this won't stall
 // operations for other sharded or unsharded collections
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 (function() {
 'use strict';

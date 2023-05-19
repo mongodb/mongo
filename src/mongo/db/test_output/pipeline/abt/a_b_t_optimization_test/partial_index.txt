@@ -18,7 +18,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -28,7 +28,7 @@ metadata:
 					    {{{scan_0, 'PathGet [b] PathTraverse [1] PathIdentity []', {{{=Const [2]}}}}}}
 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 optimization phases: 
 	ConstEvalPost
 	ConstEvalPre
@@ -77,7 +77,7 @@ metadata:
 							PathIdentity []
 
 						collation op: Ascending
-					version: 2
+					version: 1
 					ordering bits: 0
 					is multi-key: 1
 					distribution and paths: 
@@ -87,7 +87,7 @@ metadata:
 					    {{{scan_0, 'PathGet [b] PathTraverse [1] PathIdentity []', {{{=Const [2]}}}}}}
 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 optimization phases: 
 	ConstEvalPost
 	ConstEvalPre

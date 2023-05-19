@@ -845,6 +845,13 @@ public:
         }
     }
 
+    void pop_back() {
+        if (_vals.size() > 0) {
+            releaseValue(_vals.back().first, _vals.back().second);
+            _vals.pop_back();
+        }
+    }
+
     auto size() const noexcept {
         return _vals.size();
     }
@@ -855,6 +862,17 @@ public:
         }
 
         return _vals[idx];
+    }
+
+    std::pair<TypeTags, Value> swapAt(std::size_t idx, TypeTags tag, Value val) {
+        if (idx >= _vals.size() || tag == TypeTags::Nothing) {
+            return {TypeTags::Nothing, 0};
+        }
+
+        auto ret = _vals[idx];
+        _vals[idx].first = tag;
+        _vals[idx].second = val;
+        return ret;
     }
 
     auto& values() const noexcept {

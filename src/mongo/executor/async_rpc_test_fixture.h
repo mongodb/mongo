@@ -125,7 +125,7 @@ public:
      */
     template <typename CommandType>
     void initializeCommand(CommandType& c) {
-        c.setDbName(DatabaseName("testdb", boost::none));
+        c.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "testdb"));
     }
 
     /**

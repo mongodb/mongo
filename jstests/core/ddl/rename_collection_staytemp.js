@@ -12,8 +12,8 @@
  * ]
  */
 
-orig = 'rename_stayTemp_orig';
-dest = 'rename_stayTemp_dest';
+let orig = 'rename_stayTemp_orig';
+let dest = 'rename_stayTemp_dest';
 
 db[orig].drop();
 db[dest].drop();

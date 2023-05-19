@@ -34,6 +34,7 @@
 #include <set>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/historical_catalogid_tracker.h"
 #include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/profile_filter.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
 #include "mongo/util/uuid.h"
@@ -50,47 +52,44 @@ namespace mongo {
 
 class CollectionCatalog {
     friend class iterator;
+    using OrderedCollectionMap =
+        immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
 
 public:
     using CollectionInfoFn = std::function<bool(const Collection* collection)>;
 
-    // Number of how many Collection references for a single Collection that is stored in the
-    // catalog. Used to determine whether there are external references (uniquely owned). Needs to
-    // be kept in sync with the data structures below.
-    static constexpr size_t kNumCollectionReferencesStored = 3;
 
     class iterator {
     public:
         using value_type = const Collection*;
 
-        iterator(OperationContext* opCtx,
-                 const DatabaseName& dbName,
-                 const CollectionCatalog& catalog);
-        iterator(OperationContext* opCtx,
-                 std::map<std::pair<DatabaseName, UUID>,
-                          std::shared_ptr<Collection>>::const_iterator mapIter,
-                 const CollectionCatalog& catalog);
+        iterator(const DatabaseName& dbName,
+                 OrderedCollectionMap::iterator it,
+                 const OrderedCollectionMap& catalog);
         value_type operator*();
         iterator operator++();
-        iterator operator++(int);
-        UUID uuid() const;
-
-        /*
-         * Equality operators == and != do not attempt to reposition the iterators being compared.
-         * The behavior for comparing invalid iterators is undefined.
-         */
         bool operator==(const iterator& other) const;
         bool operator!=(const iterator& other) const;
 
     private:
-        bool _exhausted();
+        void _skipUncommitted();
 
-        OperationContext* _opCtx;
-        DatabaseName _dbName;
-        boost::optional<UUID> _uuid;
-        std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::const_iterator
+        const OrderedCollectionMap& _map;
+        immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::iterator
             _mapIter;
-        const CollectionCatalog* _catalog;
+        immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::iterator _end;
+    };
+
+    class Range {
+    public:
+        Range(const OrderedCollectionMap&, const DatabaseName& dbName);
+        iterator begin() const;
+        iterator end() const;
+        bool empty() const;
+
+    private:
+        OrderedCollectionMap _map;
+        DatabaseName _dbName;
     };
 
     struct ProfileSettings {
@@ -307,7 +306,6 @@ public:
      * The global lock must be held in exclusive mode.
      */
     void registerCollection(OperationContext* opCtx,
-                            const UUID& uuid,
                             std::shared_ptr<Collection> collection,
                             boost::optional<Timestamp> commitTime);
 
@@ -318,7 +316,6 @@ public:
      * 'onCreateCollection' which sets up the necessary state for finishing the two-phase commit.
      */
     void registerCollectionTwoPhase(OperationContext* opCtx,
-                                    const UUID& uuid,
                                     std::shared_ptr<Collection> collection,
                                     boost::optional<Timestamp> commitTime);
 
@@ -444,27 +441,6 @@ public:
      * Returns true if this CollectionCatalog contains the provided collection instance
      */
     bool containsCollection(OperationContext* opCtx, const Collection* collection) const;
-
-    /**
-     * Returns the CatalogId for a given 'nss' or 'uuid' at timestamp 'ts'.
-     */
-    struct CatalogIdLookup {
-        enum class Existence {
-            // Namespace or UUID exists at time 'ts' and catalogId set in 'id'.
-            kExists,
-            // Namespace or UUID does not exist at time 'ts'.
-            kNotExists,
-            // Namespace or UUID existence at time 'ts' is unknown. The durable catalog must be
-            // scanned to determine.
-            kUnknown
-        };
-        RecordId id;
-        Existence result;
-    };
-    CatalogIdLookup lookupCatalogIdByNSS(const NamespaceString& nss,
-                                         boost::optional<Timestamp> ts = boost::none) const;
-    CatalogIdLookup lookupCatalogIdByUUID(const UUID& uuid,
-                                          boost::optional<Timestamp> ts = boost::none) const;
 
     /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
@@ -652,25 +628,13 @@ public:
      */
     uint64_t getEpoch() const;
 
-    iterator begin(OperationContext* opCtx, const DatabaseName& dbName) const;
-    iterator end(OperationContext* opCtx) const;
-
     /**
-     * Checks if 'cleanupForOldestTimestampAdvanced' should be called when the oldest timestamp
-     * advanced. Used to avoid a potentially expensive call to 'cleanupForOldestTimestampAdvanced'
-     * if no write is needed.
+     * Provides an iterable range for the collections belonging to the specified database.
+     *
+     * Will not observe any updates made to the catalog after the creation of the 'Range'. The
+     * 'Range' object just remain in scope for the duration of the iteration.
      */
-    bool needsCleanupForOldestTimestamp(Timestamp oldest) const;
-
-    /**
-     * Cleans up internal structures when the oldest timestamp advances
-     */
-    void cleanupForOldestTimestampAdvanced(Timestamp oldest);
-
-    /**
-     * Cleans up internal structures after catalog reopen
-     */
-    void cleanupForCatalogReopen(Timestamp stable);
+    Range range(const DatabaseName& dbName) const;
 
     /**
      * Ensures we have a MODE_X lock on a collection or MODE_IX lock for newly created collections.
@@ -678,6 +642,13 @@ public:
     static void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
                                                         const NamespaceString& nss);
     static bool hasExclusiveAccessToCollection(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Returns HistoricalCatalogIdTracker for historical namespace/uuid mappings to catalogId based
+     * on timestamp.
+     */
+    const HistoricalCatalogIdTracker& catalogIdTracker() const;
+    HistoricalCatalogIdTracker& catalogIdTracker();
 
 private:
     friend class CollectionCatalog::iterator;
@@ -693,13 +664,12 @@ private:
                                                            const UUID& uuid) const;
 
     /**
-     * Register the collection with `uuid`.
+     * Register the collection.
      *
      * If 'twoPhase' is true, this call must be followed by 'onCreateCollection' which continues the
      * two-phase commit process.
      */
     void _registerCollection(OperationContext* opCtx,
-                             const UUID& uuid,
                              std::shared_ptr<Collection> collection,
                              bool twoPhase,
                              boost::optional<Timestamp> commitTime);
@@ -786,43 +756,6 @@ private:
                                       NamespaceType type) const;
 
     /**
-     * CatalogId with Timestamp
-     */
-    struct TimestampedCatalogId {
-        boost::optional<RecordId> id;
-        Timestamp ts;
-    };
-
-    // Push a catalogId for namespace and UUID at given Timestamp. Timestamp needs to be larger than
-    // other entries for this namespace and UUID. boost::none for catalogId represent drop,
-    // boost::none for timestamp turns this operation into a no-op.
-    void _pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
-                                     const UUID& uuid,
-                                     boost::optional<RecordId> catalogId,
-                                     boost::optional<Timestamp> ts);
-
-    // Push a catalogId for 'from' and 'to' for a rename operation at given Timestamp. Timestamp
-    // needs to be larger than other entries for these namespaces. boost::none for timestamp turns
-    // this operation into a no-op.
-    void _pushCatalogIdForRename(const NamespaceString& from,
-                                 const NamespaceString& to,
-                                 boost::optional<Timestamp> ts);
-
-    // Inserts a catalogId for namespace and UUID at given Timestamp, if not boost::none. Used after
-    // scanning the durable catalog for a correct mapping at the given timestamp.
-    void _insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<const NamespaceString&> nss,
-                                                boost::optional<UUID> uuid,
-                                                boost::optional<RecordId> catalogId,
-                                                Timestamp ts);
-
-    // Helper to calculate if a namespace or UUID needs to be marked for cleanup for a set of
-    // timestamped catalogIds
-    template <class Key, class CatalogIdChangesContainer>
-    void _markForCatalogIdCleanupIfNeeded(const Key& key,
-                                          CatalogIdChangesContainer& catalogIdChangesContainer,
-                                          const std::vector<TimestampedCatalogId>& ids);
-
-    /**
      * Returns true if catalog information about this namespace or UUID should be looked up from the
      * durable catalog rather than using the in-memory state of the catalog.
      *
@@ -857,12 +790,6 @@ private:
         const NamespaceStringOrUUID& nssOrUUID,
         Timestamp readTimestamp) const;
 
-    // Helpers for 'lookupCatalogIdByNSS' and 'lookupCatalogIdByUUID'.
-    CatalogIdLookup _checkWithOldestCatalogIdTimestampMaintained(
-        boost::optional<Timestamp> ts) const;
-    CatalogIdLookup _findCatalogIdInRange(boost::optional<Timestamp> ts,
-                                          const std::vector<TimestampedCatalogId>& range) const;
-
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
      * to pre-close NSS. See also onCloseCatalog.
@@ -871,8 +798,6 @@ private:
 
     using CollectionCatalogMap =
         immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
-    using OrderedCollectionMap =
-        std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = immutable::unordered_set<NamespaceString>;
@@ -890,21 +815,8 @@ private:
     immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>> _pendingCommitNamespaces;
     immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash> _pendingCommitUUIDs;
 
-    // CatalogId mappings for all known namespaces and UUIDs for the CollectionCatalog. The vector
-    // is sorted on timestamp. UUIDs will have at most two entries. One for the create and another
-    // for the drop. UUIDs stay the same across collection renames.
-    immutable::unordered_map<NamespaceString, std::vector<TimestampedCatalogId>> _nssCatalogIds;
-    immutable::unordered_map<UUID, std::vector<TimestampedCatalogId>, UUID::Hash> _uuidCatalogIds;
-    // Set of namespaces and UUIDs that need cleanup when the oldest timestamp advances
-    // sufficiently.
-    immutable::unordered_set<NamespaceString> _nssCatalogIdChanges;
-    immutable::unordered_set<UUID, UUID::Hash> _uuidCatalogIdChanges;
-    // Point at which the oldest timestamp need to advance for there to be any catalogId namespace
-    // that can be cleaned up
-    Timestamp _lowestCatalogIdTimestampForCleanup = Timestamp::max();
-    // The oldest timestamp at which the catalog maintains catalogId mappings. Anything older than
-    // this is unknown and must be discovered by scanning the durable catalog.
-    Timestamp _oldestCatalogIdTimestampMaintained = Timestamp::max();
+    // Provides functionality to lookup catalogId by namespace/uuid for a given timestamp.
+    HistoricalCatalogIdTracker _catalogIdTracker;
 
     // Map of database names to their corresponding views and other associated state.
     ViewsForDatabaseMap _viewsForDatabase;
@@ -939,48 +851,6 @@ private:
 
     // Tracks usage of collection usage features (e.g. capped).
     Stats _stats;
-};
-
-/**
- * RAII style object to stash a versioned CollectionCatalog on the OperationContext.
- * Calls to CollectionCatalog::get(OperationContext*) will return this instance.
- *
- * Unstashes the CollectionCatalog at destruction if the OperationContext::isLockFreeReadsOp()
- * flag is no longer set. This is handling for the nested Stasher use case.
- */
-class CollectionCatalogStasher {
-public:
-    CollectionCatalogStasher(OperationContext* opCtx);
-    CollectionCatalogStasher(OperationContext* opCtx,
-                             std::shared_ptr<const CollectionCatalog> catalog);
-
-    /**
-     * Unstashes the catalog if _opCtx->isLockFreeReadsOp() is no longer set.
-     */
-    ~CollectionCatalogStasher();
-
-    /**
-     * Moves ownership of the stash to the new instance, and marks the old one unstashed.
-     */
-    CollectionCatalogStasher(CollectionCatalogStasher&& other);
-
-    CollectionCatalogStasher(const CollectionCatalogStasher&) = delete;
-    CollectionCatalogStasher& operator=(const CollectionCatalogStasher&) = delete;
-    CollectionCatalogStasher& operator=(CollectionCatalogStasher&&) = delete;
-
-    /**
-     * Stashes 'catalog' on the _opCtx.
-     */
-    void stash(std::shared_ptr<const CollectionCatalog> catalog);
-
-    /**
-     * Resets the OperationContext so CollectionCatalog::get() returns latest catalog again
-     */
-    void reset();
-
-private:
-    OperationContext* _opCtx;
-    bool _stashed;
 };
 
 /**

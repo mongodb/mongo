@@ -39,7 +39,6 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
@@ -257,26 +256,6 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
     // In multiversion migration recovery scenarios, we may not have the key pattern.
     if (_shardKeyPattern) {
         deletionTask.setKeyPattern(*_shardKeyPattern);
-    }
-
-    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
-    // flag is used to turn on new range deleter on startup.
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-        LOGV2_DEBUG(23897,
-                    2,
-                    "Marking range deletion task on donor as ready for processing",
-                    "migrationId"_attr = _migrationInfo.getId());
-        migrationutil::markAsReadyRangeDeletionTaskLocally(
-            opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
-
-        // At this point the decision cannot be changed and will be recovered in the event of a
-        // failover, so it is safe to schedule the deletion task after updating the persisted state.
-        LOGV2_DEBUG(23898,
-                    2,
-                    "Scheduling range deletion task on donor",
-                    "migrationId"_attr = _migrationInfo.getId());
-
-        return migrationutil::submitRangeDeletionTask(opCtx, deletionTask).share();
     }
 
 

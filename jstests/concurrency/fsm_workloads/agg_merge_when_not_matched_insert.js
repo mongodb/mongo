@@ -11,8 +11,6 @@
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
  *  incompatible_with_gcov,
- *  # The config fuzzer causes certain commands to time out periodically.
- *  does_not_support_config_fuzzer,
  *]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
@@ -22,6 +20,8 @@ var $config = extendWorkload($config, function($config, $super) {
     // Set the collection to run concurrent moveChunk operations as the output collection.
     $config.data.collWithMigrations = "agg_merge_when_not_matched_insert";
     $config.data.threadRunCount = 0;
+
+    let initialMaxCatchUpPercentageBeforeBlockingWrites = null;
 
     $config.states.aggregate = function aggregate(db, collName, connCache) {
         const res = db[collName].aggregate([
@@ -50,6 +50,48 @@ var $config = extendWorkload($config, function($config, $super) {
         });
 
         this.threadRunCount += 1;
+    };
+
+    // This test is sensitive to low values of the parameter
+    // maxCatchUpPercentageBeforeBlockingWrites, which can be set by the config server. We set a min
+    // bound for this parameter here.
+    $config.setup = function setup(db, collName, cluster) {
+        $super.setup.apply(this, [db, collName, cluster]);
+
+        cluster.executeOnMongodNodes((db) => {
+            const param = assert.commandWorked(
+                db.adminCommand({getParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: 1}));
+            if (param.hasOwnProperty("maxCatchUpPercentageBeforeBlockingWrites")) {
+                const defaultValue = 10;
+                if (param.maxCatchUpPercentageBeforeBlockingWrites < defaultValue) {
+                    jsTest.log(
+                        "Parameter `maxCatchUpPercentageBeforeBlockingWrites` value too low: " +
+                        param.maxCatchUpPercentageBeforeBlockingWrites +
+                        ". Setting value to default: " + defaultValue + ".");
+                    initialMaxCatchUpPercentageBeforeBlockingWrites =
+                        param.maxCatchUpPercentageBeforeBlockingWrites;
+                    assert.commandWorked(db.adminCommand(
+                        {setParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: defaultValue}));
+                }
+            }
+        });
+    };
+
+    $config.teardown = function teardown(db, collName, cluster) {
+        if (initialMaxCatchUpPercentageBeforeBlockingWrites) {
+            jsTest.log(
+                "Resetting parameter `maxCatchUpPercentageBeforeBlockingWrites` to original value: " +
+                initialMaxCatchUpPercentageBeforeBlockingWrites);
+            cluster.executeOnMongodNodes((db) => {
+                assert.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    maxCatchUpPercentageBeforeBlockingWrites:
+                        initialMaxCatchUpPercentageBeforeBlockingWrites
+                }));
+            });
+        }
+
+        $super.teardown.apply(this, [db, collName, cluster]);
     };
 
     return $config;

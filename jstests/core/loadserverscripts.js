@@ -5,6 +5,9 @@
 //   uses_parallel_shell,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
+//   # DB.prototype.loadServerScripts does not behave as expected in module mode, and the SELinux
+//   # test runner loads scripts with dynamic load.
+//   no_selinux
 // ]
 
 // Test db.loadServerScripts()

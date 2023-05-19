@@ -11,6 +11,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
+TestData.skipCheckRoutingTableConsistency = true;
 
 // Disable auth explicitly
 var noAuthOptions = {noauth: ''};

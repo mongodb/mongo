@@ -433,8 +433,8 @@ export const authCommandsLib = {
           },
           testcases: [
             {
-              runOnDb: adminDbName, 
-              roles: roles_clusterManager, 
+              runOnDb: adminDbName,
+              roles: roles_clusterManager,
               privileges: [{resource: {cluster: true}, actions: ["transitionFromDedicatedConfigServer"]}]
             },
             {runOnDb: firstDbName, roles: {}},
@@ -5733,7 +5733,7 @@ export const authCommandsLib = {
         },
         {
           testname: "movePrimary",
-          command: {movePrimary: "x"},
+          command: {movePrimary: "x", to: "a"},
           skipUnlessSharded: true,
           testcases: [
               {
@@ -5767,8 +5767,7 @@ export const authCommandsLib = {
           // Only enterprise knows of this command.
           skipTest:
               (conn) => {
-                return !getBuildInfo().modules.includes("enterprise")
-                        || !TestData.setParameters.featureFlagOIDC;
+                return !getBuildInfo().modules.includes("enterprise");
               },
           testcases: [
             {
@@ -5785,8 +5784,7 @@ export const authCommandsLib = {
           // Only enterprise knows of this command.
           skipTest:
               (conn) => {
-                return !getBuildInfo().modules.includes("enterprise")
-                    || !TestData.setParameters.featureFlagOIDC;
+                return !getBuildInfo().modules.includes("enterprise");
               },
           testcases: [
             {
@@ -6167,9 +6165,9 @@ export const authCommandsLib = {
           skipUnlessSharded: true,
           testcases: [
             {
-              runOnDb: adminDbName, 
-              roles: roles_clusterManager, 
-              expectFail: true, 
+              runOnDb: adminDbName,
+              roles: roles_clusterManager,
+              expectFail: true,
               privileges: [{resource: {cluster: true}, actions: ["transitionToDedicatedConfigServer"]}]
             },
             {runOnDb: firstDbName, roles: {}},
@@ -6631,12 +6629,12 @@ export const authCommandsLib = {
           ]
         },
         {
-            // Test that only clusterManager has permission to run $telemetry
+            // Test that only clusterManager has permission to run $queryStats
             testname: "testTelemetryReadPrivilege",
-            command: {aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}},
+            command: {aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}},
             skipSharded: false,
             skipTest: (conn) => {
-                return !TestData.setParameters.featureFlagTelemetry;
+                return !TestData.setParameters.featureFlagQueryStats;
             },
             testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
         },

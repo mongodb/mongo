@@ -1,6 +1,6 @@
 // $unwind applied to an empty array field drops the field from the source document.  SERVER-6131
 
-t = db.jstests_aggregation_server6131;
+let t = db.jstests_aggregation_server6131;
 t.drop();
 
 function assertAggregationResults(expected, aggregation) {

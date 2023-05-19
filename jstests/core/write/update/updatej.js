@@ -5,7 +5,7 @@
 // encounters an error.
 // @tags: [requires_multi_updates, requires_non_retryable_writes, assumes_unsharded_collection]
 
-t = db.jstests_updatej;
+let t = db.jstests_updatej;
 t.drop();
 
 t.save({a: []});

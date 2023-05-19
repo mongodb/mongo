@@ -46,11 +46,16 @@ const st = new ShardingTest({
         setParameter: {
             queryAnalysisSamplerConfigurationRefreshSecs,
             queryAnalysisWriterIntervalSecs,
-            logComponentVerbosity: tojson({sharding: 2})
+            logComponentVerbosity: tojson({sharding: 3})
         }
     },
     configOptions: {
-        setParameter: {queryAnalysisSamplerInActiveThresholdSecs: 3},
+        setParameter: {
+            queryAnalysisSamplerInActiveThresholdSecs: 3,
+            queryAnalysisSamplerConfigurationRefreshSecs,
+            queryAnalysisWriterIntervalSecs,
+            logComponentVerbosity: tojson({sharding: 3})
+        },
     }
 });
 

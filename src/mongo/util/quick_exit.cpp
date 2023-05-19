@@ -43,11 +43,7 @@
 #include <cstdlib>
 
 // NOTE: Header only dependencies are OK in this library.
-#include "mongo/stdx/mutex.h"
-
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
+#include "mongo/stdx/mutex.h"  // IWYU pragma: keep
 
 #if !defined(__has_include)
 #define __has_include(x) 0
@@ -63,6 +59,12 @@
 #endif
 
 #include <sanitizer/lsan_interface.h>
+#endif
+
+#if __has_feature(xray_instrument)
+// See clang/test/Lexer/has_feature_xray_instrument.cpp
+// see compiler-rt/lib/xray/xray_basic_flags.inc
+#include <xray/xray_log_interface.h>
 #endif
 
 #ifdef MONGO_GCOV
@@ -90,6 +92,13 @@ void quickExitWithoutLogging(ExitCode code) {
 #else
     __gcov_flush();
 #endif
+#endif
+
+#if __has_feature(xray_instrument)
+    // Stop XRay and flush the xray basic log
+    /* ignore */ __xray_log_finalize();
+    /* ignore */ __xray_unpatch();
+    /* ignore */ __xray_log_flushLog();
 #endif
 
 #if __has_feature(address_sanitizer)

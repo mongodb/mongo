@@ -67,7 +67,7 @@ function testTransportTransitionCluster(scheme, oldMode, newMode) {
     rst.awaitReplication();
 
     print(`=== Switching ${scheme} from ${oldMode} to ${newMode[scheme]} for all nodes in cluster`);
-    for (n of rst.nodes) {
+    for (let n of rst.nodes) {
         let adminDB = n.getDB("admin");
         assert.commandWorked(adminDB.runCommand({"setParameter": 1, [scheme]: newMode[scheme]}));
     }

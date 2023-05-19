@@ -96,6 +96,8 @@ public:
     void appendToBSON(BSONObjBuilder* bob, bool encodeTenant = false) const;
     BSONObj toBSON(bool encodeTenant = false) const;
 
+    std::size_t getBSONObjSize() const;
+
     /**
      * Gets the name part of a AuthName.
      */
@@ -111,7 +113,7 @@ public:
     }
 
     DatabaseName getDatabaseName() const {
-        return DatabaseName(_tenant, _db);
+        return DatabaseName::createDatabaseNameForAuth(_tenant, _db);
     }
 
     /**

@@ -497,7 +497,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                           << "Not primary while creating indexes in " << ns.toStringForErrorMsg());
         }
 
-        bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
+        bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns, [&] {
             AutoGetCollection collection(
                 opCtx,
                 ns,

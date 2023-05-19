@@ -1,9 +1,9 @@
 // @tags: [requires_multi_updates, requires_non_retryable_writes]
 
-t = db.update_mulit4;
+let t = db.update_mulit4;
 t.drop();
 
-for (i = 0; i < 1000; i++) {
+for (let i = 0; i < 1000; i++) {
     t.insert({_id: i, k: i % 12, v: "v" + i % 12});
 }
 

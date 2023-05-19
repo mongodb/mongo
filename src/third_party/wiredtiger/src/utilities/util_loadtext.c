@@ -61,7 +61,7 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
 
     ret = text(session, uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }
 
@@ -163,8 +163,8 @@ insert(WT_CURSOR *cursor, const char *name, bool readkey)
             fflush(stdout);
         }
     }
-    free(key.mem);
-    free(value.mem);
+    util_free(key.mem);
+    util_free(value.mem);
 
     if (verbose)
         printf("\r\t%s: %" PRIu64 "\n", name, insert_count);

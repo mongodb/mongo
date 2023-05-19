@@ -431,8 +431,14 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
 void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                                                     repl::StorageInterface* storageInterface) {
-    if (!hasNoReplicatedCollections(opCtx))
+    if (!hasNoReplicatedCollections(opCtx)) {
+        if (!gDefaultStartupFCV.empty()) {
+            LOGV2(7557701,
+                  "Ignoring the provided defaultStartupFCV parameter since the FCV already exists");
+        }
         return;
+    }
+
 
     // If the server was not started with --shardsvr, the default featureCompatibilityVersion on
     // clean startup is the upgrade version. If it was started with --shardsvr, the default
@@ -450,11 +456,34 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
     }
 
+    // Set FCV to lastLTS for nodes started with --shardsvr. If an FCV was specified at startup
+    // through a startup parameter, set it to that FCV. Otherwise, set it to latest.
     FeatureCompatibilityVersionDocument fcvDoc;
-    if (storeUpgradeVersion) {
-        fcvDoc.setVersion(GenericFCV::kLatest);
-    } else {
+    if (!storeUpgradeVersion) {
         fcvDoc.setVersion(GenericFCV::kLastLTS);
+    } else if (!gDefaultStartupFCV.empty()) {
+        StringData versionString = StringData(gDefaultStartupFCV);
+        FCV parsedVersion;
+
+        if (versionString == multiversion::toString(GenericFCV::kLastLTS)) {
+            parsedVersion = GenericFCV::kLastLTS;
+        } else if (versionString == multiversion::toString(GenericFCV::kLastContinuous)) {
+            parsedVersion = GenericFCV::kLastContinuous;
+        } else if (versionString == multiversion::toString(GenericFCV::kLatest)) {
+            parsedVersion = GenericFCV::kLatest;
+        } else {
+            parsedVersion = GenericFCV::kLatest;
+            LOGV2_WARNING_OPTIONS(7557700,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "The provided 'defaultStartupFCV' is not a valid FCV. Setting "
+                                  "the FCV to the latest FCV instead",
+                                  "defaultStartupFCV"_attr = versionString,
+                                  "latestFCV"_attr = multiversion::toString(GenericFCV::kLatest));
+        }
+
+        fcvDoc.setVersion(parsedVersion);
+    } else {
+        fcvDoc.setVersion(GenericFCV::kLatest);
     }
 
     // We then insert the featureCompatibilityVersion document into the server configuration

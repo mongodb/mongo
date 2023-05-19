@@ -7,7 +7,7 @@
 
 var res;
 
-t = db.jstest_updateh;
+let t = db.jstest_updateh;
 t.drop();
 
 t.insert({x: 1});

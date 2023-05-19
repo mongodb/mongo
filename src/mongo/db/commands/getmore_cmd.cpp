@@ -702,8 +702,8 @@ public:
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
             curOp->debug().additiveMetrics.nBatches = 1;
-
-            collectTelemetryMongod(opCtx, cursorPin, numResults);
+            curOp->setEndOfOpMetrics(numResults);
+            collectQueryStatsMongod(opCtx, cursorPin);
 
             if (respondWithId) {
                 cursorDeleter.dismiss();
@@ -797,9 +797,14 @@ public:
 
         void validateResult(rpc::ReplyBuilderInterface* reply, boost::optional<TenantId> tenantId) {
             auto ret = reply->getBodyBuilder().asTempObj();
-            CursorGetMoreReply::parse(
-                IDLParserContext{"CursorGetMoreReply", false /* apiStrict */, tenantId},
-                ret.removeField("ok"));
+
+            // We need to copy the serialization context from the request to the reply object
+            CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply",
+                                                       false /* apiStrict */,
+                                                       tenantId,
+                                                       SerializationContext::stateCommandReply(
+                                                           _cmd.getSerializationContext())),
+                                      ret.removeField("ok"));
         }
 
         const GetMoreCommandRequest _cmd;

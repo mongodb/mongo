@@ -1,13 +1,10 @@
 // @tags: [requires_non_retryable_writes]
 
-t = db.embeddedIndexTest;
+let t = db.embeddedIndexTest;
 
 t.remove({});
 
-o = {
-    name: "foo",
-    z: {a: 17, b: 4}
-};
+let o = {name: "foo", z: {a: 17, b: 4}};
 t.save(o);
 
 assert(t.findOne().z.a == 17);

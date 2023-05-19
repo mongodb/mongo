@@ -40,3 +40,4 @@ feature_flags:
         cpp_varname: gFeatureFlagAnalyzeShardKey
         default: true
         version: 7.0
+        shouldBeFCVGated: true

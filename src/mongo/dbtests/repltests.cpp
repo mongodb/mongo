@@ -36,6 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/ops/update.h"
@@ -170,7 +171,7 @@ protected:
         return "unittests.repltests";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
     static const char* cllNS() {
         return "local.oplog.rs";
@@ -244,7 +245,7 @@ protected:
                 uassertStatusOK(applyCommand_inlock(
                     &_opCtx, ApplierOperation{&entry}, getOplogApplicationMode()));
             } else {
-                const auto coll = acquireCollection(
+                auto coll = acquireCollection(
                     &_opCtx, {nss(), {}, {}, AcquisitionPrerequisites::kWrite}, MODE_IX);
                 WriteUnitOfWork wunit(&_opCtx);
                 auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
@@ -254,7 +255,6 @@ protected:
                 ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
                 const bool dataIsConsistent = true;
                 uassertStatusOK(applyOperation_inlock(&_opCtx,
-                                                      ctx.db(),
                                                       coll,
                                                       ApplierOperation{&entry},
                                                       false,
@@ -266,8 +266,8 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        ::mongo::writeConflictRetry(&_opCtx, "deleteAll", ns, [&] {
-            NamespaceString nss(ns);
+        NamespaceString nss(ns);
+        ::mongo::writeConflictRetry(&_opCtx, "deleteAll", nss, [&] {
             Lock::GlobalWrite lk(&_opCtx);
             OldClientContext ctx(&_opCtx, nss);
             WriteUnitOfWork wunit(&_opCtx);
@@ -392,12 +392,12 @@ protected:
     virtual void reset() const = 0;
 };
 
-// Some operations are only idempotent when in RECOVERING, not in SECONDARY.  This includes
-// duplicate inserts and deletes.
+// Some operations are only idempotent when in RECOVERING from unstable checkpoint, not in
+// SECONDARY.  This includes duplicate inserts and deletes.
 class Recovering : public Base {
 protected:
     virtual OplogApplication::Mode getOplogApplicationMode() {
-        return OplogApplication::Mode::kRecovering;
+        return OplogApplication::Mode::kUnstableRecovering;
     }
 };
 

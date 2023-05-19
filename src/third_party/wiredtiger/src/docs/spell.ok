@@ -76,6 +76,7 @@ Google
 Google's
 HyperDex
 HyperLevelDB
+IAA
 IEC
 IMPL
 ITER
@@ -394,6 +395,7 @@ htmlinclude
 huffman
 hugepage
 iSi
+iaa
 icount
 ie
 ifdef
@@ -570,6 +572,7 @@ putValueString
 px
 py
 qnx
+qpl
 qqq
 rankdir
 rdbms

@@ -23,6 +23,7 @@
 {  "_id" : 9,  "a" : [ 1, 2, { "b" : 1 }, { "b" : 2 } ],  "x" : 1 }
 Collection count: 17
 
+
 [jsTest] ----
 [jsTest] Creating indexes:
 [jsTest] ----

@@ -18,9 +18,7 @@ test.testPt(test.mkPt());
 test.testPt(test.mkPt());
 test.testPt(test.mkPt());
 
-opts = {
-    sphere: 1
-};
+let opts = {sphere: 1};
 
 // Test $nearSphere with a 2d index
 test.testPt([0, 0], opts);

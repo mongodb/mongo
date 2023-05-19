@@ -33,7 +33,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -51,7 +50,7 @@ bool loggingInProgress();
 void signalSafeWriteToStderr(StringData message);
 namespace detail {
 
-using GetTenantIDFn = std::function<boost::optional<TenantId>()>;
+using GetTenantIDFn = std::function<std::string()>;
 void setGetTenantIDCallback(GetTenantIDFn&& fn);
 
 void doLogImpl(int32_t id,

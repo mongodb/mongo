@@ -336,11 +336,10 @@ std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesFo
     OperationContext* opCtx) {
 
     auto fleInlineCrudExecutor = std::make_shared<executor::InlineExecutor>();
-    auto inlineSleepExecutor = fleInlineCrudExecutor->getSleepableExecutor(_fleCrudExecutor);
 
     return std::make_shared<txn_api::SyncTransactionWithRetries>(
         opCtx,
-        inlineSleepExecutor,
+        _fleCrudExecutor,
         std::make_unique<FLEMongoDResourceYielder>(),
         fleInlineCrudExecutor);
 }
@@ -492,7 +491,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
 
     auto opStr = "getTagsFromStorage"_sd;
     return writeConflictRetry(
-        opCtx, opStr, nsOrUUID.toString(), [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
+        opCtx, opStr, nsOrUUID, [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
             AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nsOrUUID);
 
             const auto& collection = autoColl.getCollection();

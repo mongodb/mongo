@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -269,7 +270,7 @@ TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
     BSONObjBuilder reportedStateWithoutFailpointMsg;
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curop->reportState(&reportedStateWithoutFailpointMsg);
+        curop->reportState(&reportedStateWithoutFailpointMsg, SerializationContext());
     }
     auto bsonObj = reportedStateWithoutFailpointMsg.done();
 
@@ -304,5 +305,45 @@ TEST(CurOpTest, ElapsedTimeReflectsTickSource) {
     ASSERT_EQ(Milliseconds{20}, duration_cast<Milliseconds>(curop->elapsedTimeTotal()));
 }
 
+TEST(CurOpTest, CheckNSAgainstSerializationContext) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    TenantId tid = TenantId(OID::gen());
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto curop = CurOp::get(*opCtx);
+
+    // Create dummy command.
+    BSONObj command = BSON("a" << 3);
+
+    // Set dummy 'ns' and 'command'.
+    curop->setGenericOpRequestDetails(
+        NamespaceString::createNamespaceString_forTest(tid, "testDb.coll"),
+        nullptr,
+        command,
+        NetworkOp::dbQuery);
+
+    // Test without using the expectPrefix field.
+    // TODO SERVER-74284: uncomment the below and remove the line after when command
+    // serializer/deserializer is plumbed in
+    // for (bool tenantIdFromDollarTenantOrSecurityToken : {false, true}) {
+    bool tenantIdFromDollarTenantOrSecurityToken = false;
+
+    SerializationContext sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(tenantIdFromDollarTenantOrSecurityToken);
+
+    BSONObjBuilder builder;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportState(&builder, sc);
+    }
+    auto bsonObj = builder.done();
+
+    std::string serializedNs =
+        tenantIdFromDollarTenantOrSecurityToken ? "testDb.coll" : tid.toString() + "_testDb.coll";
+    ASSERT_EQ(serializedNs, bsonObj.getField("ns").String());
+    // }
+}
 }  // namespace
 }  // namespace mongo

@@ -46,6 +46,11 @@ StatusWith<StringData> findPEMBlob(StringData blob,
                                    size_t position = 0,
                                    bool allowEmpty = false);
 
+/**
+ * Read the contents of a PEM-encoded file to a std::string.
+ */
+StatusWith<std::string> readPEMFile(StringData fileName);
+
 }  // namespace ssl_util
 
 }  // namespace mongo

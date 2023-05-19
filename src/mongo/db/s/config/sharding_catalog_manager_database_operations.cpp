@@ -233,12 +233,14 @@ DatabaseType ShardingCatalogManager::createDatabase(
             // - a "commitSuccessful" notification after completing the write into config.databases
             // will allow change streams to stop collecting events on the namespace created from
             // shards != resolvedPrimaryShard.
+            const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
             {
-                DatabasesAdded prepareCommitEvent({DatabaseName(dbName)}, false /*areImported*/);
-                prepareCommitEvent.setPhase(CommitPhaseEnum::kPrepare);
+                DatabasesAdded prepareCommitEvent(
+                    {DatabaseNameUtil::deserialize(boost::none, dbName)},
+                    false /*areImported*/,
+                    CommitPhaseEnum::kPrepare);
                 prepareCommitEvent.setPrimaryShard(resolvedPrimaryShard->getId());
-                uassertStatusOK(_notifyClusterOnNewDatabases(
-                    opCtx, prepareCommitEvent, {resolvedPrimaryShard->getId()}));
+                uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, prepareCommitEvent, allShards));
             }
 
             const auto transactionChain = [db](const txn_api::TransactionClient& txnClient,
@@ -270,18 +272,19 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
             auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
             auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-            auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
             txn_api::SyncTransactionWithRetries txn(
-                opCtx, sleepInlineExecutor, nullptr /*resourceYielder*/, inlineExecutor);
+                opCtx, executor, nullptr /*resourceYielder*/, inlineExecutor);
             txn.run(opCtx, transactionChain);
 
             hangBeforeNotifyingCreateDatabaseCommitted.pauseWhileSet();
 
-            DatabasesAdded commitCompletedEvent({DatabaseName(dbName)}, false /*areImported*/);
-            commitCompletedEvent.setPhase(CommitPhaseEnum::kSuccessful);
-            const auto notificationOutcome = _notifyClusterOnNewDatabases(
-                opCtx, commitCompletedEvent, {resolvedPrimaryShard->getId()});
+            DatabasesAdded commitCompletedEvent(
+                {DatabaseNameUtil::deserialize(boost::none, dbName)},
+                false /*areImported*/,
+                CommitPhaseEnum::kSuccessful);
+            const auto notificationOutcome =
+                _notifyClusterOnNewDatabases(opCtx, commitCompletedEvent, allShards);
             if (!notificationOutcome.isOK()) {
                 LOGV2_WARNING(7175500,
                               "Unable to send out notification of successful createDatabase",
@@ -409,10 +412,9 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
     txn_api::SyncTransactionWithRetries txn(opCtx,
-                                            sleepInlineExecutor,
+                                            executor,
                                             nullptr, /*resourceYielder*/
                                             inlineExecutor);
     txn.run(opCtx, transactionChain);

@@ -18,10 +18,7 @@ test.insertPts(5000);
 // distances are in increasing order. The test runs in O(N^2).
 
 // Test $near with 2d index
-opts = {
-    sphere: 0,
-    nToTest: test.nPts * 0.01
-};
+let opts = {sphere: 0, nToTest: test.nPts * 0.01};
 test.testPt([0, 0], opts);
 test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);

@@ -37,24 +37,26 @@ for (let i = 1; i <= 100; i++) {
     assert.commandWorked(res);
 }
 
+const collNs = `test.${jsTestName()}`;
+
 // A $gt query on just the 'ts' field should return the next document after the timestamp.
-var cursor = oplog.find({ts: {$gt: timestamps[20]}});
+var cursor = oplog.find({ns: collNs, ts: {$gt: timestamps[20]}});
 assert.eq(21, cursor.next().o["_id"]);
 assert.eq(22, cursor.next().o["_id"]);
 
 // A $gte query on the 'ts' field should include the timestamp.
-cursor = oplog.find({ts: {$gte: timestamps[20]}});
+cursor = oplog.find({ns: collNs, ts: {$gte: timestamps[20]}});
 assert.eq(20, cursor.next().o["_id"]);
 assert.eq(21, cursor.next().o["_id"]);
 
 // An $eq query on the 'ts' field should return the single record with the timestamp.
-cursor = oplog.find({ts: {$eq: timestamps[20]}});
+cursor = oplog.find({ns: collNs, ts: {$eq: timestamps[20]}});
 assert.eq(20, cursor.next().o["_id"]);
 assert(!cursor.hasNext());
 
 // An AND with both a $gt and $lt query on the 'ts' field will correctly return results in
 // the proper bounds.
-cursor = oplog.find({$and: [{ts: {$lt: timestamps[5]}}, {ts: {$gt: timestamps[1]}}]});
+cursor = oplog.find({$and: [{ns: collNs}, {ts: {$lt: timestamps[5]}}, {ts: {$gt: timestamps[1]}}]});
 assert.eq(2, cursor.next().o["_id"]);
 assert.eq(3, cursor.next().o["_id"]);
 assert.eq(4, cursor.next().o["_id"]);
@@ -64,6 +66,7 @@ assert(!cursor.hasNext());
 // tightest range.
 cursor = oplog.find({
     $and: [
+        {ns: collNs},
         {ts: {$gte: timestamps[2]}},
         {ts: {$gt: timestamps[3]}},
         {ts: {$lte: timestamps[7]}},
@@ -79,6 +82,7 @@ assert(!cursor.hasNext());
 // result.
 cursor = oplog.find({
     $and: [
+        {ns: collNs},
         {ts: {$gte: timestamps[1]}},
         {ts: {$gt: timestamps[2]}},
         {ts: {$eq: timestamps[5]}},
@@ -90,7 +94,7 @@ assert.eq(5, cursor.next().o["_id"]);
 assert(!cursor.hasNext());
 
 // An $eq query stops scanning after passing the max timestamp.
-let res = oplog.find({ts: {$eq: timestamps[10]}}).explain("executionStats");
+let res = oplog.find({ns: collNs, ts: {$eq: timestamps[10]}}).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 10.
 assert.lte(res.executionStats.totalDocsExamined, 2, tojson(res));
@@ -99,7 +103,7 @@ assert.neq(null, collScanStage, "no collection scan found in explain output: " +
 assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
 
 // An AND with an $lt predicate stops scanning after passing the max timestamp.
-res = oplog.find({$and: [{ts: {$gte: timestamps[1]}}, {ts: {$lt: timestamps[10]}}]})
+res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[1]}}, {ts: {$lt: timestamps[10]}}]})
           .explain("executionStats");
 assert.commandWorked(res);
 assert.lte(res.executionStats.totalDocsExamined, 11, tojson(res));
@@ -108,7 +112,7 @@ assert.neq(null, collScanStage, "no collection scan found in explain output: " +
 assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
 
 // An AND with an $lte predicate stops scanning after passing the max timestamp.
-res = oplog.find({$and: [{ts: {$gte: timestamps[1]}}, {ts: {$lte: timestamps[10]}}]})
+res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[1]}}, {ts: {$lte: timestamps[10]}}]})
           .explain("executionStats");
 assert.commandWorked(res);
 assert.lte(res.executionStats.totalDocsExamined, 12, tojson(res));
@@ -118,7 +122,7 @@ assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
 
 // The max timestamp is respected even when the min timestamp is smaller than the lowest
 // timestamp in the collection.
-res = oplog.find({$and: [{ts: {$gte: timestamps[0]}}, {ts: {$lte: timestamps[10]}}]})
+res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[0]}}, {ts: {$lte: timestamps[10]}}]})
           .explain("executionStats");
 assert.commandWorked(res);
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
@@ -130,6 +134,7 @@ assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
 res = oplog
           .find({
               $and: [
+                  {ns: collNs},
                   {ts: {$gte: timestamps[0]}},
                   {ts: {$lte: timestamps[10]}},
                   {ts: {$eq: timestamps[5]}},
@@ -145,7 +150,7 @@ assert.eq(timestamps[5], longToTs(collScanStage.maxRecord), tojson(res));
 assert.eq(timestamps[5], longToTs(collScanStage.minRecord), tojson(res));
 
 // An $eq query for a non-existent timestamp scans a single oplog document.
-res = oplog.find({ts: {$eq: makeTS(200)}}).explain("executionStats");
+res = oplog.find({ns: collNs, ts: {$eq: makeTS(200)}}).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the end of the oplog.
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
@@ -154,7 +159,7 @@ assert.eq(makeTS(200), longToTs(collScanStage.maxRecord), tojson(res));
 
 // When the filter matches the last document within the timestamp range, the collection scan
 // examines at most one more document.
-res = oplog.find({$and: [{ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
+res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
           .explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the start of the 'ts' range.
@@ -164,14 +169,14 @@ assert.eq(timestamps[8], longToTs(collScanStage.maxRecord), tojson(res));
 
 // A filter with only an upper bound predicate on 'ts' stops scanning after
 // passing the max timestamp.
-res = oplog.find({ts: {$lt: timestamps[4]}}).explain("executionStats");
+res = oplog.find({ns: collNs, ts: {$lt: timestamps[4]}}).explain("executionStats");
 assert.commandWorked(res);
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[4], longToTs(collScanStage.maxRecord), tojson(res));
 
 // Oplog replay optimization should work with projection.
-res = oplog.find({ts: {$lte: timestamps[4]}}).projection({op: 0});
+res = oplog.find({ns: collNs, ts: {$lte: timestamps[4]}}).projection({op: 0});
 while (res.hasNext()) {
     const next = res.next();
     assert(!next.hasOwnProperty('op'));
@@ -180,7 +185,7 @@ while (res.hasNext()) {
 res = res.explain("executionStats");
 assert.commandWorked(res);
 
-res = oplog.find({ts: {$gte: timestamps[90]}}).projection({'op': 0});
+res = oplog.find({ns: collNs, ts: {$gte: timestamps[90]}}).projection({'op': 0});
 while (res.hasNext()) {
     const next = res.next();
     assert(!next.hasOwnProperty('op'));
@@ -190,7 +195,7 @@ res = res.explain("executionStats");
 assert.commandWorked(res);
 
 // Oplog replay optimization should work with limit.
-res = oplog.find({$and: [{ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
+res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
           .limit(2)
           .explain("executionStats");
 assert.commandWorked(res);
@@ -200,7 +205,7 @@ assert.eq(2, collScanStage.nReturned, res);
 
 // A query over both 'ts' and '_id' should only pay attention to the 'ts' field for finding
 // the oplog start (SERVER-13566).
-cursor = oplog.find({ts: {$gte: timestamps[20]}, "o._id": 25});
+cursor = oplog.find({ns: collNs, ts: {$gte: timestamps[20]}, "o._id": 25});
 assert.eq(25, cursor.next().o["_id"]);
 assert(!cursor.hasNext());
 
@@ -221,7 +226,9 @@ assert.commandWorked(res);
 assert.eq(res.executionStats.totalDocsExamined, 100);
 
 // Ensure oplog replay hack does not work for backward scans.
-res = oplog.find({ts: {$lt: timestamps[4]}}).sort({$natural: -1}).explain("executionStats");
+res = oplog.find({ns: collNs, ts: {$lt: timestamps[4]}})
+          .sort({$natural: -1})
+          .explain("executionStats");
 assert.commandWorked(res);
 assert.gte(res.executionStats.totalDocsExamined, 100, tojson(res));
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");

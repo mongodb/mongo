@@ -4,12 +4,19 @@
  */
 
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
+load("jstests/libs/fail_point_util.js");
 load("jstests/serverless/libs/change_collection_util.js");
 
 const tenantIds = [ObjectId(), ObjectId()];
 const donorRst = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 3,
-    nodeOptions: {setParameter: {shardSplitGarbageCollectionDelayMS: 0, ttlMonitorSleepSecs: 1}}
+    nodeOptions: {
+        setParameter: {
+            shardSplitGarbageCollectionDelayMS: 0,
+            ttlMonitorSleepSecs: 1,
+            shardSplitTimeoutMS: 100000
+        }
+    }
 });
 
 const test = new ShardSplitTest({quickGarbageCollection: true, donorRst});
@@ -59,8 +66,30 @@ donorTxnSession.endSession();
 assert.eq(donorCursor.hasNext(), true);
 const {_id: resumeToken} = donorCursor.next();
 
+// Set this break point so that we can run commands against the primary when the split operation
+// enters a blocking state.
+const blockingFp = configureFailPoint(donorPrimary, "pauseShardSplitAfterBlocking");
 const operation = test.createSplitOperation(tenantIds);
-assert.commandWorked(operation.commit());
+const splitThread = operation.commitAsync();
+
+// Wait for the split to enter the blocking state.
+blockingFp.wait();
+
+assert.commandFailedWithCode(
+    donorTenantConn.getDB("database").runCommand({
+        aggregate: "collection",
+        cursor: {},
+        pipeline: [{$changeStream: {}}],
+        // Timeout set higher than 1000ms to make sure its actually blocked and not just waiting for
+        // inserts, since change streams are awaitdata cursors.
+        maxTimeMS: 2 * 1000
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+    "Opening new change streams should block while a split operation is in a blocking state");
+
+blockingFp.off();
+splitThread.join();
+assert.commandWorked(splitThread.returnData());
 assertMigrationState(donorPrimary, operation.migrationId, "committed");
 
 // Test that we cannot open a new change stream after the tenant has been migrated.
@@ -99,13 +128,6 @@ assert.commandFailedWithCode(
 
 operation.forget();
 
-// getMore cursor to check if we can getMore after the database is dropped.
-donorTenantSession.getDatabase("config")["system.change_collection"].drop();
-assert.commandFailedWithCode(
-    donorTenantConn.getDB("database")
-        .runCommand("getMore", {getMore: donorCursor2._cursorid, collection: "collection"}),
-    ErrorCodes.QueryPlanKilled);
-
 const recipientRst = test.getRecipient();
 const recipientPrimary = recipientRst.getPrimary();
 
@@ -140,4 +162,12 @@ const cursors = [recipientPrimaryTenantConn, ...recipientSecondaryConns].map(
 });
 
 test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
+
+// getMore cursor to check if we can getMore after the database is dropped.
+donorTenantSession.getDatabase("config")["system.change_collection"].drop();
+assert.commandFailedWithCode(
+    donorTenantConn.getDB("database")
+        .runCommand("getMore", {getMore: donorCursor2._cursorid, collection: "collection"}),
+    ErrorCodes.QueryPlanKilled);
+
 test.stop();

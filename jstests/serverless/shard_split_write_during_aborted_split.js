@@ -45,10 +45,11 @@ const writes = tenantIds.map(tenantId => {
 // Verify that we have blocked the expected number of writes to tenant data
 tenantIds.forEach(tenantId => {
     assert.soon(() => {
-        // We expect the numBlockedWrites to be a function of tenantIds size because shard split
-        // donor access blockers are shared for all tenants being split. I don't understand why
-        // there are two writes for each insert though.
-        const kExpectedBlockedWrites = tenantIds.length * 2;
+        // There are two writes for each insert. The function insertBatchAndHandleErrors first try
+        // to acquire the collection lock and create the collection as it doesn't exist. This result
+        // in an error that is recorded. However insertBatchAndHandleErrors still try to process the
+        // insert, which leads to a second write error.
+        const kExpectedBlockedWrites = 2;
 
         return ShardSplitTest.getNumBlockedWrites(donorPrimary, tenantId) == kExpectedBlockedWrites;
     });

@@ -1222,7 +1222,8 @@ void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCt
         SetClusterParameter setClusterParameterRequest(
             BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
                      BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
-        setClusterParameterRequest.setDbName(DatabaseName(tenantId, DatabaseName::kAdmin.db()));
+        setClusterParameterRequest.setDbName(
+            DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db()));
         std::unique_ptr<ServerParameterService> parameterService =
             std::make_unique<ClusterParameterService>();
         SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
@@ -1361,14 +1362,16 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
             ShardsvrSetClusterParameter setClusterParamsCmd(
                 BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
                          BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
-            setClusterParamsCmd.setDbName(DatabaseName(tenantId, DatabaseName::kAdmin.db()));
+            setClusterParamsCmd.setDbName(
+                DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db()));
             setClusterParamsCmd.setClusterParameterTime(
                 parameter["clusterParameterTime"].timestamp());
 
             const auto cmdResponse = _runCommandForAddShard(
                 opCtx,
                 targeter.get(),
-                DatabaseName(tenantId, DatabaseName::kAdmin.db()).toStringWithTenantId(),
+                DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db())
+                    .toStringWithTenantId(),
                 CommandHelpers::appendMajorityWriteConcern(setClusterParamsCmd.toBSON({})));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }
@@ -1433,8 +1436,8 @@ void ShardingCatalogManager::_addShardInTransaction(
         databasesInNewShard.end(),
         std::back_inserter(importedDbNames),
         [](const std::string& s) { return DatabaseNameUtil::deserialize(boost::none, s); });
-    DatabasesAdded notification(std::move(importedDbNames), true /*addImported*/);
-    notification.setPhase(CommitPhaseEnum::kPrepare);
+    DatabasesAdded notification(
+        std::move(importedDbNames), true /*addImported*/, CommitPhaseEnum::kPrepare);
     notification.setPrimaryShard(ShardId(newShard.getName()));
     uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, notification, existingShardIds));
 
@@ -1505,9 +1508,8 @@ void ShardingCatalogManager::_addShardInTransaction(
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
     txn.run(opCtx, transactionChain);
 
     hangBeforeNotifyingaddShardCommitted.pauseWhileSet();
@@ -1568,11 +1570,10 @@ void ShardingCatalogManager::_removeShardInTransaction(OperationContext* opCtx,
             .semi();
     };
 
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, sleepInlineExecutor, nullptr, inlineExecutor);
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
 
     txn.run(opCtx, removeShardFn);
 }

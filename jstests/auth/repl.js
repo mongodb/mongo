@@ -172,7 +172,7 @@ var AuthReplTest = function(spec) {
 };
 
 jsTest.log("1 test replica sets");
-var rs = new ReplSetTest({name: rsName, nodes: 2});
+const rs = new ReplSetTest({name: rsName, nodes: 2});
 var nodes = rs.startSet(mongoOptions);
 rs.initiate();
 authutil.asCluster(nodes, "jstests/libs/key1", function() {

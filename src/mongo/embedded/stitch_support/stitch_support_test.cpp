@@ -98,7 +98,7 @@ protected:
         ASSERT(matcher);
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
         return std::all_of(
-            documentsJSON.begin(), documentsJSON.end(), [=](const char* documentJSON) {
+            documentsJSON.begin(), documentsJSON.end(), [=, this](const char* documentJSON) {
                 bool isMatch;
                 stitch_support_v1_check_match(
                     matcher, toBSONForAPI(documentJSON).first, &isMatch, nullptr);
@@ -153,7 +153,7 @@ protected:
         std::transform(documentsJSON.begin(),
                        documentsJSON.end(),
                        std::back_inserter(results),
-                       [=](const char* documentJSON) {
+                       [=, this](const char* documentJSON) {
                            auto bson = stitch_support_v1_projection_apply(
                                projection, toBSONForAPI(documentJSON).first, nullptr);
                            auto result = fromBSONForAPI(bson);

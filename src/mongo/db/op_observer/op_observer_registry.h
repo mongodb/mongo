@@ -152,10 +152,13 @@ public:
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
-                   bool defaultFromMigrate) override {
+                   bool defaultFromMigrate,
+                   InsertsOpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
+        InsertsOpStateAccumulator opStateAccumulator;
         for (auto& o : _observers)
-            o->onInserts(opCtx, coll, begin, end, fromMigrate, defaultFromMigrate);
+            o->onInserts(
+                opCtx, coll, begin, end, fromMigrate, defaultFromMigrate, &opStateAccumulator);
     }
 
     void onInsertGlobalIndexKey(OperationContext* opCtx,
@@ -263,15 +266,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType) override {
-        return onDropCollection(
-            opCtx, collectionName, uuid, numRecords, dropType, false /* markFromMigrate*/);
-    }
-
-    repl::OpTime onDropCollection(OperationContext* const opCtx,
-                                  const NamespaceString& collectionName,
-                                  const UUID& uuid,
-                                  std::uint64_t numRecords,
                                   const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         ReservedTimes times{opCtx};
@@ -291,23 +285,6 @@ public:
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onDropIndex(opCtx, nss, uuid, indexName, idxDescriptor);
-    }
-
-    void onRenameCollection(OperationContext* const opCtx,
-                            const NamespaceString& fromCollection,
-                            const NamespaceString& toCollection,
-                            const UUID& uuid,
-                            const boost::optional<UUID>& dropTargetUUID,
-                            std::uint64_t numRecords,
-                            bool stayTemp) override {
-        onRenameCollection(opCtx,
-                           fromCollection,
-                           toCollection,
-                           uuid,
-                           dropTargetUUID,
-                           numRecords,
-                           stayTemp,
-                           false /* markFromMigrate */);
     }
 
     void onRenameCollection(OperationContext* const opCtx,
@@ -348,23 +325,6 @@ public:
                                   catalogEntry,
                                   storageMetadata,
                                   isDryRun);
-    }
-
-    repl::OpTime preRenameCollection(OperationContext* const opCtx,
-                                     const NamespaceString& fromCollection,
-                                     const NamespaceString& toCollection,
-                                     const UUID& uuid,
-                                     const boost::optional<UUID>& dropTargetUUID,
-                                     std::uint64_t numRecords,
-                                     bool stayTemp) override {
-        return preRenameCollection(opCtx,
-                                   fromCollection,
-                                   toCollection,
-                                   uuid,
-                                   dropTargetUUID,
-                                   numRecords,
-                                   stayTemp,
-                                   false /* markFromMigrate */);
     }
 
     repl::OpTime preRenameCollection(OperationContext* const opCtx,
@@ -424,11 +384,13 @@ public:
         }
     }
 
-    void onUnpreparedTransactionCommit(
-        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
+        OpStateAccumulator opStateAccumulator;
         for (auto& o : _observers)
-            o->onUnpreparedTransactionCommit(opCtx, transactionOperations);
+            o->onUnpreparedTransactionCommit(opCtx, transactionOperations, &opStateAccumulator);
     }
 
     void onPreparedTransactionCommit(
@@ -481,11 +443,12 @@ public:
     }
 
     void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const LogicalSessionId& lsid,
                                         const std::vector<repl::OplogEntry>& statements,
                                         const repl::OpTime& prepareOpTime) override {
         ReservedTimes times{opCtx};
         for (auto& observer : _observers) {
-            observer->onTransactionPrepareNonPrimary(opCtx, statements, prepareOpTime);
+            observer->onTransactionPrepareNonPrimary(opCtx, lsid, statements, prepareOpTime);
         }
     }
 
@@ -517,6 +480,12 @@ public:
         }
     }
 
+    void onReplicationRollback(OperationContext* opCtx,
+                               const RollbackObserverInfo& rbInfo) override {
+        for (auto& o : _observers)
+            o->onReplicationRollback(opCtx, rbInfo);
+    }
+
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {
         for (auto& o : _observers)
@@ -524,12 +493,6 @@ public:
     }
 
 private:
-    void _onReplicationRollback(OperationContext* opCtx,
-                                const RollbackObserverInfo& rbInfo) override {
-        for (auto& o : _observers)
-            o->onReplicationRollback(opCtx, rbInfo);
-    }
-
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {
             return repl::OpTime{};

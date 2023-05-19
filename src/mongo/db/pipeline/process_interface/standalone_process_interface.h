@@ -41,6 +41,11 @@ public:
     StandaloneProcessInterface(std::shared_ptr<executor::TaskExecutor> exec)
         : NonShardServerProcessInterface(std::move(exec)) {}
 
+    std::unique_ptr<MongoProcessInterface::WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const final {
+        return std::make_unique<LocalWriteSizeEstimator>();
+    }
+
     virtual ~StandaloneProcessInterface() = default;
 };
 

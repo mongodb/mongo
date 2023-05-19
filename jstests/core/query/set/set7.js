@@ -9,7 +9,7 @@
 
 // test $set with array indicies
 
-t = db.jstests_set7;
+let t = db.jstests_set7;
 var res;
 
 t.drop();

@@ -2,7 +2,7 @@
 
 assert(db.getName() == "test");
 
-t = db.bg1;
+let t = db.bg1;
 t.drop();
 
 var a = new Mongo(db.getMongo().host).getDB(db.getName());

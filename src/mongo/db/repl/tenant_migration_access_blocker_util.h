@@ -40,23 +40,7 @@ namespace mongo {
 
 namespace tenant_migration_access_blocker {
 
-std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
-    ServiceContext* serviceContext, const UUID& migrationId);
-
-std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlockerForMigration(
-    ServiceContext* serviceContext, const UUID& migrationId);
-
-std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
-    ServiceContext* serviceContext, StringData tenantId);
-
 void fassertOnUnsafeInitialSync(const UUID& migrationId);
-
-/**
- * Add an access blocker if one does not already exist.
- */
-void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
-                                              const StringData& tenantId,
-                                              const UUID& migrationId);
 
 /**
  * Parse the tenantId from a database name, or return boost::none if there is no tenantId.
@@ -79,16 +63,16 @@ void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc);
 
 /**
- * Checks if a request is allowed to read based on the tenant migration states of this node as a
+ * Checks if a command is allowed to run based on the tenant migration states of this node as a
  * donor or as a recipient. TenantMigrationCommitted is returned if the request needs to be
  * re-routed to the new owner of the tenant. If the tenant is currently being migrated and the
  * request needs to block, a future for when the request is unblocked is returned, and the promise
  * will be set for the returned future when the migration is committed or aborted. Note: for better
  * performance, check if the future is immediately ready.
  */
-SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx,
-                                       const DatabaseName& dbName,
-                                       const OpMsgRequest& request);
+SemiFuture<void> checkIfCanRunCommandOrBlock(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const OpMsgRequest& request);
 
 /**
  * If the operation has read concern "linearizable", throws TenantMigrationCommitted error if the
@@ -107,6 +91,11 @@ void checkIfCanWriteOrThrow(OperationContext* opCtx, const DatabaseName& dbName,
  * in the blocking state). Returns TenantMigrationCommitted if it is in committed.
  */
 Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName);
+
+/**
+ * Asserts if opening a new change stream should block.
+ */
+void assertCanOpenChangeStream(OperationContext* opCtx, const DatabaseName& dbName);
 
 /**
  * Asserts if getMores for change streams should fail.
@@ -144,9 +133,9 @@ void performNoopWrite(OperationContext* opCtx, StringData msg);
 bool inRecoveryMode(OperationContext* opCtx);
 
 /*
- * Returns true if a read should be excluded from access blocker filtering.
+ * Returns true if a command should be excluded from access blocker filtering.
  */
-bool shouldExcludeRead(OperationContext* opCtx);
+bool shouldExclude(OperationContext* opCtx);
 
 /**
  * Parse the 'TenantId' from the provided DatabaseName.

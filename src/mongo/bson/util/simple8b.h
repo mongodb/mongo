@@ -48,6 +48,8 @@ public:
     public:
         friend class Simple8b;
 
+        Iterator() = default;
+
         // typedefs expected in iterators
         using iterator_category = std::input_iterator_tag;
         using difference_type = ptrdiff_t;
@@ -84,7 +86,19 @@ public:
         bool operator==(const Iterator& rhs) const;
         bool operator!=(const Iterator& rhs) const;
 
+        /**
+         * Returns true if iterator can be incremented. Equivalent to comparing not equal with the
+         * end iterator.
+         */
+        bool more() const;
+
+        /**
+         * Returns true if iterator was instantiated with a valid memory block.
+         */
+        bool valid() const;
+
     private:
+        Iterator(const char* end);
         Iterator(const char* pos, const char* end, const boost::optional<T>& previous);
 
         /**
@@ -98,8 +112,8 @@ public:
          */
         uint16_t _rleCountInCurrent(uint8_t selectorExtension) const;
 
-        const char* _pos;
-        const char* _end;
+        const char* _pos = nullptr;
+        const char* _end = nullptr;
 
         // Current Simple8b block in native endian
         uint64_t _current;
@@ -110,10 +124,10 @@ public:
         uint64_t _mask;
 
         // Remaining RLE count for repeating previous value
-        uint16_t _rleRemaining;
+        uint16_t _rleRemaining = 0;
 
         // Number of positions to shift the mask to get slot for current iterator position
-        uint8_t _shift;
+        uint8_t _shift = 0;
 
         // Number of bits in single Simple-8b slot, used to increment _shift when updating iterator
         // position
@@ -139,6 +153,7 @@ public:
     /**
      * Does not take ownership of buffer, must remain valid during the lifetime of this class.
      */
+    Simple8b() = default;
     Simple8b(const char* buffer, int size, boost::optional<T> previous = T{});
 
     /**
@@ -148,20 +163,22 @@ public:
     Iterator end() const;
 
 private:
-    const char* _buffer;
-    int _size;
+    const char* _buffer = nullptr;
+    int _size = 0;
     // Previous value to be used in case the first block in the buffer is RLE.
-    boost::optional<T> _previous;
+    boost::optional<T> _previous = boost::none;
 };
+
+template <typename T>
+Simple8b<T>::Iterator::Iterator(const char* end)
+    : _pos(end), _end(end), _rleRemaining(0), _shift(0) {}
 
 template <typename T>
 Simple8b<T>::Iterator::Iterator(const char* pos,
                                 const char* end,
                                 const boost::optional<T>& previous)
     : _pos(pos), _end(end), _value(previous), _rleRemaining(0), _shift(0) {
-    if (pos != end) {
-        _loadBlock();
-    }
+    _loadBlock();
 }
 
 template <typename T>
@@ -284,19 +301,30 @@ bool Simple8b<T>::Iterator::operator!=(const Simple8b::Iterator& rhs) const {
 }
 
 template <typename T>
-Simple8b<T>::Simple8b(const char* buffer, int size, boost::optional<T> previous)
-    : _buffer(buffer), _size(size), _previous(previous) {
-    invariant(size % sizeof(uint64_t) == 0);
+bool Simple8b<T>::Iterator::more() const {
+    return _pos != _end;
 }
 
 template <typename T>
+bool Simple8b<T>::Iterator::valid() const {
+    return _pos != nullptr;
+}
+
+template <typename T>
+Simple8b<T>::Simple8b(const char* buffer, int size, boost::optional<T> previous)
+    : _buffer(buffer), _size(size), _previous(previous) {}
+
+template <typename T>
 typename Simple8b<T>::Iterator Simple8b<T>::begin() const {
+    if (_size == 0) {
+        return {_buffer};
+    }
     return {_buffer, _buffer + _size, _previous};
 }
 
 template <typename T>
 typename Simple8b<T>::Iterator Simple8b<T>::end() const {
-    return {_buffer + _size, _buffer + _size, boost::none};
+    return {_buffer + _size};
 }
 
 }  // namespace mongo

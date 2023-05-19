@@ -51,10 +51,10 @@
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
+#include "mongo/db/exec/spool.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/timeseries_modify.h"
-#include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -63,6 +63,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request_gen.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/canonical_query.h"
@@ -107,6 +108,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/scripting/engine.h"
@@ -534,7 +536,8 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
     // to wait for the oplog visibility timestamp to be updated, it would wait for a replication
     // batch that would never complete because it couldn't reacquire its own lock, the global lock
     // held by the waiting reader.
-    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin");
+    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+        opCtx, DatabaseName::kAdmin);
 }
 
 namespace {
@@ -1457,7 +1460,21 @@ bool shouldUseRegularSbe(const CanonicalQuery& cq) {
     // The 'ExpressionContext' may indicate that there are expressions which are only supported in
     // SBE when 'featureFlagSbeFull' is set, or fully supported regardless of the value of the
     // feature flag. This function should only return true in the latter case.
-    return cq.getExpCtx()->sbeCompatibility == SbeCompatibility::fullyCompatible;
+    if (cq.getExpCtx()->sbeCompatibility != SbeCompatibility::fullyCompatible) {
+        return false;
+    }
+    for (const auto& stage : cq.pipeline()) {
+        if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage->documentSource())) {
+            // Group stage wouldn't be pushed down if it's not supported in SBE.
+            tassert(7548611,
+                    "Unexpected SBE compatibility value",
+                    groupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
+            if (groupStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /**
@@ -1726,8 +1743,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     OpDebug* opDebug,
     const ScopedCollectionAcquisition& coll,
     ParsedDelete* parsedDelete,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    DeleteStageParams::DocumentCounter&& documentCounter) {
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
 
     auto expCtx = parsedDelete->expCtx();
@@ -1776,7 +1792,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams->sort = request->getSort();
     deleteStageParams->opDebug = opDebug;
     deleteStageParams->stmtId = request->getStmtId();
-    deleteStageParams->numStatsForDoc = std::move(documentCounter);
+
+    if (parsedDelete->isRequestToTimeseries() &&
+        !parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
+        deleteStageParams->numStatsForDoc = timeseries::numMeasurementsForBucketCounter(
+            collectionPtr->getTimeseriesOptions()->getTimeField());
+    }
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     const auto policy = parsedDelete->yieldPolicy();
@@ -1910,10 +1931,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         // directly.
         root = std::make_unique<TimeseriesModifyStage>(
             expCtxRaw,
-            std::move(deleteStageParams),
+            TimeseriesModifyParams(deleteStageParams.get()),
             ws.get(),
             std::move(root),
-            collectionPtr,
+            coll,
             BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
             parsedDelete->releaseResidualExpr());
     } else if (batchDelete) {
@@ -1951,10 +1972,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    VariantCollectionPtrOrAcquisition coll,
+    const ScopedCollectionAcquisition& coll,
     ParsedUpdate* parsedUpdate,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    UpdateStageParams::DocumentCounter&& documentCounter) {
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
 
     auto expCtx = parsedUpdate->expCtx();
@@ -1974,15 +1994,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // If there is no collection and this is an upsert, callers are supposed to create
     // the collection prior to calling this method. Explain, however, will never do
     // collection or database creation.
-    if (!collectionPtr && request->isUpsert()) {
+    if (!coll.exists() && request->isUpsert()) {
         invariant(request->explain());
-    }
-
-    // If the parsed update does not have a user-specified collation, set it from the collection
-    // default.
-    if (collectionPtr && parsedUpdate->getRequest()->getCollation().isEmpty() &&
-        collectionPtr->getDefaultCollator()) {
-        parsedUpdate->setCollator(collectionPtr->getDefaultCollator()->clone());
     }
 
     // If this is a user-issued update, then we want to return an error: you cannot perform
@@ -1999,6 +2012,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     const auto policy = parsedUpdate->yieldPolicy();
 
+    auto documentCounter = [&] {
+        if (parsedUpdate->isRequestToTimeseries() &&
+            !parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
+            return timeseries::numMeasurementsForBucketCounter(
+                collectionPtr->getTimeseriesOptions()->getTimeField());
+        }
+        return UpdateStageParams::DocumentCounter{};
+    }();
+
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     UpdateStageParams updateStageParams(request, driver, opDebug, std::move(documentCounter));
 
@@ -2006,7 +2028,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // should have already enforced upstream that in this case either the upsert flag is false, or
     // we are an explain. If the collection doesn't exist, we're not an explain, and the upsert flag
     // is true, we expect the caller to have created the collection already.
-    if (!collectionPtr) {
+    if (!coll.exists()) {
         LOGV2_DEBUG(20929,
                     2,
                     "Collection does not exist. Using EOF stage",
@@ -2021,13 +2043,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                            nss);
     }
 
-    // Pass index information to the update driver, so that it can determine for us whether the
-    // update affects indices.
-    const auto& updateIndexData = CollectionQueryInfo::get(collectionPtr).getIndexKeys(opCtx);
-    driver->refreshIndexKeys(&updateIndexData);
-
     if (!parsedUpdate->hasParsedQuery()) {
-
         // Only consider using the idhack if no hint was provided.
         if (request->getHint().isEmpty()) {
             // This is the idhack fast-path for getting a PlanExecutor without doing the work
@@ -2102,12 +2118,27 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     updateStageParams.canonicalQuery = cq.get();
     const bool isUpsert = updateStageParams.request->isUpsert();
-    root =
-        (isUpsert
-             ? std::make_unique<UpsertStage>(
-                   cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release())
-             : std::make_unique<UpdateStage>(
-                   cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release()));
+    if (isUpsert) {
+        root = std::make_unique<UpsertStage>(
+            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
+    } else if (parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
+        if (request->isMulti()) {
+            // If this is a multi-update, we need to spool the data before beginning to apply
+            // updates, in order to avoid the Halloween problem.
+            root = std::make_unique<SpoolStage>(cq->getExpCtxRaw(), ws.get(), std::move(root));
+        }
+        root = std::make_unique<TimeseriesModifyStage>(
+            cq->getExpCtxRaw(),
+            TimeseriesModifyParams(&updateStageParams),
+            ws.get(),
+            std::move(root),
+            coll,
+            BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+            parsedUpdate->releaseResidualExpr());
+    } else {
+        root = std::make_unique<UpdateStage>(
+            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
+    }
 
     if (projection) {
         root = std::make_unique<ProjectionStageDefault>(
@@ -2119,7 +2150,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),
-                                       coll,
+                                       &coll,
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString(),

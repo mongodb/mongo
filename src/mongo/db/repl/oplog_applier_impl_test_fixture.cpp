@@ -60,7 +60,8 @@ void OplogApplierImplOpObserver::onInserts(OperationContext* opCtx,
                                            std::vector<InsertStatement>::const_iterator begin,
                                            std::vector<InsertStatement>::const_iterator end,
                                            std::vector<bool> fromMigrate,
-                                           bool defaultFromMigrate) {
+                                           bool defaultFromMigrate,
+                                           InsertsOpStateAccumulator* opAccumulator) {
     if (!onInsertsFn) {
         return;
     }
@@ -111,12 +112,19 @@ void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
                                                     const UUID& uuid,
                                                     const boost::optional<UUID>& dropTargetUUID,
                                                     std::uint64_t numRecords,
-                                                    bool stayTemp) {
+                                                    bool stayTemp,
+                                                    bool markFromMigrate) {
     if (!onRenameCollectionFn) {
         return;
     }
-    onRenameCollectionFn(
-        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    onRenameCollectionFn(opCtx,
+                         fromCollection,
+                         toCollection,
+                         uuid,
+                         dropTargetUUID,
+                         numRecords,
+                         stayTemp,
+                         markFromMigrate);
 }
 
 void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
@@ -499,7 +507,7 @@ CollectionOptions createRecordChangeStreamPreAndPostImagesCollectionOptions() {
 void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options) {
-    writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+    writeConflictRetry(opCtx, "createCollection", nss, [&] {
         Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
 

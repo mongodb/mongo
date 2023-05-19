@@ -1,6 +1,6 @@
 // test read/write permissions
 
-m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+let m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
 db = m.getDB("admin");
 
 // These statements throw because the localhost exception does not allow
@@ -26,7 +26,7 @@ assert.throws(function() {
 
 db.auth("eliot", "eliot");
 
-users = db.getCollection("system.users");
+let users = db.getCollection("system.users");
 assert.eq(1, users.count());
 
 db.shutdownServer();

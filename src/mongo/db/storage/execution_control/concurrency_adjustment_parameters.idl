@@ -32,7 +32,6 @@ global:
       - "mongo/db/storage/execution_control/concurrency_adjustment_validator.h"
 
 enums:
-  # TODO (SERVER-73342): Remove this enum once there is only one algorithm.
   StorageEngineConcurrencyAdjustmentAlgorithm:
     description: "Algorithm for adjusting the number of concurrent storage engine transactions"
     type: string
@@ -48,7 +47,6 @@ enums:
 
 server_parameters:
 
-  # TODO (SERVER-73342): Remove this parameter once there is only one algorithm.
   storageEngineConcurrencyAdjustmentAlgorithm:
     description: >-
       The algorithm to be used for adjusting the number of concurrent storage engine transactions.
@@ -60,3 +58,14 @@ server_parameters:
     default: "throughputProbing"
     validator:
       callback: validateConcurrencyAdjustmentAlgorithm
+
+  storageEngineConcurrencyAdjustmentIntervalMillis:
+    description: >-
+      The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
+      not set to fixedConcurrentTransactions.
+    set_at: startup
+    cpp_vartype: int32_t
+    cpp_varname: gStorageEngineConcurrencyAdjustmentIntervalMillis
+    default: 100
+    validator:
+      gt: 0

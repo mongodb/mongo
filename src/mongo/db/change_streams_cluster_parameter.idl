@@ -68,3 +68,13 @@ server_parameters:
     validator:
       gte: 1
     default: 10
+  changeCollectionTruncateMarkersMinBytes:
+    description: "Server parameter that specifies the minimum number of bytes contained in each
+    truncate marker for change collections. This is only used if
+    featureFlagUseUnreplicatedTruncatesForDeletions is enabled"
+    set_at: startup
+    cpp_varname: gChangeCollectionTruncateMarkersMinBytes
+    cpp_vartype: int32_t
+    default: 33_554_432  # 32 MiB
+    validator:
+      gt: 0

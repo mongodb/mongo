@@ -2,8 +2,8 @@
 function test(index) {
     db.server848.drop();
 
-    radius = 0.0001;
-    center = [5, 52];
+    let radius = 0.0001;
+    let center = [5, 52];
 
     db.server848.save({"_id": 1, "loc": {"x": 4.9999, "y": 52}});
     db.server848.save({"_id": 2, "loc": {"x": 5, "y": 52}});
@@ -17,12 +17,12 @@ function test(index) {
     if (index) {
         db.server848.createIndex({loc: "2d"});
     }
-    r = db.server848.find({"loc": {"$within": {"$center": [center, radius]}}}, {_id: 1});
+    let r = db.server848.find({"loc": {"$within": {"$center": [center, radius]}}}, {_id: 1});
     assert.eq(5, r.count(), "A1");
     // FIXME: surely code like this belongs in utils.js.
-    a = r.toArray();
-    x = [];
-    for (k in a) {
+    let a = r.toArray();
+    let x = [];
+    for (let k in a) {
         x.push(a[k]["_id"]);
     }
     x.sort();

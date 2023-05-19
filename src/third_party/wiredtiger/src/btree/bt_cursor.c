@@ -628,33 +628,41 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
 {
     WT_BTREE *btree;
     WT_CURSOR_BTREE *cbt;
+    WT_DECL_RET;
     WT_UPDATE *upd;
 
-    *updp = NULL;
-
+    *updp = upd = NULL; /* -Wuninitialized */
     cbt = (WT_CURSOR_BTREE *)cursor;
     btree = CUR2BT(cbt);
-    upd = NULL; /* -Wuninitialized */
 
     /*
-     * Not calling the cursor initialization functions, we don't want to be tapped for eviction nor
-     * do we want other standard cursor semantics like snapshots, just discard the hazard pointer
-     * from the last operation. This also depends on the fact we're not setting the cursor's active
-     * flag, this is really a special chunk of code and not to be modified without careful thought.
+     * Set the key only flag to indicate to the search that we don't want to check visibility we
+     * just want to position on a key. This short circuits validity checking.
      */
-    WT_RET(__cursor_reset(cbt));
-
-    WT_RET(btree->type == BTREE_ROW ? __cursor_row_search(cbt, false, NULL, NULL) :
-                                      __cursor_col_search(cbt, NULL, NULL));
-
+    F_SET(&cbt->iface, WT_CURSTD_KEY_ONLY);
     /*
-     * Ideally an exact match will be found, as this transaction is searching for updates done by
-     * itself. But, we cannot be sure of finding one, as pre-processing of the updates could have
-     * happened as part of resolving earlier transaction operations.
+     * The search logic searches the pinned page first, which would be the previously resolved
+     * update chain's page. If that doesn't find the key we want it searches from the root.
      */
-    if (cbt->compare != 0)
-        return (0);
-
+    ret = __wt_btcur_search(cbt);
+    F_CLR(&cbt->iface, WT_CURSTD_KEY_ONLY);
+    /*
+     * The following assertion relies on the fact that for every prepared update there must be an
+     * associated key. However this is only true if we pin the page to prevent eviction. By calling
+     * into the standard search function we avoid releasing our hazard pointer between update chain
+     * resolutions. It also depends on sorting the transaction modifications by key, if we didn't do
+     * that we would unpin the page between searches and later come back to the same key. We rely on
+     * resolving all updates for a single key in sequence.
+     *
+     * This is a complex scenario, suppose we have two updates to the same key by our transaction,
+     * and are resolving the prepared updates. The first pass resolves the update chain, now if we
+     * let eviction run it could evict the page and it will treat the update chain as a regular non
+     * prepared update chain. If we were rolling back the transaction the key may not exist after
+     * eviction, similarly if we wrote a globally visible tombstone. Thus our second attempt at
+     * resolution would fail as it wouldn't find a key.
+     */
+    WT_ASSERT_ALWAYS(
+      CUR2S(cursor), ret == 0, "A valid key must exist when resolving prepared updates.");
     /* Get any uncommitted update from the in-memory page. */
     switch (btree->type) {
     case BTREE_ROW:
@@ -2138,25 +2146,27 @@ err:
  *     Discard a cursor range from the tree.
  */
 int
-__wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, WT_ITEM *orig_start_key,
-  WT_ITEM *orig_stop_key, bool local_start)
+__wt_btcur_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_BTREE *btree;
+    WT_CURSOR_BTREE *start, *stop;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     bool logging;
 
-    btree = CUR2BT(start);
-    session = CUR2S(start);
+    session = trunc_info->session;
+    btree = CUR2BT(trunc_info->start);
     logging = __wt_log_op(session);
+    start = (WT_CURSOR_BTREE *)trunc_info->start;
+    stop = (WT_CURSOR_BTREE *)trunc_info->stop;
 
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
     /*
-     * FIXME WT-10887: Allow performing truncate operation without a timestamp on non logged tables
-     * for non standalone builds (MongoDB). MongoDB do perform truncate operation only on a table
-     * that do not have historical versions to avoid the problem. Remove this standalone build
-     * specific code when a proper solution is implemented.
+     * Allow performing truncate operation without a timestamp on non logged tables for non
+     * standalone builds (MongoDB). MongoDB does perform truncate operation only on a table that
+     * does not have historical versions to avoid the problem. Remove this standalone build specific
+     * code when MongoDB switches to perform truncate operation with timestamps.
      */
 #ifdef WT_STANDALONE_BUILD
     /*
@@ -2183,7 +2193,7 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, WT_ITEM
      * disabling writing of the in-memory remove records to disk.
      */
     if (logging)
-        WT_RET(__wt_txn_truncate_log(session, orig_start_key, orig_stop_key, local_start));
+        WT_RET(__wt_txn_truncate_log(trunc_info));
 
     switch (btree->type) {
     case BTREE_COL_FIX:

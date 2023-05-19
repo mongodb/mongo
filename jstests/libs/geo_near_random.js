@@ -1,6 +1,6 @@
 GeoNearRandomTest = function(name, dbToUse) {
     this.name = name;
-    this.db = (dbToUse || db);
+    this.db = (dbToUse || globalThis.db);
     this.t = this.db[name];
     this.reset();
     print("Starting getNear test: " + name);

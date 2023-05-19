@@ -1183,8 +1183,15 @@ rollback_retry:
                      * and have both a VLCS and FLCS table.
                      */
                     if (g.base_mirror != NULL && g.mirror_fix_var &&
-                      (tinfo->last == 0 || tinfo->last == max_rows))
+                      (tinfo->last == 0 || tinfo->last == max_rows)) {
                         tinfo->last = max_rows - 1;
+                        /*
+                         * It is possible that the key number was set to max rows so make sure we
+                         * don't send in poorly set truncate cursor keys.
+                         */
+                        if (tinfo->keyno > tinfo->last)
+                            tinfo->keyno = tinfo->last;
+                    }
                 }
             } else {
                 if (TV(BTREE_REVERSE)) {

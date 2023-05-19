@@ -161,7 +161,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     for (auto& timestampAndIdentInfo : toDrop) {
         // Guards against catalog changes while dropping idents using KVEngine::dropIdent(). Yields
         // after dropping each ident.
-        writeConflictRetry(opCtx, "dropIdentsOlderThan", "", [&] {
+        writeConflictRetry(opCtx, "dropIdentsOlderThan", NamespaceString(), [&] {
             Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
             const auto& dropTimestamp = timestampAndIdentInfo.first;

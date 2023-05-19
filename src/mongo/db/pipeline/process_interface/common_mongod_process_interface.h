@@ -145,24 +145,7 @@ protected:
         const Document& documentKey,
         MakePipelineOptions opts);
 
-    /**
-     * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
-     */
-    write_ops::InsertCommandRequest buildInsertOp(const NamespaceString& nss,
-                                                  std::vector<BSONObj>&& objs,
-                                                  bool bypassDocValidation);
-
-    /**
-     * Builds an ordered update op on namespace 'nss' with update entries contained in 'batch'.
-     */
-    write_ops::UpdateCommandRequest buildUpdateOp(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss,
-        BatchedObjects&& batch,
-        UpsertType upsert,
-        bool multi);
-
-    BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
+    BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       Client* client,
                                       CurrentOpTruncateMode truncateOps,
                                       CurrentOpBacktraceMode backtraceMode) const final;
@@ -191,6 +174,11 @@ protected:
                                            const NamespaceString& targetNs,
                                            const BSONObj& originalCollectionOptions,
                                            const std::list<BSONObj>& originalIndexes);
+
+    void _handleTimeseriesCreateError(const DBException& ex,
+                                      OperationContext* opCtx,
+                                      const NamespaceString& ns,
+                                      TimeseriesOptions userOpts);
 
 private:
     /**

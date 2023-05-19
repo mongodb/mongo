@@ -63,9 +63,6 @@ structs:
         description: "Stats about records in ECOC, and ESC compact touched"
         fields:
            ecoc: ECOCStats
-           ecc: # TODO: SERVER-68373 remove ecc when 7.0 becomes last LTS
-                type: ECStats
-                optional: true
            esc: ECStats
 
     CleanupStats:

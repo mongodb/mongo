@@ -52,6 +52,16 @@ const auto operationSessionDecoration =
 
 MONGO_FAIL_POINT_DEFINE(hangAfterIncrementingNumWaitingToCheckOut);
 
+std::string provenanceToString(SessionCatalog::Provenance provenance) {
+    switch (provenance) {
+        case SessionCatalog::Provenance::kRouter:
+            return "router";
+        case SessionCatalog::Provenance::kParticipant:
+            return "participant";
+    }
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace
 
 SessionCatalog::~SessionCatalog() {
@@ -314,10 +324,11 @@ SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getOrCreateSessionRuntimeIn
     return sri;
 }
 
-void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
-                                     Session* session,
-                                     boost::optional<KillToken> killToken,
-                                     boost::optional<TxnNumber> clientTxnNumberStarted) {
+void SessionCatalog::_releaseSession(
+    SessionRuntimeInfo* sri,
+    Session* session,
+    boost::optional<KillToken> killToken,
+    boost::optional<TxnNumberAndProvenance> clientTxnNumberStarted) {
     stdx::unique_lock<Latch> ul(_mutex);
 
     // Make sure we have exactly the same session on the map and that it is still associated with an
@@ -340,16 +351,18 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
 
     std::vector<LogicalSessionId> eagerlyReapedSessions;
     if (clientTxnNumberStarted.has_value()) {
+        auto [txnNumber, provenance] = *clientTxnNumberStarted;
+
         // Since the given txnNumber successfully started, we know any child sessions with older
         // txnNumbers can be discarded. This needed to wait until a transaction started because that
         // can fail, e.g. if the active transaction is prepared.
+        auto workerFn = _makeSessionWorkerFnForEagerReap(service, txnNumber, provenance);
         auto numReaped = stdx::erase_if(sri->childSessions, [&](auto&& it) {
             ObservableSession osession(ul, sri, &it.second);
-            if (it.first.getTxnNumber() && *it.first.getTxnNumber() < *clientTxnNumberStarted) {
-                osession.markForReap(ObservableSession::ReapMode::kExclusive);
-            }
+            workerFn(osession);
 
-            bool willReap = osession._shouldBeReaped();
+            bool willReap = osession._shouldBeReaped() &&
+                (osession._reapMode == ObservableSession::ReapMode::kExclusive);
             if (willReap) {
                 eagerlyReapedSessions.push_back(std::move(it.first));
             }
@@ -360,9 +373,10 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
                     4,
                     "Erased child sessions",
                     "releasedLsid"_attr = session->getSessionId(),
-                    "clientTxnNumber"_attr = *clientTxnNumberStarted,
+                    "clientTxnNumber"_attr = txnNumber,
                     "childSessionsRemaining"_attr = sri->childSessions.size(),
-                    "numReaped"_attr = numReaped);
+                    "numReaped"_attr = numReaped,
+                    "provenance"_attr = provenanceToString(provenance));
     }
 
     invariant(ul);
@@ -371,6 +385,19 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
     if (eagerlyReapedSessions.size() && _onEagerlyReapedSessionsFn) {
         (*_onEagerlyReapedSessionsFn)(service, std::move(eagerlyReapedSessions));
     }
+}
+
+SessionCatalog::ScanSessionsCallbackFn SessionCatalog::_defaultMakeSessionWorkerFnForEagerReap(
+    ServiceContext* service, TxnNumber clientTxnNumberStarted, Provenance provenance) {
+    return [clientTxnNumberStarted](ObservableSession& osession) {
+        // If a higher txnNumber has been seen for a client and started a transaction, assume any
+        // child sessions for lower transactions have been superseded and can be reaped.
+        const auto& transactionSessionId = osession.getSessionId();
+        if (transactionSessionId.getTxnNumber() &&
+            *transactionSessionId.getTxnNumber() < clientTxnNumberStarted) {
+            osession.markForReap(ObservableSession::ReapMode::kExclusive);
+        }
+    };
 }
 
 Session* SessionCatalog::SessionRuntimeInfo::getSession(WithLock, const LogicalSessionId& lsid) {
@@ -520,9 +547,10 @@ void OperationContextSession::checkOut(OperationContext* opCtx) {
     checkedOutSession.emplace(std::move(scopedCheckedOutSession));
 }
 
-void OperationContextSession::observeNewTxnNumberStarted(OperationContext* opCtx,
-                                                         const LogicalSessionId& lsid,
-                                                         TxnNumber txnNumber) {
+void OperationContextSession::observeNewTxnNumberStarted(
+    OperationContext* opCtx,
+    const LogicalSessionId& lsid,
+    SessionCatalog::TxnNumberAndProvenance txnNumberAndProvenance) {
     auto& checkedOutSession = operationSessionDecoration(opCtx);
     invariant(checkedOutSession);
 
@@ -530,7 +558,8 @@ void OperationContextSession::observeNewTxnNumberStarted(OperationContext* opCtx
                 4,
                 "Observing new retryable write number started on session",
                 "lsid"_attr = lsid,
-                "txnNumber"_attr = txnNumber);
+                "txnNumber"_attr = txnNumberAndProvenance.first,
+                "provenance"_attr = txnNumberAndProvenance.second);
 
     const auto& checkedOutLsid = (*checkedOutSession)->getSessionId();
     if (isParentSessionId(lsid)) {
@@ -540,7 +569,7 @@ void OperationContextSession::observeNewTxnNumberStarted(OperationContext* opCtx
         // parent. This is safe because both share the same SessionRuntimeInfo.
         dassert(lsid == checkedOutLsid || lsid == *getParentSessionId(checkedOutLsid));
 
-        checkedOutSession->observeNewClientTxnNumberStarted(txnNumber);
+        checkedOutSession->observeNewClientTxnNumberStarted(txnNumberAndProvenance);
     } else if (isInternalSessionForRetryableWrite(lsid)) {
         // Observing a new internal transaction on a retryable session.
 
@@ -548,7 +577,8 @@ void OperationContextSession::observeNewTxnNumberStarted(OperationContext* opCtx
         // directly.
         dassert(lsid == checkedOutLsid);
 
-        checkedOutSession->observeNewClientTxnNumberStarted(*lsid.getTxnNumber());
+        checkedOutSession->observeNewClientTxnNumberStarted(
+            {*lsid.getTxnNumber(), txnNumberAndProvenance.second});
     }
 }
 

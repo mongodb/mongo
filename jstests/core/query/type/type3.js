@@ -4,7 +4,7 @@
 
 // Check query type bracketing SERVER-3222
 
-t = db.jstests_type3;
+let t = db.jstests_type3;
 t.drop();
 
 t.createIndex({a: 1});

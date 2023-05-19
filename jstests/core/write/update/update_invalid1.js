@@ -2,7 +2,7 @@
 //   requires_fastcount,
 // ]
 
-t = db.update_invalid1;
+let t = db.update_invalid1;
 t.drop();
 
 t.update({_id: 5}, {$set: {$inc: {x: 5}}}, true);

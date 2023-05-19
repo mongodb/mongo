@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/resource_yielder.h"
@@ -99,8 +100,15 @@ public:
      * Runs the given command as part of the transaction that owns this transaction client.
      */
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const = 0;
-
     virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const = 0;
+
+    /**
+     * Same as runCommand but will assert the command status is ok.
+     */
+    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
+                                                  BSONObj cmd) const = 0;
+    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const = 0;
+
     /**
      * Helper method to run commands representable as a BatchedCommandRequest in the transaction
      * client's transaction.
@@ -127,6 +135,13 @@ public:
                                                          std::vector<StmtId> stmtIds) const = 0;
     virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const = 0;
+
+    /**
+     * Helper method to run BulkWriteCommandRequest in the transaction client's transaction.
+     */
+    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
+        const BulkWriteCommandRequest& cmd) const = 0;
+    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const = 0;
 
     /**
      * Helper method that runs the given find in the transaction client's transaction and will
@@ -170,13 +185,16 @@ public:
      *
      * Optionally accepts a custom TransactionClient and will default to a client that runs commands
      * against the local service entry point.
+     *
+     * Will run all tasks synchronously on the caller's thread via the InlineExecutor. Will sleep
+     * between retries and schedule any necessary cleanup (e.g. abortTransaction commands) using the
+     * sleepAndCleanupExecutor.
      */
-    SyncTransactionWithRetries(
-        OperationContext* opCtx,
-        std::shared_ptr<executor::InlineExecutor::SleepableExecutor> sleepableExecutor,
-        std::unique_ptr<ResourceYielder> resourceYielder,
-        std::shared_ptr<executor::InlineExecutor> executor,
-        std::unique_ptr<TransactionClient> txnClient = nullptr);
+    SyncTransactionWithRetries(OperationContext* opCtx,
+                               std::shared_ptr<executor::TaskExecutor> sleepAndCleanupExecutor,
+                               std::unique_ptr<ResourceYielder> resourceYielder,
+                               std::shared_ptr<executor::InlineExecutor> executor,
+                               std::unique_ptr<TransactionClient> txnClient = nullptr);
     /**
      * Returns a bundle with the commit command status and write concern error, if any. Any error
      * prior to receiving a response from commit (e.g. an interruption or a user assertion in the
@@ -203,10 +221,10 @@ public:
     }
 
 private:
-    CancellationSource _source;
     std::unique_ptr<ResourceYielder> _resourceYielder;
     std::shared_ptr<executor::InlineExecutor> _inlineExecutor;
     std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _sleepExec;
+    std::shared_ptr<executor::TaskExecutor> _cleanupExecutor;
     std::shared_ptr<details::TransactionWithRetries> _txn;
 };
 
@@ -286,10 +304,18 @@ public:
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override;
     virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override;
 
+    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
+                                                  BSONObj cmd) const override;
+    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override;
+
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
         const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const override;
     virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const override;
+
+    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
+        const BulkWriteCommandRequest& cmd) const override;
+    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override;
 
     virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
         const FindCommandRequest& cmd) const override;
@@ -306,8 +332,12 @@ public:
 private:
     ExecutorFuture<BSONObj> _runCommand(const DatabaseName& dbName, BSONObj cmd) const;
 
+    ExecutorFuture<BSONObj> _runCommandChecked(const DatabaseName& dbName, BSONObj cmd) const;
+
     ExecutorFuture<BatchedCommandResponse> _runCRUDOp(const BatchedCommandRequest& cmd,
                                                       std::vector<StmtId> stmtIds) const;
+
+    ExecutorFuture<BulkWriteCommandReply> _runCRUDOp(const BulkWriteCommandRequest& cmd) const;
 
     ExecutorFuture<std::vector<BSONObj>> _exhaustiveFind(const FindCommandRequest& cmd) const;
 
@@ -583,7 +613,7 @@ public:
      *
      * TODO SERVER-65840: Allow returning a SemiFuture with any type.
      */
-    SemiFuture<CommitResult> run(OperationContext* opCtx, Callback callback) noexcept;
+    SemiFuture<CommitResult> run(Callback callback) noexcept;
 
     /**
      * Returns the latest operationTime returned by a command in this transaction.
@@ -593,10 +623,15 @@ public:
     }
 
     /**
-     * If the transaction needs to be cleaned up, i.e. aborted, this will schedule the necessary
-     * work. Callers can wait for cleanup by waiting on the returned future.
+     * Returns if the transaction needs to be cleaned up, i.e. aborted.
      */
-    SemiFuture<void> cleanUpIfNecessary();
+    bool needsCleanup();
+
+    /**
+     * Schedules the necessary work to clean up the transacton, assuming it needs cleanup. Callers
+     * can wait for cleanup by waiting on the returned future.
+     */
+    SemiFuture<void> cleanUp();
 
 private:
     // Helper methods for running a transaction.

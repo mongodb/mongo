@@ -1,6 +1,6 @@
 // Tests that $$USER_ROLES works as expected in a find command when the array returned by
 // $$USER_ROLES is empty and when mongod was started with auth disabled.
-// @tags: [featureFlagUserRoles, requires_fcv_70]
+// @tags: [requires_fcv_70]
 
 (function() {
 "use strict";

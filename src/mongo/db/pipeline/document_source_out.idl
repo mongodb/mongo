@@ -46,17 +46,17 @@ structs:
                 description: "Target collection name to write documents from $out to."
                 type: string
                 optional: false
-                query_shape_anonymize: true
+                query_shape: anonymize
             db:
                 description: "Target database name to write documents from $out to."
                 type: string 
                 optional: false
-                query_shape_anonymize: true
+                query_shape: anonymize
             timeseries:
                 cpp_name: timeseries
                 description: "If set, the aggregation stage will use these options to create or 
                              replace a time-series collection in the given namespace."
                 type: TimeseriesOptions
                 optional: true
-                query_shape_literal: true
+                query_shape: literal
 

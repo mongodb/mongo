@@ -67,11 +67,13 @@ static constexpr long long kDefaultBatchSize = 101;
  * then 'explainVerbosity' contains this information. In this case, 'cmdObj' may not itself
  * contain the explain specifier. Otherwise, 'explainVerbosity' should be boost::none.
  */
-AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      NamespaceString nss,
-                                      const BSONObj& cmdObj,
-                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict);
+AggregateCommandRequest parseFromBSON(
+    OperationContext* opCtx,
+    NamespaceString nss,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict,
+    const SerializationContext& serializationContext = SerializationContext());
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     NamespaceString nss,
@@ -83,11 +85,13 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
  * Convenience overload which constructs the request's NamespaceString from the given database
  * name and command object.
  */
-AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      const DatabaseName& dbName,
-                                      const BSONObj& cmdObj,
-                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict);
+AggregateCommandRequest parseFromBSON(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict,
+    const SerializationContext& serializationContext = SerializationContext());
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const DatabaseName& dbName,

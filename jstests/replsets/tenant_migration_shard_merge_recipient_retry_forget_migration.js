@@ -15,7 +15,8 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     getCertificateAndPrivateKey,
-    isShardMergeEnabled
+    isShardMergeEnabled,
+    kProtocolShardMerge,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
@@ -48,20 +49,17 @@ const collName = "coll";
 // the state doc has been garbage collected.
 assert.commandWorked(recipientPrimary.getDB(dbName)[collName].insert({_id: 1}));
 
-function runRecipientForgetMigration(host, {
-    migrationIdString,
-    donorConnectionString,
-    tenantIds,
-    readPreference,
-    recipientCertificateForDonor
-}) {
+function runRecipientForgetMigration(
+    host,
+    {migrationIdString, donorConnectionString, tenantIds, recipientCertificateForDonor},
+    protocol) {
     const db = new Mongo(host);
     return db.adminCommand({
         recipientForgetMigration: 1,
         migrationId: UUID(migrationIdString),
         donorConnectionString,
         tenantIds: eval(tenantIds),
-        protocol: "shard merge",
+        protocol,
         decision: "committed",
         readPreference: {mode: "primary"},
         recipientCertificateForDonor
@@ -72,12 +70,15 @@ const fp = configureFailPoint(
     recipientPrimary, "fpBeforeMarkingStateDocAsGarbageCollectable", {action: "hang"});
 
 const recipientForgetMigrationThread =
-    new Thread(runRecipientForgetMigration, recipientPrimary.host, {
-        migrationIdString: extractUUIDFromObject(migrationId),
-        donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-        tenantIds: tojson([tenantId]),
-        recipientCertificateForDonor
-    });
+    new Thread(runRecipientForgetMigration,
+               recipientPrimary.host,
+               {
+                   migrationIdString: extractUUIDFromObject(migrationId),
+                   donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+                   tenantIds: tojson([tenantId]),
+                   recipientCertificateForDonor
+               },
+               kProtocolShardMerge);
 
 // Run a delayed/retried recipientForgetMigration command after the state doc has been deleted.
 recipientForgetMigrationThread.start();
@@ -114,12 +115,15 @@ assert.eq(1, newRecipientPrimary.getDB(dbName)[collName].find().itcount());
 
 // Test that we can retry the recipientForgetMigration on the new primary.
 newPrimaryFp.off();
-assert.commandWorked(runRecipientForgetMigration(newRecipientPrimary.host, {
-    migrationIdString: extractUUIDFromObject(migrationId),
-    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-    tenantIds: tojson([tenantId]),
-    recipientCertificateForDonor
-}));
+assert.commandWorked(runRecipientForgetMigration(
+    newRecipientPrimary.host,
+    {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+        tenantIds: tojson([tenantId]),
+        recipientCertificateForDonor
+    },
+    kProtocolShardMerge));
 
 currOp = assert
              .commandWorked(

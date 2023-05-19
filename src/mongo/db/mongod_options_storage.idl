@@ -83,20 +83,22 @@ configs:
         arg_vartype: Switch
         hidden: true
 
+    # This config has a setParameter alias in storage_paramaters.idl. To resolve the conflict, the
+    # default is encoded the StorageGlobalParams.
     'storage.syncPeriodSecs':
         description: 'Seconds between disk syncs'
         short_name: syncdelay
         arg_vartype: Double
-        default: 60.0
         validator:
             gte: 0.0
             lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
 
+    # This config has a setParameter alias in storage_paramaters.idl. To resolve the conflict, the
+    # default is encoded the StorageGlobalParams.
     'storage.journal.commitIntervalMs':
         description: 'how often to group/batch commit (ms)'
         short_name: 'journalCommitInterval'
         arg_vartype: Int
-        default: 100
         validator:
             gte: 1
             lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }

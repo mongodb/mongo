@@ -38,7 +38,7 @@ Based on the above, as it stands, different containers on different nodes are au
 ### Synchronisation
 The most important requirement of any sharded feature is that it scales linearly with the size of the data or the workload. 
 
-In order to scale, sharding utilises "optimistic" distributed synchronisation protocols to avoid creating nodes which are a bottleneck (i.e., the CSRS). One of these protocols, named [shard versioning](TODO), allows the routers to use cached information to send queries to one or more shards, and only read from the CSRS if the state of the world changes (e.g. chunk migration).
+In order to scale, sharding utilises "optimistic" distributed synchronisation protocols to avoid creating nodes which are a bottleneck (i.e., the CSRS). One of these protocols, named [shard versioning](README_versioning_protocols.md), allows the routers to use cached information to send queries to one or more shards, and only read from the CSRS if the state of the world changes (e.g. chunk migration).
 
 The main goal of these protocols is to maintain certain causal relationships between the different catalog containers, where *routers* operate on cached information and rely on the *shards* to "correct" them if the data is no longer where the router thinks it is.
 

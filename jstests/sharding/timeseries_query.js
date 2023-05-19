@@ -142,7 +142,7 @@ function runQuery(
 
     // Split the chunks such that primary shard has chunk: [MinKey, 2020-01-01) and other shard has
     // chunk [2020-01-01, MaxKey].
-    splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
+    let splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
     assert.commandWorked(
         sDB.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
 
@@ -475,7 +475,7 @@ function runQuery(
         timeseries: {timeField, metaField}
     }));
 
-    splitPoint = {'meta.prefix': 0, 'meta.suffix': 0};
+    let splitPoint = {'meta.prefix': 0, 'meta.suffix': 0};
     assert.commandWorked(
         sDB.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
 

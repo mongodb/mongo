@@ -359,7 +359,7 @@ protected:
                 : kNoSpecialBehavior;
             auto& done = threadPFs[i].promise;
             threads.emplace_back(
-                [=, &storage, specialBehavior = std::move(specialBehavior), &done] {
+                [=, this, &storage, specialBehavior = std::move(specialBehavior), &done] {
                     performRandomOperations(
                         storage, kIterations, kRemovalOdds, seed, specialBehavior);
                     done.emplaceValue();

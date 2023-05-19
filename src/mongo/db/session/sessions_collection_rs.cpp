@@ -86,7 +86,7 @@ bool SessionsCollectionRS::_isStandaloneOrPrimary(const NamespaceString& ns,
 
     auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
 
-    return coord->canAcceptWritesForDatabase(opCtx, ns.db());
+    return coord->canAcceptWritesForDatabase(opCtx, ns.dbName());
 }
 
 template <typename LocalCallback, typename RemoteCallback>

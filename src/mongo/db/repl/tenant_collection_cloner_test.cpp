@@ -93,7 +93,8 @@ public:
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
-                   bool defaultFromMigrate) final {
+                   bool defaultFromMigrate,
+                   InsertsOpStateAccumulator* opAccumulator = nullptr) final {
         if (coll->ns() == nssToCapture) {
             numDocsInserted += std::distance(begin, end);
         }

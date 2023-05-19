@@ -1,6 +1,6 @@
 // multiple geo clauses with $or
 
-t = db.geoor;
+let t = db.geoor;
 
 t.drop();
 

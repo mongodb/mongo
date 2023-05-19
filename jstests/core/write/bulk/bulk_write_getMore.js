@@ -14,8 +14,6 @@
  *   requires_getmore,
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,
- *   # Command is not yet compatible with tenant migration.
- *   tenant_migration_incompatible,
  *   # TODO SERVER-52419 Remove this tag.
  *   featureFlagBulkWriteCommand,
  * ]

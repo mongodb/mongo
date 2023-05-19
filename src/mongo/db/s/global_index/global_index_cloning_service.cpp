@@ -471,7 +471,7 @@ void GlobalIndexCloningService::CloningStateMachine::_ensureCollection(Operation
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // Create the destination collection if necessary.
-    writeConflictRetry(opCtx, "CloningStateMachine::_ensureCollection", nss.toString(), [&] {
+    writeConflictRetry(opCtx, "CloningStateMachine::_ensureCollection", nss, [&] {
         const Collection* coll =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         if (coll) {

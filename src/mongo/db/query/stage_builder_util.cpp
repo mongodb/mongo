@@ -46,7 +46,6 @@ std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
     // queries that disallow extensions, can be properly executed. If the query does not have
     // $text/$where context (and $text/$where are allowed), then no attempt should be made to
     // execute the query.
-    invariant(!cq.canHaveNoopMatchNodes());
     invariant(solution.root());
     invariant(ws);
     auto builder = std::make_unique<ClassicStageBuilder>(opCtx, collection, cq, solution, ws);
@@ -63,7 +62,6 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
     // queries that disallow extensions, can be properly executed. If the query does not have
     // $text/$where context (and $text/$where are allowed), then no attempt should be made to
     // execute the query.
-    invariant(!cq.canHaveNoopMatchNodes());
     invariant(solution.root());
 
     auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(yieldPolicy);

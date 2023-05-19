@@ -45,7 +45,7 @@ function getTelemetry(conn) {
     const result = conn.adminCommand({
         aggregate: 1,
         pipeline: [
-            {$telemetry: {}},
+            {$queryStats: {}},
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
             {$match: {"key.applicationName": kApplicationName}}
@@ -58,20 +58,19 @@ function getTelemetry(conn) {
 
 function getTelemetryRedacted(
     conn,
-    redactIdentifiers = true,
-    redactionKey = BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")) {
-    // Hashed application name is generated using the default redactionKey argument.
-    const kApplicationName = "T1iwlAqhXYroi7HTycmBJvWZSETwKXnaNa5akM4q0H4=";
-    // Filter out agg queries, including $telemetry.
-    const match = {$match: {"key.find": {$exists: true}, "key.applicationName": kApplicationName}};
-    if (!redactIdentifiers) {
-        match.$match["key.applicationName"] = "MongoDB Shell";
-    }
+    applyHmacToIdentifiers = true,
+    hmacKey = BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")) {
+    // Hashed application name is generated using the default hmacKey argument.
+    const kApplicationName = "MongoDB Shell";
+    // Filter out agg queries, including $queryStats.
+    const match = {
+        $match: {"key.queryShape.command": "find", "key.applicationName": kApplicationName}
+    };
 
     const result = conn.adminCommand({
         aggregate: 1,
         pipeline: [
-            {$telemetry: {redactIdentifiers: redactIdentifiers, redactionKey: redactionKey}},
+            {$queryStats: {applyHmacToIdentifiers: applyHmacToIdentifiers, hmacKey: hmacKey}},
             match,
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},

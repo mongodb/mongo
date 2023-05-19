@@ -10,6 +10,7 @@
  *   assumes_no_implicit_index_creation
  * ]
  */
+load("jstests/libs/fixture_helpers.js");
 
 (function() {
 'use strict';
@@ -29,10 +30,7 @@ if (uuid == null) {
 }
 
 // No support for UUIDs on mongos.
-const hello = db.runCommand("hello");
-assert.commandWorked(hello);
-const isMongos = (hello.msg === "isdbgrid");
-if (isMongos) {
+if (FixtureHelpers.isMongos(db)) {
     return;
 }
 

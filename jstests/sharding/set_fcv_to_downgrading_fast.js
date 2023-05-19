@@ -3,12 +3,11 @@
  * seconds).
  *
  * Config shard incompatible because we do not currently allow downgrading FCV with a catalog
- * shard. TODO SERVER-73279: Enable in config shard mode when it supports FCV downgrade.
+ * shard.
  * @tags: [
  *   requires_fcv_70,
  *   multiversion_incompatible,
  *   does_not_support_stepdowns,
- *   config_shard_incompatible,
  * ]
  */
 (function() {

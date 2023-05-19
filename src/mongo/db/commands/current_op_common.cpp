@@ -110,9 +110,9 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     pipeline.push_back(groupBuilder.obj());
 
     // Pipeline is complete; create an AggregateCommandRequest for $currentOp.
-    AggregateCommandRequest request(
-        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(dbName.tenantId(), "admin")),
-        std::move(pipeline));
+    AggregateCommandRequest request(NamespaceString::makeCollectionlessAggregateNSS(
+                                        DatabaseNameUtil::deserialize(dbName.tenantId(), "admin")),
+                                    std::move(pipeline));
 
     // Run the pipeline and obtain a CursorResponse.
     auto aggResults = uassertStatusOK(runAggregation(opCtx, request));

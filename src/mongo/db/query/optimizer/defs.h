@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <limits>
 #include <set>
 #include <sstream>
 #include <string>
@@ -193,12 +194,16 @@ private:
 struct SelectivityTag {
     // Selectivity does not have units, it is a simple ratio.
     static constexpr bool kUnitless = true;
+    static constexpr double kMaxValue = 1.0;
+    static constexpr double kMinValue = 0.0;
 };
 using SelectivityType = StrongDoubleAlias<SelectivityTag>;
 
 struct CETag {
     // Cardinality has units: it is measured in documents.
     static constexpr bool kUnitless = false;
+    static constexpr double kMaxValue = std::numeric_limits<double>::max();
+    static constexpr double kMinValue = 0.0;
 };
 using CEType = StrongDoubleAlias<CETag>;
 

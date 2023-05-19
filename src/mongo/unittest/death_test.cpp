@@ -52,7 +52,7 @@
 #include <TargetConditionals.h>
 #endif
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if __has_feature(thread_sanitizer)
 #include <sanitizer/common_interface_defs.h>
 #endif
 
@@ -67,7 +67,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
-#if defined(__has_feature)
 #if __has_feature(thread_sanitizer)
 #define TSAN_ENABLED_
 #endif
@@ -77,7 +76,6 @@
 #if __has_feature(memory_sanitizer)
 #define MSAN_ENABLED_
 #endif
-#endif  // __has_feature
 
 namespace mongo {
 namespace unittest {

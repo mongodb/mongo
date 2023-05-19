@@ -109,7 +109,7 @@ IndexDefinition::IndexDefinition(IndexCollationSpec collationSpec,
                                  DistributionAndPaths distributionAndPaths,
                                  PartialSchemaRequirements partialReqMap)
     : IndexDefinition(std::move(collationSpec),
-                      2 /*version*/,
+                      1 /*version*/,
                       0 /*orderingBits*/,
                       isMultiKey,
                       std::move(distributionAndPaths),
@@ -162,20 +162,20 @@ ScanDefinition::ScanDefinition()
                      {} /*nonMultiKeyPathSet*/,
                      {DistributionType::Centralized},
                      true /*exists*/,
-                     {-1.0} /*ce*/) {}
+                     boost::none /*ce*/) {}
 
 ScanDefinition::ScanDefinition(ScanDefOptions options,
                                opt::unordered_map<std::string, IndexDefinition> indexDefs,
                                MultikeynessTrie multikeynessTrie,
                                DistributionAndPaths distributionAndPaths,
                                const bool exists,
-                               const CEType ce)
+                               boost::optional<CEType> ce)
     : _options(std::move(options)),
       _distributionAndPaths(std::move(distributionAndPaths)),
       _indexDefs(std::move(indexDefs)),
       _multikeynessTrie(std::move(multikeynessTrie)),
       _exists(exists),
-      _ce(ce) {}
+      _ce(std::move(ce)) {}
 
 const ScanDefOptions& ScanDefinition::getOptionsMap() const {
     return _options;
@@ -201,7 +201,7 @@ bool ScanDefinition::exists() const {
     return _exists;
 }
 
-CEType ScanDefinition::getCE() const {
+const boost::optional<CEType>& ScanDefinition::getCE() const {
     return _ce;
 }
 

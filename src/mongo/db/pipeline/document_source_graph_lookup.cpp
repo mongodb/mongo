@@ -607,7 +607,7 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     }
 
     if (_additionalFilter) {
-        if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+        if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
             auto matchExpr =
                 uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
             spec["restrictSearchWithMatch"] = Value(matchExpr->serialize(opts));

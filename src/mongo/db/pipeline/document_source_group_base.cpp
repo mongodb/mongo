@@ -548,10 +548,10 @@ void DocumentSourceGroupBase::processDocument(const Value& id, const Document& r
 
     if (kDebugBuild && !pExpCtx->opCtx->readOnly()) {
         // In debug mode, spill every time we have a duplicate id to stress merge logic.
-        if (!inserted &&                      // is a dup
-            !pExpCtx->inMongos &&             // can't spill to disk in mongos
-            !_memoryTracker._allowDiskUse &&  // don't change behavior when testing external sort
-            _sortedFiles.size() < 20) {       // don't open too many FDs
+        if (!inserted &&                     // is a dup
+            !pExpCtx->inMongos &&            // can't spill to disk in mongos
+            _memoryTracker._allowDiskUse &&  // never spill when disk use is explicitly prohibited
+            _sortedFiles.size() < 20) {      // don't open too many FDs
             spill();
         }
     }

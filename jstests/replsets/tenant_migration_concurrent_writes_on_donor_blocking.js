@@ -155,8 +155,7 @@ function runTestsAfterMigrationCommitted() {
 
 setupTestsBeforeMigration();
 
-assert.commandWorked(
-    tenantMigrationTest.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 // Run the command after the migration enters the blocking state.
 let blockFp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");

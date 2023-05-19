@@ -26,6 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
+
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/sdam/sdam.h"

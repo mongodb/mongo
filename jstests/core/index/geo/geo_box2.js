@@ -1,9 +1,9 @@
-t = db.geo_box2;
+let t = db.geo_box2;
 
 t.drop();
 
-for (i = 1; i < 10; i++) {
-    for (j = 1; j < 10; j++) {
+for (let i = 1; i < 10; i++) {
+    for (let j = 1; j < 10; j++) {
         t.insert({loc: [i, j]});
     }
 }

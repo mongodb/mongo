@@ -52,7 +52,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -91,6 +91,7 @@
 #include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_options.h"
@@ -516,20 +517,20 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
         LOGV2_FATAL_NOTRACE(
             28545,
             "Locally stored replica set configuration does not parse; See "
-            "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
-            "for information on how to recover from this. Got \"{error}\" while parsing "
+            "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+            "for more information about replica set reconfig. Got \"{error}\" while parsing "
             "{config}",
             "Locally stored replica set configuration does not parse; See "
-            "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
-            "for information on how to recover from this",
+            "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+            "for more information about replica set reconfig",
             "error"_attr = status,
             "config"_attr = cfg.getValue());
     }
 
     LOGV2(4280504, "Cleaning up any partially applied oplog batches & reading last op from oplog");
     // Read the last op from the oplog after cleaning up any partially applied batches.
-    const auto stableTimestamp = boost::none;
-    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
+    auto stableTimestamp =
+        _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, boost::none);
     LOGV2(4280505,
           "Creating any necessary TenantMigrationAccessBlockers for unfinished migrations");
 
@@ -542,7 +543,9 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
     ServerlessOperationLockRegistry::recoverLocks(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
-    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
+    reconstructPreparedTransactions(opCtx,
+                                    stableTimestamp ? OplogApplication::Mode::kStableRecovering
+                                                    : OplogApplication::Mode::kUnstableRecovering);
 
     const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
 
@@ -550,7 +553,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
     auto handle =
-        _replExecutor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {
+        _replExecutor->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& args) {
             _finishLoadLocalConfig(args, localConfig, lastOpTimeAndWallTimeResult, lastVote);
         });
     if (handle == ErrorCodes::ShutdownInProgress) {
@@ -607,12 +610,12 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         } else {
             LOGV2_ERROR(21415,
                         "Locally stored replica set configuration is invalid; See "
-                        "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config"
-                        " for information on how to recover from this. Got \"{error}\" "
+                        "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+                        "for more information about replica set reconfig. Got \"{error}\" "
                         "while validating {localConfig}",
                         "Locally stored replica set configuration is invalid; See "
-                        "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config"
-                        " for information on how to recover from this",
+                        "https://www.mongodb.com/docs/manual/reference/method/rs.reconfig/ "
+                        "for more information about replica set reconfig",
                         "error"_attr = myIndex.getStatus(),
                         "localConfig"_attr = localConfig.toBSON());
             fassertFailedNoTrace(28544);
@@ -814,15 +817,16 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
                       "error"_attr = opTimeStatus.getStatus());
                 lock.unlock();
                 clearSyncSourceDenylist();
-                _scheduleWorkAt(_replExecutor->now(),
-                                [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-                                    _startInitialSync(
-                                        cc().makeOperationContext().get(),
-                                        [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
-                                            _initialSyncerCompletionFunction(opTimeStatus);
-                                        },
-                                        true /* fallbackToLogical */);
-                                });
+                _scheduleWorkAt(
+                    _replExecutor->now(),
+                    [=, this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                        _startInitialSync(
+                            cc().makeOperationContext().get(),
+                            [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
+                                _initialSyncerCompletionFunction(opTimeStatus);
+                            },
+                            true /* fallbackToLogical */);
+                    });
                 return;
             } else {
                 LOGV2_ERROR(21416,
@@ -2629,7 +2633,7 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
         }
 
         // Dump all locks to identify which thread(s) are holding RSTL.
-        getGlobalLockManager()->dump();
+        LockManager::get(opCtx)->dump();
 
         auto lockerInfo = opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase());
         BSONObjBuilder lockRep;
@@ -2928,7 +2932,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     updateMemberState();
 
     // Schedule work to (potentially) step back up once the stepdown period has ended.
-    _scheduleWorkAt(stepDownUntil, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+    _scheduleWorkAt(stepDownUntil, [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
         _handleTimePassing(cbData);
     });
 
@@ -3008,14 +3012,14 @@ bool ReplicationCoordinatorImpl::isWritablePrimaryForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(OperationContext* opCtx,
-                                                            StringData dbName) {
+                                                            const DatabaseName& dbName) {
     // The answer isn't meaningful unless we hold the ReplicationStateTransitionLock.
     invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
-                                                                   StringData dbName) {
+                                                                   const DatabaseName& dbName) {
     // _canAcceptNonLocalWrites is always true for standalone nodes, and adjusted based on
     // primary+drain state in replica sets.
     //
@@ -3024,7 +3028,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationCont
     if (_readWriteAbility->canAcceptNonLocalWrites_UNSAFE() || alwaysAllowNonLocalWrites(opCtx)) {
         return true;
     }
-    if (dbName == DatabaseName::kLocal.db()) {
+    if (dbName == DatabaseName::kLocal) {
         return true;
     }
     return false;
@@ -3069,7 +3073,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                                            const NamespaceStringOrUUID& nsOrUUID) {
-    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.dbName().db());
+    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.dbName());
 
     if (!canWriteToDB && !isSystemDotProfile(opCtx, nsOrUUID)) {
         return false;
@@ -3533,7 +3537,7 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* opCt
 }
 
 Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
-    auto result = [=]() {
+    auto result = [=, this]() {
         stdx::lock_guard<Latch> lock(_mutex);
         return _topCoord->prepareFreezeResponse(_replExecutor->now(), secs, resultObj);
     }();
@@ -3765,7 +3769,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
     _setConfigState_inlock(kConfigReconfiguring);
     auto configStateGuard =
-        ScopeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
+        ScopeGuard([&] { lockAndCall(&lk, [=, this] { _setConfigState_inlock(kConfigSteady); }); });
 
     ReplSetConfig oldConfig = _rsConfig;
     int myIndex = _selfIndex;
@@ -4314,7 +4318,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     _setConfigState_inlock(kConfigInitiating);
 
     ScopeGuard configStateGuard = [&] {
-        lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigUninitialized); });
+        lockAndCall(&lk, [=, this] { _setConfigState_inlock(kConfigUninitialized); });
     };
 
     // When writing our first oplog entry below, disable advancement of the stable timestamp so that
@@ -4668,7 +4672,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     if (_memberState.removed() && !newState.arbiter()) {
         LOGV2(5268000, "Scheduling a task to begin or continue replication");
         _scheduleWorkAt(_replExecutor->now(),
-                        [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                        [=, this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
                             _externalState->startThreads();
                             auto opCtx = cc().makeOperationContext();
                             _startDataReplication(opCtx.get());
@@ -5345,7 +5349,7 @@ void ReplicationCoordinatorImpl::_undenylistSyncSource(
 void ReplicationCoordinatorImpl::denylistSyncSource(const HostAndPort& host, Date_t until) {
     stdx::lock_guard<Latch> lock(_mutex);
     _topCoord->denylistSyncSource(host, until);
-    _scheduleWorkAt(until, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+    _scheduleWorkAt(until, [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
         _undenylistSyncSource(cbData, host);
     });
 }

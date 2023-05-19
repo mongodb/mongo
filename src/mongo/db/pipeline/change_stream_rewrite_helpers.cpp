@@ -57,7 +57,7 @@ std::unique_ptr<PathMatchExpression> cloneWithSubstitution(
     const PathMatchExpression* predicate, const StringMap<std::string>& renameList) {
     auto clonedPred = std::unique_ptr<PathMatchExpression>(
         static_cast<PathMatchExpression*>(predicate->clone().release()));
-    clonedPred->applyRename(renameList);
+    tassert(7585302, "Failed to rename", clonedPred->applyRename(renameList));
     return clonedPred;
 }
 boost::intrusive_ptr<ExpressionFieldPath> cloneWithSubstitution(

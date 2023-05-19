@@ -79,14 +79,9 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '
 
     let specialColls = [
         'config.foo',             // all collections in config db except config.system.sessions
+        'admin.foo',              // all collections is admin db can't be sharded
         `${kDbName}.system.foo`,  // any custom system collection in any db
     ];
-
-    // TODO BACKPORT-15485 always enable check on admin collections once the backport is completed
-    if (!jsTest.options().shardMixedBinVersions &&
-        !jsTest.options().useRandomBinVersionsWithinReplicaSet) {
-        specialColls.push('admin.foo');  // all collections in admin db can't be sharded
-    }
 
     specialColls.forEach(collName => {
         assert.commandFailedWithCode(

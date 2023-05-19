@@ -2,7 +2,7 @@
 // should handle numerical extremes
 // such as Number.MAX_VALUE and Infinity
 
-t = db.indexboundsnumberedgecases;
+let t = db.indexboundsnumberedgecases;
 
 t.drop();
 

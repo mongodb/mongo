@@ -114,7 +114,7 @@ function runTest(sorts, filters, verifyCallback) {
             // Check that there are no duplicates.
             let ids = new Set();
             for (let doc of res) {
-                assert(!ids.has(doc._id), () => "Duplicate _id: " + tojson(_id));
+                assert(!ids.has(doc._id), () => "Duplicate _id: " + tojson(doc._id));
                 ids.add(doc._id);
             }
         }

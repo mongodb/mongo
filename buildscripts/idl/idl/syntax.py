@@ -493,8 +493,7 @@ class Field(common.SourceLocation):
         self.serialize_op_msg_request_only = False  # type: bool
         self.constructed = False  # type: bool
 
-        self.query_shape_literal = None  # type: Optional[bool]
-        self.query_shape_anonymize = None  # type: Optional[bool]
+        self.query_shape = None  # type: Optional[str]
 
         self.hidden = False  # type: bool
 
@@ -557,6 +556,8 @@ class Struct(common.SourceLocation):
         self.cpp_validator_func = None  # type: str
         self.is_command_reply = False  # type: bool
         self.is_generic_cmd_list = None  # type: Optional[str]
+        # pylint: disable=invalid-name
+        self.unsafe_dangerous_disable_extra_field_duplicate_checks = None  # type: bool
 
         # Command only property
         self.cpp_name = None  # type: str
@@ -884,6 +885,8 @@ class FeatureFlag(common.SourceLocation):
         self.cpp_varname = None  # type: str
         self.default = None  # type: Expression
         self.version = None  # type: str
+        # pylint: disable=C0103
+        self.shouldBeFCVGated = None  # type: Expression
 
         super(FeatureFlag, self).__init__(file_name, line, column)
 

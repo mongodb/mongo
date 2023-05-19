@@ -38,6 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -84,7 +85,7 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
 
     const auto cmd = cmdBuilder.obj();
 
-    writeConflictRetry(opCtx, "ReshardCollection", NamespaceString::kRsOplogNamespace.ns(), [&] {
+    writeConflictRetry(opCtx, "ReshardCollection", NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork uow(opCtx);
         serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
@@ -163,6 +164,15 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.set_presetReshardedChunks(_doc.get_presetReshardedChunks());
             configsvrReshardCollection.setZones(_doc.getZones());
             configsvrReshardCollection.setNumInitialChunks(_doc.getNumInitialChunks());
+
+            if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, reject shardDistribution parameter",
+                    !_doc.getShardDistribution().has_value());
+            }
+            configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
 
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

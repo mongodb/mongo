@@ -76,6 +76,11 @@ public:
                 str::stream() << "Collection " << nss->toStringForErrorMsg() << " does not exist",
                 _autoColl->getCollection());
 
+        uassert(ErrorCodes::NotWritablePrimary,
+                "No longer primary when trying to acquire active migrate cloner",
+                opCtx->writesAreReplicated() &&
+                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, *nss));
+
         {
             const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, *nss);
@@ -302,7 +307,7 @@ public:
         writeConflictRetry(
             opCtx,
             "Fetching session related oplogs for migration",
-            NamespaceString::kRsOplogNamespace.ns(),
+            NamespaceString::kRsOplogNamespace,
             [&]() {
                 AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, false);
                 opTime = autoCloner.getCloner()->nextSessionMigrationBatch(opCtx, arrBuilder);

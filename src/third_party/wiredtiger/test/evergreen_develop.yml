@@ -173,10 +173,14 @@ buildvariants:
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
     make_command: ninja
+  # As these tests run infrequently by the time they fail we may have had 
+  # a lot of prior commits that would also fail for the same test. This is acceptable 
+  # as our infrequent tests aren't tracking critical failures, but we don't want 
+  # to perform stepback as evergreen will run the same test on all of these older commits 
+  # and generate a lot of redundant BFGs.
+  stepback: false
   tasks:
     - name: memory-model-test
       batchtime: 40320 # 28 days
     - name: s-outdated-fixmes
       batchtime: 10080 # 7 days
-    - name: s-string
-      batchtime: 129600 # 90 days

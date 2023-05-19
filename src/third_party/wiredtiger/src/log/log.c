@@ -230,6 +230,7 @@ __log_fsync_dir(WT_SESSION_IMPL *session, WT_LSN *min_lsn, const char *method)
     uint64_t fsync_duration_usecs, time_start, time_stop;
 
     log = S2C(session)->log;
+    WT_ASSERT_SPINLOCK_OWNED(session, &log->log_sync_lock);
 
     if (log->sync_dir_lsn.l.file < min_lsn->l.file) {
         WT_ASSERT(session, log->log_dir_fh != NULL);
@@ -263,6 +264,7 @@ __log_fsync_file(WT_SESSION_IMPL *session, WT_LSN *min_lsn, const char *method, 
 
     log = S2C(session)->log;
     log_fh = NULL;
+    WT_ASSERT_SPINLOCK_OWNED(session, &log->log_sync_lock);
 
     if (__wt_log_cmp(&log->sync_lsn, min_lsn) < 0) {
         /*
@@ -1080,12 +1082,10 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
     uint32_t from_num;
     u_int logcount;
     char **logfiles;
-    bool locked;
 
     conn = S2C(session);
     log = conn->log;
     logfiles = NULL;
-    locked = false;
 
     /*
      * If there are no pre-allocated files, return WT_NOTFOUND.
@@ -1102,7 +1102,6 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
     WT_ERR(__wt_log_filename(session, from_num, WT_LOG_PREPNAME, from_path));
     WT_ERR(__wt_log_filename(session, to_num, WT_LOG_FILENAME, to_path));
     __wt_spin_lock(session, &log->log_fs_lock);
-    locked = true;
     __wt_verbose(session, WT_VERB_LOG, "log_alloc_prealloc: rename log %s to %s",
       (const char *)from_path->data, (const char *)to_path->data);
     WT_STAT_CONN_INCR(session, log_prealloc_used);
@@ -1115,8 +1114,7 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 err:
     __wt_scr_free(session, &from_path);
     __wt_scr_free(session, &to_path);
-    if (locked)
-        __wt_spin_unlock(session, &log->log_fs_lock);
+    __wt_spin_unlock_if_owned(session, &log->log_fs_lock);
     WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
     return (ret);
 }
@@ -1893,11 +1891,9 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
     WT_LOG *log;
     WT_LSN sync_lsn;
     int64_t release_buffered, release_bytes;
-    bool locked;
 
     conn = S2C(session);
     log = conn->log;
-    locked = false;
     if (freep != NULL)
         *freep = 1;
     release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
@@ -1983,7 +1979,6 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
             __wt_cond_wait(session, log->log_sync_cond, 10 * WT_THOUSAND, NULL);
             continue;
         }
-        locked = true;
 
         /*
          * Record the current end of our update after the lock. That is how far our calls can
@@ -2007,12 +2002,10 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
          * Clear the flags before leaving the loop.
          */
         F_CLR_ATOMIC_16(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR);
-        locked = false;
         __wt_spin_unlock(session, &log->log_sync_lock);
     }
 err:
-    if (locked)
-        __wt_spin_unlock(session, &log->log_sync_lock);
+    __wt_spin_unlock_if_owned(session, &log->log_sync_lock);
     if (ret != 0 && slot->slot_error == 0)
         slot->slot_error = ret;
     return (ret);

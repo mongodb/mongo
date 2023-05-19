@@ -228,7 +228,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
                            StringData message,
                            const TypeErasedAttributeStorage& attrs,
                            LogTag tags,
-                           const TenantId* tenant,
+                           const std::string& tenant,
                            LogTruncation truncation) const {
     namespace c = constants;
     static constexpr auto kFmt = JsonStringFormat::ExtendedRelaxedV2_0_0;
@@ -339,8 +339,8 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         field(top, c::kSeverityFieldName, padNextComma(top, 5, quote(strFn(severityString))));
         field(top, c::kComponentFieldName, padNextComma(top, 11, quote(strFn(componentString))));
         field(top, c::kIdFieldName, padNextComma(top, 8, intFn(id)));
-        if (tenant) {
-            field(top, c::kTenantFieldName, quote(strFn(tenant->toString())));
+        if (!tenant.empty()) {
+            field(top, c::kTenantFieldName, quote(strFn(tenant)));
         }
         field(top, c::kContextFieldName, quote(strFn(context)));
         field(top, c::kMessageFieldName, quote(escFn(message)));
@@ -366,6 +366,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
 
     fmt::memory_buffer buffer;
 
+    const auto& tenant = extract<std::string>(attributes::tenant(), rec);
     format(buffer,
            extract<LogSeverity>(attributes::severity(), rec).get(),
            extract<LogComponent>(attributes::component(), rec).get(),
@@ -375,7 +376,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
            extract<StringData>(attributes::message(), rec).get(),
            extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get(),
            extract<LogTag>(attributes::tags(), rec).get(),
-           extract<TenantId>(attributes::tenant(), rec).get_ptr(),
+           !tenant.empty() ? tenant.get() : std::string(),
            extract<LogTruncation>(attributes::truncation(), rec).get());
 
     // Write final JSON object to output stream

@@ -2,7 +2,7 @@
 // Utilities for testing chunk manipulation: moveChunk, mergeChunks, etc.
 //
 
-load('./jstests/libs/test_background_ops.js');
+load('jstests/libs/test_background_ops.js');
 
 //
 // Start a background moveChunk.

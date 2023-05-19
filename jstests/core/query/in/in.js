@@ -1,5 +1,5 @@
 
-t = db.in1;
+let t = db.in1;
 t.drop();
 
 t.save({a: 1});

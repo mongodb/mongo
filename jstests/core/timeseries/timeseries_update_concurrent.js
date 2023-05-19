@@ -118,10 +118,12 @@ validateUpdateIndex(
 
 // Attempt to update a document in a collection that has been replaced with a new time-series
 // collection with a different metaField.
-validateUpdateIndex(
-    docs,
-    [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
-    testCases.REPLACE_METAFIELD,
-    ErrorCodes.InvalidOptions,
-    "meta");
+if (!TimeseriesTest.arbitraryUpdatesEnabled(db)) {
+    validateUpdateIndex(
+        docs,
+        [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
+        testCases.REPLACE_METAFIELD,
+        ErrorCodes.InvalidOptions,
+        "meta");
+}
 })();

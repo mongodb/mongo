@@ -4,7 +4,7 @@
 // required to do
 // exact lookups on the points to get correct results.
 
-t = db.geo_fiddly_box2;
+let t = db.geo_fiddly_box2;
 t.drop();
 
 t.insert({"letter": "S", "position": [-3, 0]});
@@ -17,7 +17,7 @@ t.insert({"letter": "L", "position": [3, 0]});
 t.insert({"letter": "E", "position": [4, 0]});
 
 t.createIndex({position: "2d"});
-result = t.find({"position": {"$within": {"$box": [[-3, -1], [0, 1]]}}});
+let result = t.find({"position": {"$within": {"$box": [[-3, -1], [0, 1]]}}});
 assert.eq(4, result.count());
 
 t.dropIndex({position: "2d"});

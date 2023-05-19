@@ -4,7 +4,7 @@
 load('jstests/selinux/lib/selinux_base_test.js');
 
 class TestDefinition extends SelinuxBaseTest {
-    run() {
+    async run() {
         // On RHEL7 there is no python3, but check_has_tag.py will also work with python2
         const python = (0 == runNonMongoProgram("which", "python3")) ? "python3" : "python2";
 
@@ -42,9 +42,13 @@ class TestDefinition extends SelinuxBaseTest {
                 }
 
                 jsTest.log("Running test: " + t);
-                if (!load(t)) {
+                try {
+                    await import(t);
+                } catch (e) {
+                    print(tojson(e));
                     throw ("failed to load test " + t);
                 }
+
                 jsTest.log("Successful test: " + t);
             }
         }

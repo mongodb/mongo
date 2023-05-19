@@ -480,11 +480,11 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
                 statusWithFilter.isOK());
         auto filter = std::move(statusWithFilter.getValue());
 
-        if (!expression::isOnlyDependentOn(*filter,
-                                           {std::string{timeseries::kBucketMetaFieldName},
-                                            controlMinTimeField,
-                                            controlMaxTimeField,
-                                            idField})) {
+        if (!expression::isOnlyDependentOnConst(*filter,
+                                                {std::string{timeseries::kBucketMetaFieldName},
+                                                 controlMinTimeField,
+                                                 controlMaxTimeField,
+                                                 idField})) {
             // Partial filter expression depends on a non-time, non-metadata field.
             return true;
         }

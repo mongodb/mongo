@@ -116,7 +116,6 @@ selector:
   # collStats is not causally consistent
   - requires_collstats
   - requires_dbstats
-  - requires_datasize
   - requires_sharding
   # Operations in the main test shell aren't guaranteed to be causally consistent with operations
   # performed earlier in a parallel shell if multiple nodes are electable because the latest

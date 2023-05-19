@@ -247,44 +247,46 @@ class ShardSplitFixture(interface.MultiClusterFixture):
         # Reconfig the donor to add the recipient nodes as non-voting members
         donor_client = self._create_client(self.get_donor_rs())
 
-        repl_config = with_naive_retry(lambda: donor_client.admin.command({"replSetGetConfig": 1})[
-            "config"])
-        repl_members = repl_config["members"]
+        def reconfig_add_node_rs(client):
+            repl_config = client.admin.command({"replSetGetConfig": 1})["config"]
+            repl_members = repl_config["members"]
 
-        for recipient_node in recipient_nodes:
-            # It is possible for the reconfig below to fail with a retryable error code like
-            # 'InterruptedDueToReplStateChange'. In these cases, we need to run the reconfig
-            # again, but some or all of the recipient nodes might have already been added to
-            # the member list. Only add recipient nodes which have not yet been added on a
-            # retry.
-            recipient_host = recipient_node.get_internal_connection_string()
-            recipient_entry = {
-                "host": recipient_host, "votes": 0, "priority": 0, "hidden": True,
-                "tags": {recipient_tag_name: str(ObjectId())}
-            }
-            member_exists = False
-            for index, member in enumerate(repl_members):
-                if member["host"] == recipient_host:
-                    repl_members[index] = recipient_entry
-                    member_exists = True
+            for recipient_node in recipient_nodes:
+                # It is possible for the reconfig below to fail with a retryable error code like
+                # 'InterruptedDueToReplStateChange'. In these cases, we need to run the reconfig
+                # again, but some or all of the recipient nodes might have already been added to
+                # the member list. Only add recipient nodes which have not yet been added on a
+                # retry.
+                recipient_host = recipient_node.get_internal_connection_string()
+                recipient_entry = {
+                    "host": recipient_host, "votes": 0, "priority": 0, "hidden": True,
+                    "tags": {recipient_tag_name: str(ObjectId())}
+                }
+                member_exists = False
+                for index, member in enumerate(repl_members):
+                    if member["host"] == recipient_host:
+                        repl_members[index] = recipient_entry
+                        member_exists = True
 
-            if not member_exists:
-                repl_members.append(recipient_entry)
+                if not member_exists:
+                    repl_members.append(recipient_entry)
 
-        # Re-index all members from 0
-        for idx, member in enumerate(repl_members):
-            member["_id"] = idx
+            # Re-index all members from 0
+            for idx, member in enumerate(repl_members):
+                member["_id"] = idx
 
-        # Prepare the new config
-        repl_config["version"] = repl_config["version"] + 1
-        repl_config["members"] = repl_members
+            # Prepare the new config
+            repl_config["version"] = repl_config["version"] + 1
+            repl_config["members"] = repl_members
 
-        self.logger.info(
-            f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}")
-        with_naive_retry(lambda: donor_client.admin.command({
-            "replSetReconfig": repl_config, "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-        }))
+            self.logger.info(
+                f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}")
+            client.admin.command({
+                "replSetReconfig": repl_config,
+                "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+            })
 
+        with_naive_retry(lambda: reconfig_add_node_rs(donor_client))
         # Wait for recipient nodes to become secondaries
         self._await_recipient_nodes()
 
@@ -334,30 +336,37 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             self.fixtures = [donor_rs]
 
         donor_client = self._create_client(self.get_donor_rs())
-        repl_config = with_naive_retry(lambda: donor_client.admin.command({"replSetGetConfig": 1})[
-            "config"])
-        repl_members = [
-            member for member in repl_config["members"]
-            if not 'tags' in member or not recipient_tag_name in member["tags"]
-        ]
 
-        # Re-index all members from 0
-        for idx, member in enumerate(repl_members):
-            member["_id"] = idx
+        def reconfig_rs(client):
+            repl_config = client.admin.command({"replSetGetConfig": 1})["config"]
+            repl_members = [
+                member for member in repl_config["members"]
+                if not 'tags' in member or not recipient_tag_name in member["tags"]
+            ]
 
-        # Prepare the new config
-        repl_config["version"] = repl_config["version"] + 1
-        repl_config["members"] = repl_members
+            if "recipientConfig" in repl_config:
+                del repl_config["recipientConfig"]
+            elif repl_members == repl_config["members"]:
+                # The recipientConfig and recipient nodes have already been cleaned, no need to
+                # reconfig.
+                return
 
-        # It's possible that the recipient config has been removed in a previous remove attempt.
-        if "recipientConfig" in repl_config:
-            del repl_config["recipientConfig"]
+            # Re-index all members from 0
+            for idx, member in enumerate(repl_members):
+                member["_id"] = idx
 
-        self.logger.info(
-            f"Reconfiguring donor '{donor_rs_name}' to remove recipient nodes: {repl_config}")
-        with_naive_retry(lambda: donor_client.admin.command({
-            "replSetReconfig": repl_config, "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-        }))
+            # Prepare the new config
+            repl_config["version"] = repl_config["version"] + 1
+            repl_config["members"] = repl_members
+
+            self.logger.info(
+                f"Reconfiguring donor '{donor_rs_name}' to remove recipient nodes: {repl_config}")
+            donor_client.admin.command({
+                "replSetReconfig": repl_config,
+                "maxTimeMS": self.AWAIT_READY_TIMEOUT_SECS * 60 * 1000
+            })
+
+        with_naive_retry(func=lambda: reconfig_rs(donor_client))
 
         self.logger.info("Tearing down recipient nodes and removing data directories.")
         for recipient_node in reversed(recipient_nodes):

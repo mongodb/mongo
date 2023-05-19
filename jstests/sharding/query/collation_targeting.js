@@ -190,11 +190,10 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
         coll.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
     assert(res.a === "foo" || res.a === "FOO");
 
-    // TODO: SERVER-69925 Implement explain for findAndModify.
-    // assert.throws(function() {
-    //     coll.explain().findAndModify(
-    //         {query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
-    // });
+    explain = coll.explain().findAndModify(
+        {query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
+    assert.commandWorked(explain);
+    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 } else {
     // Sharded findAndModify on strings with non-simple collation should fail, because findAndModify
     // must target a single shard.
@@ -318,9 +317,13 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
     assert.eq(1, writeRes.nRemoved);
     let afterNumDocsMatch = coll.find({a: "foo"}).collation(caseInsensitive).count();
     assert.eq(beforeNumDocsMatch - 1, afterNumDocsMatch);
+
+    explain = coll.explain().remove({a: "foo"}, {justOne: true, collation: caseInsensitive});
+    assert.commandWorked(explain);
+    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
+
     coll.insert(a_foo);
     coll.insert(a_FOO);
-    // TODO: SERVER-69924 Implement explain for deleteOne
 } else {
     // A single remove (justOne: true) must be single-shard or an exact-ID query. A query is
     // exact-ID if it contains an equality on _id and either has the collection default collation or
@@ -421,7 +424,9 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
     writeRes =
         assert.commandWorked(coll.update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
     assert.eq(1, writeRes.nMatched);
-    // TODO: SERVER-69922 Implement explain for updateOne
+    explain = coll.explain().update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive});
+    assert.commandWorked(explain);
+    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 } else {
     // A single (non-multi) update must be single-shard or an exact-ID query. A query is exact-ID if
     // it contains an equality on _id and either has the collection default collation or _id is not

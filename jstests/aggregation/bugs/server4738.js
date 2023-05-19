@@ -1,5 +1,5 @@
 // test to make sure we accept all numeric types for inclusion
-c = db.blah;
+let c = db.blah;
 c.drop();
 c.save({key: 4, v: 3, x: 2});
 

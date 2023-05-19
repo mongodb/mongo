@@ -7,9 +7,8 @@ env = env.Clone()
 env.Library(
     target='batch_write_types',
     source=[
-        'batched_command_request.cpp',
-        'batched_command_response.cpp',
-        'batched_upsert_detail.cpp',
+        'batched_command_request.cpp', 'batched_command_response.cpp', 'batched_upsert_detail.cpp',
+        'bulk_write_command_modifier.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

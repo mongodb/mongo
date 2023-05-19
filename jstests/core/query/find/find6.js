@@ -4,7 +4,7 @@
 //   requires_scripting,
 // ]
 
-t = db.find6;
+let t = db.find6;
 t.drop();
 
 t.save({a: 1});
@@ -16,7 +16,7 @@ assert.eq(1, t.find("function() { return this.b == null; }").itcount(), "C");
 assert.eq(1, t.find("function() { return this.b == null; }").count(), "D");
 
 /* test some stuff with dot array notation */
-q = db.find6a;
+let q = db.find6a;
 q.drop();
 q.insert({"a": [{"0": 1}]});
 q.insert({"a": [{"0": 2}]});

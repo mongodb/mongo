@@ -4,28 +4,28 @@
 //   assumes_no_implicit_index_creation,
 // ]
 
-t = db.in5;
+let t = db.in5;
 
 function go(fn) {
     t.drop();
-    o = {};
+    let o = {};
     o[fn] = {a: 1, b: 2};
     t.insert(o);
 
-    x = {};
+    let x = {};
     x[fn] = {a: 1, b: 2};
     assert.eq(1, t.find(x).itcount(), "A1 - " + fn);
 
-    y = {};
+    let y = {};
     y[fn] = {$in: [{a: 1, b: 2}]};
     assert.eq(1, t.find(y).itcount(), "A2 - " + fn);
 
-    z = {};
+    let z = {};
     z[fn + ".a"] = 1;
     z[fn + ".b"] = {$in: [2]};
     assert.eq(1, t.find(z).itcount(), "A3 - " + fn);  // SERVER-1366
 
-    i = {};
+    let i = {};
     i[fn] = 1;
     t.createIndex(i);
 

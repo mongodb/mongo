@@ -16,7 +16,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 -- OUTPUT:
 [2] project [s3 = getField(s1, "b")] 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: UnionNode with two children ====
 -- INPUT:
@@ -45,11 +45,11 @@ PhysicalScan [{'<root>': scan0}, collName]
     branch0 [s2] 
         [2] project [s3 = getField(s1, "b")] 
         [1] project [s2 = getField(s1, "a")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     branch1 [s5] 
         [5] project [s6 = getField(s4, "b")] 
         [4] project [s5 = getField(s4, "a")] 
-        [3] scan s4 none none none none none [] @"<collUUID>" true false 
+        [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: UnionNode with many children ====
@@ -106,21 +106,21 @@ PhysicalScan [{'<root>': scan0}, collName]
     branch0 [s2] 
         [2] project [s3 = getField(s1, "b")] 
         [1] project [s2 = getField(s1, "a")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     branch1 [s5] 
         [5] project [s6 = getField(s4, "b")] 
         [4] project [s5 = getField(s4, "a")] 
-        [3] scan s4 none none none none none [] @"<collUUID>" true false 
+        [3] scan s4 none none none none none none none [] @"<collUUID>" true false 
     branch2 [s8] 
         [8] project [s9 = getField(s7, "b")] 
         [7] project [s8 = getField(s7, "a")] 
-        [6] scan s7 none none none none none [] @"<collUUID>" true false 
+        [6] scan s7 none none none none none none none [] @"<collUUID>" true false 
     branch3 [s11] 
         [11] project [s12 = getField(s10, "b")] 
         [10] project [s11 = getField(s10, "a")] 
-        [9] scan s10 none none none none none [] @"<collUUID>" true false 
+        [9] scan s10 none none none none none none none [] @"<collUUID>" true false 
     branch4 [s14] 
         [14] project [s15 = getField(s13, "b")] 
         [13] project [s14 = getField(s13, "a")] 
-        [12] scan s13 none none none none none [] @"<collUUID>" true false 
+        [12] scan s13 none none none none none none none [] @"<collUUID>" true false 
 

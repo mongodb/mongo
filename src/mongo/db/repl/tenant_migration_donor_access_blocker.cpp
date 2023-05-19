@@ -135,13 +135,13 @@ Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationC
     MONGO_UNREACHABLE;
 }
 
-SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(OperationContext* opCtx,
-                                                                           StringData command) {
+SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanRunCommandFuture(
+    OperationContext* opCtx, StringData command) {
     // Exclude internal client requests
-    if (tenant_migration_access_blocker::shouldExcludeRead(opCtx)) {
+    if (tenant_migration_access_blocker::shouldExclude(opCtx)) {
         LOGV2_DEBUG(6397500,
                     1,
-                    "Internal tenant read got excluded from the MTAB filtering",
+                    "Internal tenant command got excluded from the MTAB filtering",
                     "migrationId"_attr = getMigrationId(),
                     "opId"_attr = opCtx->getOpID());
         return SharedSemiFuture<void>();
@@ -190,7 +190,7 @@ SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(Opera
 
             return SharedSemiFuture<void>(
                 Status(ErrorCodes::TenantMigrationCommitted,
-                       "Read must be re-routed to the new owner of this tenant"));
+                       "Command must be re-routed to the new owner of this tenant"));
 
         default:
             MONGO_UNREACHABLE;
@@ -218,6 +218,25 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanBuildIndex() {
         case BlockerState::State::kReject:
             return {ErrorCodes::TenantMigrationCommitted,
                     "Index build must be re-routed to the new owner of this tenant"};
+        case BlockerState::State::kAborted:
+            return Status::OK();
+    }
+    MONGO_UNREACHABLE;
+}
+
+Status TenantMigrationDonorAccessBlocker::checkIfCanOpenChangeStream() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    switch (_state.getState()) {
+        case BlockerState::State::kAllow:
+            return Status::OK();
+        case BlockerState::State::kBlockWrites:
+        case BlockerState::State::kBlockWritesAndReads:
+            return {TenantMigrationConflictInfo(getMigrationId(), shared_from_this()),
+                    "Change stream must wait for commit or abort to get a safe start time"};
+        case BlockerState::State::kReject:
+            // At this point checkIfCanReadOrBlock should have blocked this at the command level.
+            return {ErrorCodes::TenantMigrationCommitted,
+                    "Change stream must be resumed on the new owner of this tenant"};
         case BlockerState::State::kAborted:
             return Status::OK();
     }

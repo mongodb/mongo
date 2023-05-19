@@ -2,12 +2,12 @@
 //   requires_getmore,
 // ]
 
-t = db.proj_key1;
+let t = db.proj_key1;
 t.drop();
 
-as = [];
+let as = [];
 
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     as.push({a: i});
     t.insert({a: i, b: i});
 }

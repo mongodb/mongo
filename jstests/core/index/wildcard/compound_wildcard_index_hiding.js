@@ -5,6 +5,7 @@
  * @tags: [
  *   not_allowed_with_security_token,
  *   does_not_support_stepdowns,
+ *   does_not_support_transaction,
  *   featureFlagCompoundWildcardIndexes,
  *   requires_fcv_70,
  * ]
@@ -49,17 +50,6 @@ const cwiList = [
         wildcardProjection: {"front": 1},
     },
 ];
-
-function validateIndex(coll, indexSpec) {
-    const index = findIndex(coll, indexSpec);
-    assert.neq(null, index);
-
-    if (indexSpec.hidden) {
-        assert.eq(true, index.hidden);
-    } else {
-        assert.neq(true, index.hidden);
-    }
-}
 
 function setIndexVisibilityByKeyPattern(collectionName, keyPattern, hidden) {
     assert.commandWorked(db.runCommand({collMod: collectionName, index: {keyPattern, hidden}}));

@@ -4,7 +4,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-t = db.regex6;
+let t = db.regex6;
 t.drop();
 
 t.save({name: "eliot"});

@@ -483,7 +483,7 @@ public:
         // Then, if the numeric (IP address) lookup failed, we fall back to DNS or return the error
         // from the resolver.
         return _resolve(peer, flags | Resolver::numeric_host, enableIPv6)
-            .onError([=](Status) { return _resolve(peer, flags, enableIPv6); })
+            .onError([=, this](Status) { return _resolve(peer, flags, enableIPv6); })
             .getNoThrow();
     }
 
@@ -495,9 +495,8 @@ public:
         // We follow the same numeric -> hostname fallback procedure as the synchronous resolver
         // function for setting resolver flags (see above).
         const auto flags = Resolver::numeric_service;
-        return _asyncResolve(peer, flags | Resolver::numeric_host, enableIPv6).onError([=](Status) {
-            return _asyncResolve(peer, flags, enableIPv6);
-        });
+        return _asyncResolve(peer, flags | Resolver::numeric_host, enableIPv6)
+            .onError([=, this](Status) { return _asyncResolve(peer, flags, enableIPv6); });
     }
 
     void cancel() {
@@ -507,7 +506,7 @@ public:
 private:
     boost::optional<EndpointVector> _checkForUnixSocket(const HostAndPort& peer) {
 #ifndef _WIN32
-        if (str::contains(peer.host(), '/')) {
+        if (isUnixDomainSocket(peer.host())) {
             asio::local::stream_protocol::endpoint ep(peer.host());
             return EndpointVector{WrappedEndpoint(ep)};
         }

@@ -26,7 +26,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] project [s4 = getField(s1, "c")] 
 [2] project [s3 = getField(s1, "b")] 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: GroupByNode multiple outputs with type Complete ====
 -- INPUT:
@@ -62,7 +62,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] project [s4 = getField(s1, "c")] 
 [2] project [s3 = getField(s1, "b")] 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: GroupByNode one output with type Local ====
 -- INPUT:
@@ -90,7 +90,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] project [s4 = getField(s1, "c")] 
 [2] project [s3 = getField(s1, "b")] 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: GroupByNode multiple outputs with type Local ====
 -- INPUT:
@@ -126,7 +126,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] project [s4 = getField(s1, "c")] 
 [2] project [s3 = getField(s1, "b")] 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: GroupByNode one output with type Global ====
 -- INPUT:
@@ -154,7 +154,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] project [s4 = getField(s1, "c")] 
 [2] project [s3 = getField(s1, "b")] 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: GroupByNode multiple outputs with type Global ====
 -- INPUT:
@@ -190,4 +190,4 @@ PhysicalScan [{'<root>': scan0}, collName]
 [3] project [s4 = getField(s1, "c")] 
 [2] project [s3 = getField(s1, "b")] 
 [1] project [s2 = getField(s1, "a")] 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 

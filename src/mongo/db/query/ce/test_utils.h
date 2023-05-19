@@ -39,7 +39,6 @@ namespace mongo::optimizer::ce {
 constexpr bool kCETestLogOnly = false;
 
 const double kMaxCEError = 0.01;
-const CEType kInvalidCardinality{-1.0};
 
 const OptPhaseManager::PhaseSet kDefaultCETestPhaseSet{OptPhase::MemoSubstitutionPhase,
                                                        OptPhase::MemoExplorationPhase,
@@ -182,7 +181,7 @@ public:
      * Adds a ScanDefinition for an additional collection for the test.
      */
     void addCollection(std::string collName,
-                       CEType numRecords,
+                       boost::optional<CEType> numRecords,
                        opt::unordered_map<std::string, IndexDefinition> indexes = {});
 
     /**

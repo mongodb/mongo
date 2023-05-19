@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 
 // Test calls step down on primaries.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

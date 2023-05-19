@@ -70,7 +70,7 @@ function runTest({
     jsTestLog(`Running ${tojson(deleteFilter)} with queryCollation: ${
         tojson(queryCollation)} and collectionCollation: ${tojson(collectionCollation)}`);
 
-    assert(expectedDeleteStage === "TS_MODIFY" || expectedDeleteStage === "BATCHED_DELETE");
+    assert(expectedDeleteStage === "TS_MODIFY" || expectedDeleteStage === "DELETE");
 
     const coll = testDB.getCollection(collNamePrefix + testCaseId++);
     assert.commandWorked(testDB.createCollection(coll.getName(), {
@@ -134,7 +134,7 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
     runTest({
         deleteFilter: {[metaFieldName]: "A"},
@@ -145,7 +145,7 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
 })();
 
@@ -189,7 +189,7 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
     runTest({
         deleteFilter: {[metaFieldName]: "a"},
@@ -201,7 +201,7 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
 })();
 
@@ -245,7 +245,7 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
     runTest({
         deleteFilter: {[metaFieldName]: "a"},
@@ -257,7 +257,7 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
 })();
 
@@ -309,28 +309,28 @@ function runTest({
         queryCollation: caseInsensitive,
         collectionCollation: caseInsensitive,
         nDeleted: 4,
-        // We can push down bucket filter for BATCHED_DELETE stage with the query level collation.
+        // We can push down bucket filter for DELETE stage with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
     runTest({
         deleteFilter: {[metaFieldName]: "a"},
         queryCollation: caseInsensitive,
         collectionCollation: caseSensitive,
         nDeleted: 4,
-        // We can push down bucket filter for BATCHED_DELETE stage with the query level collation.
+        // We can push down bucket filter for DELETE stage with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
 })();
 
@@ -393,28 +393,28 @@ function runTest({
         queryCollation: simple,
         collectionCollation: caseInsensitive,
         nDeleted: 0,
-        // We can push down bucket filter for BATCHED_DELETE stage with the query level collation.
+        // We can push down bucket filter for DELETE stage with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
     runTest({
         deleteFilter: {[metaFieldName]: "A"},
         queryCollation: simple,
         collectionCollation: caseInsensitive,
         nDeleted: 4,
-        // We can push down bucket filter for BATCHED_DELETE stage with the query level collation.
+        // We can push down bucket filter for DELETE stage with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "A"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "BATCHED_DELETE"
+        expectedDeleteStage: "DELETE"
     });
 })();
 })();

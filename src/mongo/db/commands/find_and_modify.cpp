@@ -64,6 +64,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -349,7 +350,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     }();
     auto request = requestAndMsg.first;
 
-    const NamespaceString& nss = request.getNamespace();
+    auto [isTimeseries, nss] = timeseries::isTimeseries(opCtx, request);
+
     uassertStatusOK(userAllowedWriteNS(opCtx, nss));
     auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
@@ -372,7 +374,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
-        ParsedDelete parsedDelete(opCtx, &deleteRequest, collection.getCollectionPtr());
+        ParsedDelete parsedDelete(
+            opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseries);
         uassertStatusOK(parsedDelete.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -389,26 +392,31 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         updateRequest.setNamespaceString(nss);
         update::makeUpdateRequest(opCtx, request, verbosity, &updateRequest);
 
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-        uassertStatusOK(parsedUpdate.parseRequest());
-
         // Explain calls of the findAndModify command are read-only, but we take write
         // locks so that the timing information is more accurate.
-        AutoGetCollection collection(opCtx, nss, MODE_IX);
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+                              MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
-                collection.getDb());
+                DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
+
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
+        ParsedUpdate parsedUpdate(
+            opCtx, &updateRequest, extensionsCallback, collection.getCollectionPtr());
+        uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
             ->checkShardVersionOrThrow(opCtx);
 
-        const auto exec = uassertStatusOK(
-            getExecutorUpdate(opDebug, &collection.getCollection(), &parsedUpdate, verbosity));
+        const auto exec =
+            uassertStatusOK(getExecutorUpdate(opDebug, collection, &parsedUpdate, verbosity));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
-            exec.get(), collection.getCollection(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
+            exec.get(), collection.getCollectionPtr(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
     }
 }
 
@@ -474,7 +482,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         opCtx, ns(), analyze_shard_key::SampledCommandNameEnum::kFindAndModify, req);
     if (sampleId) {
         analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-            ->addFindAndModifyQuery(*sampleId, req)
+            ->addFindAndModifyQuery(opCtx, *sampleId, req)
             .getAsync([](auto) {});
     }
 
@@ -487,7 +495,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
     // is executing a findAndModify. This is done to ensure that we can always match,
     // modify, and return the document under concurrency, if a matching document exists.
-    return writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
+    return writeConflictRetry(opCtx, "findAndModify", nsString, [&] {
         if (req.getRemove().value_or(false)) {
             DeleteRequest deleteRequest;
             makeDeleteRequest(opCtx, req, false, &deleteRequest);
@@ -525,11 +533,6 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 updateRequest.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
                     req.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
 
-                const ExtensionsCallbackReal extensionsCallback(
-                    opCtx, &updateRequest.getNamespaceString());
-                ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-                uassertStatusOK(parsedUpdate.parseRequest());
-
                 try {
                     boost::optional<BSONObj> docFound;
                     auto updateResult =
@@ -541,11 +544,20 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                                  req.getRemove().value_or(false),
                                                                  req.getUpsert().value_or(false),
                                                                  docFound,
-                                                                 &parsedUpdate);
+                                                                 &updateRequest);
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                    const ExtensionsCallbackReal extensionsCallback(
+                        opCtx, &updateRequest.getNamespaceString());
+
+                    // We are only using this to check if we should retry the command, so we don't
+                    // need to pass it a real collection object.
+                    ParsedUpdate parsedUpdate(
+                        opCtx, &updateRequest, extensionsCallback, CollectionPtr::null);
+                    uassertStatusOK(parsedUpdate.parseRequest());
+
                     if (!parsedUpdate.hasParsedQuery()) {
                         uassertStatusOK(parsedUpdate.parseQueryToCQ());
                     }

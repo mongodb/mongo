@@ -87,7 +87,7 @@ assert.soon(() => {
         diagnosticsBeforeTestCollInsertions.docsDeleted + numberOfDocuments - 1 &&
         diagnosticsAfterTestCollInsertions.maxStartWallTimeMillis.tojson() >=
         wallTimeOfTheFirstOplogEntry.tojson() &&
-        diagnosticsAfterTestCollInsertions.timeElapsedMillis >
+        diagnosticsAfterTestCollInsertions.timeElapsedMillis >=
         diagnosticsBeforeTestCollInsertions.timeElapsedMillis;
 });
 

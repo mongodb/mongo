@@ -3,7 +3,7 @@
 (function() {
 'use strict';
 
-load('./jstests/multiVersion/libs/auth_helpers.js');
+load('jstests/multiVersion/libs/auth_helpers.js');
 
 const conn = MongoRunner.runMongod({auth: ''});
 const adminDB = conn.getDB('admin');

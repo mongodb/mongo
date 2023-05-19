@@ -168,18 +168,8 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
         : sort.getSortKeyPattern();
     std::vector<SortPattern::SortPatternPart> updatedPattern;
 
-    if (groupIdField) {
-        auto groupId = FieldPath(groupIdField.value());
-        SortPattern::SortPatternPart patternPart;
-        patternPart.isAscending = !flipSort;
-        patternPart.fieldPath = groupId;
-        updatedPattern.push_back(patternPart);
-    }
-
-
     for (const auto& entry : sortPattern) {
         updatedPattern.push_back(entry);
-
         if (lastpointTimeField && entry.fieldPath->fullPath() == lastpointTimeField.value()) {
             updatedPattern.back().fieldPath =
                 FieldPath((entry.isAscending ? timeseries::kControlMinFieldNamePrefix
@@ -198,6 +188,33 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
             }
             updatedPattern.back().fieldPath = updated;
         }
+    }
+    // After the modifications of the sortPattern are completed, for the lastPoint
+    // optimizations, the group field needs to be added to the beginning of the sort pattern.
+    // Do note that the modified sort pattern is for sorting within a group (within the bucket)
+    // and the plan is to do the grouping and sort within on go.
+    // If the group field is already in the sortPattern then it needs to moved to the first
+    // position. A flip in the later case is not necessary anymore as the sort order was
+    // already flipped.
+    // Example 1: $group: {a:1}, $sort{b: 1, a: -1} --> modifiedPattern: {a: -1, b: 1}
+    // Example 2: $group: {c:1}, $sort{d: -1, e: 1} --> modifiedPattern: {c: 1, d: -1, e: 1}
+    if (groupIdField) {
+        const auto groupId = FieldPath(groupIdField.value());
+        SortPattern::SortPatternPart patternPart;
+        patternPart.fieldPath = groupId;
+        const auto pattern =
+            std::find_if(updatedPattern.begin(),
+                         updatedPattern.end(),
+                         [&groupId](const SortPattern::SortPatternPart& s) -> bool {
+                             return s.fieldPath->fullPath().compare(groupId.fullPath()) == 0;
+                         });
+        if (pattern != updatedPattern.end()) {
+            patternPart.isAscending = pattern->isAscending;
+            updatedPattern.erase(pattern);
+        } else {
+            patternPart.isAscending = !flipSort;
+        }
+        updatedPattern.insert(updatedPattern.begin(), patternPart);
     }
 
     boost::optional<uint64_t> maxMemoryUsageBytes;

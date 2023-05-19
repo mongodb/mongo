@@ -5,7 +5,7 @@
 // unique index constraint test for updates
 // case where object doesn't grow tested here
 
-t = db.indexa;
+let t = db.indexa;
 t.drop();
 
 t.createIndex({x: 1}, true);
@@ -18,8 +18,8 @@ assert.eq(2, t.count(), "indexa 1");
 
 t.update({x: 'B'}, {x: 'A'});
 
-a = t.find().toArray();
-u = Array.unique(a.map(function(z) {
+let a = t.find().toArray();
+let u = Array.unique(a.map(function(z) {
     return z.x;
 }));
 assert.eq(2, t.count(), "indexa 2");

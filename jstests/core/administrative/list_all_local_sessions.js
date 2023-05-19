@@ -5,6 +5,9 @@
 //   # former operation must be routed to the primary in a replica set, whereas the latter may be
 //   # routed to a secondary.
 //   assumes_read_preference_unchanged,
+//   # The config fuzzer may run logical session cache refreshes in the background, which interferes
+//   # with this test.
+//   does_not_support_config_fuzzer,
 //   # Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
 //   # startSession may cause this test to fail to find the returned sessionId.
 //   does_not_support_stepdowns,

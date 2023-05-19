@@ -1,6 +1,6 @@
 // SERVER-8088: test $unwind with a scalar
 
-t = db.agg_unwind;
+let t = db.agg_unwind;
 t.drop();
 
 t.insert({_id: 1});

@@ -29,29 +29,54 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <map>
-#include <string>
+#include "mongo/transport/grpc/client_context.h"
 
 #include "mongo/transport/grpc/mock_client_stream.h"
 
 namespace mongo::transport::grpc {
 
-// TODO: SERVER-74015 introduce a ClientContext interface that covers the whole API surface of
-// gRPC's ClientContext type, and implement that interface here.
-class MockClientContext {
+class MockClientContext : public ClientContext {
 public:
-    explicit MockClientContext(MockClientStream* stream) : _stream{stream} {}
-    ~MockClientContext() = default;
+    MockClientContext() : _deadline{Date_t::max()}, _stream{nullptr} {}
 
-    boost::optional<const MetadataContainer&> getServerInitialMetadata() const {
+    void addMetadataEntry(const std::string& key, const std::string& value) override {
+        invariant(!_stream);
+        _metadata.insert({key, value});
+    };
+
+    boost::optional<const MetadataContainer&> getServerInitialMetadata() const override {
+        invariant(_stream);
         if (!_stream->_serverInitialMetadata.isReady()) {
             return boost::none;
         }
         return _stream->_serverInitialMetadata.get();
     }
 
+    Date_t getDeadline() const override {
+        return _deadline;
+    }
+
+    void setDeadline(Date_t deadline) override {
+        invariant(!_stream);
+        _deadline = deadline;
+    }
+
+    HostAndPort getRemote() const override {
+        invariant(_stream);
+        return _stream->_remote;
+    }
+
+    void tryCancel() override {
+        invariant(_stream);
+        _stream->_cancel();
+    }
+
 private:
+    friend class MockStub;
+    friend struct MockStreamTestFixtures;
+
+    Date_t _deadline;
+    MetadataContainer _metadata;
     MockClientStream* _stream;
 };
 

@@ -42,8 +42,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 
@@ -110,13 +108,13 @@ boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              const NamespaceString& ns,
-                                              std::vector<BSONObj>&& objs,
-                                              const WriteConcernOptions& wc,
-                                              boost::optional<OID> targetEpoch) {
-    auto writeResults = write_ops_exec::performInserts(
-        expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+Status NonShardServerProcessInterface::insert(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+    auto writeResults = write_ops_exec::performInserts(expCtx->opCtx, *insertCommand);
 
     // Need to check each result in the batch since the writes are unordered.
     for (const auto& result : writeResults.results) {
@@ -130,12 +128,11 @@ Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<Express
 Status NonShardServerProcessInterface::insertTimeseries(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    std::vector<BSONObj>&& objs,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
     try {
-        auto insertReply = write_ops_exec::performTimeseriesWrites(
-            expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+        auto insertReply = write_ops_exec::performTimeseriesWrites(expCtx->opCtx, *insertCommand);
 
         checkWriteErrors(insertReply.getWriteCommandReplyBase());
     } catch (DBException& ex) {
@@ -148,13 +145,12 @@ Status NonShardServerProcessInterface::insertTimeseries(
 StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    BatchedObjects&& batch,
+    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
     const WriteConcernOptions& wc,
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto writeResults = write_ops_exec::performUpdates(
-        expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
+    auto writeResults = write_ops_exec::performUpdates(expCtx->opCtx, *updateCommand);
 
     // Need to check each result in the batch since the writes are unordered.
     UpdateResult updateResult;
@@ -174,7 +170,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     AutoGetCollection autoColl(opCtx, ns, MODE_X);
     CollectionWriter collection(opCtx, autoColl);
     writeConflictRetry(
-        opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
+        opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns, [&] {
             uassert(ErrorCodes::DatabaseDropPending,
                     str::stream() << "The database is in the process of being dropped "
                                   << ns.dbName().toStringForErrorMsg(),
@@ -215,49 +211,24 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& targetNs,
     bool dropTarget,
     bool stayTemp,
-    bool allowBuckets,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     RenameCollectionOptions options;
     options.dropTarget = dropTarget;
     options.stayTemp = stayTemp;
-    options.allowBuckets = allowBuckets;
     // skip sharding validation on non sharded servers
     doLocalRenameIfOptionsAndIndexesHaveNotChanged(
         opCtx, sourceNs, targetNs, options, originalIndexes, originalCollectionOptions);
 }
 
-void NonShardServerProcessInterface::createTimeseries(OperationContext* opCtx,
-                                                      const NamespaceString& ns,
-                                                      const BSONObj& options,
-                                                      bool createView) {
-
-    // try to create the view, but catch the error if the view already exists.
-    if (createView) {
-        try {
-            uassertStatusOK(mongo::createTimeseries(opCtx, ns, options));
-        } catch (DBException& ex) {
-            auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
-            if (ex.code() != ErrorCodes::NamespaceExists || !view || !view->timeseries()) {
-                throw;
-                // check the time-series spec matches.
-            } else {
-                auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(opCtx, ns, true);
-                BSONObj inputOpts = options.getField("timeseries").Obj();
-                if (!timeseriesOpts ||
-                    timeseriesOpts->getTimeField() !=
-                        inputOpts.getField(timeseries::kTimeFieldName).valueStringData() ||
-                    (inputOpts.hasField(timeseries::kMetaFieldName) &&
-                     timeseriesOpts->getMetaField() !=
-                         inputOpts.getField(timeseries::kMetaFieldName).valueStringData())) {
-                    throw;
-                }
-            }
-        }
-        // creating the buckets collection should always succeed.
-    } else {
-        uassertStatusOK(
-            mongo::createTimeseries(opCtx, ns, options, TimeseriesCreateLevel::kBucketsCollOnly));
+void NonShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,
+                                                          const NamespaceString& ns,
+                                                          const BSONObj& cmdObj,
+                                                          const TimeseriesOptions& userOpts) {
+    try {
+        uassertStatusOK(mongo::createTimeseries(opCtx, ns, cmdObj));
+    } catch (DBException& ex) {
+        _handleTimeseriesCreateError(ex, opCtx, ns, userOpts);
     }
 }
 

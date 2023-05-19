@@ -47,13 +47,15 @@ namespace mongo {
  *
  * When data cloning is finished (and therefore a consistent donor optime established) an opObserver
  * that is observing the recipient state document will create a
- * TenantMigrationRecipientAccessBlocker in state `kReject` that will reject all reads (with
- * SnapshotTooOld) for that tenant.
+ * TenantMigrationRecipientAccessBlocker in state `kRejectReadsAndWrites` that will reject all
+ * commands (with IllegalOperation) for that tenant. If a command is received during this
+ * `kRejectReadsAndWrites` phase it suggests that something is wrong with the proxy since traffic
+ * should not be routed to the recipient yet.
  *
  * When oplog application reaches this consistent point, the recipient primary will wait for
  * the earlier state document write to be committed on all recipient nodes before doing the state
- * machine write for the consistent state. The TenantMigrationRecipientAccessBlocker, upon see the
- * write for the consistent state, will transition to `kRejectBefore` state with the
+ * machine write for the consistent state. The TenantMigrationRecipientAccessBlocker, upon seeing
+ * the write for the consistent state, will transition to `kRejectReadsBefore` state with the
  * `rejectBeforeTimestamp` set to the recipient consistent timestamp and will start allowing reads
  * for read concerns which read the latest snapshot, and "atClusterTime" or "majority" read concerns
  * which are after the `rejectBeforeTimestamp`. Reads for older snapshots, except "majority" until
@@ -83,13 +85,19 @@ public:
     Status waitUntilCommittedOrAborted(OperationContext* opCtx) final;
 
     Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) final;
-    SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx, StringData command) final;
+    SharedSemiFuture<void> getCanRunCommandFuture(OperationContext* opCtx,
+                                                  StringData command) final;
 
     //
     // Called by index build user threads before acquiring an index build slot, and again right
     // after registering the build.
     //
     Status checkIfCanBuildIndex() final;
+
+    /**
+     * Checks if opening a new change stream should block.
+     */
+    Status checkIfCanOpenChangeStream() final;
 
     /**
      * Returns error status if "getMore" command of a change stream should fail.
@@ -117,7 +125,7 @@ public:
     void startRejectingReadsBefore(const Timestamp& timestamp);
 
     bool inStateReject() const {
-        return _state.isReject();
+        return _state.isRejectReadsAndWrites();
     }
 
 private:
@@ -126,24 +134,24 @@ private:
      */
     class BlockerState {
     public:
-        void transitionToRejectBefore() {
-            _state = State::kRejectBefore;
+        void transitionToRejectReadsBefore() {
+            _state = State::kRejectReadsBefore;
         }
 
-        bool isReject() const {
-            return _state == State::kReject;
+        bool isRejectReadsAndWrites() const {
+            return _state == State::kRejectReadsAndWrites;
         }
 
-        bool isRejectBefore() const {
-            return _state == State::kRejectBefore;
+        bool isRejectReadsBefore() const {
+            return _state == State::kRejectReadsBefore;
         }
 
         std::string toString() const;
 
     private:
-        enum class State { kReject, kRejectBefore };
+        enum class State { kRejectReadsAndWrites, kRejectReadsBefore };
 
-        State _state = State::kReject;
+        State _state = State::kRejectReadsAndWrites;
     };
 
     ServiceContext* _serviceContext;

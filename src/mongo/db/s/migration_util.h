@@ -123,31 +123,6 @@ size_t checkForConflictingDeletions(OperationContext* opCtx,
                                     const UUID& uuid);
 
 /**
- * Asynchronously attempts to submit the RangeDeletionTask for processing.
- *
- * Note that if the current filtering metadata's UUID does not match the task's UUID, the filtering
- * metadata will be refreshed once. If the UUID's still don't match, the task will be deleted from
- * disk. If the UUID's do match, the range will be submitted for deletion.
- *
- * If the range is submitted for deletion, the returned future is set when the range deletion
- * completes. If the range is not submitted for deletion, the returned future is set with an error
- * explaining why.
- */
-ExecutorFuture<void> submitRangeDeletionTask(OperationContext* oppCtx,
-                                             const RangeDeletionTask& deletionTask);
-
-/**
- * Queries the rangeDeletions collection for ranges that are ready to be deleted and submits them to
- * the range deleter.
- */
-void submitPendingDeletions(OperationContext* opCtx);
-
-/**
- * Asynchronously calls submitPendingDeletions using the fixed executor pool.
- */
-void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext);
-
-/**
  * Writes the migration coordinator document to config.migrationCoordinators and waits for majority
  * write concern.
  */

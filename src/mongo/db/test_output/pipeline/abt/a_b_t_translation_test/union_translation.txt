@@ -11,7 +11,7 @@ metadata:
 				distribution paths: 
 			indexes: 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 		collB: 
 			options: 
 			distribution and paths: 
@@ -19,7 +19,7 @@ metadata:
 				distribution paths: 
 			indexes: 
 			collection exists: 1
-			CE type: -1
+			CE type: (empty)
 
 -- OUTPUT:
 Root [{scan_0}]

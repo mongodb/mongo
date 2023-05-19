@@ -122,7 +122,6 @@ env.Library(
 env.Library(
     target='logical_session_cache_impl',
     source=[
-        'initialize_operation_session_info.cpp',
         'logical_session_cache_impl.cpp',
     ],
     LIBDEPS=[
@@ -175,6 +174,8 @@ env.Library(
 env.Library(
     target='session_catalog_mongod',
     source=[
+        'internal_transactions_reap_service.cpp',
+        'internal_transactions_reap_service.idl',
         'session_catalog_mongod.cpp',
         'session_txn_record.idl',
     ],
@@ -186,6 +187,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/repl/storage_interface',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',

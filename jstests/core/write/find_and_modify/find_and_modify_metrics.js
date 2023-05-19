@@ -10,6 +10,9 @@
  *   # This test contains assertions on the number of executed operations, and tenant migrations
  *   # passthrough suites automatically retry operations on TenantMigrationAborted errors.
  *   tenant_migration_incompatible,
+ *   # The config fuzzer may run logical session cache refreshes in the background, which modifies
+ *   # some serverStatus metrics read in this test.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 (function() {

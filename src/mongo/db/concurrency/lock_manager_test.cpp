@@ -1012,13 +1012,13 @@ TEST_F(LockManagerTest, HasConflictingRequests) {
     LockerImpl lockerIX{getServiceContext()};
     LockRequestCombo requestIX{&lockerIX};
     ASSERT_EQ(lockMgr.lock(resId, &requestIX, LockMode::MODE_IX), LockResult::LOCK_OK);
-    ASSERT_FALSE(lockMgr.hasConflictingRequests(&requestIX));
+    ASSERT_FALSE(lockMgr.hasConflictingRequests(resId, &requestIX));
 
     LockerImpl lockerX{getServiceContext()};
     LockRequestCombo requestX{&lockerX};
     ASSERT_EQ(lockMgr.lock(resId, &requestX, LockMode::MODE_X), LockResult::LOCK_WAITING);
-    ASSERT_TRUE(lockMgr.hasConflictingRequests(&requestIX));
-    ASSERT_TRUE(lockMgr.hasConflictingRequests(&requestX));
+    ASSERT_TRUE(lockMgr.hasConflictingRequests(resId, &requestIX));
+    ASSERT_TRUE(lockMgr.hasConflictingRequests(resId, &requestX));
 
     ASSERT(lockMgr.unlock(&requestIX));
     ASSERT(lockMgr.unlock(&requestX));

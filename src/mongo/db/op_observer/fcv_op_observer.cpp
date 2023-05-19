@@ -166,7 +166,8 @@ void FcvOpObserver::onInserts(OperationContext* opCtx,
                               std::vector<InsertStatement>::const_iterator first,
                               std::vector<InsertStatement>::const_iterator last,
                               std::vector<bool> fromMigrate,
-                              bool defaultFromMigrate) {
+                              bool defaultFromMigrate,
+                              InsertsOpStateAccumulator* opAccumulator) {
     if (coll->ns().isServerConfigurationCollection()) {
         for (auto it = first; it != last; it++) {
             _onInsertOrUpdate(opCtx, it->doc);
@@ -203,8 +204,8 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void FcvOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                           const RollbackObserverInfo& rbInfo) {
+void FcvOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                          const RollbackObserverInfo& rbInfo) {
     // Ensures the in-memory and on-disk FCV states are consistent after a rollback.
     const auto query = BSON("_id" << multiversion::kParameterName);
     const auto swFcv = repl::StorageInterface::get(opCtx)->findById(

@@ -8,15 +8,13 @@
 // see indexa.js for the test case for an update with dup id check
 // when it doesn't move
 
-t = db.indexb;
+let t = db.indexb;
 t.drop();
 t.createIndex({a: 1}, true);
 
 t.insert({a: 1});
 
-x = {
-    a: 2
-};
+let x = {a: 2};
 t.save(x);
 
 {

@@ -82,6 +82,9 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     WT_STAT_CONN_INCR(session, flush_tier);
     conn = S2C(session);
     cursor = NULL;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     /*
      * For supporting splits and merge:
      * - See if there is any merging work to do to prepare and create an object that is
@@ -95,6 +98,11 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     conn->flush_ckpt_complete = false;
     conn->flush_most_recent = conn->ckpt_most_recent;
     conn->flush_ts = conn->txn_global.last_ckpt_timestamp;
+    /*
+     * It would be more efficient to return here if no tiered storage is enabled in the system. If
+     * the user asks for a flush_tier without tiered storage, the loop below is effectively a no-op
+     * and will not be incorrect. But we could also just return.
+     */
 
     /*
      * Walk the metadata cursor to find tiered tables to flush. This should be optimized to avoid
@@ -666,6 +674,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
     use_timestamp = (cval.val != 0);
     WT_RET(__wt_config_gets(session, cfg, "flush_tier.enabled", &cval));
@@ -1001,6 +1011,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     saved_isolation = session->isolation;
     full = idle = tracking = use_timestamp = false;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
     /* Avoid doing work if possible. */
     WT_RET(__txn_checkpoint_can_skip(session, cfg, &full, &use_timestamp, &can_skip));
     if (can_skip) {
@@ -1027,10 +1039,11 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Reset the statistics tracked per checkpoint. */
     cache->evict_max_page_size = 0;
-    cache->evict_max_seconds = 0;
-    conn->rec_maximum_hs_wrapup_seconds = 0;
-    conn->rec_maximum_image_build_seconds = 0;
-    conn->rec_maximum_seconds = 0;
+    cache->evict_max_ms = 0;
+    cache->reentry_hs_eviction_ms = 0;
+    conn->rec_maximum_hs_wrapup_milliseconds = 0;
+    conn->rec_maximum_image_build_milliseconds = 0;
+    conn->rec_maximum_milliseconds = 0;
 
     /* Initialize the verbose tracking timer */
     __wt_epoch(session, &conn->ckpt_timer_start);
@@ -1394,6 +1407,8 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
     conn = S2C(session);
     txn_global = &conn->txn_global;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
     txn_global->checkpoint_running = true;
@@ -2444,6 +2459,8 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
     WT_BTREE *btree;
     WT_DECL_RET;
     bool bulk, metadata, need_tracking;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &session->dhandle->close_lock);
 
     btree = S2BT(session);
     bulk = F_ISSET(btree, WT_BTREE_BULK);

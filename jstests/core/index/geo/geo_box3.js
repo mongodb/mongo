@@ -4,7 +4,7 @@
 // bounding box.
 
 // This is the bug reported in SERVER-994.
-t = db.geo_box3;
+let t = db.geo_box3;
 t.drop();
 t.insert({point: {x: -15000000, y: 10000000}});
 t.createIndex({point: "2d"}, {min: -21000000, max: 21000000});

@@ -1,6 +1,11 @@
 /**
  * Validate auto complete works for various javascript types implemented by C++.
+ * @tags: [
+ * # TODO SERVER-77024 enable on sharded passthrough suites when orphans hook will be supported
+ *   assumes_unsharded_collection,
+ * ]
  */
+
 (function() {
 'use strict';
 

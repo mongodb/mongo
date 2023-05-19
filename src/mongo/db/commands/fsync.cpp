@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/fsync.h"
@@ -388,9 +389,11 @@ void FSyncLockThread::run() {
         bool successfulFsyncLock = false;
         auto backupCursorHooks = BackupCursorHooks::get(_serviceContext);
         try {
+            // TODO SERVER-65920: Create a NamespaceString for logging with the "global" ns in
+            // writeConflictRetry.
             writeConflictRetry(&opCtx,
                                "beginBackup",
-                               "global",
+                               NamespaceString("global"),
                                [&opCtx, backupCursorHooks, &successfulFsyncLock, storageEngine] {
                                    if (backupCursorHooks->enabled()) {
                                        backupCursorHooks->fsyncLock(&opCtx);

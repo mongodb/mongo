@@ -9,7 +9,7 @@ load("jstests/libs/analyze_plan.js");
 
 var coll = db.getCollection("covered_simple_id");
 coll.drop();
-for (i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     coll.insert({_id: i});
 }
 coll.insert({_id: "string"});

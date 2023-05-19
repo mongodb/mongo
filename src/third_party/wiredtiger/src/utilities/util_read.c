@@ -58,7 +58,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
      */
     if ((ret = session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
         (void)util_err(session, ret, "%s: session.open_cursor", uri);
-    free(uri);
+    util_free(uri);
     if (ret != 0)
         return (ret);
 

@@ -11,6 +11,7 @@ from threading import Lock
 from typing import List, Optional, NamedTuple, Set
 
 from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
 
 # This lock prevents different resmoke jobs from symbolizing stacktraces concurrently,
@@ -56,6 +57,15 @@ class ResmokeSymbolizerConfig(NamedTuple):
         :return: True if on Windows
         """
         return sys.platform == "win32" or sys.platform == "cygwin"
+
+    @staticmethod
+    def is_macos() -> bool:
+        """
+        Whether we are on MacOS.
+
+        :return: True if on MacOS.
+        """
+        return sys.platform == "darwin"
 
 
 class ResmokeSymbolizer:
@@ -133,6 +143,16 @@ class ResmokeSymbolizer:
 
         if self.config.is_windows():
             test.logger.info("Running on Windows, skipping symbolization")
+            return False
+
+        if self.config.is_macos():
+            test.logger.info("Running on MacOS, skipping symbolization")
+            return False
+
+        if HANG_ANALYZER_CALLED.is_set():
+            test.logger.info(
+                "Hang analyzer has been called, skipping symbolization to meet timeout constraints."
+            )
             return False
 
         return True
@@ -305,8 +325,8 @@ class SymbolizerService:
         """
 
         symbolizer_args = [
-            "python",
-            "buildscripts/mongosymb.py",
+            "db-contrib-tool",
+            "symbolize",
             "--client-secret",
             _config.SYMBOLIZER_CLIENT_SECRET,
             "--client-id",

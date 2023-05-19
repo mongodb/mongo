@@ -10,8 +10,8 @@
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
  *   uses_curop_agg_stage,
- *   assumes_unsharded_collection,
- *   requires_fcv_71
+ *   requires_fcv_71,
+ *   featureFlagAggOutTimeseries
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
@@ -32,8 +32,11 @@ var $config = extendWorkload($config, function($config, $super) {
         db[collName].runCommand({
             aggregate: collName,
             pipeline: [{
-                $out:
-                    {db: db.getName(), coll: "interrupt_temp_out", timeseries: {timeField: "time"}}
+                $out: {
+                    db: db.getName(),
+                    coll: "interrupt_temp_out",
+                    timeseries: {timeField: timeFieldName, metaField: metaFieldName}
+                }
             }],
             cursor: {}
         });
@@ -74,6 +77,7 @@ var $config = extendWorkload($config, function($config, $super) {
      * Create a time-series collection and insert 100 documents.
      */
     $config.setup = function setup(db, collName, cluster) {
+        db[collName].drop();
         assert.commandWorked(db.createCollection(
             collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
         const docs = [];

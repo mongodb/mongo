@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import('env')
+Import('get_option')
 
 env = env.Clone()
 
@@ -25,6 +26,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/operation_time_tracker',
         '$BUILD_DIR/mongo/db/pipeline/field_path',
         '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/util/diagnostic_info'
+        if get_option('use-diagnostic-latches') == 'on' else [],
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
@@ -130,6 +133,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',

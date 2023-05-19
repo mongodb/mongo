@@ -46,35 +46,28 @@ SelectivityType heuristicEqualitySel(const CEType inputCard) {
 }
 
 SelectivityType heuristicClosedRangeSel(const CEType inputCard) {
-    SelectivityType sel = kInvalidSel;
     if (inputCard < kSmallLimit) {
-        sel = kSmallCardClosedRangeSel;
+        return kSmallCardClosedRangeSel;
     } else if (inputCard < kMediumLimit) {
-        sel = kMediumCardClosedRangeSel;
-    } else {
-        sel = kLargeCardClosedRangeSel;
+        return kMediumCardClosedRangeSel;
     }
-    return sel;
+    return kLargeCardClosedRangeSel;
 }
 
 SelectivityType heuristicOpenRangeSel(const CEType inputCard) {
-    SelectivityType sel = kInvalidSel;
     if (inputCard < kSmallLimit) {
-        sel = kSmallCardOpenRangeSel;
+        return kSmallCardOpenRangeSel;
     } else if (inputCard < kMediumLimit) {
-        sel = kMediumCardOpenRangeSel;
-    } else {
-        sel = kLargeCardOpenRangeSel;
+        return kMediumCardOpenRangeSel;
     }
-    return sel;
+    return kLargeCardOpenRangeSel;
 }
 
 SelectivityType heuristicIntervalSel(const IntervalRequirement& interval, const CEType inputCard) {
-    SelectivityType sel = kInvalidSel;
     if (interval.isFullyOpen()) {
-        sel = {1.0};
+        return 1.0;
     } else if (interval.isEquality()) {
-        sel = heuristicEqualitySel(inputCard);
+        return heuristicEqualitySel(inputCard);
     } else if (interval.getHighBound().isPlusInf() || interval.getLowBound().isMinusInf() ||
                getBoundReqTypeTag(interval.getLowBound()) !=
                    getBoundReqTypeTag(interval.getHighBound())) {
@@ -84,12 +77,9 @@ SelectivityType heuristicIntervalSel(const IntervalRequirement& interval, const 
         //   one of the bounds is the lowest/highest value of the previous/next type.
         // TODO: Notice that sometimes type bracketing uses a min/max value from the same type,
         // so sometimes we may not detect an open-ended interval.
-        sel = heuristicOpenRangeSel(inputCard);
-    } else {
-        sel = heuristicClosedRangeSel(inputCard);
+        return heuristicOpenRangeSel(inputCard);
     }
-    uassert(6716603, "Invalid selectivity.", validSelectivity(sel));
-    return sel;
+    return heuristicClosedRangeSel(inputCard);
 }
 
 CEType heuristicIntervalCard(const IntervalRequirement& interval, const CEType inputCard) {

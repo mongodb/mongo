@@ -5,7 +5,8 @@
 [jsTest] ----
 
 nReturned: 3
-Plan skeleton: {
+Plan skeleton: 
+{
 	"queryPlanner" : {
 		"winningPlan" : {
 			"optimizerPlan" : {
@@ -21,12 +22,14 @@ Plan skeleton: {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Index on {  "a.b" : 1 }. Query: [ { "$match" : { "a.b" : null } } ]
 [jsTest] ----
 
 nReturned: 3
-Plan skeleton: {
+Plan skeleton: 
+{
 	"queryPlanner" : {
 		"winningPlan" : {
 			"optimizerPlan" : {

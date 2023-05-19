@@ -113,5 +113,50 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
     metadata.serialize(&section);
 }
 
+std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx) {
+    if (!opCtx) {
+        return 0;
+    }
+
+    // Otherwise construct a metadata section from the list of authenticated users/roles
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    auto userName = authSession->getImpersonatedUserName();
+    auto roleNames = authSession->getImpersonatedRoleNames();
+    if (!userName && !roleNames.more()) {
+        userName = authSession->getAuthenticatedUserName();
+        roleNames = authSession->getAuthenticatedRoleNames();
+    }
+
+    // If there are no users/roles being impersonated just exit
+    if (!userName && !roleNames.more()) {
+        return 0;
+    }
+
+    std::size_t ret = 4 +                                   // BSONObj size
+        1 + kImpersonationMetadataSectionName.size() + 1 +  // "$audit" sub-object key
+        4;                                                  // $audit object length
+
+    if (userName) {
+        // BSONObjType + "impersonatedUser" + NULL + UserName object.
+        ret += 1 + ImpersonatedUserMetadata::kUserFieldName.size() + 1 + userName->getBSONObjSize();
+    }
+
+    // BSONArrayType + "impersonatedRoles" + NULL + BSONArray Length
+    ret += 1 + ImpersonatedUserMetadata::kRolesFieldName.size() + 1 + 4;
+    for (std::size_t i = 0; roleNames.more(); roleNames.next(), ++i) {
+        // BSONType::Object + strlen(indexId) + NULL byte
+        // to_string(i).size() will be log10(i) plus some rounding and fuzzing.
+        // Increment prior to taking the log so that we never take log10(0) which is NAN.
+        // This estimates one extra byte every time we reach (i % 10) == 9.
+        ret += 1 + static_cast<std::size_t>(1.1 + log10(i + 1)) + 1;
+        ret += roleNames.get().getBSONObjSize();
+    }
+
+    // EOD terminators for: impersonatedRoles, $audit, and metadata
+    ret += 1 + 1 + 1;
+
+    return ret;
+}
+
 }  // namespace rpc
 }  // namespace mongo

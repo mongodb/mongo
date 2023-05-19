@@ -38,6 +38,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 using namespace fmt::literals;
@@ -83,11 +85,14 @@ public:
 /**
  * This is a base abstract class for all stages performing a write operation into an output
  * collection. The writes are organized in batches in which elements are objects of the templated
- * type 'B'. A subclass must override two methods to be able to write into the output collection:
+ * type 'B'. A subclass must override the following methods to be able to write into the output
+ * collection:
  *
- *    1. 'makeBatchObject()' - to create an object of type 'B' from the given 'Document', which is,
+ *    - 'makeBatchObject()' - creates an object of type 'B' from the given 'Document', which is,
  *       essentially, a result of the input source's 'getNext()' .
- *    2. 'spill()' - to write the batch into the output collection.
+ *    - 'spill()' - writes the batch into the output collection.
+ *    - 'initializeBatchedWriteRequest()' - initializes the request object for writing a batch to
+ *       the output collection.
  *
  * Two other virtual methods exist which a subclass may override: 'initialize()' and 'finalize()',
  * which are called before the first element is read from the input source, and after the last one
@@ -98,6 +103,18 @@ class DocumentSourceWriter : public DocumentSource {
 public:
     using BatchObject = B;
     using BatchedObjects = std::vector<BatchObject>;
+
+    static BatchedCommandRequest makeInsertCommand(const NamespaceString& outputNs,
+                                                   bool bypassDocumentValidation) {
+        write_ops::InsertCommandRequest insertOp(outputNs);
+        insertOp.setWriteCommandRequestBase([&] {
+            write_ops::WriteCommandRequestBase wcb;
+            wcb.setOrdered(false);
+            wcb.setBypassDocumentValidation(bypassDocumentValidation);
+            return wcb;
+        }());
+        return BatchedCommandRequest(std::move(insertOp));
+    }
 
     DocumentSourceWriter(const char* stageName,
                          NamespaceString outputNs,
@@ -145,9 +162,31 @@ protected:
     virtual void finalize() {}
 
     /**
-     * Writes the documents in 'batch' to the output namespace.
+     * Writes the documents in 'batch' to the output namespace via 'bcr'.
      */
-    virtual void spill(BatchedObjects&& batch) = 0;
+    virtual void spill(BatchedCommandRequest&& bcr, BatchedObjects&& batch) = 0;
+
+    /**
+     * Estimates the size of the header of a batch write (that is, the size of the write command
+     * minus the size of write statements themselves).
+     */
+    int estimateWriteHeaderSize(const BatchedCommandRequest& bcr) const {
+        using BatchType = BatchedCommandRequest::BatchType;
+        switch (bcr.getBatchType()) {
+            case BatchType::BatchType_Insert:
+                return _writeSizeEstimator->estimateInsertHeaderSize(bcr.getInsertRequest());
+            case BatchType::BatchType_Update:
+                return _writeSizeEstimator->estimateUpdateHeaderSize(bcr.getUpdateRequest());
+            case BatchType::BatchType_Delete:
+                break;
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    /**
+     * Constructs and configures a BatchedCommandRequest for performing a batch write.
+     */
+    virtual BatchedCommandRequest initializeBatchedWriteRequest() const = 0;
 
     /**
      * Creates a batch object from the given document and returns it to the caller along with the
@@ -203,9 +242,26 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
             _initialized = true;
         }
 
-        BatchedObjects batch;
-        int bufferedBytes = 0;
+        // While most metadata attached to a command is limited to less than a KB,
+        // Impersonation metadata may grow to an arbitrary size.
+        // Ask the active Client how much impersonation metadata we'll use for it,
+        // and assume the rest can fit in the 16KB already built into BSONObjMaxUserSize.
+        const auto estimatedMetadataSizeBytes =
+            rpc::estimateImpersonatedUserMetadataSize(pExpCtx->opCtx);
 
+        BatchedCommandRequest batchWrite = initializeBatchedWriteRequest();
+        const auto writeHeaderSize = estimateWriteHeaderSize(batchWrite);
+        const auto initialRequestSize = estimatedMetadataSizeBytes + writeHeaderSize;
+
+        uassert(7637800,
+                "Unable to proceed with write while metadata size ({}KB) exceeds {}KB"_format(
+                    initialRequestSize / 1024, BSONObjMaxUserSize / 1024),
+                initialRequestSize <= BSONObjMaxUserSize);
+
+        const auto maxBatchSizeBytes = BSONObjMaxUserSize - initialRequestSize;
+
+        BatchedObjects batch;
+        size_t bufferedBytes = 0;
         auto nextInput = pSource->getNext();
         for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
             waitWhileFailPointEnabled();
@@ -215,16 +271,17 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
 
             bufferedBytes += objSize;
             if (!batch.empty() &&
-                (bufferedBytes > BSONObjMaxUserSize ||
+                (bufferedBytes > maxBatchSizeBytes ||
                  batch.size() >= write_ops::kMaxWriteBatchSize)) {
-                spill(std::move(batch));
+                spill(std::move(batchWrite), std::move(batch));
                 batch.clear();
+                batchWrite = initializeBatchedWriteRequest();
                 bufferedBytes = objSize;
             }
             batch.push_back(obj);
         }
         if (!batch.empty()) {
-            spill(std::move(batch));
+            spill(std::move(batchWrite), std::move(batch));
             batch.clear();
         }
 

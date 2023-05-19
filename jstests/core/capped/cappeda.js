@@ -6,13 +6,13 @@
  * ]
  */
 
-t = db.scan_capped_id;
+let t = db.scan_capped_id;
 t.drop();
 
-x = t.runCommand("create", {capped: true, size: 10000});
+let x = t.runCommand("create", {capped: true, size: 10000});
 assert(x.ok);
 
-for (i = 0; i < 100; i++)
+for (let i = 0; i < 100; i++)
     t.insert({_id: i, x: 1});
 
 function q() {

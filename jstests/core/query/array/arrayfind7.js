@@ -1,6 +1,6 @@
 // Nested $elemMatch clauses.  SERVER-5741
 
-t = db.jstests_arrayfind7;
+let t = db.jstests_arrayfind7;
 t.drop();
 
 t.save({a: [{b: [{c: 1, d: 2}]}]});

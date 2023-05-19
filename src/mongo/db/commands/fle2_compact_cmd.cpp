@@ -57,11 +57,6 @@ MONGO_FAIL_POINT_DEFINE(fleCompactSkipECOCDropUnsharded);
 namespace mongo {
 namespace {
 
-/**
- * Ensures that only one compactStructuredEncryptionData can run at a given time.
- */
-Lock::ResourceMutex commandMutex("compactStructuredEncryptionDataCommandMutex");
-
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
 
@@ -71,15 +66,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             str::stream() << CompactStructuredEncryptionData::kCommandName
                           << " must be run through mongos in a sharded cluster",
             !ShardingState::get(opCtx)->enabled());
-
-    uassert(
-        7592901,
-        "The preview version of compactStructuredEncryptionData is no longer supported in this "
-        "binary version",
-        gFeatureFlagFLE2CompactForProtocolV2.isEnabled(serverGlobalParams.featureCompatibility));
-
-    // Only allow one instance of compactStructuredEncryptionData to run at a time.
-    Lock::ExclusiveLock fleCompactCommandLock(opCtx, commandMutex);
 
     // Since this command holds an IX lock on the DB and the global lock throughout
     // the lifetime of this operation, setFCV should not be allowed to abort the transaction
@@ -117,7 +103,12 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     auto namespaces =
         uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));
 
+    // Acquire exclusive lock on the associated 'ecoc.lock' namespace to serialize calls
+    // to cleanup and compact on the same EDC namespace
+    Lock::CollectionLock compactionLock(opCtx, namespaces.ecocLockNss, MODE_X);
+
     // Step 1: rename the ECOC collection if it exists
+    catalog = CollectionCatalog::get(opCtx);
     auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
     auto ecocRename = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss);
 

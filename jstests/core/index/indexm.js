@@ -1,6 +1,6 @@
 // Check proper range combinations with or clauses overlapping non or portion of query SERVER-2302
 
-t = db.jstests_indexm;
+let t = db.jstests_indexm;
 t.drop();
 
 t.save({a: [{x: 1}, {x: 2}, {x: 3}, {x: 4}]});

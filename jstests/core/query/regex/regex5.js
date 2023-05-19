@@ -1,5 +1,5 @@
 
-t = db.regex5;
+let t = db.regex5;
 t.drop();
 
 // Add filler data to make sure that indexed solutions are
@@ -11,10 +11,10 @@ for (var i = 0; i < 10; i++) {
 t.save({x: ["abc", "xyz1"]});
 t.save({x: ["ac", "xyz2"]});
 
-a = /.*b.*c/;
-x = /.*y.*/;
+let a = /.*b.*c/;
+let x = /.*y.*/;
 
-doit = function() {
+let doit = function() {
     assert.eq(1, t.find({x: a}).count(), "A");
     assert.eq(2, t.find({x: x}).count(), "B");
     assert.eq(2, t.find({x: {$in: [x]}}).count(), "C");            // SERVER-322

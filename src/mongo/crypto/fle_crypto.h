@@ -1326,6 +1326,15 @@ public:
      * in the encrypted field config
      */
     static void validateCompactionTokens(const EncryptedFieldConfig& efc, BSONObj compactionTokens);
+
+    /**
+     * Validates the compaction tokens BSON contains an element for each field
+     * in the encrypted field config
+     */
+    static void validateCleanupTokens(const EncryptedFieldConfig& efc, BSONObj cleanupTokens);
+
+private:
+    static void _validateTokens(const EncryptedFieldConfig& efc, BSONObj tokens, StringData cmd);
 };
 
 /**
@@ -1542,6 +1551,8 @@ public:
     static PrfBlock prf(ConstDataRange key, ConstDataRange cdr);
 
     static PrfBlock prf(ConstDataRange key, uint64_t value);
+
+    static void checkEFCForECC(const EncryptedFieldConfig& efc);
 
     /**
      * Decrypt AES-256-CTR encrypted data. Exposed for benchmarking purposes.

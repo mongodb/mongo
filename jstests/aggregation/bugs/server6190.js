@@ -3,7 +3,7 @@
 load('jstests/aggregation/extras/utils.js');
 load("jstests/libs/sbe_assert_error_override.js");
 
-t = db.jstests_aggregation_server6190;
+let t = db.jstests_aggregation_server6190;
 t.drop();
 
 t.save({});

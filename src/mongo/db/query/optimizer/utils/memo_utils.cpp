@@ -30,6 +30,7 @@
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
 #include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
 
 
 namespace mongo::optimizer {
@@ -268,6 +269,30 @@ public:
             auto& entry = result.at(index);
             PlanAndProps merged = moveOrCopy(initial, index == result.size() - 1);
             mergeNodeAndProps<GroupByNode>(_includeRejected, merged, entry, true /*canMove*/);
+            std::swap(entry, merged);
+        }
+        return result;
+    }
+
+    PlanExtractorResult operator()(const ABT& n,
+                                   const EvaluationNode& node,
+                                   const bool isGroupRoot,
+                                   ProjectionNameOrderPreservingSet required) {
+        ProjectionNameOrderPreservingSet requiredForChild = required;
+        requiredForChild.erase(node.getProjectionName());
+        auto env = VariableEnvironment::build(node.getProjection());
+        for (const auto& proj : env.freeVariableNames()) {
+            requiredForChild.emplace_back(proj);
+        }
+
+        auto result =
+            node.getChild().visit(*this, false /*isGroupRoot*/, std::move(requiredForChild));
+
+        PlanAndProps initial = createInitial(isGroupRoot, n, std::move(required));
+        for (size_t index = 0; index < result.size(); index++) {
+            auto& entry = result.at(index);
+            PlanAndProps merged = moveOrCopy(initial, index == result.size() - 1);
+            mergeNodeAndProps<EvaluationNode>(_includeRejected, merged, entry, true /*canMove*/);
             std::swap(entry, merged);
         }
         return result;

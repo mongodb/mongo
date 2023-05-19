@@ -432,10 +432,9 @@ public:
      * it could still get evicted if the cache is under pressure. The returned handle must be
      * destroyed before the owning cache object itself is destroyed.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    ValueHandle get(
-        const KeyType& key,
+    template <typename KeyType>
+    requires IsComparable<KeyType> ValueHandle
+    get(const KeyType& key,
         CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
@@ -492,8 +491,8 @@ public:
      * Returns true if the passed 'newTimeInStore' is grater than the time of the currently cached
      * value or if no value is cached for 'key'.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     bool advanceTimeInStore(const KeyType& key, const Time& newTimeInStore) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
@@ -522,9 +521,9 @@ public:
      * which can either be from the time of insertion or from the latest call to
      * 'advanceTimeInStore'. Otherwise, returns a nullptr ValueHandle and Time().
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(const KeyType& key) {
+    template <typename KeyType>
+    requires IsComparable<KeyType> std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(
+        const KeyType& key) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
@@ -548,8 +547,8 @@ public:
      * Any already returned ValueHandles will start returning isValid = false. Subsequent calls to
      * 'get' will *not* return value for 'key' until the next call to 'insertOrAssign'.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     void invalidate(const KeyType& key) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
         _invalidate(&guard, key, _cache.find(key));
@@ -641,8 +640,8 @@ private:
      * the key may not exist, and after this call will no longer be valid and will not be in either
      * of the maps.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     void _invalidate(LockGuardWithPostUnlockDestructor* guard,
                      const KeyType& key,
                      typename Cache::iterator it,

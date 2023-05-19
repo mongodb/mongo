@@ -70,7 +70,11 @@ public:
             const auto& collectionUUID = request().getCollectionUUID();
 
             ShardingCatalogManager::get(opCtx)->setAllowMigrationsAndBumpOneChunk(
-                opCtx, nss, collectionUUID, allowMigrations);
+                opCtx,
+                nss,
+                collectionUUID,
+                allowMigrations,
+                ConfigsvrSetAllowMigrations::kCommandName.toString());
         }
 
     private:
@@ -107,6 +111,10 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
+    }
+
+    bool supportsRetryableWrite() const final {
+        return true;
     }
 } configsvrSetAllowMigrationsCmd;
 

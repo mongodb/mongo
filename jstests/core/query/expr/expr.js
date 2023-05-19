@@ -15,12 +15,9 @@
 "use strict";
 
 load("jstests/libs/sbe_assert_error_override.js");  // For 'assert.errorCodeEq'.
+load("jstests/libs/fixture_helpers.js");
 
 const coll = db.expr;
-
-const hello = db.runCommand("hello");
-assert.commandWorked(hello);
-const isMongos = (hello.msg === "isdbgrid");
 
 //
 // $expr in aggregate.
@@ -126,7 +123,7 @@ assert.throws(function() {
 // 'executionSuccess' field.
 let explain = coll.find({$expr: {$divide: [1, "$a"]}}).explain("executionStats");
 // Accommodate format differences between explain via mongos and explain directly on a mongod.
-if (!isMongos) {
+if (!FixtureHelpers.isMongos(db)) {
     assert(explain.hasOwnProperty("executionStats"), explain);
     assert.eq(explain.executionStats.executionSuccess, false, explain);
     assert.errorCodeEq(explain.executionStats.errorCode, [16609, ErrorCodes.TypeMismatch], explain);

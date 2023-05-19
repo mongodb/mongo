@@ -326,8 +326,6 @@ selector:
   - requires_dbstats
   # "Cowardly fail if collStats is run with a mongod that had an unclean shutdown: ..."
   - requires_collstats
-  # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
-  - requires_datasize
   # "Cowardly fail if startParallelShell is run with a mongod that had an unclean shutdown: ..."
   - uses_parallel_shell
   # system.profile collection doesn't exist on mongos.
@@ -393,6 +391,7 @@ executor:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: CleanEveryN
     n: 20
   fixture:

@@ -16,13 +16,12 @@
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
-    donorStartMigrationWithProtocol,
     getCertificateAndPrivateKey,
-    isMigrationCompleted,
     makeMigrationCertificatesForTest,
     makeX509OptionsForTest,
-    runTenantMigrationCommand
 } from "jstests/replsets/libs/tenant_migration_util.js";
+
+load("jstests/libs/uuid_util.js");
 
 const kTenantId = ObjectId().str;
 const kReadPreference = {
@@ -46,31 +45,27 @@ const kExpiredMigrationCertificates = {
 
     jsTest.log("Test that donorStartMigration requires 'donorCertificateForRecipient' when  " +
                "tenantMigrationDisableX509Auth=false");
-    assert.commandFailedWithCode(
-        donorPrimary.adminCommand(donorStartMigrationWithProtocol({
-            donorStartMigration: 1,
-            migrationId: UUID(),
-            recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-            tenantId: kTenantId,
-            readPreference: kReadPreference,
-            recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
-        },
-                                                                  donorPrimary.getDB("admin"))),
-        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
+    }),
+                                 ErrorCodes.InvalidOptions);
 
     jsTest.log("Test that donorStartMigration requires 'recipientCertificateForDonor' when  " +
                "tenantMigrationDisableX509Auth=false");
-    assert.commandFailedWithCode(
-        donorPrimary.adminCommand(donorStartMigrationWithProtocol({
-            donorStartMigration: 1,
-            migrationId: UUID(),
-            recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-            tenantId: kTenantId,
-            readPreference: kReadPreference,
-            donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
-        },
-                                                                  donorPrimary.getDB("admin"))),
-        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference,
+        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
+    }),
+                                 ErrorCodes.InvalidOptions);
 
     jsTest.log("Test that recipientSyncData requires 'recipientCertificateForDonor' when " +
                "tenantMigrationDisableX509Auth=false");
@@ -109,18 +104,16 @@ const kExpiredMigrationCertificates = {
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    assert.commandFailedWithCode(
-        donorPrimary.adminCommand(donorStartMigrationWithProtocol({
-            donorStartMigration: 1,
-            migrationId: UUID(),
-            recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-            tenantId: kTenantId,
-            readPreference: kReadPreference,
-            donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
-            recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
-        },
-                                                                  donorPrimary.getDB("admin"))),
-        ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference,
+        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
+    }),
+                                 ErrorCodes.IllegalOperation);
 
     donorRst.stopSet();
     tenantMigrationTest.stop();
@@ -246,15 +239,13 @@ const kExpiredMigrationCertificates = {
     const migrationId = UUID();
     const donorStartMigrationCmdObj = {
         donorStartMigration: 1,
-        migrationId: migrationId,
+        migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference
     };
-    const stateRes = assert.commandWorked(runTenantMigrationCommand(
-        donorStartMigrationCmdObj,
-        donorRst,
-        {retryOnRetryableErrors: false, shouldStopFunc: isMigrationCompleted}));
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.runMigration(donorStartMigrationCmdObj));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(
         donorRst.getPrimary().adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
@@ -292,16 +283,14 @@ const kExpiredMigrationCertificates = {
 
     const donorStartMigrationCmdObj = {
         donorStartMigration: 1,
-        migrationId: UUID(),
+        migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference
     };
 
-    const stateRes = assert.commandWorked(runTenantMigrationCommand(
-        donorStartMigrationCmdObj,
-        donorRst,
-        {retryOnRetryableErrors: false, shouldStopFunc: isMigrationCompleted}));
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.runMigration(donorStartMigrationCmdObj));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();
@@ -339,17 +328,15 @@ const kExpiredMigrationCertificates = {
 
     const donorStartMigrationCmdObj = {
         donorStartMigration: 1,
-        migrationId: UUID(),
+        migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference,
         donorCertificateForRecipient: kExpiredMigrationCertificates.donorCertificateForRecipient,
         recipientCertificateForDonor: kExpiredMigrationCertificates.recipientCertificateForDonor,
     };
-    const stateRes = assert.commandWorked(runTenantMigrationCommand(
-        donorStartMigrationCmdObj,
-        donorRst,
-        {retryOnRetryableErrors: false, shouldStopFunc: isMigrationCompleted}));
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.runMigration(donorStartMigrationCmdObj));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();

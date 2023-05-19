@@ -447,12 +447,16 @@ private:
     boost::optional<uint32_t> _planCacheKey;
     boost::optional<uint32_t> _queryHash;
 
-    // The shape of the original query serialized with readConcern, application name, and namespace.
     // If boost::none, telemetry should not be collected for this cursor.
-    boost::optional<BSONObj> _telemetryStoreKey;
+    boost::optional<std::size_t> _queryStatsStoreKeyHash;
+    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
+    boost::optional<BSONObj> _queryStatsStoreKey;
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
-    // Useful for diagnostics like telemetry.
+    // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
+    // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
+    // store key.
+    std::unique_ptr<query_stats::RequestShapifier> _queryStatsRequestShapifier;
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};
@@ -588,10 +592,13 @@ void startClientCursorMonitor();
  * Records certain metrics for the current operation on OpDebug and aggregates those metrics for
  * telemetry use. If a cursor pin is provided, metrics are aggregated on the cursor; otherwise,
  * metrics are written directly to the telemetry store.
+ * NOTE: Metrics are taken from opDebug.additiveMetrics, so CurOp::setEndOfOpMetrics must be called
+ * *prior* to calling these.
+ *
+ * Currently, telemetry is only collected for find and aggregate requests (and their subsequent
+ * getMore requests), so these should only be called from those request paths.
  */
-void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor, long long nreturned);
-void collectTelemetryMongod(OperationContext* opCtx,
-                            const BSONObj& originatingCommand,
-                            long long nreturned);
-
+void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
+void collectQueryStatsMongod(OperationContext* opCtx,
+                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier);
 }  // namespace mongo

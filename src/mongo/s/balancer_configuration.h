@@ -51,7 +51,7 @@ class StatusWith;
  *
  * balancer: {
  *  stopped: <true|false>,
- *  mode: <full|autoSplitOnly|off>,  // Only consulted if "stopped" is missing or
+ *  mode: <full|off>,  // Only consulted if "stopped" is missing or
  * false activeWindow: { start: "<HH:MM>", stop: "<HH:MM>" }
  * }
  */
@@ -59,9 +59,8 @@ class BalancerSettingsType {
 public:
     // Supported balancer modes
     enum BalancerMode {
-        kFull,           // Balancer will always try to keep the cluster even
-        kAutoSplitOnly,  // Only balance on auto splits
-        kOff,            // Balancer is completely off
+        kFull,  // Balancer will always try to keep the cluster even
+        kOff,   // Balancer is completely off
     };
 
     // The key under which this setting is stored on the config server

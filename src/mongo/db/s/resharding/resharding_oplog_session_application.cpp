@@ -83,7 +83,7 @@ boost::optional<repl::OpTime> ReshardingOplogSessionApplication::_logPrePostImag
     return writeConflictRetry(
         opCtx,
         "ReshardingOplogSessionApplication::_logPrePostImage",
-        NamespaceString::kRsOplogNamespace.ns(),
+        NamespaceString::kRsOplogNamespace,
         [&] {
             AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
 

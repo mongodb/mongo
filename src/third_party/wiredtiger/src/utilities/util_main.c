@@ -124,8 +124,8 @@ main(int argc, char *argv[])
         case 'E': /* secret key */
             if (secretkey != NULL)
                 wt_explicit_zero(secretkey, strlen(secretkey));
-            free(secretkey); /* lint: set more than once */
-            if ((secretkey = strdup(__wt_optarg)) == NULL) {
+            util_free(secretkey); /* lint: set more than once */
+            if ((secretkey = util_strdup(__wt_optarg)) == NULL) {
                 (void)util_err(NULL, errno, NULL);
                 goto err;
             }
@@ -293,7 +293,7 @@ open:
         p3 = ")";
     }
     len += strlen(rec_config);
-    if ((p = malloc(len)) == NULL) {
+    if ((p = util_malloc(len)) == NULL) {
         (void)util_err(NULL, errno, NULL);
         goto err;
     }
@@ -316,8 +316,8 @@ open:
         wt_explicit_zero(p, strlen(p));
         wt_explicit_zero(secretkey, strlen(secretkey));
     }
-    free(p);
-    free(secretkey);
+    util_free(p);
+    util_free(secretkey);
     secretkey = p = NULL;
 
     /* If we only want to verify the metadata, that is done in wiredtiger_open. We're done. */
@@ -342,11 +342,11 @@ done:
     if (p != NULL) {
         /* p may contain a copy of secretkey, so zero before freeing */
         wt_explicit_zero(p, strlen(p));
-        free(p);
+        util_free(p);
     }
     if (secretkey != NULL) {
         wt_explicit_zero(secretkey, strlen(secretkey));
-        free(secretkey);
+        util_free(secretkey);
     }
 
     if (conn != NULL) {
@@ -381,7 +381,7 @@ util_uri(WT_SESSION *session, const char *s, const char *type)
     }
 
     len = strlen(type) + strlen(s) + 2;
-    if ((name = calloc(len, 1)) == NULL) {
+    if ((name = util_calloc(len, 1)) == NULL) {
         (void)util_err(session, errno, NULL);
         return (NULL);
     }
@@ -397,7 +397,7 @@ util_uri(WT_SESSION *session, const char *s, const char *type)
     return (name);
 
 err:
-    free(name);
+    util_free(name);
     (void)util_err(session, ret, NULL);
     return (NULL);
 }

@@ -1,5 +1,5 @@
 # DDL Operations
-On the Sharding team, we use the term *DDL* to mean any operation that needs to update any subset of [catalog containers](https://github.com/mongodb/mongo/blob/f8a2113103a509ffa361c5aacb3ec0fa94858f9b/src/mongo/db/s/README_sharding_catalog.md#catalog-containers). Within this definition, there are standard DDLs that use the DDL coordinator infrastructure as well as non-standard DDLs that each have their own implementations.
+On the Sharding team, we use the term *DDL* to mean any operation that needs to update any subset of [catalog containers](README_sharding_catalog.md#catalog-containers). Within this definition, there are standard DDLs that use the DDL coordinator infrastructure as well as non-standard DDLs that each have their own implementations.
 
 ## Standard DDLs
 Most DDL operations are built upon the DDL coordinator infrastructure which provides some [retriability](#retriability), [synchronization](#synchronization), and [recoverability](#recovery) guarantees.
@@ -54,9 +54,15 @@ DDL coordinators are resilient to elections and sudden crashes because they are 
 
 When a new primary node is elected, the DDL primary only service is rebuilt, and any ongoing coordinators will be restarted based on their persisted state document. During this recovery phase, any new requests for DDL operations are put on hold, waiting for existing coordinators to be re-instatiated to avoid conflicts with the DDL locks.
 
+### Sections about specific standard DDL operations
+- [User write blocking](README_user_write_blocking.md)
+
 ## Non-Standard DDLs
-Some DDL operations do not follow the structure outlined in the section above. These operations are chunk migration, resharding, and refine collection shard key. There are also other operations such as add and remove shard that do not modify the sharding catalog but do modify local metadata and need to coordinate with ddl operations. These operations also do not use the DDL coordinator infrastructure, but they do take the DDl lock to synchronize with other ddls.
+Some DDL operations do not follow the structure outlined in the section above. These operations are [chunk migration](README_migrations.md), resharding, and refine collection shard key. There are also other operations such as add and remove shard that do not modify the sharding catalog but do modify local metadata and need to coordinate with ddl operations. These operations also do not use the DDL coordinator infrastructure, but they do take the DDl lock to synchronize with other ddls.
 
 Both chunk migration and resharding have to copy user data across shards. This is too time intensive to happen entirely while holding the collection critical section, so these operations have separate machinery to transfer the data and commit the changes. These commands do not commit transactionally across the shards and the config server, rather they commit on the config server and rely on shards pulling the updated commit information from the config server after learning via a router that there is new information. They also do not have the same requirement as standard DDL operations that they must complete after starting except after entering their commit phases.
 
 Refine shard key commits only on the config server, again relying on shards to pull updated information from the config server after hearing about this more recent information from a router. In this case, this was done not because of the cost of transfering data, but so that refine shard key did not need to involve the shards. This allows the refineShardKey command to run quickly and not block operations.
+
+### Sections explaining specific non-standard DDL operations
+- [Chunk Migration](README_migrations.md)

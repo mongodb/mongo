@@ -56,7 +56,13 @@ namespace tenantMigrationRecipientEntryHelpers {
 
 Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc) {
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Sanity check
     uassert(ErrorCodes::PrimarySteppedDown,
@@ -65,7 +71,7 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
     return writeConflictRetry(
-        opCtx, "insertTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
+        opCtx, "insertTenantMigrationRecipientStateDoc", nss, [&]() -> Status {
             // Insert the 'stateDoc' if no active tenant migration found for the 'tenantId' provided
             // in the 'stateDoc'. Tenant Migration is considered as active for a tenantId if a state
             // document exists on the disk for that 'tenantId' and not marked to be garbage
@@ -76,7 +82,7 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
                                      << BSON("$exists" << false));
             const auto updateMod = BSON("$setOnInsert" << stateDoc.toBSON());
             auto updateResult =
-                Helpers::upsert(opCtx, nss, filter, updateMod, /*fromMigrate=*/false);
+                Helpers::upsert(opCtx, collection, filter, updateMod, /*fromMigrate=*/false);
 
             // '$setOnInsert' update operator can no way modify the existing on-disk state doc.
             invariant(!updateResult.numDocsModified);
@@ -93,17 +99,23 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
 
 Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc) {
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
-    if (!collection) {
+    if (!collection.exists()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
 
     return writeConflictRetry(
-        opCtx, "updateTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
+        opCtx, "updateTenantMigrationRecipientStateDoc", nss, [&]() -> Status {
             auto updateResult =
-                Helpers::upsert(opCtx, nss, stateDoc.toBSON(), /*fromMigrate=*/false);
+                Helpers::upsert(opCtx, collection, stateDoc.toBSON(), /*fromMigrate=*/false);
             if (updateResult.numMatched == 0) {
                 return {ErrorCodes::NoSuchKey,
                         str::stream()
@@ -119,7 +131,7 @@ StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* op
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
     const auto collection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(NamespaceString(nss),
+        CollectionAcquisitionRequest(nss,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
@@ -133,11 +145,10 @@ StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* op
     auto query = BSON(TenantMigrationRecipientDocument::kTenantIdFieldName
                       << tenantId << TenantMigrationRecipientDocument::kExpireAtFieldName
                       << BSON("$exists" << 1));
-    return writeConflictRetry(
-        opCtx, "deleteTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> bool {
-            auto nDeleted = deleteObjects(opCtx, collection, query, true /* justOne */);
-            return nDeleted > 0;
-        });
+    return writeConflictRetry(opCtx, "deleteTenantMigrationRecipientStateDoc", nss, [&]() -> bool {
+        auto nDeleted = deleteObjects(opCtx, collection, query, true /* justOne */);
+        return nDeleted > 0;
+    });
 }
 
 StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx,

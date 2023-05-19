@@ -63,8 +63,6 @@ public:
      * Retrieves the lock manager instance attached to this ServiceContext.
      * The lock manager is now a decoration on the service context and this is the accessor that
      * most callers should prefer outside of startup, lock internals, and debugger scripts.
-     * Using the ServiceContext and OperationContext versions where possible is preferable to
-     * getGlobalLockManager().
      */
     static LockManager* get(ServiceContext* service);
     static LockManager* get(ServiceContext& service);
@@ -146,10 +144,10 @@ public:
     void cleanupUnusedLocks();
 
     /**
-     * Returns whether there are any conflicting lock requests for the resource associated with the
-     * given lock request. Note that this return value may be immediately stale.
+     * Returns whether there are any conflicting lock requests for the given resource and lock
+     * request. Note that the returned value may be immediately stale.
      */
-    bool hasConflictingRequests(const LockRequest* request) const;
+    bool hasConflictingRequests(ResourceId resId, const LockRequest* request) const;
 
     /**
      * Dumps the contents of all locks to the log.

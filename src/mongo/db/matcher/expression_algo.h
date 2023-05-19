@@ -39,7 +39,9 @@
 
 namespace mongo {
 
+class ExprMatchExpression;
 class MatchExpression;
+class PathMatchExpression;
 struct DepsTracker;
 
 namespace expression {
@@ -53,10 +55,33 @@ using NodeTraversalFunc = std::function<void(MatchExpression*, std::string)>;
  */
 bool hasExistencePredicateOnPath(const MatchExpression& expr, StringData path);
 
+using PathOrExprMatchExpression = stdx::variant<PathMatchExpression*, ExprMatchExpression*>;
+using Renameables = std::vector<std::pair<PathOrExprMatchExpression, std::string>>;
+
 /**
- * Checks if 'expr' has any children which do not have renaming implemented.
+ * Checks if 'expr' has any subexpression which does not have renaming implemented or has renaming
+ * implemented but may fail to rename for any one of 'renames'. If there's any such subexpression,
+ * we should not proceed with renaming.
  */
-bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr);
+bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr,
+                                              const StringMap<std::string>& renames);
+
+/**
+ * Checks if 'expr' has any subexpression which does not have renaming implemented or has renaming
+ * implemented but may fail to rename for any one of 'renames'. If there's any such subexpression,
+ * we should not proceed with renaming.
+ *
+ * This function also fills out 'renameables' with the renameable subexpressions. For
+ * PathMatchExpression, the new path is returned in the second element of the pair. For
+ * ExprMatchExpression, the second element should be ignored and renames must be applied based on
+ * the full 'renames' map.
+ *
+ * Note: The 'renameables' is filled out while traversing the tree and so, designated as an output
+ * parameter as an optimization to avoid traversing the tree again unnecessarily.
+ */
+bool hasOnlyRenameableMatchExpressionChildren(MatchExpression& expr,
+                                              const StringMap<std::string>& renames,
+                                              Renameables& renameables);
 
 /**
  * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
@@ -122,14 +147,40 @@ bool containsOverlappingPaths(const OrderedPathSet& testSet);
 bool containsEmptyPaths(const OrderedPathSet& testSet);
 
 /**
- * Determine if 'expr' is reliant upon any path from 'pathSet'.
+ * Determines if 'expr' is reliant upon any path from 'pathSet' and can be renamed by 'renames'.
  */
-bool isIndependentOf(const MatchExpression& expr, const OrderedPathSet& pathSet);
+bool isIndependentOfConst(const MatchExpression& expr,
+                          const OrderedPathSet& pathSet,
+                          const StringMap<std::string>& renames = {});
 
 /**
- * Determine if 'expr' is reliant only upon paths from 'pathSet'.
+ * Determines if 'expr' is reliant upon any path from 'pathSet' and can be renamed by 'renames'.
+ *
+ * Note: For a description of the expected value returned in the 'renameables' output parameter, see
+ * the documentation for the 'hasOnlyRenameableMatchExpressionChildren()' function.
  */
-bool isOnlyDependentOn(const MatchExpression& expr, const OrderedPathSet& pathSet);
+bool isIndependentOf(MatchExpression& expr,
+                     const OrderedPathSet& pathSet,
+                     const StringMap<std::string>& renames,
+                     Renameables& renameables);
+
+/**
+ * Determines if 'expr' is reliant only upon paths from 'pathSet' and can be renamed by 'renames'.
+ */
+bool isOnlyDependentOnConst(const MatchExpression& expr,
+                            const OrderedPathSet& pathSet,
+                            const StringMap<std::string>& renames = {});
+
+/**
+ * Determines if 'expr' is reliant only upon paths from 'pathSet' and can be renamed by 'renames'.
+ *
+ * Note: For a description of the expected value returned in the 'renameables' output parameter, see
+ * the documentation for the 'hasOnlyRenameableMatchExpressionChildren()' function.
+ */
+bool isOnlyDependentOn(MatchExpression& expr,
+                       const OrderedPathSet& pathSet,
+                       const StringMap<std::string>& renames,
+                       Renameables& renameables);
 
 /**
  * Returns whether the path represented by 'first' is an prefix of the path represented by 'second'.
@@ -156,7 +207,8 @@ bool bidirectionalPathPrefixOf(StringData first, StringData second);
  */
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "");
 
-using ShouldSplitExprFunc = std::function<bool(const MatchExpression&, const OrderedPathSet&)>;
+using ShouldSplitExprFunc = std::function<bool(
+    MatchExpression&, const OrderedPathSet&, const StringMap<std::string>&, Renameables&)>;
 
 /**
  * Attempt to split 'expr' into two MatchExpressions according to 'func'. 'func' describes the
@@ -176,12 +228,6 @@ using ShouldSplitExprFunc = std::function<bool(const MatchExpression&, const Ord
  * original match expression is {old: {$gt: 3}} and 'renames' contains the mapping "old" => "new".
  * The returned exprLeft value will be {new: {$gt: 3}}, provided that "old" is not in 'fields'.
  *
- * If the previous stage is a simple rename, 'fields' should be empty and 'renames' are attempted
- * but due to the limitation of renaming algorithm, we may fail to rename, when we return the
- * original expression as residualExpr.
- *
- * TODO SERVER-74298 Remove the above comment after the ticket is done.
- *
  * Never returns {nullptr, nullptr}.
  */
 std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
@@ -191,21 +237,32 @@ splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
                        ShouldSplitExprFunc func = isIndependentOf);
 
 /**
- * Applies the renames specified in 'renames' to 'expr'. 'renames' maps from path names in 'expr'
- * to the new values of those paths. For example, suppose the original match expression is
+ * Applies the renames specified in 'renames' & 'renameables'. 'renames' maps from path names in
+ * 'expr' to the new values of those paths. For example, suppose the original match expression is
  * {old: {$gt: 3}} and 'renames' contains the mapping "old" => "new". At the end, 'expr' will be
  * {new: {$gt: 3}}.
  *
- * The caller should make sure that `expr` is renamable as a whole.
+ * In order to do an in-place renaming of the match expression tree, the caller should first call
+ * 'hasOnlyRenameableMatchExpressionChildren()' and then call this function if it returns true,
+ * passing through the resulting 'renameables'.
  *
- * Returns whether there's any attempted but failed to rename. This case can happen when path
- * component is part of sub-fields. For example, expr = {x: {$eq: {y: 3}}} and renames = {{"x.y",
- * "a.b"}}. We should be able to rename 'x' and 'y' to 'a' and 'b' respectively but due to the
- * current limitation of renaming algorithm, we cannot rename such match expressions.
- *
- * TODO SERVER-74298 The return value might be necessary any more after the ticket is done.
+ * Note: To enforce the above precondition, the caller should pass in the output of the call to
+ * hasOnlyRenameableMatchExpressionChildren() as the 'renameables' argument. To avoid passing empty
+ * vector for 'renameables' like applyRenamesToExpression(expr, {}, {}), the parameter is defined as
+ * a pointer.
  */
-bool applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
+void applyRenamesToExpression(const StringMap<std::string>& renames,
+                              const Renameables* renameables);
+
+/**
+ * Copies the 'expr' and applies the renames specified in 'renames' to the copy of 'expr' and
+ * returns the renamed copy of 'expr' if renaming is successful. Otherwise, returns nullptr.
+ * 'renames' maps from path names in 'expr' to the new values of those paths. For example, suppose
+ * the original match expression is {old: {$gt: 3}} and 'renames' contains the mapping "old" =>
+ * "new". The returned expression will be {new: {$gt: 3}}.
+ */
+std::unique_ptr<MatchExpression> copyExpressionAndApplyRenames(
+    const MatchExpression* expr, const StringMap<std::string>& renames);
 
 /**
  * Split a MatchExpression into two parts:

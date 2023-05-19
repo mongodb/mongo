@@ -40,14 +40,18 @@ template <typename T>
 void assertValuesEqual(const Simple8b<T>& actual, const std::vector<boost::optional<T>>& expected) {
     auto it = actual.begin();
     auto end = actual.end();
-    size_t i = 0;
+    ASSERT_TRUE(it.valid());
 
+    size_t i = 0;
     for (; i < expected.size() && it != end; ++i, ++it) {
         ASSERT_EQ(*it, expected[i]);
+        ASSERT_TRUE(it.more());
     }
 
     ASSERT(it == end);
     ASSERT_EQ(i, expected.size());
+    ASSERT_TRUE(it.valid());
+    ASSERT_FALSE(it.more());
 }
 
 template <typename T>
@@ -96,6 +100,13 @@ TEST(Simple8b, NoValues) {
     std::vector<boost::optional<uint64_t>> expectedInts = {};
     std::vector<uint8_t> expectedBinary = {};
     testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, Null) {
+    Simple8b<uint64_t> s8b;
+    ASSERT_FALSE(s8b.begin().valid());
+    ASSERT_FALSE(s8b.begin().more());
+    ASSERT(s8b.begin() == s8b.end());
 }
 
 TEST(Simple8b, OnlySkip) {

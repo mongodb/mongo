@@ -111,13 +111,14 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
         }
 
         // Check if the above optimizations eliminated all children. An OR with no children is
-        // always false.
-        // TODO SERVER-34759 It is correct to replace this empty AND with an $alwaysTrue, but we
-        // need to make enhancements to the planner to make it understand an $alwaysTrue and an
-        // empty AND as the same thing. The planner can create inferior plans for $alwaysTrue which
-        // it would not produce for an AND with no children.
+        // always false. An AND with no children is always true and we need to return an
+        // EmptyExpression
         if (children.empty() && matchType == MatchExpression::OR) {
             return std::make_unique<AlwaysFalseMatchExpression>();
+        }
+        // This ensures that the empty $and[] will be returned that serializes to {} (SERVER-34759)
+        if (children.empty() && matchType == MatchExpression::AND) {
+            return std::make_unique<AndMatchExpression>();
         }
 
         if (children.size() == 1) {
@@ -143,11 +144,12 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 if (childExpression->isTriviallyFalse() && matchType == MatchExpression::AND) {
                     return std::make_unique<AlwaysFalseMatchExpression>();
                 }
-
                 // Likewise, an OR containing an expression that always evaluates to true can be
-                // optimized to a single $alwaysTrue expression.
+                // optimized to a single $and[] expression that is trivially true and serializes to
+                // {}. This "normalizes" the behaviour of true statements with $and and $or
+                // (SERVER-34759).
                 if (childExpression->isTriviallyTrue() && matchType == MatchExpression::OR) {
-                    return std::make_unique<AlwaysTrueMatchExpression>();
+                    return std::make_unique<AndMatchExpression>();
                 }
             }
         }

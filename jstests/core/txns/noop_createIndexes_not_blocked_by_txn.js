@@ -6,6 +6,7 @@
 // TODO(SERVER-39704): Remove the following load after SERVER-39704 is completed
 // For withTxnAndAutoRetryOnMongos.
 load('jstests/libs/auto_retry_transaction_in_sharding.js');
+load("jstests/libs/fixture_helpers.js");
 
 const dbName = 'noop_createIndexes_not_blocked';
 const collName = 'test';
@@ -16,8 +17,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 const session = db.getMongo().startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
-if (isMongos) {
+if (FixtureHelpers.isMongos(db)) {
     // Access the collection before creating indexes so it can be implicitly sharded.
     assert.eq(sessionDB[collName].find().itcount(), 0);
 }

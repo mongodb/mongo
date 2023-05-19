@@ -42,14 +42,12 @@
 
 namespace mongo::fle {
 
-REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(GT, RangePredicate, gFeatureFlagFLE2Range);
-REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(GTE, RangePredicate, gFeatureFlagFLE2Range);
-REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(LT, RangePredicate, gFeatureFlagFLE2Range);
-REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(LTE, RangePredicate, gFeatureFlagFLE2Range);
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE(GT, RangePredicate);
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE(GTE, RangePredicate);
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE(LT, RangePredicate);
+REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE(LTE, RangePredicate);
 
-REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionCompare,
-                                                   RangePredicate,
-                                                   gFeatureFlagFLE2Range);
+REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE(ExpressionCompare, RangePredicate);
 
 namespace {
 // Validate the range operator passed in and return the fieldpath and payload for the rewrite. If

@@ -14,7 +14,7 @@
  * Checks an array for match against regex.
  * Returns true if regex matches a string in the array
  */
-doesLogMatchRegex = function(logArray, regex) {
+let doesLogMatchRegex = function(logArray, regex) {
     for (var i = (logArray.length - 1); i >= 0; i--) {
         var regexInLine = regex.exec(logArray[i]);
         if (regexInLine != null) {
@@ -24,7 +24,7 @@ doesLogMatchRegex = function(logArray, regex) {
     return false;
 };
 
-doTest = function() {
+let doTest = function() {
     var log = db.adminCommand({getLog: 'global'});
     // this regex will need to change if output changes
     var re = new RegExp(".*conn.*options.*");

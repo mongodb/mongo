@@ -13,7 +13,7 @@ function check(indexed) {
         hint = {$natural: 1};
     }
 
-    f = r.find().sort({a: 1, b: 1}).hint(hint);
+    let f = r.find().sort({a: 1, b: 1}).hint(hint);
     eq(z[0], f[0]);
     eq(z[1], f[1]);
     eq(z[2], f[2]);
@@ -50,11 +50,11 @@ function check(indexed) {
     eq(z[0], f[3]);
 }
 
-r = db.ed_db_cursor6;
+let r = db.ed_db_cursor6;
 r.drop();
 
-z = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 1}, {a: 2, b: 2}];
-for (i = 0; i < z.length; ++i)
+let z = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 1}, {a: 2, b: 2}];
+for (let i = 0; i < z.length; ++i)
     r.save(z[i]);
 
 r.createIndex({a: 1, b: -1});

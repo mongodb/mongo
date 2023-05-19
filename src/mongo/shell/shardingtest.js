@@ -402,8 +402,8 @@ var ShardingTest = function(params) {
         const replicaSetsToTerminate = [];
         [...(shardRS.map(obj => obj.test))].forEach(rst => {
             // Generating a list of live nodes in the replica set
-            liveNodes = [];
-            pidValues = [];
+            const liveNodes = [];
+            const pidValues = [];
             rst.nodes.forEach(function(node) {
                 try {
                     node.getDB('admin')._helloOrLegacyHello();
@@ -416,6 +416,7 @@ var ShardingTest = function(params) {
 
                 if (!node.pid) {
                     // Getting the pid for the node
+                    let serverStatus;
                     rst.keyFile = rst.keyFile ? rst.keyFile : this.keyFile;
                     if (rst.keyFile) {
                         serverStatus = authutil.asCluster(node, rst.keyFile, () => {
@@ -835,7 +836,6 @@ var ShardingTest = function(params) {
             return;
         }
 
-        var result;
         for (var i = 0; i < 5; i++) {
             var otherShard = this.getOther(this.getPrimaryShard(dbName)).name;
             let cmd = {movechunk: c, find: move, to: otherShard};
@@ -844,7 +844,7 @@ var ShardingTest = function(params) {
                 cmd._waitForDelete = waitForDelete;
             }
 
-            result = this.s.adminCommand(cmd);
+            const result = this.s.adminCommand(cmd);
             if (result.ok)
                 break;
 
@@ -872,11 +872,11 @@ var ShardingTest = function(params) {
             var replSet = this._rs[i];
             if (!replSet)
                 continue;
-            nodes = replSet.test.nodes;
-            keyFileUsed = replSet.test.keyFile;
+            const nodes = replSet.test.nodes;
+            const keyFileUsed = replSet.test.keyFile;
 
             for (var j = 0; j < nodes.length; ++j) {
-                diff = (new Date()).getTime() - start.getTime();
+                const diff = (new Date()).getTime() - start.getTime();
                 var currNode = nodes[j];
                 // Skip arbiters
                 if (currNode.getDB('admin')._helloOrLegacyHello().arbiterOnly) {
@@ -1236,7 +1236,7 @@ var ShardingTest = function(params) {
 
         numMongos = numMongos.length;
     } else if (isObject(numMongos)) {
-        var tempCount = 0;
+        let tempCount = 0;
         for (var i in numMongos) {
             otherParams[i] = numMongos[i];
             tempCount++;
@@ -1247,14 +1247,14 @@ var ShardingTest = function(params) {
 
     if (Array.isArray(numConfigs)) {
         assert(!usedDefaultNumConfigs);
-        for (var i = 0; i < numConfigs.length; i++) {
+        for (let i = 0; i < numConfigs.length; i++) {
             otherParams["c" + i] = numConfigs[i];
         }
 
         numConfigs = numConfigs.length;
     } else if (isObject(numConfigs)) {
         assert(!usedDefaultNumConfigs);
-        var tempCount = 0;
+        let tempCount = 0;
         for (var i in numConfigs) {
             otherParams[i] = numConfigs[i];
             tempCount++;
@@ -1358,8 +1358,8 @@ var ShardingTest = function(params) {
             var setIsConfigSvr = false;
 
             if (isConfigShardMode && i == 0) {
-                otherParams.configOptions =
-                    Object.merge(otherParams.configOptions, {configsvr: ""});
+                otherParams.configOptions = Object.merge(
+                    otherParams.configOptions, {configsvr: "", storageEngine: "wiredTiger"});
                 rsDefaults = Object.merge(rsDefaults, otherParams.configOptions);
                 setIsConfigSvr = true;
             } else {
@@ -1840,8 +1840,6 @@ var ShardingTest = function(params) {
                                 admin.runCommand({transitionFromDedicatedConfigServer: 1}));
                         }
 
-                        // TODO SERVER-74448: Investigate if transitionFromDedicatedConfigServer
-                        // should be added to the localhost bypass exception like addShard.
                         if (keyFile) {
                             authutil.asCluster(
                                 admin.getMongo(), keyFile, transitionFromDedicatedConfigServer);

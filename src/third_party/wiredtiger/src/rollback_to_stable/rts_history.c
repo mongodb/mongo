@@ -215,16 +215,18 @@ __wt_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_ti
     WT_ERR(__wt_session_get_dhandle(session, WT_HS_URI, NULL, NULL, 0));
 
     /*
-     * The rollback operation should be performed on the history store file when the checkpoint
-     * durable start/stop timestamp is greater than the rollback timestamp. But skip if there is no
-     * stable timestamp.
+     * The rollback operation should be skipped if there is no stable timestamp. Otherwise, it
+     * should be performed if one of the following criteria is satisfied:
+     * - The history store has dirty content.
+     * - The checkpoint durable start/stop timestamp is greater than the rollback timestamp.
      *
      * Note that the corresponding code for RTS btree apply also checks whether there _are_
      * timestamped updates by checking max_durable_ts; that check is redundant here for several
      * reasons, the most immediate being that max_durable_ts cannot be none (zero) because it's
      * greater than rollback_timestamp, which is itself greater than zero.
      */
-    if (max_durable_ts > rollback_timestamp && rollback_timestamp != WT_TS_NONE) {
+    if ((S2BT(session)->modified || max_durable_ts > rollback_timestamp) &&
+      rollback_timestamp != WT_TS_NONE) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_HS_TREE_ROLLBACK "tree rolled back with durable_timestamp=%s",
           __wt_timestamp_to_string(max_durable_ts, ts_string[0]));

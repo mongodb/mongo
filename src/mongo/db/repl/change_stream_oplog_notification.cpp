@@ -43,7 +43,7 @@ namespace {
 void insertOplogEntry(OperationContext* opCtx,
                       repl::MutableOplogEntry&& oplogEntry,
                       StringData opStr) {
-    writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace.ns(), [&] {
+    writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork wunit(opCtx);
         const auto& oplogOpTime = repl::logOp(opCtx, &oplogEntry);
@@ -102,20 +102,29 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
 
 void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
                                         const DatabasesAdded& databasesAddedNotification) {
-    const auto& notifiedPhase = databasesAddedNotification.getPhase();
+    const std::string operationName = [&] {
+        switch (databasesAddedNotification.getPhase()) {
+            case CommitPhaseEnum::kSuccessful:
+                return "createDatabase";
+            case CommitPhaseEnum::kAborted:
+                return "createDatabaseAbort";
+            case CommitPhaseEnum::kPrepare:
+                return "createDatabasePrepare";
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
     for (const auto& dbName : databasesAddedNotification.getNames()) {
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
         oplogEntry.setNss(NamespaceString(dbName));
         oplogEntry.setTid(dbName.tenantId());
-        oplogEntry.setObject(BSON("msg" << BSON("createDatabase" << dbName.db())));
+        oplogEntry.setObject(BSON("msg" << BSON(operationName << dbName.db())));
         BSONObjBuilder o2Builder;
-        o2Builder.append("createDatabase", dbName.db());
-        if (notifiedPhase) {
-            o2Builder.append("phase", *notifiedPhase);
-            if (*notifiedPhase == CommitPhaseEnum::kPrepare) {
-                o2Builder.append("primaryShard", *databasesAddedNotification.getPrimaryShard());
-            }
+        o2Builder.append(operationName, dbName.db());
+        if (databasesAddedNotification.getPhase() == CommitPhaseEnum::kPrepare) {
+            o2Builder.append("primaryShard", *databasesAddedNotification.getPrimaryShard());
         }
 
         o2Builder.append("isImported", databasesAddedNotification.getAreImported());

@@ -1,6 +1,6 @@
 // Test $all/$elemMatch with missing field - SERVER-4492
 
-t = db.jstests_all4;
+let t = db.jstests_all4;
 t.drop();
 
 function checkQuery(query, val) {

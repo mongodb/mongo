@@ -88,6 +88,8 @@ Status RecordStore::rangeTruncate(OperationContext* opCtx,
                                   int64_t hintDataSizeDiff,
                                   int64_t hintNumRecordsDiff) {
     validateWriteAllowed(opCtx);
+    invariant(minRecordId != RecordId() || maxRecordId != RecordId(),
+              "Ranged truncate must have one bound defined");
     invariant(minRecordId <= maxRecordId, "Start position cannot be after end position");
     return doRangeTruncate(opCtx, minRecordId, maxRecordId, hintDataSizeDiff, hintNumRecordsDiff);
 }
@@ -151,13 +153,13 @@ uint64_t CappedInsertNotifier::getVersion() const {
     return _version;
 }
 
-void CappedInsertNotifier::waitUntil(uint64_t prevVersion, Date_t deadline) const {
+void CappedInsertNotifier::waitUntil(OperationContext* opCtx,
+                                     uint64_t prevVersion,
+                                     Date_t deadline) const {
     stdx::unique_lock<Latch> lk(_mutex);
-    while (!_dead && prevVersion == _version) {
-        if (stdx::cv_status::timeout == _notifier.wait_until(lk, deadline.toSystemTimePoint())) {
-            return;
-        }
-    }
+    opCtx->waitForConditionOrInterruptUntil(_notifier, lk, deadline, [this, prevVersion]() {
+        return _dead || prevVersion != _version;
+    });
 }
 
 void CappedInsertNotifier::kill() {

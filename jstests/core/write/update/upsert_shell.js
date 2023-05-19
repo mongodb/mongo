@@ -5,7 +5,7 @@
 
 // tests to make sure that the new _id is returned after the insert in the shell
 var l;
-t = db.upsert1;
+let t = db.upsert1;
 t.drop();
 
 // make sure the new _id is returned when $mods are used

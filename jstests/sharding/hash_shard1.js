@@ -24,7 +24,7 @@ s.printShardingStatus();
 
 // insert stuff
 var numitems = 1000;
-for (i = 0; i < numitems; i++) {
+for (let i = 0; i < numitems; i++) {
     t.insert({a: i});
 }
 // check they all got inserted

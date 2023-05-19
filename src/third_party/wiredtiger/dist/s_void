@@ -74,6 +74,7 @@ func_ok()
         -e '/int __wt_epoch$/d' \
         -e '/int __wt_errno$/d' \
         -e '/int __wt_get_vm_pagesize$/d' \
+        -e '/int __wt_lex_compare_skip$/d' \
         -e '/int __wt_lsm_manager_pop_entry$/d' \
         -e '/int __wt_once$/d' \
         -e '/int __wt_posix_directory_list_free$/d' \
@@ -117,6 +118,9 @@ func_ok()
         -e '/int index_compare_primary$/d' \
         -e '/int index_compare_u$/d' \
         -e '/int index_extractor_u$/d' \
+        -e '/int iaa_error$/d' \
+        -e '/int iaa_pre_size$/d' \
+        -e '/int iaa_terminate$/d' \
         -e '/int dir_store_directory_list_free$/d' \
         -e '/int dir_store_err$/d' \
         -e '/int dir_store_file_lock$/d' \

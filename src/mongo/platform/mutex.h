@@ -41,7 +41,6 @@
 #include "mongo/platform/source_location.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concepts.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -196,8 +195,8 @@ inline auto& getDiagnosticListenerState() noexcept {
  * DiagnosticListeners subclass, please provide the switch on that subclass to noop its
  * functions. It is only safe to add a DiagnosticListener during a MONGO_INITIALIZER.
  */
-TEMPLATE(typename ListenerT)
-REQUIRES(std::is_base_of_v<DiagnosticListener, ListenerT>)
+template <typename ListenerT>
+requires std::is_base_of_v<DiagnosticListener, ListenerT>
 void installDiagnosticListener() {
     auto& state = getDiagnosticListenerState();
 

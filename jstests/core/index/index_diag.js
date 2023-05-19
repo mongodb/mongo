@@ -3,14 +3,14 @@
 // ]
 load("jstests/libs/fixture_helpers.js");
 
-t = db.index_diag;
+let t = db.index_diag;
 t.drop();
 
 assert.commandWorked(t.createIndex({x: 1}));
 
-all = [];
-ids = [];
-xs = [];
+let all = [];
+let ids = [];
+let xs = [];
 
 function r(a) {
     var n = [];
@@ -19,8 +19,8 @@ function r(a) {
     return n;
 }
 
-for (i = 1; i < 4; i++) {
-    o = {_id: i, x: -i};
+for (let i = 1; i < 4; i++) {
+    let o = {_id: i, x: -i};
     t.insert(o);
     all.push(o);
     ids.push({_id: i});

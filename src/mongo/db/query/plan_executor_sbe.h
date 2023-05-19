@@ -185,7 +185,15 @@ private:
     sbe::value::Value _valLastRecordId{0};
     sbe::RuntimeEnvironment::Accessor* _oplogTs{nullptr};
 
+    // Only for a resumed scan ("seek"). Slot holding the TypeTags::RecordId of the record to resume
+    // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
+
+    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
+    boost::optional<sbe::value::SlotId> _minRecordIdSlot;
+
+    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
+    boost::optional<sbe::value::SlotId> _maxRecordIdSlot;
 
     // NOTE: '_stash' stores documents as BSON. Currently, one of the '_stash' is usages is to store
     // documents received from the plan during multiplanning. This means that the documents

@@ -239,7 +239,7 @@ function generateRangePredicates(field, queryValues, fieldType) {
         ranges.forEach(function(range) {
             assert(range.length == 2);
             let [op1, op2] = opOptions[j];
-            pred = makeRangePredicate(field, op1, range[0], op2, range[1]);
+            let pred = makeRangePredicate(field, op1, range[0], op2, range[1]);
             const doc = {
                 "pipeline": [pred],
                 "qtype": qSize + " range",
@@ -249,7 +249,7 @@ function generateRangePredicates(field, queryValues, fieldType) {
             };
             docs.push(doc);
             if (fieldType == 'array' && range[0] <= range[1]) {
-                pred = makeRangePredicate(field, op1, range[0], op2, range[1], true);
+                let pred = makeRangePredicate(field, op1, range[0], op2, range[1], true);
                 const doc = {
                     "pipeline": [pred],
                     "qtype": qSize + " range",
@@ -643,7 +643,7 @@ function generateComplexPredicates(testCases, fields, fieldTypes, queryValues) {
     // Generate single-field disjunctions and conjunctions.
     generateSingleFieldPredicates(fields, fieldTypes, queryValues, predicates);
 
-    i = 0;
+    let i = 0;
     for (let query of predicates) {
         query["_id"] = i++;
     }

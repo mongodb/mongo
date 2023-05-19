@@ -1,5 +1,5 @@
 
-t = db.updatec;
+let t = db.updatec;
 t.drop();
 
 t.update({"_id": 123}, {$set: {"v": {"i": 123, "a": 456}}, $push: {"f": 234}}, 1, 0);

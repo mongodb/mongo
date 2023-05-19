@@ -49,7 +49,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/stats/fill_locker_info.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -58,6 +58,8 @@
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/session_catalog_router.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -128,7 +130,8 @@ public:
     };
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations) override;
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) override;
     bool onUnpreparedTransactionCommitThrowsException = false;
     bool unpreparedTransactionCommitted = false;
     std::function<void(const std::vector<repl::ReplOperation>&)> onUnpreparedTransactionCommitFn =
@@ -154,12 +157,12 @@ public:
     bool onTransactionAbortThrowsException = false;
     bool transactionAborted = false;
 
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) override;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) override;
 
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
@@ -195,7 +198,9 @@ void OpObserverMock::onTransactionPrepare(
 }
 
 void OpObserverMock::onUnpreparedTransactionCommit(
-    OperationContext* opCtx, const TransactionOperations& transactionOperations) {
+    OperationContext* opCtx,
+    const TransactionOperations& transactionOperations,
+    OpStateAccumulator* opAccumulator) {
     ASSERT(opCtx->lockState()->inAWriteUnitOfWork());
 
     OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations);
@@ -240,7 +245,8 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              const CollectionDropType dropType) {
+                                              const CollectionDropType dropType,
+                                              bool markFromMigrate) {
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
@@ -6226,9 +6232,11 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     // Update `2` to increment its `value` to 2. This must be done in the same split session as the
     // insert.
     callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
-        AutoGetCollection userColl(opCtx, kNss, LockMode::MODE_IX);
-        Helpers::update(
-            opCtx, userColl->ns(), BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
+        auto userColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        Helpers::update(opCtx, userColl, BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
     });
 
     // Mimic the methods to call for a secondary performing a split prepare. Those are called inside
@@ -6802,6 +6810,124 @@ TEST_F(ShardTxnParticipantTest, CheckingOutEagerlyReapedSessionDoesNotCrash) {
     ASSERT_THROWS_CODE(runAndCommitTransaction(retryableChildLsid, 1),
                        AssertionException,
                        ErrorCodes::TransactionTooOld);
+}
+
+class TxnParticipantAndTxnRouterTest : public TxnParticipantTest {
+protected:
+    bool doesExistInCatalog(const LogicalSessionId& lsid, SessionCatalog* sessionCatalog) {
+        bool existsInCatalog{false};
+        sessionCatalog->scanSession(
+            lsid, [&](const ObservableSession& session) { existsInCatalog = true; });
+        return existsInCatalog;
+    }
+
+    void runRouterTransactionLeaveOpen(LogicalSessionId lsid, TxnNumber txnNumber) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            auto opCtxSession = std::make_unique<RouterOperationContextSession>(opCtx);
+
+            auto txnRouter = TransactionRouter::get(opCtx);
+            txnRouter.beginOrContinueTxn(
+                opCtx, *opCtx->getTxnNumber(), TransactionRouter::TransactionActions::kStart);
+        });
+    }
+
+    void runParticipantTransactionLeaveOpen(LogicalSessionId lsid, TxnNumber txnNumber) {
+        runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(lsid);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            auto opCtxSession = MongoDSessionCatalog::get(opCtx)->checkOutSession(opCtx);
+
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            txnParticipant.beginOrContinue(opCtx,
+                                           {*opCtx->getTxnNumber()},
+                                           false /* autocommit */,
+                                           true /* startTransaction */);
+        });
+    }
+};
+
+TEST_F(TxnParticipantAndTxnRouterTest, SkipEagerReapingSessionUsedByParticipantFromRouter) {
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with two retryable children.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runRouterTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runRouterTransactionLeaveOpen(retryableChildLsid, 0);
+
+    auto retryableChildLsidReapable =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runRouterTransactionLeaveOpen(retryableChildLsidReapable, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Use one retryable session with a TransactionParticipant and verify this blocks the router
+    // role from reaping it.
+
+    runParticipantTransactionLeaveOpen(retryableChildLsid, 0);
+
+    // Start a higher txnNumber client transaction in the router role and verify the child used with
+    // TransactionParticipant was not erased but the other one was.
+
+    parentTxnNumber++;
+    runRouterTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Verify the participant role can reap the child.
+
+    auto higherRetryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runParticipantTransactionLeaveOpen(higherRetryableChildLsid, 5);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
+
+    // Sanity check that higher txnNumbers are reaped correctly and eager reaping only applies to
+    // parent and children sessions in the same "family."
+
+    auto parentLsid2 = makeLogicalSessionIdForTest();
+    auto parentTxnNumber2 = parentTxnNumber + 11;
+    runParticipantTransactionLeaveOpen(parentLsid2, parentTxnNumber2);
+
+    auto retryableChildLsid2 =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid2, parentTxnNumber2);
+    runRouterTransactionLeaveOpen(retryableChildLsid2, 12131);
+
+    ASSERT_EQ(sessionCatalog->size(), 2);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(parentLsid2, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+
+    parentTxnNumber2++;
+    runParticipantTransactionLeaveOpen(parentLsid2, parentTxnNumber2);
+
+    // The unrelated sessions still exist and the superseded child was reaped.
+    ASSERT_EQ(sessionCatalog->size(), 2);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(parentLsid2, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
+    ASSERT_FALSE(doesExistInCatalog(retryableChildLsid2, sessionCatalog));
 }
 
 }  // namespace

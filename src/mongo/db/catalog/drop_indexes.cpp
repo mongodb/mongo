@@ -508,7 +508,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         // The index catalog requires that no active index builders are running when dropping ready
         // indexes.
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
-        writeConflictRetry(opCtx, "dropIndexes", dbAndUUID.toString(), [&] {
+        writeConflictRetry(opCtx, "dropIndexes", dbAndUUID, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             // This is necessary to check shard version.
@@ -561,16 +561,15 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         invariant((*collection)->getIndexCatalog()->numIndexesInProgress() == 0);
     }
 
-    writeConflictRetry(
-        opCtx, "dropIndexes", dbAndUUID.toString(), [opCtx, &collection, &indexNames, &reply] {
-            WriteUnitOfWork wunit(opCtx);
+    writeConflictRetry(opCtx, "dropIndexes", dbAndUUID, [opCtx, &collection, &indexNames, &reply] {
+        WriteUnitOfWork wunit(opCtx);
 
-            // This is necessary to check shard version.
-            OldClientContext ctx(opCtx, (*collection)->ns());
-            dropReadyIndexes(
-                opCtx, collection->getWritableCollection(opCtx), indexNames, &reply, false);
-            wunit.commit();
-        });
+        // This is necessary to check shard version.
+        OldClientContext ctx(opCtx, (*collection)->ns());
+        dropReadyIndexes(
+            opCtx, collection->getWritableCollection(opCtx), indexNames, &reply, false);
+        wunit.commit();
+    });
 
     return reply;
 }
@@ -584,7 +583,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
     auto parsed = DropIndexes::parse(
         IDLParserContext{"dropIndexes", false /* apiStrict */, nss.tenantId()}, cmdObjWithDb);
 
-    return writeConflictRetry(opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &cmdObj, &parsed] {
+    return writeConflictRetry(opCtx, "dropIndexes", nss, [opCtx, &nss, &cmdObj, &parsed] {
         AutoGetCollection collection(opCtx, nss, MODE_X);
 
         // If db/collection does not exist, short circuit and return.

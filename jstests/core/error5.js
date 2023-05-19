@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.error5;
+let t = db.error5;
 t.drop();
 
 assert.throws(function() {

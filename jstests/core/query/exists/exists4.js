@@ -1,6 +1,6 @@
 // Check various exists cases, based on SERVER-1735 example.
 
-t = db.jstests_exists4;
+let t = db.jstests_exists4;
 t.drop();
 
 t.createIndex({date: -1, country_code: 1, user_id: 1}, {unique: 1, background: 1});

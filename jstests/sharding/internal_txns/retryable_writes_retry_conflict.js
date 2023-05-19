@@ -50,11 +50,7 @@ let currentParentTxnNumber = 35;
  * blocked until the transaction commits or aborts and does not cause the write statement to execute
  * more than once.
  */
-function testBlockingRetry(retryFunc, testOpts = {
-    prepareBeforeRetry,
-    abortAfterBlockingRetry,
-    stepDownPrimaryAfterBlockingRetry
-}) {
+function testBlockingRetry(retryFunc, testOpts) {
     jsTest.log("Test blocking retry with test options " + tojson(testOpts));
     const parentTxnNumber = currentParentTxnNumber++;
     const docToInsert = {x: 1};

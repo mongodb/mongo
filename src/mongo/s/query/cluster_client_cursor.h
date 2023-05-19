@@ -158,6 +158,13 @@ public:
     virtual bool remotesExhausted() = 0;
 
     /**
+     * Returns whether or not the cursor has been killed. Repeated calls to kill() can occur in
+     * ~ClusterClientCursorGuard() if the cursor was killed while the cursor was checked out or in
+     * use with the guard.
+     */
+    virtual bool hasBeenKilled() = 0;
+
+    /**
      * Sets the maxTimeMS value that the cursor should forward with any internally issued getMore
      * requests.
      *
@@ -259,9 +266,15 @@ public:
      */
     virtual bool shouldOmitDiagnosticInformation() const = 0;
 
+    /**
+     * Returns and releases ownership of the RequestShapifier associated with the request this
+     * cursor is handling.
+     */
+    virtual std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() = 0;
+
 protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
-    // Useful for diagnostics like telemetry.
+    // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
 
 private:

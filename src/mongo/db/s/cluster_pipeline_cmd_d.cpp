@@ -76,7 +76,8 @@ struct ClusterPipelineCommandD {
             opMsgRequest.body.replaceFieldNames(BSON(AggregateCommandRequest::kCommandName << 1));
         return aggregation_request_helper::parseFromBSON(
             opCtx,
-            DatabaseName(opMsgRequest.getValidatedTenantId(), opMsgRequest.getDatabase()),
+            DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
+                                          opMsgRequest.getDatabase()),
             modifiedRequestBody,
             explainVerbosity,
             apiStrict);

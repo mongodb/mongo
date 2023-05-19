@@ -51,7 +51,7 @@ function runTransaction(primaryHost, dbName, collName) {
     session.getDatabase(dbName)[collName].insert({doc: makeLargeDoc(10)});
     session.getDatabase(dbName)[collName].insert({doc: makeLargeDoc(5)});
     session.getDatabase(dbName)[collName].insert({doc: makeLargeDoc(5)});
-    commitRes = session.commitTransaction_forTesting();
+    let commitRes = session.commitTransaction_forTesting();
     assert.eq(1, commitRes.ok);
     session.endSession();
 }

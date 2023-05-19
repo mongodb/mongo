@@ -68,6 +68,12 @@ class HangAnalyzer(Subcommand):
         self._configure_processes()
         self._setup_logging(logger)
 
+    def kill_rogue_processes(self):
+        """Kill any processes that are currently being analyzed."""
+        processes = process_list.get_processes(self.process_ids, self.interesting_processes,
+                                               self.options.process_match, self.root_logger)
+        process.teardown_processes(self.root_logger, processes, dump_pids={})
+
     def execute(self):
         """
         Execute hang analysis.
@@ -193,12 +199,11 @@ class HangAnalyzer(Subcommand):
     def _setup_logging(self, logger):
         if logger is None:
             self.root_logger = logging.Logger("hang_analyzer", level=logging.DEBUG)
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setFormatter(logging.Formatter(fmt="%(message)s"))
+            self.root_logger.addHandler(handler)
         else:
             self.root_logger = logger
-
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter(fmt="%(message)s"))
-        self.root_logger.addHandler(handler)
 
     def _log_system_info(self):
         self.root_logger.info("Python Version: %s", sys.version)

@@ -743,7 +743,6 @@ MongoRunner.mongodOptions = function(opts = {}) {
     _removeSetParameterIfBeforeVersion(
         opts, "enableDefaultWriteConcernUpdatesForInitiate", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "enableReconfigRollbackCommittedWritesCheck", "5.0.0");
-    _removeSetParameterIfBeforeVersion(opts, "featureFlagRetryableFindAndModify", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "allowMultipleArbiters", "5.3.0");
     _removeSetParameterIfBeforeVersion(
         opts, "internalQueryDisableExclusionProjectionFastPath", "6.2.0");
@@ -1435,16 +1434,6 @@ function appendSetParameterArgs(argArray) {
                 const backtraceLogFilePath =
                     MongoRunner.dataDir + "/" + randomName + Date.now() + ".stacktrace";
                 argArray.push(...["--setParameter", "backtraceLogFile=" + backtraceLogFilePath]);
-            }
-
-            // When launching a 5.0 mongod, if we're mentioning the
-            // `storeFindAndModifyImagesInSideCollection` setParameter and the corresponding feature
-            // flag is not set, add it for good measure.
-            if (programMajorMinorVersion === 500 &&
-                isSetParameterMentioned(jsTest.options().setParameters,
-                                        "storeFindAndModifyImagesInSideCollection") &&
-                !argArrayContainsSetParameterValue("featureFlagRetryableFindAndModify=")) {
-                argArray.push(...['--setParameter', "featureFlagRetryableFindAndModify=true"]);
             }
 
             // New mongod-specific option in 4.9.x.

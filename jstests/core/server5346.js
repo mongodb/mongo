@@ -1,11 +1,8 @@
 
-t = db.server5346;
+let t = db.server5346;
 t.drop();
 
-x = {
-    _id: 1,
-    versions: {}
-};
+let x = {_id: 1, versions: {}};
 t.insert(x);
 
 t.update({_id: 1}, {$inc: {"versions.2_01": 1}});

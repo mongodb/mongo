@@ -53,37 +53,43 @@ struct TestObserver : public OpObserverNoop {
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
         drops++;
     }
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType) override {
+                                  const CollectionDropType dropType,
+                                  bool markFromMigrate) override {
         drops++;
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
-    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) {
-        preRenameCollection(
-            opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+                            bool stayTemp,
+                            bool markFromMigrate) {
+        preRenameCollection(opCtx,
+                            fromCollection,
+                            toCollection,
+                            uuid,
+                            dropTargetUUID,
+                            numRecords,
+                            stayTemp,
+                            markFromMigrate);
         postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     }
 
-    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
-                                     bool stayTemp) override {
+                                     bool stayTemp,
+                                     bool markFromMigrate) override {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
@@ -182,8 +188,12 @@ TEST_F(OpObserverRegistryTest, OnDropCollectionObserverResultReturnsRightTime) {
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::make_unique<OpObserverNoop>());
     auto op = [&]() -> repl::OpTime {
-        return registry.onDropCollection(
-            &opCtx, testNss, UUID::gen(), 0U, OpObserver::CollectionDropType::kOnePhase);
+        return registry.onDropCollection(&opCtx,
+                                         testNss,
+                                         UUID::gen(),
+                                         0U,
+                                         OpObserver::CollectionDropType::kOnePhase,
+                                         /*markFromMigrate=*/false);
     };
     checkConsistentOpTime(op);
 }
@@ -194,7 +204,8 @@ TEST_F(OpObserverRegistryTest, PreRenameCollectionObserverResultReturnsRightTime
     registry.addObserver(std::make_unique<OpObserverNoop>());
     auto op = [&]() -> repl::OpTime {
         UUID uuid = UUID::gen();
-        auto opTime = registry.preRenameCollection(&opCtx, testNss, testNss, uuid, {}, 0U, false);
+        auto opTime = registry.preRenameCollection(
+            &opCtx, testNss, testNss, uuid, {}, 0U, /*stayTemp=*/false, /*markFromMigrate=*/false);
         registry.postRenameCollection(&opCtx, testNss, testNss, uuid, {}, false);
         return opTime;
     };
@@ -206,8 +217,12 @@ DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "i
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
     auto op = [&]() -> repl::OpTime {
-        return registry.onDropCollection(
-            &opCtx, testNss, UUID::gen(), 0U, OpObserver::CollectionDropType::kOnePhase);
+        return registry.onDropCollection(&opCtx,
+                                         testNss,
+                                         UUID::gen(),
+                                         0U,
+                                         OpObserver::CollectionDropType::kOnePhase,
+                                         /*markFromMigrate=*/false);
     };
     checkInconsistentOpTime(op);
 }
@@ -218,7 +233,8 @@ DEATH_TEST_F(OpObserverRegistryTest, PreRenameCollectionReturnsInconsistentTime,
     registry.addObserver(std::move(unique2));
     auto op = [&]() -> repl::OpTime {
         UUID uuid = UUID::gen();
-        auto opTime = registry.preRenameCollection(&opCtx, testNss, testNss, uuid, {}, 0U, false);
+        auto opTime = registry.preRenameCollection(
+            &opCtx, testNss, testNss, uuid, {}, 0U, /*stayTemp=*/false, /*markFromMigrate=*/false);
         registry.postRenameCollection(&opCtx, testNss, testNss, uuid, {}, false);
         return opTime;
     };

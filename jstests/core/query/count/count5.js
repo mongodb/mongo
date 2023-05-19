@@ -1,15 +1,13 @@
 // @tags: [requires_fastcount]
 
-t = db.count5;
+let t = db.count5;
 t.drop();
 
-for (i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     t.save({x: i});
 }
 
-q = {
-    x: {$gt: 25, $lte: 75}
-};
+let q = {x: {$gt: 25, $lte: 75}};
 
 assert.eq(50, t.find(q).count(), "A");
 assert.eq(50, t.find(q).itcount(), "B");

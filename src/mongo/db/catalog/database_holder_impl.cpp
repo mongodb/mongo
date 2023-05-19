@@ -143,7 +143,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     lk.unlock();
 
     if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty()) {
-        audit::logCreateDatabase(opCtx->getClient(), dbName.toString());
+        audit::logCreateDatabase(opCtx->getClient(), DatabaseNameUtil::serialize(dbName));
         if (justCreated)
             *justCreated = true;
     }
@@ -179,8 +179,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = *collIt;
+    for (auto&& coll : catalog->range(name)) {
         if (!coll) {
             break;
         }
@@ -192,12 +191,11 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                                 << coll->ns().toStringForErrorMsg() << "'.");
     }
 
-    audit::logDropDatabase(opCtx->getClient(), name.toString());
+    audit::logDropDatabase(opCtx->getClient(), DatabaseNameUtil::serialize(name));
 
     auto const serviceContext = opCtx->getServiceContext();
 
-    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
-        auto coll = *collIt;
+    for (auto&& coll : catalog->range(name)) {
         if (!coll) {
             break;
         }
@@ -213,7 +211,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                 coll->ns(),
                 coll->uuid(),
                 coll->numRecords(opCtx),
-                OpObserver::CollectionDropType::kOnePhase);
+                OpObserver::CollectionDropType::kOnePhase,
+                /*markFromMigrate=*/false);
         }
 
         Top::get(serviceContext).collectionDropped(coll->ns());
@@ -231,7 +230,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
         });
 
     auto const storageEngine = serviceContext->getStorageEngine();
-    writeConflictRetry(opCtx, "dropDatabase", name.toString(), [&] {
+    writeConflictRetry(opCtx, "dropDatabase", NamespaceString(name), [&] {
         storageEngine->dropDatabase(opCtx, name).transitional_ignore();
     });
 }

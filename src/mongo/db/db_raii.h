@@ -199,12 +199,6 @@ private:
     // there's already a lock-free read in progress.
     bool _isLockFreeReadSubOperation;
 
-    // The CollectionCatalogStasher must outlive the LockFreeReadsBlock below. ~LockFreeReadsBlock
-    // clears a flag that the ~CollectionCatalogStasher checks.
-    //
-    // Is not assigned-to after construction, but will have reset/stash called on yield/restore.
-    CollectionCatalogStasher _catalogStasher;
-
     // Whether or not the calling context expects to conflict with secondary batch application. This
     // is just used for invariant checking.
     bool _callerExpectedToConflictWithSecondaryBatchApplication;
@@ -243,7 +237,7 @@ private:
     // May change after construction, when restoring from yield.
     NamespaceString _resolvedNss;
 
-    // Only set if _collectionPtr does not contain a nullptr and if the requested namesapce is a
+    // Only set if _collectionPtr does not contain a nullptr and if the requested namespace is a
     // view.
     //
     // May change after construction, when restoring from yield.
@@ -435,10 +429,6 @@ public:
     AutoReadLockFree(OperationContext* opCtx, Date_t deadline = Date_t::max());
 
 private:
-    // The CollectionCatalogStasher must outlive the LockFreeReadsBlock below. ~LockFreeReadsBlock
-    // clears a flag that the ~CollectionCatalogStasher checks.
-    CollectionCatalogStasher _catalogStash;
-
     // Sets a flag on the opCtx to inform subsequent code that the operation is running lock-free.
     LockFreeReadsBlock _lockFreeReadsBlock;
 
@@ -462,10 +452,6 @@ public:
                              Date_t deadline = Date_t::max());
 
 private:
-    // The CollectionCatalogStasher must outlive the LockFreeReadsBlock below. ~LockFreeReadsBlock
-    // clears a flag that the ~CollectionCatalogStasher checks.
-    CollectionCatalogStasher _catalogStash;
-
     // Sets a flag on the opCtx to inform subsequent code that the operation is running lock-free.
     LockFreeReadsBlock _lockFreeReadsBlock;
 

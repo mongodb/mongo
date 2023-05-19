@@ -155,6 +155,15 @@ private:
         return static_cast<const ClusterWriteCmd*>(definition());
     }
 
+    /**
+     * Runs a two-phase protocol to explain an updateOne/deleteOne without a shard key or _id.
+     * Returns true if we successfully ran the protocol, false otherwise.
+     */
+    bool _runExplainWithoutShardKey(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    ExplainOptions::Verbosity verbosity,
+                                    BSONObjBuilder* result);
+
     const OpMsgRequest* _request;
     BatchedCommandRequest _batchedRequest;
 

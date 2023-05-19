@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/duration.h"
 
@@ -46,6 +47,10 @@ void setSocketKeepAliveParams(int sock,
                               Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
 
 std::string makeUnixSockPath(int port);
+
+inline bool isUnixDomainSocket(const StringData& hostname) {
+    return hostname.find('/') != std::string::npos;
+}
 
 // If an ip address is passed in, just return that.  If a hostname is passed
 // in, look up its ip and return that.  Returns "" on failure.

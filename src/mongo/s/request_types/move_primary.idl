@@ -36,35 +36,40 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 structs:
-    movePrimary:
-        description: "The public movePrimary command on mongos"
+    MovePrimaryRequestBase:
+        description: The movePrimary request fields shared by several commands
         strict: false
         fields:
-            movePrimary:
-                type: namespacestring
-                description: "The namespace of the database whose primary shard is to be reassigned."
-                optional: true
-            moveprimary:
-                type: namespacestring
-                description: "The deprecated version of this command's name."
-                optional: true
             to:
-                type: string
-                description: "The shard serving as the destination for un-sharded collections."
-
-    ShardMovePrimary:
-        description: "The internal movePrimary command on a primary shard"
-        generate_comparison_operators: true
-        strict: false
-        fields:
-            _shardsvrMovePrimary:
-                type: namespacestring
-                description: "The namespace of the database whose primary shard is to be reassigned."
-            to:
-                type: string
-                description: "The shard serving as the destination for un-sharded collections."
+                type: shard_id
+                description: Shard serving as the destination for un-sharded collections
+                validator:
+                    callback: "ShardId::validate"
 
 commands:
+    movePrimary:
+        command_name: movePrimary
+        command_alias: moveprimary
+        description: The public movePrimary command on mongos
+        cpp_name: MovePrimary
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false
+        chained_structs:
+            MovePrimaryRequestBase: MovePrimaryRequestBase
+
+    _shardsvrMovePrimary:
+        command_name: _shardsvrMovePrimary
+        description: The internal movePrimary command on a primary shard
+        cpp_name: ShardsvrMovePrimary
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false
+        chained_structs:
+            MovePrimaryRequestBase: MovePrimaryRequestBase
+
     _shardsvrMovePrimaryEnterCriticalSection:
         command_name: _shardsvrMovePrimaryEnterCriticalSection
         description: Block CRUD operations on the given database by entering the critical section.

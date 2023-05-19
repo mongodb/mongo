@@ -52,7 +52,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
     // Creates the collection if it doesn't exist.
     if (!localCollection) {
         Status status =
-            writeConflictRetry(opCtx, "createLostAndFoundCollection", lostAndFoundNss.ns(), [&]() {
+            writeConflictRetry(opCtx, "createLostAndFoundCollection", lostAndFoundNss, [&]() {
                 // Ensure the database exists.
                 auto db = autoColl.ensureDbExists(opCtx);
                 invariant(db, lostAndFoundNss.toStringForErrorMsg());
@@ -81,7 +81,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
     localCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, localCollection));
 
     return writeConflictRetry(
-        opCtx, "writeDupDocToLostAndFoundCollection", nss.ns(), [&]() -> StatusWith<int> {
+        opCtx, "writeDupDocToLostAndFoundCollection", nss, [&]() -> StatusWith<int> {
             WriteUnitOfWork wuow(opCtx);
             Snapshotted<BSONObj> doc;
             int docSize = 0;
@@ -130,7 +130,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
     int64_t numInserted = 0;
 
     Status insertStatus = Status::OK();
-    writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss.ns(), [&] {
+    writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss, [&] {
         WriteUnitOfWork wunit(opCtx);
         insertStatus =
             accessMethod->insertKeysAndUpdateMultikeyPaths(opCtx,
@@ -195,7 +195,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
                 // duplicate records is in the index, so we need to add the newer record to the
                 // index.
                 if (dupKeyRid && ridToMove == *dupKeyRid) {
-                    writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss.ns(), [&] {
+                    writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss, [&] {
                         WriteUnitOfWork wunit(opCtx);
                         insertStatus = accessMethod->insertKeysAndUpdateMultikeyPaths(
                             opCtx, coll, {ks}, {}, {}, options, nullptr, nullptr);

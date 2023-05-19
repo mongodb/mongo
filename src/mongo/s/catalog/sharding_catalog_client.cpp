@@ -46,4 +46,8 @@ const WriteConcernOptions ShardingCatalogClient::kMajorityWriteConcern(
 const WriteConcernOptions ShardingCatalogClient::kLocalWriteConcern(
     1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
+// An empty namespace is used as a reserved value to persist initialization metadata of
+// config.placementHistory.
+const NamespaceString ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker{};
+
 }  // namespace mongo

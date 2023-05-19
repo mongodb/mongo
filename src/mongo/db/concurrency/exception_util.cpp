@@ -43,13 +43,17 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 
-void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns) {
+void logWriteConflictAndBackoff(int attempt,
+                                StringData operation,
+                                StringData reason,
+                                StringData ns) {
     logAndBackoff(4640401,
                   logv2::LogComponent::kWrite,
                   logv2::LogSeverity::Debug(1),
                   static_cast<size_t>(attempt),
                   "Caught WriteConflictException",
                   "operation"_attr = operation,
+                  "reason"_attr = reason,
                   logAttrs(NamespaceString(ns)));
 }
 
@@ -133,7 +137,7 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
 
     // Handle as write conflict.
     CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-    logWriteConflictAndBackoff(*writeConflictAttempts, opStr, ns);
+    logWriteConflictAndBackoff(*writeConflictAttempts, opStr, e.reason(), ns);
     ++(*writeConflictAttempts);
     opCtx->recoveryUnit()->abandonSnapshot();
 }

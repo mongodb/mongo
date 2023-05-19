@@ -140,18 +140,6 @@ result = testDB.runCommand({
 });
 assert.commandWorked(result);
 
-// Tests that the internal '$_generateV2ResumeTokens' option does not fail with 'apiStrict: true'.
-result = testDB.runCommand({
-    aggregate: collName,
-    pipeline: [{$project: {_id: 0}}],
-    cursor: {},
-    writeConcern: {w: "majority"},
-    $_generateV2ResumeTokens: false,
-    apiVersion: "1",
-    apiStrict: true
-});
-assert.commandWorked(result);
-
 // Tests that time-series collection can be queried (invoking $_internalUnpackBucket stage)
 // from an external client with 'apiStrict'.
 (function testInternalUnpackBucketAllowance() {

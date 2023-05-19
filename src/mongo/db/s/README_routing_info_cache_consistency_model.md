@@ -1,5 +1,5 @@
 # Consistency Model of the Routing Info Cache
-This section builds upon the definitions of the sharding catalog in [this section](https://github.com/mongodb/mongo/blob/9b4ddb11af242d7c8d48181c26ca091fe4533642/src/mongo/db/s/README_sharding_catalog.md#catalog-containers) and elaborates on the consistency model of the [CatalogCache](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134), which is what backs the [Router role](README_sharding_catalog.md#router-role).
+This section builds upon the definitions of the sharding catalog in [this section](README_sharding_catalog.md#catalog-containers) and elaborates on the consistency model of the [CatalogCache](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134), which is what backs the [Router role](README_sharding_catalog.md#router-role).
 
 ## Timelines
 Let's define the set of operations which a DDL coordinator performs over a set of catalog objects as the **timeline** of that object. The timelines of different objects can be **causally dependent** (or just *dependent* for brevity) on one another, or they can be **independent**.

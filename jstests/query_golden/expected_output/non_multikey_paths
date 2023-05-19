@@ -4,47 +4,56 @@
 [jsTest] Query: [ { "$match" : { "one.one.one.one" : 2 } } ]
 [jsTest] ----
 
-Leaf stage: {
+Leaf stage: 
+{
 	"nodeType" : "IndexScan",
 	"indexDefName" : "one.one.one.one_1",
 	"interval" : "[ 2, 2 ]"
 }
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "one.one.one.many" : 2 } } ]
 [jsTest] ----
 
-Leaf stage: {
+Leaf stage: 
+{
 	"nodeType" : "IndexScan",
 	"indexDefName" : "one.one.one.many_1",
 	"interval" : "[ 2, 2 ]"
 }
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many.one.one.one" : 2 } } ]
 [jsTest] ----
 
-Leaf stage: {
+Leaf stage: 
+{
 	"nodeType" : "IndexScan",
 	"indexDefName" : "many.one.one.one_1",
 	"interval" : "[ 2, 2 ]"
 }
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many.one.one.many" : 2 } } ]
 [jsTest] ----
 
-Leaf stage: {
+Leaf stage: 
+{
 	"nodeType" : "IndexScan",
 	"indexDefName" : "many.one.one.many_1",
 	"interval" : "[ 2, 2 ]"
 }
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "many.many.many.many" : 2 } } ]
 [jsTest] ----
 
-Leaf stage: {
+Leaf stage: 
+{
 	"nodeType" : "IndexScan",
 	"indexDefName" : "many.many.many.many_1",
 	"interval" : "[ 2, 2 ]"

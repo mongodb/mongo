@@ -600,19 +600,19 @@ private:
 };
 
 /**
- * Record metrics for the current operation on opDebug and aggregates those metrics for telemetry
+ * Record metrics for the current operation on opDebug and aggregates those metrics for queryStats
  * use. If a cursor is provided (via ClusterClientCursorGuard or
  * ClusterCursorManager::PinnedCursor), metrics are aggregated on the cursor; otherwise, metrics are
  * written directly to the telemetry store.
+ * NOTE: Metrics are taken from opDebug.additiveMetrics, so CurOp::setEndOfOpMetrics must be called
+ * *prior* to calling these.
+ *
+ * Currently, telemetry is only collected for find and aggregate requests (and their subsequent
+ * getMore requests), so these should only be called from those request paths.
  */
-void collectTelemetryMongos(OperationContext* opCtx,
-                            const BSONObj& originatingCommand,
-                            long long nreturned);
-void collectTelemetryMongos(OperationContext* opCtx,
-                            ClusterClientCursorGuard& cursor,
-                            long long nreturned);
-void collectTelemetryMongos(OperationContext* opCtx,
-                            ClusterCursorManager::PinnedCursor& cursor,
-                            long long nreturned);
+void collectQueryStatsMongos(OperationContext* opCtx,
+                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier);
+void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor);
+void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor);
 
 }  // namespace mongo

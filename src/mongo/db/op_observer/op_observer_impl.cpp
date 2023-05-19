@@ -43,13 +43,13 @@
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -68,12 +68,10 @@
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
-#include "mongo/db/views/util.h"
-#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -290,12 +288,16 @@ void writeToImageCollection(OperationContext* opCtx,
     // stronger lock acquisition is taken on this namespace is during step up to create the
     // collection.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    AutoGetCollection imageCollectionRaii(
-        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     auto curOp = CurOp::get(opCtx);
     const auto existingNs = curOp->getNSS();
-    UpdateResult res =
-        Helpers::upsert(opCtx, NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
+    UpdateResult res = Helpers::upsert(opCtx, collection, imageEntry.toBSON());
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
         curOp->setNS_inlock(existingNs);
@@ -570,12 +572,137 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
 }
 
+namespace {
+
+std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
+                                        MutableOplogEntry* oplogEntryTemplate,
+                                        std::vector<InsertStatement>::const_iterator begin,
+                                        std::vector<InsertStatement>::const_iterator end,
+                                        const std::vector<bool>& fromMigrate,
+                                        const ShardingWriteRouter& shardingWriteRouter,
+                                        const CollectionPtr& collectionPtr,
+                                        OplogWriter* oplogWriter) {
+    invariant(begin != end);
+
+    auto nss = oplogEntryTemplate->getNss();
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->isOplogDisabledFor(opCtx, nss)) {
+        invariant(!begin->stmtIds.empty());
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "retryable writes is not supported for unreplicated ns: "
+                              << nss.toStringForErrorMsg(),
+                begin->stmtIds.front() == kUninitializedStmtId);
+        return {};
+    }
+
+    // The number of entries in 'fromMigrate' should be consistent with the number of insert
+    // operations in [begin, end). Also, 'fromMigrate' is a sharding concept, so there is no
+    // need to check 'fromMigrate' for inserts that are not replicated. See SERVER-75829.
+    invariant(std::distance(fromMigrate.begin(), fromMigrate.end()) == std::distance(begin, end),
+              oplogEntryTemplate->toReplOperation().toBSON().toString());
+
+    // If this oplog entry is from a tenant migration, include the tenant migration
+    // UUID and optional donor timeline metadata.
+    if (const auto& recipientInfo = repl::tenantMigrationInfo(opCtx)) {
+        oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
+        if (oplogEntryTemplate->getTid() &&
+            change_stream_serverless_helpers::isChangeStreamEnabled(
+                opCtx, *oplogEntryTemplate->getTid()) &&
+            recipientInfo->donorOplogEntryData) {
+            oplogEntryTemplate->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
+            oplogEntryTemplate->setDonorApplyOpsIndex(
+                recipientInfo->donorOplogEntryData->applyOpsIndex);
+        }
+    }
+
+    const size_t count = end - begin;
+
+    // Use OplogAccessMode::kLogOp to avoid recursive locking.
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
+
+    WriteUnitOfWork wuow(opCtx);
+
+    std::vector<repl::OpTime> opTimes(count);
+    std::vector<Timestamp> timestamps(count);
+    std::vector<BSONObj> bsonOplogEntries(count);
+    std::vector<Record> records(count);
+    for (size_t i = 0; i < count; i++) {
+        // Make a copy from the template for each insert oplog entry.
+        MutableOplogEntry oplogEntry = *oplogEntryTemplate;
+        // Make a mutable copy.
+        auto insertStatementOplogSlot = begin[i].oplogSlot;
+        // Fetch optime now, if not already fetched.
+        if (insertStatementOplogSlot.isNull()) {
+            insertStatementOplogSlot = oplogWriter->getNextOpTimes(opCtx, 1U)[0];
+        }
+        const auto docKey =
+            repl::getDocumentKey(opCtx, collectionPtr, begin[i].doc).getShardKeyAndId();
+        oplogEntry.setObject(begin[i].doc);
+        oplogEntry.setObject2(docKey);
+        oplogEntry.setOpTime(insertStatementOplogSlot);
+        oplogEntry.setDestinedRecipient(
+            shardingWriteRouter.getReshardingDestinedRecipient(begin[i].doc));
+        repl::addDestinedRecipient.execute([&](const BSONObj& data) {
+            auto recipient = data["destinedRecipient"].String();
+            oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
+        });
+
+        repl::OplogLink oplogLink;
+        if (i > 0)
+            oplogLink.prevOpTime = opTimes[i - 1];
+
+        oplogEntry.setFromMigrateIfTrue(fromMigrate[i]);
+
+        oplogWriter->appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtIds);
+
+        opTimes[i] = insertStatementOplogSlot;
+        timestamps[i] = insertStatementOplogSlot.getTimestamp();
+        bsonOplogEntries[i] = oplogEntry.toBSON();
+        // The storage engine will assign the RecordId based on the "ts" field of the oplog entry,
+        // see record_id_helpers::extractKey.
+        records[i] = Record{
+            RecordId(), RecordData(bsonOplogEntries[i].objdata(), bsonOplogEntries[i].objsize())};
+    }
+
+    repl::sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
+        auto numMillis = data["waitForMillis"].numberInt();
+        LOGV2(7456300,
+              "Sleeping for {sleepMillis}ms after receiving {numOpTimesReceived} optimes from "
+              "{firstOpTime} to "
+              "{lastOpTime}",
+              "Sleeping due to sleepBetweenInsertOpTimeGenerationAndLogOp failpoint",
+              "sleepMillis"_attr = numMillis,
+              "numOpTimesReceived"_attr = count,
+              "firstOpTime"_attr = opTimes.front(),
+              "lastOpTime"_attr = opTimes.back());
+        sleepmillis(numMillis);
+    });
+
+    invariant(!opTimes.empty());
+    auto lastOpTime = opTimes.back();
+    invariant(!lastOpTime.isNull());
+    auto wallClockTime = oplogEntryTemplate->getWallClockTime();
+    oplogWriter->logOplogRecords(opCtx,
+                                 nss,
+                                 &records,
+                                 timestamps,
+                                 oplogWrite.getCollection(),
+                                 lastOpTime,
+                                 wallClockTime,
+                                 /*isAbortIndexBuild=*/false);
+    wuow.commit();
+    return opTimes;
+}
+
+}  // namespace
+
 void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                std::vector<bool> fromMigrate,
-                               bool defaultFromMigrate) {
+                               bool defaultFromMigrate,
+                               InsertsOpStateAccumulator* opAccumulator) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
@@ -644,13 +771,14 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         Date_t lastWriteDate = getWallClockTimeForOpLog(opCtx);
         oplogEntryTemplate.setWallClockTime(lastWriteDate);
 
-        opTimeList = _oplogWriter->logInsertOps(opCtx,
-                                                &oplogEntryTemplate,
-                                                first,
-                                                last,
-                                                std::move(fromMigrate),
-                                                shardingWriteRouter,
-                                                coll);
+        opTimeList = _logInsertOps(opCtx,
+                                   &oplogEntryTemplate,
+                                   first,
+                                   last,
+                                   std::move(fromMigrate),
+                                   shardingWriteRouter,
+                                   coll,
+                                   _oplogWriter.get());
         if (!opTimeList.empty())
             lastOpTime = opTimeList.back();
 
@@ -670,6 +798,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord);
     }
 
+    if (opAccumulator) {
+        opAccumulator->opTimes = opTimeList;
+    }
+
     shardObserveInsertsOp(opCtx,
                           nss,
                           first,
@@ -678,54 +810,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                           shardingWriteRouter,
                           defaultFromMigrate,
                           inMultiDocumentTransaction);
-
-    if (nss.coll() == "system.js") {
-        Scope::storedFuncMod(opCtx);
-    } else if (nss.isSystemDotViews()) {
-        try {
-            for (auto it = first; it != last; it++) {
-                view_util::validateViewDefinitionBSON(opCtx, it->doc, nss.dbName());
-
-                uassertStatusOK(CollectionCatalog::get(opCtx)->createView(
-                    opCtx,
-                    NamespaceStringUtil::deserialize(nss.dbName().tenantId(),
-                                                     it->doc.getStringField("_id")),
-                    NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                               it->doc.getStringField("viewOn")),
-                    BSONArray{it->doc.getObjectField("pipeline")},
-                    view_catalog_helpers::validatePipeline,
-                    it->doc.getObjectField("collation"),
-                    ViewsForDatabase::Durability::kAlreadyDurable));
-            }
-        } catch (const DBException&) {
-            // If a previous operation left the view catalog in an invalid state, our inserts can
-            // fail even if all the definitions are valid. Reloading may help us reset the state.
-            CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
-        }
-    } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
-        for (auto it = first; it != last; it++) {
-            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-            mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, it->doc);
-        }
-    } else if (nss == NamespaceString::kConfigSettingsNamespace) {
-        for (auto it = first; it != last; it++) {
-            ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
-                opCtx, it->doc["_id"], it->doc);
-        }
-    } else if (nss == NamespaceString::kExternalKeysCollectionNamespace) {
-        for (auto it = first; it != last; it++) {
-            auto externalKey =
-                ExternalKeysCollectionDocument::parse(IDLParserContext("externalKey"), it->doc);
-            opCtx->recoveryUnit()->onCommit(
-                [this, externalKey = std::move(externalKey)](OperationContext* opCtx,
-                                                             boost::optional<Timestamp>) mutable {
-                    auto validator = LogicalTimeValidator::get(opCtx);
-                    if (validator) {
-                        validator->cacheExternalKey(externalKey);
-                    }
-                });
-        }
-    }
 }
 
 void OpObserverImpl::onInsertGlobalIndexKey(OperationContext* opCtx,
@@ -950,20 +1034,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                                  inMultiDocumentTransaction);
         }
     }
-
-    if (args.coll->ns().coll() == "system.js") {
-        Scope::storedFuncMod(opCtx);
-    } else if (args.coll->ns().isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, args.coll->ns().dbName());
-    } else if (args.coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
-               !opTime.writeOpTime.isNull()) {
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx,
-                                                                     args.updateArgs->updatedDoc);
-    } else if (args.coll->ns() == NamespaceString::kConfigSettingsNamespace) {
-        ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
-            opCtx, args.updateArgs->updatedDoc["_id"], args.updateArgs->updatedDoc);
-    }
 }
 
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
@@ -1109,19 +1179,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                                  shardingWriteRouter,
                                  inMultiDocumentTransaction);
         }
-    }
-
-    if (nss.coll() == "system.js") {
-        Scope::storedFuncMod(opCtx);
-    } else if (nss.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
-    } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
-               (inBatchedWrite || !opTime.writeOpTime.isNull())) {
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, documentKey.getId());
-    } else if (nss == NamespaceString::kConfigSettingsNamespace) {
-        ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
-            opCtx, documentKey.getId().firstElement(), boost::none);
     }
 }
 
@@ -1279,20 +1336,6 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     uassert(50714,
             "dropping the admin database is not allowed.",
             dbName.db() != DatabaseName::kAdmin.db());
-
-    if (dbName.db() == NamespaceString::kSessionTransactionsTableNamespace.db()) {
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->invalidateAllSessions(opCtx);
-    }
-}
-
-repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
-                                              const NamespaceString& collectionName,
-                                              const UUID& uuid,
-                                              std::uint64_t numRecords,
-                                              CollectionDropType dropType) {
-    return onDropCollection(
-        opCtx, collectionName, uuid, numRecords, dropType, false /* markFromMigrate */);
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -1326,34 +1369,6 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
             "dropping the server configuration collection (admin.system.version) is not allowed.",
             collectionName != NamespaceString::kServerConfigurationNamespace);
 
-    if (collectionName.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->clearViews(opCtx, collectionName.dbName());
-    } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
-        // Disallow this drop if there are currently prepared transactions.
-        const auto sessionCatalog = SessionCatalog::get(opCtx);
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        bool noPreparedTxns = true;
-        sessionCatalog->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
-            auto txnParticipant = TransactionParticipant::get(session);
-            if (txnParticipant.transactionIsPrepared()) {
-                noPreparedTxns = false;
-            }
-        });
-        uassert(4852500,
-                "Unable to drop transactions table (config.transactions) while prepared "
-                "transactions are present.",
-                noPreparedTxns);
-
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        mongoDSessionCatalog->invalidateAllSessions(opCtx);
-    } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
-        ReadWriteConcernDefaults::get(opCtx).invalidate();
-    } else if (collectionName.isSystemDotJavascript()) {
-        // Inform the JavaScript engine of the change to system.js.
-        Scope::storedFuncMod(opCtx);
-    }
-
     return {};
 }
 
@@ -1380,23 +1395,6 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
               "opTime"_attr = opTime,
               "object"_attr = oplogEntry.getObject());
     }
-}
-
-repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
-                                                 const NamespaceString& fromCollection,
-                                                 const NamespaceString& toCollection,
-                                                 const UUID& uuid,
-                                                 const boost::optional<UUID>& dropTargetUUID,
-                                                 std::uint64_t numRecords,
-                                                 bool stayTemp) {
-    return preRenameCollection(opCtx,
-                               fromCollection,
-                               toCollection,
-                               uuid,
-                               dropTargetUUID,
-                               numRecords,
-                               stayTemp,
-                               false /* markFromMigrate */);
 }
 
 repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
@@ -1449,23 +1447,6 @@ void OpObserverImpl::postRenameCollection(OperationContext* const opCtx,
         CollectionCatalog::get(opCtx)->reloadViews(opCtx, fromCollection.dbName());
     if (toCollection.isSystemDotViews())
         CollectionCatalog::get(opCtx)->reloadViews(opCtx, toCollection.dbName());
-}
-
-void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
-                                        const NamespaceString& fromCollection,
-                                        const NamespaceString& toCollection,
-                                        const UUID& uuid,
-                                        const boost::optional<UUID>& dropTargetUUID,
-                                        std::uint64_t numRecords,
-                                        bool stayTemp) {
-    onRenameCollection(opCtx,
-                       fromCollection,
-                       toCollection,
-                       uuid,
-                       dropTargetUUID,
-                       numRecords,
-                       stayTemp,
-                       false /* markFromMigrate */);
 }
 
 void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
@@ -1734,7 +1715,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     invariant(!opCtx->lockState()->hasMaxLockTimeout());
 
     writeConflictRetry(
-        opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace, [&] {
             // Writes to the oplog only require a Global intent lock. Guaranteed by
             // OplogSlotReserver.
             invariant(opCtx->lockState()->isWriteLocked());
@@ -1761,7 +1742,9 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 void OpObserverImpl::onTransactionStart(OperationContext* opCtx) {}
 
 void OpObserverImpl::onUnpreparedTransactionCommit(
-    OperationContext* opCtx, const TransactionOperations& transactionOperations) {
+    OperationContext* opCtx,
+    const TransactionOperations& transactionOperations,
+    OpStateAccumulator* opAccumulator) {
     const auto& statements = transactionOperations.getOperationsForOpObserver();
     auto numberOfPrePostImagesToWrite = transactionOperations.getNumberOfPrePostImagesToWrite();
 
@@ -1776,7 +1759,6 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     if (statements.empty())
         return;
 
-    repl::OpTime commitOpTime;
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots =
@@ -1860,8 +1842,12 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
     }
 
-    commitOpTime = oplogSlots[numOplogEntries - 1];
+    repl::OpTime commitOpTime = oplogSlots[numOplogEntries - 1];
     invariant(!commitOpTime.isNull());
+    if (opAccumulator) {
+        opAccumulator->opTime.writeOpTime = commitOpTime;
+        opAccumulator->opTime.wallClockTime = wallClockTime;
+    }
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
 }
 
@@ -1908,8 +1894,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
                                     getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/false);
 
-    if (!gFeatureFlagInternalWritesAreReplicatedTransactionally.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!gFeatureFlagLargeBatchedOperations.isEnabled(serverGlobalParams.featureCompatibility)) {
         // Before SERVER-70765, we relied on packTransactionStatementsForApplyOps() to check if the
         // batch of operations could fit in a single applyOps entry. Now, we pass the size limit to
         // TransactionOperations::getApplyOpsInfo() and are now able to return an error earlier.
@@ -2052,116 +2037,116 @@ void OpObserverImpl::onTransactionPrepare(
         invariant(reservedSlots.size() >= statements.size());
         TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
-        writeConflictRetry(
-            opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        writeConflictRetry(opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace, [&] {
+            // Writes to the oplog only require a Global intent lock. Guaranteed by
+            // OplogSlotReserver.
+            invariant(opCtx->lockState()->isWriteLocked());
+
+            WriteUnitOfWork wuow(opCtx);
+            // It is possible that the transaction resulted in no changes, In that case, we
+            // should not write any operations other than the prepare oplog entry.
+            if (!statements.empty()) {
+                // Storage transaction commit is the last place inside a transaction that can
+                // throw an exception. In order to safely allow exceptions to be thrown at that
+                // point, this function must be called from an outer WriteUnitOfWork in order to
+                // be rolled back upon reaching the exception.
+                invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
                 // Writes to the oplog only require a Global intent lock. Guaranteed by
                 // OplogSlotReserver.
                 invariant(opCtx->lockState()->isWriteLocked());
 
-                WriteUnitOfWork wuow(opCtx);
-                // It is possible that the transaction resulted in no changes, In that case, we
-                // should not write any operations other than the prepare oplog entry.
-                if (!statements.empty()) {
-                    // Storage transaction commit is the last place inside a transaction that can
-                    // throw an exception. In order to safely allow exceptions to be thrown at that
-                    // point, this function must be called from an outer WriteUnitOfWork in order to
-                    // be rolled back upon reaching the exception.
-                    invariant(opCtx->lockState()->inAWriteUnitOfWork());
-
-                    // Writes to the oplog only require a Global intent lock. Guaranteed by
-                    // OplogSlotReserver.
-                    invariant(opCtx->lockState()->isWriteLocked());
-
-                    if (applyOpsOperationAssignment.applyOpsEntries.size() > 1U) {
-                        // Partial transactions create/reserve multiple oplog entries in the same
-                        // WriteUnitOfWork. Because of this, such transactions will set multiple
-                        // timestamps, violating the multi timestamp constraint. It's safe to ignore
-                        // the multi timestamp constraints here as additional rollback logic is in
-                        // place for this case. See SERVER-48771.
-                        opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
-                    }
-
-                    // This is set for every oplog entry, except for the last one, in the applyOps
-                    // chain of an unprepared multi-doc transaction.
-                    // For a single prepare oplog entry, choose the last oplog slot for the first
-                    // optime of the transaction. The first optime corresponds to the 'startOpTime'
-                    // field in SessionTxnRecord that is persisted in config.transactions.
-                    // See SERVER-40678.
-                    auto startOpTime = applyOpsOperationAssignment.applyOpsEntries.size() == 1U
-                        ? reservedSlots.back()
-                        : reservedSlots.front();
-
-                    auto logApplyOpsForPreparedTransaction =
-                        [opCtx, oplogWriter = _oplogWriter.get(), startOpTime](
-                            repl::MutableOplogEntry* oplogEntry,
-                            bool firstOp,
-                            bool lastOp,
-                            std::vector<StmtId> stmtIdsWritten) {
-                            return logApplyOps(opCtx,
-                                               oplogEntry,
-                                               /*txnState=*/
-                                               (lastOp ? DurableTxnStateEnum::kPrepared
-                                                       : DurableTxnStateEnum::kInProgress),
-                                               startOpTime,
-                                               std::move(stmtIdsWritten),
-                                               /*updateTxnTable=*/(firstOp || lastOp),
-                                               oplogWriter);
-                        };
-
-                    // We had reserved enough oplog slots for the worst case where each operation
-                    // produced one oplog entry.  When operations are smaller and can be packed, we
-                    // will waste the extra slots.  The implicit prepare oplog entry will still use
-                    // the last reserved slot, because the transaction participant has already used
-                    // that as the prepare time.
-                    boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
-                    invariant(applyOpsOperationAssignment.prepare);
-                    (void)transactionOperations.logOplogEntries(reservedSlots,
-                                                                applyOpsOperationAssignment,
-                                                                wallClockTime,
-                                                                logApplyOpsForPreparedTransaction,
-                                                                &imageToWrite);
-                    if (imageToWrite) {
-                        writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
-                    }
-                } else {
-                    // Log an empty 'prepare' oplog entry.
-                    // We need to have at least one reserved slot.
-                    invariant(reservedSlots.size() > 0);
-                    BSONObjBuilder applyOpsBuilder;
-                    BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
-                    opsArray.done();
-                    applyOpsBuilder.append("prepare", true);
-
-                    auto oplogSlot = reservedSlots.front();
-                    MutableOplogEntry oplogEntry;
-                    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-                    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
-                    oplogEntry.setOpTime(oplogSlot);
-                    oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
-                    oplogEntry.setObject(applyOpsBuilder.done());
-                    oplogEntry.setWallClockTime(wallClockTime);
-
-                    // TODO SERVER-69286: set the top-level tenantId here
-
-                    logApplyOps(opCtx,
-                                &oplogEntry,
-                                DurableTxnStateEnum::kPrepared,
-                                /*startOpTime=*/oplogSlot,
-                                /*stmtIdsWritten=*/{},
-                                /*updateTxnTable=*/true,
-                                _oplogWriter.get());
+                if (applyOpsOperationAssignment.applyOpsEntries.size() > 1U) {
+                    // Partial transactions create/reserve multiple oplog entries in the same
+                    // WriteUnitOfWork. Because of this, such transactions will set multiple
+                    // timestamps, violating the multi timestamp constraint. It's safe to ignore
+                    // the multi timestamp constraints here as additional rollback logic is in
+                    // place for this case. See SERVER-48771.
+                    opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
                 }
-                wuow.commit();
-            });
+
+                // This is set for every oplog entry, except for the last one, in the applyOps
+                // chain of an unprepared multi-doc transaction.
+                // For a single prepare oplog entry, choose the last oplog slot for the first
+                // optime of the transaction. The first optime corresponds to the 'startOpTime'
+                // field in SessionTxnRecord that is persisted in config.transactions.
+                // See SERVER-40678.
+                auto startOpTime = applyOpsOperationAssignment.applyOpsEntries.size() == 1U
+                    ? reservedSlots.back()
+                    : reservedSlots.front();
+
+                auto logApplyOpsForPreparedTransaction =
+                    [opCtx, oplogWriter = _oplogWriter.get(), startOpTime](
+                        repl::MutableOplogEntry* oplogEntry,
+                        bool firstOp,
+                        bool lastOp,
+                        std::vector<StmtId> stmtIdsWritten) {
+                        return logApplyOps(opCtx,
+                                           oplogEntry,
+                                           /*txnState=*/
+                                           (lastOp ? DurableTxnStateEnum::kPrepared
+                                                   : DurableTxnStateEnum::kInProgress),
+                                           startOpTime,
+                                           std::move(stmtIdsWritten),
+                                           /*updateTxnTable=*/(firstOp || lastOp),
+                                           oplogWriter);
+                    };
+
+                // We had reserved enough oplog slots for the worst case where each operation
+                // produced one oplog entry.  When operations are smaller and can be packed, we
+                // will waste the extra slots.  The implicit prepare oplog entry will still use
+                // the last reserved slot, because the transaction participant has already used
+                // that as the prepare time.
+                boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
+                invariant(applyOpsOperationAssignment.prepare);
+                (void)transactionOperations.logOplogEntries(reservedSlots,
+                                                            applyOpsOperationAssignment,
+                                                            wallClockTime,
+                                                            logApplyOpsForPreparedTransaction,
+                                                            &imageToWrite);
+                if (imageToWrite) {
+                    writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
+                }
+            } else {
+                // Log an empty 'prepare' oplog entry.
+                // We need to have at least one reserved slot.
+                invariant(reservedSlots.size() > 0);
+                BSONObjBuilder applyOpsBuilder;
+                BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
+                opsArray.done();
+                applyOpsBuilder.append("prepare", true);
+
+                auto oplogSlot = reservedSlots.front();
+                MutableOplogEntry oplogEntry;
+                oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+                oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
+                oplogEntry.setOpTime(oplogSlot);
+                oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
+                oplogEntry.setObject(applyOpsBuilder.done());
+                oplogEntry.setWallClockTime(wallClockTime);
+
+                // TODO SERVER-69286: set the top-level tenantId here
+
+                logApplyOps(opCtx,
+                            &oplogEntry,
+                            DurableTxnStateEnum::kPrepared,
+                            /*startOpTime=*/oplogSlot,
+                            /*stmtIdsWritten=*/{},
+                            /*updateTxnTable=*/true,
+                            _oplogWriter.get());
+            }
+            wuow.commit();
+        });
     }
 
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, prepareOpTime);
 }
 
 void OpObserverImpl::onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                                    const LogicalSessionId& lsid,
                                                     const std::vector<repl::OplogEntry>& statements,
                                                     const repl::OpTime& prepareOpTime) {
-    shardObserveNonPrimaryTransactionPrepare(opCtx, statements, prepareOpTime);
+    shardObserveNonPrimaryTransactionPrepare(opCtx, lsid, statements, prepareOpTime);
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
@@ -2204,8 +2189,8 @@ void OpObserverImpl::onModifyCollectionShardingIndexCatalog(OperationContext* op
     logOperation(opCtx, &oplogEntry, true, _oplogWriter.get());
 }
 
-void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
-                                            const RollbackObserverInfo& rbInfo) {
+void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
+                                           const RollbackObserverInfo& rbInfo) {
     // Reset the key manager cache.
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator) {

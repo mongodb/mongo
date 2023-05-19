@@ -571,14 +571,15 @@ err:
  *     Begin truncating a range of a file.
  */
 int
-__wt_txn_truncate_log(
-  WT_SESSION_IMPL *session, WT_ITEM *orig_start_key, WT_ITEM *orig_stop_key, bool local_start)
+__wt_txn_truncate_log(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_BTREE *btree;
     WT_ITEM *item;
+    WT_SESSION_IMPL *session;
     WT_TXN_OP *op;
     uint64_t start_recno, stop_recno;
 
+    session = trunc_info->session;
     btree = S2BT(session);
     start_recno = WT_RECNO_OOB;
     stop_recno = WT_RECNO_OOB;
@@ -594,28 +595,40 @@ __wt_txn_truncate_log(
          * If the user provided a start cursor key (i.e. local_start is false) then use the original
          * key provided.
          */
-        if (!local_start && orig_start_key != NULL) {
+        if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_START)) {
+            WT_ASSERT_ALWAYS(session, trunc_info->orig_start_key != NULL,
+              "Truncate log operation with explicit range start has empty original key.");
             op->u.truncate_row.mode = WT_TXN_TRUNC_START;
             item = &op->u.truncate_row.start;
-            WT_RET(__wt_buf_set(session, item, orig_start_key->data, orig_start_key->size));
+            WT_RET(__wt_buf_set(
+              session, item, trunc_info->orig_start_key->data, trunc_info->orig_start_key->size));
         }
-        if (orig_stop_key != NULL) {
+        if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_STOP)) {
+            WT_ASSERT_ALWAYS(session, trunc_info->orig_stop_key != NULL,
+              "Truncate log operation with explicit range stop has empty original key.");
             op->u.truncate_row.mode =
               (op->u.truncate_row.mode == WT_TXN_TRUNC_ALL) ? WT_TXN_TRUNC_STOP : WT_TXN_TRUNC_BOTH;
             item = &op->u.truncate_row.stop;
-            WT_RET(__wt_buf_set(session, item, orig_stop_key->data, orig_stop_key->size));
+            WT_RET(__wt_buf_set(
+              session, item, trunc_info->orig_stop_key->data, trunc_info->orig_stop_key->size));
         }
     } else {
         /*
          * If the user provided cursors, unpack the original keys that were saved in the cursor's
          * lower_bound field.
          */
-        if (!local_start && orig_start_key != NULL)
-            WT_RET(__wt_struct_unpack(
-              session, orig_start_key->data, orig_start_key->size, "q", &start_recno));
-        if (orig_stop_key != NULL)
-            WT_RET(__wt_struct_unpack(
-              session, orig_stop_key->data, orig_stop_key->size, "q", &stop_recno));
+        if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_START)) {
+            WT_ASSERT_ALWAYS(session, trunc_info->orig_start_key != NULL,
+              "Truncate log operation with explicit range start has empty original key.");
+            WT_RET(__wt_struct_unpack(session, trunc_info->orig_start_key->data,
+              trunc_info->orig_start_key->size, "q", &start_recno));
+        }
+        if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_STOP)) {
+            WT_ASSERT_ALWAYS(session, trunc_info->orig_stop_key != NULL,
+              "Truncate log operation with explicit range stop has empty original key.");
+            WT_RET(__wt_struct_unpack(session, trunc_info->orig_stop_key->data,
+              trunc_info->orig_stop_key->size, "q", &stop_recno));
+        }
 
         op->type = WT_TXN_OP_TRUNCATE_COL;
         op->u.truncate_col.start = start_recno;

@@ -61,6 +61,7 @@ bool useOnlineCloner() {
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
+MONGO_FAIL_POINT_DEFINE(movePrimaryCoordinatorHangBeforeCleaningUp);
 
 MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* service,
                                                const BSONObj& initialState)
@@ -69,7 +70,7 @@ MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* se
       _csReason([&] {
           BSONObjBuilder builder;
           builder.append("command", "movePrimary");
-          builder.append("db", _dbName.toString());
+          builder.append("db", DatabaseNameUtil::serialize(_dbName));
           builder.append("to", _doc.getToShardId());
           return builder.obj();
       }()) {}
@@ -348,8 +349,16 @@ bool MovePrimaryCoordinator::onlineClonerAllowedToBeMissing() const {
 }
 
 void MovePrimaryCoordinator::recoverOnlineCloner(OperationContext* opCtx) {
+    if (_onlineCloner) {
+        return;
+    }
     _onlineCloner = MovePrimaryDonor::get(opCtx, _dbName, _doc.getToShardId());
     if (_onlineCloner) {
+        LOGV2(7687200,
+              "MovePrimaryCoordinator found existing online cloner",
+              "migrationId"_attr = _onlineCloner->getMetadata().getMigrationId(),
+              logAttrs(_dbName),
+              "to"_attr = _doc.getToShardId());
         return;
     }
     invariant(onlineClonerAllowedToBeMissing());
@@ -358,6 +367,11 @@ void MovePrimaryCoordinator::recoverOnlineCloner(OperationContext* opCtx) {
 void MovePrimaryCoordinator::createOnlineCloner(OperationContext* opCtx) {
     invariant(onlineClonerPossiblyNeverCreated());
     _onlineCloner = MovePrimaryDonor::create(opCtx, _dbName, _doc.getToShardId());
+    LOGV2(7687201,
+          "MovePrimaryCoordinator created new online cloner",
+          "migrationId"_attr = _onlineCloner->getMetadata().getMigrationId(),
+          logAttrs(_dbName),
+          "to"_attr = _doc.getToShardId());
 }
 
 void MovePrimaryCoordinator::cloneDataUntilReadyForCatchup(OperationContext* opCtx,
@@ -396,6 +410,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             const auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
+
+            if (MONGO_unlikely(movePrimaryCoordinatorHangBeforeCleaningUp.shouldFail())) {
+                LOGV2(7687202, "Hit movePrimaryCoordinatorHangBeforeCleaningUp");
+                movePrimaryCoordinatorHangBeforeCleaningUp.pauseWhileSet(opCtx);
+            }
 
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                 opCtx, getNewSession(opCtx), **executor);
@@ -464,6 +483,7 @@ void MovePrimaryCoordinator::cleanupOnAbortWithOnlineCloner(OperationContext* op
                                                             const CancellationToken& token,
                                                             const Status& status) {
     unblockReadsAndWrites(opCtx);
+    recoverOnlineCloner(opCtx);
     if (!_onlineCloner) {
         return;
     }
@@ -481,7 +501,7 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
         details.append("error", status.toString());
     }
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "movePrimary.{}"_format(what), _dbName.toString(), details.obj());
+        opCtx, "movePrimary.{}"_format(what), DatabaseNameUtil::serialize(_dbName), details.obj());
 }
 
 std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
@@ -510,7 +530,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
 
     const auto shardedCollections = [&] {
         auto colls = Grid::get(opCtx)->catalogClient()->getAllShardedCollectionsForDb(
-            opCtx, _dbName.toString(), repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx,
+            DatabaseNameUtil::serialize(_dbName),
+            repl::ReadConcernLevel::kMajorityReadConcern);
 
         std::sort(colls.begin(), colls.end());
         return colls;
@@ -544,7 +566,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
         const auto listResponse = uassertStatusOK(
             toShard->runExhaustiveCursorCommand(opCtx,
                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                _dbName.toString(),
+                                                DatabaseNameUtil::serialize(_dbName),
                                                 listCommand,
                                                 Milliseconds(-1)));
 
@@ -581,7 +603,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
 
     const auto cloneCommand = [&] {
         BSONObjBuilder commandBuilder;
-        commandBuilder.append("_shardsvrCloneCatalogData", _dbName.toString());
+        commandBuilder.append("_shardsvrCloneCatalogData", DatabaseNameUtil::serialize(_dbName));
         commandBuilder.append("from", fromShard->getConnString().toString());
         return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
     }();
@@ -652,14 +674,14 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
     OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
     const auto postCommitDbType = [&]() {
         const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto findResponse = uassertStatusOK(
-            config->exhaustiveFindOnConfig(opCtx,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           repl::ReadConcernLevel::kMajorityReadConcern,
-                                           NamespaceString::kConfigDatabasesNamespace,
-                                           BSON(DatabaseType::kNameFieldName << _dbName.toString()),
-                                           BSONObj(),
-                                           1));
+        auto findResponse = uassertStatusOK(config->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            NamespaceString::kConfigDatabasesNamespace,
+            BSON(DatabaseType::kNameFieldName << DatabaseNameUtil::serialize(_dbName)),
+            BSONObj(),
+            1));
 
         const auto databases = std::move(findResponse.docs);
         uassert(ErrorCodes::IncompatibleShardingMetadata,

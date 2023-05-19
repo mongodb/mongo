@@ -130,6 +130,10 @@ bool ClusterClientCursorMock::remotesExhausted() {
     return _remotesExhausted;
 }
 
+bool ClusterClientCursorMock::hasBeenKilled() {
+    return _killed;
+}
+
 void ClusterClientCursorMock::queueError(Status status) {
     _resultsQueue.push({status});
 }
@@ -164,6 +168,10 @@ boost::optional<repl::ReadConcernArgs> ClusterClientCursorMock::getReadConcern()
 
 bool ClusterClientCursorMock::shouldOmitDiagnosticInformation() const {
     return false;
+}
+
+std::unique_ptr<query_stats::RequestShapifier> ClusterClientCursorMock::getRequestShapifier() {
+    return nullptr;
 }
 
 }  // namespace mongo

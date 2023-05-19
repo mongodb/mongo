@@ -3,10 +3,10 @@
 // This test requires persistence beacuase it assumes data will survive a restart.
 // @tags: [requires_persistence, requires_replication]
 
-testname = 'temp_namespace_sw';
+let testname = 'temp_namespace_sw';
 
 var conn = MongoRunner.runMongod();
-d = conn.getDB('test');
+let d = conn.getDB('test');
 assert.commandWorked(d.runCommand({
     applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + 'temp1', temp: true}}]
 }));

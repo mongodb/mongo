@@ -93,13 +93,9 @@ CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime::
     ScopedExclusiveCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss)
     : _scopedCss(std::move(scopedCss)) {}
 
-CollectionShardingRuntime::CollectionShardingRuntime(
-    ServiceContext* service,
-    NamespaceString nss,
-    std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor)
+CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* service, NamespaceString nss)
     : _serviceContext(service),
       _nss(std::move(nss)),
-      _rangeDeleterExecutor(std::move(rangeDeleterExecutor)),
       _metadataType(_nss.isNamespaceAlwaysUnsharded() ? MetadataType::kUnsharded
                                                       : MetadataType::kUnknown) {}
 
@@ -277,8 +273,8 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
     _metadataType = MetadataType::kSharded;
 
     if (!_metadataManager || !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
-        _metadataManager = std::make_shared<MetadataManager>(
-            opCtx->getServiceContext(), _nss, _rangeDeleterExecutor, newMetadata);
+        _metadataManager =
+            std::make_shared<MetadataManager>(opCtx->getServiceContext(), _nss, newMetadata);
         ++_numMetadataManagerChanges;
     } else {
         _metadataManager->setFilteringMetadata(std::move(newMetadata));
@@ -319,20 +315,6 @@ void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection(
     _clearFilteringMetadata(opCtx, /* collIsDropped */ true);
 }
 
-SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
-                                                               CleanWhen when) const {
-    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
-    // flag is used to turn on new range deleter on startup.
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-        stdx::lock_guard lk(_metadataManagerLock);
-        invariant(_metadataType == MetadataType::kSharded);
-        return _metadataManager->cleanUpRange(range, when == kDelayed);
-    }
-
-    // This method must never be called if the range deleter service feature flag is enabled
-    MONGO_UNREACHABLE;
-}
-
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& collectionUuid,
@@ -355,17 +337,11 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                         "metadata reset"};
             }
 
-            // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The
-            // feature flag is used to turn on new range deleter on startup.
-            if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-                const auto rangeDeleterService = RangeDeleterService::get(opCtx);
-                rangeDeleterService->getRangeDeleterServiceInitializationFuture().get(opCtx);
+            const auto rangeDeleterService = RangeDeleterService::get(opCtx);
+            rangeDeleterService->getRangeDeleterServiceInitializationFuture().get(opCtx);
 
-                return rangeDeleterService->getOverlappingRangeDeletionsFuture(
-                    self->_metadataManager->getCollectionUuid(), orphanRange);
-            } else {
-                return self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
-            }
+            return rangeDeleterService->getOverlappingRangeDeletionsFuture(
+                self->_metadataManager->getCollectionUuid(), orphanRange);
         }();
 
         if (!swOrphanCleanupFuture.isOK()) {
@@ -567,15 +543,6 @@ void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) cons
         versionBuilder.append("timestamp", optCollDescr->getShardPlacementVersion().getTimestamp());
     }
 }
-
-size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
-    stdx::lock_guard lk(_metadataManagerLock);
-    if (_metadataType == MetadataType::kSharded) {
-        return _metadataManager->numberOfRangesScheduledForDeletion();
-    }
-    return 0;
-}
-
 
 void CollectionShardingRuntime::setPlacementVersionRecoverRefreshFuture(
     SharedSemiFuture<void> future, CancellationSource cancellationSource) {

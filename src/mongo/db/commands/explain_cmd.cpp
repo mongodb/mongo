@@ -111,14 +111,11 @@ public:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         // Explain is never allowed in multi-document transactions.
         const bool inMultiDocumentTransaction = false;
-        // TODO SERVER-68655 pass _dbName directly to commandCanRunHere
         uassert(50746,
                 "Explain's child command cannot run on this node. "
                 "Are you explaining a write command on a secondary?",
-                commandCanRunHere(opCtx,
-                                  _dbName.toStringWithTenantId(),
-                                  _innerInvocation->definition(),
-                                  inMultiDocumentTransaction));
+                commandCanRunHere(
+                    opCtx, _dbName, _innerInvocation->definition(), inMultiDocumentTransaction));
         _innerInvocation->explain(opCtx, _verbosity, result);
     }
 
@@ -185,7 +182,7 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
                 str::stream() << "Mismatched $db in explain command. Expected "
                               << dbName.toStringForErrorMsg() << " but got "
                               << innerDbName.toStringForErrorMsg(),
-                innerDb.checkAndGetStringData() == dbName.toString());
+                innerDbName == dbName);
     }
     auto explainedCommand = CommandHelpers::findCommand(explainedObj.firstElementFieldName());
     uassert(ErrorCodes::CommandNotFound,

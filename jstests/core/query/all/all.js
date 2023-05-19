@@ -1,7 +1,7 @@
-t = db.jstests_all;
+let t = db.jstests_all;
 t.drop();
 
-doTest = function() {
+let doTest = function() {
     assert.commandWorked(t.save({a: [1, 2, 3]}));
     assert.commandWorked(t.save({a: [1, 2, 4]}));
     assert.commandWorked(t.save({a: [1, 8, 5]}));

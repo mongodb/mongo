@@ -29,11 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_unwind.h"
+
 #include <boost/intrusive_ptr.hpp>
 #include <deque>
 #include <memory>
 #include <string>
 #include <vector>
+
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -44,7 +47,6 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"

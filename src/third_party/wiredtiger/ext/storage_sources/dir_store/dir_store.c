@@ -639,6 +639,7 @@ dir_store_file_copy(DIR_STORE *dir_store, WT_SESSION *session, const char *src_p
     size_t pathlen;
     int ret, t_ret;
     char buffer[1024 * 64], *tmp_path;
+    bool dest_exists;
 
     dest = src = NULL;
     pathlen = strlen(dest_path) + 10;
@@ -667,8 +668,8 @@ dir_store_file_copy(DIR_STORE *dir_store, WT_SESSION *session, const char *src_p
         goto err;
     }
 
-    if ((ret = wt_fs->fs_open_file(wt_fs, session, tmp_path, type, WT_FS_OPEN_CREATE, &dest)) !=
-      0) {
+    if ((ret = wt_fs->fs_open_file(
+           wt_fs, session, tmp_path, type, WT_FS_OPEN_CREATE | WT_FS_OPEN_EXCLUSIVE, &dest)) != 0) {
         ret = dir_store_err(dir_store, session, ret, "%s: cannot create", tmp_path);
         goto err;
     }
@@ -687,11 +688,32 @@ dir_store_file_copy(DIR_STORE *dir_store, WT_SESSION *session, const char *src_p
             goto err;
         }
     }
-    if (ret == 0 && (ret = chmod(tmp_path, 0444)) < 0)
+    if (ret == 0 && chmod(tmp_path, 0444) < 0)
         ret = dir_store_err(dir_store, session, errno, "%s: file_copy chmod failed", tmp_path);
-    if ((ret = rename(tmp_path, dest_path)) != 0) {
-        ret = dir_store_err(
-          dir_store, session, errno, "%s: cannot rename from %s", dest_path, tmp_path);
+
+    /*
+     * We want to be sure that we cannot overwrite an object that was previously written. POSIX does
+     * not have an rename operation that is exclusive (although Linux has one that works only on
+     * certain file systems). In any case, we are covered, because 1) all users of dir_store use the
+     * function we're in to create an object 2) we used an exclusive open for the temporary file
+     * above and 3) we make a check for the existence of the target file at this point. That should
+     * eliminate any races. Once the existence check is passed, we know no other thread can sneak
+     * in, they'd need to successfully open that temporary file, and we are holding exclusive access
+     * to it.
+     */
+    if ((ret = wt_fs->fs_exist(wt_fs, session, dest_path, &dest_exists)) != 0) {
+        ret = dir_store_err(dir_store, session, ret, "%s: cannot check existence", dest_path);
+        goto err;
+    }
+
+    if (dest_exists) {
+        ret = dir_store_err(dir_store, session, EEXIST, "%s: already exists", dest_path);
+        goto err;
+    }
+
+    if ((ret = wt_fs->fs_rename(wt_fs, session, tmp_path, dest_path, 0)) != 0) {
+        ret =
+          dir_store_err(dir_store, session, ret, "%s: cannot rename from %s", dest_path, tmp_path);
         goto err;
     }
 err:
@@ -1042,6 +1064,9 @@ dir_store_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *nam
             if ((ret = dir_store_delay(dir_store)) != 0)
                 goto err;
 
+            /*
+             * If the file actually exists now, it could be a racing thread that created it.
+             */
             if ((ret = dir_store_file_copy(dir_store, session, bucket_path, cache_path,
                    WT_FS_OPEN_FILE_TYPE_DATA, false)) != 0)
                 goto err;

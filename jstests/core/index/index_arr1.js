@@ -2,7 +2,7 @@
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
 
-t = db.index_arr1;
+let t = db.index_arr1;
 t.drop();
 
 t.insert({_id: 1, a: 5, b: [{x: 1}]});

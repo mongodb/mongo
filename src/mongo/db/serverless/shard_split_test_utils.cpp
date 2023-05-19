@@ -37,19 +37,19 @@ namespace mongo {
 namespace test {
 namespace shard_split {
 
-ScopedTenantAccessBlocker::ScopedTenantAccessBlocker(const std::vector<TenantId>& tenants,
-                                                     OperationContext* opCtx)
-    : _tenants(tenants), _opCtx(opCtx) {}
+ScopedTenantAccessBlocker::ScopedTenantAccessBlocker(const UUID& uuid, OperationContext* opCtx)
+    : _uuid(uuid), _opCtx(opCtx) {}
 
 ScopedTenantAccessBlocker::~ScopedTenantAccessBlocker() {
-    for (const auto& tenant : _tenants) {
+    if (_uuid) {
         TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-            .remove(tenant, TenantMigrationAccessBlocker::BlockerType::kDonor);
+            .removeAccessBlockersForMigration(*_uuid,
+                                              TenantMigrationAccessBlocker::BlockerType::kDonor);
     }
 }
 
 void ScopedTenantAccessBlocker::dismiss() {
-    _tenants.clear();
+    _uuid.reset();
 }
 
 void reconfigToAddRecipientNodes(ServiceContext* serviceContext,

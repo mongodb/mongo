@@ -44,6 +44,8 @@
 #include <unistd.h>
 #endif
 
+#include "mongo/platform/compiler.h"
+
 #if !MONGO_HAS_SIGALTSTACK
 
 int main() {
@@ -52,10 +54,6 @@ int main() {
 }
 
 #else  // MONGO_HAS_SIGALTSTACK
-
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
 
 namespace mongo::stdx {
 namespace {

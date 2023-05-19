@@ -33,6 +33,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
@@ -74,8 +75,6 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<DropCollectionCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kRenameCollection:
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
-        case DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible:
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateCollection:
         // TODO SERVER-68008 Remove the Pre61Compatible case once 7.0 becomes last LTS
@@ -98,15 +97,12 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kReshardCollection:
             return std::make_shared<ReshardCollectionCoordinator>(service, std::move(initialState));
             break;
-        case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible:
-            // TODO SERVER-68373 remove once 7.0 becomes last LTS
-        case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible:
-            // TODO SERVER-68373 remove once 7.0 becomes last LTS
-            return std::make_shared<CompactStructuredEncryptionDataCoordinatorPre70Compatible>(
-                service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData:
             return std::make_shared<CompactStructuredEncryptionDataCoordinator>(
+                service, std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kCleanupStructuredEncryptionData:
+            return std::make_shared<CleanupStructuredEncryptionDataCoordinator>(
                 service, std::move(initialState));
             break;
         default:

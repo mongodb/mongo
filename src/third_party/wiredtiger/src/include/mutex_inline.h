@@ -14,6 +14,13 @@
  */
 
 /*
+ * WT_SPIN_SESSION_ID_SAFE --
+ *     Get the session ID. We need this because there are a few calls to lock and unlock where the
+ * session parameter is actually NULL.
+ */
+#define WT_SPIN_SESSION_ID_SAFE(session) ((session) != NULL ? (session)->id : WT_SESSION_ID_NULL)
+
+/*
  * __spin_init_internal --
  *     Initialize the WT portion of a spinlock.
  */
@@ -21,6 +28,7 @@ static inline void
 __spin_init_internal(WT_SPINLOCK *t, const char *name)
 {
     t->name = name;
+    t->session_id = WT_SESSION_ID_INVALID;
     t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
     t->stat_session_usecs_off = -1;
     t->initialized = 1;
@@ -68,7 +76,11 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
 
-    return (!__atomic_test_and_set(&t->lock, __ATOMIC_ACQUIRE) ? 0 : EBUSY);
+    if (!__atomic_test_and_set(&t->lock, __ATOMIC_ACQUIRE)) {
+        t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
+        return (0);
+    } else
+        return (EBUSY);
 }
 
 /*
@@ -88,6 +100,8 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
         if (t->lock)
             __wt_yield();
     }
+
+    t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
 }
 
 /*
@@ -99,6 +113,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
 
+    t->session_id = WT_SESSION_ID_INVALID;
     __atomic_clear(&t->lock, __ATOMIC_RELEASE);
 }
 
@@ -154,9 +169,13 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline int
 __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
+    WT_DECL_RET;
     WT_UNUSED(session);
 
-    return (pthread_mutex_trylock(&t->lock));
+    ret = pthread_mutex_trylock(&t->lock);
+    if (ret == 0)
+        t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
+    return (ret);
 }
 
 /*
@@ -170,6 +189,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
     if ((ret = pthread_mutex_lock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_lock: %s", t->name));
+    t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
 }
 #endif
 
@@ -182,6 +202,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_DECL_RET;
 
+    t->session_id = WT_SESSION_ID_INVALID;
     if ((ret = pthread_mutex_unlock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_unlock: %s", t->name));
 }
@@ -233,7 +254,10 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
     WT_UNUSED(session);
 
     BOOL b = TryEnterCriticalSection(&t->lock);
-    return (b == 0 ? EBUSY : 0);
+    if (b == 0)
+        return (EBUSY);
+    t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
+    return (0);
 }
 
 /*
@@ -246,6 +270,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
     WT_UNUSED(session);
 
     EnterCriticalSection(&t->lock);
+    t->session_id = WT_SPIN_SESSION_ID_SAFE(session);
 }
 
 /*
@@ -257,6 +282,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
 
+    t->session_id = WT_SESSION_ID_INVALID;
     LeaveCriticalSection(&t->lock);
 }
 
@@ -265,6 +291,44 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 #error Unknown spinlock type
 
 #endif
+
+/*
+ * __wt_spin_locked --
+ *     Check whether the spinlock is locked, irrespective of which session locked it.
+ */
+static inline bool
+__wt_spin_locked(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+    WT_UNUSED(session);
+    return (t->session_id != WT_SESSION_ID_INVALID);
+}
+
+/*
+ * __wt_spin_owned --
+ *     Check whether the session owns the spinlock.
+ */
+static inline bool
+__wt_spin_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+    return (t->session_id == WT_SPIN_SESSION_ID_SAFE(session));
+}
+
+/*
+ * __wt_spin_unlock_if_owned --
+ *     Unlock the spinlock only if it is acquired by the specified session.
+ */
+static inline void
+__wt_spin_unlock_if_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+    if (__wt_spin_owned(session, t))
+        __wt_spin_unlock(session, t);
+}
+
+/*
+ * WT_ASSERT_SPINLOCK_OWNED --
+ *      Assert that the session owns the spinlock.
+ */
+#define WT_ASSERT_SPINLOCK_OWNED(session, t) WT_ASSERT((session), __wt_spin_owned((session), (t)));
 
 /*
  * WT_SPIN_INIT_TRACKED --

@@ -1,6 +1,6 @@
 // don't allow most operators with regex
 
-t = db.jstests_ne3;
+let t = db.jstests_ne3;
 t.drop();
 
 assert.throws(function() {

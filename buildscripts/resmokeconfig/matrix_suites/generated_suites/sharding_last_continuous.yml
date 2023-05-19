@@ -21,7 +21,6 @@ matrix_suite: true
 selector:
   exclude_files:
   - jstests/sharding/**/libs/**/*.js
-  - jstests/sharding/analyze_shard_key/**/*.js
   - jstests/sharding/query/merge_command_options.js
   - jstests/sharding/max_time_ms_enforced_on_shard.js
   - jstests/sharding/drop_indexes_with_stale_config_error.js

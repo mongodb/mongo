@@ -168,7 +168,8 @@ public:
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
                       const boost::optional<BSONObj>& letParameters = boost::none,
-                      bool mayDbProfile = true);
+                      bool mayDbProfile = true,
+                      const SerializationContext& serializationCtx = SerializationContext());
 
     /**
      * Constructs an ExpressionContext suitable for use outside of the aggregation system, including
@@ -422,7 +423,7 @@ public:
     void stopExpressionCounters();
 
     bool expressionCountersAreActive() {
-        return _expressionCounters.is_initialized();
+        return static_cast<bool>(_expressionCounters);
     }
 
     /**
@@ -463,6 +464,8 @@ public:
     bool hasWhereClause = false;
 
     NamespaceString ns;
+
+    SerializationContext serializationCtxt;
 
     // If known, the UUID of the execution namespace for this aggregation command.
     boost::optional<UUID> uuid;
@@ -600,7 +603,7 @@ protected:
     bool _requiresTimeseriesExtendedRangeSupport = false;
 
 private:
-    boost::optional<ExpressionCounters> _expressionCounters = boost::none;
+    std::unique_ptr<ExpressionCounters> _expressionCounters;
     bool _gotTemporarilyUnavailableException = false;
 
     // We use this set to indicate whether or not a system variable was referenced in the query that

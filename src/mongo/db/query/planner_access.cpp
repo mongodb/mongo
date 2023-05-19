@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/planner_access.h"
@@ -445,9 +446,15 @@ void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
+
+    // The following are expensive to look up, so only do it once for each.
+    const mongo::NamespaceString nss = query.nss();
+    const bool isOplog = nss.isOplog();
+    const bool isChangeCollection = nss.isChangeCollection();
+
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
-    csn->name = query.ns().toString();
+    csn->name = nss.ns().toString();
     csn->filter = query.root()->clone();
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =
@@ -455,6 +462,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->shouldWaitForOplogVisibility =
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
     csn->direction = direction;
+    csn->isOplog = isOplog;
+    csn->isClustered = params.clusteredInfo ? true : false;
 
     if (params.clusteredInfo) {
         csn->clusteredIndex = params.clusteredInfo->getIndexSpec();
@@ -475,8 +484,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // the collection scan to return timestamp-based tokens. Otherwise, we should
     // return generic RecordId-based tokens.
     if (query.getFindCommandRequest().getRequestResumeToken()) {
-        csn->shouldTrackLatestOplogTimestamp = query.nss().isOplogOrChangeCollection();
-        csn->requestResumeToken = !query.nss().isOplogOrChangeCollection();
+        csn->shouldTrackLatestOplogTimestamp = (isOplog || isChangeCollection);
+        csn->requestResumeToken = !csn->shouldTrackLatestOplogTimestamp;
     }
 
     // Extract and assign the RecordId from the 'resumeAfter' token, if present.
@@ -488,13 +497,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     const bool assertMinTsHasNotFallenOffOplog =
         params.options & QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
-    if (query.nss().isOplogOrChangeCollection() && csn->direction == 1) {
+    if ((isOplog || isChangeCollection) && csn->direction == 1) {
         // Takes Timestamp 'ts' as input, transforms it to the RecordIdBound and assigns it to the
         // output parameter 'recordId'. The RecordId format for the change collection is a string,
         // where as the RecordId format for the oplog is a long integer. The timestamp should be
         // converted to the required format before assigning it to the 'recordId'.
         auto assignRecordIdFromTimestamp = [&](auto& ts, auto* recordId) {
-            auto keyFormat = query.nss().isChangeCollection() ? KeyFormat::String : KeyFormat::Long;
+            auto keyFormat = isChangeCollection ? KeyFormat::String : KeyFormat::Long;
             auto status = record_id_helpers::keyForOptime(ts, keyFormat);
             if (status.isOK()) {
                 *recordId = RecordIdBound(status.getValue());
@@ -538,7 +547,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     auto collCollator = params.clusteredCollectionCollator;
     csn->hasCompatibleCollation = CollatorInterface::collatorsMatch(queryCollator, collCollator);
 
-    if (params.clusteredInfo && !csn->resumeAfterRecordId) {
+    if (csn->isClustered && !csn->resumeAfterRecordId) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
         // via minRecord and maxRecord if applicable. During this process, we will check if the
         // query is guaranteed to exclude values of the cluster key which are affected by collation.
@@ -1356,6 +1365,42 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
 
             refineTightnessForMaybeCoveredQuery(query, scanState.tightness);
             handleFilter(&scanState);
+        }
+    }
+
+    // If the index is partial and we have reached children without index tag, check if they are
+    // covered by the index' filter expression. In this case the child can be removed. In some cases
+    // this enables to remove the fetch stage from the plan.
+    // The check could be put inside the 'handleFilterAnd()' function, but if moved then the
+    // optimization will not be applied if the predicate contains an $elemMatch expression, since
+    // then the 'handleFilterAnd()' is not called.
+    if (IndexTag::kNoIndex != scanState.currentIndexNumber) {
+        const IndexEntry& index = indices[scanState.currentIndexNumber];
+        if (index.filterExpr != nullptr) {
+            while (scanState.curChild < root->numChildren()) {
+                MatchExpression* child = root->getChild(scanState.curChild);
+                if (expression::isSubsetOf(index.filterExpr, child)) {
+                    // When the documents satisfying the index filter predicate are a subset of the
+                    // documents satisfying the child expression, the child predicate is redundant.
+                    // Remove the child from the root's children.
+                    // For example: index on 'a' with a filter {$and: [{a: {$gt: 10}}, {b: {$lt:
+                    // 100}}]} and a query predicate {$and: [{a: {$gt: 20}}, {b: {$lt: 100}}]}. The
+                    // non-indexed child {b: {$lt: 100}} is always satisfied by the index filter and
+                    // can be removed.
+
+                    // In case of index filter predicate with $or, this optimization is not
+                    // applicable, since the subset relationship doesn't hold.
+                    // For example, an index on field 'c' with a filter expression {$or: [{a: {$gt:
+                    // 10}}, {b: {$lt: 100}}]} could be applicable for the query with a predicate
+                    // {$and: [{c: {$gt: 100}}, {b: {$lt: 100}}]}, but the predicate will not be
+                    // removed.
+                    scanState.tightness = IndexBoundsBuilder::EXACT;
+                    refineTightnessForMaybeCoveredQuery(query, scanState.tightness);
+                    handleFilter(&scanState);
+                } else {
+                    ++scanState.curChild;
+                }
+            }
         }
     }
 

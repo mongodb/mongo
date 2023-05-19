@@ -3,13 +3,14 @@
 //   requires_fastcount,
 // ]
 
-t = db.geo_center_sphere1;
+let t = db.geo_center_sphere1;
 
 function test(index) {
     t.drop();
-    skip = 8;  // lower for more rigor, higher for more speed (tested with .5, .678, 1, 2, 3, and 4)
+    let skip =
+        8;  // lower for more rigor, higher for more speed (tested with .5, .678, 1, 2, 3, and 4)
 
-    searches = [
+    let searches = [
         //  x , y    rad
         [[5, 0], 0.05],  // ~200 miles
         [[135, 0], 0.05],
@@ -23,18 +24,18 @@ function test(index) {
         [[-20, 60], 0.25],
         [[-20, -70], 0.25],
     ];
-    correct = searches.map(function(z) {
+    let correct = searches.map(function(z) {
         return [];
     });
 
-    num = 0;
+    let num = 0;
 
     var bulk = t.initializeUnorderedBulkOp();
-    for (x = -179; x <= 179; x += skip) {
-        for (y = -89; y <= 89; y += skip) {
-            o = {_id: num++, loc: [x, y]};
+    for (let x = -179; x <= 179; x += skip) {
+        for (let y = -89; y <= 89; y += skip) {
+            let o = {_id: num++, loc: [x, y]};
             bulk.insert(o);
-            for (i = 0; i < searches.length; i++) {
+            for (let i = 0; i < searches.length; i++) {
                 if (Geo.sphereDistance([x, y], searches[i][0]) <= searches[i][1])
                     correct[i].push(o);
             }
@@ -47,10 +48,10 @@ function test(index) {
         t.createIndex({loc: index});
     }
 
-    for (i = 0; i < searches.length; i++) {
+    for (let i = 0; i < searches.length; i++) {
         print('------------');
         print(tojson(searches[i]) + "\t" + correct[i].length);
-        q = {loc: {$within: {$centerSphere: searches[i]}}};
+        let q = {loc: {$within: {$centerSphere: searches[i]}}};
 
         // correct[i].forEach( printjson )
         // printjson( q );
@@ -69,8 +70,8 @@ function test(index) {
             return z._id;
         });
 
-        missing = [];
-        epsilon = 0.001;  // allow tenth of a percent error due to conversions
+        let missing = [];
+        let epsilon = 0.001;  // allow tenth of a percent error due to conversions
         for (var j = 0; j < x.length; j++) {
             if (!Array.contains(y, x[j])) {
                 missing.push(x[j]);

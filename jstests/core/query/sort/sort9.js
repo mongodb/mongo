@@ -1,6 +1,6 @@
 // Unindexed array sorting SERVER-2884
 
-t = db.jstests_sort9;
+let t = db.jstests_sort9;
 t.drop();
 
 t.save({a: []});

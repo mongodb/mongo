@@ -34,7 +34,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_coordinator.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -107,10 +106,7 @@ public:
     std::string help() const override {
         return "Refreshes the query analyzer configurations for all collections.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(RefreshQueryAnalyzerConfigurationCmd,
-                                       analyze_shard_key::gFeatureFlagAnalyzeShardKey);
+} refreshQueryAnalyzerConfigurationCmd;
 
 }  // namespace
 

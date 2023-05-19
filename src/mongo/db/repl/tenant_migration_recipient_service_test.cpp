@@ -3776,17 +3776,13 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableClonerE
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, MigrationFailsOnRecipientFailover) {
-    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
-    stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
     // Hang before deleting the state doc so that we can check the state doc was persisted.
     FailPointEnableBlock fpDeletingStateDoc("pauseTenantMigrationRecipientBeforeDeletingStateDoc");
 
     const UUID migrationUUID = UUID::gen();
-    const OpTime topOfOplogOpTime(Timestamp(1, 1), 1);
 
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
-    insertTopOfOplog(&replSet, topOfOplogOpTime);
 
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
@@ -3801,25 +3797,29 @@ TEST_F(TenantMigrationRecipientServiceTest, MigrationFailsOnRecipientFailover) {
     initialStateDocument.setState(TenantMigrationRecipientStateEnum::kStarted);
 
     auto opCtx = makeOperationContext();
-    CollectionOptions collectionOptions;
-    collectionOptions.uuid = UUID::gen();
+
+    auto pauseFp = globalFailPointRegistry().find("pauseAfterRunTenantMigrationRecipientInstance");
+    pauseFp->setMode(FailPoint::alwaysOn);
+    auto pauseFpTimesEntered = pauseFp->setMode(FailPoint::alwaysOn,
+                                                0,
+                                                BSON("action"
+                                                     << "hang"));
+
+    // Create and start the instance, which ensures that the rebuild has completed and the tenant
+    // recipient collection and indexes have been created.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    pauseFp->waitForTimesEntered(pauseFpTimesEntered + 1);
+
     auto storage = StorageInterface::get(opCtx->getServiceContext());
-    const auto status = storage->createCollection(
-        opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions);
-    if (!status.isOK()) {
-        // It's possible to race with the test fixture setup in creating the tenant recipient
-        // collection.
-        ASSERT_EQ(ErrorCodes::NamespaceExists, status.code());
-    }
     ASSERT_OK(storage->insertDocument(opCtx.get(),
                                       NamespaceString::kTenantMigrationRecipientsNamespace,
                                       {initialStateDocument.toBSON()},
                                       0));
 
-    // Create and start the instance.
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
+    pauseFp->setMode(FailPoint::off);
 
     ASSERT_EQ(ErrorCodes::TenantMigrationAborted,
               instance->getDataSyncCompletionFuture().getNoThrow().code());
@@ -3827,7 +3827,6 @@ TEST_F(TenantMigrationRecipientServiceTest, MigrationFailsOnRecipientFailover) {
 
 TEST_F(TenantMigrationRecipientServiceTest,
        RecipientFailureCounterNotIncrementedWhenMigrationForgotten) {
-    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
     // Hang before deleting the state doc so that we can check the state doc was persisted.
     FailPointEnableBlock fpDeletingStateDoc("pauseTenantMigrationRecipientBeforeDeletingStateDoc");
 
@@ -3855,25 +3854,28 @@ TEST_F(TenantMigrationRecipientServiceTest,
     initialStateDocument.setExpireAt(opCtx->getServiceContext()->getFastClockSource()->now());
     ASSERT_EQ(0, initialStateDocument.getNumRestartsDueToRecipientFailure());
 
-    CollectionOptions collectionOptions;
-    collectionOptions.uuid = UUID::gen();
+    auto pauseFp = globalFailPointRegistry().find("pauseAfterRunTenantMigrationRecipientInstance");
+    pauseFp->setMode(FailPoint::alwaysOn);
+    auto pauseFpTimesEntered = pauseFp->setMode(FailPoint::alwaysOn,
+                                                0,
+                                                BSON("action"
+                                                     << "hang"));
+
+    // Create and start the instance, which ensures that the rebuild has completed and the tenant
+    // recipient collection and indexes have been created.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    pauseFp->waitForTimesEntered(pauseFpTimesEntered + 1);
+
     auto storage = StorageInterface::get(opCtx->getServiceContext());
-    const auto status = storage->createCollection(
-        opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions);
-    if (!status.isOK()) {
-        // It's possible to race with the test fixture setup in creating the tenant recipient
-        // collection.
-        ASSERT_EQ(ErrorCodes::NamespaceExists, status.code());
-    }
     ASSERT_OK(storage->insertDocument(opCtx.get(),
                                       NamespaceString::kTenantMigrationRecipientsNamespace,
                                       {initialStateDocument.toBSON()},
                                       0));
 
-    // Create and start the instance.
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
+    pauseFp->setMode(FailPoint::off);
 
     ASSERT_EQ(ErrorCodes::TenantMigrationForgotten,
               instance->getDataSyncCompletionFuture().getNoThrow().code());
@@ -3931,7 +3933,6 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
 TEST_F(TenantMigrationRecipientServiceTest,
        RecipientDeletesExistingStateDocMarkedForGarbageCollection) {
-    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
     auto beforeDeleteFp = globalFailPointRegistry().find(
         "pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc");
@@ -3940,10 +3941,36 @@ TEST_F(TenantMigrationRecipientServiceTest,
     auto initialTimesEntered = beforeDeleteFp->setMode(FailPoint::alwaysOn);
     auto opCtx = makeOperationContext();
 
-    // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
-    // garbage collection.
     const auto kTenantId = TenantId(OID::gen());
     const std::string kConnectionString = "donor-rs/localhost:12345";
+    const UUID migrationUUID = UUID::gen();
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        kConnectionString,
+        kTenantId.toString(),
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto pauseFp = globalFailPointRegistry().find("pauseAfterRunTenantMigrationRecipientInstance");
+    pauseFp->setMode(FailPoint::alwaysOn);
+    auto pauseFpTimesEntered = pauseFp->setMode(FailPoint::alwaysOn,
+                                                0,
+                                                BSON("action"
+                                                     << "hang"));
+
+    // Create and start the instance, which ensures that the rebuild has completed and the tenant
+    // recipient collection and indexes have been created.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+
+    pauseFp->waitForTimesEntered(pauseFpTimesEntered + 1);
+
+    // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
+    // garbage collection.
     const UUID existingMigrationId = UUID::gen();
     TenantMigrationRecipientDocument previousStateDoc(
         existingMigrationId,
@@ -3971,21 +3998,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
         .add(kTenantId, recipientMtab);
 
-    const UUID migrationUUID = UUID::gen();
-    TenantMigrationRecipientDocument initialStateDocument(
-        migrationUUID,
-        kConnectionString,
-        kTenantId.toString(),
-        kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
-    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
-
-    // Create and start the instance.
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
-    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+    pauseFp->setMode(FailPoint::off);
 
     // We block and wait right before the service deletes the previous state document.
     beforeDeleteFp->waitForTimesEntered(initialTimesEntered + 1);
@@ -4006,14 +4019,41 @@ TEST_F(TenantMigrationRecipientServiceTest,
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict) {
-    FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
     FailPointEnableBlock skipRebuildFp("PrimaryOnlyServiceSkipRebuildingInstances");
 
-    // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
-    // garbage collection.
+    auto opCtx = makeOperationContext();
+
     const auto kTenantId = TenantId(OID::gen());
     const std::string kConnectionString = "donor-rs/localhost:12345";
+    const UUID migrationUUID = UUID::gen();
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        kConnectionString,
+        kTenantId.toString(),
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto pauseFp = globalFailPointRegistry().find("pauseAfterRunTenantMigrationRecipientInstance");
+    pauseFp->setMode(FailPoint::alwaysOn);
+    auto pauseFpTimesEntered = pauseFp->setMode(FailPoint::alwaysOn,
+                                                0,
+                                                BSON("action"
+                                                     << "hang"));
+
+    // Create and start the instance, which ensures that the rebuild has completed and the tenant
+    // recipient collection and indexes have been created.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+
+    pauseFp->waitForTimesEntered(pauseFpTimesEntered + 1);
+
+    // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
+    // garbage collection.
     const UUID existingMigrationId = UUID::gen();
     TenantMigrationRecipientDocument previousStateDoc(
         existingMigrationId,
@@ -4028,8 +4068,6 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict
     // from failover.
     previousStateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
 
-    auto opCtx = makeOperationContext();
-
     // Insert existing state document for the same tenant but different migration id
     uassertStatusOK(
         tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx.get(), previousStateDoc));
@@ -4041,21 +4079,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict
     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
         .add(kTenantId, recipientMtab);
 
-    const UUID migrationUUID = UUID::gen();
-    TenantMigrationRecipientDocument initialStateDocument(
-        migrationUUID,
-        kConnectionString,
-        kTenantId.toString(),
-        kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
-    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
-
-    // Create and start the instance.
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
-    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+    pauseFp->setMode(FailPoint::off);
 
     // Since the previous state doc did not have expireAt set we will assert with
     // ConflictingOperationInProgress.

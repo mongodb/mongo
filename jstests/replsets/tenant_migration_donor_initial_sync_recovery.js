@@ -149,7 +149,7 @@ if (donorDoc) {
                                           donorDoc.blockTimestamp) == 0);
             break;
         default:
-            throw new Error(`Invalid state "${state}" from donor doc.`);
+            throw new Error(`Invalid state "${donorDoc.state}" from donor doc.`);
     }
 }
 

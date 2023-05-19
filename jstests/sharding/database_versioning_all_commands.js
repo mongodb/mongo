@@ -456,7 +456,7 @@ let testCases = {
     echo: {skip: "does not forward command to primary shard"},
     enableSharding: {skip: "does not forward command to primary shard"},
     endSessions: {skip: "goes through the cluster write path"},
-    explain: {skip: "TODO SERVER-31226"},
+    explain: {skip: "already tested by each CRUD command through the 'explain' field"},
     features: {skip: "executes locally on mongos (not sent to any remote node)"},
     filemd5: {
         run: {
@@ -674,6 +674,7 @@ let testCases = {
     },
     repairShardedCollectionChunksHistory: {skip: "always targets the config server"},
     replSetGetStatus: {skip: "not supported in mongos"},
+    resetPlacementHistory: {skip: "always targets the config server"},
     reshardCollection: {skip: "does not forward command to primary shard"},
     revokePrivilegesFromRole: {skip: "always targets the config server"},
     revokeRolesFromRole: {skip: "always targets the config server"},

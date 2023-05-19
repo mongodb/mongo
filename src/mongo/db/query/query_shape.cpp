@@ -28,8 +28,13 @@
  */
 
 #include "mongo/db/query/query_shape.h"
-#include "query_request_helper.h"
-#include "sort_pattern.h"
+
+#include "mongo/base/status.h"
+#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/projection_ast_util.h"
+#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo::query_shape {
 
@@ -45,27 +50,26 @@ BSONObj representativePredicateShape(const MatchExpression* predicate) {
 }
 
 BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> identifierRedactionPolicy) {
+                            std::function<std::string(StringData)> identifierHmacPolicy) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierRedactionPolicy = identifierRedactionPolicy;
-    opts.redactIdentifiers = true;
+    opts.identifierHmacPolicy = identifierHmacPolicy;
+    opts.applyHmacToIdentifiers = true;
     return predicate->serialize(opts);
 }
 
-BSONObj representativePredicateShape(
-    const MatchExpression* predicate,
-    std::function<std::string(StringData)> identifierRedactionPolicy) {
+BSONObj representativePredicateShape(const MatchExpression* predicate,
+                                     std::function<std::string(StringData)> identifierHmacPolicy) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
-    opts.identifierRedactionPolicy = identifierRedactionPolicy;
-    opts.redactIdentifiers = true;
+    opts.identifierHmacPolicy = identifierHmacPolicy;
+    opts.applyHmacToIdentifiers = true;
     return predicate->serialize(opts);
 }
 
-BSONObj sortShape(const BSONObj& sortSpec,
-                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                  const SerializationOptions& opts) {
+BSONObj extractSortShape(const BSONObj& sortSpec,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         const SerializationOptions& opts) {
     if (sortSpec.isEmpty()) {
         return sortSpec;
     }
@@ -95,4 +99,240 @@ BSONObj sortShape(const BSONObj& sortSpec,
     return bob.obj();
 }
 
+static std::string hintSpecialField = "$hint";
+void addShapeLiterals(BSONObjBuilder* bob,
+                      const FindCommandRequest& findCommand,
+                      const SerializationOptions& opts) {
+    if (auto limit = findCommand.getLimit()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kLimitFieldName, static_cast<long long>(*limit));
+    }
+    if (auto skip = findCommand.getSkip()) {
+        opts.appendLiteral(bob, FindCommandRequest::kSkipFieldName, static_cast<long long>(*skip));
+    }
+}
+
+static std::vector<
+    std::pair<StringData, std::function<const OptionalBool(const FindCommandRequest&)>>>
+    boolArgMap = {
+        {FindCommandRequest::kSingleBatchFieldName, &FindCommandRequest::getSingleBatch},
+        {FindCommandRequest::kAllowDiskUseFieldName, &FindCommandRequest::getAllowDiskUse},
+        {FindCommandRequest::kReturnKeyFieldName, &FindCommandRequest::getReturnKey},
+        {FindCommandRequest::kShowRecordIdFieldName, &FindCommandRequest::getShowRecordId},
+        {FindCommandRequest::kTailableFieldName, &FindCommandRequest::getTailable},
+        {FindCommandRequest::kAwaitDataFieldName, &FindCommandRequest::getAwaitData},
+        {FindCommandRequest::kMirroredFieldName, &FindCommandRequest::getMirrored},
+        {FindCommandRequest::kOplogReplayFieldName, &FindCommandRequest::getOplogReplay},
+};
+std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandRequest&)>>>
+    objArgMap = {
+        {FindCommandRequest::kCollationFieldName, &FindCommandRequest::getCollation},
+
+};
+
+void addRemainingFindCommandFields(BSONObjBuilder* bob,
+                                   const FindCommandRequest& findCommand,
+                                   const SerializationOptions& opts) {
+    for (auto [fieldName, getterFunction] : boolArgMap) {
+        auto optBool = getterFunction(findCommand);
+        if (optBool.has_value()) {
+            opts.appendLiteral(bob, fieldName, optBool.value_or(false));
+        }
+    }
+    auto collation = findCommand.getCollation();
+    if (!collation.isEmpty()) {
+        opts.appendLiteral(bob, FindCommandRequest::kCollationFieldName, collation);
+    }
+}
+
+BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool redactValues) {
+    BSONObjBuilder bob;
+    for (BSONElement elem : obj) {
+        if (hintSpecialField.compare(elem.fieldName()) == 0) {
+            tassert(7421703,
+                    "Hinted field must be a string with $hint operator",
+                    elem.type() == BSONType::String);
+            bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            continue;
+        }
+
+        // $natural doesn't need to be redacted.
+        if (elem.fieldNameStringData().compare(query_request_helper::kNaturalSortField) == 0) {
+            bob.append(elem);
+            continue;
+        }
+
+        if (opts.replacementForLiteralArgs && redactValues) {
+            bob.append(opts.serializeFieldPathFromString(elem.fieldName()),
+                       opts.replacementForLiteralArgs.get());
+        } else {
+            bob.appendAs(elem, opts.serializeFieldPathFromString(elem.fieldName()));
+        }
+    }
+    return bob.obj();
+}
+
+/**
+ * In a let specification all field names are variable names, and all values are either expressions
+ * or constants.
+ */
+BSONObj extractLetSpecShape(BSONObj letSpec,
+                            const SerializationOptions& opts,
+                            boost::intrusive_ptr<ExpressionContext> expCtx) {
+
+    BSONObjBuilder bob;
+    for (BSONElement elem : letSpec) {
+        auto redactedValue =
+            Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState)
+                ->serialize(opts);
+        // Note that this will throw on deeply nested let variables.
+        redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
+    }
+    return bob.obj();
+}
+
+BSONObj extractNamespaceShape(NamespaceString nss, const SerializationOptions& opts) {
+    BSONObjBuilder bob;
+    if (nss.tenantId()) {
+        bob.append("tenantId", opts.serializeIdentifier(nss.tenantId().value().toString()));
+    }
+    bob.append("db", opts.serializeIdentifier(nss.db()));
+    bob.append("coll", opts.serializeIdentifier(nss.coll()));
+    return bob.obj();
+}
+
+BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+                          const SerializationOptions& opts,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONObjBuilder bob;
+    // Serialize the namespace as part of the query shape.
+    {
+        auto ns = findCommand.getNamespaceOrUUID();
+        if (ns.nss()) {
+            bob.append("cmdNs", extractNamespaceShape(ns.nss().value(), opts));
+        } else {
+            BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
+            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid()->toString()));
+            cmdNs.done();
+        }
+    }
+
+    bob.append("command", "find");
+    std::unique_ptr<MatchExpression> filterExpr;
+    // Filter.
+    {
+        auto filter = findCommand.getFilter();
+        filterExpr = uassertStatusOKWithContext(
+            MatchExpressionParser::parse(findCommand.getFilter(),
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures),
+            "Failed to parse 'filter' option when making queryStats key");
+        bob.append(FindCommandRequest::kFilterFieldName, filterExpr->serialize(opts));
+    }
+
+    // Let Spec.
+    if (auto letSpec = findCommand.getLet()) {
+        auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
+        auto ownedObj = redactedObj.getOwned();
+        bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
+    }
+
+    if (!findCommand.getProjection().isEmpty()) {
+        // Parse to Projection
+        auto projection =
+            projection_ast::parseAndAnalyze(expCtx,
+                                            findCommand.getProjection(),
+                                            filterExpr.get(),
+                                            findCommand.getFilter(),
+                                            ProjectionPolicies::findProjectionPolicies());
+
+        bob.append(FindCommandRequest::kProjectionFieldName,
+                   projection_ast::serialize(*projection.root(), opts));
+    }
+
+    // Assume the hint is correct and contains field names. It is possible that this hint
+    // doesn't actually represent an index, but we can't detect that here.
+    // Hint, max, and min won't serialize if the object is empty.
+    if (!findCommand.getHint().isEmpty()) {
+        bob.append(FindCommandRequest::kHintFieldName,
+                   extractHintShape(findCommand.getHint(), opts, false));
+        // Max/Min aren't valid without hint.
+        if (!findCommand.getMax().isEmpty()) {
+            bob.append(FindCommandRequest::kMaxFieldName,
+                       extractHintShape(findCommand.getMax(), opts, true));
+        }
+        if (!findCommand.getMin().isEmpty()) {
+            bob.append(FindCommandRequest::kMinFieldName,
+                       extractHintShape(findCommand.getMin(), opts, true));
+        }
+    }
+
+    // Sort.
+    if (!findCommand.getSort().isEmpty()) {
+        bob.append(FindCommandRequest::kSortFieldName,
+                   query_shape::extractSortShape(findCommand.getSort(), expCtx, opts));
+    }
+
+    // Fields for literal redaction. Adds limit and skip.
+    addShapeLiterals(&bob, findCommand, opts);
+
+    // Add the fields that require no redaction.
+    addRemainingFindCommandFields(&bob, findCommand, opts);
+
+    return bob.obj();
+}
+
+BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
+                          const std::vector<BSONObj>& serializedPipeline,
+                          const SerializationOptions& opts,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONObjBuilder bob;
+
+    // TODO SERVER-73152 update to newest query shape definition
+
+    // namespace
+    bob.append("ns", extractNamespaceShape(aggregateCommand.getNamespace(), opts));
+    bob.append(AggregateCommandRequest::kCommandName,
+               opts.serializeIdentifier(aggregateCommand.getNamespace().coll()));
+
+    // pipeline
+    {
+        BSONArrayBuilder pipelineBab(
+            bob.subarrayStart(AggregateCommandRequest::kPipelineFieldName));
+        for (const auto& stage : serializedPipeline) {
+            pipelineBab.append(stage);
+        }
+        pipelineBab.doneFast();
+    }
+
+    // explain
+    if (aggregateCommand.getExplain().has_value()) {
+        bob.append(AggregateCommandRequest::kExplainFieldName, true);
+    }
+
+    // allowDiskUse
+    if (auto param = aggregateCommand.getAllowDiskUse(); param.has_value()) {
+        bob.append(AggregateCommandRequest::kAllowDiskUseFieldName, param.value_or(false));
+    }
+
+    // collation
+    if (auto param = aggregateCommand.getCollation()) {
+        bob.append(AggregateCommandRequest::kCollationFieldName, param.get());
+    }
+
+    // hint
+    if (auto hint = aggregateCommand.getHint()) {
+        bob.append(AggregateCommandRequest::kHintFieldName,
+                   extractHintShape(hint.get(), opts, false));
+    }
+
+    // let
+    if (auto letSpec = aggregateCommand.getLet()) {
+        auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
+        auto ownedObj = redactedObj.getOwned();
+        bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
+    }
+    return bob.obj();
+}
 }  // namespace mongo::query_shape

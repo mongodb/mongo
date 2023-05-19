@@ -102,7 +102,7 @@ struct DeleteStageParams {
  * Callers of work() must be holding a write lock (and, for replicated deletes, callers must have
  * had the replication coordinator approve the write).
  */
-class DeleteStage : public RequiresMutableCollectionStage {
+class DeleteStage : public RequiresWritableCollectionStage {
     DeleteStage(const DeleteStage&) = delete;
     DeleteStage& operator=(const DeleteStage&) = delete;
 

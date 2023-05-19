@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.regex2;
+let t = db.regex2;
 t.drop();
 
 assert.commandWorked(t.save({a: "test"}));
@@ -15,8 +15,8 @@ assert.eq(2, t.find({a: /test/i}).count(), "F");
 
 t.drop();
 
-a = "\u0442\u0435\u0441\u0442";
-b = "\u0422\u0435\u0441\u0442";
+let a = "\u0442\u0435\u0441\u0442";
+let b = "\u0422\u0435\u0441\u0442";
 
 assert((new RegExp(a)).test(a), "B 1");
 assert(!(new RegExp(a)).test(b), "B 2");

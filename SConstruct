@@ -616,6 +616,13 @@ add_option(
     help="Specify variables files to load.",
 )
 
+add_option(
+    'streams-release-build',
+    default=False,
+    action='store_true',
+    help='If set, will include the enterprise streams module in a release build.',
+)
+
 link_model_choices = ['auto', 'object', 'static', 'dynamic', 'dynamic-strict', 'dynamic-sdk']
 add_option(
     'link-model',
@@ -3667,6 +3674,9 @@ def doConfigure(myenv):
         # Don't issue warnings about potentially evaluated expressions
         myenv.AddToCCFLAGSIfSupported("-Wno-potentially-evaluated-expression")
 
+        # SERVER-76472 we don't try to maintain ABI so disable warnings about possible ABI issues.
+        myenv.AddToCCFLAGSIfSupported("-Wno-psabi")
+
         # Warn about moves of prvalues, which can inhibit copy elision.
         myenv.AddToCXXFLAGSIfSupported("-Wpessimizing-move")
 
@@ -3705,15 +3715,6 @@ def doConfigure(myenv):
         # likely to catch these errors early, add the (currently clang
         # only) flag that turns it on.
         myenv.AddToCXXFLAGSIfSupported("-Wunused-exception-parameter")
-
-        # TODO(SERVER-60151): Avoid the dilemma identified in
-        # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100493. Unfortunately,
-        # we don't have a more targeted warning suppression we can use
-        # other than disabling all deprecation warnings. We will
-        # revisit this once we are fully on C++20 and can commit the
-        # C++20 style code.
-        if get_option('cxx-std') == "20":
-            myenv.AddToCXXFLAGSIfSupported('-Wno-deprecated')
 
         # TODO SERVER-58675 - Remove this suppression after abseil is upgraded
         myenv.AddToCXXFLAGSIfSupported("-Wno-deprecated-builtins")
@@ -3828,6 +3829,9 @@ def doConfigure(myenv):
 
     usingLibStdCxx = False
     if has_option('libc++'):
+        # TODO SERVER-54659 - ASIO depends on std::result_of which was removed in C++ 20
+        myenv.Append(CPPDEFINES=["ASIO_HAS_STD_INVOKE_RESULT"])
+
         if not myenv.ToolchainIs('clang'):
             myenv.FatalError('libc++ is currently only supported for clang')
         if myenv.AddToCXXFLAGSIfSupported('-stdlib=libc++'):
@@ -6018,6 +6022,24 @@ env.AddPackageNameAlias(
 )
 
 env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'
+
+
+def isSupportedStreamsPlatform(thisEnv):
+    # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+    return thisEnv.TargetOSIs(
+        'linux') and thisEnv['TARGET_ARCH'] == 'x86_64' and ssl_provider == 'openssl'
+
+
+def shouldBuildStreams(thisEnv):
+    if releaseBuild:
+        # The streaming enterprise module and dependencies are only included in release builds.
+        # when streams-release-build is set.
+        return get_option('streams-release-build') and isSupportedStreamsPlatform(thisEnv)
+    else:
+        return isSupportedStreamsPlatform(thisEnv)
+
+
+env.AddMethod(shouldBuildStreams, 'ShouldBuildStreams')
 
 
 def prefix_libdir_rpath_generator(env, source, target, for_signature):

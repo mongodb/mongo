@@ -42,26 +42,21 @@ void OplogWriterTransactionProxy::appendOplogEntryChainInfo(OperationContext* op
     return _targetOplogWriter->appendOplogEntryChainInfo(opCtx, oplogEntry, oplogLink, stmtIds);
 }
 
-std::vector<repl::OpTime> OplogWriterTransactionProxy::logInsertOps(
-    OperationContext* opCtx,
-    repl::MutableOplogEntry* oplogEntryTemplate,
-    std::vector<InsertStatement>::const_iterator begin,
-    std::vector<InsertStatement>::const_iterator end,
-    std::vector<bool> fromMigrate,
-    const ShardingWriteRouter& shardingWriteRouter,
-    const CollectionPtr& collectionPtr) {
-    return _targetOplogWriter->logInsertOps(opCtx,
-                                            oplogEntryTemplate,
-                                            begin,
-                                            end,
-                                            std::move(fromMigrate),
-                                            shardingWriteRouter,
-                                            collectionPtr);
-}
-
 repl::OpTime OplogWriterTransactionProxy::logOp(OperationContext* opCtx,
                                                 repl::MutableOplogEntry* oplogEntry) {
     return _targetOplogWriter->logOp(opCtx, oplogEntry);
+}
+
+void OplogWriterTransactionProxy::logOplogRecords(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  std::vector<Record>* records,
+                                                  const std::vector<Timestamp>& timestamps,
+                                                  const CollectionPtr& oplogCollection,
+                                                  repl::OpTime finalOpTime,
+                                                  Date_t wallTime,
+                                                  bool isAbortIndexBuild) {
+    _targetOplogWriter->logOplogRecords(
+        opCtx, nss, records, timestamps, oplogCollection, finalOpTime, wallTime, isAbortIndexBuild);
 }
 
 std::vector<OplogSlot> OplogWriterTransactionProxy::getNextOpTimes(OperationContext* opCtx,

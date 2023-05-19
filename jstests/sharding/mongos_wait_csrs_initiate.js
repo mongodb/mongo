@@ -21,6 +21,7 @@ assert.commandWorked(
 
 jsTestLog("getting mongos");
 var e;
+let mongos2;
 assert.soon(
     function() {
         try {

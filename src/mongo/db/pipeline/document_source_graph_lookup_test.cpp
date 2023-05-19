@@ -995,7 +995,7 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
                                                                    flagStatus);
 
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-            boost::none, expCtx->ns.dbName().toString(), _targetColl);
+            boost::none, expCtx->ns.dbName().toString_forTest(), _targetColl);
         auto liteParsedLookup =
             DocumentSourceGraphLookUp::LiteParsed::parse(nss, originalBSON.firstElement());
         auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();

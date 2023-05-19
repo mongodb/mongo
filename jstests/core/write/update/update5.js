@@ -4,7 +4,7 @@
 //
 // @tags: [assumes_unsharded_collection, requires_fastcount]
 
-t = db.update5;
+let t = db.update5;
 
 function go(key) {
     t.drop();
@@ -24,7 +24,7 @@ function go(key) {
     check(3, "C");
 
     var ik = {};
-    for (k in key)
+    for (let k in key)
         ik[k] = 1;
     t.createIndex(ik);
 

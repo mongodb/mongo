@@ -179,7 +179,7 @@ void parseAndVerifyResults(
 /**
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -3725,8 +3725,8 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
 TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.redactIdentifiers = true;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.applyHmacToIdentifiers = true;
+    options.identifierHmacPolicy = applyHmacForTest;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
@@ -3801,8 +3801,8 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
 TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
-    options.redactIdentifiers = true;
+    options.identifierHmacPolicy = applyHmacForTest;
+    options.applyHmacToIdentifiers = true;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 

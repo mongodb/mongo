@@ -80,7 +80,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
     }
 
     urilen = strlen("statistics:") + strlen(objname) + 1;
-    if ((uri = calloc(urilen, 1)) == NULL) {
+    if ((uri = util_calloc(urilen, 1)) == NULL) {
         fprintf(stderr, "%s: %s\n", progname, strerror(errno));
         goto err;
     }
@@ -116,8 +116,8 @@ err:
         ret = 1;
     }
     if (objname_free)
-        free(objname);
-    free(uri);
+        util_free(objname);
+    util_free(uri);
 
     return (ret);
 }

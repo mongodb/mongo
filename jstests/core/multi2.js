@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.multi2;
+let t = db.multi2;
 t.drop();
 
 t.save({x: 1, a: [1]});

@@ -290,12 +290,12 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
     // If the index is not visible within the side transaction, the index may have been created,
     // but not committed, in the parent transaction. Therefore, we abandon the side transaction
     // and set the multikey flag in the parent transaction.
-    if (!isPresentInMySnapshot(opCtx)) {
+    if (!DurableCatalog::get(opCtx)->isIndexPresent(opCtx, _catalogId, _descriptor->indexName())) {
         return {ErrorCodes::SnapshotUnavailable, "index not visible in side transaction"};
     }
 
     writeConflictRetry(
-        opCtx, "set index multikey", collection->ns().ns(), [&] {
+        opCtx, "set index multikey", collection->ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
 
             // If we have a prepare optime for recovery, then we always use that. This is safe since
@@ -368,14 +368,6 @@ void IndexCatalogEntryImpl::setIdent(std::shared_ptr<Ident> newIdent) {
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {
     return DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
-}
-
-bool IndexCatalogEntryImpl::isReadyInMySnapshot(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->isIndexReady(opCtx, _catalogId, _descriptor->indexName());
-}
-
-bool IndexCatalogEntryImpl::isPresentInMySnapshot(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->isIndexPresent(opCtx, _catalogId, _descriptor->indexName());
 }
 
 bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,

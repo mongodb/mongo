@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
@@ -72,8 +73,11 @@ protected:
     }
 
     void insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
-        auto updateResult = Helpers::upsert(opCtx, nss, doc);
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        auto updateResult = Helpers::upsert(opCtx, collection, doc);
         ASSERT_EQ(0, updateResult.numDocsModified);
     }
 

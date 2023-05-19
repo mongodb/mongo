@@ -7,7 +7,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
 [1] limitskip 5 0 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower single skip without limit ====
 -- INPUT:
@@ -16,7 +16,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
 [1] limitskip 0 4 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower LimitSkip node with values for both limit and skip ====
 -- INPUT:
@@ -25,4 +25,4 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
 [1] limitskip 4 2 
-[0] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none none none [] @"<collUUID>" true false 

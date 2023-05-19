@@ -1,6 +1,6 @@
 // Aggregation $strcasecmp tests.
 
-t = db.jstests_aggregation_strcasecmp;
+let t = db.jstests_aggregation_strcasecmp;
 t.drop();
 
 t.save({});

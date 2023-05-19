@@ -6,7 +6,8 @@
 
 
 nReturned: 0
-Plan skeleton: {
+Plan skeleton: 
+{
 	"queryPlanner" : {
 		"winningPlan" : {
 			"optimizerPlan" : {
@@ -31,13 +32,15 @@ Plan skeleton: {
 	}
 }
 
+
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "username" : "/^user8/" } }, { "$group" : { "_id" : 1, "count" : { "$sum" : 1 } } } ]
 [jsTest] ----
 
 
 nReturned: 0
-Plan skeleton: {
+Plan skeleton: 
+{
 	"queryPlanner" : {
 		"winningPlan" : {
 			"optimizerPlan" : {

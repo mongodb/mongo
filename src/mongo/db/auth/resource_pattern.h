@@ -267,7 +267,7 @@ public:
     /**
      * Returns the tenantId that this pattern matches.
      */
-    const boost::optional<TenantId>& tenantId() const {
+    boost::optional<TenantId> tenantId() const {
         return _ns.tenantId();
     }
 
@@ -277,7 +277,7 @@ public:
      * Behavior is undefined unless the pattern is of type matchDatabaseName or
      * matchExactNamespace or matchExactSystemBucketResource or matchAnySystemBucketInDBResource
      */
-    const DatabaseName& dbNameToMatch() const {
+    DatabaseName dbNameToMatch() const {
         return _ns.dbName();
     }
 

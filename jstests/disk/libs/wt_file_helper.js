@@ -190,8 +190,8 @@ let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
 let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     dbpath, dbName, collName, deleteOrCorruptFunc, requestFunc, errmsgRegExp) {
     // Start a MongoDB instance, create the collection file.
-    mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
-    testColl = mongod.getDB(dbName)[collName];
+    let mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
+    let testColl = mongod.getDB(dbName)[collName];
     const doc = {a: 1};
     assert.commandWorked(testColl.insert(doc));
 

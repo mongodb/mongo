@@ -186,7 +186,12 @@ void serializeMetadata(std::ostream& stream, Metadata metadata) {
         }
 
         stream << "\t\t\tcollection exists: " << scanDef.exists() << std::endl;
-        stream << "\t\t\tCE type: " << scanDef.getCE() << std::endl;
+        stream << "\t\t\tCE type: ";
+        if (const auto& ce = scanDef.getCE()) {
+            stream << *ce << std::endl;
+        } else {
+            stream << "(empty)" << std::endl;
+        }
     }
 }
 

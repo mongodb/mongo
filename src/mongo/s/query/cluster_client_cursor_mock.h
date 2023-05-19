@@ -33,6 +33,7 @@
 #include <functional>
 #include <queue>
 
+#include "mongo/db/query/request_shapifier.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 
@@ -111,12 +112,16 @@ public:
      */
     bool remotesExhausted() final;
 
+    bool hasBeenKilled() final;
+
     /**
      * Queues an error response.
      */
     void queueError(Status status);
 
     bool shouldOmitDiagnosticInformation() const final;
+
+    std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() final;
 
 private:
     bool _killed = false;

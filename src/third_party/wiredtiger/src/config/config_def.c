@@ -80,6 +80,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_debug_mode_subconfigs[] = {
   {"slow_checkpoint", "boolean", NULL, NULL, NULL, 0},
   {"stress_skiplist", "boolean", NULL, NULL, NULL, 0},
   {"table_logging", "boolean", NULL, NULL, NULL, 0},
+  {"tiered_flush_error_continue", "boolean", NULL, NULL, NULL, 0},
   {"update_restore_evict", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_wiredtiger_open_eviction_subconfigs[] = {
@@ -130,11 +131,13 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
   {"cache_overhead", "int", NULL, "min=0,max=30", NULL, 0},
   {"cache_size", "int", NULL, "min=1MB,max=10TB", NULL, 0},
+  {"cache_stuck_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"checkpoint", "category", NULL, NULL, confchk_wiredtiger_open_checkpoint_subconfigs, 2},
+  {"checkpoint_cleanup", "string", NULL, "choices=[\"none\",\"reclaim_space\"]", NULL, 0},
   {"chunk_cache", "category", NULL, NULL, confchk_wiredtiger_open_chunk_cache_subconfigs, 7},
   {"compatibility", "category", NULL, NULL,
     confchk_WT_CONNECTION_reconfigure_compatibility_subconfigs, 1},
-  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 13},
+  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 14},
   {"error_prefix", "string", NULL, NULL, NULL, 0},
   {"eviction", "category", NULL, NULL, confchk_wiredtiger_open_eviction_subconfigs, 2},
   {"eviction_checkpoint_target", "int", NULL, "min=0,max=10TB", NULL, 0},
@@ -177,9 +180,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"sleep_before_read_overflow_onpage\",\"split_1\",\"split_2\","
-    "\"split_3\",\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"split_8\",\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"block_cache\","
@@ -882,12 +885,14 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
   {"cache_overhead", "int", NULL, "min=0,max=30", NULL, 0},
   {"cache_size", "int", NULL, "min=1MB,max=10TB", NULL, 0},
+  {"cache_stuck_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"checkpoint", "category", NULL, NULL, confchk_wiredtiger_open_checkpoint_subconfigs, 2},
+  {"checkpoint_cleanup", "string", NULL, "choices=[\"none\",\"reclaim_space\"]", NULL, 0},
   {"checkpoint_sync", "boolean", NULL, NULL, NULL, 0},
   {"chunk_cache", "category", NULL, NULL, confchk_wiredtiger_open_chunk_cache_subconfigs, 7},
   {"compatibility", "category", NULL, NULL, confchk_wiredtiger_open_compatibility_subconfigs, 3},
   {"config_base", "boolean", NULL, NULL, NULL, 0}, {"create", "boolean", NULL, NULL, NULL, 0},
-  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 13},
+  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 14},
   {"direct_io", "list", NULL, "choices=[\"checkpoint\",\"data\",\"log\"]", NULL, 0},
   {"encryption", "category", NULL, NULL, confchk_wiredtiger_open_encryption_subconfigs, 3},
   {"error_prefix", "string", NULL, NULL, NULL, 0},
@@ -941,9 +946,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"sleep_before_read_overflow_onpage\",\"split_1\",\"split_2\","
-    "\"split_3\",\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"split_8\",\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -975,12 +980,14 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
   {"cache_overhead", "int", NULL, "min=0,max=30", NULL, 0},
   {"cache_size", "int", NULL, "min=1MB,max=10TB", NULL, 0},
+  {"cache_stuck_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"checkpoint", "category", NULL, NULL, confchk_wiredtiger_open_checkpoint_subconfigs, 2},
+  {"checkpoint_cleanup", "string", NULL, "choices=[\"none\",\"reclaim_space\"]", NULL, 0},
   {"checkpoint_sync", "boolean", NULL, NULL, NULL, 0},
   {"chunk_cache", "category", NULL, NULL, confchk_wiredtiger_open_chunk_cache_subconfigs, 7},
   {"compatibility", "category", NULL, NULL, confchk_wiredtiger_open_compatibility_subconfigs, 3},
   {"config_base", "boolean", NULL, NULL, NULL, 0}, {"create", "boolean", NULL, NULL, NULL, 0},
-  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 13},
+  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 14},
   {"direct_io", "list", NULL, "choices=[\"checkpoint\",\"data\",\"log\"]", NULL, 0},
   {"encryption", "category", NULL, NULL, confchk_wiredtiger_open_encryption_subconfigs, 3},
   {"error_prefix", "string", NULL, NULL, NULL, 0},
@@ -1034,9 +1041,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"sleep_before_read_overflow_onpage\",\"split_1\",\"split_2\","
-    "\"split_3\",\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"split_8\",\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1068,11 +1075,13 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
   {"cache_overhead", "int", NULL, "min=0,max=30", NULL, 0},
   {"cache_size", "int", NULL, "min=1MB,max=10TB", NULL, 0},
+  {"cache_stuck_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"checkpoint", "category", NULL, NULL, confchk_wiredtiger_open_checkpoint_subconfigs, 2},
+  {"checkpoint_cleanup", "string", NULL, "choices=[\"none\",\"reclaim_space\"]", NULL, 0},
   {"checkpoint_sync", "boolean", NULL, NULL, NULL, 0},
   {"chunk_cache", "category", NULL, NULL, confchk_wiredtiger_open_chunk_cache_subconfigs, 7},
   {"compatibility", "category", NULL, NULL, confchk_wiredtiger_open_compatibility_subconfigs, 3},
-  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 13},
+  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 14},
   {"direct_io", "list", NULL, "choices=[\"checkpoint\",\"data\",\"log\"]", NULL, 0},
   {"encryption", "category", NULL, NULL, confchk_wiredtiger_open_encryption_subconfigs, 3},
   {"error_prefix", "string", NULL, NULL, NULL, 0},
@@ -1125,9 +1134,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"sleep_before_read_overflow_onpage\",\"split_1\",\"split_2\","
-    "\"split_3\",\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"split_8\",\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1157,11 +1166,13 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
   {"cache_overhead", "int", NULL, "min=0,max=30", NULL, 0},
   {"cache_size", "int", NULL, "min=1MB,max=10TB", NULL, 0},
+  {"cache_stuck_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"checkpoint", "category", NULL, NULL, confchk_wiredtiger_open_checkpoint_subconfigs, 2},
+  {"checkpoint_cleanup", "string", NULL, "choices=[\"none\",\"reclaim_space\"]", NULL, 0},
   {"checkpoint_sync", "boolean", NULL, NULL, NULL, 0},
   {"chunk_cache", "category", NULL, NULL, confchk_wiredtiger_open_chunk_cache_subconfigs, 7},
   {"compatibility", "category", NULL, NULL, confchk_wiredtiger_open_compatibility_subconfigs, 3},
-  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 13},
+  {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 14},
   {"direct_io", "list", NULL, "choices=[\"checkpoint\",\"data\",\"log\"]", NULL, 0},
   {"encryption", "category", NULL, NULL, confchk_wiredtiger_open_encryption_subconfigs, 3},
   {"error_prefix", "string", NULL, NULL, NULL, 0},
@@ -1214,9 +1225,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"sleep_before_read_overflow_onpage\",\"split_1\",\"split_2\","
-    "\"split_3\",\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"split_8\",\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1263,14 +1274,16 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "full_target=95,hashsize=32768,max_percent_overhead=10,"
     "nvram_path=,percent_file_in_dram=50,size=0,system_ram=0,type=),"
     "cache_max_wait_ms=0,cache_overhead=8,cache_size=100MB,"
-    "checkpoint=(log_size=0,wait=0),chunk_cache=(capacity=10GB,"
+    "cache_stuck_timeout_ms=300000,checkpoint=(log_size=0,wait=0),"
+    "checkpoint_cleanup=none,chunk_cache=(capacity=10GB,"
     "chunk_cache_evict_trigger=90,chunk_size=1MB,device_path=,"
     "enabled=false,hashsize=1024,type=),compatibility=(release=),"
     "debug_mode=(checkpoint_retention=0,corruption_abort=true,"
     "cursor_copy=false,cursor_reposition=false,eviction=false,"
     "log_retention=0,realloc_exact=false,realloc_malloc=false,"
     "rollback_error=0,slow_checkpoint=false,stress_skiplist=false,"
-    "table_logging=false,update_restore_evict=false),error_prefix=,"
+    "table_logging=false,tiered_flush_error_continue=false,"
+    "update_restore_evict=false),error_prefix=,"
     "eviction=(threads_max=8,threads_min=1),"
     "eviction_checkpoint_target=1,eviction_dirty_target=5,"
     "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
@@ -1286,7 +1299,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "on_close=false,sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),"
     "tiered_storage=(local_retention=300),timing_stress_for_test=,"
     "verbose=[]",
-    confchk_WT_CONNECTION_reconfigure, 32},
+    confchk_WT_CONNECTION_reconfigure, 34},
   {"WT_CONNECTION.rollback_to_stable", "dryrun=false", confchk_WT_CONNECTION_rollback_to_stable, 1},
   {"WT_CONNECTION.set_file_system", "", NULL, 0},
   {"WT_CONNECTION.set_timestamp",
@@ -1549,7 +1562,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "nvram_path=,percent_file_in_dram=50,size=0,system_ram=0,type=),"
     "buffer_alignment=-1,builtin_extension_config=,cache_cursors=true"
     ",cache_max_wait_ms=0,cache_overhead=8,cache_size=100MB,"
-    "checkpoint=(log_size=0,wait=0),checkpoint_sync=true,"
+    "cache_stuck_timeout_ms=300000,checkpoint=(log_size=0,wait=0),"
+    "checkpoint_cleanup=none,checkpoint_sync=true,"
     "chunk_cache=(capacity=10GB,chunk_cache_evict_trigger=90,"
     "chunk_size=1MB,device_path=,enabled=false,hashsize=1024,type=),"
     "compatibility=(release=,require_max=,require_min=),"
@@ -1558,9 +1572,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     ",eviction=false,log_retention=0,realloc_exact=false,"
     "realloc_malloc=false,rollback_error=0,slow_checkpoint=false,"
     "stress_skiplist=false,table_logging=false,"
-    "update_restore_evict=false),direct_io=,encryption=(keyid=,name=,"
-    "secretkey=),error_prefix=,eviction=(threads_max=8,threads_min=1)"
-    ",eviction_checkpoint_target=1,eviction_dirty_target=5,"
+    "tiered_flush_error_continue=false,update_restore_evict=false),"
+    "direct_io=,encryption=(keyid=,name=,secretkey=),error_prefix=,"
+    "eviction=(threads_max=8,threads_min=1),"
+    "eviction_checkpoint_target=1,eviction_dirty_target=5,"
     "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
     ",eviction_updates_target=0,eviction_updates_trigger=0,"
     "exclusive=false,extensions=,extra_diagnostics=[],file_extend=,"
@@ -1584,7 +1599,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "transaction_sync=(enabled=false,method=fsync),"
     "use_environment=true,use_environment_priv=false,verbose=[],"
     "verify_metadata=false,write_through=",
-    confchk_wiredtiger_open, 60},
+    confchk_wiredtiger_open, 62},
   {"wiredtiger_open_all",
     "backup_restore_target=,"
     "block_cache=(blkcache_eviction_aggression=1800,"
@@ -1593,7 +1608,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "nvram_path=,percent_file_in_dram=50,size=0,system_ram=0,type=),"
     "buffer_alignment=-1,builtin_extension_config=,cache_cursors=true"
     ",cache_max_wait_ms=0,cache_overhead=8,cache_size=100MB,"
-    "checkpoint=(log_size=0,wait=0),checkpoint_sync=true,"
+    "cache_stuck_timeout_ms=300000,checkpoint=(log_size=0,wait=0),"
+    "checkpoint_cleanup=none,checkpoint_sync=true,"
     "chunk_cache=(capacity=10GB,chunk_cache_evict_trigger=90,"
     "chunk_size=1MB,device_path=,enabled=false,hashsize=1024,type=),"
     "compatibility=(release=,require_max=,require_min=),"
@@ -1602,9 +1618,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     ",eviction=false,log_retention=0,realloc_exact=false,"
     "realloc_malloc=false,rollback_error=0,slow_checkpoint=false,"
     "stress_skiplist=false,table_logging=false,"
-    "update_restore_evict=false),direct_io=,encryption=(keyid=,name=,"
-    "secretkey=),error_prefix=,eviction=(threads_max=8,threads_min=1)"
-    ",eviction_checkpoint_target=1,eviction_dirty_target=5,"
+    "tiered_flush_error_continue=false,update_restore_evict=false),"
+    "direct_io=,encryption=(keyid=,name=,secretkey=),error_prefix=,"
+    "eviction=(threads_max=8,threads_min=1),"
+    "eviction_checkpoint_target=1,eviction_dirty_target=5,"
     "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
     ",eviction_updates_target=0,eviction_updates_trigger=0,"
     "exclusive=false,extensions=,extra_diagnostics=[],file_extend=,"
@@ -1628,7 +1645,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "transaction_sync=(enabled=false,method=fsync),"
     "use_environment=true,use_environment_priv=false,verbose=[],"
     "verify_metadata=false,version=(major=0,minor=0),write_through=",
-    confchk_wiredtiger_open_all, 61},
+    confchk_wiredtiger_open_all, 63},
   {"wiredtiger_open_basecfg",
     "backup_restore_target=,"
     "block_cache=(blkcache_eviction_aggression=1800,"
@@ -1637,7 +1654,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "nvram_path=,percent_file_in_dram=50,size=0,system_ram=0,type=),"
     "buffer_alignment=-1,builtin_extension_config=,cache_cursors=true"
     ",cache_max_wait_ms=0,cache_overhead=8,cache_size=100MB,"
-    "checkpoint=(log_size=0,wait=0),checkpoint_sync=true,"
+    "cache_stuck_timeout_ms=300000,checkpoint=(log_size=0,wait=0),"
+    "checkpoint_cleanup=none,checkpoint_sync=true,"
     "chunk_cache=(capacity=10GB,chunk_cache_evict_trigger=90,"
     "chunk_size=1MB,device_path=,enabled=false,hashsize=1024,type=),"
     "compatibility=(release=,require_max=,require_min=),"
@@ -1645,10 +1663,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "cursor_copy=false,cursor_reposition=false,eviction=false,"
     "log_retention=0,realloc_exact=false,realloc_malloc=false,"
     "rollback_error=0,slow_checkpoint=false,stress_skiplist=false,"
-    "table_logging=false,update_restore_evict=false),direct_io=,"
-    "encryption=(keyid=,name=,secretkey=),error_prefix=,"
-    "eviction=(threads_max=8,threads_min=1),"
-    "eviction_checkpoint_target=1,eviction_dirty_target=5,"
+    "table_logging=false,tiered_flush_error_continue=false,"
+    "update_restore_evict=false),direct_io=,encryption=(keyid=,name=,"
+    "secretkey=),error_prefix=,eviction=(threads_max=8,threads_min=1)"
+    ",eviction_checkpoint_target=1,eviction_dirty_target=5,"
     "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
     ",eviction_updates_target=0,eviction_updates_trigger=0,"
     "extensions=,extra_diagnostics=[],file_extend=,"
@@ -1670,7 +1688,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "shared=false),timing_stress_for_test=,"
     "transaction_sync=(enabled=false,method=fsync),verbose=[],"
     "verify_metadata=false,version=(major=0,minor=0),write_through=",
-    confchk_wiredtiger_open_basecfg, 55},
+    confchk_wiredtiger_open_basecfg, 57},
   {"wiredtiger_open_usercfg",
     "backup_restore_target=,"
     "block_cache=(blkcache_eviction_aggression=1800,"
@@ -1679,7 +1697,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "nvram_path=,percent_file_in_dram=50,size=0,system_ram=0,type=),"
     "buffer_alignment=-1,builtin_extension_config=,cache_cursors=true"
     ",cache_max_wait_ms=0,cache_overhead=8,cache_size=100MB,"
-    "checkpoint=(log_size=0,wait=0),checkpoint_sync=true,"
+    "cache_stuck_timeout_ms=300000,checkpoint=(log_size=0,wait=0),"
+    "checkpoint_cleanup=none,checkpoint_sync=true,"
     "chunk_cache=(capacity=10GB,chunk_cache_evict_trigger=90,"
     "chunk_size=1MB,device_path=,enabled=false,hashsize=1024,type=),"
     "compatibility=(release=,require_max=,require_min=),"
@@ -1687,10 +1706,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "cursor_copy=false,cursor_reposition=false,eviction=false,"
     "log_retention=0,realloc_exact=false,realloc_malloc=false,"
     "rollback_error=0,slow_checkpoint=false,stress_skiplist=false,"
-    "table_logging=false,update_restore_evict=false),direct_io=,"
-    "encryption=(keyid=,name=,secretkey=),error_prefix=,"
-    "eviction=(threads_max=8,threads_min=1),"
-    "eviction_checkpoint_target=1,eviction_dirty_target=5,"
+    "table_logging=false,tiered_flush_error_continue=false,"
+    "update_restore_evict=false),direct_io=,encryption=(keyid=,name=,"
+    "secretkey=),error_prefix=,eviction=(threads_max=8,threads_min=1)"
+    ",eviction_checkpoint_target=1,eviction_dirty_target=5,"
     "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
     ",eviction_updates_target=0,eviction_updates_trigger=0,"
     "extensions=,extra_diagnostics=[],file_extend=,"
@@ -1712,7 +1731,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "shared=false),timing_stress_for_test=,"
     "transaction_sync=(enabled=false,method=fsync),verbose=[],"
     "verify_metadata=false,write_through=",
-    confchk_wiredtiger_open_usercfg, 54},
+    confchk_wiredtiger_open_usercfg, 56},
   {NULL, NULL, NULL, 0}};
 
 int

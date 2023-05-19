@@ -289,7 +289,7 @@ void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
     BSONObj res;
     auto success = _localClient->runCommand(
-        DatabaseName(boost::none, "admin"),
+        DatabaseName::kAdmin,
         BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
         res);
     uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);

@@ -339,7 +339,7 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
 
     if (_sessionCatalogSource) {
-        _sessionCatalogSource->init(opCtx);
+        _sessionCatalogSource->init(opCtx, lsid);
 
         // Prime up the session migration source if there are oplog entries to migrate.
         _sessionCatalogSource->fetchNextOplog(opCtx);
@@ -1264,7 +1264,8 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                 _args.getMaxChunkSizeBytes();
             int64_t maxUntransferredSessionsSize = BSONObjMaxUserSize *
                 _args.getMaxChunkSizeBytes() / ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes;
-            if (estimatedUntransferredChunkPercentage < maxCatchUpPercentageBeforeBlockingWrites &&
+            if (estimatedUntransferredChunkPercentage <
+                    maxCatchUpPercentageBeforeBlockingWrites.load() &&
                 estimateUntransferredSessionsSize < maxUntransferredSessionsSize) {
                 // The recipient is sufficiently caught-up with the writes on the donor.
                 // Block writes, so that it can drain everything.

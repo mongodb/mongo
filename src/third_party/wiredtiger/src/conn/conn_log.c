@@ -567,12 +567,10 @@ __log_file_server(void *arg)
     WT_LSN close_end_lsn;
     WT_SESSION_IMPL *session;
     uint32_t filenum;
-    bool locked;
 
     session = arg;
     conn = S2C(session);
     log = conn->log;
-    locked = false;
     while (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LOG)) {
         /*
          * If there is a log file to close, make sure any outstanding write operations have
@@ -615,12 +613,10 @@ __log_file_server(void *arg)
                 }
                 WT_SET_LSN(&close_end_lsn, close_end_lsn.l.file + 1, 0);
                 __wt_spin_lock(session, &log->log_sync_lock);
-                locked = true;
                 WT_ERR(__wt_close(session, &close_fh));
                 WT_ASSERT(session, __wt_log_cmp(&close_end_lsn, &log->sync_lsn) >= 0);
                 WT_ASSIGN_LSN(&log->sync_lsn, &close_end_lsn);
                 __wt_cond_signal(session, log->log_sync_cond);
-                locked = false;
                 __wt_spin_unlock(session, &log->log_sync_lock);
             }
         }
@@ -633,8 +629,7 @@ __log_file_server(void *arg)
 err:
         WT_IGNORE_RET(__wt_panic(session, ret, "log close server error"));
     }
-    if (locked)
-        __wt_spin_unlock(session, &log->log_sync_lock);
+    __wt_spin_unlock_if_owned(session, &log->log_sync_lock);
     return (WT_THREAD_RET_VALUE);
 }
 

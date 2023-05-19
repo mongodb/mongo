@@ -565,8 +565,7 @@ public:
                    const write_ops::UpdateModification& updateSpec,
                    StringData matchedField = StringData(),
                    std::vector<BSONObj> arrayFilterSpec = {},
-                   bool fromOplog = false,
-                   UpdateIndexData* indexData = nullptr) {
+                   bool fromOplog = false) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         _driver = std::make_unique<UpdateDriver>(expCtx);
         std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
@@ -579,7 +578,6 @@ public:
         }
 
         _driver->setFromOplogApplication(fromOplog);
-        _driver->refreshIndexKeys(indexData);
         _driver->parse(updateSpec, arrayFilters);
 
         const bool validateForStorage = true;
@@ -679,6 +677,20 @@ TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentAlwaysAffectsIndex) {
     mutablebson::Document doc(fromjson("{a: 0, b: 0}"));
     runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{}");
+}
+
+TEST_F(ModifiedPathsTestFixture, NeedsMatchDetailsIsTrueForPositionalUpdate) {
+    BSONObj spec = fromjson("{$set: {'a.$': 1}}");
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
+    runUpdate(&doc, makeUpdateMod(spec), "0"_sd);
+    ASSERT_EQ(true, _driver->needMatchDetails());
+}
+
+TEST_F(ModifiedPathsTestFixture, NeedsMatchDetailsIsFalseForNonPositionalUpdate) {
+    BSONObj spec = fromjson("{$set: {a: 1}}");
+    mutablebson::Document doc(fromjson("{a: 0}"));
+    runUpdate(&doc, makeUpdateMod(spec));
+    ASSERT_EQ(false, _driver->needMatchDetails());
 }
 
 }  // namespace

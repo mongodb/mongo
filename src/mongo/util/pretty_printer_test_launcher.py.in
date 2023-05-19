@@ -6,6 +6,7 @@ interpolated by scons.
 """
 
 import subprocess
+import os
 
 gdb_path = '@gdb_path@'
 args = [
@@ -18,8 +19,11 @@ args = [
     r'@pretty_printer_test_program@',
 ]
 print(f"Pretty printer test running command:\n{' '.join(args)}")
-proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-stdout, stderr = proc.communicate()
+# We assume we are running from project root, and require modules buried in the src directory
+python_env = os.environ.copy()
+python_env['PYTHONPATH'] = os.getcwd() + os.pathsep + python_env.get('PYTHONPATH', "")
 
-print(stdout.decode('utf-8'))
+proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                      env=python_env)
+print(proc.stdout)
 exit(proc.returncode)

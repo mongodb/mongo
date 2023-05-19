@@ -33,7 +33,6 @@
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/util/concepts.h"
 #include "mongo/util/lockable_adapter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -255,8 +254,8 @@ public:
     /**
      * Get the name for a Latch
      */
-    TEMPLATE(typename LatchT)
-    REQUIRES(std::is_base_of_v<latch_detail::Latch, LatchT>)  //
+    template <typename LatchT>
+    requires std::is_base_of_v<latch_detail::Latch, LatchT>
     static StringData getLatchName(const stdx::unique_lock<LatchT>& lk) {
         return lk.mutex()->getName();
     }

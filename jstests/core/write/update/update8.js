@@ -1,5 +1,5 @@
 
-t = db.update8;
+let t = db.update8;
 t.drop();
 
 t.update({_id: 1, tags: {"$ne": "a"}}, {"$push": {tags: "a"}}, true);

@@ -14,6 +14,7 @@ Collection count: 20
 Running CE accuracy test for collection ce_data_20 of 20 documents.
 Begin query generation
 
+
 [jsTest] ----
 [jsTest] Sample positions: [ 2, 7, 12, 17 ]
 [jsTest] 
@@ -100,10 +101,14 @@ Running query batch [0 - 37) with fields [ "a", "b", "c_int", "mixed" ]
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -112,10 +117,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -124,10 +133,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 7
 Cardinality estimates:
-heuristic: 6.6 QError: 1.06, RelError: -0.06, SelError: -2%
-heuristicIdx: 6.6 QError: 1.06, RelError: -0.06, SelError: -2%
-histogram: 7 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 7 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.06, RelError: -0.06, SelError: -2%
+heuristicIdx: 6.6 
+QError: 1.06, RelError: -0.06, SelError: -2%
+histogram: 7 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 7 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -136,10 +149,14 @@ histogramIdx: 7 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 8
 Cardinality estimates:
-heuristic: 6.6 QError: 1.21, RelError: -0.18, SelError: -7%
-heuristicIdx: 6.6 QError: 1.21, RelError: -0.18, SelError: -7%
-histogram: 8 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 8 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.21, RelError: -0.18, SelError: -7%
+heuristicIdx: 6.6 
+QError: 1.21, RelError: -0.18, SelError: -7%
+histogram: 8 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 8 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -148,10 +165,14 @@ histogramIdx: 8 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 12
 Cardinality estimates:
-heuristic: 9 QError: 1.33, RelError: -0.25, SelError: -15%
-heuristicIdx: 9 QError: 1.33, RelError: -0.25, SelError: -15%
-histogram: 12 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 12 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1.33, RelError: -0.25, SelError: -15%
+heuristicIdx: 9 
+QError: 1.33, RelError: -0.25, SelError: -15%
+histogram: 12 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 12 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -160,10 +181,14 @@ histogramIdx: 12 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 13
 Cardinality estimates:
-heuristic: 9 QError: 1.44, RelError: -0.31, SelError: -20%
-heuristicIdx: 9 QError: 1.44, RelError: -0.31, SelError: -20%
-histogram: 13 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 13 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1.44, RelError: -0.31, SelError: -20%
+heuristicIdx: 9 
+QError: 1.44, RelError: -0.31, SelError: -20%
+histogram: 13 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 13 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -172,10 +197,14 @@ histogramIdx: 13 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 10
 Cardinality estimates:
-heuristic: 6.6 QError: 1.52, RelError: -0.34, SelError: -17%
-heuristicIdx: 6.6 QError: 1.52, RelError: -0.34, SelError: -17%
-histogram: 10 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.52, RelError: -0.34, SelError: -17%
+heuristicIdx: 6.6 
+QError: 1.52, RelError: -0.34, SelError: -17%
+histogram: 10 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 10 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -184,10 +213,14 @@ histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 13
 Cardinality estimates:
-heuristic: 6.6 QError: 1.97, RelError: -0.49, SelError: -32%
-heuristicIdx: 6.6 QError: 1.97, RelError: -0.49, SelError: -32%
-histogram: 13 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 13 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.97, RelError: -0.49, SelError: -32%
+heuristicIdx: 6.6 
+QError: 1.97, RelError: -0.49, SelError: -32%
+histogram: 13 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 13 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -196,10 +229,14 @@ histogramIdx: 13 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-heuristicIdx: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -208,10 +245,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -220,10 +261,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 18
 Cardinality estimates:
-heuristic: 6.6 QError: 2.73, RelError: -0.63, SelError: -57%
-heuristicIdx: 6.6 QError: 2.73, RelError: -0.63, SelError: -57%
-histogram: 18 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.73, RelError: -0.63, SelError: -57%
+heuristicIdx: 6.6 
+QError: 2.73, RelError: -0.63, SelError: -57%
+histogram: 18 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 18 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -232,10 +277,14 @@ histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 19
 Cardinality estimates:
-heuristic: 6.6 QError: 2.88, RelError: -0.65, SelError: -62%
-heuristicIdx: 6.6 QError: 2.88, RelError: -0.65, SelError: -62%
-histogram: 19 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.88, RelError: -0.65, SelError: -62%
+heuristicIdx: 6.6 
+QError: 2.88, RelError: -0.65, SelError: -62%
+histogram: 19 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 19 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -244,10 +293,14 @@ histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 9 QError: 9, RelError: 8, SelError: 40%
-heuristicIdx: 9 QError: 9, RelError: 8, SelError: 40%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 9, RelError: 8, SelError: 40%
+heuristicIdx: 9 
+QError: 9, RelError: 8, SelError: 40%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -256,10 +309,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-heuristicIdx: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -268,10 +325,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 3.69 QError: 3.69, RelError: 2.69, SelError: 13.45%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 3.69 
+QError: 3.69, RelError: 2.69, SelError: 13.45%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -280,10 +341,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 7.75 QError: 3.88, RelError: 2.88, SelError: 28.75%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 7.75 
+QError: 3.88, RelError: 2.88, SelError: 28.75%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -292,10 +357,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 7.75 QError: 3.88, RelError: 2.88, SelError: 28.75%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 7.75 
+QError: 3.88, RelError: 2.88, SelError: 28.75%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -304,10 +373,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 6.93 QError: 2.31, RelError: 1.31, SelError: 19.65%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 6.93 
+QError: 2.31, RelError: 1.31, SelError: 19.65%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -316,10 +389,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 1.95 QError: 1.95, RelError: 0.95, SelError: 4.75%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 1.95 
+QError: 1.95, RelError: 0.95, SelError: 4.75%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -328,10 +405,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -340,10 +421,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -352,10 +437,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -364,10 +453,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 10
 Cardinality estimates:
-heuristic: 6.6 QError: 1.52, RelError: -0.34, SelError: -17%
-heuristicIdx: 6.6 QError: 1.52, RelError: -0.34, SelError: -17%
-histogram: 10 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.52, RelError: -0.34, SelError: -17%
+heuristicIdx: 6.6 
+QError: 1.52, RelError: -0.34, SelError: -17%
+histogram: 10 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 10 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -376,10 +469,14 @@ histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 11
 Cardinality estimates:
-heuristic: 6.6 QError: 1.67, RelError: -0.4, SelError: -22%
-heuristicIdx: 6.6 QError: 1.67, RelError: -0.4, SelError: -22%
-histogram: 11 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 11 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.67, RelError: -0.4, SelError: -22%
+heuristicIdx: 6.6 
+QError: 1.67, RelError: -0.4, SelError: -22%
+histogram: 11 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 11 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -388,10 +485,14 @@ histogramIdx: 11 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 9
 Cardinality estimates:
-heuristic: 9 QError: 1, RelError: 0, SelError: 0%
-heuristicIdx: 9 QError: 1, RelError: 0, SelError: 0%
-histogram: 9 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1, RelError: 0, SelError: 0%
+heuristicIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogram: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -400,10 +501,14 @@ histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 10
 Cardinality estimates:
-heuristic: 9 QError: 1.11, RelError: -0.1, SelError: -5%
-heuristicIdx: 9 QError: 1.11, RelError: -0.1, SelError: -5%
-histogram: 10 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1.11, RelError: -0.1, SelError: -5%
+heuristicIdx: 9 
+QError: 1.11, RelError: -0.1, SelError: -5%
+histogram: 10 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 10 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -412,10 +517,14 @@ histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 13
 Cardinality estimates:
-heuristic: 6.6 QError: 1.97, RelError: -0.49, SelError: -32%
-heuristicIdx: 6.6 QError: 1.97, RelError: -0.49, SelError: -32%
-histogram: 13 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 13 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.97, RelError: -0.49, SelError: -32%
+heuristicIdx: 6.6 
+QError: 1.97, RelError: -0.49, SelError: -32%
+histogram: 13 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 13 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -424,10 +533,14 @@ histogramIdx: 13 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 18
 Cardinality estimates:
-heuristic: 6.6 QError: 2.73, RelError: -0.63, SelError: -57%
-heuristicIdx: 6.6 QError: 2.73, RelError: -0.63, SelError: -57%
-histogram: 18 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.73, RelError: -0.63, SelError: -57%
+heuristicIdx: 6.6 
+QError: 2.73, RelError: -0.63, SelError: -57%
+histogram: 18 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 18 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -436,10 +549,14 @@ histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 9 QError: 9, RelError: 8, SelError: 40%
-heuristicIdx: 9 QError: 9, RelError: 8, SelError: 40%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 9, RelError: 8, SelError: 40%
+heuristicIdx: 9 
+QError: 9, RelError: 8, SelError: 40%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -448,10 +565,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -460,10 +581,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 19
 Cardinality estimates:
-heuristic: 6.6 QError: 2.88, RelError: -0.65, SelError: -62%
-heuristicIdx: 6.6 QError: 2.88, RelError: -0.65, SelError: -62%
-histogram: 19 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.88, RelError: -0.65, SelError: -62%
+heuristicIdx: 6.6 
+QError: 2.88, RelError: -0.65, SelError: -62%
+histogram: 19 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 19 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -472,10 +597,14 @@ histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 20
 Cardinality estimates:
-heuristic: 6.6 QError: 3.03, RelError: -0.67, SelError: -67%
-heuristicIdx: 6.6 QError: 3.03, RelError: -0.67, SelError: -67%
-histogram: 20 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 20 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 3.03, RelError: -0.67, SelError: -67%
+heuristicIdx: 6.6 
+QError: 3.03, RelError: -0.67, SelError: -67%
+histogram: 20 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 20 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -484,10 +613,14 @@ histogramIdx: 20 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 9 QError: 9, RelError: 0.9, SelError: 45%
-heuristicIdx: 9 QError: 9, RelError: 0.9, SelError: 45%
-histogram: 0 QError: 0, RelError: 0, SelError: 0%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 9, RelError: 0.9, SelError: 45%
+heuristicIdx: 9 
+QError: 9, RelError: 0.9, SelError: 45%
+histogram: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -496,10 +629,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 9 QError: 9, RelError: 8, SelError: 40%
-heuristicIdx: 9 QError: 9, RelError: 8, SelError: 40%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 9, RelError: 8, SelError: 40%
+heuristicIdx: 9 
+QError: 9, RelError: 8, SelError: 40%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -508,10 +645,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 3.69 QError: 3.69, RelError: 2.69, SelError: 13.45%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 3.69 
+QError: 3.69, RelError: 2.69, SelError: 13.45%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -520,10 +661,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 6.67 QError: 6.67, RelError: 0.67, SelError: 33.35%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 6.67 
+QError: 6.67, RelError: 0.67, SelError: 33.35%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -532,10 +677,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 5.86 QError: 5.86, RelError: 4.86, SelError: 24.3%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 5.86 
+QError: 5.86, RelError: 4.86, SelError: 24.3%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -544,10 +693,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 2.85 QError: 2.85, RelError: 1.85, SelError: 9.25%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 2.85 
+QError: 2.85, RelError: 1.85, SelError: 9.25%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -556,10 +709,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -568,10 +725,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 0 QError: 0, RelError: 0, SelError: 0%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -580,10 +741,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 3.79 QError: 1.9, RelError: 0.9, SelError: 8.95%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 3.79 
+QError: 1.9, RelError: 0.9, SelError: 8.95%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -592,10 +757,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 7.42 QError: 7.42, RelError: 6.42, SelError: 32.1%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 7.42 
+QError: 7.42, RelError: 6.42, SelError: 32.1%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -604,10 +773,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 5.02 QError: 5.02, RelError: 0.5, SelError: 25.1%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 5.02 
+QError: 5.02, RelError: 0.5, SelError: 25.1%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -616,10 +789,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 1.9 QError: 1.9, RelError: 0.19, SelError: 9.5%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 1.9 
+QError: 1.9, RelError: 0.19, SelError: 9.5%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -628,10 +805,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -640,10 +821,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -652,10 +837,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 4.61 QError: 2.31, RelError: 1.31, SelError: 13.05%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 4.61 
+QError: 2.31, RelError: 1.31, SelError: 13.05%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -664,10 +853,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 6.97 QError: 6.97, RelError: 5.97, SelError: 29.85%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 6.97 
+QError: 6.97, RelError: 5.97, SelError: 29.85%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -676,10 +869,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 6.26 QError: 2.09, RelError: 1.09, SelError: 16.3%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 6.26 
+QError: 2.09, RelError: 1.09, SelError: 16.3%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -688,10 +885,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 3 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 3 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -700,10 +901,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 3.43, SelError: 17.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 5.6, SelError: 28%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 3.43, SelError: 17.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 5.6, SelError: 28%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -712,10 +917,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 6.6 QError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 0 QError: 0, RelError: 0, SelError: 0%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -724,10 +933,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.47 QError: 2.24, RelError: 1.23, SelError: 12.35%
-heuristicIdx: 4.47 QError: 2.24, RelError: 1.23, SelError: 12.35%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 2.24, RelError: 1.23, SelError: 12.35%
+heuristicIdx: 4.47 
+QError: 2.24, RelError: 1.23, SelError: 12.35%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -736,10 +949,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.47 QError: 2.24, RelError: 1.23, SelError: 12.35%
-heuristicIdx: 4.47 QError: 2.24, RelError: 1.23, SelError: 12.35%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 2.24, RelError: 1.23, SelError: 12.35%
+heuristicIdx: 4.47 
+QError: 2.24, RelError: 1.23, SelError: 12.35%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -748,10 +965,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -760,10 +981,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 3 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 3 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -772,10 +997,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 18
 Cardinality estimates:
-heuristic: 9 QError: 2, RelError: -0.5, SelError: -45%
-heuristicIdx: 9 QError: 2, RelError: -0.5, SelError: -45%
-histogram: 18 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 2, RelError: -0.5, SelError: -45%
+heuristicIdx: 9 
+QError: 2, RelError: -0.5, SelError: -45%
+histogram: 18 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 18 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -784,10 +1013,14 @@ histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 19
 Cardinality estimates:
-heuristic: 9 QError: 2.11, RelError: -0.53, SelError: -50%
-heuristicIdx: 9 QError: 2.11, RelError: -0.53, SelError: -50%
-histogram: 19 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 2.11, RelError: -0.53, SelError: -50%
+heuristicIdx: 9 
+QError: 2.11, RelError: -0.53, SelError: -50%
+histogram: 19 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 19 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -796,10 +1029,14 @@ histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 3 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 3 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -808,10 +1045,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 6.6 QError: 1.1, RelError: 0.1, SelError: 3%
-heuristicIdx: 6.6 QError: 1.1, RelError: 0.1, SelError: 3%
-histogram: 6 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.1, RelError: 0.1, SelError: 3%
+heuristicIdx: 6.6 
+QError: 1.1, RelError: 0.1, SelError: 3%
+histogram: 6 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 6 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -820,10 +1061,14 @@ histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 10
 Cardinality estimates:
-heuristic: 9 QError: 1.11, RelError: -0.1, SelError: -5%
-heuristicIdx: 9 QError: 1.11, RelError: -0.1, SelError: -5%
-histogram: 10 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1.11, RelError: -0.1, SelError: -5%
+heuristicIdx: 9 
+QError: 1.11, RelError: -0.1, SelError: -5%
+histogram: 10 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 10 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -832,10 +1077,14 @@ histogramIdx: 10 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.47 QError: 1.49, RelError: 0.49, SelError: 7.35%
-heuristicIdx: 4.47 QError: 1.49, RelError: 0.49, SelError: 7.35%
-histogram: 3 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 1.49, RelError: 0.49, SelError: 7.35%
+heuristicIdx: 4.47 
+QError: 1.49, RelError: 0.49, SelError: 7.35%
+histogram: 3 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -844,10 +1093,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 12
 Cardinality estimates:
-heuristic: 6.6 QError: 1.82, RelError: -0.45, SelError: -27%
-heuristicIdx: 6.6 QError: 1.82, RelError: -0.45, SelError: -27%
-histogram: 12 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 12 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.82, RelError: -0.45, SelError: -27%
+heuristicIdx: 6.6 
+QError: 1.82, RelError: -0.45, SelError: -27%
+histogram: 12 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 12 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -856,10 +1109,14 @@ histogramIdx: 12 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 14
 Cardinality estimates:
-heuristic: 6.6 QError: 2.12, RelError: -0.53, SelError: -37%
-heuristicIdx: 6.6 QError: 2.12, RelError: -0.53, SelError: -37%
-histogram: 14 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 14 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.12, RelError: -0.53, SelError: -37%
+heuristicIdx: 6.6 
+QError: 2.12, RelError: -0.53, SelError: -37%
+histogram: 14 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 14 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -868,10 +1125,14 @@ histogramIdx: 14 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 9
 Cardinality estimates:
-heuristic: 9 QError: 1, RelError: 0, SelError: 0%
-heuristicIdx: 9 QError: 1, RelError: 0, SelError: 0%
-histogram: 9 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1, RelError: 0, SelError: 0%
+heuristicIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogram: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -880,10 +1141,14 @@ histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 9
 Cardinality estimates:
-heuristic: 9 QError: 1, RelError: 0, SelError: 0%
-heuristicIdx: 9 QError: 1, RelError: 0, SelError: 0%
-histogram: 9 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1, RelError: 0, SelError: 0%
+heuristicIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogram: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -892,10 +1157,14 @@ histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 9
 Cardinality estimates:
-heuristic: 9 QError: 1, RelError: 0, SelError: 0%
-heuristicIdx: 9 QError: 1, RelError: 0, SelError: 0%
-histogram: 9 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1, RelError: 0, SelError: 0%
+heuristicIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogram: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -904,10 +1173,14 @@ histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.47 QError: 1.12, RelError: -0.11, SelError: -2.65%
-heuristicIdx: 4.47 QError: 1.12, RelError: -0.11, SelError: -2.65%
-histogram: 5 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 5 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 1.12, RelError: -0.11, SelError: -2.65%
+heuristicIdx: 4.47 
+QError: 1.12, RelError: -0.11, SelError: -2.65%
+histogram: 5 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 5 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -916,10 +1189,14 @@ histogramIdx: 5 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 16
 Cardinality estimates:
-heuristic: 6.6 QError: 2.42, RelError: -0.59, SelError: -47%
-heuristicIdx: 6.6 QError: 2.42, RelError: -0.59, SelError: -47%
-histogram: 16 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 16 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.42, RelError: -0.59, SelError: -47%
+heuristicIdx: 6.6 
+QError: 2.42, RelError: -0.59, SelError: -47%
+histogram: 16 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 16 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -928,10 +1205,14 @@ histogramIdx: 16 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.47 QError: 1.12, RelError: -0.11, SelError: -2.65%
-heuristicIdx: 4.47 QError: 1.12, RelError: -0.11, SelError: -2.65%
-histogram: 5 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 5 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 1.12, RelError: -0.11, SelError: -2.65%
+heuristicIdx: 4.47 
+QError: 1.12, RelError: -0.11, SelError: -2.65%
+histogram: 5 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 5 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -940,10 +1221,14 @@ histogramIdx: 5 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 18
 Cardinality estimates:
-heuristic: 6.6 QError: 2.73, RelError: -0.63, SelError: -57%
-heuristicIdx: 6.6 QError: 2.73, RelError: -0.63, SelError: -57%
-histogram: 18 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.73, RelError: -0.63, SelError: -57%
+heuristicIdx: 6.6 
+QError: 2.73, RelError: -0.63, SelError: -57%
+histogram: 18 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 18 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -952,10 +1237,14 @@ histogramIdx: 18 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 19
 Cardinality estimates:
-heuristic: 6.6 QError: 2.88, RelError: -0.65, SelError: -62%
-heuristicIdx: 6.6 QError: 2.88, RelError: -0.65, SelError: -62%
-histogram: 19 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.88, RelError: -0.65, SelError: -62%
+heuristicIdx: 6.6 
+QError: 2.88, RelError: -0.65, SelError: -62%
+histogram: 19 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 19 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -964,10 +1253,14 @@ histogramIdx: 19 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 9 QError: 2.25, RelError: 1.25, SelError: 25%
-heuristicIdx: 9 QError: 2.25, RelError: 1.25, SelError: 25%
-histogram: 4 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 2.25, RelError: 1.25, SelError: 25%
+heuristicIdx: 9 
+QError: 2.25, RelError: 1.25, SelError: 25%
+histogram: 4 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -976,10 +1269,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 9 QError: 1.5, RelError: 0.5, SelError: 15%
-heuristicIdx: 9 QError: 1.5, RelError: 0.5, SelError: 15%
-histogram: 6 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 1.5, RelError: 0.5, SelError: 15%
+heuristicIdx: 9 
+QError: 1.5, RelError: 0.5, SelError: 15%
+histogram: 6 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 6 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -988,10 +1285,14 @@ histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 20
 Cardinality estimates:
-heuristic: 6.6 QError: 3.03, RelError: -0.67, SelError: -67%
-heuristicIdx: 6.6 QError: 3.03, RelError: -0.67, SelError: -67%
-histogram: 20 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 20 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 3.03, RelError: -0.67, SelError: -67%
+heuristicIdx: 6.6 
+QError: 3.03, RelError: -0.67, SelError: -67%
+histogram: 20 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 20 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1000,10 +1301,14 @@ histogramIdx: 20 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-histogram: 2.92 QError: 1.46, RelError: 0.46, SelError: 4.6%
-histogramIdx: 2.92 QError: 1.46, RelError: 0.46, SelError: 4.6%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+histogram: 2.92 
+QError: 1.46, RelError: 0.46, SelError: 4.6%
+histogramIdx: 2.92 
+QError: 1.46, RelError: 0.46, SelError: 4.6%
 
 
 [jsTest] ----
@@ -1012,10 +1317,14 @@ histogramIdx: 2.92 QError: 1.46, RelError: 0.46, SelError: 4.6%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-histogram: 1.63 QError: 1.23, RelError: -0.19, SelError: -1.85%
-histogramIdx: 1.63 QError: 1.23, RelError: -0.19, SelError: -1.85%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+histogram: 1.63 
+QError: 1.23, RelError: -0.19, SelError: -1.85%
+histogramIdx: 1.63 
+QError: 1.23, RelError: -0.19, SelError: -1.85%
 
 
 [jsTest] ----
@@ -1024,10 +1333,14 @@ histogramIdx: 1.63 QError: 1.23, RelError: -0.19, SelError: -1.85%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-heuristicIdx: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-histogram: 4.74 QError: 1.58, RelError: 0.58, SelError: 8.7%
-histogramIdx: 4.74 QError: 1.58, RelError: 0.58, SelError: 8.7%
+heuristic: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+histogram: 4.74 
+QError: 1.58, RelError: 0.58, SelError: 8.7%
+histogramIdx: 4.74 
+QError: 1.58, RelError: 0.58, SelError: 8.7%
 
 
 [jsTest] ----
@@ -1036,10 +1349,14 @@ histogramIdx: 4.74 QError: 1.58, RelError: 0.58, SelError: 8.7%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-heuristicIdx: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-histogram: 4.08 QError: 1.36, RelError: 0.36, SelError: 5.4%
-histogramIdx: 4.08 QError: 1.36, RelError: 0.36, SelError: 5.4%
+heuristic: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+histogram: 4.08 
+QError: 1.36, RelError: 0.36, SelError: 5.4%
+histogramIdx: 4.08 
+QError: 1.36, RelError: 0.36, SelError: 5.4%
 
 
 [jsTest] ----
@@ -1048,10 +1365,14 @@ histogramIdx: 4.08 QError: 1.36, RelError: 0.36, SelError: 5.4%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-heuristicIdx: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-histogram: 4.74 QError: 1.58, RelError: 0.58, SelError: 8.7%
-histogramIdx: 4.74 QError: 1.58, RelError: 0.58, SelError: 8.7%
+heuristic: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+histogram: 4.74 
+QError: 1.58, RelError: 0.58, SelError: 8.7%
+histogramIdx: 4.74 
+QError: 1.58, RelError: 0.58, SelError: 8.7%
 
 
 [jsTest] ----
@@ -1060,10 +1381,14 @@ histogramIdx: 4.74 QError: 1.58, RelError: 0.58, SelError: 8.7%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-heuristicIdx: 4.43 QError: 1.48, RelError: 0.48, SelError: 7.15%
-histogram: 4.08 QError: 1.36, RelError: 0.36, SelError: 5.4%
-histogramIdx: 4.08 QError: 1.36, RelError: 0.36, SelError: 5.4%
+heuristic: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+heuristicIdx: 4.43 
+QError: 1.48, RelError: 0.48, SelError: 7.15%
+histogram: 4.08 
+QError: 1.36, RelError: 0.36, SelError: 5.4%
+histogramIdx: 4.08 
+QError: 1.36, RelError: 0.36, SelError: 5.4%
 
 
 [jsTest] ----
@@ -1072,10 +1397,14 @@ histogramIdx: 4.08 QError: 1.36, RelError: 0.36, SelError: 5.4%
 
 Actual cardinality: 7
 Cardinality estimates:
-heuristic: 4.43 QError: 1.58, RelError: -0.37, SelError: -12.85%
-heuristicIdx: 4.43 QError: 1.58, RelError: -0.37, SelError: -12.85%
-histogram: 8.54 QError: 1.22, RelError: 0.22, SelError: 7.7%
-histogramIdx: 8.54 QError: 1.22, RelError: 0.22, SelError: 7.7%
+heuristic: 4.43 
+QError: 1.58, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 
+QError: 1.58, RelError: -0.37, SelError: -12.85%
+histogram: 8.54 
+QError: 1.22, RelError: 0.22, SelError: 7.7%
+histogramIdx: 8.54 
+QError: 1.22, RelError: 0.22, SelError: 7.7%
 
 
 [jsTest] ----
@@ -1084,10 +1413,14 @@ histogramIdx: 8.54 QError: 1.22, RelError: 0.22, SelError: 7.7%
 
 Actual cardinality: 7
 Cardinality estimates:
-heuristic: 4.43 QError: 1.58, RelError: -0.37, SelError: -12.85%
-heuristicIdx: 4.43 QError: 1.58, RelError: -0.37, SelError: -12.85%
-histogram: 8.99 QError: 1.28, RelError: 0.28, SelError: 9.95%
-histogramIdx: 8.99 QError: 1.28, RelError: 0.28, SelError: 9.95%
+heuristic: 4.43 
+QError: 1.58, RelError: -0.37, SelError: -12.85%
+heuristicIdx: 4.43 
+QError: 1.58, RelError: -0.37, SelError: -12.85%
+histogram: 8.99 
+QError: 1.28, RelError: 0.28, SelError: 9.95%
+histogramIdx: 8.99 
+QError: 1.28, RelError: 0.28, SelError: 9.95%
 
 
 [jsTest] ----
@@ -1096,10 +1429,14 @@ histogramIdx: 8.99 QError: 1.28, RelError: 0.28, SelError: 9.95%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-histogram: 7.75 QError: 3.88, RelError: 2.88, SelError: 28.75%
-histogramIdx: 7.75 QError: 3.88, RelError: 2.88, SelError: 28.75%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+histogram: 7.75 
+QError: 3.88, RelError: 2.88, SelError: 28.75%
+histogramIdx: 7.75 
+QError: 3.88, RelError: 2.88, SelError: 28.75%
 
 
 [jsTest] ----
@@ -1108,10 +1445,14 @@ histogramIdx: 7.75 QError: 3.88, RelError: 2.88, SelError: 28.75%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-histogram: 1.63 QError: 1.23, RelError: -0.19, SelError: -1.85%
-histogramIdx: 1.63 QError: 1.23, RelError: -0.19, SelError: -1.85%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+histogram: 1.63 
+QError: 1.23, RelError: -0.19, SelError: -1.85%
+histogramIdx: 1.63 
+QError: 1.23, RelError: -0.19, SelError: -1.85%
 
 
 [jsTest] ----
@@ -1120,10 +1461,14 @@ histogramIdx: 1.63 QError: 1.23, RelError: -0.19, SelError: -1.85%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-heuristicIdx: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-histogram: 8.05 QError: 1.61, RelError: 0.61, SelError: 15.25%
-histogramIdx: 8.05 QError: 1.61, RelError: 0.61, SelError: 15.25%
+heuristic: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+histogram: 8.05 
+QError: 1.61, RelError: 0.61, SelError: 15.25%
+histogramIdx: 8.05 
+QError: 1.61, RelError: 0.61, SelError: 15.25%
 
 
 [jsTest] ----
@@ -1132,10 +1477,14 @@ histogramIdx: 8.05 QError: 1.61, RelError: 0.61, SelError: 15.25%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-heuristicIdx: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-histogram: 7.35 QError: 1.47, RelError: 0.47, SelError: 11.75%
-histogramIdx: 7.35 QError: 1.47, RelError: 0.47, SelError: 11.75%
+heuristic: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+histogram: 7.35 
+QError: 1.47, RelError: 0.47, SelError: 11.75%
+histogramIdx: 7.35 
+QError: 1.47, RelError: 0.47, SelError: 11.75%
 
 
 [jsTest] ----
@@ -1144,10 +1493,14 @@ histogramIdx: 7.35 QError: 1.47, RelError: 0.47, SelError: 11.75%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-heuristicIdx: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-histogram: 8.05 QError: 1.61, RelError: 0.61, SelError: 15.25%
-histogramIdx: 8.05 QError: 1.61, RelError: 0.61, SelError: 15.25%
+heuristic: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+histogram: 8.05 
+QError: 1.61, RelError: 0.61, SelError: 15.25%
+histogramIdx: 8.05 
+QError: 1.61, RelError: 0.61, SelError: 15.25%
 
 
 [jsTest] ----
@@ -1156,10 +1509,14 @@ histogramIdx: 8.05 QError: 1.61, RelError: 0.61, SelError: 15.25%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-heuristicIdx: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-histogram: 7.35 QError: 1.47, RelError: 0.47, SelError: 11.75%
-histogramIdx: 7.35 QError: 1.47, RelError: 0.47, SelError: 11.75%
+heuristic: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+histogram: 7.35 
+QError: 1.47, RelError: 0.47, SelError: 11.75%
+histogramIdx: 7.35 
+QError: 1.47, RelError: 0.47, SelError: 11.75%
 
 
 [jsTest] ----
@@ -1168,10 +1525,14 @@ histogramIdx: 7.35 QError: 1.47, RelError: 0.47, SelError: 11.75%
 
 Actual cardinality: 8
 Cardinality estimates:
-heuristic: 4.43 QError: 1.81, RelError: -0.45, SelError: -17.85%
-heuristicIdx: 4.43 QError: 1.81, RelError: -0.45, SelError: -17.85%
-histogram: 8.77 QError: 1.1, RelError: 0.1, SelError: 3.85%
-histogramIdx: 8.77 QError: 1.1, RelError: 0.1, SelError: 3.85%
+heuristic: 4.43 
+QError: 1.81, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 
+QError: 1.81, RelError: -0.45, SelError: -17.85%
+histogram: 8.77 
+QError: 1.1, RelError: 0.1, SelError: 3.85%
+histogramIdx: 8.77 
+QError: 1.1, RelError: 0.1, SelError: 3.85%
 
 
 [jsTest] ----
@@ -1180,10 +1541,14 @@ histogramIdx: 8.77 QError: 1.1, RelError: 0.1, SelError: 3.85%
 
 Actual cardinality: 8
 Cardinality estimates:
-heuristic: 4.43 QError: 1.81, RelError: -0.45, SelError: -17.85%
-heuristicIdx: 4.43 QError: 1.81, RelError: -0.45, SelError: -17.85%
-histogram: 13.07 QError: 1.63, RelError: 0.63, SelError: 25.35%
-histogramIdx: 13.07 QError: 1.63, RelError: 0.63, SelError: 25.35%
+heuristic: 4.43 
+QError: 1.81, RelError: -0.45, SelError: -17.85%
+heuristicIdx: 4.43 
+QError: 1.81, RelError: -0.45, SelError: -17.85%
+histogram: 13.07 
+QError: 1.63, RelError: 0.63, SelError: 25.35%
+histogramIdx: 13.07 
+QError: 1.63, RelError: 0.63, SelError: 25.35%
 
 
 [jsTest] ----
@@ -1192,10 +1557,14 @@ histogramIdx: 13.07 QError: 1.63, RelError: 0.63, SelError: 25.35%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-heuristicIdx: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-histogram: 5.85 QError: 1.17, RelError: 0.17, SelError: 4.25%
-histogramIdx: 5.85 QError: 1.17, RelError: 0.17, SelError: 4.25%
+heuristic: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+histogram: 5.85 
+QError: 1.17, RelError: 0.17, SelError: 4.25%
+histogramIdx: 5.85 
+QError: 1.17, RelError: 0.17, SelError: 4.25%
 
 
 [jsTest] ----
@@ -1204,10 +1573,14 @@ histogramIdx: 5.85 QError: 1.17, RelError: 0.17, SelError: 4.25%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-heuristicIdx: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-histogram: 4.08 QError: 1.23, RelError: -0.18, SelError: -4.6%
-histogramIdx: 4.08 QError: 1.23, RelError: -0.18, SelError: -4.6%
+heuristic: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+histogram: 4.08 
+QError: 1.23, RelError: -0.18, SelError: -4.6%
+histogramIdx: 4.08 
+QError: 1.23, RelError: -0.18, SelError: -4.6%
 
 
 [jsTest] ----
@@ -1216,10 +1589,14 @@ histogramIdx: 4.08 QError: 1.23, RelError: -0.18, SelError: -4.6%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-heuristicIdx: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-histogram: 4 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+histogram: 4 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1228,10 +1605,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-heuristicIdx: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-histogram: 4 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+histogram: 4 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1240,10 +1621,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-heuristicIdx: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-histogram: 4 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+histogram: 4 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1252,10 +1637,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-heuristicIdx: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-histogram: 4 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+histogram: 4 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1264,10 +1653,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1276,10 +1669,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1288,10 +1685,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 7
 Cardinality estimates:
-heuristic: 6.6 QError: 1.06, RelError: -0.06, SelError: -2%
-heuristicIdx: 6.6 QError: 1.06, RelError: -0.06, SelError: -2%
-histogram: 7 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 7 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.06, RelError: -0.06, SelError: -2%
+heuristicIdx: 6.6 
+QError: 1.06, RelError: -0.06, SelError: -2%
+histogram: 7 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 7 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1300,10 +1701,14 @@ histogramIdx: 7 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 8
 Cardinality estimates:
-heuristic: 6.6 QError: 1.21, RelError: -0.18, SelError: -7%
-heuristicIdx: 6.6 QError: 1.21, RelError: -0.18, SelError: -7%
-histogram: 8 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 8 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.21, RelError: -0.18, SelError: -7%
+heuristicIdx: 6.6 
+QError: 1.21, RelError: -0.18, SelError: -7%
+histogram: 8 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 8 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1312,10 +1717,14 @@ histogramIdx: 8 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-heuristicIdx: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1324,10 +1733,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 9 QError: 3, RelError: 2, SelError: 30%
-heuristicIdx: 9 QError: 3, RelError: 2, SelError: 30%
-histogram: 3 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 3, RelError: 2, SelError: 30%
+heuristicIdx: 9 
+QError: 3, RelError: 2, SelError: 30%
+histogram: 3 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1336,10 +1749,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 6.6 QError: 6.6, RelError: 0.66, SelError: 33%
-heuristicIdx: 6.6 QError: 6.6, RelError: 0.66, SelError: 33%
-histogram: 0 QError: 0, RelError: 0, SelError: 0%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 6.6, RelError: 0.66, SelError: 33%
+heuristicIdx: 6.6 
+QError: 6.6, RelError: 0.66, SelError: 33%
+histogram: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1348,10 +1765,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 3 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 3 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1360,10 +1781,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 9 QError: 2.25, RelError: 1.25, SelError: 25%
-heuristicIdx: 9 QError: 2.25, RelError: 1.25, SelError: 25%
-histogram: 4 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 2.25, RelError: 1.25, SelError: 25%
+heuristicIdx: 9 
+QError: 2.25, RelError: 1.25, SelError: 25%
+histogram: 4 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1372,10 +1797,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-heuristicIdx: 4.47 QError: 4.47, RelError: 3.47, SelError: 17.35%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+heuristicIdx: 4.47 
+QError: 4.47, RelError: 3.47, SelError: 17.35%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1384,10 +1813,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 8
 Cardinality estimates:
-heuristic: 6.6 QError: 1.21, RelError: -0.18, SelError: -7%
-heuristicIdx: 6.6 QError: 1.21, RelError: -0.18, SelError: -7%
-histogram: 8 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 8 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.21, RelError: -0.18, SelError: -7%
+heuristicIdx: 6.6 
+QError: 1.21, RelError: -0.18, SelError: -7%
+histogram: 8 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 8 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1396,10 +1829,14 @@ histogramIdx: 8 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 9
 Cardinality estimates:
-heuristic: 6.6 QError: 1.36, RelError: -0.27, SelError: -12%
-heuristicIdx: 6.6 QError: 1.36, RelError: -0.27, SelError: -12%
-histogram: 9 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
+heuristic: 6.6 
+QError: 1.36, RelError: -0.27, SelError: -12%
+heuristicIdx: 6.6 
+QError: 1.36, RelError: -0.27, SelError: -12%
+histogram: 9 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1408,10 +1845,14 @@ histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 9 QError: 9, RelError: 8, SelError: 40%
-heuristicIdx: 9 QError: 9, RelError: 8, SelError: 40%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 9, RelError: 8, SelError: 40%
+heuristicIdx: 9 
+QError: 9, RelError: 8, SelError: 40%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1420,10 +1861,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-heuristicIdx: 9 QError: 4.5, RelError: 3.5, SelError: 35%
-histogram: 2 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+heuristicIdx: 9 
+QError: 4.5, RelError: 3.5, SelError: 35%
+histogram: 2 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1432,10 +1877,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-heuristicIdx: 6.6 QError: 1.65, RelError: 0.65, SelError: 13%
-histogram: 4.14 QError: 1.03, RelError: 0.03, SelError: 0.7%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 6.6 
+QError: 1.65, RelError: 0.65, SelError: 13%
+histogram: 4.14 
+QError: 1.03, RelError: 0.03, SelError: 0.7%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1444,10 +1893,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 0 QError: 0, RelError: 0, SelError: 0%
-histogram: 0.32 QError: 0.32, RelError: 0.03, SelError: 1.6%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogram: 0.32 
+QError: 0.32, RelError: 0.03, SelError: 1.6%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1456,10 +1909,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 1.41 QError: 1.42, RelError: -0.3, SelError: -2.95%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 1.41 
+QError: 1.42, RelError: -0.3, SelError: -2.95%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1468,10 +1925,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-heuristicIdx: 6.6 QError: 1.65, RelError: 0.65, SelError: 13%
-histogram: 3.79 QError: 1.06, RelError: -0.05, SelError: -1.05%
-histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 6.6 
+QError: 1.65, RelError: 0.65, SelError: 13%
+histogram: 3.79 
+QError: 1.06, RelError: -0.05, SelError: -1.05%
+histogramIdx: 4 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1480,10 +1941,14 @@ histogramIdx: 4 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 6.6 QError: 3.3, RelError: 2.3, SelError: 23%
-histogram: 2.53 QError: 1.26, RelError: 0.26, SelError: 2.65%
-histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 6.6 
+QError: 3.3, RelError: 2.3, SelError: 23%
+histogram: 2.53 
+QError: 1.26, RelError: 0.26, SelError: 2.65%
+histogramIdx: 2 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1492,10 +1957,14 @@ histogramIdx: 2 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 0 QError: 0, RelError: 0, SelError: 0%
-histogram: 0.59 QError: 0.59, RelError: 0.06, SelError: 2.95%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogram: 0.59 
+QError: 0.59, RelError: 0.06, SelError: 2.95%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1504,10 +1973,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 0 QError: 0, RelError: 0, SelError: 0%
-histogram: 0.77 QError: 0.77, RelError: 0.08, SelError: 3.85%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogram: 0.77 
+QError: 0.77, RelError: 0.08, SelError: 3.85%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1516,10 +1989,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 4.43 QError: 1.35, RelError: -0.26, SelError: -7.85%
-heuristicIdx: 6.6 QError: 1.1, RelError: 0.1, SelError: 3%
-histogram: 4.24 QError: 1.42, RelError: -0.29, SelError: -8.8%
-histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.35, RelError: -0.26, SelError: -7.85%
+heuristicIdx: 6.6 
+QError: 1.1, RelError: 0.1, SelError: 3%
+histogram: 4.24 
+QError: 1.42, RelError: -0.29, SelError: -8.8%
+histogramIdx: 6 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1528,10 +2005,14 @@ histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 5
 Cardinality estimates:
-heuristic: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-heuristicIdx: 6.6 QError: 1.32, RelError: 0.32, SelError: 8%
-histogram: 4.43 QError: 1.13, RelError: -0.11, SelError: -2.85%
-histogramIdx: 5 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+heuristicIdx: 6.6 
+QError: 1.32, RelError: 0.32, SelError: 8%
+histogram: 4.43 
+QError: 1.13, RelError: -0.11, SelError: -2.85%
+histogramIdx: 5 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1540,10 +2021,14 @@ histogramIdx: 5 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 0 QError: 0, RelError: 0, SelError: 0%
-histogram: 1.77 QError: 1.77, RelError: 0.18, SelError: 8.85%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogram: 1.77 
+QError: 1.77, RelError: 0.18, SelError: 8.85%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1552,10 +2037,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 4.43 QError: 4.43, RelError: 0.44, SelError: 22.15%
-heuristicIdx: 0 QError: 0, RelError: 0, SelError: 0%
-histogram: 1.5 QError: 1.5, RelError: 0.15, SelError: 7.5%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 4.43, RelError: 0.44, SelError: 22.15%
+heuristicIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogram: 1.5 
+QError: 1.5, RelError: 0.15, SelError: 7.5%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1564,10 +2053,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 9
 Cardinality estimates:
-heuristic: 4.43 QError: 2.03, RelError: -0.51, SelError: -22.85%
-heuristicIdx: 6.6 QError: 1.36, RelError: -0.27, SelError: -12%
-histogram: 6.36 QError: 1.42, RelError: -0.29, SelError: -13.2%
-histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.03, RelError: -0.51, SelError: -22.85%
+heuristicIdx: 6.6 
+QError: 1.36, RelError: -0.27, SelError: -12%
+histogram: 6.36 
+QError: 1.42, RelError: -0.29, SelError: -13.2%
+histogramIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1576,10 +2069,14 @@ histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 2.11 QError: 2.11, RelError: 0.21, SelError: 10.55%
-heuristicIdx: 2.11 QError: 2.11, RelError: 0.21, SelError: 10.55%
-histogram: 0.22 QError: 0.22, RelError: 0.02, SelError: 1.1%
-histogramIdx: 0.22 QError: 0.22, RelError: 0.02, SelError: 1.1%
+heuristic: 2.11 
+QError: 2.11, RelError: 0.21, SelError: 10.55%
+heuristicIdx: 2.11 
+QError: 2.11, RelError: 0.21, SelError: 10.55%
+histogram: 0.22 
+QError: 0.22, RelError: 0.02, SelError: 1.1%
+histogramIdx: 0.22 
+QError: 0.22, RelError: 0.02, SelError: 1.1%
 
 
 [jsTest] ----
@@ -1588,10 +2085,14 @@ histogramIdx: 0.22 QError: 0.22, RelError: 0.02, SelError: 1.1%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 2.1 QError: 2.1, RelError: 0.21, SelError: 10.5%
-heuristicIdx: 2.57 QError: 2.57, RelError: 0.26, SelError: 12.85%
-histogram: 0.59 QError: 0.59, RelError: 0.06, SelError: 2.95%
-histogramIdx: 0.22 QError: 0.22, RelError: 0.02, SelError: 1.1%
+heuristic: 2.1 
+QError: 2.1, RelError: 0.21, SelError: 10.5%
+heuristicIdx: 2.57 
+QError: 2.57, RelError: 0.26, SelError: 12.85%
+histogram: 0.59 
+QError: 0.59, RelError: 0.06, SelError: 2.95%
+histogramIdx: 0.22 
+QError: 0.22, RelError: 0.02, SelError: 1.1%
 
 
 [jsTest] ----
@@ -1600,10 +2101,14 @@ histogramIdx: 0.22 QError: 0.22, RelError: 0.02, SelError: 1.1%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 2.57 QError: 2.57, RelError: 1.57, SelError: 7.85%
-heuristicIdx: 2.57 QError: 2.57, RelError: 1.57, SelError: 7.85%
-histogram: 1 QError: 1, RelError: 0, SelError: 0%
-histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
+heuristic: 2.57 
+QError: 2.57, RelError: 1.57, SelError: 7.85%
+heuristicIdx: 2.57 
+QError: 2.57, RelError: 1.57, SelError: 7.85%
+histogram: 1 
+QError: 1, RelError: 0, SelError: 0%
+histogramIdx: 1 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1612,10 +2117,14 @@ histogramIdx: 1 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 3 QError: 3, RelError: 0.3, SelError: 15%
-heuristicIdx: 3 QError: 3, RelError: 0.3, SelError: 15%
-histogram: 0.32 QError: 0.32, RelError: 0.03, SelError: 1.6%
-histogramIdx: 0.32 QError: 0.32, RelError: 0.03, SelError: 1.6%
+heuristic: 3 
+QError: 3, RelError: 0.3, SelError: 15%
+heuristicIdx: 3 
+QError: 3, RelError: 0.3, SelError: 15%
+histogram: 0.32 
+QError: 0.32, RelError: 0.03, SelError: 1.6%
+histogramIdx: 0.32 
+QError: 0.32, RelError: 0.03, SelError: 1.6%
 
 
 [jsTest] ----
@@ -1624,10 +2133,14 @@ histogramIdx: 0.32 QError: 0.32, RelError: 0.03, SelError: 1.6%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 2.57 QError: 1.29, RelError: 0.28, SelError: 2.85%
-heuristicIdx: 2.57 QError: 1.29, RelError: 0.28, SelError: 2.85%
-histogram: 1.9 QError: 1.05, RelError: -0.05, SelError: -0.5%
-histogramIdx: 1.9 QError: 1.05, RelError: -0.05, SelError: -0.5%
+heuristic: 2.57 
+QError: 1.29, RelError: 0.28, SelError: 2.85%
+heuristicIdx: 2.57 
+QError: 1.29, RelError: 0.28, SelError: 2.85%
+histogram: 1.9 
+QError: 1.05, RelError: -0.05, SelError: -0.5%
+histogramIdx: 1.9 
+QError: 1.05, RelError: -0.05, SelError: -0.5%
 
 
 [jsTest] ----
@@ -1636,10 +2149,14 @@ histogramIdx: 1.9 QError: 1.05, RelError: -0.05, SelError: -0.5%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 3.11 QError: 1.04, RelError: 0.04, SelError: 0.55%
-heuristicIdx: 3.11 QError: 1.04, RelError: 0.04, SelError: 0.55%
-histogram: 4.62 QError: 1.54, RelError: 0.54, SelError: 8.1%
-histogramIdx: 4.62 QError: 1.54, RelError: 0.54, SelError: 8.1%
+heuristic: 3.11 
+QError: 1.04, RelError: 0.04, SelError: 0.55%
+heuristicIdx: 3.11 
+QError: 1.04, RelError: 0.04, SelError: 0.55%
+histogram: 4.62 
+QError: 1.54, RelError: 0.54, SelError: 8.1%
+histogramIdx: 4.62 
+QError: 1.54, RelError: 0.54, SelError: 8.1%
 
 
 [jsTest] ----
@@ -1648,10 +2165,14 @@ histogramIdx: 4.62 QError: 1.54, RelError: 0.54, SelError: 8.1%
 
 Actual cardinality: 1
 Cardinality estimates:
-heuristic: 2.57 QError: 2.57, RelError: 1.57, SelError: 7.85%
-heuristicIdx: 2.57 QError: 2.57, RelError: 1.57, SelError: 7.85%
-histogram: 0.95 QError: 1.05, RelError: -0.05, SelError: -0.25%
-histogramIdx: 0.95 QError: 1.05, RelError: -0.05, SelError: -0.25%
+heuristic: 2.57 
+QError: 2.57, RelError: 1.57, SelError: 7.85%
+heuristicIdx: 2.57 
+QError: 2.57, RelError: 1.57, SelError: 7.85%
+histogram: 0.95 
+QError: 1.05, RelError: -0.05, SelError: -0.25%
+histogramIdx: 0.95 
+QError: 1.05, RelError: -0.05, SelError: -0.25%
 
 
 [jsTest] ----
@@ -1660,10 +2181,14 @@ histogramIdx: 0.95 QError: 1.05, RelError: -0.05, SelError: -0.25%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 2.57 QError: 2.57, RelError: 0.26, SelError: 12.85%
-heuristicIdx: 2.57 QError: 2.57, RelError: 0.26, SelError: 12.85%
-histogram: 0.32 QError: 0.32, RelError: 0.03, SelError: 1.6%
-histogramIdx: 0.32 QError: 0.32, RelError: 0.03, SelError: 1.6%
+heuristic: 2.57 
+QError: 2.57, RelError: 0.26, SelError: 12.85%
+heuristicIdx: 2.57 
+QError: 2.57, RelError: 0.26, SelError: 12.85%
+histogram: 0.32 
+QError: 0.32, RelError: 0.03, SelError: 1.6%
+histogramIdx: 0.32 
+QError: 0.32, RelError: 0.03, SelError: 1.6%
 
 
 [jsTest] ----
@@ -1672,10 +2197,14 @@ histogramIdx: 0.32 QError: 0.32, RelError: 0.03, SelError: 1.6%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 2.1 QError: 2.1, RelError: 0.21, SelError: 10.5%
-heuristicIdx: 2.1 QError: 2.1, RelError: 0.21, SelError: 10.5%
-histogram: 0.65 QError: 0.65, RelError: 0.07, SelError: 3.25%
-histogramIdx: 0.65 QError: 0.65, RelError: 0.07, SelError: 3.25%
+heuristic: 2.1 
+QError: 2.1, RelError: 0.21, SelError: 10.5%
+heuristicIdx: 2.1 
+QError: 2.1, RelError: 0.21, SelError: 10.5%
+histogram: 0.65 
+QError: 0.65, RelError: 0.07, SelError: 3.25%
+histogramIdx: 0.65 
+QError: 0.65, RelError: 0.07, SelError: 3.25%
 
 
 [jsTest] ----
@@ -1684,10 +2213,14 @@ histogramIdx: 0.65 QError: 0.65, RelError: 0.07, SelError: 3.25%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 1.21 QError: 1.21, RelError: 0.12, SelError: 6.05%
-heuristicIdx: 1.21 QError: 1.21, RelError: 0.12, SelError: 6.05%
-histogram: 0.08 QError: 0.08, RelError: 0.01, SelError: 0.4%
-histogramIdx: 0.08 QError: 0.08, RelError: 0.01, SelError: 0.4%
+heuristic: 1.21 
+QError: 1.21, RelError: 0.12, SelError: 6.05%
+heuristicIdx: 1.21 
+QError: 1.21, RelError: 0.12, SelError: 6.05%
+histogram: 0.08 
+QError: 0.08, RelError: 0.01, SelError: 0.4%
+histogramIdx: 0.08 
+QError: 0.08, RelError: 0.01, SelError: 0.4%
 
 
 [jsTest] ----
@@ -1696,10 +2229,14 @@ histogramIdx: 0.08 QError: 0.08, RelError: 0.01, SelError: 0.4%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 4.43 QError: 1.35, RelError: -0.26, SelError: -7.85%
-heuristicIdx: 6.6 QError: 1.1, RelError: 0.1, SelError: 3%
-histogram: 7.59 QError: 1.26, RelError: 0.26, SelError: 7.95%
-histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.35, RelError: -0.26, SelError: -7.85%
+heuristicIdx: 6.6 
+QError: 1.1, RelError: 0.1, SelError: 3%
+histogram: 7.59 
+QError: 1.26, RelError: 0.26, SelError: 7.95%
+histogramIdx: 6 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1708,10 +2245,14 @@ histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 2.81 QError: 1.07, RelError: -0.06, SelError: -0.95%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 7.09 QError: 2.36, RelError: 1.36, SelError: 20.45%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 2.81 
+QError: 1.07, RelError: -0.06, SelError: -0.95%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 7.09 
+QError: 2.36, RelError: 1.36, SelError: 20.45%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1720,10 +2261,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 16
 Cardinality estimates:
-heuristic: 11 QError: 1.45, RelError: -0.31, SelError: -25%
-heuristicIdx: 11 QError: 1.45, RelError: -0.31, SelError: -25%
-histogram: 13.55 QError: 1.18, RelError: -0.15, SelError: -12.25%
-histogramIdx: 13.55 QError: 1.18, RelError: -0.15, SelError: -12.25%
+heuristic: 11 
+QError: 1.45, RelError: -0.31, SelError: -25%
+heuristicIdx: 11 
+QError: 1.45, RelError: -0.31, SelError: -25%
+histogram: 13.55 
+QError: 1.18, RelError: -0.15, SelError: -12.25%
+histogramIdx: 13.55 
+QError: 1.18, RelError: -0.15, SelError: -12.25%
 
 
 [jsTest] ----
@@ -1732,10 +2277,14 @@ histogramIdx: 13.55 QError: 1.18, RelError: -0.15, SelError: -12.25%
 
 Actual cardinality: 14
 Cardinality estimates:
-heuristic: 10.31 QError: 1.36, RelError: -0.26, SelError: -18.45%
-heuristicIdx: 10.31 QError: 1.36, RelError: -0.26, SelError: -18.45%
-histogram: 13.18 QError: 1.06, RelError: -0.06, SelError: -4.1%
-histogramIdx: 13.18 QError: 1.06, RelError: -0.06, SelError: -4.1%
+heuristic: 10.31 
+QError: 1.36, RelError: -0.26, SelError: -18.45%
+heuristicIdx: 10.31 
+QError: 1.36, RelError: -0.26, SelError: -18.45%
+histogram: 13.18 
+QError: 1.06, RelError: -0.06, SelError: -4.1%
+histogramIdx: 13.18 
+QError: 1.06, RelError: -0.06, SelError: -4.1%
 
 
 [jsTest] ----
@@ -1744,10 +2293,14 @@ histogramIdx: 13.18 QError: 1.06, RelError: -0.06, SelError: -4.1%
 
 Actual cardinality: 12
 Cardinality estimates:
-heuristic: 11.81 QError: 1.02, RelError: -0.02, SelError: -0.95%
-heuristicIdx: 11.81 QError: 1.02, RelError: -0.02, SelError: -0.95%
-histogram: 8.83 QError: 1.36, RelError: -0.26, SelError: -15.85%
-histogramIdx: 8.83 QError: 1.36, RelError: -0.26, SelError: -15.85%
+heuristic: 11.81 
+QError: 1.02, RelError: -0.02, SelError: -0.95%
+heuristicIdx: 11.81 
+QError: 1.02, RelError: -0.02, SelError: -0.95%
+histogram: 8.83 
+QError: 1.36, RelError: -0.26, SelError: -15.85%
+histogramIdx: 8.83 
+QError: 1.36, RelError: -0.26, SelError: -15.85%
 
 
 [jsTest] ----
@@ -1756,10 +2309,14 @@ histogramIdx: 8.83 QError: 1.36, RelError: -0.26, SelError: -15.85%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 3.36 QError: 1.79, RelError: -0.44, SelError: -13.2%
-heuristicIdx: 9.03 QError: 1.51, RelError: 0.5, SelError: 15.15%
-histogram: 8.88 QError: 1.48, RelError: 0.48, SelError: 14.4%
-histogramIdx: 4.82 QError: 1.24, RelError: -0.2, SelError: -5.9%
+heuristic: 3.36 
+QError: 1.79, RelError: -0.44, SelError: -13.2%
+heuristicIdx: 9.03 
+QError: 1.51, RelError: 0.5, SelError: 15.15%
+histogram: 8.88 
+QError: 1.48, RelError: 0.48, SelError: 14.4%
+histogramIdx: 4.82 
+QError: 1.24, RelError: -0.2, SelError: -5.9%
 
 
 [jsTest] ----
@@ -1768,10 +2325,14 @@ histogramIdx: 4.82 QError: 1.24, RelError: -0.2, SelError: -5.9%
 
 Actual cardinality: 9
 Cardinality estimates:
-heuristic: 4.43 QError: 2.03, RelError: -0.51, SelError: -22.85%
-heuristicIdx: 6.6 QError: 1.36, RelError: -0.27, SelError: -12%
-histogram: 10.44 QError: 1.16, RelError: 0.16, SelError: 7.2%
-histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 2.03, RelError: -0.51, SelError: -22.85%
+heuristicIdx: 6.6 
+QError: 1.36, RelError: -0.27, SelError: -12%
+histogram: 10.44 
+QError: 1.16, RelError: 0.16, SelError: 7.2%
+histogramIdx: 9 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1780,10 +2341,14 @@ histogramIdx: 9 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 3
 Cardinality estimates:
-heuristic: 2.81 QError: 1.07, RelError: -0.06, SelError: -0.95%
-heuristicIdx: 6.6 QError: 2.2, RelError: 1.2, SelError: 18%
-histogram: 7.64 QError: 2.55, RelError: 1.55, SelError: 23.2%
-histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
+heuristic: 2.81 
+QError: 1.07, RelError: -0.06, SelError: -0.95%
+heuristicIdx: 6.6 
+QError: 2.2, RelError: 1.2, SelError: 18%
+histogram: 7.64 
+QError: 2.55, RelError: 1.55, SelError: 23.2%
+histogramIdx: 3 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1792,10 +2357,14 @@ histogramIdx: 3 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 13
 Cardinality estimates:
-heuristic: 11 QError: 1.18, RelError: -0.15, SelError: -10%
-heuristicIdx: 11 QError: 1.18, RelError: -0.15, SelError: -10%
-histogram: 10.78 QError: 1.21, RelError: -0.17, SelError: -11.1%
-histogramIdx: 10.78 QError: 1.21, RelError: -0.17, SelError: -11.1%
+heuristic: 11 
+QError: 1.18, RelError: -0.15, SelError: -10%
+heuristicIdx: 11 
+QError: 1.18, RelError: -0.15, SelError: -10%
+histogram: 10.78 
+QError: 1.21, RelError: -0.17, SelError: -11.1%
+histogramIdx: 10.78 
+QError: 1.21, RelError: -0.17, SelError: -11.1%
 
 
 [jsTest] ----
@@ -1804,10 +2373,14 @@ histogramIdx: 10.78 QError: 1.21, RelError: -0.17, SelError: -11.1%
 
 Actual cardinality: 11
 Cardinality estimates:
-heuristic: 10.31 QError: 1.07, RelError: -0.06, SelError: -3.45%
-heuristicIdx: 10.31 QError: 1.07, RelError: -0.06, SelError: -3.45%
-histogram: 10.25 QError: 1.07, RelError: -0.07, SelError: -3.75%
-histogramIdx: 10.25 QError: 1.07, RelError: -0.07, SelError: -3.75%
+heuristic: 10.31 
+QError: 1.07, RelError: -0.06, SelError: -3.45%
+heuristicIdx: 10.31 
+QError: 1.07, RelError: -0.06, SelError: -3.45%
+histogram: 10.25 
+QError: 1.07, RelError: -0.07, SelError: -3.75%
+histogramIdx: 10.25 
+QError: 1.07, RelError: -0.07, SelError: -3.75%
 
 
 [jsTest] ----
@@ -1816,10 +2389,14 @@ histogramIdx: 10.25 QError: 1.07, RelError: -0.07, SelError: -3.75%
 
 Actual cardinality: 7
 Cardinality estimates:
-heuristic: 11.81 QError: 1.69, RelError: 0.69, SelError: 24.05%
-heuristicIdx: 11.81 QError: 1.69, RelError: 0.69, SelError: 24.05%
-histogram: 4.18 QError: 1.67, RelError: -0.4, SelError: -14.1%
-histogramIdx: 4.18 QError: 1.67, RelError: -0.4, SelError: -14.1%
+heuristic: 11.81 
+QError: 1.69, RelError: 0.69, SelError: 24.05%
+heuristicIdx: 11.81 
+QError: 1.69, RelError: 0.69, SelError: 24.05%
+histogram: 4.18 
+QError: 1.67, RelError: -0.4, SelError: -14.1%
+histogramIdx: 4.18 
+QError: 1.67, RelError: -0.4, SelError: -14.1%
 
 
 [jsTest] ----
@@ -1828,10 +2405,14 @@ histogramIdx: 4.18 QError: 1.67, RelError: -0.4, SelError: -14.1%
 
 Actual cardinality: 11
 Cardinality estimates:
-heuristic: 3.36 QError: 3.27, RelError: -0.69, SelError: -38.2%
-heuristicIdx: 9.03 QError: 1.22, RelError: -0.18, SelError: -9.85%
-histogram: 10.57 QError: 1.04, RelError: -0.04, SelError: -2.15%
-histogramIdx: 8.37 QError: 1.31, RelError: -0.24, SelError: -13.15%
+heuristic: 3.36 
+QError: 3.27, RelError: -0.69, SelError: -38.2%
+heuristicIdx: 9.03 
+QError: 1.22, RelError: -0.18, SelError: -9.85%
+histogram: 10.57 
+QError: 1.04, RelError: -0.04, SelError: -2.15%
+histogramIdx: 8.37 
+QError: 1.31, RelError: -0.24, SelError: -13.15%
 
 
 [jsTest] ----
@@ -1840,10 +2421,14 @@ histogramIdx: 8.37 QError: 1.31, RelError: -0.24, SelError: -13.15%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-heuristicIdx: 4.43 QError: 1.11, RelError: 0.11, SelError: 2.15%
-histogram: 5.69 QError: 1.42, RelError: 0.42, SelError: 8.45%
-histogramIdx: 5.69 QError: 1.42, RelError: 0.42, SelError: 8.45%
+heuristic: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+heuristicIdx: 4.43 
+QError: 1.11, RelError: 0.11, SelError: 2.15%
+histogram: 5.69 
+QError: 1.42, RelError: 0.42, SelError: 8.45%
+histogramIdx: 5.69 
+QError: 1.42, RelError: 0.42, SelError: 8.45%
 
 
 [jsTest] ----
@@ -1852,10 +2437,14 @@ histogramIdx: 5.69 QError: 1.42, RelError: 0.42, SelError: 8.45%
 
 Actual cardinality: 8
 Cardinality estimates:
-heuristic: 2.81 QError: 2.85, RelError: -0.65, SelError: -25.95%
-heuristicIdx: 2.81 QError: 2.85, RelError: -0.65, SelError: -25.95%
-histogram: 8.04 QError: 1, RelError: 0, SelError: 0.2%
-histogramIdx: 8.04 QError: 1, RelError: 0, SelError: 0.2%
+heuristic: 2.81 
+QError: 2.85, RelError: -0.65, SelError: -25.95%
+heuristicIdx: 2.81 
+QError: 2.85, RelError: -0.65, SelError: -25.95%
+histogram: 8.04 
+QError: 1, RelError: 0, SelError: 0.2%
+histogramIdx: 8.04 
+QError: 1, RelError: 0, SelError: 0.2%
 
 
 [jsTest] ----
@@ -1864,10 +2453,14 @@ histogramIdx: 8.04 QError: 1, RelError: 0, SelError: 0.2%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-heuristicIdx: 4.43 QError: 2.22, RelError: 1.21, SelError: 12.15%
-histogram: 3.79 QError: 1.9, RelError: 0.9, SelError: 8.95%
-histogramIdx: 3.79 QError: 1.9, RelError: 0.9, SelError: 8.95%
+heuristic: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+heuristicIdx: 4.43 
+QError: 2.22, RelError: 1.21, SelError: 12.15%
+histogram: 3.79 
+QError: 1.9, RelError: 0.9, SelError: 8.95%
+histogramIdx: 3.79 
+QError: 1.9, RelError: 0.9, SelError: 8.95%
 
 
 [jsTest] ----
@@ -1876,10 +2469,14 @@ histogramIdx: 3.79 QError: 1.9, RelError: 0.9, SelError: 8.95%
 
 Actual cardinality: 2
 Cardinality estimates:
-heuristic: 2.57 QError: 1.29, RelError: 0.28, SelError: 2.85%
-heuristicIdx: 2.57 QError: 1.29, RelError: 0.28, SelError: 2.85%
-histogram: 1.79 QError: 1.12, RelError: -0.1, SelError: -1.05%
-histogramIdx: 1.79 QError: 1.12, RelError: -0.1, SelError: -1.05%
+heuristic: 2.57 
+QError: 1.29, RelError: 0.28, SelError: 2.85%
+heuristicIdx: 2.57 
+QError: 1.29, RelError: 0.28, SelError: 2.85%
+histogram: 1.79 
+QError: 1.12, RelError: -0.1, SelError: -1.05%
+histogramIdx: 1.79 
+QError: 1.12, RelError: -0.1, SelError: -1.05%
 
 
 [jsTest] ----
@@ -1888,10 +2485,14 @@ histogramIdx: 1.79 QError: 1.12, RelError: -0.1, SelError: -1.05%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 2.81 QError: 2.81, RelError: 0.28, SelError: 14.05%
-heuristicIdx: 2.81 QError: 2.81, RelError: 0.28, SelError: 14.05%
-histogram: 4.04 QError: 4.04, RelError: 0.4, SelError: 20.2%
-histogramIdx: 4.04 QError: 4.04, RelError: 0.4, SelError: 20.2%
+heuristic: 2.81 
+QError: 2.81, RelError: 0.28, SelError: 14.05%
+heuristicIdx: 2.81 
+QError: 2.81, RelError: 0.28, SelError: 14.05%
+histogram: 4.04 
+QError: 4.04, RelError: 0.4, SelError: 20.2%
+histogramIdx: 4.04 
+QError: 4.04, RelError: 0.4, SelError: 20.2%
 
 
 [jsTest] ----
@@ -1900,10 +2501,14 @@ histogramIdx: 4.04 QError: 4.04, RelError: 0.4, SelError: 20.2%
 
 Actual cardinality: 20
 Cardinality estimates:
-heuristic: 11 QError: 1.82, RelError: -0.45, SelError: -45%
-heuristicIdx: 11 QError: 1.82, RelError: -0.45, SelError: -45%
-histogram: 18.21 QError: 1.1, RelError: -0.09, SelError: -8.95%
-histogramIdx: 18.21 QError: 1.1, RelError: -0.09, SelError: -8.95%
+heuristic: 11 
+QError: 1.82, RelError: -0.45, SelError: -45%
+heuristicIdx: 11 
+QError: 1.82, RelError: -0.45, SelError: -45%
+histogram: 18.21 
+QError: 1.1, RelError: -0.09, SelError: -8.95%
+histogramIdx: 18.21 
+QError: 1.1, RelError: -0.09, SelError: -8.95%
 
 
 [jsTest] ----
@@ -1912,10 +2517,14 @@ histogramIdx: 18.21 QError: 1.1, RelError: -0.09, SelError: -8.95%
 
 Actual cardinality: 18
 Cardinality estimates:
-heuristic: 10.31 QError: 1.75, RelError: -0.43, SelError: -38.45%
-heuristicIdx: 10.31 QError: 1.75, RelError: -0.43, SelError: -38.45%
-histogram: 18.1 QError: 1.01, RelError: 0.01, SelError: 0.5%
-histogramIdx: 18.1 QError: 1.01, RelError: 0.01, SelError: 0.5%
+heuristic: 10.31 
+QError: 1.75, RelError: -0.43, SelError: -38.45%
+heuristicIdx: 10.31 
+QError: 1.75, RelError: -0.43, SelError: -38.45%
+histogram: 18.1 
+QError: 1.01, RelError: 0.01, SelError: 0.5%
+histogramIdx: 18.1 
+QError: 1.01, RelError: 0.01, SelError: 0.5%
 
 
 [jsTest] ----
@@ -1924,10 +2533,14 @@ histogramIdx: 18.1 QError: 1.01, RelError: 0.01, SelError: 0.5%
 
 Actual cardinality: 18
 Cardinality estimates:
-heuristic: 11.81 QError: 1.52, RelError: -0.34, SelError: -30.95%
-heuristicIdx: 11.81 QError: 1.52, RelError: -0.34, SelError: -30.95%
-histogram: 10.74 QError: 1.68, RelError: -0.4, SelError: -36.3%
-histogramIdx: 10.74 QError: 1.68, RelError: -0.4, SelError: -36.3%
+heuristic: 11.81 
+QError: 1.52, RelError: -0.34, SelError: -30.95%
+heuristicIdx: 11.81 
+QError: 1.52, RelError: -0.34, SelError: -30.95%
+histogram: 10.74 
+QError: 1.68, RelError: -0.4, SelError: -36.3%
+histogramIdx: 10.74 
+QError: 1.68, RelError: -0.4, SelError: -36.3%
 
 
 [jsTest] ----
@@ -1936,10 +2549,14 @@ histogramIdx: 10.74 QError: 1.68, RelError: -0.4, SelError: -36.3%
 
 Actual cardinality: 7
 Cardinality estimates:
-heuristic: 3.36 QError: 2.08, RelError: -0.52, SelError: -18.2%
-heuristicIdx: 3.36 QError: 2.08, RelError: -0.52, SelError: -18.2%
-histogram: 9.45 QError: 1.35, RelError: 0.35, SelError: 12.25%
-histogramIdx: 9.45 QError: 1.35, RelError: 0.35, SelError: 12.25%
+heuristic: 3.36 
+QError: 2.08, RelError: -0.52, SelError: -18.2%
+heuristicIdx: 3.36 
+QError: 2.08, RelError: -0.52, SelError: -18.2%
+histogram: 9.45 
+QError: 1.35, RelError: 0.35, SelError: 12.25%
+histogramIdx: 9.45 
+QError: 1.35, RelError: 0.35, SelError: 12.25%
 
 
 [jsTest] ----
@@ -1948,10 +2565,14 @@ histogramIdx: 9.45 QError: 1.35, RelError: 0.35, SelError: 12.25%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 4.43 QError: 1.35, RelError: -0.26, SelError: -7.85%
-heuristicIdx: 6.6 QError: 1.1, RelError: 0.1, SelError: 3%
-histogram: 5.06 QError: 1.19, RelError: -0.16, SelError: -4.7%
-histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
+heuristic: 4.43 
+QError: 1.35, RelError: -0.26, SelError: -7.85%
+heuristicIdx: 6.6 
+QError: 1.1, RelError: 0.1, SelError: 3%
+histogram: 5.06 
+QError: 1.19, RelError: -0.16, SelError: -4.7%
+histogramIdx: 6 
+QError: 1, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1960,10 +2581,14 @@ histogramIdx: 6 QError: 1, RelError: 0, SelError: 0%
 
 Actual cardinality: 0
 Cardinality estimates:
-heuristic: 2.81 QError: 2.81, RelError: 0.28, SelError: 14.05%
-heuristicIdx: 0 QError: 0, RelError: 0, SelError: 0%
-histogram: 0 QError: 0, RelError: 0, SelError: 0%
-histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
+heuristic: 2.81 
+QError: 2.81, RelError: 0.28, SelError: 14.05%
+heuristicIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogram: 0 
+QError: 0, RelError: 0, SelError: 0%
+histogramIdx: 0 
+QError: 0, RelError: 0, SelError: 0%
 
 
 [jsTest] ----
@@ -1972,10 +2597,14 @@ histogramIdx: 0 QError: 0, RelError: 0, SelError: 0%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 11 QError: 1.83, RelError: 0.83, SelError: 25%
-heuristicIdx: 11 QError: 1.83, RelError: 0.83, SelError: 25%
-histogram: 4.33 QError: 1.39, RelError: -0.28, SelError: -8.35%
-histogramIdx: 4.33 QError: 1.39, RelError: -0.28, SelError: -8.35%
+heuristic: 11 
+QError: 1.83, RelError: 0.83, SelError: 25%
+heuristicIdx: 11 
+QError: 1.83, RelError: 0.83, SelError: 25%
+histogram: 4.33 
+QError: 1.39, RelError: -0.28, SelError: -8.35%
+histogramIdx: 4.33 
+QError: 1.39, RelError: -0.28, SelError: -8.35%
 
 
 [jsTest] ----
@@ -1984,10 +2613,14 @@ histogramIdx: 4.33 QError: 1.39, RelError: -0.28, SelError: -8.35%
 
 Actual cardinality: 4
 Cardinality estimates:
-heuristic: 10.31 QError: 2.58, RelError: 1.58, SelError: 31.55%
-heuristicIdx: 10.31 QError: 2.58, RelError: 1.58, SelError: 31.55%
-histogram: 3.43 QError: 1.17, RelError: -0.14, SelError: -2.85%
-histogramIdx: 3.43 QError: 1.17, RelError: -0.14, SelError: -2.85%
+heuristic: 10.31 
+QError: 2.58, RelError: 1.58, SelError: 31.55%
+heuristicIdx: 10.31 
+QError: 2.58, RelError: 1.58, SelError: 31.55%
+histogram: 3.43 
+QError: 1.17, RelError: -0.14, SelError: -2.85%
+histogramIdx: 3.43 
+QError: 1.17, RelError: -0.14, SelError: -2.85%
 
 
 [jsTest] ----
@@ -1996,10 +2629,14 @@ histogramIdx: 3.43 QError: 1.17, RelError: -0.14, SelError: -2.85%
 
 Actual cardinality: 12
 Cardinality estimates:
-heuristic: 11.81 QError: 1.02, RelError: -0.02, SelError: -0.95%
-heuristicIdx: 11.81 QError: 1.02, RelError: -0.02, SelError: -0.95%
-histogram: 8.83 QError: 1.36, RelError: -0.26, SelError: -15.85%
-histogramIdx: 8.83 QError: 1.36, RelError: -0.26, SelError: -15.85%
+heuristic: 11.81 
+QError: 1.02, RelError: -0.02, SelError: -0.95%
+heuristicIdx: 11.81 
+QError: 1.02, RelError: -0.02, SelError: -0.95%
+histogram: 8.83 
+QError: 1.36, RelError: -0.26, SelError: -15.85%
+histogramIdx: 8.83 
+QError: 1.36, RelError: -0.26, SelError: -15.85%
 
 
 [jsTest] ----
@@ -2008,10 +2645,14 @@ histogramIdx: 8.83 QError: 1.36, RelError: -0.26, SelError: -15.85%
 
 Actual cardinality: 6
 Cardinality estimates:
-heuristic: 4.88 QError: 1.23, RelError: -0.19, SelError: -5.6%
-heuristicIdx: 9.03 QError: 1.51, RelError: 0.5, SelError: 15.15%
-histogram: 4.24 QError: 1.42, RelError: -0.29, SelError: -8.8%
-histogramIdx: 4.82 QError: 1.24, RelError: -0.2, SelError: -5.9%
+heuristic: 4.88 
+QError: 1.23, RelError: -0.19, SelError: -5.6%
+heuristicIdx: 9.03 
+QError: 1.51, RelError: 0.5, SelError: 15.15%
+histogram: 4.24 
+QError: 1.42, RelError: -0.29, SelError: -8.8%
+histogramIdx: 4.82 
+QError: 1.24, RelError: -0.2, SelError: -5.9%
 
 
 [jsTest] ----
@@ -2240,50 +2881,70 @@ histogramIdx:
 [jsTest] Mean errors per strategy for predicate {  "dtype" : {  "$ne" : "array" } }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 4.022,  "RMSRelError" : 2.698,  "meanSelError" : 21.329 }
-heuristicIdx: {  "RMSQError" : 4.524,  "RMSRelError" : 3.231,  "meanSelError" : 23.669 }
-histogram: {  "RMSQError" : 2.156,  "RMSRelError" : 1.351,  "meanSelError" : 4.712 }
-histogramIdx: {  "RMSQError" : 0.92,  "RMSRelError" : 0,  "meanSelError" : 0 }
+heuristic: 
+{  "RMSQError" : 4.022,  "RMSRelError" : 2.698,  "meanSelError" : 21.329 }
+heuristicIdx: 
+{  "RMSQError" : 4.524,  "RMSRelError" : 3.231,  "meanSelError" : 23.669 }
+histogram: 
+{  "RMSQError" : 2.156,  "RMSRelError" : 1.351,  "meanSelError" : 4.712 }
+histogramIdx: 
+{  "RMSQError" : 0.92,  "RMSRelError" : 0,  "meanSelError" : 0 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for predicate {  "dtype" : "array" }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
-heuristicIdx: {  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
-histogram: {  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
-histogramIdx: {  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
+heuristic: 
+{  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
+heuristicIdx: 
+{  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
+histogram: 
+{  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
+histogramIdx: 
+{  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for predicate {  "$and" : [ { "elemMatch" : true }, { "dtype" : "array" } ] }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
-heuristicIdx: {  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
-histogram: {  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
-histogramIdx: {  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
+heuristic: 
+{  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
+heuristicIdx: 
+{  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
+histogram: 
+{  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
+histogramIdx: 
+{  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for predicate {  "$and" : [ { "elemMatch" : false }, { "dtype" : "array" } ] }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
-heuristicIdx: {  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
-histogram: {  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
-histogramIdx: {  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
+heuristic: 
+{  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
+heuristicIdx: 
+{  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
+histogram: 
+{  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
+histogramIdx: 
+{  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for all queries:
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 3.385,  "RMSRelError" : 2.192,  "meanSelError" : 19.222 }
-heuristicIdx: {  "RMSQError" : 3.766,  "RMSRelError" : 2.61,  "meanSelError" : 20.706 }
-histogram: {  "RMSQError" : 1.887,  "RMSRelError" : 1.118,  "meanSelError" : 4.41 }
-histogramIdx: {  "RMSQError" : 1.072,  "RMSRelError" : 0.303,  "meanSelError" : 1.422 }
+heuristic: 
+{  "RMSQError" : 3.385,  "RMSRelError" : 2.192,  "meanSelError" : 19.222 }
+heuristicIdx: 
+{  "RMSQError" : 3.766,  "RMSRelError" : 2.61,  "meanSelError" : 20.706 }
+histogram: 
+{  "RMSQError" : 1.887,  "RMSRelError" : 1.118,  "meanSelError" : 4.41 }
+histogramIdx: 
+{  "RMSQError" : 1.072,  "RMSRelError" : 0.303,  "meanSelError" : 1.422 }
 
 
 [jsTest] ----
@@ -2494,10 +3155,14 @@ histogramIdx:
 [jsTest] Mean errors per strategy for all queries:
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.931,  "RMSRelError" : 0.597,  "meanSelError" : 14.195 }
-heuristicIdx: {  "RMSQError" : 1.851,  "RMSRelError" : 0.648,  "meanSelError" : 13.789 }
-histogram: {  "RMSQError" : 1.417,  "RMSRelError" : 0.432,  "meanSelError" : 7.936 }
-histogramIdx: {  "RMSQError" : 1.295,  "RMSRelError" : 0.252,  "meanSelError" : 6.159 }
+heuristic: 
+{  "RMSQError" : 1.931,  "RMSRelError" : 0.597,  "meanSelError" : 14.195 }
+heuristicIdx: 
+{  "RMSQError" : 1.851,  "RMSRelError" : 0.648,  "meanSelError" : 13.789 }
+histogram: 
+{  "RMSQError" : 1.417,  "RMSRelError" : 0.432,  "meanSelError" : 7.936 }
+histogramIdx: 
+{  "RMSQError" : 1.295,  "RMSRelError" : 0.252,  "meanSelError" : 6.159 }
 
 
 [jsTest] ----
@@ -2562,11 +3227,18 @@ cardinality: 7, histogramIdx estimation: 9.45, errors: {  "qError" : 1.35,  "rel
 [jsTest] Mean errors per strategy for all queries:
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 3.11,  "RMSRelError" : 1.943,  "meanSelError" : 18.059 }
-heuristicIdx: {  "RMSQError" : 3.42,  "RMSRelError" : 2.31,  "meanSelError" : 19.106 }
-histogram: {  "RMSQError" : 1.789,  "RMSRelError" : 1.002,  "meanSelError" : 5.226 }
-histogramIdx: {  "RMSQError" : 1.127,  "RMSRelError" : 0.292,  "meanSelError" : 2.518 }
-===============================================================================Errors excluding empty queries.Non-empty simple error entries: 111; complex error entries: 29
+heuristic: 
+{  "RMSQError" : 3.11,  "RMSRelError" : 1.943,  "meanSelError" : 18.059 }
+heuristicIdx: 
+{  "RMSQError" : 3.42,  "RMSRelError" : 2.31,  "meanSelError" : 19.106 }
+histogram: 
+{  "RMSQError" : 1.789,  "RMSRelError" : 1.002,  "meanSelError" : 5.226 }
+histogramIdx: 
+{  "RMSQError" : 1.127,  "RMSRelError" : 0.292,  "meanSelError" : 2.518 }
+===============================================================================
+Errors excluding empty queries.
+Non-empty simple error entries: 111; complex error entries: 29
+
 
 [jsTest] ----
 [jsTest] Aggregate errors for all simple predicate queries
@@ -2794,50 +3466,70 @@ histogramIdx:
 [jsTest] Mean errors per strategy for predicate {  "dtype" : {  "$ne" : "array" } }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 3.775,  "RMSRelError" : 2.924,  "meanSelError" : 20.669 }
-heuristicIdx: {  "RMSQError" : 4.359,  "RMSRelError" : 3.505,  "meanSelError" : 24.29 }
-histogram: {  "RMSQError" : 2.071,  "RMSRelError" : 1.465,  "meanSelError" : 4.164 }
-histogramIdx: {  "RMSQError" : 1,  "RMSRelError" : 0,  "meanSelError" : 0 }
+heuristic: 
+{  "RMSQError" : 3.775,  "RMSRelError" : 2.924,  "meanSelError" : 20.669 }
+heuristicIdx: 
+{  "RMSQError" : 4.359,  "RMSRelError" : 3.505,  "meanSelError" : 24.29 }
+histogram: 
+{  "RMSQError" : 2.071,  "RMSRelError" : 1.465,  "meanSelError" : 4.164 }
+histogramIdx: 
+{  "RMSQError" : 1,  "RMSRelError" : 0,  "meanSelError" : 0 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for predicate {  "dtype" : "array" }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
-heuristicIdx: {  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
-histogram: {  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
-histogramIdx: {  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
+heuristic: 
+{  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
+heuristicIdx: 
+{  "RMSQError" : 1.812,  "RMSRelError" : 0.723,  "meanSelError" : 15.57 }
+histogram: 
+{  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
+histogramIdx: 
+{  "RMSQError" : 1.293,  "RMSRelError" : 0.501,  "meanSelError" : 3.888 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for predicate {  "$and" : [ { "elemMatch" : true }, { "dtype" : "array" } ] }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
-heuristicIdx: {  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
-histogram: {  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
-histogramIdx: {  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
+heuristic: 
+{  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
+heuristicIdx: 
+{  "RMSQError" : 1.546,  "RMSRelError" : 0.587,  "meanSelError" : 7.468 }
+histogram: 
+{  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
+histogramIdx: 
+{  "RMSQError" : 1.309,  "RMSRelError" : 0.341,  "meanSelError" : 7.082 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for predicate {  "$and" : [ { "elemMatch" : false }, { "dtype" : "array" } ] }::
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
-heuristicIdx: {  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
-histogram: {  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
-histogramIdx: {  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
+heuristic: 
+{  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
+heuristicIdx: 
+{  "RMSQError" : 1.89,  "RMSRelError" : 0.761,  "meanSelError" : 18.191 }
+histogram: 
+{  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
+histogramIdx: 
+{  "RMSQError" : 1.288,  "RMSRelError" : 0.543,  "meanSelError" : 2.854 }
 
 
 [jsTest] ----
 [jsTest] Mean errors per strategy for all queries:
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 3.132,  "RMSRelError" : 2.301,  "meanSelError" : 18.602 }
-heuristicIdx: {  "RMSQError" : 3.554,  "RMSRelError" : 2.742,  "meanSelError" : 20.755 }
-histogram: {  "RMSQError" : 1.797,  "RMSRelError" : 1.174,  "meanSelError" : 4.052 }
-histogramIdx: {  "RMSQError" : 1.128,  "RMSRelError" : 0.319,  "meanSelError" : 1.576 }
+heuristic: 
+{  "RMSQError" : 3.132,  "RMSRelError" : 2.301,  "meanSelError" : 18.602 }
+heuristicIdx: 
+{  "RMSQError" : 3.554,  "RMSRelError" : 2.742,  "meanSelError" : 20.755 }
+histogram: 
+{  "RMSQError" : 1.797,  "RMSRelError" : 1.174,  "meanSelError" : 4.052 }
+histogramIdx: 
+{  "RMSQError" : 1.128,  "RMSRelError" : 0.319,  "meanSelError" : 1.576 }
 
 
 [jsTest] ----
@@ -3040,10 +3732,14 @@ histogramIdx:
 [jsTest] Mean errors per strategy for all queries:
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 1.779,  "RMSRelError" : 0.662,  "meanSelError" : 14.884 }
-heuristicIdx: {  "RMSQError" : 1.726,  "RMSRelError" : 0.722,  "meanSelError" : 14.771 }
-histogram: {  "RMSQError" : 1.401,  "RMSRelError" : 0.482,  "meanSelError" : 9.053 }
-histogramIdx: {  "RMSQError" : 1.246,  "RMSRelError" : 0.274,  "meanSelError" : 6.85 }
+heuristic: 
+{  "RMSQError" : 1.779,  "RMSRelError" : 0.662,  "meanSelError" : 14.884 }
+heuristicIdx: 
+{  "RMSQError" : 1.726,  "RMSRelError" : 0.722,  "meanSelError" : 14.771 }
+histogram: 
+{  "RMSQError" : 1.401,  "RMSRelError" : 0.482,  "meanSelError" : 9.053 }
+histogramIdx: 
+{  "RMSQError" : 1.246,  "RMSRelError" : 0.274,  "meanSelError" : 6.85 }
 
 
 [jsTest] ----
@@ -3098,10 +3794,14 @@ cardinality: 11, histogramIdx estimation: 8.37, errors: {  "qError" : 1.31,  "re
 [jsTest] Mean errors per strategy for all queries:
 [jsTest] ----
 
-heuristic: {  "RMSQError" : 2.904,  "RMSRelError" : 2.071,  "meanSelError" : 17.832 }
-heuristicIdx: {  "RMSQError" : 3.261,  "RMSRelError" : 2.463,  "meanSelError" : 19.515 }
-histogram: {  "RMSQError" : 1.722,  "RMSRelError" : 1.068,  "meanSelError" : 5.088 }
-histogramIdx: {  "RMSQError" : 1.154,  "RMSRelError" : 0.31,  "meanSelError" : 2.669 }
+heuristic: 
+{  "RMSQError" : 2.904,  "RMSRelError" : 2.071,  "meanSelError" : 17.832 }
+heuristicIdx: 
+{  "RMSQError" : 3.261,  "RMSRelError" : 2.463,  "meanSelError" : 19.515 }
+histogram: 
+{  "RMSQError" : 1.722,  "RMSRelError" : 1.068,  "meanSelError" : 5.088 }
+histogramIdx: 
+{  "RMSQError" : 1.154,  "RMSRelError" : 0.31,  "meanSelError" : 2.669 }
 
 
 [jsTest] ----

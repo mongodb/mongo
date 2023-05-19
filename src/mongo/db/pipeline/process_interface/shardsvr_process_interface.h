@@ -53,6 +53,11 @@ public:
                                       const NamespaceString& nss,
                                       ChunkVersion targetCollectionPlacementVersion) const final;
 
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const final {
+        return std::make_unique<TargetPrimaryWriteSizeEstimator>();
+    }
+
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final {
         // We don't expect anyone to use this method on the shard itself (yet). This is currently
@@ -71,23 +76,15 @@ public:
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) final;
 
-    /**
-     * Inserts the documents 'objs' into the namespace 'ns' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
+                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                   const WriteConcernOptions& wc,
                   boost::optional<OID> targetEpoch) final;
 
-    /**
-     * Replaces the documents matching 'queries' with 'updates' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    BatchedObjects&& batch,
+                                    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,
@@ -106,7 +103,6 @@ public:
                                                  const NamespaceString& targetNs,
                                                  bool dropTarget,
                                                  bool stayTemp,
-                                                 bool allowBuckets,
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes) final;
     void createCollection(OperationContext* opCtx,
@@ -143,24 +139,16 @@ public:
 
     void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) final;
 
-    void createTimeseries(OperationContext* opCtx,
-                          const NamespaceString& ns,
-                          const BSONObj& options,
-                          bool createView) final {
-        // TODO SERVER-74061 remove uassert.
-        uasserted(7268704,
-                  "$out for time-series collections is not supported on sharded clusters.");
-    }
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) final;
 
     Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             const NamespaceString& ns,
-                            std::vector<BSONObj>&& objs,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                             const WriteConcernOptions& wc,
-                            boost::optional<OID> targetEpoch) final {
-        // TODO SERVER-74061 remove uassert.
-        uasserted(7268705,
-                  "$out for time-series collections is not supported on sharded clusters.");
-    }
+                            boost::optional<OID> targetEpoch) final;
 };
 
 }  // namespace mongo

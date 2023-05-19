@@ -65,9 +65,7 @@ QueryAnalysisCoordinator* QueryAnalysisCoordinator::get(ServiceContext* serviceC
 }
 
 bool QueryAnalysisCoordinator::shouldRegisterReplicaSetAwareService() const {
-    // This is invoked when the Register above is constructed which is before FCV is set so we need
-    // to ignore FCV when checking if the feature flag is enabled.
-    return supportsCoordinatingQueryAnalysis(true /* isReplEnabled */, true /* ignoreFCV */);
+    return supportsCoordinatingQueryAnalysis(true /* isReplEnabled */);
 }
 
 void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument& doc) {

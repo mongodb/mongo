@@ -43,11 +43,8 @@ public:
     const MetadataView& getClientMetadata() const override;
     Date_t getDeadline() const override;
     bool isCancelled() const override;
-    HostAndPort getHostAndPort() const override {
-        return _stream->_hostAndPort;
-    }
-    CancellationToken getCancellationToken() {
-        return _stream->_cancellationSource.token();
+    HostAndPort getRemote() const override {
+        return _stream->_remote;
     }
     void tryCancel() override;
 

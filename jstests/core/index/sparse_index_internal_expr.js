@@ -5,6 +5,7 @@
  *
  * @tags: [
  *   multiversion_incompatible,
+ *   does_not_support_transaction,
  * ]
  */
 
@@ -47,7 +48,8 @@ assert.docEq(res[0], {a: 1});
 
 // Drop the non-sparse index and create a sparse index with the same key pattern.
 assert.commandWorked(coll.dropIndex("missing_1"));
-assert.commandWorked(coll.createIndex({'missing': 1}, {'sparse': true}));
+assert.commandWorked(
+    coll.createIndex({'missing': 1}, {'sparse': true, 'name': 'missing_1_sparse'}));
 
 // Run the same query to test that a COLLSCAN plan is used rather than an indexed plan.
 const collScans =
@@ -58,13 +60,13 @@ assert.gt(collScans.length, 0, collScans);
 
 // Test that a sparse index can be hinted to answer $expr query but incomplete results in returned,
 // because the document is not indexed by the sparse index.
-res = coll.find(exprQuery, {_id: 0}).hint("missing_1").toArray();
+res = coll.find(exprQuery, {_id: 0}).hint("missing_1_sparse").toArray();
 assert.eq(res.length, 0);
 
 ixScans = getPlanStages(
-    getWinningPlan(coll.find(exprQuery).hint("missing_1").explain().queryPlanner), "IXSCAN");
+    getWinningPlan(coll.find(exprQuery).hint("missing_1_sparse").explain().queryPlanner), "IXSCAN");
 
 assert.gt(ixScans.length, 0, ixScans);
-assert.eq("missing_1", ixScans[0].indexName, ixScans);
+assert.eq("missing_1_sparse", ixScans[0].indexName, ixScans);
 assert.eq(true, ixScans[0].isSparse, ixScans);
 }());

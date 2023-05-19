@@ -53,6 +53,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -64,6 +65,8 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/scopeguard.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace {
@@ -245,7 +248,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         auto opCtx = operationContext();
         repl::UnreplicatedWritesBlock uwb(opCtx);
         auto nss = VersionType::ConfigNS;
-        writeConflictRetry(opCtx, "removeConfigDocuments", nss.ns(), [&] {
+        writeConflictRetry(opCtx, "removeConfigDocuments", nss, [&] {
             AutoGetCollection coll(opCtx, nss, MODE_IX);
             ASSERT_TRUE(coll);
             auto cursor = coll->getCursor(opCtx);
@@ -390,102 +393,130 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
     opObserver.onMajorityCommitPointUpdate(getServiceContext(), majorityCommitPoint);
 
     now = VectorClock::get(operationContext())->getTime();
-    auto timeAtInitialization = now.configTime().asTimestamp();
+    const auto timeAtFirstInvocation = now.configTime().asTimestamp();
 
     // init placement history
     ShardingCatalogManager::get(operationContext())->initializePlacementHistory(operationContext());
 
-    // Verify the outcome
-    DBDirectClient dbClient(operationContext());
+    auto verifyOutcome = [&,
+                          coll1 = coll1,
+                          coll1Chunks = coll1Chunks,
+                          coll2 = coll2,
+                          coll2Chunks = coll2Chunks,
+                          corruptedColl = corruptedColl](const Timestamp& timeAtInitialization) {
+        DBDirectClient dbClient(operationContext());
 
-    // The expected amount of documents has been generated
-    ASSERT_EQUALS(dbClient.count(NamespaceString::kConfigsvrPlacementHistoryNamespace, BSONObj()),
-                  3 /*numDatabases*/ + 3 /*numCollections*/ + 2 /*numMarkers*/);
+        // The expected amount of documents has been generated
+        ASSERT_EQUALS(
+            dbClient.count(NamespaceString::kConfigsvrPlacementHistoryNamespace, BSONObj()),
+            3 /*numDatabases*/ + 3 /*numCollections*/ + 2 /*numMarkers*/);
 
-    // Each database is correctly described
-    for (const auto& [dbName, primaryShard, timeOfCreation] : databaseInfos) {
-        const NamespacePlacementType expectedEntry(
-            NamespaceString(dbName), timeOfCreation, {primaryShard});
-        const auto generatedEntry = findOneOnConfigCollection<NamespacePlacementType>(
+        // Each database is correctly described
+        for (const auto& [dbName, primaryShard, timeOfCreation] : databaseInfos) {
+            const NamespacePlacementType expectedEntry(
+                NamespaceString(dbName), timeOfCreation, {primaryShard});
+            const auto generatedEntry = findOneOnConfigCollection<NamespacePlacementType>(
+                operationContext(),
+                NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                BSON("nss" << dbName));
+
+            assertSamePlacementInfo(expectedEntry, generatedEntry);
+        }
+
+        // Each collection is properly described:
+        const auto getExpectedTimestampForColl = [](const std::vector<ChunkType>& collChunks) {
+            return std::max_element(collChunks.begin(),
+                                    collChunks.end(),
+                                    [](const ChunkType& lhs, const ChunkType& rhs) {
+                                        return *lhs.getOnCurrentShardSince() <
+                                            *rhs.getOnCurrentShardSince();
+                                    })
+                ->getOnCurrentShardSince()
+                .value();
+        };
+
+        // - coll1
+        NamespacePlacementType expectedEntryForColl1(
+            coll1.getNss(), getExpectedTimestampForColl(coll1Chunks), expectedColl1Placement);
+        expectedEntryForColl1.setUuid(coll1.getUuid());
+        const auto generatedEntryForColl1 = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << dbName));
+            BSON("nss" << coll1.getNss().ns()));
 
-        assertSamePlacementInfo(expectedEntry, generatedEntry);
-    }
+        assertSamePlacementInfo(expectedEntryForColl1, generatedEntryForColl1);
 
-    // Each collection is properly described:
-    const auto getExpectedTimestampForColl = [](const std::vector<ChunkType>& collChunks) {
-        return std::max_element(collChunks.begin(),
-                                collChunks.end(),
-                                [](const ChunkType& lhs, const ChunkType& rhs) {
-                                    return *lhs.getOnCurrentShardSince() <
-                                        *rhs.getOnCurrentShardSince();
-                                })
-            ->getOnCurrentShardSince()
-            .value();
+        // - coll2
+        NamespacePlacementType expectedEntryForColl2(
+            coll2.getNss(), getExpectedTimestampForColl(coll2Chunks), expectedColl2Placement);
+        expectedEntryForColl2.setUuid(coll2.getUuid());
+        const auto generatedEntryForColl2 = findOneOnConfigCollection<NamespacePlacementType>(
+            operationContext(),
+            NamespaceString::kConfigsvrPlacementHistoryNamespace,
+            BSON("nss" << coll2.getNss().ns()));
+
+        assertSamePlacementInfo(expectedEntryForColl2, generatedEntryForColl2);
+
+        // - corruptedColl
+        NamespacePlacementType expectedEntryForCorruptedColl(
+            corruptedColl.getNss(), timeAtInitialization, expectedCorruptedCollPlacement);
+        expectedEntryForCorruptedColl.setUuid(corruptedColl.getUuid());
+        const auto generatedEntryForCorruptedColl =
+            findOneOnConfigCollection<NamespacePlacementType>(
+                operationContext(),
+                NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                BSON("nss" << corruptedColl.getNss().ns()));
+
+        assertSamePlacementInfo(expectedEntryForCorruptedColl, generatedEntryForCorruptedColl);
+
+        // Check placement initialization markers:
+        // - one entry at begin-of-time with all the currently existing shards (and no UUID set).
+        const NamespacePlacementType expectedMarkerForDawnOfTime(
+            ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+            Timestamp(0, 1),
+            allShardIds);
+        const auto generatedMarkerForDawnOfTime = findOneOnConfigCollection<NamespacePlacementType>(
+            operationContext(),
+            NamespaceString::kConfigsvrPlacementHistoryNamespace,
+            BSON("nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
+                       << "timestamp" << Timestamp(0, 1)));
+
+        assertSamePlacementInfo(expectedMarkerForDawnOfTime, generatedMarkerForDawnOfTime);
+
+        // - one entry at the time the initialization is performed with an empty set of shards
+        // (and no UUID set).
+        const NamespacePlacementType expectedMarkerForInitializationTime(
+            ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+            timeAtInitialization,
+            {});
+        const auto generatedMarkerForInitializationTime =
+            findOneOnConfigCollection<NamespacePlacementType>(
+                operationContext(),
+                NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                BSON(
+                    "nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
+                          << "timestamp" << timeAtInitialization));
+
+        assertSamePlacementInfo(expectedMarkerForInitializationTime,
+                                generatedMarkerForInitializationTime);
     };
 
-    // - coll1
-    NamespacePlacementType expectedEntryForColl1(
-        coll1.getNss(), getExpectedTimestampForColl(coll1Chunks), expectedColl1Placement);
-    expectedEntryForColl1.setUuid(coll1.getUuid());
-    const auto generatedEntryForColl1 = findOneOnConfigCollection<NamespacePlacementType>(
-        operationContext(),
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON("nss" << coll1.getNss().ns()));
+    verifyOutcome(timeAtFirstInvocation);
 
-    assertSamePlacementInfo(expectedEntryForColl1, generatedEntryForColl1);
+    // Perform a second invocation - the content created by the previous invocation should have been
+    // fully replaced by a new full representation with updated initialization markers
 
-    // - coll2
-    NamespacePlacementType expectedEntryForColl2(
-        coll2.getNss(), getExpectedTimestampForColl(coll2Chunks), expectedColl2Placement);
-    expectedEntryForColl2.setUuid(coll2.getUuid());
-    const auto generatedEntryForColl2 = findOneOnConfigCollection<NamespacePlacementType>(
-        operationContext(),
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON("nss" << coll2.getNss().ns()));
+    now = VectorClock::get(operationContext())->getTime();
+    majorityCommitPoint = repl::OpTime(now.clusterTime().asTimestamp(), 1);
+    opObserver.onMajorityCommitPointUpdate(getServiceContext(), majorityCommitPoint);
 
-    assertSamePlacementInfo(expectedEntryForColl2, generatedEntryForColl2);
+    now = VectorClock::get(operationContext())->getTime();
+    const auto timeAtSecondInvocation = now.configTime().asTimestamp();
+    ASSERT_GT(timeAtSecondInvocation, timeAtFirstInvocation);
 
-    // - corruptedColl
-    NamespacePlacementType expectedEntryForCorruptedColl(
-        corruptedColl.getNss(), timeAtInitialization, expectedCorruptedCollPlacement);
-    expectedEntryForCorruptedColl.setUuid(corruptedColl.getUuid());
-    const auto generatedEntryForCorruptedColl = findOneOnConfigCollection<NamespacePlacementType>(
-        operationContext(),
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON("nss" << corruptedColl.getNss().ns()));
+    ShardingCatalogManager::get(operationContext())->initializePlacementHistory(operationContext());
 
-    assertSamePlacementInfo(expectedEntryForCorruptedColl, generatedEntryForCorruptedColl);
-
-    // Check FCV special markers:
-    // - one entry at begin-of-time with all the currently existing shards (and no UUID set).
-    const NamespacePlacementType expectedMarkerForDawnOfTime(
-        NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace,
-        Timestamp(0, 1),
-        allShardIds);
-    const auto generatedMarkerForDawnOfTime = findOneOnConfigCollection<NamespacePlacementType>(
-        operationContext(),
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON("nss" << NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns()
-                   << "timestamp" << Timestamp(0, 1)));
-
-    assertSamePlacementInfo(expectedMarkerForDawnOfTime, generatedMarkerForDawnOfTime);
-
-    // - one entry at the time the initialization is performed with an empty set of shards
-    // (and no UUID set).
-    const NamespacePlacementType expectedMarkerForInitializationTime(
-        NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace, timeAtInitialization, {});
-    const auto generatedMarkerForInitializationTime =
-        findOneOnConfigCollection<NamespacePlacementType>(
-            operationContext(),
-            NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns()
-                       << "timestamp" << timeAtInitialization));
-
-    assertSamePlacementInfo(expectedMarkerForInitializationTime,
-                            generatedMarkerForInitializationTime);
+    verifyOutcome(timeAtSecondInvocation);
 }
 
 }  // unnamed namespace

@@ -52,9 +52,10 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
@@ -267,6 +268,12 @@ public:
             // Parse the command BSON to a FindCommandRequest.
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
 
+            // check validated tenantId and correct the serialization context object on the request
+            auto reqSerializationContext = findCommand->getSerializationContext();
+            reqSerializationContext.setTenantIdSource(_request.getValidatedTenantId() !=
+                                                      boost::none);
+            findCommand->setSerializationContext(reqSerializationContext);
+
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
 
@@ -311,7 +318,8 @@ public:
                     nss,
                     viewAggCmd,
                     verbosity,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                    APIParameters::get(opCtx).getAPIStrict().value_or(false),
+                    reqSerializationContext);
 
                 try {
                     // An empty PrivilegeVector is acceptable because these privileges are only
@@ -367,6 +375,16 @@ public:
             const bool isExplain = false;
             const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, cmdObj);
+
+            // check validated tenantId and correct the serialization context object on the request
+            auto reqSerializationContext = findCommand->getSerializationContext();
+            reqSerializationContext.setTenantIdSource(_request.getValidatedTenantId() !=
+                                                      boost::none);
+            findCommand->setSerializationContext(reqSerializationContext);
+
+            auto respSerializationContext =
+                SerializationContext::stateCommandReply(reqSerializationContext);
+
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // Only allow speculative majority for internal commands that specify the correct flag.
@@ -560,12 +578,14 @@ public:
             cq->setUseCqfIfEligible(true);
 
             if (collection) {
-                // Collect telemetry. Exclude queries against collections with encrypted fields.
+                // Collect queryStats. Exclude queries against collections with encrypted fields.
                 if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
-                    telemetry::registerFindRequest(cq->getFindCommandRequest(),
-                                                   collection.get()->ns(),
-                                                   opCtx,
-                                                   cq->getExpCtx());
+                    query_stats::registerRequest(
+                        std::make_unique<query_stats::FindRequestShapifier>(
+                            cq->getFindCommandRequest(), opCtx),
+                        collection.get()->ns(),
+                        opCtx,
+                        cq->getExpCtx());
                 }
             }
 
@@ -724,8 +744,8 @@ public:
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(nss.ns(), docUnitsReturned);
-            query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
-                                                         nss.tenantId());
+            query_request_helper::validateCursorResponse(
+                result->getBodyBuilder().asTempObj(), nss.tenantId(), respSerializationContext);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
@@ -774,9 +794,9 @@ public:
                     processFLEFindD(
                         opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
                 }
-                // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
-                // FLE rewrite.
-                CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
+                // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done
+                // a FLE rewrite.
+                CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
             }
 

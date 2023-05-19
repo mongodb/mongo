@@ -32,18 +32,16 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(listSampledQueries,
-                                           DocumentSourceListSampledQueries::LiteParsed::parse,
-                                           DocumentSourceListSampledQueries::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           analyze_shard_key::gFeatureFlagAnalyzeShardKey);
+REGISTER_DOCUMENT_SOURCE(listSampledQueries,
+                         DocumentSourceListSampledQueries::LiteParsed::parse,
+                         DocumentSourceListSampledQueries::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFromBson(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -61,7 +59,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFro
 }
 
 Value DocumentSourceListSampledQueries::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(6876002);
     }
 

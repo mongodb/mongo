@@ -18,7 +18,7 @@ var atan2 = Math.atan2;
 
 var originGeo = {type: "Point", coordinates: [20.0, 20.0]};
 // Center point for all tests.
-var origin = {name: "origin", geo: originGeo};
+let origin = {name: "origin", geo: originGeo};
 
 /*
  * Convenience function for checking that coordinates match.  threshold let's you
@@ -114,7 +114,7 @@ function uniformPointsWithClusters(
     origin, count, minDist, maxDist, numberOfClusters, minClusterSize, maxClusterSize, distRatio) {
     distRatio = distRatio || 10;
     var points = uniformPoints(origin, count, minDist, maxDist);
-    for (j = 0; j < numberOfClusters; j++) {
+    for (let j = 0; j < numberOfClusters; j++) {
         var randomPoint = points[Math.floor(random() * points.length)];
         var clusterSize = (random() * (maxClusterSize - minClusterSize)) + minClusterSize;
         uniformPoints(randomPoint, clusterSize, minDist / distRatio, maxDist / distRatio);
@@ -146,18 +146,18 @@ function validateOrdering(query) {
     var near30 = t.find(query).limit(30);
     var near40 = t.find(query).limit(40);
 
-    for (i = 0; i < 10; i++) {
+    for (let i = 0; i < 10; i++) {
         assert(coordinateEqual(near10[i], near20[i]));
         assert(coordinateEqual(near10[i], near30[i]));
         assert(coordinateEqual(near10[i], near40[i]));
     }
 
-    for (i = 0; i < 20; i++) {
+    for (let i = 0; i < 20; i++) {
         assert(coordinateEqual(near20[i], near30[i]));
         assert(coordinateEqual(near20[i], near40[i]));
     }
 
-    for (i = 0; i < 30; i++) {
+    for (let i = 0; i < 30; i++) {
         assert(coordinateEqual(near30[i], near40[i]));
     }
 }
@@ -281,7 +281,7 @@ origin = {
 
 uniformPoints(origin, 10, 89, 90);
 
-cur = t.find({geo: {$near: {$geometry: originGeo}}});
+let cur = t.find({geo: {$near: {$geometry: originGeo}}});
 
 assert.eq(cur.itcount(), 10);
 cur = t.find({geo: {$near: {$geometry: originGeo}}});
@@ -290,5 +290,5 @@ print("Near search on very distant points:");
 print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
           .explain("executionStats")
           .executionStats.executionTimeMillis);
-pt = cur.next();
+let pt = cur.next();
 assert(pt);

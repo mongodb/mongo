@@ -4,13 +4,7 @@
  * where extreme chunk is defined as the chunk containing either the upper or lower bound of the
  * entire shard key space.
  *
- * This test mimics the existing clustered_top_chunk_split.js but on a clustered collection.
- *
- * TODO SERVER-61557: evaluate usefulness of this test.
- *
- * @tags: [
- *   requires_fcv_53,
- * ]
+ * This test mimics the existing top_chunk_split.js but on a clustered collection.
  */
 (function() {
 'use strict';

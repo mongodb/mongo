@@ -47,7 +47,7 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     // Confirm that we were set with a valid collection instance at construction if yield is
     // performed.
     invariant(!_nss.isEmpty());
-    // Confirm that we are holding the neccessary collection level lock.
+    // Confirm that we are holding the necessary collection level lock.
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
 
     // Hold reference to the catalog for collection lookup without locks to be safe.

@@ -83,7 +83,7 @@ const hangBeforeAdvanceStableTsFp =
     configureFailPoint(recipientPrimary, "fpBeforeAdvancingStableTimestamp", {action: "hang"});
 
 // Start the migration.
-assert.commandWorked(tmt.startMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));
+assert.commandWorked(tmt.startMigration(migrationOpts));
 
 // The recipient's stable timestamp should be less than the timestamp it receives from the donor to
 // use as the startApplyingDonorOpTime, so the recipient should advance its stable timestamp. Wait

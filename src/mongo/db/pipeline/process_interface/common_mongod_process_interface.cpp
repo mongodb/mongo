@@ -69,6 +69,9 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
@@ -216,14 +219,7 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         auto entry = idxCatalog->getEntry(idx);
         doc["spec"] = Value(idx->infoObj());
 
-        // Not all indexes in the CollectionIndexUsageTracker may be visible or consistent with our
-        // snapshot. For this reason, it is unsafe to check `isReady` on the entry, which
-        // asserts that the index's in-memory state is consistent with our snapshot.
-        if (!entry->isPresentInMySnapshot(opCtx)) {
-            continue;
-        }
-
-        if (!entry->isReadyInMySnapshot(opCtx)) {
+        if (!entry->isReady()) {
             doc["building"] = Value(true);
         }
 
@@ -649,13 +645,13 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
 }
 
 BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
-    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Client* client,
     CurrentOpTruncateMode truncateOps,
     CurrentOpBacktraceMode backtraceMode) const {
     BSONObjBuilder builder;
 
-    CurOp::reportCurrentOpForClient(opCtx,
+    CurOp::reportCurrentOpForClient(expCtx,
                                     client,
                                     (truncateOps == CurrentOpTruncateMode::kTruncateOps),
                                     (backtraceMode == CurrentOpBacktraceMode::kIncludeBacktrace),
@@ -792,59 +788,6 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     return {*fieldPaths, targetCollectionPlacementVersion};
 }
 
-write_ops::InsertCommandRequest CommonMongodProcessInterface::buildInsertOp(
-    const NamespaceString& nss, std::vector<BSONObj>&& objs, bool bypassDocValidation) {
-    write_ops::InsertCommandRequest insertOp(nss);
-    insertOp.setDocuments(std::move(objs));
-    insertOp.setWriteCommandRequestBase([&] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setOrdered(false);
-        wcb.setBypassDocumentValidation(bypassDocValidation);
-        return wcb;
-    }());
-    return insertOp;
-}
-
-write_ops::UpdateCommandRequest CommonMongodProcessInterface::buildUpdateOp(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const NamespaceString& nss,
-    BatchedObjects&& batch,
-    UpsertType upsert,
-    bool multi) {
-    write_ops::UpdateCommandRequest updateOp(nss);
-    updateOp.setUpdates([&] {
-        std::vector<write_ops::UpdateOpEntry> updateEntries;
-        for (auto&& obj : batch) {
-            updateEntries.push_back([&] {
-                write_ops::UpdateOpEntry entry;
-                auto&& [q, u, c] = obj;
-                entry.setQ(std::move(q));
-                entry.setU(std::move(u));
-                entry.setC(std::move(c));
-                entry.setUpsert(upsert != UpsertType::kNone);
-                entry.setUpsertSupplied(
-                    {{entry.getUpsert(), upsert == UpsertType::kInsertSuppliedDoc}});
-                entry.setMulti(multi);
-                return entry;
-            }());
-        }
-        return updateEntries;
-    }());
-    updateOp.setWriteCommandRequestBase([&] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setOrdered(false);
-        wcb.setBypassDocumentValidation(expCtx->bypassDocumentValidation);
-        return wcb;
-    }());
-    auto [constants, letParams] =
-        expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
-    updateOp.setLegacyRuntimeConstants(std::move(constants));
-    if (!letParams.isEmpty()) {
-        updateOp.setLet(std::move(letParams));
-    }
-    return updateOp;
-}
-
 BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
     OperationContext* opCtx,
     const NamespaceString& sourceNs,
@@ -865,6 +808,27 @@ BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
     return newCmd.obj();
 }
 
+void CommonMongodProcessInterface::_handleTimeseriesCreateError(const DBException& ex,
+                                                                OperationContext* opCtx,
+                                                                const NamespaceString& ns,
+                                                                TimeseriesOptions userOpts) {
+    // If we receive a NamespaceExists error for a time-series view that has the same
+    // specification as the time-series view we wanted to create, we should not throw an
+    // error. The user is allowed to overwrite an existing time-series collection when
+    // entering this function.
+    auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
+    // Confirming the error is NamespaceExists and that there is a time-series view in that
+    // namespace.
+    if (ex.code() != ErrorCodes::NamespaceExists || !view || !view->timeseries()) {
+        throw;
+    }
+    // Confirming the time-series options of the existing view are the same as expected.
+    auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(opCtx, ns, true);
+    if (!timeseriesOpts || !mongo::timeseries::optionsAreEqual(timeseriesOpts.value(), userOpts)) {
+        throw;
+    }
+}
+
 void CommonMongodProcessInterface::writeRecordsToRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     RecordStore* rs,
@@ -872,7 +836,7 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
     const std::vector<Timestamp>& ts) const {
     tassert(5643012, "Attempted to write to record store with nullptr", records);
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns.ns(), [&] {
+    writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns, [&] {
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         auto writeResult = rs->insertRecords(expCtx->opCtx, records, ts);
@@ -902,7 +866,7 @@ Document CommonMongodProcessInterface::readRecordFromRecordStore(
 void CommonMongodProcessInterface::deleteRecordFromRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::deleteFromRecordStore", expCtx->ns.ns(), [&] {
+    writeConflictRetry(expCtx->opCtx, "MPI::deleteFromRecordStore", expCtx->ns, [&] {
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         rs->deleteRecord(expCtx->opCtx, rID);
@@ -913,7 +877,7 @@ void CommonMongodProcessInterface::deleteRecordFromRecordStore(
 void CommonMongodProcessInterface::truncateRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::truncateRecordStore", expCtx->ns.ns(), [&] {
+    writeConflictRetry(expCtx->opCtx, "MPI::truncateRecordStore", expCtx->ns, [&] {
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         auto status = rs->truncate(expCtx->opCtx);

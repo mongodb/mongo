@@ -260,20 +260,30 @@ class TestRunner(Subcommand):
     def _log_local_resmoke_invocation(self):
         """Log local resmoke invocation example."""
         local_args = to_local_args()
+        local_args = strip_fuzz_config_params(local_args)
         local_resmoke_invocation = (
             f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}")
 
+        using_config_fuzzer = False
         if config.FUZZ_MONGOD_CONFIGS:
-            local_args = strip_fuzz_config_params(local_args)
-            local_resmoke_invocation = (
-                f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}"
-                f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS} --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
-            )
+            using_config_fuzzer = True
+            local_resmoke_invocation += f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS}"
 
             self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s",
                                       config.MONGOD_SET_PARAMETERS)
             self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: %s",
                                       config.WT_ENGINE_CONFIG)
+
+        if config.FUZZ_MONGOS_CONFIGS:
+            using_config_fuzzer = True
+            local_resmoke_invocation += f" --fuzzMongosConfigs={config.FUZZ_MONGOS_CONFIGS}"
+
+            self._resmoke_logger.info("Fuzzed mongosSetParameters:\n%s",
+                                      config.MONGOS_SET_PARAMETERS)
+
+        if using_config_fuzzer:
+            local_resmoke_invocation += f" --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
+
         resmoke_env_options = ''
         if os.path.exists('resmoke_env_options.txt'):
             with open('resmoke_env_options.txt') as fin:
@@ -936,14 +946,19 @@ class RunPlugin(PluginInterface):
 
         mongodb_server_options.add_argument(
             "--fuzzMongodConfigs", dest="fuzz_mongod_configs",
-            help="Randomly chooses server parameters that were not specified. Use 'stress' to fuzz "
+            help="Randomly chooses mongod parameters that were not specified. Use 'stress' to fuzz "
             "all configs including stressful storage configurations that may significantly "
             "slow down the server. Use 'normal' to only fuzz non-stressful configurations. ",
             metavar="MODE", choices=('normal', 'stress'))
 
-        mongodb_server_options.add_argument("--configFuzzSeed", dest="config_fuzz_seed",
-                                            metavar="PATH",
-                                            help="Sets the seed used by storage config fuzzer")
+        mongodb_server_options.add_argument(
+            "--fuzzMongosConfigs", dest="fuzz_mongos_configs",
+            help="Randomly chooses mongos parameters that were not specified", metavar="MODE",
+            choices=('normal', ))
+
+        mongodb_server_options.add_argument(
+            "--configFuzzSeed", dest="config_fuzz_seed", metavar="PATH",
+            help="Sets the seed used by mongod and mongos config fuzzers")
 
         mongodb_server_options.add_argument(
             "--configShard", dest="config_shard", metavar="CONFIG",
@@ -1289,7 +1304,7 @@ def strip_fuzz_config_params(input_args):
 
     ret = []
     for arg in input_args:
-        if "--fuzzMongodConfigs" not in arg and "--fuzzConfigSeed" not in arg:
+        if not arg.startswith(("--fuzzMongodConfigs", "--fuzzMongosConfigs", "--configFuzzSeed")):
             ret.append(arg)
 
     return ret

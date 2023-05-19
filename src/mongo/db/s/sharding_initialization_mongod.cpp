@@ -55,6 +55,7 @@
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -506,8 +507,14 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
 
     try {
-        AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
-        auto result = update(opCtx, autoColl.ensureDbExists(opCtx), updateReq);
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kServerConfigurationNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        auto result = update(opCtx, collection, updateReq);
         if (result.numMatched == 0) {
             LOGV2_WARNING(22076,
                           "Failed to update config server connection string of shard identity "

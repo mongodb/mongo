@@ -52,6 +52,21 @@ var CheckShardFilteringMetadataHelpers = (function() {
             print(`CheckShardFilteringMetadata: Database '${dbName}' on '${nodeConn.host}' OK`);
         }
 
+        function getPrimaryShardForDB(dbName) {
+            if (dbName == 'config') {
+                return 'config';
+            }
+
+            const configDB = mongosConn.getDB('config');
+
+            const dbEntry = configDB.databases.findOne({_id: dbName});
+            assert(dbEntry, `Couldn't find database '${dbName}' in 'config.databases'`);
+            assert(dbEntry.primary,
+                   `Database entry for db '${dbName}' does not contain primary shard: ${
+                       tojson(dbEntry)}`);
+            return dbEntry.primary;
+        }
+
         function checkShardedCollection(coll, nodeShardingState) {
             const ns = coll._id;
             print(`CheckShardFilteringMetadata: checking collection '${ns} ' on node '${
@@ -59,13 +74,13 @@ var CheckShardFilteringMetadataHelpers = (function() {
 
             const configDB = mongosConn.getDB('config');
 
+            const dbName = mongosConn.getCollection(ns).getDB().getName();
+            const primaryShardId = getPrimaryShardForDB(dbName);
             const highestChunkOnShard = configDB.chunks.find({uuid: coll.uuid, shard: shardId})
                                             .sort({lastmod: -1})
                                             .limit(1)
                                             .toArray()[0];
 
-            const expectedShardVersion =
-                highestChunkOnShard ? highestChunkOnShard.lastmod : Timestamp(0, 0);
             const expectedTimestamp = coll.timestamp;
 
             const collectionMetadataOnNode = nodeShardingState.versions[ns];
@@ -75,25 +90,29 @@ var CheckShardFilteringMetadataHelpers = (function() {
                 return;
             }
 
-            if (collectionMetadataOnNode.timestamp === undefined) {
-                // Versions earlier than v6.3 did not report the timestamp on shardingState command
-                // (SERVER-70790). This early exit can be removed after v6.0 is no longer tested in
-                // multiversion suites.
+            // TODO BACKPORT-15533: re-enable the following checks in multiversion suites
+            const isMultiversion = jsTest.options().shardMixedBinVersions ||
+                jsTest.options().useRandomBinVersionsWithinReplicaSet;
+            if (isMultiversion ||
+                (shardId != getPrimaryShardForDB(dbName) && !highestChunkOnShard)) {
+                // The shard is neither primary for database nor owns some chunks for this
+                // collection.
+                // In this case the shard is allow to have a stale/wrong collection
+                // metadata as long as it has the correct db version.
                 return;
             }
 
-            if (timestampCmp(collectionMetadataOnNode.timestamp, Timestamp(0, 0)) === 0) {
-                // The metadata reflects an unsharded collection. It is okay for a node to have this
-                // stale metadata, as long as the node knows the correct dbVersion.
-                return;
-            }
-
-            // If the node knows its filtering info, then assert that it is correct.
+            // Check that timestamp is correct
             assert.eq(timestampCmp(collectionMetadataOnNode.timestamp, expectedTimestamp),
                       0,
                       `Unexpected timestamp for ns '${ns}' on node '${nodeConn.host}'. Found '${
                           tojson(collectionMetadataOnNode.timestamp)}', expected '${
                           tojson(expectedTimestamp)}'`);
+
+            // Check that placement version is correct
+            const expectedShardVersion =
+                highestChunkOnShard ? highestChunkOnShard.lastmod : Timestamp(0, 0);
+
             // Only check the major version because some operations (such as resharding or
             // setAllowMigrations) bump the minor version without the shards knowing. This does not
             // affect placement, so it is okay.

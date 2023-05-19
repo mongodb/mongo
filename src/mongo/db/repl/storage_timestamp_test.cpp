@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <fstream>  // IWYU pragma: keep
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -79,6 +81,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -89,7 +92,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/future.h"
+#include "mongo/stdx/future.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/stacktrace.h"
@@ -346,7 +349,7 @@ public:
     }
 
     void create(NamespaceString nss) const {
-        ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss.ns(), [&] {
+        ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss, [&] {
             _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             _opCtx->recoveryUnit()->abandonSnapshot();
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
@@ -1196,7 +1199,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
 
         BSONObjBuilder resultBuilder;
         auto swResult = doApplyOps(
-            DatabaseName(dbName),
+            DatabaseName::createDatabaseName_forTest(boost::none, dbName),
             {
                 BSON("ts" << _presentTs << "t" << 1LL << "op"
                           << "i"
@@ -1410,7 +1413,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         _coordinatorMock,
         _consistencyMarkers,
         storageInterface,
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
         writerPool.get());
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
@@ -1509,7 +1512,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
         _coordinatorMock,
         _consistencyMarkers,
         storageInterface,
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
         writerPool.get());
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
@@ -2601,8 +2604,12 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         NamespaceString::createNamespaceString_forTest("unittests.timestampIndexBuilds");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-    CollectionWriter collection(_opCtx, autoColl);
+    auto collectionAcquisition = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+
+    CollectionWriter collection(_opCtx, &collectionAcquisition);
 
     // Indexing of parallel arrays is not allowed, so these are deemed "bad".
     const auto badDoc1 = BSON("_id" << 0 << "a" << BSON_ARRAY(0 << 1) << "b" << BSON_ARRAY(0 << 1));
@@ -2710,12 +2717,15 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
 
     // Update one documents to be valid, and delete the other. These modifications are written
     // to the side writes table and must be drained.
-    Helpers::upsert(_opCtx, collection->ns(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
+    Helpers::upsert(_opCtx, collectionAcquisition, BSON("_id" << 0 << "a" << 1 << "b" << 1));
     {
         RecordId badRecord = Helpers::findOne(_opCtx, collection.get(), BSON("_id" << 1));
         WriteUnitOfWork wuow(_opCtx);
-        collection_internal::deleteDocument(
-            _opCtx, *autoColl, kUninitializedStmtId, badRecord, nullptr);
+        collection_internal::deleteDocument(_opCtx,
+                                            collectionAcquisition.getCollectionPtr(),
+                                            kUninitializedStmtId,
+                                            badRecord,
+                                            nullptr);
         wuow.commit();
     }
 
@@ -3219,7 +3229,6 @@ protected:
 };
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     RAIIServerParameterControllerForTest storeImageInSideCollection(
         "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
@@ -3267,7 +3276,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     namespace mmb = mongo::mutablebson;
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     RAIIServerParameterControllerForTest storeImageInSideCollection(
         "storeFindAndModifyImagesInSideCollection", true);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
@@ -3328,7 +3336,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
 }
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     RAIIServerParameterControllerForTest storeImageInSideCollection(
         "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);

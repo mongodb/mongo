@@ -59,7 +59,8 @@ repl::OpTime FreeMonOpObserver::onDropCollection(OperationContext* opCtx,
                                                  const NamespaceString& collectionName,
                                                  const UUID& uuid,
                                                  std::uint64_t numRecords,
-                                                 const CollectionDropType dropType) {
+                                                 const CollectionDropType dropType,
+                                                 bool markFromMigrate) {
     if (collectionName == NamespaceString::kServerConfigurationNamespace) {
         auto controller = FreeMonController::get(opCtx->getServiceContext());
 
@@ -76,7 +77,8 @@ void FreeMonOpObserver::onInserts(OperationContext* opCtx,
                                   std::vector<InsertStatement>::const_iterator begin,
                                   std::vector<InsertStatement>::const_iterator end,
                                   std::vector<bool> fromMigrate,
-                                  bool defaultFromMigrate) {
+                                  bool defaultFromMigrate,
+                                  InsertsOpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kServerConfigurationNamespace) {
         return;
     }
@@ -154,8 +156,8 @@ void FreeMonOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void FreeMonOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                               const RollbackObserverInfo& rbInfo) {
+void FreeMonOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                              const RollbackObserverInfo& rbInfo) {
     // Invalidate any in-memory auth data if necessary.
     const auto& rollbackNamespaces = rbInfo.rollbackNamespaces;
     if (rollbackNamespaces.count(NamespaceString::kServerConfigurationNamespace) == 1) {

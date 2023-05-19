@@ -101,8 +101,6 @@ selector:
   - requires_dbstats
   # "Cowardly fail if collStats is run with a mongod that had an unclean shutdown: ..."
   - requires_collstats
-  # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
-  - requires_datasize
   ## The next tag corresponds to long running-operations, as they may exhaust their number
   # of retries and result in a network error being thrown.
   - operations_longer_than_stepdown_interval

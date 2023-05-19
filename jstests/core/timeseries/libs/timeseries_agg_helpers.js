@@ -20,13 +20,14 @@ var TimeseriesAggTests = class {
      * @returns An array of a time-series collection and a non time-series collection,
      *     respectively in this order.
      */
-    static prepareInputCollections(numHosts, numIterations, includeIdleMeasurements = true) {
+    static prepareInputCollections(numHosts,
+                                   numIterations,
+                                   includeIdleMeasurements = true,
+                                   testDB = TimeseriesAggTests.getTestDb()) {
         const timeseriesCollOption = {timeseries: {timeField: "time", metaField: "tags"}};
 
         Random.setRandomSeed();
         const hosts = TimeseriesTest.generateHosts(numHosts);
-
-        const testDB = TimeseriesAggTests.getTestDb();
 
         // Creates a time-series input collection.
         const inColl = testDB.getCollection("in");
@@ -78,9 +79,7 @@ var TimeseriesAggTests = class {
     /**
      * Gets an output collection object with the name 'outCollname'.
      */
-    static getOutputCollection(outCollName, shouldDrop) {
-        const testDB = TimeseriesAggTests.getTestDb();
-
+    static getOutputCollection(outCollName, shouldDrop, testDB = TimeseriesAggTests.getTestDb()) {
         let outColl = testDB.getCollection(outCollName);
         if (shouldDrop) {
             outColl.drop();
@@ -101,10 +100,16 @@ var TimeseriesAggTests = class {
      * If 'shouldDrop' is set to false, the output collection will not be dropped before executing
      * 'pipeline'.
      *
+     * If 'testDB' is set, that database will be used in the aggregation pipeline.
+     *
      * Returns sorted data by "time" field. The sorted result data will help simplify comparison
      * logic.
      */
-    static getOutputAggregateResults(inColl, pipeline, prepareAction = null, shouldDrop = true) {
+    static getOutputAggregateResults(inColl,
+                                     pipeline,
+                                     prepareAction = null,
+                                     shouldDrop = true,
+                                     testDB = TimeseriesAggTests.getTestDb()) {
         // Figures out the output collection name from the last pipeline stage.
         var outCollName = "out";
         if (pipeline[pipeline.length - 1]["$out"] != undefined) {
@@ -120,7 +125,7 @@ var TimeseriesAggTests = class {
             outCollName = pipeline[pipeline.length - 1]["$merge"].into;
         }
 
-        let outColl = TimeseriesAggTests.getOutputCollection(outCollName, shouldDrop);
+        let outColl = TimeseriesAggTests.getOutputCollection(outCollName, shouldDrop, testDB);
         if (prepareAction != null) {
             prepareAction(outColl);
         }
@@ -141,5 +146,13 @@ var TimeseriesAggTests = class {
         for (var i = 0; i < expectedResults.length; ++i) {
             assert.eq(actualResults[i], expectedResults[i], actualResults);
         }
+    }
+
+    static generateOutPipeline(collName, dbName, options, aggStage = null) {
+        let outStage = {$out: {db: dbName, coll: collName, timeseries: options}};
+        if (aggStage) {
+            return [aggStage, outStage];
+        }
+        return [outStage];
     }
 };

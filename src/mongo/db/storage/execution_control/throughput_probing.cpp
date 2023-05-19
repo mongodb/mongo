@@ -87,11 +87,11 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
     : TicketHolderMonitor(svcCtx, readTicketHolder, writeTicketHolder, interval),
       _stableConcurrency(gInitialConcurrency
                              ? gInitialConcurrency
-                             : std::clamp(static_cast<int32_t>(ProcessInfo::getNumCores()),
-                                          gMinConcurrency,
-                                          gMaxConcurrency.load())) {
-    _readTicketHolder->resize(_stableConcurrency);
-    _writeTicketHolder->resize(_stableConcurrency);
+                             : std::clamp(static_cast<int32_t>(ProcessInfo::getNumCores() * 2),
+                                          gMinConcurrency * 2,
+                                          gMaxConcurrency.load() * 2)),
+      _timer(svcCtx->getTickSource()) {
+    _setConcurrency(_stableConcurrency);
 }
 
 void ThroughputProbing::appendStats(BSONObjBuilder& builder) const {
@@ -103,9 +103,22 @@ void ThroughputProbing::_run(Client* client) {
         _readTicketHolder->numFinishedProcessing() + _writeTicketHolder->numFinishedProcessing();
     invariant(numFinishedProcessing >= _prevNumFinishedProcessing);
 
-    auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) /
-        static_cast<double>(durationCount<Milliseconds>(_interval()));
-    _stats.throughput.store(throughput);
+    // Initialize on first iteration.
+    if (_prevNumFinishedProcessing < 0) {
+        _prevNumFinishedProcessing = numFinishedProcessing;
+        _timer.reset();
+        return;
+    }
+
+    double elapsed = _timer.micros();
+    if (elapsed == 0) {
+        // The clock used to sleep between iterations may not be reliable, and thus the timer may
+        // report that no time has elapsed. If this occurs, just wait for the next iteration.
+        return;
+    }
+
+    auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) / elapsed;
+    _stats.opsPerSec.store(throughput * 1'000'000);
 
     switch (_state) {
         case ProbingState::kStable:
@@ -119,8 +132,19 @@ void ThroughputProbing::_run(Client* client) {
             break;
     }
 
-    _prevNumFinishedProcessing = numFinishedProcessing;
+    // Reset these with fresh values after we've made our adjustment to establish a better
+    // cause-effect relationship.
+    _prevNumFinishedProcessing =
+        _readTicketHolder->numFinishedProcessing() + _writeTicketHolder->numFinishedProcessing();
+    _timer.reset();
 }
+
+namespace {
+// Computes the moving average by weighing 'newValue' with the provided 'weight'.
+double expMovingAverage(double average, double newValue, double weight) {
+    return (newValue * weight) + (average * (1 - weight));
+}
+}  // namespace
 
 void ThroughputProbing::_probeStable(double throughput) {
     invariant(_state == ProbingState::kStable);
@@ -130,19 +154,21 @@ void ThroughputProbing::_probeStable(double throughput) {
     // Record the baseline reading.
     _stableThroughput = throughput;
 
-    auto outof = _readTicketHolder->outof();
-    auto peakUsed = std::max(_readTicketHolder->getAndResetPeakUsed(),
-                             _writeTicketHolder->getAndResetPeakUsed());
-    if (outof < gMaxConcurrency.load() && peakUsed >= outof) {
+    auto readTotal = _readTicketHolder->outof();
+    auto writeTotal = _readTicketHolder->outof();
+    auto readPeak = _readTicketHolder->getAndResetPeakUsed();
+    auto writePeak = _writeTicketHolder->getAndResetPeakUsed();
+
+    if ((readTotal < gMaxConcurrency.load() && readPeak >= readTotal) ||
+        (writeTotal < gMaxConcurrency.load() && writePeak >= writeTotal)) {
         // At least one of the ticket pools is exhausted, so try increasing concurrency.
         _state = ProbingState::kUp;
         _setConcurrency(std::ceil(_stableConcurrency * (1 + gStepMultiple.load())));
-    } else if (_readTicketHolder->used() > gMinConcurrency ||
-               _writeTicketHolder->used() > gMinConcurrency) {
+    } else if (readPeak > gMinConcurrency || writePeak > gMinConcurrency) {
         // Neither of the ticket pools are exhausted, so try decreasing concurrency to just below
         // the current level of usage.
         _state = ProbingState::kDown;
-        _setConcurrency(std::floor(peakUsed * (1 - gStepMultiple.load())));
+        _setConcurrency(std::floor(_stableConcurrency * (1 - gStepMultiple.load())));
     }
 }
 
@@ -152,19 +178,24 @@ void ThroughputProbing::_probeUp(double throughput) {
     LOGV2_DEBUG(7346001, 3, "Throughput Probing: up", "throughput"_attr = throughput);
 
     if (throughput > _stableThroughput) {
-        // Increasing concurrency caused throughput to increase, so promote this new level of
-        // concurrency to stable.
-        auto concurrency = _readTicketHolder->outof();
+        // Increasing concurrency caused throughput to increase, so use this information to adjust
+        // our stable concurrency. We don't want to leave this at the current level. Instead, we use
+        // this to update the moving average to avoid over-correcting on recent measurements.
+        auto concurrency = _readTicketHolder->outof() + _writeTicketHolder->outof();
+        auto newConcurrency = expMovingAverage(
+            _stableConcurrency, concurrency, gConcurrencyMovingAverageWeight.load());
+
         _stats.timesIncreased.fetchAndAdd(1);
-        _stats.totalAmountIncreased.fetchAndAdd(concurrency - _stableConcurrency);
+        _stats.totalAmountIncreased.fetchAndAdd(newConcurrency - _stableConcurrency);
         _state = ProbingState::kStable;
         _stableThroughput = throughput;
-        _stableConcurrency = concurrency;
+        _stableConcurrency = newConcurrency;
+        _setConcurrency(_stableConcurrency);
     } else if (_readTicketHolder->outof() > gMinConcurrency) {
-        // Increasing concurrency did not cause throughput to increase, so try decreasing
-        // concurrency instead.
-        _state = ProbingState::kDown;
-        _setConcurrency(std::floor(_stableConcurrency * (1 - gStepMultiple.load())));
+        // Increasing concurrency did not cause throughput to increase, so go back to stable and get
+        // a new baseline to compare against.
+        _state = ProbingState::kStable;
+        _setConcurrency(_stableConcurrency);
     }
 }
 
@@ -174,14 +205,19 @@ void ThroughputProbing::_probeDown(double throughput) {
     LOGV2_DEBUG(7346002, 3, "Throughput Probing: down", "throughput"_attr = throughput);
 
     if (throughput > _stableThroughput) {
-        // Decreasing concurrency caused throughput to increase, so promote this new level of
-        // concurrency to stable.
-        auto concurrency = _readTicketHolder->outof();
+        // Decreasing concurrency caused throughput to increase, so use this information to adjust
+        // our stable concurrency. We don't want to leave this at the current level. Instead, we use
+        // this to update the moving average to avoid over-correcting on recent measurements.
+        auto concurrency = _readTicketHolder->outof() + _writeTicketHolder->outof();
+        auto newConcurrency = expMovingAverage(
+            _stableConcurrency, concurrency, gConcurrencyMovingAverageWeight.load());
+
         _stats.timesDecreased.fetchAndAdd(1);
-        _stats.totalAmountDecreased.fetchAndAdd(_stableConcurrency - concurrency);
+        _stats.totalAmountDecreased.fetchAndAdd(_stableConcurrency - newConcurrency);
         _state = ProbingState::kStable;
         _stableThroughput = throughput;
-        _stableConcurrency = concurrency;
+        _stableConcurrency = newConcurrency;
+        _setConcurrency(_stableConcurrency);
     } else {
         // Decreasing concurrency did not cause throughput to increase, so go back to stable and get
         // a new baseline to compare against.
@@ -190,17 +226,25 @@ void ThroughputProbing::_probeDown(double throughput) {
     }
 }
 
-void ThroughputProbing::_setConcurrency(int32_t concurrency) {
-    concurrency = std::clamp(concurrency, gMinConcurrency, gMaxConcurrency.load());
-    _readTicketHolder->resize(concurrency);
-    _writeTicketHolder->resize(concurrency);
+void ThroughputProbing::_setConcurrency(double concurrency) {
+    auto ratio = gReadWriteRatio.load();
+    auto total = ratio + 1;
+    auto readPct = ratio / total;
+    auto writePct = 1 - readPct;
+
+    _readTicketHolder->resize(std::clamp(static_cast<int>(std::round(concurrency * readPct)),
+                                         gMinConcurrency,
+                                         gMaxConcurrency.load()));
+    _writeTicketHolder->resize(std::clamp(static_cast<int>(std::round(concurrency * writePct)),
+                                          gMinConcurrency,
+                                          gMaxConcurrency.load()));
 
     LOGV2_DEBUG(
         7346003, 3, "Throughput Probing: set concurrency", "concurrency"_attr = concurrency);
 }
 
 void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
-    builder.append("throughput", throughput.load());
+    builder.append("opsPerSec", opsPerSec.load());
     builder.append("timesDecreased", static_cast<long long>(timesDecreased.load()));
     builder.append("timesIncreased", static_cast<long long>(timesIncreased.load()));
     builder.append("totalAmountDecreased", static_cast<long long>(totalAmountDecreased.load()));

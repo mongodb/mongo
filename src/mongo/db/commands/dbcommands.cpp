@@ -220,7 +220,9 @@ public:
                     !storageEngine->supportsRecoveryTimestamp());
             }
 
-            Reply reply;
+            // We need to copy the serialization context from the request to the reply object
+            Reply reply(
+                SerializationContext::stateCommandReply(request().getSerializationContext()));
             uassertStatusOK(
                 dropCollection(opCtx,
                                request().getNamespace(),
@@ -457,7 +459,13 @@ public:
 
         uassert(ErrorCodes::OperationFailed, "No collection name specified", !nss.coll().empty());
 
-        result.append("ns", NamespaceStringUtil::serialize(nss));
+        // We need to use the serialization context from the request when calling
+        // NamespaceStringUtil to build the reply
+        result.append(
+            "ns",
+            NamespaceStringUtil::serialize(
+                nss, SerializationContext::stateCommandReply(cmd.getSerializationContext())));
+
         auto spec = StorageStatsSpec::parse(IDLParserContext("collStats"), cmdObj);
         Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
         if (!status.isOK() && (status.code() != ErrorCodes::NamespaceNotFound)) {
@@ -640,7 +648,8 @@ public:
             AutoGetDb autoDb(opCtx, dbname, MODE_IS);
             Database* db = autoDb.getDb();
 
-            Reply reply;
+            // We need to copy the serialization context from the request to the reply object
+            Reply reply(SerializationContext::stateCommandReply(cmd.getSerializationContext()));
             reply.setDB(dbname.db());
 
             if (!db) {

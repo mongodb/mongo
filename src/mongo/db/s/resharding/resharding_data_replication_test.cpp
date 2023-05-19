@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/resharding/resharding_data_replication.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/persistent_task_store.h"
@@ -34,7 +36,6 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"

@@ -1,13 +1,13 @@
 // @tags: [requires_getmore, requires_fastcount]
 
-t = db.cursor1;
+let t = db.cursor1;
 t.drop();
 
-big = "";
+let big = "";
 while (big.length < 50000)
     big += "asdasdasdasdsdsdadsasdasdasD";
 
-num = Math.ceil(10000000 / big.length);
+let num = Math.ceil(10000000 / big.length);
 
 for (var i = 0; i < num; i++) {
     t.save({num: i, str: big});

@@ -1,15 +1,12 @@
 // @tags: [
 //   assumes_read_concern_local,
 // ]
+load("jstests/libs/fixture_helpers.js");
 
 (function() {
 'use strict';
 
 const t = db.jstests_regex;
-
-const hello = db.runCommand("hello");
-assert.commandWorked(hello);
-const isMongos = (hello.msg === "isdbgrid");
 
 t.drop();
 assert.commandWorked(t.save({a: "bcd"}));
@@ -48,7 +45,7 @@ assert.eq(1, t.count(query));
 const result = t.find(query).explain();
 assert.commandWorked(result);
 
-if (!isMongos) {
+if (!FixtureHelpers.isMongos(db)) {
     assert(result.hasOwnProperty("queryPlanner"));
     assert(result.queryPlanner.hasOwnProperty("parsedQuery"), tojson(result));
     assert.eq(result.queryPlanner.parsedQuery, query);

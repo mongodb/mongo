@@ -52,16 +52,16 @@ function loadJSONDataset(db, dataSet, dataDir, dbMetadata) {
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
     for (const collMetadata of dbMetadata) {
-        coll = db[collMetadata.collectionName];
+        let coll = db[collMetadata.collectionName];
         coll.drop();
     }
 
     for (const chunkName of dataSet) {
-        chunkFilePath = `${dataDir}${chunkName}`;
+        let chunkFilePath = `${dataDir}${chunkName}`;
         print(`Loading chunk file: ${chunkFilePath}\n`);
         load(chunkFilePath);
         // At this point there is a variable named as the value of chunkName.
-        coll = eval(`db[${chunkName}.collName]`);
+        let coll = eval(`db[${chunkName}.collName]`);
         eval(`assert.commandWorked(coll.insertMany(${chunkName}.collData, {ordered: false}));`);
         // Free the chunk memory after insertion into the DB
         eval(`${chunkName} = null`);

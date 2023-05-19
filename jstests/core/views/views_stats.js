@@ -17,6 +17,7 @@
 (function() {
 "use strict";
 load("jstests/libs/stats.js");
+load("jstests/libs/fixture_helpers.js");
 
 let viewsDB = db.getSiblingDB("views_stats");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -42,9 +43,7 @@ lastHistogram = assertHistogramDiffEq(view, lastHistogram, 0, 1, 0);
 assert.writeError(view.update({}, {}));
 lastHistogram = assertHistogramDiffEq(view, lastHistogram, 0, 1, 0);
 
-let helloResponse = assert.commandWorked(viewsDB.runCommand("hello"));
-const isMongos = (helloResponse.msg === "isdbgrid");
-if (isMongos) {
+if (FixtureHelpers.isMongos(viewsDB)) {
     jsTest.log("Tests are being run on a mongos; skipping top tests.");
     return;
 }

@@ -46,7 +46,7 @@
 
 #include <iostream>
 #include <limits>
-#include <sstream>
+#include <sstream>  // IWYU pragma: keep
 
 #include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"

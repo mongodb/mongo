@@ -1,10 +1,10 @@
 // Check that shard selection does not assert for certain unsatisfiable queries.
 // SERVER-4554, SERVER-4914
 
-s = new ShardingTest({name: 'shard7', shards: 2});
+let s = new ShardingTest({name: 'shard7', shards: 2});
 
 db = s.admin._mongo.getDB('test');
-c = db['foo'];
+let c = db['foo'];
 c.drop();
 
 s.adminCommand({enablesharding: '' + db});
@@ -28,15 +28,12 @@ assert.eq(0, c.find({$or: [{a: 1, b: {$gt: 0, $lt: 10}}, {a: 1, b: 5}]}).itcount
 
 // Check other operations that use getShardsForQuery.
 
-unsatisfiable = {
-    a: 1,
-    b: {$gt: 4, $lt: 2}
-};
+let unsatisfiable = {a: 1, b: {$gt: 4, $lt: 2}};
 
 assert.eq(0, c.count(unsatisfiable));
 assert.eq([], c.distinct('a', unsatisfiable));
 
-aggregate = c.aggregate({$match: unsatisfiable});
+let aggregate = c.aggregate({$match: unsatisfiable});
 assert.eq(0, aggregate.toArray().length);
 
 c.save({a: null, b: null});
@@ -49,7 +46,7 @@ assert.eq(0, c.count({c: 1}));
 
 c.createIndex({loc: '2d'});
 c.save({a: 2, b: 2, loc: [0, 0]});
-near =
+let near =
     c.aggregate({$geoNear: {near: [0, 0], query: unsatisfiable, distanceField: "dist"}}).toArray();
 assert.eq(0, near.length, tojson(near));
 

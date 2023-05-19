@@ -18,7 +18,7 @@ var maxDocuments = Random.randInt(400) + 100;
  * check is performed in both forward and reverse directions.
  */
 function checkOrder(i, valueArray) {
-    res = coll.find().sort({$natural: -1});
+    let res = coll.find().sort({$natural: -1});
     assert(res.hasNext(), "A");
     var j = i;
     while (res.hasNext()) {
@@ -41,7 +41,7 @@ function prepareCollection(shouldReverse) {
     assert.commandWorked(db.createCollection("capped6", {capped: true, size: 1000}));
     var valueArray = new Array(maxDocuments);
     var c = "";
-    for (i = 0; i < maxDocuments; ++i, c += "-") {
+    for (let i = 0; i < maxDocuments; ++i, c += "-") {
         // The a values are strings of increasing length.
         valueArray[i] = {a: c};
     }
@@ -67,7 +67,7 @@ function runCapTrunc(valueArray, valueArrayCurIndex, n, inc) {
     for (var i = valueArrayCurIndex; i < maxDocuments; ++i) {
         assert.commandWorked(coll.insert(valueArray[i]));
     }
-    count = coll.count();
+    let count = coll.count();
 
     // The index corresponding to the last document in the collection.
     valueArrayCurIndex = maxDocuments - 1;

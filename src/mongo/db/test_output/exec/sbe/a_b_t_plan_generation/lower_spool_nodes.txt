@@ -17,7 +17,7 @@ PhysicalScan [{'<root>': scan0}, collName]
     branch0 [s2] 
         [2] espool sp1 [s2] 
         [1] project [s2 = getField(s1, "a")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     branch1 [s3] 
         [3] cspool sp1 [s3] 
 
@@ -39,7 +39,7 @@ PhysicalScan [{'<root>': scan0}, collName]
     branch0 [s2] 
         [2] espool sp1 [s2] 
         [1] project [s2 = getField(s1, "a")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     branch1 [s3] 
         [3] sspool sp1 [s3] 
 
@@ -61,7 +61,7 @@ PhysicalScan [{'<root>': scan0}, collName]
     branch0 [s2] 
         [2] lspool sp1 [s2] {true} 
         [1] project [s2 = getField(s1, "a")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     branch1 [s3] 
         [3] cspool sp1 [s3] 
 
@@ -83,7 +83,7 @@ PhysicalScan [{'<root>': scan0}, collName]
     branch0 [s2] 
         [2] lspool sp1 [s2] {true} 
         [1] project [s2 = getField(s1, "a")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     branch1 [s3] 
         [3] sspool sp1 [s3] 
 
@@ -113,7 +113,7 @@ PhysicalScan [{'<root>': scan0}, collName]
     branch0 [s2] 
         [2] lspool sp1 [s2] {(((getField(s1, "b") <=> 23) >= 0ll) ?: false)} 
         [1] project [s2 = getField(s1, "a")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     branch1 [s3] 
         [3] sspool sp1 [s3] 
 

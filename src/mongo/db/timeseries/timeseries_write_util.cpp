@@ -37,6 +37,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -143,14 +144,59 @@ BSONObj makeNewDocumentForWrite(
     return makeNewDocument(bucketId, metadata, minmax->min(), minmax->max(), dataBuilders);
 }
 
-Status performAtomicWrites(OperationContext* opCtx,
-                           const CollectionPtr& coll,
-                           const RecordId& recordId,
-                           const stdx::variant<write_ops::UpdateCommandRequest,
-                                               write_ops::DeleteCommandRequest>& modificationOp,
-                           const std::vector<write_ops::InsertCommandRequest>& insertOps,
-                           bool fromMigrate,
-                           StmtId stmtId) try {
+std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
+    const std::vector<BSONObj>& measurements,
+    const NamespaceString& nss,
+    const TimeseriesOptions& options,
+    const StringData::ComparatorInterface* comparator) {
+    std::vector<write_ops::InsertCommandRequest> insertOps;
+    for (const auto& measurement : measurements) {
+        auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
+            nss, comparator, options, measurement));
+        auto time = res.second;
+        auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
+        insertOps.push_back(
+            {nss,
+             {makeNewDocumentForWrite(
+                 oid, {measurement}, res.first.metadata.toBSON(), options, comparator)}});
+    }
+    return insertOps;
+}
+
+stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
+    const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements) {
+    if (measurements.empty()) {
+        write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
+        write_ops::DeleteCommandRequest op(coll->ns(), {deleteEntry});
+        return op;
+    }
+    auto timeseriesOptions = coll->getTimeseriesOptions();
+    auto metaFieldName = timeseriesOptions->getMetaField();
+    auto metadata = [&] {
+        if (!metaFieldName) {  // Collection has no metadata field.
+            return BSONObj();
+        }
+        // Look for the metadata field on this bucket and return it if present.
+        auto metaField = measurements[0].getField(*metaFieldName);
+        return metaField ? metaField.wrap() : BSONObj();
+    }();
+    auto replaceBucket = timeseries::makeNewDocumentForWrite(
+        bucketId, measurements, metadata, timeseriesOptions, coll->getDefaultCollator());
+
+    write_ops::UpdateModification u(replaceBucket);
+    write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
+    write_ops::UpdateCommandRequest op(coll->ns(), {updateEntry});
+    return op;
+}
+
+void performAtomicWrites(OperationContext* opCtx,
+                         const CollectionPtr& coll,
+                         const RecordId& recordId,
+                         const stdx::variant<write_ops::UpdateCommandRequest,
+                                             write_ops::DeleteCommandRequest>& modificationOp,
+                         const std::vector<write_ops::InsertCommandRequest>& insertOps,
+                         bool fromMigrate,
+                         StmtId stmtId) {
     NamespaceString ns = coll->ns();
 
     DisableDocumentValidation disableDocumentValidation{opCtx};
@@ -222,20 +268,13 @@ Status performAtomicWrites(OperationContext* opCtx,
             invariant(op.getDocuments().size() == 1);
             insertStatements.emplace_back(op.getDocuments().front());
         }
-        auto status = collection_internal::insertDocuments(
-            opCtx, coll, insertStatements.begin(), insertStatements.end(), &curOp->debug());
-        if (!status.isOK()) {
-            return status;
-        }
+        uassertStatusOK(collection_internal::insertDocuments(
+            opCtx, coll, insertStatements.begin(), insertStatements.end(), &curOp->debug()));
     }
 
     wuow.commit();
 
     lastOpFixer.finishedOpSuccessfully();
-
-    return Status::OK();
-} catch (const DBException& ex) {
-    return ex.toStatus();
 }
 
 }  // namespace mongo::timeseries

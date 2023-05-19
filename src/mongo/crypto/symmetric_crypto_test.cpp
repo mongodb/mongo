@@ -33,7 +33,6 @@
 #include <queue>
 
 #include "mongo/crypto/block_packer.h"
-#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 
@@ -296,6 +295,8 @@ TEST(BlockPacker, AlignedThenOverfill) {
     ASSERT_EQ(1, leftovers.length());
 }
 
+#ifdef __linux__
+// (Only for OpenSSL, i.e. on Linux)
 // ... Try using insufficiently large output buffers for encryption and decryption
 TEST(SymmetricEncryptor, InsufficientOutputBuffer) {
     SymmetricKey key = crypto::aesGenerate(crypto::sym256KeySize, "InsufficientOutputBufferTest");
@@ -359,6 +360,7 @@ TEST(SymmetricEncryptor, InsufficientOutputBuffer) {
     // Validate that the decrypted ciphertext matches the original plaintext
     ASSERT(std::equal(plaintextMessage.begin(), plaintextMessage.end(), decryptionBuffer.begin()));
 }
+#endif
 
 // The following tests validate that SymmetricEncryptors function when called with inputs with
 // varying block alignments.

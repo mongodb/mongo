@@ -1,22 +1,22 @@
 // SERVER-7343: allow $within without a geo index.
 
-t = db.geo_polygon1_noindex;
+let t = db.geo_polygon1_noindex;
 t.drop();
 
-num = 0;
-for (x = 1; x < 9; x++) {
-    for (y = 1; y < 9; y++) {
-        o = {_id: num++, loc: [x, y]};
+let num = 0;
+for (let x = 1; x < 9; x++) {
+    for (let y = 1; y < 9; y++) {
+        let o = {_id: num++, loc: [x, y]};
         t.save(o);
     }
 }
 
-triangle = [[0, 0], [1, 1], [0, 2]];
+let triangle = [[0, 0], [1, 1], [0, 2]];
 
 // Look at only a small slice of the data within a triangle
 assert.eq(1, t.find({loc: {"$within": {"$polygon": triangle}}}).count(), "Triangle Test");
 
-boxBounds = [[0, 0], [0, 10], [10, 10], [10, 0]];
+let boxBounds = [[0, 0], [0, 10], [10, 10], [10, 0]];
 
 assert.eq(num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Bounding Box Test");
 
@@ -33,7 +33,7 @@ assert.eq(
 
 t.drop();
 
-pacman = [
+let pacman = [
     [0, 2],
     [0, 4],
     [2, 6],

@@ -45,8 +45,17 @@ public:
                                     int64_t leftoverRecordsBytes,
                                     int64_t minBytesPerMarker);
 
+    // Expires the partial marker with proper care for the last entry. Expiring here means:
+    //   * Turning the partial marker into an actual marker
+    //   * Ensuring the last entry isn't present in the generated marker
+    // The last entry is necessary for correctness of the change collection. This method will shift
+    // the last entry size and count to the next partial marker.
+    void expirePartialMarker(OperationContext* opCtx, const Collection* changeCollection);
+
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override;
+
+    bool _hasPartialMarkerExpired(OperationContext* opCtx) const override;
 
     TenantId _tenantId;
 };

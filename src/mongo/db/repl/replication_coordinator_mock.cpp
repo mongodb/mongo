@@ -189,7 +189,7 @@ bool ReplicationCoordinatorMock::isWritablePrimaryForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(OperationContext* opCtx,
-                                                            StringData dbName) {
+                                                            const DatabaseName& dbName) {
     stdx::lock_guard<Mutex> lk(_mutex);
 
     // Return true if we allow writes explicitly even when not in primary state, as in sharding
@@ -198,18 +198,18 @@ bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(OperationContext* op
     if (_alwaysAllowWrites) {
         return true;
     }
-    return dbName == DatabaseName::kLocal.db() || _memberState.primary();
+    return dbName == DatabaseName::kLocal || _memberState.primary();
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
-                                                                   StringData dbName) {
+                                                                   const DatabaseName& dbName) {
     return canAcceptWritesForDatabase(opCtx, dbName);
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
     // TODO
-    return canAcceptWritesForDatabase(opCtx, nsOrUUID.dbName().db());
+    return canAcceptWritesForDatabase(opCtx, nsOrUUID.dbName());
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,

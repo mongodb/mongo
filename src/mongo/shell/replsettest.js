@@ -2548,6 +2548,68 @@ var ReplSetTest = function(opts) {
         this.checkReplicaSet(checkOplogs, liveSecondaries, this, liveSecondaries, msgPrefix);
     };
 
+    const ReverseReader = function(mongo, coll, query) {
+        this.kCappedPositionLostSentinel = Object.create(null);
+
+        this._safelyPerformCursorOperation = function(name, operation, onCappedPositionLost) {
+            if (!this.cursor) {
+                throw new Error("ReverseReader is not open!");
+            }
+
+            if (this._cursorExhausted) {
+                return onCappedPositionLost;
+            }
+
+            try {
+                return operation(this.cursor);
+            } catch (err) {
+                print("Error: " + name + " threw '" + err.message + "' on " + this.mongo.host);
+                // Occasionally, the capped collection will get truncated while we are iterating
+                // over it. Since we are iterating over the collection in reverse, getting a
+                // truncated item means we've reached the end of the list, so return false.
+                if (err.code === ErrorCodes.CappedPositionLost) {
+                    this.cursor.close();
+                    this._cursorExhausted = true;
+                    return onCappedPositionLost;
+                }
+
+                throw err;
+            }
+        };
+
+        this.next = function() {
+            return this._safelyPerformCursorOperation('next', function(cursor) {
+                return cursor.next();
+            }, this.kCappedPositionLostSentinel);
+        };
+
+        this.hasNext = function() {
+            return this._safelyPerformCursorOperation('hasNext', function(cursor) {
+                return cursor.hasNext();
+            }, false);
+        };
+
+        this.query = function() {
+            // Set the cursor to read backwards, from last to first. We also set the cursor not
+            // to time out since it may take a while to process each batch and a test may have
+            // changed "cursorTimeoutMillis" to a short time period.
+            this._cursorExhausted = false;
+            this.cursor = coll.find(query)
+                              .sort({$natural: -1})
+                              .noCursorTimeout()
+                              .readConcern("local")
+                              .limit(-1);
+        };
+
+        this.getFirstDoc = function() {
+            return coll.find(query).sort({$natural: 1}).readConcern("local").limit(-1).next();
+        };
+
+        this.cursor = null;
+        this._cursorExhausted = true;
+        this.mongo = mongo;
+    };
+
     /**
      * Check oplogs on all nodes, by reading from the last time. Since the oplog is a capped
      * collection, each node may not contain the same number of entries and stop if the cursor
@@ -2555,74 +2617,6 @@ var ReplSetTest = function(opts) {
      */
     function checkOplogs(rst, secondaries, msgPrefix = 'checkOplogs') {
         secondaries = secondaries || rst._secondaries;
-        const kCappedPositionLostSentinel = Object.create(null);
-        const OplogReader = function(mongo) {
-            this._safelyPerformCursorOperation = function(name, operation, onCappedPositionLost) {
-                if (!this.cursor) {
-                    throw new Error("OplogReader is not open!");
-                }
-
-                if (this._cursorExhausted) {
-                    return onCappedPositionLost;
-                }
-
-                try {
-                    return operation(this.cursor);
-                } catch (err) {
-                    print("Error: " + name + " threw '" + err.message + "' on " + this.mongo.host);
-                    // Occasionally, the capped collection will get truncated while we are iterating
-                    // over it. Since we are iterating over the collection in reverse, getting a
-                    // truncated item means we've reached the end of the list, so return false.
-                    if (err.code === ErrorCodes.CappedPositionLost) {
-                        this.cursor.close();
-                        this._cursorExhausted = true;
-                        return onCappedPositionLost;
-                    }
-
-                    throw err;
-                }
-            };
-
-            this.next = function() {
-                return this._safelyPerformCursorOperation('next', function(cursor) {
-                    return cursor.next();
-                }, kCappedPositionLostSentinel);
-            };
-
-            this.hasNext = function() {
-                return this._safelyPerformCursorOperation('hasNext', function(cursor) {
-                    return cursor.hasNext();
-                }, false);
-            };
-
-            this.query = function(ts) {
-                const coll = this.getOplogColl();
-                const query = {ts: {$gte: ts ? ts : new Timestamp()}};
-                // Set the cursor to read backwards, from last to first. We also set the cursor not
-                // to time out since it may take a while to process each batch and a test may have
-                // changed "cursorTimeoutMillis" to a short time period.
-                this._cursorExhausted = false;
-                this.cursor =
-                    coll.find(query).sort({$natural: -1}).noCursorTimeout().readConcern("local");
-            };
-
-            this.getFirstDoc = function() {
-                return this.getOplogColl()
-                    .find()
-                    .sort({$natural: 1})
-                    .readConcern("local")
-                    .limit(-1)
-                    .next();
-            };
-
-            this.getOplogColl = function() {
-                return this.mongo.getDB("local")[oplogName];
-            };
-
-            this.cursor = null;
-            this._cursorExhausted = true;
-            this.mongo = mongo;
-        };
 
         function assertOplogEntriesEq(oplogEntry0, oplogEntry1, reader0, reader1, prevOplogEntry) {
             if (!bsonBinaryEqual(oplogEntry0, oplogEntry1)) {
@@ -2658,7 +2652,8 @@ var ReplSetTest = function(opts) {
                 }
 
                 print("checkOplogs going to check oplog of node: " + node.host);
-                readers[i] = new OplogReader(node);
+                readers[i] = new ReverseReader(
+                    node, node.getDB("local")[oplogName], {ts: {$gte: new Timestamp()}});
                 const currTS = readers[i].getFirstDoc().ts;
                 // Find the reader which has the smallestTS. This reader should have the most
                 // number of documents in the oplog.
@@ -2682,7 +2677,7 @@ var ReplSetTest = function(opts) {
             while (firstReader.hasNext()) {
                 const oplogEntry = firstReader.next();
                 bytesSinceGC += Object.bsonsize(oplogEntry);
-                if (oplogEntry === kCappedPositionLostSentinel) {
+                if (oplogEntry === firstReader.kCappedPositionLostSentinel) {
                     // When using legacy OP_QUERY/OP_GET_MORE reads against mongos, it is
                     // possible for hasNext() to return true but for next() to throw an exception.
                     break;
@@ -2697,7 +2692,8 @@ var ReplSetTest = function(opts) {
 
                     const otherOplogEntry = readers[i].next();
                     bytesSinceGC += Object.bsonsize(otherOplogEntry);
-                    if (otherOplogEntry && otherOplogEntry !== kCappedPositionLostSentinel) {
+                    if (otherOplogEntry &&
+                        otherOplogEntry !== readers[i].kCappedPositionLostSentinel) {
                         assertOplogEntriesEq.call(this,
                                                   oplogEntry,
                                                   otherOplogEntry,
@@ -2716,6 +2712,108 @@ var ReplSetTest = function(opts) {
         }
         print("checkOplogs oplog checks complete.");
     }
+
+    function getPreImageReaders(msgPrefix, rst, secondaries, nsUUID) {
+        const readers = [];
+        const nodes = rst.nodes;
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+
+            if (rst._primary !== node && !secondaries.includes(node)) {
+                print(`${msgPrefix} -- skipping preimages of node as it's not in our list of ` +
+                      `secondaries: ${node.host}`);
+                continue;
+            }
+
+            // Arbiters have no documents in the oplog and thus don't have preimages
+            // content.
+            if (isNodeArbiter(node)) {
+                jsTestLog(`${msgPrefix} -- skipping preimages of arbiter node: ${node.host}`);
+                continue;
+            }
+
+            print(`${msgPrefix} -- going to check preimages of ${nsUUID} of node: ${node.host}`);
+            readers[i] = new ReverseReader(
+                node, node.getDB("config")["system.preimages"], {"_id.nsUUID": nsUUID});
+            // Start all reverseReaders at their last document for the collection.
+            readers[i].query();
+        }
+
+        return readers;
+    }
+
+    /**
+     * Check preimages on all nodes, by reading reading from the last time. Since the preimage may
+     * or may not be maintained independently, each node may not contain the same number of entries
+     * and stop if the cursor is exhausted on any node being checked.
+     */
+    function checkPreImageCollection(rst, secondaries, msgPrefix = 'checkPreImageCollection') {
+        secondaries = secondaries || rst._secondaries;
+
+        print(`${msgPrefix} -- starting preimage checks.`);
+        print(`${msgPrefix} -- waiting for secondaries to be ready.`);
+        this.awaitSecondaryNodes(self.kDefaultTimeoutMS, secondaries);
+        if (secondaries.length >= 1) {
+            let collectionsWithPreimages = {};
+            const nodes = rst.nodes;
+            for (let i = 0; i < nodes.length; i++) {
+                const node = nodes[i];
+
+                if (rst._primary !== node && !secondaries.includes(node)) {
+                    print(`${msgPrefix} -- skipping preimages of node as it's not in our list of ` +
+                          `secondaries: ${node.host}`);
+                    continue;
+                }
+
+                // Arbiters have no documents in the oplog and thus don't have preimages content.
+                if (isNodeArbiter(node)) {
+                    jsTestLog(`${msgPrefix} -- skipping preimages of arbiter node: ${node.host}`);
+                    continue;
+                }
+
+                const preImageColl = node.getDB("config")["system.preimages"];
+                // Reset connection preferences in case the test has modified them.
+                preImageColl.getMongo().setSecondaryOk(true);
+                preImageColl.getMongo().setReadPref(rst._primary === node ? "primary"
+                                                                          : "secondary");
+
+                // Find all collections participating in pre-images.
+                const collectionsInPreimages =
+                    preImageColl.aggregate([{$group: {_id: "$_id.nsUUID"}}]).toArray();
+                for (const collTs of collectionsInPreimages) {
+                    collectionsWithPreimages[collTs._id] = collTs._id;
+                }
+            }
+            for (const nsUUID of Object.values(collectionsWithPreimages)) {
+                const readers = getPreImageReaders(msgPrefix, rst, secondaries, nsUUID);
+
+                while (true) {
+                    let preImageEntryToCompare = undefined;
+                    for (const reader of readers) {
+                        if (reader.hasNext()) {
+                            const preImageEntry = reader.next();
+                            if (preImageEntryToCompare === undefined) {
+                                preImageEntryToCompare = preImageEntry;
+                            } else {
+                                assert(bsonBinaryEqual(preImageEntryToCompare, preImageEntry),
+                                       `Detected preimage entries that have different content`);
+                            }
+                        }
+                    }
+                    if (preImageEntryToCompare === undefined) {
+                        break;
+                    }
+                }
+            }
+        }
+        print(`${msgPrefix} -- preimages check complete.`);
+    }
+
+    this.checkPreImageCollection = function(msgPrefix) {
+        var liveSecondaries = _determineLiveSecondaries();
+        this.checkReplicaSet(
+            checkPreImageCollection, liveSecondaries, this, liveSecondaries, msgPrefix);
+    };
 
     /**
      * Waits for an initial connection to a given node. Should only be called after the node's
@@ -3158,6 +3256,8 @@ var ReplSetTest = function(opts) {
                 // refuses to log in live connections if some secondaries are down.
                 print("ReplSetTest stopSet checking oplogs.");
                 asCluster(this._liveNodes, () => this.checkOplogs());
+                print("ReplSetTest stopSet checking preimages.");
+                asCluster(this._liveNodes, () => this.checkPreImageCollection());
                 print("ReplSetTest stopSet checking replicated data hashes.");
                 asCluster(this._liveNodes, () => this.checkReplicatedDataHashes());
             } else {

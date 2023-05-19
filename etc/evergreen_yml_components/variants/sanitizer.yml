@@ -98,7 +98,6 @@ buildvariants:
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
-  - name: .logical_session_cache
   - name: .multi_shard .common
   - name: multiversion_gen
   - name: .multiversion_fuzzer
@@ -182,7 +181,6 @@ buildvariants:
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
-  - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: multiversion_gen
   - name: .multiversion_fuzzer

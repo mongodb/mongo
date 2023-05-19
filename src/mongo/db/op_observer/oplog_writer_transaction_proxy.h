@@ -53,15 +53,16 @@ public:
                                    repl::OplogLink* oplogLink,
                                    const std::vector<StmtId>& stmtIds) override;
 
-    std::vector<repl::OpTime> logInsertOps(OperationContext* opCtx,
-                                           repl::MutableOplogEntry* oplogEntryTemplate,
-                                           std::vector<InsertStatement>::const_iterator begin,
-                                           std::vector<InsertStatement>::const_iterator end,
-                                           std::vector<bool> fromMigrate,
-                                           const ShardingWriteRouter& shardingWriteRouter,
-                                           const CollectionPtr& collectionPtr) override;
-
     repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override;
+
+    void logOplogRecords(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         std::vector<Record>* records,
+                         const std::vector<Timestamp>& timestamps,
+                         const CollectionPtr& oplogCollection,
+                         repl::OpTime finalOpTime,
+                         Date_t wallTime,
+                         bool isAbortIndexBuild) override;
 
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override;
 

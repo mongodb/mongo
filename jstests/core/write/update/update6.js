@@ -5,7 +5,7 @@
 //   assumes_unsharded_collection,
 // ]
 
-t = db.update6;
+let t = db.update6;
 t.drop();
 
 t.save({a: 1, b: {c: 1, d: 1}});

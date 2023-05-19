@@ -1,4 +1,4 @@
-t = db.exists2;
+let t = db.exists2;
 t.drop();
 
 t.save({a: 1, b: 1});

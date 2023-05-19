@@ -30,7 +30,7 @@ if (jsTestOptions().storageEngine == "inMemory") {
     wcMajorityJournalDefault = true;
 }
 
-opts = {
+let opts = {
     sslMode: "allowSSL",
     sslPEMKeyFile: SERVER_CERT,
     sslAllowInvalidCertificates: "",

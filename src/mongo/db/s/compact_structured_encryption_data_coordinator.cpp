@@ -221,14 +221,6 @@ bool doRenameOperation(const CompactionState& state,
     return !needCompact;
 }
 
-CompactStats doCompactOperationPre70Compatible(
-    const CompactStructuredEncryptionDataStatePre70Compatible& state) {
-    LOGV2_DEBUG(6517005, 1, "Skipping compaction");
-    CompactStats stats({}, {});
-    stats.setEcc({});
-    return stats;
-}
-
 void doCompactOperation(const CompactStructuredEncryptionDataState& state,
                         const FLECompactESCDeleteSet& escDeleteSet,
                         ECStats* escStats,
@@ -298,104 +290,6 @@ void doDropOperation(const State& state) {
 }
 
 }  // namespace
-
-boost::optional<BSONObj>
-CompactStructuredEncryptionDataCoordinatorPre70Compatible::reportForCurrentOp(
-    MongoProcessInterface::CurrentOpConnectionsMode connMode,
-    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    auto bob = basicReportBuilder();
-
-    stdx::lock_guard lg{_docMutex};
-    bob.append("escNss", _doc.getEscNss().ns());
-    bob.append("eccNss", _doc.getEccNss().ns());
-    bob.append("ecocNss", _doc.getEcocNss().ns());
-    bob.append("ecocUuid", _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none");
-    bob.append("ecocRenameNss", _doc.getEcocRenameNss().ns());
-    bob.append("ecocRenameUuid",
-               _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none");
-    return bob.obj();
-}
-
-// TODO: SERVER-68373 remove once 7.0 becomes last LTS
-void CompactStructuredEncryptionDataCoordinatorPre70Compatible::_enterPhase(const Phase& newPhase) {
-    // Before 6.1, this coordinator persists the result of the doCompactOperation()
-    // by reusing the compactionTokens field to store the _response BSON.
-    // If newPhase is kDropTempCollection, this override of _enterPhase performs this
-    // replacement on the in-memory state document (_doc), before calling the base _enterPhase()
-    // which persists _doc to disk. In the event that updating the persisted document fails,
-    // the replaced compaction tokens are restored in _doc.
-    using Base =
-        RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataStatePre70Compatible,
-                                          CompactStructuredEncryptionDataPhaseEnum>;
-    bool useOverload = _isPre61Compatible() && (newPhase == Phase::kDropTempCollection);
-
-    if (useOverload) {
-        BSONObj compactionTokensCopy;
-        {
-            stdx::lock_guard lg(_docMutex);
-            compactionTokensCopy = _doc.getCompactionTokens().getOwned();
-            _doc.setCompactionTokens(_response->toBSON());
-        }
-
-        try {
-            Base::_enterPhase(newPhase);
-        } catch (...) {
-            // on error, restore the compaction tokens
-            stdx::lock_guard lg(_docMutex);
-            _doc.setCompactionTokens(std::move(compactionTokensCopy));
-            throw;
-        }
-    } else {
-        Base::_enterPhase(newPhase);
-    }
-}
-
-ExecutorFuture<void> CompactStructuredEncryptionDataCoordinatorPre70Compatible::_runImpl(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) noexcept {
-    return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(Phase::kRenameEcocForCompact,
-                                 [this, anchor = shared_from_this()]() {
-                                     _skipCompact = doRenameOperation(
-                                         _doc, &_ecocRenameUuid, nullptr, nullptr);
-                                     stdx::unique_lock ul{_docMutex};
-                                     _doc.setSkipCompact(_skipCompact);
-                                     _doc.setEcocRenameUuid(_ecocRenameUuid);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kCompactStructuredEncryptionData,
-                                 [this, anchor = shared_from_this()]() {
-                                     _response = doCompactOperationPre70Compatible(_doc);
-                                     if (!_isPre61Compatible()) {
-                                         stdx::lock_guard lg(_docMutex);
-                                         _doc.setResponse(_response);
-                                     }
-                                 }))
-        .then(_buildPhaseHandler(Phase::kDropTempCollection, [this, anchor = shared_from_this()] {
-            if (!_isPre61Compatible()) {
-                invariant(_doc.getResponse());
-                _response = *_doc.getResponse();
-            } else {
-                try {
-                    // restore the response that was stored in the compactionTokens field
-                    IDLParserContext ctxt("response");
-                    _response = CompactStructuredEncryptionDataCommandReply::parse(
-                        ctxt, _doc.getCompactionTokens());
-                } catch (...) {
-                    LOGV2_ERROR(6846101,
-                                "Failed to parse response from "
-                                "CompactStructuredEncryptionDataState document",
-                                "response"_attr = _doc.getCompactionTokens());
-                    // ignore for compatibility with 6.0.0
-                }
-            }
-
-            doDropOperation(_doc);
-            if (MONGO_unlikely(fleCompactHangAfterDropTempCollection.shouldFail())) {
-                LOGV2(6790902, "Hanging due to fleCompactHangAfterDropTempCollection fail point");
-                fleCompactHangAfterDropTempCollection.pauseWhileSet();
-            }
-        }));
-}
 
 boost::optional<BSONObj> CompactStructuredEncryptionDataCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,

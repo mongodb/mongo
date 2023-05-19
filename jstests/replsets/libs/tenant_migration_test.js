@@ -10,12 +10,15 @@ import {
     createTenantMigrationRecipientRoleIfNotExist,
     createTenantMigrationDonorRoleIfNotExist,
     runTenantMigrationCommand,
+    runDonorStartMigrationCommand,
     isMigrationCompleted,
     checkTenantDBHashes,
     getExternalKeys,
     isShardMergeEnabled,
     isNamespaceForTenant,
     getTenantMigrationAccessBlocker,
+    kProtocolShardMerge,
+    kProtocolMultitenantMigrations,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/aggregation/extras/utils.js");
 
@@ -67,6 +70,9 @@ export class TenantMigrationTest {
      * Make a new TenantMigrationTest
      *
      * @param {string} [name] the name of the replica sets
+     * @param {string} [protocol] the migration protocol to use, either "multitenant migrations" or
+     *     "shard merge". If no value is provided, will default to "shard merge" if the shard merge
+     *     feature flag is enabled, otherwise will be set to "multitenant migrations"
      * @param {boolean} [enableRecipientTesting] whether recipient would actually migrate tenant
      *     data
      * @param {Object} [donorRst] the ReplSetTest instance to adopt for the donor
@@ -83,6 +89,7 @@ export class TenantMigrationTest {
      */
     constructor({
         name = "TenantMigrationTest",
+        protocol = "",
         enableRecipientTesting = true,
         donorRst,
         recipientRst,
@@ -132,7 +139,8 @@ export class TenantMigrationTest {
                     tojson({mode: 'alwaysOn'});
             }
 
-            let nodeOptions = isDonor ? migrationX509Options.donor : migrationX509Options.recipient;
+            const nodeOptions =
+                isDonor ? migrationX509Options.donor : migrationX509Options.recipient;
             nodeOptions["setParameter"] = setParameterOpts;
 
             const rstName = `${name}_${(isDonor ? "donor" : "recipient")}`;
@@ -150,6 +158,19 @@ export class TenantMigrationTest {
         this._donorRst = this._donorPassedIn ? donorRst : performSetUp(true /* isDonor */);
         this._recipientRst =
             this._recipientPassedIn ? recipientRst : performSetUp(false /* isDonor */);
+
+        // If we don't pass "protocol" and shard merge is enabled, we set the protocol to
+        // "shard merge". Otherwise, the provided protocol is used, which defaults to
+        // "multitenant migrations" if not provided.
+        if (protocol === "" && isShardMergeEnabled(this.getDonorPrimary().getDB("admin"))) {
+            this.protocol = kProtocolShardMerge;
+        } else if (protocol === "") {
+            this.protocol = kProtocolMultitenantMigrations;
+        }
+
+        this.configRecipientsNs = this.protocol === kProtocolShardMerge
+            ? TenantMigrationTest.kConfigShardMergeRecipientsNS
+            : TenantMigrationTest.kConfigRecipientsNS;
 
         this._donorRst.asCluster(this._donorRst.nodes, () => {
             this._donorRst.getPrimary();
@@ -228,12 +249,8 @@ export class TenantMigrationTest {
      *
      * Returns the result of the 'donorStartMigration' command.
      */
-    startMigration(migrationOpts,
-                   {retryOnRetryableErrors = false, enableDonorStartMigrationFsync = false} = {}) {
-        return this.runDonorStartMigration(migrationOpts, {
-            retryOnRetryableErrors,
-            enableDonorStartMigrationFsync,
-        });
+    startMigration(migrationOpts, {retryOnRetryableErrors = false} = {}) {
+        return this.runDonorStartMigration(migrationOpts, {retryOnRetryableErrors});
     }
 
     /**
@@ -291,11 +308,9 @@ export class TenantMigrationTest {
         const {
             waitForMigrationToComplete = false,
             retryOnRetryableErrors = false,
-            enableDonorStartMigrationFsync = false,
         } = opts;
 
-        const cmdObj = {
-            donorStartMigration: 1,
+        const migrationOpts = {
             migrationId: UUID(migrationIdString),
             tenantId,
             tenantIds,
@@ -306,8 +321,7 @@ export class TenantMigrationTest {
             protocol
         };
 
-        const stateRes = runTenantMigrationCommand(cmdObj, this.getDonorRst(), {
-            enableDonorStartMigrationFsync,
+        const stateRes = runDonorStartMigrationCommand(migrationOpts, this.getDonorRst(), {
             retryOnRetryableErrors,
             shouldStopFunc: stateRes =>
                 (!waitForMigrationToComplete || isMigrationCompleted(stateRes))
@@ -344,14 +358,11 @@ export class TenantMigrationTest {
                 donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
                     _id: UUID(migrationIdString)
                 });
+
             const recipientStateDoc =
-                recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
+                recipientPrimary.getCollection(this.configRecipientsNs).findOne({
                     _id: UUID(migrationIdString)
                 });
-
-            const shardMergeRecipientStateDoc =
-                recipientPrimary.getCollection(TenantMigrationTest.kConfigShardMergeRecipientsNS)
-                    .findOne({_id: UUID(migrationIdString)});
 
             if (donorStateDoc) {
                 assert(donorStateDoc.expireAt);
@@ -359,12 +370,9 @@ export class TenantMigrationTest {
             if (recipientStateDoc) {
                 assert(recipientStateDoc.expireAt);
             }
-            if (shardMergeRecipientStateDoc) {
-                assert(shardMergeRecipientStateDoc.expireAt);
-            }
 
             const configDBCollections = recipientPrimary.getDB('config').getCollectionNames();
-            assert(!configDBCollections.includes('repl.migration.oplog_' + migrationIdString),
+            assert(!configDBCollections.includes(`repl.migration.oplog_${migrationIdString}`),
                    configDBCollections);
 
             this.getDonorRst().asCluster(donorPrimary, () => {
@@ -425,12 +433,7 @@ export class TenantMigrationTest {
         });
 
         recipientNodes.forEach(node => {
-            const configRecipientsColl =
-                node.getCollection(TenantMigrationTest.kConfigRecipientsNS);
-            assert.soon(() => 0 === configRecipientsColl.count({_id: migrationId}), tojson(node));
-
-            const configShardMergeRecipientsColl =
-                node.getCollection(TenantMigrationTest.kConfigShardMergeRecipientsNS);
+            const configRecipientsColl = node.getCollection(this.configRecipientsNs);
             assert.soon(() => 0 === configRecipientsColl.count({_id: migrationId}), tojson(node));
 
             let mtab;
@@ -544,13 +547,8 @@ export class TenantMigrationTest {
         expectedAccessState,
     }) {
         const configRecipientsColl =
-            this.getRecipientPrimary().getCollection("config.tenantMigrationRecipients");
-        let configDoc = configRecipientsColl.findOne({_id: migrationId});
-        if (!configDoc) {
-            configDoc = this.getRecipientPrimary()
-                            .getCollection(TenantMigrationTest.kConfigShardMergeRecipientsNS)
-                            .findOne({_id: migrationId});
-        }
+            this.getRecipientPrimary().getCollection(this.configRecipientsNs);
+        const configDoc = configRecipientsColl.findOne({_id: migrationId});
 
         const mtab = this.getTenantMigrationAccessBlocker({recipientNode: node, tenantId});
 
@@ -715,8 +713,8 @@ TenantMigrationTest.DonorAccessState = {
 };
 
 TenantMigrationTest.RecipientAccessState = {
-    kReject: "reject",
-    kRejectBefore: "rejectBefore"
+    kRejectReadsAndWrites: "rejectReadsAndWrites",
+    kRejectReadsBefore: "rejectReadsBefore"
 };
 
 TenantMigrationTest.kConfigDonorsNS = "config.tenantMigrationDonors";

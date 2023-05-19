@@ -178,11 +178,11 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                              ? stdx::get<const Yieldable*>(yieldable)
                              : nullptr);
             return Status::OK();
-        } catch (const WriteConflictException&) {
+        } catch (const WriteConflictException& e) {
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }
-            logWriteConflictAndBackoff(attempt, "query yield", ""_sd);
+            logWriteConflictAndBackoff(attempt, "query yield", e.reason(), ""_sd);
             // Retry the yielding process.
         } catch (...) {
             // Errors other than write conflicts don't get retried, and should instead result in

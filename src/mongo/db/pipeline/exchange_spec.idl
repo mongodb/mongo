@@ -52,24 +52,24 @@ structs:
         type: ExchangePolicy
         description: A string indicating a policy of how documents are distributed to consumers.
         stability: stable
-        query_shape_literal: false
+        query_shape: parameter
       consumers:
         type: int
         description: Number of consumers.
         stability: stable
-        query_shape_literal: true
+        query_shape: literal
       orderPreserving:
         type: bool
         default: false
         description: A flag indicating documents are merged while preserving the order.
         stability: stable
-        query_shape_literal: false
+        query_shape: parameter
       bufferSize:
         type: int
         default: 16777216
         description: The size of exchange buffers.
         stability: stable
-        query_shape_literal: true
+        query_shape: literal
       key:
         type: object
         default: "BSONObj()"
@@ -79,17 +79,17 @@ structs:
                      field listed here, or if any prefix of any path is multikey (i.e. an array is
                      encountered while traversing a path listed here), then it is by definition sent
                      to consumer 0.
-        query_shape_literal: true
+        query_shape: literal
       boundaries:
         type: array<object>
         optional: true
         description: Range/hash split points.
         stability: stable
-        query_shape_literal: true
+        query_shape: literal
       consumerIds:
         type: array<int>
         optional: true
         description: Mapping from a range index to a consumer id.
         stability: stable
-        query_shape_literal: true
+        query_shape: literal
 

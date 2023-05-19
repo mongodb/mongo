@@ -1,5 +1,5 @@
 
-t = db.server7756;
+let t = db.server7756;
 t.drop();
 
 t.save({a: [{1: 'x'}, 'y']});

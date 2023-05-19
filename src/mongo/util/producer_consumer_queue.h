@@ -439,10 +439,11 @@ public:
         size_t waitingConsumers;
         size_t waitingProducers;
         size_t producerQueueDepth;
+        bool producerEndClosed;
+        bool consumerEndClosed;
         // TODO more stats
         //
         // totalTimeBlocked on either side
-        // closed ends
         // count of producers and consumers (blocked, or existing if we're a pipe)
     };
 
@@ -629,6 +630,8 @@ public:
         stats.waitingConsumers = _consumers;
         stats.waitingProducers = _producers;
         stats.producerQueueDepth = _producers.queueDepth();
+        stats.producerEndClosed = _producerEndClosed;
+        stats.consumerEndClosed = _consumerEndClosed;
         return stats;
     }
 

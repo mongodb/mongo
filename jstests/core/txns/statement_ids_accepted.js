@@ -8,6 +8,7 @@
 //    # Tenant migrations don't support applyOps.
 //    tenant_migration_incompatible
 // ]
+load("jstests/libs/fixture_helpers.js");
 
 (function() {
 "use strict";
@@ -172,8 +173,7 @@ assert.commandWorked(sessionDb.adminCommand({
     autocommit: false
 }));
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
-if (!isMongos) {
+if (!FixtureHelpers.isMongos(db)) {
     // Skip commands that do not exist on mongos.
 
     jsTestLog("Check that prepareTransaction accepts a statement ID");

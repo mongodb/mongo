@@ -97,7 +97,7 @@ public:
     explicit DecorationContainer(Decorable<DecoratedType>* const decorated,
                                  const DecorationRegistry<DecoratedType>* const registry)
         : _registry(registry),
-          _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]) {
+          _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]{}) {
         // Because the decorations live in the externally allocated storage buffer at
         // `_decorationData`, there needs to be a way to get back from a known location within this
         // buffer to the type which owns those decorations.  We place a pointer to ourselves, a

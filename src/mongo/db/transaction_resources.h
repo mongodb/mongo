@@ -76,11 +76,13 @@ struct AcquisitionPrerequisites {
 
     AcquisitionPrerequisites(NamespaceString nss,
                              boost::optional<UUID> uuid,
+                             repl::ReadConcernArgs readConcern,
                              PlacementConcernVariant placementConcern,
                              OperationType operationType,
                              ViewMode viewMode)
         : nss(std::move(nss)),
           uuid(std::move(uuid)),
+          readConcern(std::move(readConcern)),
           placementConcern(std::move(placementConcern)),
           operationType(operationType),
           viewMode(viewMode) {}
@@ -88,6 +90,7 @@ struct AcquisitionPrerequisites {
     NamespaceString nss;
     boost::optional<UUID> uuid;
 
+    repl::ReadConcernArgs readConcern;
     PlacementConcernVariant placementConcern;
     OperationType operationType;
     ViewMode viewMode;
@@ -96,6 +99,21 @@ struct AcquisitionPrerequisites {
 namespace shard_role_details {
 
 struct AcquiredCollection {
+    AcquiredCollection(AcquisitionPrerequisites prerequisites,
+                       std::shared_ptr<Lock::DBLock> dbLock,
+                       boost::optional<Lock::CollectionLock> collectionLock,
+                       boost::optional<ScopedCollectionDescription> collectionDescription,
+                       boost::optional<ScopedCollectionFilter> ownershipFilter,
+                       CollectionPtr collectionPtr)
+        : prerequisites(std::move(prerequisites)),
+          dbLock(std::move(dbLock)),
+          collectionLock(std::move(collectionLock)),
+          collectionDescription(std::move(collectionDescription)),
+          ownershipFilter(std::move(ownershipFilter)),
+          collectionPtr(std::move(collectionPtr)),
+          invalidated(false),
+          sharedImpl(std::make_shared<SharedImpl>()) {}
+
     AcquisitionPrerequisites prerequisites;
 
     std::shared_ptr<Lock::DBLock> dbLock;
@@ -105,6 +123,18 @@ struct AcquiredCollection {
     boost::optional<ScopedCollectionFilter> ownershipFilter;
 
     CollectionPtr collectionPtr;
+
+    // Indicates whether this acquisition has been invalidated after a ScopedLocalCatalogWriteFence
+    // was unable to restore it on rollback.
+    bool invalidated;
+
+    // Used by the ScopedLocalCatalogWriteFence to track the lifetime of AcquiredCollection.
+    // ScopedLocalCatalogWriteFence will hold a weak_ptr pointing to 'sharedImpl'. The 'onRollback'
+    // handler it installs will use that weak_ptr to determine if the AcquiredCollection is still
+    // alive.
+    // TODO: (jordist) SERVER-XXXXX Rework this.
+    struct SharedImpl {};
+    std::shared_ptr<SharedImpl> sharedImpl;
 };
 
 struct AcquiredView {
@@ -153,7 +183,7 @@ struct AcquiredView {
  * the read concern of the operation).
  */
 struct TransactionResources {
-    TransactionResources(repl::ReadConcernArgs readConcern);
+    TransactionResources();
 
     TransactionResources(TransactionResources&&) = delete;
     TransactionResources& operator=(TransactionResources&&) = delete;
@@ -163,15 +193,8 @@ struct TransactionResources {
 
     ~TransactionResources();
 
-    AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection) {
-        return acquiredCollections.emplace_back(std::move(acquiredCollection));
-    }
-
-    void releaseCollection(UUID uuid);
-
-    const AcquiredView& addAcquiredView(AcquiredView&& acquiredView) {
-        return acquiredViews.emplace_back(std::move(acquiredView));
-    }
+    AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection);
+    const AcquiredView& addAcquiredView(AcquiredView&& acquiredView);
 
     void releaseAllResourcesOnCommitOrAbort() noexcept;
 
@@ -182,22 +205,22 @@ struct TransactionResources {
      */
     void assertNoAcquiredCollections() const;
 
-    // The read concern with which the whole operation started. Remains the same for the duration of
-    // the entire operation.
-    repl::ReadConcernArgs readConcern;
-
     // Indicates whether yield has been performed on these resources
     bool yielded{false};
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Global resources (cover all collections for the operation)
 
+    // The read concern with which the transaction runs. All acquisitions must match that read
+    // concern.
+    boost::optional<repl::ReadConcernArgs> readConcern;
+
     // Set of locks acquired by the operation or nullptr if yielded.
     std::unique_ptr<Locker> locker;
 
     // If '_locker' has been yielded, contains a snapshot of the locks which have been yielded.
     // Otherwise boost::none.
-    boost::optional<Locker::LockSnapshot> lockSnapshot;
+    boost::optional<Locker::LockSnapshot> yieldedLocker;
 
     // The storage engine snapshot associated with this transaction (when yielded).
     struct YieldedRecoveryUnit {
@@ -205,7 +228,7 @@ struct TransactionResources {
         WriteUnitOfWork::RecoveryUnitState recoveryUnitState;
     };
 
-    boost::optional<YieldedRecoveryUnit> yieldRecoveryUnit;
+    boost::optional<YieldedRecoveryUnit> yieldedRecoveryUnit;
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Per-collection resources

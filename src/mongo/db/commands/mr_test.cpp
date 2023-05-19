@@ -265,7 +265,8 @@ public:
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
-                   bool defaultFromMigrate) override;
+                   bool defaultFromMigrate,
+                   InsertsOpStateAccumulator* opAccumulator = nullptr) override;
 
     /**
      * Tracks the temporary collections mapReduces creates.
@@ -278,12 +279,12 @@ public:
                             const OplogSlot& createOpTime,
                             bool fromMigrate) override;
 
-    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) override;
+                                  CollectionDropType dropType,
+                                  bool markFromMigrate) override;
 
     // Hook for onInserts. Defaults to a no-op function but may be overridden to inject exceptions
     // while mapReduce inserts its results into the temporary output collection.
@@ -323,7 +324,8 @@ void MapReduceOpObserver::onInserts(OperationContext* opCtx,
                                     std::vector<InsertStatement>::const_iterator begin,
                                     std::vector<InsertStatement>::const_iterator end,
                                     std::vector<bool> fromMigrate,
-                                    bool defaultFromMigrate) {
+                                    bool defaultFromMigrate,
+                                    InsertsOpStateAccumulator* opAccumulator) {
     onInsertsFn();
 }
 
@@ -344,7 +346,8 @@ repl::OpTime MapReduceOpObserver::onDropCollection(OperationContext* opCtx,
                                                    const NamespaceString& collectionName,
                                                    const UUID& uuid,
                                                    std::uint64_t numRecords,
-                                                   const CollectionDropType dropType) {
+                                                   const CollectionDropType dropType,
+                                                   bool markFromMigrate) {
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
@@ -545,7 +548,7 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
         AutoGetCollection coll(_opCtx.get(), outputNss, MODE_X);
         ASSERT(coll);
         writeConflictRetry(
-            _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss.ns(), [&] {
+            _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss, [&] {
                 WriteUnitOfWork wuow(_opCtx.get());
                 ASSERT_OK(
                     coll.getWritableCollection(_opCtx.get())

@@ -50,6 +50,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/subplan.h"
+#include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -491,7 +492,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
                 CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
                 writeConflictsInARow++;
-                logWriteConflictAndBackoff(writeConflictsInARow, "plan execution", _nss.ns());
+                logWriteConflictAndBackoff(
+                    writeConflictsInARow, "plan execution", ""_sd, _nss.ns());
             }
 
             // Yield next time through the loop.
@@ -605,6 +607,18 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
                 static_cast<const UpdateStats&>(*stats),
                 static_cast<UpdateStage*>(_root->child().get())->containsDotsAndDollarsField());
         }
+        case StageType::STAGE_TIMESERIES_MODIFY: {
+            const auto& stats =
+                static_cast<const TimeseriesModifyStats&>(*_root->getSpecificStats());
+            return UpdateResult(
+                stats.nMeasurementsModified > 0 /* Did we update at least one obj? */,
+                stats.isModUpdate /* Is this a $mod update? */,
+                stats.nMeasurementsModified /* number of modified docs, no no-ops */,
+                stats.nMeasurementsMatched /* # of docs matched/updated, even no-ops */,
+                // TODO SERVER-76551 Add upsert support.
+                BSONObj() /* objInserted */,
+                static_cast<TimeseriesModifyStage*>(_root.get())->containsDotsAndDollarsField());
+        }
         default:
             invariant(StageType::STAGE_UPDATE == _root->stageType());
             const auto stats = _root->getSpecificStats();
@@ -624,27 +638,40 @@ long long PlanExecutorImpl::executeDelete() {
     }
 
     // If the collection exists, the delete plan may either have a delete stage at the root, or
-    // (for findAndModify) a projection stage wrapping a delete stage.
-    switch (_root->stageType()) {
-        case StageType::STAGE_PROJECTION_DEFAULT:
-        case StageType::STAGE_PROJECTION_COVERED:
-        case StageType::STAGE_PROJECTION_SIMPLE: {
-            invariant(_root->getChildren().size() == 1U);
-            invariant(StageType::STAGE_DELETE == _root->child()->stageType());
-            const SpecificStats* stats = _root->child()->getSpecificStats();
-            return static_cast<const DeleteStats*>(stats)->docsDeleted;
+    // (for findAndModify) a projection stage wrapping a delete / TS_MODIFY stage.
+    const auto deleteStage = [&] {
+        switch (_root->stageType()) {
+            case StageType::STAGE_PROJECTION_DEFAULT:
+            case StageType::STAGE_PROJECTION_COVERED:
+            case StageType::STAGE_PROJECTION_SIMPLE: {
+                tassert(7308302,
+                        "Unexpected number of children: {}"_format(_root->getChildren().size()),
+                        _root->getChildren().size() == 1U);
+                auto childStage = _root->child().get();
+                tassert(7308303,
+                        "Unexpected child stage type: {}"_format(childStage->stageType()),
+                        StageType::STAGE_DELETE == childStage->stageType() ||
+                            StageType::STAGE_TIMESERIES_MODIFY == childStage->stageType());
+                return childStage;
+            }
+            default:
+                return _root.get();
         }
+    }();
+    switch (deleteStage->stageType()) {
         case StageType::STAGE_TIMESERIES_MODIFY: {
             const auto* tsModifyStats =
-                static_cast<const TimeseriesModifyStats*>(_root->getSpecificStats());
-            return tsModifyStats->nMeasurementsDeleted;
+                static_cast<const TimeseriesModifyStats*>(deleteStage->getSpecificStats());
+            return tsModifyStats->nMeasurementsModified;
         }
-        default: {
-            invariant(StageType::STAGE_DELETE == _root->stageType() ||
-                      StageType::STAGE_BATCHED_DELETE == _root->stageType());
-            const auto* deleteStats = static_cast<const DeleteStats*>(_root->getSpecificStats());
+        case StageType::STAGE_DELETE:
+        case StageType::STAGE_BATCHED_DELETE: {
+            const auto* deleteStats =
+                static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
             return deleteStats->docsDeleted;
         }
+        default:
+            MONGO_UNREACHABLE_TASSERT(7308306);
     }
 }
 

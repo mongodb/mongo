@@ -97,15 +97,16 @@ __wt_blkcache_map_read(
     if (!bm->map) /* FIXME WT-8728. */
         return (0);
 
+    WT_ASSERT(session, !bm->is_multi_handle);
+
     block = bm->block;
 
     /* Crack the cookie. */
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
-    /* Swap block handles if reading from a different object. */
-    if (block->objectid != objectid)
-        WT_RET(__wt_blkcache_get_handle(session, bm, objectid, &block));
+    /* Not supported on multi-handle trees */
+    WT_ASSERT(session, block->objectid == objectid);
 
     /* Map the block if it's possible. */
     handle = block->fh->handle;

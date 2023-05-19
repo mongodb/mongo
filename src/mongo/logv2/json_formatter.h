@@ -32,7 +32,6 @@
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/utility/formatting_ostream_fwd.hpp>
 
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
@@ -59,7 +58,7 @@ public:
                 StringData message,
                 const TypeErasedAttributeStorage& attrs,
                 LogTag tags,
-                const TenantId* tenant,
+                const std::string& tenant,
                 LogTruncation truncation) const;
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
 

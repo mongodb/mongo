@@ -53,7 +53,6 @@
 # - func: "set up venv"
 
 include:
-- filename: etc/evergreen_yml_components/project_and_distro_settings.yml
 - filename: etc/evergreen_yml_components/definitions.yml
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/sanitizer.yml
@@ -73,7 +72,7 @@ variables:
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
-    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile-required
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
@@ -89,8 +88,6 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: version_burn_in_gen
-    variant: generate-tasks-for-version
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
   depends_on:
@@ -121,8 +118,6 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: version_burn_in_gen
-    variant: generate-tasks-for-version
 
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -190,6 +185,11 @@ variables:
     distros:
     - windows-vsCurrent-large
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
   - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
@@ -203,7 +203,6 @@ variables:
     - windows-2016-dc
   - name: .jscore .common !.sharding
   - name: .jstestfuzz .common
-  - name: .logical_session_cache
   - name: replica_sets_auth_gen
   - name: sasl
   - name: sharding_auth_audit_gen
@@ -263,7 +262,6 @@ variables:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -573,7 +571,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .config_fuzzer !.large !.linux_only
-  - name: .config_fuzzer .large !.linux_only
+  - name: .config_fuzzer .large !.linux_only !.sharded
     distros:
     - windows-vsCurrent-large
   - name: disk_wiredtiger
@@ -637,6 +635,12 @@ buildvariants:
     external_auth_jobs_max: 1
   tasks:
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *windows_compile_variant_name
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -702,7 +706,19 @@ buildvariants:
   - name: query_golden_classic
   - name: query_golden_cqf
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *windows_compile_variant_name
   # - name: burn_in_tasks_gen
+  #   depends_on:
+  #   - name: version_burn_in_gen
+  #     variant: generate-tasks-for-version
+  #     omit_generated_tasks: true
+  #   - name: archive_dist_test_debug
+  #     variant: *windows_compile_variant_name
   - name: audit
   - name: auth_audit_gen
   - name: buildscripts_test
@@ -816,7 +832,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos-rosetta-2 enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -843,14 +858,12 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
   - name: .jscore .common !.decimal !.sharding
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   # TODO(SERVER-64009): Re-enable replica_sets_auth_gen.
   # - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos enterprise-macos
   display_name: "Enterprise macOS DEBUG"
@@ -877,16 +890,13 @@ buildvariants:
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
-  # TODO: SERVER-66945 Re-enable ESE on enterprise macos
-  # - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
+  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
   - name: .jscore .common !.decimal !.sharding
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
@@ -912,13 +922,11 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding
-  - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: .crypt
-  - name: generate_buildid_to_debug_symbols_mapping
 
 ###########################################
 #          Redhat buildvariants           #
@@ -957,10 +965,14 @@ buildvariants:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: version_burn_in_gen
-    variant: generate-tasks-for-version
   tasks:
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: aggregation_repeat_queries
@@ -1154,10 +1166,10 @@ buildvariants:
   - name: streams
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
-  display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
+  name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags enterprise-rhel-80-64-bit-dynamic-all-feature-flags
+  display_name: "* Shared Library Enterprise RHEL 8.0 (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
@@ -1183,11 +1195,8 @@ buildvariants:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: version_burn_in_gen
-    variant: generate-tasks-for-version
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
-  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
@@ -1197,8 +1206,26 @@ buildvariants:
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: burn_in_tags_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   # - name: burn_in_tasks_gen
+  #   depends_on:
+  #   - name: version_burn_in_gen
+  #     variant: generate-tasks-for-version
+  #     omit_generated_tasks: true
+  #   - name: archive_dist_test_debug
+  #     variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
@@ -1212,6 +1239,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
+  # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
   - name: .misc_js
@@ -1221,6 +1249,12 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
+    distros:
+    - rhel80-medium
+  - name: .config_fuzzer_stress
+    distros:
+    - rhel80-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -1274,6 +1308,7 @@ buildvariants:
   - name: sharding_api_strict_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
+  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
@@ -1314,7 +1349,6 @@ buildvariants:
   - name: change_streams_multi_stmt_txn_mongos_passthrough
   - name: change_streams_multi_stmt_txn_sharded_collections_passthrough
   - name: change_streams_per_shard_cursor_passthrough
-  - name: change_streams_v1_resume_token_sharded_collections_passthrough
   - name: fle2_sharding_high_cardinality
   - name: fle2_sharding
   - name: jstestfuzz_sharded_causal_consistency_gen
@@ -1326,18 +1360,16 @@ buildvariants:
   - name: sharding_auth_gen
   # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
   # variant will be removed when config shards become the default, so this is only temporary.
-  # TODO SERVER-76444: Enable after 7.0 picks up the new config shard terminology
-  # - name: sharding_multiversion_gen
+  - name: sharding_multiversion_gen
   - name: .sharding .txns
   # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
-  - name: .sharding .common !.csrs !.multiversion
+  - name: .sharding .common !.csrs
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .concurrency .sharded !.large
   - name: .concurrency .sharded .large
     distros:
     - rhel80-medium
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
-  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+  - name: .multi_shard
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
@@ -1370,8 +1402,6 @@ buildvariants:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: version_burn_in_gen
-    variant: generate-tasks-for-version
   tasks:
   - name: .aggfuzzer !.sbe_only
   - name: .aggregation !.sbe_only
@@ -1409,7 +1439,19 @@ buildvariants:
   - name: aggregation_repeat_queries
   - name: audit
   - name: burn_in_tags_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: disk_wiredtiger
@@ -1420,7 +1462,6 @@ buildvariants:
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
-  - name: lint_fuzzer_sanity_patch
   - name: mqlrun
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
@@ -1482,7 +1523,6 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: jsCore
   - name: jsCore_txns
-  - name: .logical_session_cache .repl
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_auth_gen
@@ -1621,7 +1661,6 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -1666,14 +1705,14 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - amazon2022-arm64-large
+  - amazon2023.0-arm64-large
   expansions:
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
-    large_distro_name: amazon2022-arm64-large
+    large_distro_name: amazon2023.0-arm64-large
     num_scons_link_jobs_available: 0.1
   tasks:
   - name: build_metrics_gen_TG
@@ -1742,35 +1781,6 @@ buildvariants:
   - name: jsCore
   - name: noPassthroughHotBackups_gen
   - name: generate_buildid_to_debug_symbols_mapping
-
-- name: &ubuntu1804-container ubuntu1804-container
-  display_name: "Ubuntu 18.04 Container"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu1804-container-server
-  expansions:
-    resmoke_jobs_factor: 1
-    compile_variant: *ubuntu1804-container
-    disable_shared_scons_cache: true
-    compile_flags: >-
-      MONGO_DISTMOD=ubuntu1804
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    tooltags: ""
-    build_mongoreplay: true
-    test_flags: >-
-      --excludeWithAnyTags=requires_os_access
-  tasks:
-  - name: compile_and_archive_dist_test_then_package_TG
-    distros:
-    - ubuntu1804-build
-  - name: jsCore
-  - name: sharding_gen
-  - name: replica_sets_gen
-  - name: generate_buildid_to_debug_symbols_mapping
-    distros:
-    - ubuntu1804-build
 
 - name: &enterprise-rhel-72-s390x-compile enterprise-rhel-72-s390x-compile
   display_name: "Enterprise RHEL 7.2 s390x Compile"
@@ -1844,8 +1854,8 @@ buildvariants:
 - &enterprise-amazon-linux2-arm64-all-feature-flags-template
   <<: *amazon_linux2_arm64_compile_variant_dependency
   name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
-  display_name: "* Amazon Linux 2 arm64 (all feature flags)"
-  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  display_name: "! Amazon Linux 2 arm64 (all feature flags)"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
     - enterprise
   run_on:
@@ -1862,19 +1872,35 @@ buildvariants:
     max_sub_suites: 5
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
+    # TODO: These should be al2 specific variants however we haven't moved these variants over to al2
+    # For now we are not running burn_in_tag with al2
+    burn_in_tag_buildvariants: >-
+      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge,requires_external_data_source
   tasks:
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_passthrough
-  - name: cqf_parallel
+  - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic
   - name: query_golden_cqf
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *amazon_linux2_arm64_compile_variant_name
+  - name: burn_in_tags_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *amazon_linux2_arm64_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
@@ -1882,15 +1908,19 @@ buildvariants:
   - name: aggregation_repeat_queries
   - name: audit
   - name: .auth
-  #- name: burn_in_tags_gen
   - name: buildscripts_test
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
+  # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
+  - name: cqf
+  - name: cqf_disabled_pipeline_opt
+  - name: cqf_passthrough
+  - name: cqf_parallel
   - name: .misc_js
   - name: .clustered_collections
   - name: .concurrency !.large !.ubsan !.no_txns
@@ -1939,111 +1969,27 @@ buildvariants:
   - name: search_auth
   - name: search_pinned_connections_auth
   - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: sharding_api_version_jscore_passthrough_gen
-  - name: .sharding .txns
-  - name: .sharding .common
-  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: secondary_reads_passthrough_gen
   - name: .serverless
     distros:
     - amazon2-arm64-large
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-  - name: .updatefuzzer
-  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
   - name: .shard_split
   - name: .shard_merge
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: sharding_api_strict_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: .updatefuzzer
   - name: telemetry_passthrough
-
 
 ###########################################
 #     Experimental buildvariants          #
 ###########################################
-
-- name: &rhel80-debug-asan-classic-engine rhel80-debug-asan-classic-engine
-  display_name: "* ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-build
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    lang_environment: LANG=C
-    san_options: *aubsan_options
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      --dbg=on
-      --opt=on
-      --allocator=system
-      --sanitize=address
-      --ssl
-      --ocsp-stapling=off
-      --enable-free-mon=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-    compile_variant: *rhel80-debug-asan-classic-engine
-    test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-    exec_timeout_secs: 14400 # 3 hour timeout
-    separate_debug: off
-    large_distro_name: rhel80-build
-  tasks:
-  - name: compile_test_benchmark_and_package_serial_TG
-  - name: .aggregation !.sbe_only
-  - name: .auth
-  - name: audit
-  - name: .benchmarks
-  - name: .causally_consistent !.wo_snapshot
-  - name: .change_streams
-  - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode
-  - name: .encrypt
-  - name: free_monitoring
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_oidc
-  - name: initial_sync_fuzzer_gen
-  - name: compile_integration_and_test_parallel_stream_TG
-    distros:
-    - rhel80-large
-  - name: .jscore .common !.sbe_only
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
-  - name: .logical_session_cache
-  - name: .multi_shard .common
-  - name: .query_fuzzer
-  - name: .read_write_concern
-  - name: replica_sets_large_txns_format_jscore_passthrough
-  - name: .replica_sets !.multi_oplog
-  - name: .replica_sets .encrypt
-  - name: .resharding_fuzzer
-  - name: .retry
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: .updatefuzzer
-  - name: sasl
-  - name: secondary_reads_passthrough_gen
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common !.csrs !.jstestfuzz
-  - name: .watchdog
-  - name: .stitch
-  - name: .serverless
-  - name: unittest_shell_hang_analyzer_gen
-  - name: .updatefuzzer
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - &rhel80-debug-ubsan-all-feature-flags-template
   name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
@@ -2089,83 +2035,6 @@ buildvariants:
   - name: disk_wiredtiger
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
-  display_name: "* UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-build
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    lang_environment: LANG=C
-    san_options: *aubsan_options
-    compile_variant: *rhel80-debug-ubsan-classic-engine
-    compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      --dbg=on
-      --opt=on
-      --sanitize=undefined
-      --ssl
-      --ocsp-stapling=off
-      --enable-free-mon=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
-    scons_cache_scope: shared
-    separate_debug: off
-    large_distro_name: rhel80-build
-  tasks:
-  - name: compile_test_benchmark_and_package_serial_TG
-  - name: .aggregation !.sbe_only
-  - name: .auth
-  - name: audit
-  - name: .benchmarks
-  - name: .causally_consistent !.wo_snapshot
-  - name: .change_streams
-  - name: .misc_js
-  - name: .concurrency !.no_txns !.repl !.kill_terminate !.compute_mode
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: free_monitoring
-  - name: initial_sync_fuzzer_gen
-  - name: compile_integration_and_test_parallel_stream_TG
-    distros:
-    - rhel80-large
-  - name: .jscore .common !.sbe_only
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
-  - name: .logical_session_cache .one_sec
-  - name: .multi_shard .common
-  - name: .read_write_concern
-  - name: replica_sets_large_txns_format_jscore_passthrough
-  - name: .replica_sets !.multi_oplog
-  - name: .replica_sets .encrypt
-  - name: .resharding_fuzzer
-  - name: .retry
-  - name: .rollbackfuzzer
-  - name: .read_only
-  - name: sasl
-  - name: secondary_reads_passthrough_gen
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common !.csrs !.jstestfuzz
-  - name: .stitch
-  - name: .updatefuzzer
-  - name: .serverless
-  - name: watchdog_wiredtiger
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
-  - name: generate_buildid_to_debug_symbols_mapping
-
 - &rhel80-debug-aubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency
   name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
@@ -2192,6 +2061,55 @@ buildvariants:
   tasks:
   - name: jsCore
   - name: jsCore_txns
+
+- <<: *rhel80-debug-aubsan-lite-template
+  name: &rhel80-debug-aubsan-classic-engine rhel80-debug-aubsan-classic-engine
+  display_name: "* {A,UB}SAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  expansions:
+    <<: *aubsan-lite-required-expansions
+    test_flags: >-
+      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
+  tasks:
+  - name: .aggregation !.sbe_only
+  - name: .auth
+  - name: audit
+  - name: .causally_consistent !.wo_snapshot
+  - name: .change_streams
+  - name: disk_wiredtiger
+  - name: .misc_js
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode
+  - name: .encrypt
+  - name: free_monitoring
+  - name: external_auth
+  - name: external_auth_aws
+  - name: external_auth_oidc
+  - name: initial_sync_fuzzer_gen
+  - name: .jscore .common !.sbe_only
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .multi_shard .common
+  - name: .query_fuzzer
+  - name: .read_write_concern
+  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: .replica_sets !.multi_oplog
+  - name: .replica_sets .encrypt
+  - name: .resharding_fuzzer
+  - name: .retry
+  - name: .rollbackfuzzer
+  - name: .read_only
+  - name: sasl
+  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot
+  - name: .sharding .common !.csrs !.jstestfuzz
+  - name: .updatefuzzer
+  - name: .serverless
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .watchdog
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *rhel80-debug-aubsan-lite-template
   name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
@@ -2227,6 +2145,7 @@ buildvariants:
   - name: audit
   - name: .aggregation
   - name: .auth
+  - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: .config_fuzzer
   - name: .config_fuzzer_stress
   - name: cqf
@@ -2235,13 +2154,16 @@ buildvariants:
   - name: cqf_parallel
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
+  # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
+  - name: disk_wiredtiger
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: .encrypt
   - name: free_monitoring
+  - name: generate_buildid_to_debug_symbols_mapping
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
@@ -2249,7 +2171,6 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: jsCore_wildcard_indexes
   - name: json_schema
-  - name: .logical_session_cache
   - name: .misc_js
   - name: .multi_shard .common
   - name: query_golden_classic
@@ -2327,12 +2248,24 @@ buildvariants:
   # - name: compile_integration_and_test_parallel_stream_TG # Not passing
   # - name: test_api_version_compatibility # Not relevant for TSAN
   # - name: burn_in_tests_gen # No burn in tests needed
+  #   depends_on:
+  #   - name: version_burn_in_gen
+  #     variant: generate-tasks-for-version
+  #     omit_generated_tasks: true
+  #   - name: archive_dist_test_debug
+  #     variant: *enterprise-rhel80-debug-tsan
   - name: check_feature_flag_tags
   - name: .aggfuzzer !.feature_flag_guarded
   # - name: .aggregation !.feature_flag_guarded # Not passing
   - name: audit
   # - name: .auth  # Not passing
   # - name: burn_in_tags_gen # No burn in tests needed
+  #   depends_on:
+  #   - name: version_burn_in_gen
+  #     variant: generate-tasks-for-version
+  #     omit_generated_tasks: true
+  #   - name: archive_dist_test_debug
+  #     variant: *enterprise-rhel80-debug-tsan
   - name: buildscripts_test
   # - name: unittest_shell_hang_analyzer_gen # Not passing
   # - name: .config_fuzzer # Not passing
@@ -2592,7 +2525,6 @@ buildvariants:
   - name: .jscore .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2636,7 +2568,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2679,7 +2610,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2727,7 +2657,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2775,7 +2704,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -2822,8 +2750,6 @@ buildvariants:
     patch_only: true
   - name: .jscore .common
     patch_only: true
-  - name: .logical_session_cache .one_sec
-    patch_only: true
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
     patch_only: true
   - name: .sharding .common !.csrs !.encrypt
@@ -2851,20 +2777,20 @@ buildvariants:
   tasks:
   - name: win_shared_scons_cache_pruning
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-template
+- <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
   name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
-    <<: *linux_x86_generic_expansions
+    <<: *linux_arm64_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
-    commit_queue_alternate_cache: linux-x86-dynamic-compile-required
+    commit_queue_alternate_cache: amazon-linux2-arm64-compile
     has_packages: false
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=rhel80
+      MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
@@ -2878,20 +2804,18 @@ buildvariants:
   depends_on: []
   tasks:
   - name: compile_ninja_quick_TG
-    distros:
-    - rhel80-xlarge-commitqueue
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-xlarge-commitqueue
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-xlarge-commitqueue
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-xlarge-commitqueue
   - name: jsCore
     distros:
-    - rhel80-xlarge-commitqueue
+    - amazon2-arm64-large
   - name: .lint
   - name: test_api_version_compatibility
   - name: validate_commit_message
@@ -2901,7 +2825,7 @@ buildvariants:
   - name: resmoke_validation_tests
   - name: version_gen_validation
     distros:
-    - ubuntu2004-medium
+    - ubuntu2004-small
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
@@ -2974,7 +2898,7 @@ buildvariants:
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=resource_intensive
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -2989,7 +2913,8 @@ buildvariants:
       --excludeWithAnyTags=resource_intensive
       --excludeWithAnyTags=incompatible_with_shard_merge
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+### Security Patch-Specific Build Variants ###
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-security-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Security Patch Only (all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -2999,13 +2924,32 @@ buildvariants:
     max_sub_suites: 15
   tasks:
   - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *linux_x86_dynamic_compile_variant_name
   - name: .audit .patch_build
-  - name: .sasl .patch_build
   - name: .encrypt .patch_build
+  - name: .sasl .patch_build
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: lint_fuzzer_sanity_patch
+
+- <<: *enterprise-windows-template
+  name: &windows-compile-security-patch-only windows-compile-security-patch-only
+  display_name: "~ Windows Security Patch Only"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  expansions:
+    <<: *windows_required_expansions
+    exe: ".exe"
+  tasks:
+  - name: .encrypt .patch_build
+  - name: .sasl .patch_build
+  - name: external_auth_aws
+  - name: external_auth_oidc
 
 - name: &enterprise-ubuntu1804-64-libvoidstar enterprise-ubuntu1804-64-libvoidstar
   display_name: "~ Enterprise Ubuntu 18.04 w/ libvoidstar"

@@ -60,6 +60,6 @@ util_create(WT_SESSION *session, int argc, char *argv[])
     if ((ret = session->create(session, uri, config)) != 0)
         (void)util_err(session, ret, "session.create: %s", uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

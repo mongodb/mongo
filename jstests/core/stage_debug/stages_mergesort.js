@@ -7,7 +7,7 @@
 // ]
 
 // Test query stage merge sorting.
-t = db.stages_mergesort;
+let t = db.stages_mergesort;
 t.drop();
 var collname = "stages_mergesort";
 
@@ -22,7 +22,7 @@ t.createIndex({baz: 1, bar: 1});
 
 // foo == 1
 // We would (internally) use "": MinKey and "": MaxKey for the bar index bounds.
-ixscan1 = {
+let ixscan1 = {
     ixscan: {
         args: {
             keyPattern: {foo: 1, bar: 1},
@@ -35,7 +35,7 @@ ixscan1 = {
     }
 };
 // baz == 1
-ixscan2 = {
+let ixscan2 = {
     ixscan: {
         args: {
             keyPattern: {baz: 1, bar: 1},
@@ -48,10 +48,8 @@ ixscan2 = {
     }
 };
 
-mergesort = {
-    mergeSort: {args: {nodes: [ixscan1, ixscan2], pattern: {bar: 1}}}
-};
-res = db.runCommand({stageDebug: {plan: mergesort, collection: collname}});
+let mergesort = {mergeSort: {args: {nodes: [ixscan1, ixscan2], pattern: {bar: 1}}}};
+let res = db.runCommand({stageDebug: {plan: mergesort, collection: collname}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, 2 * N);
 assert.eq(res.results[0].bar, 0);

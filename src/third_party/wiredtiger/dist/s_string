@@ -76,7 +76,7 @@ while :
         sort -u -o $t $t
 
 	if ! diff $t s_string.ok >/dev/null 2>&1; then
-            echo "The string.ok list will be updated."
+            echo "The string.ok list will be updated to remove words that are no longer needed."
             cp $t s_string.ok
             exit_val=1
         else

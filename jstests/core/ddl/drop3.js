@@ -4,8 +4,8 @@
 //   does_not_support_causal_consistency,
 // ]
 
-t = db.jstests_drop3;
-sub = t.sub;
+let t = db.jstests_drop3;
+let sub = t.sub;
 
 t.drop();
 sub.drop();

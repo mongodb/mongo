@@ -1591,6 +1591,17 @@ class TestParser(testcase.IDLTestcase):
                 featureFlagToaster:
                     description: "Make toast"
                     cpp_varname: gToaster
+                    shouldBeFCVGated: true
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
+        # Missing shouldBeFCVGated
+        self.assert_parse_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
 
     def _test_field_list(self, field_list_name, should_forward_name):
@@ -1981,6 +1992,24 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_EMPTY_ACCESS_CHECK)
+
+    # pylint: disable=invalid-name
+    def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(self):
+
+        # Test commands and unsafe_dangerous_disable_extra_field_duplicate_checks are disallowed
+        self.assert_parse_fail(
+            textwrap.dedent("""
+            commands:
+                dangerc:
+                    description: foo
+                    namespace: ignored
+                    command_name: dangerc
+                    api_version: ""
+                    strict: false
+                    unsafe_dangerous_disable_extra_field_duplicate_checks: true
+                    fields:
+                        foo: string
+            """), idl.errors.ERROR_ID_UNKNOWN_NODE)
 
 
 if __name__ == '__main__':

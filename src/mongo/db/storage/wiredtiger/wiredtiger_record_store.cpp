@@ -1085,10 +1085,11 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
         }
     });
 
-    WT_CURSOR* cursor = writeConflictRetry(opCtx, "getLatestOplogTimestamp", "local.oplog.rs", [&] {
-        auto cachedCursor = session->getCachedCursor(_tableId, "");
-        return cachedCursor ? cachedCursor : session->getNewCursor(_uri);
-    });
+    WT_CURSOR* cursor = writeConflictRetry(
+        opCtx, "getLatestOplogTimestamp", NamespaceString::kRsOplogNamespace, [&] {
+            auto cachedCursor = session->getCachedCursor(_tableId, "");
+            return cachedCursor ? cachedCursor : session->getNewCursor(_uri);
+        });
     ON_BLOCK_EXIT([&] { session->releaseCursor(_tableId, cursor, ""); });
     int ret = cursor->prev(cursor);
     if (ret == WT_NOTFOUND) {
@@ -1114,8 +1115,8 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
     if (firstRecordTimestamp == Timestamp()) {
         WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
         auto sessRaii = cache->getSession();
-        WT_CURSOR* cursor =
-            writeConflictRetry(opCtx, "getEarliestOplogTimestamp", "local.oplog.rs", [&] {
+        WT_CURSOR* cursor = writeConflictRetry(
+            opCtx, "getEarliestOplogTimestamp", NamespaceString::kRsOplogNamespace, [&] {
                 auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
                 return cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
             });
@@ -1406,12 +1407,15 @@ Status WiredTigerRecordStore::doRangeTruncate(OperationContext* opCtx,
         return Status::OK();
     }
     invariantWTOK(ret, start->session);
+    // Make sure to reset the cursor since we have to replace it with what the user provided us.
+    invariantWTOK(start->reset(start), start->session);
 
     boost::optional<CursorKey> startKey;
     if (minRecordId != RecordId()) {
-        invariantWTOK(start->reset(start), start->session);
         startKey = makeCursorKey(minRecordId, _keyFormat);
         setKey(start, &(*startKey));
+    } else {
+        start = nullptr;
     }
     WiredTigerCursor endWrap(_uri, _tableId, true, opCtx);
     boost::optional<CursorKey> endKey;
@@ -1694,6 +1698,12 @@ long long WiredTigerRecordStore::_reserveIdBlock(OperationContext* opCtx, size_t
 void WiredTigerRecordStore::_changeNumRecordsAndDataSize(OperationContext* opCtx,
                                                          int64_t numRecordDiff,
                                                          int64_t dataSizeDiff) {
+    if (numRecordDiff == 0 && dataSizeDiff == 0) {
+        // If there's nothing to increment/decrement this will be a no-op. Avoid all the other
+        // checks and early return.
+        return;
+    }
+
     if (!_tracksSizeAdjustments) {
         return;
     }

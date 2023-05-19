@@ -95,10 +95,9 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
               // The global lock is held by the timestamp monitor while callbacks are executed, so
               // there can be no batched CollectionCatalog writer and we are thus safe to write
               // using the service context.
-              if (CollectionCatalog::latest(serviceContext)
-                      ->needsCleanupForOldestTimestamp(timestamp)) {
+              if (CollectionCatalog::latest(serviceContext)->catalogIdTracker().dirty(timestamp)) {
                   CollectionCatalog::write(serviceContext, [timestamp](CollectionCatalog& catalog) {
-                      catalog.cleanupForOldestTimestampAdvanced(timestamp);
+                      catalog.catalogIdTracker().cleanup(timestamp);
                   });
               }
           }),
@@ -279,7 +278,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
     Timestamp minValidTs = stableTs ? *stableTs : Timestamp::min();
     CollectionCatalog::write(opCtx, [&minValidTs](CollectionCatalog& catalog) {
         // Let the CollectionCatalog know that we are maintaining timestamps from minValidTs
-        catalog.cleanupForCatalogReopen(minValidTs);
+        catalog.catalogIdTracker().rollback(minValidTs);
     });
     for (DurableCatalog::EntryIdentifier entry : catalogEntries) {
         if (_options.forRestore) {
@@ -429,8 +428,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     auto collection = collectionFactory->make(opCtx, nss, catalogId, md, std::move(rs));
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(
-            opCtx, md->options.uuid.value(), std::move(collection), /*commitTime*/ minValidTs);
+        catalog.registerCollection(opCtx, std::move(collection), /*commitTime*/ minValidTs);
     });
 }
 
@@ -847,7 +845,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 }
 
 std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName) const {
-    return _catalog->getFilesystemPathForDb(dbName.toString());
+    return _catalog->getFilesystemPathForDb(DatabaseNameUtil::serializeForCatalog(dbName));
 }
 
 void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
@@ -1400,9 +1398,8 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, const Databa
 
     if (opCtx->isLockFreeReadsOp()) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
-        for (auto it = collectionCatalog->begin(opCtx, dbName); it != collectionCatalog->end(opCtx);
-             ++it) {
-            perCollectionWork(*it);
+        for (auto&& coll : collectionCatalog->range(dbName)) {
+            perCollectionWork(coll);
         }
     } else {
         catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);

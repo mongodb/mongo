@@ -78,7 +78,6 @@ private:
     void _setFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid);
 
     // Scoped objects
-    RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", true};
     unittest::MinimumLoggedSeverityGuard _severityGuard{logv2::LogComponent::kShardingRangeDeleter,
                                                         logv2::LogSeverity::Debug(2)};
 };

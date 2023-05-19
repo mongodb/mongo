@@ -1,0 +1,16 @@
+[
+    {include: ["<boost/smart_ptr/detail/operator_bool.hpp>", "private", "<boost/smart_ptr.hpp>", "public"]},
+    {include: ["\"boost/smart_ptr/detail/operator_bool.hpp\"", "private", "<boost/smart_ptr.hpp>", "public"]},
+    {include: ["<boost/optional/detail/optional_relops.hpp>", "private", "<boost/optional.hpp>", "public"]},
+    {include: ["\"boost/optional/detail/optional_relops.hpp\"", "private", "<boost/optional.hpp>", "public"]},
+    {include: ["<boost/optional/detail/optional_reference_spec.hpp>", "private", "<boost/optional.hpp>", "public"]},
+    {include: ["\"boost/optional/detail/optional_reference_spec.hpp\"", "private", "<boost/optional.hpp>", "public"]},
+    {include: ["<boost/tuple/detail/tuple_basic.hpp>", "private", "<boost/tuple/tuple.hpp>", "public"]},
+    {include: ["\"boost/tuple/detail/tuple_basic.hpp\"", "private", "<boost/tuple/tuple.hpp>", "public"]},
+    {include: ["<boost/program_options/detail/value_semantic.hpp>", "private", "<boost/program_options/value_semantic.hpp>", "public"]},
+    {include: ["\"boost/program_options/detail/value_semantic.hpp\"", "private", "<boost/program_options/value_semantic.hpp>", "public"]},
+    {include: ["<boost/optional/detail/optional_swap.hpp>", "private", "<boost/optional.hpp>", "public"]},
+    {include: ["\"boost/optional/detail/optional_swap.hpp\"", "private", "<boost/optional.hpp>", "public"]},
+    {include: ["<boost/preprocessor/iteration/detail/iter/limits/forward1_256.hpp>", "private", "<boost/preprocessor/iteration/iterate.hpp>", "public"]},
+    {include: ["\"boost/preprocessor/iteration/detail/iter/limits/forward1_256.hpp\"", "private", "<boost/preprocessor/iteration/iterate.hpp>", "public"]},
+]

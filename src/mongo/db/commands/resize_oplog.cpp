@@ -89,7 +89,7 @@ public:
         auto params =
             ReplSetResizeOplogRequest::parse(IDLParserContext("replSetResizeOplog"), jsobj);
 
-        return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns().ns(), [&] {
+        return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
             if (auto sizeMB = params.getSize()) {

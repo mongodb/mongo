@@ -14,12 +14,12 @@ s.ensurePrimaryShard('test', s.shard1.shardName);
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
 db = s.getDB("test");
-primary = s.getPrimaryShard("test").getDB("test");
-secondary = s.getOther(primary).getDB("test");
+let primary = s.getPrimaryShard("test").getDB("test");
+let secondary = s.getOther(primary).getDB("test");
 
 var numObjs = 30;
 var bulk = db.foo.initializeUnorderedBulkOp();
-for (i = 0; i < numObjs; i++) {
+for (let i = 0; i < numObjs; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());

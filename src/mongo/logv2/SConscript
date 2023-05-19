@@ -14,7 +14,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/security_token',
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )

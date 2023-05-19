@@ -103,4 +103,4 @@ class test_tiered16(TieredConfigMixin, wttest.WiredTigerTestCase):
             self.check_bucket([])
 
 if __name__ == '__main__':
-    wttest.run
+    wttest.run()

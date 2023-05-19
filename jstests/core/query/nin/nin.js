@@ -1,6 +1,6 @@
 // @tags: [requires_fastcount]
 
-t = db.jstests_nin;
+let t = db.jstests_nin;
 t.drop();
 
 function checkEqual(name, key, value) {
@@ -16,7 +16,7 @@ function checkEqual(name, key, value) {
                   " != " + t.find().count());
 }
 
-doTest = function(n) {
+let doTest = function(n) {
     t.save({a: [1, 2, 3]});
     t.save({a: [1, 2, 4]});
     t.save({a: [1, 8, 5]});

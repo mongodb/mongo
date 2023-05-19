@@ -207,7 +207,8 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
         handleTimeseriesRewrites(&resolvedPipeline);
     }
 
-    AggregateCommandRequest expandedRequest{_namespace, std::move(resolvedPipeline)};
+    AggregateCommandRequest expandedRequest{
+        _namespace, std::move(resolvedPipeline), request.getSerializationContext()};
 
     if (request.getExplain()) {
         expandedRequest.setExplain(request.getExplain());

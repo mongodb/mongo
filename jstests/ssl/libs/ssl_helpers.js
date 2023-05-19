@@ -1,5 +1,6 @@
 load('jstests/multiVersion/libs/multi_rs.js');
 load('jstests/libs/os_helpers.js');
+load('jstests/replsets/libs/basic_replset_test.js');
 
 // Do not fail if this test leaves unterminated processes because this file expects replset1.js to
 // throw for invalid SSL options.
@@ -46,26 +47,18 @@ var dhparamSSL = {
 
 // Test if ssl replset  configs work
 
-var replSetTestFile = "jstests/replsets/replset1.js";
-
 var replShouldSucceed = function(name, opt1, opt2) {
-    ssl_options1 = opt1;
-    ssl_options2 = opt2;
-    ssl_name = name;
     // try running this file using the given config
-    load(replSetTestFile);
+    basicReplsetTest(15, opt1, opt2, name);
 };
 
 // Test if ssl replset configs fail
 var replShouldFail = function(name, opt1, opt2) {
-    ssl_options1 = opt1;
-    ssl_options2 = opt2;
-    ssl_name = name;
     // This will cause an assert.soon() in ReplSetTest to fail. This normally triggers the hang
     // analyzer, but since we do not want to run it on expected timeouts, we temporarily disable it.
     MongoRunner.runHangAnalyzer.disable();
     try {
-        assert.throws(load, [replSetTestFile], "This setup should have failed");
+        assert.throws(() => basicReplsetTest(15, opt1, opt2, name));
     } finally {
         MongoRunner.runHangAnalyzer.enable();
     }
@@ -322,7 +315,7 @@ function sslProviderSupportsTLS1_0() {
         return false;
     }
 
-    return !isDebian10() && !isUbuntu2004();
+    return !isDebian() && !isUbuntu2004();
 }
 
 function sslProviderSupportsTLS1_1() {
@@ -335,7 +328,7 @@ function sslProviderSupportsTLS1_1() {
         return false;
     }
 
-    return !isDebian10() && !isUbuntu2004();
+    return !isDebian() && !isUbuntu2004();
 }
 
 function isOpenSSL3orGreater() {
@@ -360,6 +353,22 @@ function opensslVersionAsInt() {
     let version = (matches[1] << 24) | (matches[2] << 16) | (matches[3] << 8);
 
     return version;
+}
+
+function supportsFIPS() {
+    // OpenSSL supports FIPS
+    let expectSupportsFIPS = (determineSSLProvider() == "openssl");
+
+    // But OpenSSL supports FIPS only sometimes
+    // - Debian does not support FIPS, Fedora 37 does not, Fedora 38 does
+    // - Ubuntu only supports FIPS with Ubuntu pro
+    if (expectSupportsFIPS) {
+        if (isDebian() || isUbuntu()) {
+            expectSupportsFIPS = false;
+        }
+    }
+
+    return expectSupportsFIPS;
 }
 
 function copyCertificateFile(a, b) {

@@ -4,7 +4,7 @@
 // init with one shard with one node rs
 var st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
 var mongos = st.s;
-var rs = st.rs0;
+const rs = st.rs0;
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
 

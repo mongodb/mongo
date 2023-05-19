@@ -4,12 +4,12 @@
 
 // Test sorting with dups and multiple candidate query plans.
 
-t = db.jstests_sortd;
+let t = db.jstests_sortd;
 
 function checkNumSorted(n, query) {
-    docs = query.toArray();
+    let docs = query.toArray();
     assert.eq(n, docs.length);
-    for (i = 1; i < docs.length; ++i) {
+    for (let i = 1; i < docs.length; ++i) {
         assert.lte(docs[i - 1].a, docs[i].a);
     }
 }
@@ -31,10 +31,10 @@ t.drop();
 
 t.save({a: 1});
 t.save({a: 10});
-for (i = 2; i <= 9; ++i) {
+for (let i = 2; i <= 9; ++i) {
     t.save({a: i});
 }
-for (i = 0; i < 30; ++i) {
+for (let i = 0; i < 30; ++i) {
     t.save({a: 100});
 }
 t.createIndex({a: 1});
@@ -49,10 +49,10 @@ t.drop();
 
 t.save({a: 1});
 t.save({a: 200});
-for (i = 2; i <= 199; ++i) {
+for (let i = 2; i <= 199; ++i) {
     t.save({a: i});
 }
-for (i = 0; i < 30; ++i) {
+for (let i = 0; i < 30; ++i) {
     t.save({a: 2000});
 }
 t.createIndex({a: 1});
@@ -65,7 +65,7 @@ checkNumSorted(200, t.find({a: {$gte: 0, $lte: 200}, b: null}).sort({a: 1}));
 
 t.drop();
 
-for (i = 399; i >= 0; --i) {
+for (let i = 399; i >= 0; --i) {
     t.save({a: i});
 }
 t.createIndex({a: 1});

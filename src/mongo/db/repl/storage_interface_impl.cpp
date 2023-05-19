@@ -239,7 +239,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
     std::unique_ptr<CollectionBulkLoader> loader;
     // Retry if WCE.
-    Status status = writeConflictRetry(opCtx.get(), "beginCollectionClone", nss.ns(), [&] {
+    Status status = writeConflictRetry(opCtx.get(), "beginCollectionClone", nss, [&] {
         UnreplicatedWritesBlock uwb(opCtx.get());
 
         // Get locks and create the collection.
@@ -405,14 +405,15 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
             hasLocalDatabase = true;
             continue;
         }
-        writeConflictRetry(opCtx, "dropReplicatedDatabases", dbName.toString(), [&] {
+        writeConflictRetry(opCtx, "dropReplicatedDatabases", NamespaceString(dbName), [&] {
             if (auto db = databaseHolder->getDb(opCtx, dbName)) {
                 WriteUnitOfWork wuow(opCtx);
                 databaseHolder->dropDb(opCtx, db);
                 wuow.commit();
             } else {
                 // This is needed since dropDatabase can't be rolled back.
-                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed.
+                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once
+                // fixed.
                 LOGV2(21755,
                       "dropReplicatedDatabases - database disappeared after retrieving list of "
                       "database names but before drop: {dbName}",
@@ -456,7 +457,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const bool createIdIndex,
                                               const BSONObj& idIndexSpec) {
     try {
-        return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
+        return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss, [&] {
             AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
             auto db = databaseWriteGuard.ensureDbExists(opCtx);
             invariant(db);
@@ -494,20 +495,19 @@ Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
         return Status::OK();
 
     try {
-        writeConflictRetry(
-            opCtx, "StorageInterfaceImpl::createIndexesOnEmptyCollection", nss.ns(), [&] {
-                AutoGetCollection autoColl(
-                    opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
-                CollectionWriter collection(opCtx, nss);
+        writeConflictRetry(opCtx, "StorageInterfaceImpl::createIndexesOnEmptyCollection", nss, [&] {
+            AutoGetCollection autoColl(
+                opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
+            CollectionWriter collection(opCtx, nss);
 
-                WriteUnitOfWork wunit(opCtx);
-                // Use IndexBuildsCoordinator::createIndexesOnEmptyCollection() rather than
-                // IndexCatalog::createIndexOnEmptyCollection() as the former generates
-                // 'createIndexes' oplog entry for replicated writes.
-                IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                    opCtx, collection, secondaryIndexSpecs, false /* fromMigrate */);
-                wunit.commit();
-            });
+            WriteUnitOfWork wunit(opCtx);
+            // Use IndexBuildsCoordinator::createIndexesOnEmptyCollection() rather than
+            // IndexCatalog::createIndexOnEmptyCollection() as the former generates
+            // 'createIndexes' oplog entry for replicated writes.
+            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                opCtx, collection, secondaryIndexSpecs, false /* fromMigrate */);
+            wunit.commit();
+        });
     } catch (DBException& ex) {
         return ex.toStatus();
     }
@@ -517,7 +517,7 @@ Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
 
 Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        return writeConflictRetry(opCtx, "StorageInterfaceImpl::dropCollection", nss.ns(), [&] {
+        return writeConflictRetry(opCtx, "StorageInterfaceImpl::dropCollection", nss, [&] {
             AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
             Lock::CollectionLock collLock(opCtx, nss, MODE_X);
             if (!autoDb.getDb()) {
@@ -539,7 +539,7 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
 
 Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
-    return writeConflictRetry(opCtx, "StorageInterfaceImpl::truncateCollection", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "StorageInterfaceImpl::truncateCollection", nss, [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         auto collectionResult =
             getCollection(autoColl, nss, "The collection must exist before truncating.");
@@ -568,7 +568,7 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
                                     << "; to NS: " << toNS.toStringForErrorMsg());
     }
 
-    return writeConflictRetry(opCtx, "StorageInterfaceImpl::renameCollection", fromNS.ns(), [&] {
+    return writeConflictRetry(opCtx, "StorageInterfaceImpl::renameCollection", fromNS, [&] {
         AutoGetDb autoDB(opCtx, fromNS.dbName(), MODE_X);
         if (!autoDB.getDb()) {
             return Status(ErrorCodes::NamespaceNotFound,
@@ -601,7 +601,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
                           << " (" << collectionUUID << ") as multikey at null timestamp");
     }
 
-    return writeConflictRetry(opCtx, "StorageInterfaceImpl::setIndexIsMultikey", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "StorageInterfaceImpl::setIndexIsMultikey", nss, [&] {
         const NamespaceStringOrUUID nsOrUUID(nss.dbName(), collectionUUID);
         boost::optional<AutoGetCollection> autoColl;
         try {
@@ -669,186 +669,180 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
     auto isFind = mode == FindDeleteMode::kFind;
     auto opStr = isFind ? "StorageInterfaceImpl::find" : "StorageInterfaceImpl::delete";
 
-    return writeConflictRetry(
-        opCtx, opStr, nsOrUUID.toString(), [&]() -> StatusWith<std::vector<BSONObj>> {
-            // We need to explicitly use this in a few places to help the type inference.  Use a
-            // shorthand.
-            using Result = StatusWith<std::vector<BSONObj>>;
+    return writeConflictRetry(opCtx, opStr, nsOrUUID, [&]() -> StatusWith<std::vector<BSONObj>> {
+        // We need to explicitly use this in a few places to help the type inference.  Use a
+        // shorthand.
+        using Result = StatusWith<std::vector<BSONObj>>;
 
-            auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-            const auto collection =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest::fromOpCtx(
-                                      opCtx, nsOrUUID, AcquisitionPrerequisites::kWrite),
-                                  collectionAccessMode);
-            if (!collection.exists()) {
-                return Status{ErrorCodes::NamespaceNotFound,
-                              str::stream()
-                                  << "Collection [" << nsOrUUID.toString() << "] not found. "
-                                  << "Unable to proceed with " << opStr << "."};
+        auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nsOrUUID, AcquisitionPrerequisites::kWrite),
+                              collectionAccessMode);
+        if (!collection.exists()) {
+            return Status{ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
+                                        << "Unable to proceed with " << opStr << "."};
+        }
+
+        auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
+        auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
+
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor;
+        if (!indexName) {
+            if (!startKey.isEmpty()) {
+                return Result(ErrorCodes::NoSuchKey,
+                              "non-empty startKey not allowed for collection scan");
             }
+            if (boundInclusion != BoundInclusion::kIncludeStartKeyOnly) {
+                return Result(ErrorCodes::InvalidOptions,
+                              "bound inclusion must be BoundInclusion::kIncludeStartKeyOnly for "
+                              "collection scan");
+            }
+            // Use collection scan.
+            planExecutor = isFind
+                ? InternalPlanner::collectionScan(opCtx,
+                                                  &collection.getCollectionPtr(),
+                                                  PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                  direction)
+                : InternalPlanner::deleteWithCollectionScan(
+                      opCtx,
+                      collection,
+                      makeDeleteStageParamsForDeleteDocuments(),
+                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                      direction);
+        } else if (*indexName == kIdIndexName && collection.getCollectionPtr()->isClustered() &&
+                   collection.getCollectionPtr()
+                           ->getClusteredInfo()
+                           ->getIndexSpec()
+                           .getKey()
+                           .firstElement()
+                           .fieldNameStringData() == "_id") {
 
-            auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
-            auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
+            auto collScanBoundInclusion = [boundInclusion]() {
+                switch (boundInclusion) {
+                    case BoundInclusion::kExcludeBothStartAndEndKeys:
+                        return CollectionScanParams::ScanBoundInclusion::
+                            kExcludeBothStartAndEndRecords;
+                    case BoundInclusion::kIncludeStartKeyOnly:
+                        return CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
+                    case BoundInclusion::kIncludeEndKeyOnly:
+                        return CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+                    case BoundInclusion::kIncludeBothStartAndEndKeys:
+                        return CollectionScanParams::ScanBoundInclusion::
+                            kIncludeBothStartAndEndRecords;
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            }();
 
-            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor;
-            if (!indexName) {
+            boost::optional<RecordIdBound> minRecord, maxRecord;
+            if (direction == InternalPlanner::FORWARD) {
                 if (!startKey.isEmpty()) {
-                    return Result(ErrorCodes::NoSuchKey,
-                                  "non-empty startKey not allowed for collection scan");
-                }
-                if (boundInclusion != BoundInclusion::kIncludeStartKeyOnly) {
-                    return Result(
-                        ErrorCodes::InvalidOptions,
-                        "bound inclusion must be BoundInclusion::kIncludeStartKeyOnly for "
-                        "collection scan");
-                }
-                // Use collection scan.
-                planExecutor = isFind
-                    ? InternalPlanner::collectionScan(opCtx,
-                                                      &collection.getCollectionPtr(),
-                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                      direction)
-                    : InternalPlanner::deleteWithCollectionScan(
-                          opCtx,
-                          collection,
-                          makeDeleteStageParamsForDeleteDocuments(),
-                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                          direction);
-            } else if (*indexName == kIdIndexName && collection.getCollectionPtr()->isClustered() &&
-                       collection.getCollectionPtr()
-                               ->getClusteredInfo()
-                               ->getIndexSpec()
-                               .getKey()
-                               .firstElement()
-                               .fieldNameStringData() == "_id") {
-
-                auto collScanBoundInclusion = [boundInclusion]() {
-                    switch (boundInclusion) {
-                        case BoundInclusion::kExcludeBothStartAndEndKeys:
-                            return CollectionScanParams::ScanBoundInclusion::
-                                kExcludeBothStartAndEndRecords;
-                        case BoundInclusion::kIncludeStartKeyOnly:
-                            return CollectionScanParams::ScanBoundInclusion::
-                                kIncludeStartRecordOnly;
-                        case BoundInclusion::kIncludeEndKeyOnly:
-                            return CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
-                        case BoundInclusion::kIncludeBothStartAndEndKeys:
-                            return CollectionScanParams::ScanBoundInclusion::
-                                kIncludeBothStartAndEndRecords;
-                        default:
-                            MONGO_UNREACHABLE;
-                    }
-                }();
-
-                boost::optional<RecordIdBound> minRecord, maxRecord;
-                if (direction == InternalPlanner::FORWARD) {
-                    if (!startKey.isEmpty()) {
-                        minRecord = RecordIdBound(record_id_helpers::keyForObj(startKey));
-                    }
-                    if (!endKey.isEmpty()) {
-                        maxRecord = RecordIdBound(record_id_helpers::keyForObj(endKey));
-                    }
-                } else {
-                    if (!startKey.isEmpty()) {
-                        maxRecord = RecordIdBound(record_id_helpers::keyForObj(startKey));
-                    }
-                    if (!endKey.isEmpty()) {
-                        minRecord = RecordIdBound(record_id_helpers::keyForObj(endKey));
-                    }
-                }
-
-                planExecutor = isFind
-                    ? InternalPlanner::collectionScan(opCtx,
-                                                      &collection.getCollectionPtr(),
-                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                      direction,
-                                                      boost::none /* resumeAfterId */,
-                                                      minRecord,
-                                                      maxRecord,
-                                                      collScanBoundInclusion)
-                    : InternalPlanner::deleteWithCollectionScan(
-                          opCtx,
-                          collection,
-                          makeDeleteStageParamsForDeleteDocuments(),
-                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                          direction,
-                          minRecord,
-                          maxRecord,
-                          collScanBoundInclusion);
-            } else {
-                // Use index scan.
-                auto indexCatalog = collection.getCollectionPtr()->getIndexCatalog();
-                invariant(indexCatalog);
-                const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
-                    opCtx, *indexName, IndexCatalog::InclusionPolicy::kReady);
-                if (!indexDescriptor) {
-                    return Result(ErrorCodes::IndexNotFound,
-                                  str::stream()
-                                      << "Index not found, ns:" << nsOrUUID.toStringForErrorMsg()
-                                      << ", index: " << *indexName);
-                }
-                if (indexDescriptor->isPartial()) {
-                    return Result(ErrorCodes::IndexOptionsConflict,
-                                  str::stream()
-                                      << "Partial index is not allowed for this operation, ns:"
-                                      << nsOrUUID.toStringForErrorMsg()
-                                      << ", index: " << *indexName);
-                }
-
-                KeyPattern keyPattern(indexDescriptor->keyPattern());
-                auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
-                auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
-                auto bounds =
-                    isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
-                if (!startKey.isEmpty()) {
-                    bounds.first = startKey;
+                    minRecord = RecordIdBound(record_id_helpers::keyForObj(startKey));
                 }
                 if (!endKey.isEmpty()) {
-                    bounds.second = endKey;
+                    maxRecord = RecordIdBound(record_id_helpers::keyForObj(endKey));
                 }
-                planExecutor = isFind
-                    ? InternalPlanner::indexScan(opCtx,
-                                                 &collection.getCollectionPtr(),
-                                                 indexDescriptor,
-                                                 bounds.first,
-                                                 bounds.second,
-                                                 boundInclusion,
-                                                 PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                 direction,
-                                                 InternalPlanner::IXSCAN_FETCH)
-                    : InternalPlanner::deleteWithIndexScan(
-                          opCtx,
-                          collection,
-                          makeDeleteStageParamsForDeleteDocuments(),
-                          indexDescriptor,
-                          bounds.first,
-                          bounds.second,
-                          boundInclusion,
-                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                          direction);
+            } else {
+                if (!startKey.isEmpty()) {
+                    maxRecord = RecordIdBound(record_id_helpers::keyForObj(startKey));
+                }
+                if (!endKey.isEmpty()) {
+                    minRecord = RecordIdBound(record_id_helpers::keyForObj(endKey));
+                }
             }
 
-            std::vector<BSONObj> docs;
-
-            try {
-                BSONObj out;
-                PlanExecutor::ExecState state = PlanExecutor::ExecState::ADVANCED;
-                while (state == PlanExecutor::ExecState::ADVANCED && docs.size() < limit) {
-                    state = planExecutor->getNext(&out, nullptr);
-                    if (state == PlanExecutor::ExecState::ADVANCED) {
-                        docs.push_back(out.getOwned());
-                    }
-                }
-            } catch (const WriteConflictException&) {
-                // Re-throw the WCE, since it will get caught be a retry loop at a higher level.
-                throw;
-            } catch (const DBException&) {
-                return exceptionToStatus();
+            planExecutor = isFind
+                ? InternalPlanner::collectionScan(opCtx,
+                                                  &collection.getCollectionPtr(),
+                                                  PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                  direction,
+                                                  boost::none /* resumeAfterId */,
+                                                  minRecord,
+                                                  maxRecord,
+                                                  collScanBoundInclusion)
+                : InternalPlanner::deleteWithCollectionScan(
+                      opCtx,
+                      collection,
+                      makeDeleteStageParamsForDeleteDocuments(),
+                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                      direction,
+                      minRecord,
+                      maxRecord,
+                      collScanBoundInclusion);
+        } else {
+            // Use index scan.
+            auto indexCatalog = collection.getCollectionPtr()->getIndexCatalog();
+            invariant(indexCatalog);
+            const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
+                opCtx, *indexName, IndexCatalog::InclusionPolicy::kReady);
+            if (!indexDescriptor) {
+                return Result(ErrorCodes::IndexNotFound,
+                              str::stream()
+                                  << "Index not found, ns:" << nsOrUUID.toStringForErrorMsg()
+                                  << ", index: " << *indexName);
+            }
+            if (indexDescriptor->isPartial()) {
+                return Result(ErrorCodes::IndexOptionsConflict,
+                              str::stream()
+                                  << "Partial index is not allowed for this operation, ns:"
+                                  << nsOrUUID.toStringForErrorMsg() << ", index: " << *indexName);
             }
 
-            return Result{docs};
-        });
+            KeyPattern keyPattern(indexDescriptor->keyPattern());
+            auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
+            auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
+            auto bounds =
+                isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
+            if (!startKey.isEmpty()) {
+                bounds.first = startKey;
+            }
+            if (!endKey.isEmpty()) {
+                bounds.second = endKey;
+            }
+            planExecutor = isFind
+                ? InternalPlanner::indexScan(opCtx,
+                                             &collection.getCollectionPtr(),
+                                             indexDescriptor,
+                                             bounds.first,
+                                             bounds.second,
+                                             boundInclusion,
+                                             PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                             direction,
+                                             InternalPlanner::IXSCAN_FETCH)
+                : InternalPlanner::deleteWithIndexScan(opCtx,
+                                                       collection,
+                                                       makeDeleteStageParamsForDeleteDocuments(),
+                                                       indexDescriptor,
+                                                       bounds.first,
+                                                       bounds.second,
+                                                       boundInclusion,
+                                                       PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                       direction);
+        }
+
+        std::vector<BSONObj> docs;
+
+        try {
+            BSONObj out;
+            PlanExecutor::ExecState state = PlanExecutor::ExecState::ADVANCED;
+            while (state == PlanExecutor::ExecState::ADVANCED && docs.size() < limit) {
+                state = planExecutor->getNext(&out, nullptr);
+                if (state == PlanExecutor::ExecState::ADVANCED) {
+                    docs.push_back(out.getOwned());
+                }
+            }
+        } catch (const WriteConflictException&) {
+            // Re-throw the WCE, since it will get caught be a retry loop at a higher level.
+            throw;
+        } catch (const DBException&) {
+            return exceptionToStatus();
+        }
+
+        return Result{docs};
+    });
 }
 
 StatusWith<BSONObj> _findOrDeleteById(OperationContext* opCtx,
@@ -983,27 +977,30 @@ Status _updateWithQuery(OperationContext* opCtx,
     invariant(PlanYieldPolicy::YieldPolicy::NO_YIELD == request.getYieldPolicy());
 
     auto& nss = request.getNamespaceString();
-    return writeConflictRetry(opCtx, "_updateWithQuery", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "_updateWithQuery", nss, [&] {
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        if (!collection.exists()) {
+            return Status{ErrorCodes::NamespaceNotFound,
+                          str::stream()
+                              << "Collection [" << nss.toString() << "] not found. "
+                              << "Unable to update documents in " << nss.toStringForErrorMsg()
+                              << " using query " << request.getQuery()};
+        }
+
         // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
         // CanonicalQuery whose ownership will be transferred to the plan executor in
         // getExecutorUpdate().
         const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
+        ParsedUpdate parsedUpdate(
+            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;
         }
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto collectionResult = getCollection(
-            autoColl,
-            nss,
-            str::stream() << "Unable to update documents in " << nss.toStringForErrorMsg()
-                          << " using query " << request.getQuery());
-        if (!collectionResult.isOK()) {
-            return collectionResult.getStatus();
-        }
-        const auto& collection = *collectionResult.getValue();
         WriteUnitOfWork wuow(opCtx);
         if (!ts.isNull()) {
             uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
@@ -1011,7 +1008,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         }
 
         auto planExecutorResult = mongo::getExecutorUpdate(
-            nullptr, &collection, &parsedUpdate, boost::none /* verbosity */);
+            nullptr, collection, &parsedUpdate, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1045,18 +1042,22 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
     }
     auto query = queryResult.getValue();
 
-    return writeConflictRetry(opCtx, "StorageInterfaceImpl::upsertById", nsOrUUID.toString(), [&] {
-        AutoGetCollection autoColl(opCtx, nsOrUUID, MODE_IX);
-        auto collectionResult = getCollection(autoColl, nsOrUUID, "Unable to update document.");
-        if (!collectionResult.isOK()) {
-            return collectionResult.getStatus();
+    return writeConflictRetry(opCtx, "StorageInterfaceImpl::upsertById", nsOrUUID, [&] {
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nsOrUUID, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+        if (!collection.exists()) {
+            return Status{ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
+                                        << "Unable to update document."};
         }
-        const auto& collection = *collectionResult.getValue();
 
         // We can create an UpdateRequest now that the collection's namespace has been resolved, in
         // the event it was specified as a UUID.
         auto request = UpdateRequest();
-        request.setNamespaceString(collection->ns());
+        request.setNamespaceString(collection.nss());
         request.setQuery(query);
         request.setUpdateModification(
             write_ops::UpdateModification::parseFromClassicUpdate(update));
@@ -1068,7 +1069,8 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         // ParsedUpdate needs to be inside the write conflict retry loop because it contains
         // the UpdateDriver whose state may be modified while we are applying the update.
         const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
+        ParsedUpdate parsedUpdate(
+            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;
@@ -1076,7 +1078,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 
         // We're using the ID hack to perform the update so we have to disallow collections
         // without an _id index.
-        auto descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+        auto descriptor = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
         if (!descriptor) {
             return Status(ErrorCodes::IndexNotFound,
                           "Unable to update document in a collection without an _id index.");
@@ -1085,7 +1087,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         UpdateStageParams updateStageParams(
             parsedUpdate.getRequest(), parsedUpdate.getDriver(), nullptr);
         auto planExecutor = InternalPlanner::updateWithIdHack(opCtx,
-                                                              &collection,
+                                                              collection,
                                                               updateStageParams,
                                                               descriptor,
                                                               idKey.wrap(""),
@@ -1142,7 +1144,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
     // disallow client deletes from unrecognized system collections.
     request.setGod(true);
 
-    return writeConflictRetry(opCtx, "StorageInterfaceImpl::deleteByFilter", nss.ns(), [&] {
+    return writeConflictRetry(opCtx, "StorageInterfaceImpl::deleteByFilter", nss, [&] {
         const auto collection = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
@@ -1459,7 +1461,8 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     if (primaryOnly &&
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin"))
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
+                                                                              DatabaseName::kAdmin))
         return;
     const auto& oplog = oplogRead.getCollection();
     uassert(ErrorCodes::NotYetInitialized, "The oplog does not exist", oplog);

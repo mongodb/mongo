@@ -39,6 +39,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -105,6 +106,8 @@ public:
 
             opObserverRegistry->addObserver(
                 std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterImpl>()));
+            opObserverRegistry->addObserver(
+                std::make_unique<MigrationChunkClonerSourceOpObserver>());
         }
 
         {

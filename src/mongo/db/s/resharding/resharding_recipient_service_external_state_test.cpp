@@ -263,7 +263,7 @@ public:
         RecipientStateMachineExternalStateImpl externalState;
         externalState.ensureTempReshardingCollectionExistsWithIndexes(
             operationContext(), kMetadata, kDefaultFetchTimestamp);
-        CollectionShardingRuntime csr(getServiceContext(), kOrigNss, executor());
+        CollectionShardingRuntime csr(getServiceContext(), kOrigNss);
         ASSERT(csr.getCurrentMetadataIfKnown() == boost::none);
     }
 };

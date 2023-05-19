@@ -22,7 +22,7 @@ var primeSystemReplset = function() {
 var restartWithConfig = function() {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: conn.dbpath});
-    testDB = conn.getDB("test");
+    let testDB = conn.getDB("test");
     var n = 100;
     for (var i = 0; i < n; i++) {
         testDB.foo.insert({x: new Date()});

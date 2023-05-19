@@ -37,10 +37,10 @@ PhysicalScan [{'<root>': scan0}, collName]
     left 
         [3] project [s3 = getField(s1, "zipcode")] 
         [1] project [s2 = getField(s1, "city")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right 
         [5] project [s5 = getField(s4, "id")] 
-        [4] scan s4 none none none none none [] @"<collUUID>" true false 
+        [4] scan s4 none none none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Nested loop join with equality predicate (Left join) ====
@@ -80,8 +80,8 @@ PhysicalScan [{'<root>': scan0}, collName]
     left 
         [3] project [s3 = getField(s1, "zipcode")] 
         [1] project [s2 = getField(s1, "city")] 
-        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+        [0] scan s1 none none none none none none none [] @"<collUUID>" true false 
     right 
         [5] project [s5 = getField(s4, "id")] 
-        [4] scan s4 none none none none none [] @"<collUUID>" true false 
+        [4] scan s4 none none none none none none none [] @"<collUUID>" true false 
 

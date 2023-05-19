@@ -29,6 +29,8 @@ if (FixtureHelpers.isMongos(db) &&
     return;
 }
 
+const arbitraryUpdatesEnabled = TimeseriesTest.arbitraryUpdatesEnabled(db);
+
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
@@ -206,58 +208,60 @@ TimeseriesTest.run((insert) => {
     });
 
     // Query on a field that is not the metaField.
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [{
-            q: {measurement: "cpu"},
-            u: {$set: {[metaFieldName]: {c: "C"}}},
-            multi: true,
-        }],
-        resultDocList: [doc1],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
-
-    // Query on the metaField and modify a field that is not the metaField.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [{
-            q: {[metaFieldName]: {c: "C", d: 2}},
-            u: {$set: {f2: "f2"}},
-            multi: true,
-        }],
-        resultDocList: [doc2],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
-
-    // Query on the metaField and a field that is not the metaField.
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [
-            {
-                q: {[metaFieldName]: {a: "A", b: "B"}, measurement: "cpu"},
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [{
+                q: {measurement: "cpu"},
                 u: {$set: {[metaFieldName]: {c: "C"}}},
                 multi: true,
-            },
-        ],
-        resultDocList: [doc1],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+            }],
+            resultDocList: [doc1],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Query on the metaField and modify the metaField and fields that are not the metaField.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [{
-            q: {[metaFieldName]: {c: "C", d: 2}},
-            u: {$set: {[metaFieldName]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}},
-            multi: true,
-        }],
-        resultDocList: [doc2],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Query on the metaField and modify a field that is not the metaField.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [{
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {$set: {f2: "f2"}},
+                multi: true,
+            }],
+            resultDocList: [doc2],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+
+        // Query on the metaField and a field that is not the metaField.
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {a: "A", b: "B"}, measurement: "cpu"},
+                    u: {$set: {[metaFieldName]: {c: "C"}}},
+                    multi: true,
+                },
+            ],
+            resultDocList: [doc1],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+
+        // Query on the metaField and modify the metaField and fields that are not the metaField.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [{
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {$set: {[metaFieldName]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}},
+                multi: true,
+            }],
+            resultDocList: [doc2],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Compound query on the metaField using dot notation and modify the metaField.
     testUpdate({
@@ -301,17 +305,19 @@ TimeseriesTest.run((insert) => {
     });
 
     // Query on a field that is not the metaField using dot notation and modify the metaField.
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [{
-            q: {"measurement.A": "cpu"},
-            u: {$set: {[metaFieldName]: {c: "C"}}},
-            multi: true,
-        }],
-        resultDocList: [doc1],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [{
+                q: {"measurement.A": "cpu"},
+                u: {$set: {[metaFieldName]: {c: "C"}}},
+                multi: true,
+            }],
+            resultDocList: [doc1],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Query with an empty document (i.e update all documents in the collection).
     testUpdate({
@@ -346,17 +352,19 @@ TimeseriesTest.run((insert) => {
     });
 
     // Rename the metaField.
-    testUpdate({
-        initialDocList: [doc1, doc2, doc4],
-        updateList: [{
-            q: {[metaFieldName + ".a"]: "A"},
-            u: {$rename: {[metaFieldName]: "Z"}},
-            multi: true,
-        }],
-        resultDocList: [doc1, doc2, doc4],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, doc2, doc4],
+            updateList: [{
+                q: {[metaFieldName + ".a"]: "A"},
+                u: {$rename: {[metaFieldName]: "Z"}},
+                multi: true,
+            }],
+            resultDocList: [doc1, doc2, doc4],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Rename a subfield of the metaField.
     testUpdate({
@@ -372,17 +380,19 @@ TimeseriesTest.run((insert) => {
     });
 
     // Rename a subfield of the metaField to something not in the metaField.
-    testUpdate({
-        initialDocList: [doc1, doc2, doc4],
-        updateList: [{
-            q: {[metaFieldName + ".a"]: "A"},
-            u: {$rename: {[metaFieldName + ".a"]: "notMetaField.a"}},
-            multi: true,
-        }],
-        resultDocList: [doc1, doc2, doc4],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, doc2, doc4],
+            updateList: [{
+                q: {[metaFieldName + ".a"]: "A"},
+                u: {$rename: {[metaFieldName + ".a"]: "notMetaField.a"}},
+                multi: true,
+            }],
+            resultDocList: [doc1, doc2, doc4],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // For all documents that have at least one 2 in its metaField array, update the first 2
     // to be 100 using the positional $ operator.
@@ -534,251 +544,253 @@ TimeseriesTest.run((insert) => {
     });
 
     // Multiple updates, ordered: Query on the metaField and on a field that is not the metaField.
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [
-            {
-                q: {[metaFieldName]: {a: "A", b: "B"}},
-                u: {$set: {[metaFieldName]: {c: "C", d: 1}}},
-                multi: true,
-            },
-            {
-                q: {measurement: "cpu", [metaFieldName + ".d"]: 1},
-                u: {$set: {[metaFieldName + ".c"]: "CC"}},
-                multi: true,
-            }
-        ],
-        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {c: "C", d: 1}}],
-        n: 1,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {a: "A", b: "B"}},
+                    u: {$set: {[metaFieldName]: {c: "C", d: 1}}},
+                    multi: true,
+                },
+                {
+                    q: {measurement: "cpu", [metaFieldName + ".d"]: 1},
+                    u: {$set: {[metaFieldName + ".c"]: "CC"}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {c: "C", d: 1}}],
+            n: 1,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, ordered: Query on the metaField and modify the metaField and a field that
-    // is not the metaField using dot notation.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            }
-        ],
-        resultDocList: [{
-            _id: 2,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {c: "C", d: 8},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        n: 1,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, ordered: Query on the metaField and modify the metaField and a field
+        // that is not the metaField using dot notation.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [{
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C", d: 8},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            n: 1,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, ordered: Query on the metaField and modify a field that is not the
-    // metaField using dot notation.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            }
-        ],
-        resultDocList: [doc2],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, ordered: Query on the metaField and modify a field that is not the
+        // metaField using dot notation.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [doc2],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, unordered: Query on the metaField and modify a field that is not the
-    // metaField using dot notation.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            }
-        ],
-        ordered: false,
-        resultDocList: [{
-            _id: 2,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {c: "C", d: 8},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        n: 1,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, unordered: Query on the metaField and modify a field that is not the
+        // metaField using dot notation.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                }
+            ],
+            ordered: false,
+            resultDocList: [{
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C", d: 8},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            n: 1,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, ordered: Modify the metaField, a field that is not the metaField, and the
-    // metaField. Only the first update should succeed.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$inc: {[metaFieldName + ".d"]: 7}},
-                multi: true,
-            }
-        ],
-        resultDocList: [{
-            _id: 2,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {c: "C", d: 8},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        n: 1,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, ordered: Modify the metaField, a field that is not the metaField, and
+        // the metaField. Only the first update should succeed.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$inc: {[metaFieldName + ".d"]: 7}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [{
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C", d: 8},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            n: 1,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, unordered: Modify the metaField, a field that is not the metaField, and the
-    // metaField. The first and last updates should succeed.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$inc: {[metaFieldName + ".d"]: 7}},
-                multi: true,
-            }
-        ],
-        resultDocList: [{
-            _id: 2,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {c: "C", d: 15},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        ordered: false,
-        n: 2,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, unordered: Modify the metaField, a field that is not the metaField, and
+        // the metaField. The first and last updates should succeed.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$inc: {[metaFieldName + ".d"]: 7}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [{
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C", d: 15},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            ordered: false,
+            n: 2,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, unordered: Query on the metaField and modify a field that is not the
-    // metaField using dot notation.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            }
-        ],
-        ordered: false,
-        resultDocList: [{
-            _id: 2,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {c: "C", d: 8},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        n: 1,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, unordered: Query on the metaField and modify a field that is not the
+        // metaField using dot notation.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                }
+            ],
+            ordered: false,
+            resultDocList: [{
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C", d: 8},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            n: 1,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, ordered: Modify the metaField, a field that is not the metaField, and the
-    // metaField. Only the first update should succeed.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$inc: {[metaFieldName + ".d"]: 7}},
-                multi: true,
-            }
-        ],
-        resultDocList: [{
-            _id: 2,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {c: "C", d: 8},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        n: 1,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, ordered: Modify the metaField, a field that is not the metaField, and
+        // the metaField. Only the first update should succeed.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$inc: {[metaFieldName + ".d"]: 7}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [{
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C", d: 8},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            n: 1,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Multiple updates, unordered: Modify the metaField, a field that is not the metaField, and the
-    // metaField.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [
-            {
-                q: {[metaFieldName]: {c: "C", d: 2}},
-                u: {$inc: {[metaFieldName + ".d"]: 6}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$set: {"f1.0": "f2"}},
-                multi: true,
-            },
-            {
-                q: {[metaFieldName]: {c: "C", d: 8}},
-                u: {$inc: {[metaFieldName + ".d"]: 7}},
-                multi: true,
-            }
-        ],
-        resultDocList: [{
-            _id: 2,
-            [timeFieldName]: dateTime,
-            [metaFieldName]: {c: "C", d: 15},
-            f: [{"k": "K", "v": "V"}],
-        }],
-        ordered: false,
-        n: 2,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Multiple updates, unordered: Modify the metaField, a field that is not the metaField, and
+        // the metaField.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [
+                {
+                    q: {[metaFieldName]: {c: "C", d: 2}},
+                    u: {$inc: {[metaFieldName + ".d"]: 6}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$set: {"f1.0": "f2"}},
+                    multi: true,
+                },
+                {
+                    q: {[metaFieldName]: {c: "C", d: 8}},
+                    u: {$inc: {[metaFieldName + ".d"]: 7}},
+                    multi: true,
+                }
+            ],
+            resultDocList: [{
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C", d: 15},
+                f: [{"k": "K", "v": "V"}],
+            }],
+            ordered: false,
+            n: 2,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Multiple unordered updates on multiple matching documents.
     testUpdate({
@@ -845,71 +857,78 @@ TimeseriesTest.run((insert) => {
         n: 2
     });
 
-    // Query for documents using $jsonSchema with the metaField in dot notation required.
-    testUpdate({
-        initialDocList: [doc1, doc2, doc3],
-        updateList: [{
-            q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}},
-            u: {$set: {[metaFieldName]: "a"}},
-            multi: true
-        }],
-        resultDocList: [doc1, doc2, doc3],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        // Query for documents using $jsonSchema with the metaField in dot notation required.
+        testUpdate({
+            initialDocList: [doc1, doc2, doc3],
+            updateList: [{
+                q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}},
+                u: {$set: {[metaFieldName]: "a"}},
+                multi: true
+            }],
+            resultDocList: [doc1, doc2, doc3],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Query for documents using $jsonSchema with a field that is not the metaField required.
-    testUpdate({
-        initialDocList: [doc1, doc2, doc3],
-        updateList: [{
-            q: {"$jsonSchema": {"required": [metaFieldName, timeFieldName]}},
-            u: {$set: {[metaFieldName]: "a"}},
-            multi: true
-        }],
-        resultDocList: [doc1, doc2, doc3],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, doc2, doc3],
+            updateList: [{
+                q: {"$jsonSchema": {"required": [metaFieldName, timeFieldName]}},
+                u: {$set: {[metaFieldName]: "a"}},
+                multi: true
+            }],
+            resultDocList: [doc1, doc2, doc3],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions
+        });
+    }
 
     const nestedMetaObj =
         {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: {[metaFieldName]: "A"}};
-
-    // Query for documents using $jsonSchema with the metaField required and a required subfield of
-    // the metaField with the same name as the metaField.
-    testUpdate({
-        initialDocList: [doc1, nestedMetaObj],
-        updateList: [{
-            q: {
-                "$jsonSchema": {
-                    "required": [metaFieldName],
-                    "properties": {[metaFieldName]: {"required": [metaFieldName]}}
-                }
-            },
-            u: {$set: {[metaFieldName]: "a"}},
-            multi: true
-        }],
-        resultDocList: [doc1, {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: "a"}],
-        n: 1
-    });
+    if (!arbitraryUpdatesEnabled) {
+        // Query for documents using $jsonSchema with the metaField required and a required
+        // subfield of the metaField with the same name as the metaField.
+        testUpdate({
+            initialDocList: [doc1, nestedMetaObj],
+            updateList: [{
+                q: {
+                    "$jsonSchema": {
+                        "required": [metaFieldName],
+                        "properties": {[metaFieldName]: {"required": [metaFieldName]}}
+                    }
+                },
+                u: {$set: {[metaFieldName]: "a"}},
+                multi: true
+            }],
+            resultDocList: [doc1, {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: "a"}],
+            n: 1
+        });
+    }
 
     // Query for documents using $jsonSchema with the metaField required and an optional field that
     // is not the metaField.
-    testUpdate({
-        initialDocList: [doc1, nestedMetaObj],
-        updateList: [{
-            q: {
-                "$jsonSchema": {
-                    "required": [metaFieldName],
-                    "properties": {"measurement": {description: "can be any value"}}
-                }
-            },
-            u: {$set: {[metaFieldName]: "a"}},
-            multi: true
-        }],
-        resultDocList: [doc1, nestedMetaObj],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, nestedMetaObj],
+            updateList: [{
+                q: {
+                    "$jsonSchema": {
+                        "required": [metaFieldName],
+                        "properties": {"measurement": {description: "can be any value"}}
+                    }
+                },
+                u: {$set: {[metaFieldName]: "a"}},
+                multi: true
+            }],
+            resultDocList: [doc1, nestedMetaObj],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions
+        });
+    }
 
     // Multiple updates, unordered: Modify the metaField of all documents using arrayFilters.
     testUpdate({
@@ -1058,94 +1077,98 @@ TimeseriesTest.run((insert) => {
         n: 1,
     });
 
-    /************************** Tests updating with an update pipeline **************************/
-    // Modify the metaField, which should fail since update pipelines are not supported.
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [{
-            q: {},
-            u: [
-                {$addFields: {[metaFieldName + ".c"]: "C", [metaFieldName + ".e"]: "E"}},
-                {$unset: metaFieldName + ".e"}
-            ],
-            multi: true,
-        }],
-        resultDocList: [doc1],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        /************************** Tests updating with an update pipeline ************************/
+        // Modify the metaField, which should fail since update pipelines are not supported.
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [{
+                q: {},
+                u: [
+                    {$addFields: {[metaFieldName + ".c"]: "C", [metaFieldName + ".e"]: "E"}},
+                    {$unset: metaFieldName + ".e"}
+                ],
+                multi: true,
+            }],
+            resultDocList: [doc1],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    /************************ Tests updating with a replacement document *************************/
-    // Replace a document to have no metaField, which should fail since updates with replacement
-    // documents are not supported.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [{
-            q: {[metaFieldName]: {c: "C", d: 2}},
-            u: {f2: {e: "E", f: "F"}, f3: 7},
-            multi: true,
-        }],
-        resultDocList: [doc2],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        /************************ Tests updating with a replacement document **********************/
+        // Replace a document to have no metaField, which should fail since updates with replacement
+        // documents are not supported.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [{
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {f2: {e: "E", f: "F"}, f3: 7},
+                multi: true,
+            }],
+            resultDocList: [doc2],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
 
-    // Replace a document with an empty document, which should fail since updates with replacement
-    // documents are not supported.
-    testUpdate({
-        initialDocList: [doc2],
-        updateList: [{
-            q: {[metaFieldName]: {c: "C", d: 2}},
-            u: {},
-            multi: true,
-        }],
-        resultDocList: [doc2],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+        // Replace a document with an empty document, which should fail since updates with
+        // replacement documents are not supported.
+        testUpdate({
+            initialDocList: [doc2],
+            updateList: [{
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {},
+                multi: true,
+            }],
+            resultDocList: [doc2],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     /*********************** Tests updating a collection with no metaField. **********************/
     // Query on a field which is not the (nonexistent) metaField.
-    testUpdate({
-        initialDocList: [doc3],
-        updateList: [{
-            q: {f: "F"},
-            u: {},
-            multi: true,
-        }],
-        resultDocList: [doc3],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-        hasMetaField: false,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc3],
+            updateList: [{
+                q: {f: "F"},
+                u: {$set: {f: "FF"}},
+                multi: true,
+            }],
+            resultDocList: [doc3],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+            hasMetaField: false,
+        });
 
-    // Query on all documents and update them to be empty documents.
-    testUpdate({
-        initialDocList: [doc3],
-        updateList: [{
-            q: {},
-            u: {},
-            multi: true,
-        }],
-        resultDocList: [doc3],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-        hasMetaField: false,
-    });
+        // Query on all documents and update them to be empty documents.
+        testUpdate({
+            initialDocList: [doc3],
+            updateList: [{
+                q: {},
+                u: {$set: {f: "FF"}},
+                multi: true,
+            }],
+            resultDocList: [doc3],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+            hasMetaField: false,
+        });
 
-    // Query on all documents and update them to be nonempty documents.
-    testUpdate({
-        initialDocList: [doc3],
-        updateList: [{
-            q: {},
-            u: {f: "FF"},
-            multi: true,
-        }],
-        resultDocList: [doc3],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-        hasMetaField: false,
-    });
+        // Query on all documents and update them to be nonempty documents.
+        testUpdate({
+            initialDocList: [doc3],
+            updateList: [{
+                q: {},
+                u: {$set: {f: "FF"}},
+                multi: true,
+            }],
+            resultDocList: [doc3],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+            hasMetaField: false,
+        });
+    }
 
     /************************ Tests updating a collection using collation. ************************/
     const collationDoc1 = {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "café"};

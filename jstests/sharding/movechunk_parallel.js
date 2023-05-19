@@ -9,7 +9,7 @@
  *  ]
  */
 
-load('./jstests/libs/chunk_manipulation_util.js');
+load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/sharding/libs/find_chunks_util.js");
 
 (function() {

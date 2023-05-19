@@ -8,7 +8,7 @@ var st = setupMoveChunkTest({moveParanoia: ""});
 
 var shards = [st.shard0, st.shard1];
 var foundMoveChunk = false;
-for (i in shards) {
+for (let i in shards) {
     var dbpath = shards[i].adminCommand("getCmdLineOpts").parsed.storage.dbPath;
     var hasMoveChunkDir = 0 !=
         ls(dbpath)

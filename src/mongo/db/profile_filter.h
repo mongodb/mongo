@@ -49,9 +49,16 @@ public:
         const CurOp& curop;
     };
 
+    virtual ~ProfileFilter() = default;
+
     virtual bool matches(OperationContext*, const OpDebug&, const CurOp&) const = 0;
     virtual BSONObj serialize() const = 0;
-    virtual ~ProfileFilter() = default;
+
+    /**
+     * Returns true if the profile filter depends on the given top-level field name and false
+     * otherwise.
+     */
+    virtual bool dependsOn(StringData topLevelField) const = 0;
 
     /**
      * Thread-safe getter for the global 'ProfileFilter' default.

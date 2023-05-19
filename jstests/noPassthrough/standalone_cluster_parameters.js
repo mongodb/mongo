@@ -1,8 +1,8 @@
 /**
  * Checks that set/getClusterParameter run as expected on standalone.
  * @tags: [
- *   # Standalone cluster parameters enabled only under this flag.
- *   featureFlagAuditConfigClusterParameter,
+ *   # Standalone cluster parameters enabled in 7.1+.
+ *   requires_fcv_71,
  * ]
  */
 (function() {

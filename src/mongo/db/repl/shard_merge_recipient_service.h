@@ -203,7 +203,6 @@ public:
 
     private:
         friend class ShardMergeRecipientServiceTest;
-        friend class ShardMergeRecipientServiceShardMergeTest;
 
         /**
          * Only used for testing. Allows setting a custom task executor for backup cursor fetcher.

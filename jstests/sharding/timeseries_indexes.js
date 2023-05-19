@@ -59,7 +59,7 @@ function generateDoc(time, metaValue) {
 
     // Split the chunks such that primary shard has chunk: [MinKey, 2020-01-01) and other shard has
     // chunk [2020-01-01, MaxKey].
-    splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
+    let splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
     assert.commandWorked(
         mongosDB.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
 

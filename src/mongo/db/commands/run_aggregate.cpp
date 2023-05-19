@@ -76,11 +76,12 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
@@ -451,15 +452,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               allowDiskUseByDefault.load());
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
-
-    // If the request explicitly specified NOT to use v2 resume tokens for change streams, set this
-    // on the expCtx. This can happen if a the request originated from 6.0 mongos, or in test mode.
-    if (request.getGenerateV2ResumeTokens().has_value()) {
-        // We only ever expect an explicit $_generateV2ResumeTokens to be false.
-        uassert(6528200, "Invalid request for v2 tokens", !request.getGenerateV2ResumeTokens());
-        expCtx->changeStreamTokenVersion = 1;
-    }
-
     return expCtx;
 }
 
@@ -844,11 +836,11 @@ Status runAggregate(OperationContext* opCtx,
     };
 
     auto registerTelemetry = [&]() -> void {
-        // Register telemetry. Exclude queries against collections with encrypted fields.
-        // We still collect telemetry on collection-less aggregations.
+        // Register queryStats. Exclude queries against collections with encrypted fields.
+        // We still collect queryStats on collection-less aggregations.
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            telemetry::registerAggRequest(request, opCtx);
+            query_stats::registerAggRequest(request, opCtx);
         }
     };
 
@@ -882,9 +874,8 @@ Status runAggregate(OperationContext* opCtx,
             nss = NamespaceString::kRsOplogNamespace;
 
             // In case of serverless the change stream will be opened on the change collection.
-            const bool changeCollectionsMode =
-                change_stream_serverless_helpers::isChangeCollectionsModeActive();
-            if (changeCollectionsMode) {
+            const bool isServerless = change_stream_serverless_helpers::isServerlessEnvironment();
+            if (isServerless) {
                 const auto tenantId =
                     change_stream_serverless_helpers::resolveTenantId(origNss.tenantId());
 
@@ -931,7 +922,7 @@ Status runAggregate(OperationContext* opCtx,
             registerTelemetry();
             uassert(ErrorCodes::ChangeStreamNotEnabled,
                     "Change streams must be enabled before being used",
-                    !changeCollectionsMode ||
+                    !isServerless ||
                         change_stream_serverless_helpers::isChangeStreamEnabled(opCtx,
                                                                                 *nss.tenantId()));
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
@@ -1019,6 +1010,18 @@ Status runAggregate(OperationContext* opCtx,
         curOp->beginQueryPlanningTimer();
         expCtx->stopExpressionCounters();
 
+        // This prevents opening a new change stream in the critical section of a serverless shard
+        // split or merge operation to prevent resuming on the recipient with a resume token higher
+        // than that operation's blockTimestamp.
+        //
+        // If we do this check before picking a startTime for a change stream then the primary could
+        // go into a blocking state between the check and getting the timestamp resulting in a
+        // startTime greater than blockTimestamp. Therefore we must do this check here, after the
+        // pipeline has been parsed and startTime has been initialized.
+        if (liteParsedPipeline.hasChangeStream()) {
+            tenant_migration_access_blocker::assertCanOpenChangeStream(expCtx->opCtx, nss.dbName());
+        }
+
         // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
         // $$USER_ROLES for the aggregation.
         expCtx->setUserRoles();
@@ -1048,9 +1051,9 @@ Status runAggregate(OperationContext* opCtx,
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
 
-            // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a FLE
-            // rewrite.
-            CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
+            // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done a
+            // FLE rewrite.
+            CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
         }
 
         pipeline->optimizePipeline();
@@ -1217,11 +1220,12 @@ Status runAggregate(OperationContext* opCtx,
         PlanSummaryStats stats;
         planExplainer.getSummaryStats(&stats);
         curOp->debug().setPlanSummaryMetrics(stats);
+        curOp->setEndOfOpMetrics(stats.nReturned);
 
         if (keepCursor) {
-            collectTelemetryMongod(opCtx, pins[0], stats.nReturned);
+            collectQueryStatsMongod(opCtx, pins[0]);
         } else {
-            collectTelemetryMongod(opCtx, cmdObj, stats.nReturned);
+            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsRequestShapifier));
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.

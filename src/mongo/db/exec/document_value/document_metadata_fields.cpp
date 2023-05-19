@@ -45,8 +45,10 @@ DocumentMetadataFields::DocumentMetadataFields(const DocumentMetadataFields& oth
     : _holder(other._holder ? std::make_unique<MetadataHolder>(*other._holder) : nullptr) {}
 
 DocumentMetadataFields& DocumentMetadataFields::operator=(const DocumentMetadataFields& other) {
-    _holder = other._holder ? std::make_unique<MetadataHolder>(*other._holder) : nullptr;
-    _modified = true;
+    if (this != &other) {
+        _holder = other._holder ? std::make_unique<MetadataHolder>(*other._holder) : nullptr;
+        _modified = true;
+    }
     return *this;
 }
 

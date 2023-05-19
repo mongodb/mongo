@@ -34,8 +34,10 @@ feature_flags:
     cpp_varname: feature_flags::gFeatureFlagExecutionControl
     default: true
     version: 7.0
+    shouldBeFCVGated: true
   featureFlagDeprioritizeLowPriorityOperations:
     description: Enables the deprioritization of low priority operations
     cpp_varname: feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
     default: true
     version: 7.0
+    shouldBeFCVGated: true

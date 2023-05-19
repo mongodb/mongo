@@ -30,14 +30,20 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdlib>
+#include <new>
+
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -46,6 +52,67 @@ namespace mongo {
 class Document;
 class DocumentStorage;
 class Value;
+
+
+/** An immutable reference-counted string of inline data. */
+class RCString final : public RefCountable {
+public:
+    static boost::intrusive_ptr<const RCString> create(StringData s) {
+        using namespace fmt::literals;
+        static constexpr size_t sizeLimit = BSONObjMaxUserSize;
+        uassert(16493,
+                "RCString too large. Requires size={} < limit={}"_format(s.size(), sizeLimit),
+                s.size() < sizeLimit);
+        return boost::intrusive_ptr{new (s) RCString{s}};
+    }
+
+    explicit operator StringData() const noexcept {
+        return StringData{_data(), _size};
+    }
+
+    void* operator new(size_t, StringData s) {
+        return ::operator new(_allocSize(s.size()));
+    }
+
+    /** Used if constructor fails after placement `new (StringData)`. */
+    void operator delete(void* ptr, StringData s) {
+        ::operator delete(ptr, _allocSize(s.size()));
+    }
+
+#if __cpp_lib_destroying_delete >= 201806L
+    void operator delete(RCString* ptr, std::destroying_delete_t) {
+        size_t sz = _allocSize(ptr->_size);
+        ptr->~RCString();
+        ::operator delete(ptr, sz);
+    }
+#else   // !__cpp_lib_destroying_delete
+    /** Invoked by virtual destructor. */
+    void operator delete(void* ptr) {
+        ::operator delete(ptr);
+    }
+#endif  // __cpp_lib_destroying_delete
+
+private:
+    static size_t _allocSize(size_t stringSize) {
+        return sizeof(RCString) + stringSize + 1;  // Incl. '\0'-terminator
+    }
+
+    /** Use static `create()` instead. */
+    explicit RCString(StringData s) : _size{s.size()} {
+        if (_size)
+            memcpy(_data(), s.rawData(), _size);
+        _data()[_size] = '\0';
+    }
+
+    const char* _data() const noexcept {
+        return reinterpret_cast<const char*>(this + 1);
+    }
+    char* _data() noexcept {
+        return const_cast<char*>(std::as_const(*this)._data());
+    }
+
+    size_t _size; /** Excluding '\0' terminator. */
+};
 
 // TODO: a MutableVector, similar to MutableDocument
 /// A heap-allocated reference-counted std::vector
@@ -268,7 +335,7 @@ public:
         } else {
             dassert(typeid(*genericRCPtr) == typeid(const RCString));
             const RCString* stringPtr = static_cast<const RCString*>(genericRCPtr);
-            return StringData(stringPtr->c_str(), stringPtr->size());
+            return StringData{*stringPtr};
         }
     }
 

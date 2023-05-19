@@ -29,37 +29,52 @@
 
 #pragma once
 
-#include <map>
-#include <string>
+#include "mongo/transport/grpc/client_stream.h"
 
 #include "mongo/transport/grpc/bidirectional_pipe.h"
 #include "mongo/transport/grpc/metadata.h"
-#include "mongo/transport/grpc/server_stream.h"
+#include "mongo/transport/grpc/mock_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::transport::grpc {
 
-// TODO: SERVER-74015 introduce a ClientStream interface that covers the whole API surface of
-// gRPC's ClientReaderWriter type, and implement that interface here.
-class MockClientStream {
+class MockClientStream : public ClientStream {
 public:
-    ~MockClientStream() = default;
+    MockClientStream(HostAndPort remote,
+                     Future<MetadataContainer>&& serverInitialMetadata,
+                     Future<::grpc::Status>&& rpcReturnStatus,
+                     std::shared_ptr<MockCancellationState> rpcCancellationState,
+                     BidirectionalPipe::End&& pipe);
 
-    boost::optional<SharedBuffer> read();
-    bool write(ConstSharedBuffer msg);
+    boost::optional<SharedBuffer> read() override;
 
-    explicit MockClientStream(HostAndPort hostAndPort,
-                              Milliseconds timeout,
-                              Future<MetadataContainer>&& serverInitialMetadata,
-                              BidirectionalPipe::End&& pipe);
+    bool write(ConstSharedBuffer msg) override;
+
+    ::grpc::Status finish() override;
 
 private:
     friend class MockClientContext;
 
-    Date_t _deadline;
+    void _cancel();
+
+    HostAndPort _remote;
+    MetadataContainer _clientMetadata;
     Future<MetadataContainer> _serverInitialMetadata;
+
+    /**
+     * The mocked equivalent of a status returned from a server-side RPC handler.
+     */
+    Future<::grpc::Status> _rpcReturnStatus;
+
+    /**
+     * State used to mock RPC cancellation, including explicit cancellation (client or server side)
+     * or network errors.
+     */
+    std::shared_ptr<MockCancellationState> _rpcCancellationState;
+
     BidirectionalPipe::End _pipe;
 };
 }  // namespace mongo::transport::grpc

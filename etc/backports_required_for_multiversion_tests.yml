@@ -4,19 +4,20 @@
 #
 # Usage:
 # Add the server ticket number and the path to the test file for the test you intend to denylist
-# under the appropriate suite. Any test in a (ticket, test_file) pair that appears in this file but
+# under the appropriate multiversion branch. Any test in a (ticket, test_file) pair that appears in this file but
 # not in the last-lts or last-continuous branch version of this file indicates that a commit has
 # not yet been backported to the last-lts or last-continuous branch and will be excluded from the
 # multiversion suite corresponding to the root level suite key.
 #
-# Example: To prevent 'my_test_file.js' from running in the 'replica_sets_multiversion' suite with the last-continuous binary
-# replica_sets_multiversion:
-#   - ticket: SERVER-1000
-#     test_file: jstests/core/my_test_file.js
+# Example: To prevent 'my_test_file.js' from running with the last-continuous binary
+# last-continuous:
+#   all:
+#   - test_file: jstests/core/my_test_file.js
+#     ticket: SERVER-1000
 #
 # The above example will denylist jstests/core/my_test_file.js from the
-# 'replica_sets_multiversion_gen' task until this file has been updated with the same
-# (ticket, test_file) pair on the last-lts branch.
+# last-continuous branch until this file has been updated with the same
+# (ticket, test_file) pair on the last-continuous branch.
 #
 last-continuous:
   all:
@@ -328,8 +329,6 @@ last-continuous:
     ticket: SERVER-72224
   - test_file: jstests/sharding/internal_txns/incomplete_transaction_history_during_migration.js
     ticket: SERVER-73938
-  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
-    ticket: SERVER-74124
   - test_file: jstests/core/query/partial_index_logical.js
     ticket: SERVER-68434
   - test_file: jstests/core/timeseries/timeseries_collmod.js
@@ -374,6 +373,24 @@ last-continuous:
     ticket: SERVER-76311
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
+  - test_file: jstests/sharding/shard_drain_works_with_chunks_of_any_size.js
+    ticket: SERVER-76550
+  - test_file: jstests/sharding/analyze_shard_key/monotonicity_hashed_sharding_compound.js
+    ticket: SERVER-76719
+  - test_file: jstests/sharding/ddl_commits_with_two_phase_oplog_notification.js
+    ticket: SERVER-76908
+  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
+    ticket: SERVER-76948
+  - test_file: jstests/sharding/merge_let_params_size_estimation.js
+    ticket: SERVER-74806
+  - test_file: jstests/sharding/resharding_with_multi_deletes_reduced_ticket_pool_size.js
+    ticket: SERVER-77097
+  - test_file: jstests/sharding/move_primary_donor_cleaned_up_if_coordinator_steps_up_aborted.js
+    ticket: SERVER-76872
+  - test_file: jstests/sharding/resharding_update_tag_zones_large.js
+    ticket: SERVER-76988
+  - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
+    ticket: SERVER-77247
   suites: null
 last-lts:
   all:
@@ -777,8 +794,6 @@ last-lts:
     ticket: SERVER-72224
   - test_file: jstests/sharding/internal_txns/incomplete_transaction_history_during_migration.js
     ticket: SERVER-73938
-  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
-    ticket: SERVER-74124
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-69952
   - test_file: jstests/replsets/log_ddl_ops.js
@@ -831,4 +846,24 @@ last-lts:
     ticket: SERVER-76311
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-76394
+  - test_file: jstests/sharding/shard_drain_works_with_chunks_of_any_size.js
+    ticket: SERVER-76550
+  - test_file: jstests/sharding/analyze_shard_key/monotonicity_hashed_sharding_compound.js
+    ticket: SERVER-76719
+  - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
+    ticket: SERVER-76489
+  - test_file: jstests/sharding/ddl_commits_with_two_phase_oplog_notification.js
+    ticket: SERVER-76908
+  - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
+    ticket: SERVER-76948
+  - test_file: jstests/sharding/merge_let_params_size_estimation.js
+    ticket: SERVER-74806
+  - test_file: jstests/sharding/resharding_with_multi_deletes_reduced_ticket_pool_size.js
+    ticket: SERVER-77097
+  - test_file: jstests/sharding/move_primary_donor_cleaned_up_if_coordinator_steps_up_aborted.js
+    ticket: SERVER-76872
+  - test_file: jstests/sharding/resharding_update_tag_zones_large.js
+    ticket: SERVER-76988
+  - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
+    ticket: SERVER-77247
   suites: null

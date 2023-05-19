@@ -1,7 +1,7 @@
 // do not allow creation of fields with a $ prefix
 load('jstests/aggregation/extras/utils.js');
 
-c = db.c;
+const c = db.c;
 c.drop();
 
 c.insert({a: 1});

@@ -14,7 +14,7 @@ import gdb
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr
+    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr, get_unique_ptr_bytes
 
 
 def detect_toolchain(progspace):
@@ -249,7 +249,7 @@ def get_decorations(obj):
         type_name = type_name[0:type_name.rindex(">")]
         type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
         # get_unique_ptr should be loaded from 'mongo_printers.py'.
-        decoration_data = get_unique_ptr(decorable["_decorations"]["_decorationData"])
+        decoration_data = get_unique_ptr_bytes(decorable["_decorations"]["_decorationData"])
 
         if type_name.endswith('*'):
             type_name = type_name[0:len(type_name) - 1]
@@ -341,14 +341,14 @@ class GetMongoDecoration(gdb.Command):
     """
     Search for a decoration on an object by typename and print it e.g.
 
-    (gdb) mongo-decoration opCtx ReadConcernArgs
+    (gdb) mongodb-decoration opCtx ReadConcernArgs
 
     would print out a decoration on opCtx whose type name contains the string "ReadConcernArgs".
     """
 
     def __init__(self):
         """Initialize GetMongoDecoration."""
-        RegisterMongoCommand.register(self, "mongo-decoration", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "mongodb-decoration", gdb.COMMAND_DATA)
 
     def invoke(self, args, _from_tty):
         """Invoke GetMongoDecoration."""
@@ -584,8 +584,6 @@ class MongoDBDumpLocks(gdb.Command):
         try:
             # Call into mongod, and dump the state of lock manager
             # Note that output will go to mongod's standard output, not the debugger output window
-            # Do not call mongo::getGlobalLockManager() due to the compiler optimizing this function in a very weird way
-            # See SERVER-72816 for more context
             gdb.execute(
                 "call mongo::LockManager::get((mongo::ServiceContext*) mongo::getGlobalServiceContext())->dump()",
                 from_tty=False, to_string=False)

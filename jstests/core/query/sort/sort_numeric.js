@@ -1,5 +1,5 @@
 
-t = db.sort_numeric;
+let t = db.sort_numeric;
 t.drop();
 
 // there are two numeric types int he db; make sure it handles them right
@@ -18,7 +18,7 @@ for (var pass = 0; pass < 2; pass++) {
     var c = t.find().sort({a: 1});
     var last = 0;
     while (c.hasNext()) {
-        current = c.next();
+        let current = c.next();
         assert(current.a > last);
         last = current.a;
     }

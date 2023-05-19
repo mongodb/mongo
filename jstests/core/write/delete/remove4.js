@@ -1,6 +1,6 @@
 // @tags: [requires_non_retryable_writes]
 
-t = db.remove4;
+let t = db.remove4;
 t.drop();
 
 t.save({a: 1, b: 1});

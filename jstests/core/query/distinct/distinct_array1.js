@@ -1,4 +1,4 @@
-t = db.distinct_array1;
+let t = db.distinct_array1;
 t.drop();
 
 t.save({a: [1, 2, 3]});
@@ -7,7 +7,7 @@ t.save({a: [3, 4, 5]});
 t.save({a: 9});
 
 // Without index.
-res = t.distinct("a").sort();
+let res = t.distinct("a").sort();
 assert.eq("1,2,3,4,5,9", res.toString());
 
 // Array element 0 without index.

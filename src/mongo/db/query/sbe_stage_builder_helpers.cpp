@@ -827,7 +827,7 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
                                                      sbe::value::SlotId recordIdSlot,
                                                      std::vector<std::string> fields,
                                                      sbe::value::SlotVector fieldSlots,
-                                                     sbe::value::SlotId seekKeySlot,
+                                                     sbe::value::SlotId seekRecordIdSlot,
                                                      sbe::value::SlotId snapshotIdSlot,
                                                      sbe::value::SlotId indexIdentSlot,
                                                      sbe::value::SlotId indexKeySlot,
@@ -842,7 +842,7 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
 
     sbe::ScanCallbacks callbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
 
-    // Scan the collection in the range [seekKeySlot, Inf).
+    // Scan the collection in the range [seekRecordIdSlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
                                                 resultSlot,
                                                 recordIdSlot,
@@ -853,8 +853,10 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
                                                 boost::none,
                                                 std::move(fields),
                                                 std::move(fieldSlots),
-                                                seekKeySlot,
-                                                true,
+                                                seekRecordIdSlot,
+                                                boost::none /* minRecordIdSlot */,
+                                                boost::none /* maxRecordIdSlot */,
+                                                true /* forward */,
                                                 nullptr,
                                                 planNodeId,
                                                 std::move(callbacks));
@@ -865,7 +867,8 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
         std::move(inputStage),
         sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
         std::move(slotsToForward),
-        sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdentSlot, indexKeySlot, indexKeyPatternSlot),
+        sbe::makeSV(
+            seekRecordIdSlot, snapshotIdSlot, indexIdentSlot, indexKeySlot, indexKeyPatternSlot),
         nullptr,
         planNodeId);
 }

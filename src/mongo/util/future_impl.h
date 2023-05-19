@@ -641,7 +641,8 @@ struct SharedStateImpl final : SharedStateBase {
         }
     }
 
-    REQUIRES_FOR_NON_TEMPLATE(std::is_same_v<T, FakeVoid>)
+    template <int...>
+    requires std::is_same_v<T, FakeVoid>
     void setFrom(Status status) {
         if (status.isOK()) {
             emplaceValue();
@@ -942,8 +943,8 @@ public:
         return _shared.getNoThrow(interruptible);
     }
 
-    TEMPLATE(typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
+    template <typename Policy, typename Func>
+    requires isFuturePolicy<Policy>
     void getAsync(Policy policy, Func&& func) && noexcept {
         static_assert(std::is_void<decltype(call(func, std::declval<StatusWith<T>>()))>::value,
                       "func passed to getAsync must return void");
@@ -967,8 +968,8 @@ public:
             });
     }
 
-    TEMPLATE(typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
+    template <typename Policy, typename Func>
+    requires isFuturePolicy<Policy>
     auto then(Policy policy, Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, T>;
         if constexpr (!isFutureLike<Result>) {
@@ -1025,8 +1026,8 @@ public:
         }
     }
 
-    TEMPLATE(typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
+    template <typename Policy, typename Func>
+    requires isFuturePolicy<Policy>
     auto onCompletion(Policy policy, Func&& func) && noexcept {
         using Wrapper = StatusOrStatusWith<T>;
         using Result = NormalizedCallResult<Func, StatusOrStatusWith<T>>;
@@ -1103,9 +1104,9 @@ public:
         }
     }
 
-    TEMPLATE(typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
-    FutureImpl<FakeVoidToVoid<T>> onError(Policy policy, Func&& func) && noexcept {
+    template <typename Policy, typename Func>
+    requires isFuturePolicy<Policy> FutureImpl<FakeVoidToVoid<T>> onError(Policy policy,
+                                                                          Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, Status>;
         static_assert(
             std::is_same<VoidToFakeVoid<UnwrappedType<Result>>, T>::value,
@@ -1160,9 +1161,9 @@ public:
         }
     }
 
-    TEMPLATE(ErrorCodes::Error code, typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
-    FutureImpl<FakeVoidToVoid<T>> onError(Policy policy, Func&& func) && noexcept {
+    template <ErrorCodes::Error code, typename Policy, typename Func>
+    requires isFuturePolicy<Policy> FutureImpl<FakeVoidToVoid<T>> onError(Policy policy,
+                                                                          Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, Status>;
         static_assert(
             std::is_same_v<UnwrappedType<Result>, FakeVoidToVoid<T>>,
@@ -1181,9 +1182,9 @@ public:
                                         });
     }
 
-    TEMPLATE(ErrorCategory category, typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
-    FutureImpl<FakeVoidToVoid<T>> onErrorCategory(Policy policy, Func&& func) && noexcept {
+    template <ErrorCategory category, typename Policy, typename Func>
+    requires isFuturePolicy<Policy> FutureImpl<FakeVoidToVoid<T>> onErrorCategory(
+        Policy policy, Func&& func) && noexcept {
         using Result = NormalizedCallResult<Func, Status>;
         static_assert(std::is_same_v<UnwrappedType<Result>, FakeVoidToVoid<T>>,
                       "func passed to Future<T>::onErrorCategory must return T, StatusWith<T>, "
@@ -1200,9 +1201,9 @@ public:
                                         });
     }
 
-    TEMPLATE(typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
-    FutureImpl<FakeVoidToVoid<T>> tap(Policy policy, Func&& func) && noexcept {
+    template <typename Policy, typename Func>
+    requires isFuturePolicy<Policy> FutureImpl<FakeVoidToVoid<T>> tap(Policy policy,
+                                                                      Func&& func) && noexcept {
         static_assert(std::is_void<decltype(call(func, std::declval<const T&>()))>::value,
                       "func passed to tap must return void");
 
@@ -1212,9 +1213,9 @@ public:
             [](Func&& failFunc, const Status& status) noexcept {});
     }
 
-    TEMPLATE(typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
-    FutureImpl<FakeVoidToVoid<T>> tapError(Policy policy, Func&& func) && noexcept {
+    template <typename Policy, typename Func>
+    requires isFuturePolicy<Policy> FutureImpl<FakeVoidToVoid<T>> tapError(
+        Policy policy, Func&& func) && noexcept {
         static_assert(std::is_void<decltype(call(func, std::declval<const Status&>()))>::value,
                       "func passed to tapError must return void");
 
@@ -1224,9 +1225,9 @@ public:
             [](Func&& failFunc, const Status& status) noexcept { call(failFunc, status); });
     }
 
-    TEMPLATE(typename Policy, typename Func)
-    REQUIRES(isFuturePolicy<Policy>)
-    FutureImpl<FakeVoidToVoid<T>> tapAll(Policy policy, Func&& func) && noexcept {
+    template <typename Policy, typename Func>
+    requires isFuturePolicy<Policy> FutureImpl<FakeVoidToVoid<T>> tapAll(Policy policy,
+                                                                         Func&& func) && noexcept {
         static_assert(
             std::is_void<decltype(call(func, std::declval<const StatusOrStatusWith<T>&>()))>::value,
             "func passed to tapAll must return void");

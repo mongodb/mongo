@@ -65,21 +65,20 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
-    writeConflictRetry(
-        opCtx, "RefineCollectionShardKey", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-            WriteUnitOfWork uow(opCtx);
-            serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
-                                                                 collNss,
-                                                                 collUUID,
-                                                                 BSON("msg" << oMessage),
-                                                                 cmdBuilder.obj(),
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none,
-                                                                 boost::none);
-            uow.commit();
-        });
+    writeConflictRetry(opCtx, "RefineCollectionShardKey", NamespaceString::kRsOplogNamespace, [&] {
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+        WriteUnitOfWork uow(opCtx);
+        serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
+                                                             collNss,
+                                                             collUUID,
+                                                             BSON("msg" << oMessage),
+                                                             cmdBuilder.obj(),
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none,
+                                                             boost::none);
+        uow.commit();
+    });
 }
 }  // namespace
 

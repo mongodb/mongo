@@ -34,7 +34,6 @@
 
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concepts.h"
 
 namespace mongo {
 template <typename Function>
@@ -61,10 +60,11 @@ class function_ref;
 template <typename RetType, typename... Args>
 class function_ref<RetType(Args...)> {
 public:
-    TEMPLATE(typename F)
-    REQUIRES(std::is_invocable_r_v<RetType, F&, Args...> &&
-             !std::is_same_v<stdx::remove_cvref_t<F>, function_ref>)
-    /*implicit*/ function_ref(F&& f) noexcept {
+    /** Implicitly convertible from any `f` callable with signature `RetType f(Args...)`. */
+    template <typename F>
+    requires(std::is_invocable_r_v<RetType, F&, Args...> &&
+             !std::is_same_v<stdx::remove_cvref_t<F>, function_ref>) function_ref(F&& f)
+    noexcept {
         // removing then re-adding pointer ensures that (language-level) function references and
         // function pointer are treated the same.
         using Pointer = std::add_pointer_t<std::remove_pointer_t<std::remove_reference_t<F>>>;
@@ -114,9 +114,8 @@ public:
      * somebody really needs it, we could try to allow T& but not T&&, since T& is less likely to
      * dangle, but I don't think there is an actual use case for this, so not doing it at this time.
      */
-    TEMPLATE(typename T)
-    REQUIRES(!std::is_function_v<std::remove_pointer_t<T>>)
-    function_ref& operator=(T) = delete;
+    template <typename T>
+    requires(!std::is_function_v<std::remove_pointer_t<T>>) function_ref& operator=(T) = delete;
 
     RetType operator()(Args... args) const {
         return _adapter(_target, std::forward<Args>(args)...);

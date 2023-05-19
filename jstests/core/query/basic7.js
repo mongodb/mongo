@@ -1,5 +1,5 @@
 
-t = db.basic7;
+let t = db.basic7;
 t.drop();
 
 t.save({a: 1});

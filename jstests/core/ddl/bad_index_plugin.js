@@ -1,5 +1,5 @@
 // SERVER-5826 ensure you can't build an index with a non-existent plugin
-t = db.bad_index_plugin;
+let t = db.bad_index_plugin;
 
 assert.commandWorked(t.createIndex({good: 1}));
 assert.eq(t.getIndexes().length, 2);  // good + _id

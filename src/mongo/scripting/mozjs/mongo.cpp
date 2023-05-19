@@ -320,7 +320,8 @@ void MongoBase::Functions::_runCommandImpl::call(JSContext* cx, JS::CallArgs arg
                 str::stream() << "The options parameter to runCommand must be a number",
                 args.get(2).isNumber());
         auto options = ValueWriter(cx, args.get(2)).toInt32();
-        return rpc::upconvertRequest({boost::none, database}, cmd, options);
+        return rpc::upconvertRequest(
+            DatabaseName::createDatabaseName_forTest(boost::none, database), cmd, options);
     });
 }
 

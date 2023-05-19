@@ -89,7 +89,7 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) 
         uassert(ErrorCodes::NotWritablePrimary,
                 "Cannot lock the registry while the node is in draining mode",
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-                    opCtx, DatabaseName::kAdmin.toString()));
+                    opCtx, DatabaseName::kAdmin));
     }
 
     unblockMigrationsOnError.dismiss();

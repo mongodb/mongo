@@ -7,7 +7,7 @@
 // ]
 
 // Test basic fetch functionality.
-t = db.stages_fetch;
+let t = db.stages_fetch;
 t.drop();
 var collname = "stages_fetch";
 
@@ -20,7 +20,7 @@ t.createIndex({foo: 1});
 
 // 20 <= foo <= 30
 // bar == 25 (not covered, should error.)
-ixscan1 = {
+let ixscan1 = {
     ixscan: {
         args: {
             keyPattern: {foo: 1},
@@ -33,11 +33,11 @@ ixscan1 = {
         filter: {bar: 25}
     }
 };
-res = db.runCommand({stageDebug: {collection: collname, plan: ixscan1}});
+let res = db.runCommand({stageDebug: {collection: collname, plan: ixscan1}});
 assert.eq(res.ok, 0);
 
 // Now, add a fetch.  We should be able to filter on the non-covered field since we fetched the obj.
-ixscan2 = {
+let ixscan2 = {
     ixscan: {
         args: {
             keyPattern: {foo: 1},
@@ -49,9 +49,7 @@ ixscan2 = {
         }
     }
 };
-fetch = {
-    fetch: {args: {node: ixscan2}, filter: {bar: 25}}
-};
+let fetch = {fetch: {args: {node: ixscan2}, filter: {bar: 25}}};
 res = db.runCommand({stageDebug: {collection: collname, plan: fetch}});
 printjson(res);
 assert.eq(res.ok, 1);

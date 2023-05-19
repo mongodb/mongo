@@ -30,7 +30,7 @@
 #include "pinned_connection_task_executor.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/util/scoped_unlock.h"
+#include "mongo/util/scoped_unlock.h"  // IWYU pragma: keep
 
 namespace mongo::executor {
 /**
@@ -170,7 +170,7 @@ StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleR
               "RPCs scheduled through PinnedConnectionTaskExecutor can only target a single host.");
     RemoteCommandRequest req = RemoteCommandRequest(requestOnAny, 0);
     auto state = PinnedConnectionTaskExecutor::CallbackState::make(cb, baton);
-    _requestQueue.push_front({req, state});
+    _requestQueue.push_back({req, state});
 
     CallbackHandle cbHandle;
     setCallbackForHandle(&cbHandle, state);

@@ -77,7 +77,7 @@ public:
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
         // Create test collection
-        writeConflictRetry(opCtx.get(), "createColl", _nss.ns(), [&] {
+        writeConflictRetry(opCtx.get(), "createColl", _nss, [&] {
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             opCtx->recoveryUnit()->abandonSnapshot();
 

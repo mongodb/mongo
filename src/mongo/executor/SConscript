@@ -37,6 +37,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/s/mongos_server_parameters',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -434,6 +435,7 @@ env.CppIntegrationTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/async_client',
         '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
