@@ -777,6 +777,28 @@ tasks:
             {scale: 1,
              schema: denormalized}
 
+  - name: tpch_10_normalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: normalized}
+
+  - name: tpch_10_denormalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized}
+
   - name: non_sharded_workloads
     priority: 5
     commands:
@@ -2181,6 +2203,7 @@ buildvariants:
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: crud_workloads
+      - name: crud_workloads_majority
       - name: genny_canaries
       - name: cursor_manager
       - name: mixed_workloads
@@ -2192,6 +2215,9 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
+      - name: tpcc
+      - name: tpch_10_denormalized
+      - name: tpch_10_normalized
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
 
