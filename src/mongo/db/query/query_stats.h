@@ -197,10 +197,9 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
  * TODO SERVER-73152 remove request-specific registers, leave only registerRequest
  */
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx);
-void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
-                     const NamespaceString& collection,
-                     OperationContext* opCtx,
-                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
+void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     const NamespaceString& collection);
 
 /**
  * Writes queryStats to the queryStats store for the operation identified by `queryStatsKey`.

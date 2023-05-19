@@ -475,10 +475,10 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     CurOp::get(opCtx)->debug().queryStatsStoreKey = key.getOwned();
 }
 
-void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
-                     const NamespaceString& collection,
-                     OperationContext* opCtx,
-                     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     const NamespaceString& collection) {
+    auto opCtx = expCtx->opCtx;
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
     }

@@ -64,7 +64,7 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const SerializationOptions& opts);
 
-BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,

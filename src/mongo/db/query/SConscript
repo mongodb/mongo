@@ -23,7 +23,11 @@ env.SConscript(
 
 env.Library(
     target='canonical_query',
-    source=['canonical_query.cpp', 'canonical_query_encoder.cpp'],
+    source=[
+        'canonical_query.cpp',
+        'canonical_query_encoder.cpp',
+        'parsed_find_command.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/cst/cst',

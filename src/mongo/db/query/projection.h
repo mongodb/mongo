@@ -164,6 +164,13 @@ public:
         return _deps.containsElemMatch;
     }
 
+    /**
+     * Optimizes the projection tree. Additionally, re-computes dependencies in case anything
+     * changes as in projection {x: {$and: [false, "$b"]}} - which when optimized will no longer
+     * depend on "b".
+     */
+    void optimize();
+
 private:
     ProjectionPathASTNode _root;
     ProjectType _type;
@@ -171,7 +178,10 @@ private:
 };
 
 /**
- * Walks the projection AST and optimizes each node.
+ * Walks the projection AST and optimizes each node. Note if you have a 'Projection' instance you
+ * should prefer to use Projection::optimize() since it will additionally re-compute dependencies in
+ * case anything changes as in projection {x: {$and: [false, "$b"]}} - which when optimized will no
+ * longer depend on "b".
  */
 void optimizeProjection(ProjectionPathASTNode* root);
 

@@ -32,7 +32,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sort_pattern.h"
 
@@ -201,13 +200,14 @@ BSONObj extractNamespaceShape(NamespaceString nss, const SerializationOptions& o
     return bob.obj();
 }
 
-BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& findCmd = *findRequest.findCommandRequest;
     BSONObjBuilder bob;
     // Serialize the namespace as part of the query shape.
     {
-        auto ns = findCommand.getNamespaceOrUUID();
+        auto ns = findCmd.getNamespaceOrUUID();
         if (ns.nss()) {
             bob.append("cmdNs", extractNamespaceShape(ns.nss().value(), opts));
         } else {
@@ -220,65 +220,51 @@ BSONObj extractQueryShape(const FindCommandRequest& findCommand,
     bob.append("command", "find");
     std::unique_ptr<MatchExpression> filterExpr;
     // Filter.
-    {
-        auto filter = findCommand.getFilter();
-        filterExpr = uassertStatusOKWithContext(
-            MatchExpressionParser::parse(findCommand.getFilter(),
-                                         expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures),
-            "Failed to parse 'filter' option when making queryStats key");
-        bob.append(FindCommandRequest::kFilterFieldName, filterExpr->serialize(opts));
-    }
+    bob.append(FindCommandRequest::kFilterFieldName, findRequest.filter->serialize(opts));
 
     // Let Spec.
-    if (auto letSpec = findCommand.getLet()) {
+    if (auto letSpec = findCmd.getLet()) {
         auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
         auto ownedObj = redactedObj.getOwned();
         bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
     }
 
-    if (!findCommand.getProjection().isEmpty()) {
-        // Parse to Projection
-        auto projection =
-            projection_ast::parseAndAnalyze(expCtx,
-                                            findCommand.getProjection(),
-                                            filterExpr.get(),
-                                            findCommand.getFilter(),
-                                            ProjectionPolicies::findProjectionPolicies());
-
+    if (findRequest.proj) {
         bob.append(FindCommandRequest::kProjectionFieldName,
-                   projection_ast::serialize(*projection.root(), opts));
+                   projection_ast::serialize(*findRequest.proj->root(), opts));
     }
 
     // Assume the hint is correct and contains field names. It is possible that this hint
     // doesn't actually represent an index, but we can't detect that here.
     // Hint, max, and min won't serialize if the object is empty.
-    if (!findCommand.getHint().isEmpty()) {
+    if (!findCmd.getHint().isEmpty()) {
         bob.append(FindCommandRequest::kHintFieldName,
-                   extractHintShape(findCommand.getHint(), opts, false));
+                   extractHintShape(findCmd.getHint(), opts, false));
         // Max/Min aren't valid without hint.
-        if (!findCommand.getMax().isEmpty()) {
+        if (!findCmd.getMax().isEmpty()) {
             bob.append(FindCommandRequest::kMaxFieldName,
-                       extractHintShape(findCommand.getMax(), opts, true));
+                       extractHintShape(findCmd.getMax(), opts, true));
         }
-        if (!findCommand.getMin().isEmpty()) {
+        if (!findCmd.getMin().isEmpty()) {
             bob.append(FindCommandRequest::kMinFieldName,
-                       extractHintShape(findCommand.getMin(), opts, true));
+                       extractHintShape(findCmd.getMin(), opts, true));
         }
     }
 
     // Sort.
-    if (!findCommand.getSort().isEmpty()) {
-        bob.append(FindCommandRequest::kSortFieldName,
-                   query_shape::extractSortShape(findCommand.getSort(), expCtx, opts));
+    if (findRequest.sort) {
+        bob.append(
+            FindCommandRequest::kSortFieldName,
+            findRequest.sort
+                ->serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
+                .toBson());
     }
 
     // Fields for literal redaction. Adds limit and skip.
-    addShapeLiterals(&bob, findCommand, opts);
+    addShapeLiterals(&bob, findCmd, opts);
 
     // Add the fields that require no redaction.
-    addRemainingFindCommandFields(&bob, findCommand, opts);
+    addRemainingFindCommandFields(&bob, findCmd, opts);
 
     return bob.obj();
 }

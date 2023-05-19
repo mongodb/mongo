@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -78,6 +79,16 @@ public:
         bool isCountLike = false);
 
     /**
+     * Creates a CanonicalQuery from a ParsedFindCommand. Uses 'expCtx->opCtx', which must be valid.
+     */
+    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
+        boost::intrusive_ptr<ExpressionContext> expCtx,
+        std::unique_ptr<ParsedFindCommand> parsedFind,
+        bool explain = false,
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {},
+        bool isCountLike = false);
+
+    /**
      * For testing or for internal clients to use.
      */
 
@@ -98,27 +109,16 @@ public:
     static bool isSimpleIdQuery(const BSONObj& query);
 
     /**
-     * Validates the match expression 'root' as well as the query specified by 'request', checking
-     * for illegal combinations of operators. Returns a non-OK status if any such illegal
-     * combination is found.
-     *
-     * This method can be called both on normalized and non-normalized 'root'. However, some checks
-     * can only be performed once the match expressions is normalized. To perform these checks one
-     * can call 'isValidNormalized()'.
-     *
-     * On success, returns a bitset indicating which types of metadata are *unavailable*. For
-     * example, if 'root' does not contain a $text predicate, then the returned metadata bitset will
-     * indicate that text score metadata is unavailable. This means that if subsequent
-     * $meta:"textScore" expressions are found during analysis of the query, we should raise in an
-     * error.
-     */
-    static StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
-                                                   const FindCommandRequest& findCommand);
-
-    /**
-     * Perform additional validation checks on the normalized 'root'.
+     * Perform validation checks on the normalized 'root' which could not be checked before
+     * normalization - those should happen in parsed_find_command::isValid().
      */
     static Status isValidNormalized(const MatchExpression* root);
+
+    /**
+     * For internal use only - but public for accessibility for make_unique(). You must go through
+     * canonicalize to create a CanonicalQuery.
+     */
+    CanonicalQuery() {}
 
     NamespaceString nss() const {
         invariant(_findCommand->getNamespaceOrUUID().nss());
@@ -207,11 +207,6 @@ public:
         return toStringShort(true);
     }
 
-    /**
-     * Returns a count of 'type' nodes in expression tree.
-     */
-    static size_t countNodes(const MatchExpression* root, MatchExpression::MatchType type);
-
     bool getExplain() const {
         return _explain;
     }
@@ -292,22 +287,10 @@ public:
     }
 
 private:
-    // You must go through canonicalize to create a CanonicalQuery.
-    CanonicalQuery() {}
-
-    Status init(OperationContext* opCtx,
-                boost::intrusive_ptr<ExpressionContext> expCtx,
-                std::unique_ptr<FindCommandRequest> findCommand,
-                std::unique_ptr<MatchExpression> root,
-                const ProjectionPolicies& projectionPolicies,
+    Status init(boost::intrusive_ptr<ExpressionContext> expCtx,
+                std::unique_ptr<ParsedFindCommand> parsedFind,
                 std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
                 bool isCountLike);
-
-    // Initializes '_sortPattern', adding any metadata dependencies implied by the sort.
-    //
-    // Throws a UserException if the sort is illegal, or if any metadata type in
-    // 'unavailableMetadata' is required.
-    void initSortPattern(QueryMetadataBitSet unavailableMetadata);
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

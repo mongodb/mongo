@@ -48,8 +48,6 @@ public:
                               const boost::optional<std::string> applicationName = boost::none)
         : RequestShapifier(opCtx, applicationName), _request(request), _pipeline(pipeline) {}
 
-    virtual ~AggregateRequestShapifier() = default;
-
     BSONObj makeQueryStatsKey(const SerializationOptions& opts,
                               OperationContext* opCtx) const final;
 

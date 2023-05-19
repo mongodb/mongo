@@ -58,7 +58,7 @@ function confirmAllFieldsPresent(queryStatsEntries) {
             assert(queryStatsKeyFields.includes(field));
             fieldCounter++;
         }
-        assert.eq(fieldCounter, queryStatsKeyFields.length);
+        assert.eq(fieldCounter, queryStatsKeyFields.length, entry.key);
     }
 }
 

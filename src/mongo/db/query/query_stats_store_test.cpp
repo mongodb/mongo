@@ -54,11 +54,13 @@ std::size_t hash(const BSONObj& obj) {
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
     BSONObj makeQueryStatsKeyFindRequest(
-        FindCommandRequest fcr,
+        const FindCommandRequest& fcr,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         bool applyHmac = false,
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
-        FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
+        auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
+        FindRequestShapifier findShapifier(expCtx->opCtx, *parsedFind);
 
         SerializationOptions opts;
         if (literalPolicy != LiteralSerializationPolicy::kUnchanged) {
@@ -235,10 +237,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
         key);
 
     // Add let.
-    fcr.setLet(BSON("var1"
-                    << "$a"
-                    << "var2"
-                    << "const1"));
+    fcr.setLet(BSON("var1" << 1 << "var2"
+                           << "const1"));
     key = makeQueryStatsKeyFindRequest(
         fcr, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -255,7 +255,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     }
                 },
                 "let": {
-                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var1>": "?number",
                     "HASH<var2>": "?string"
                 },
                 "projection": {
@@ -291,7 +291,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     }
                 },
                 "let": {
-                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var1>": "?number",
                     "HASH<var2>": "?string"
                 },
                 "projection": {
@@ -341,7 +341,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     }
                 },
                 "let": {
-                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var1>": "?number",
                     "HASH<var2>": "?string"
                 },
                 "projection": {
@@ -397,7 +397,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     }
                 },
                 "let": {
-                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var1>": "?number",
                     "HASH<var2>": "?string"
                 },
                 "projection": {
@@ -451,7 +451,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     }
                 },
                 "let": {
-                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var1>": "?number",
                     "HASH<var2>": "?string"
                 },
                 "projection": {
@@ -491,16 +491,12 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
-    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
     fcr.setFilter(BSONObj());
     fcr.setSort(BSONObj());
     fcr.setProjection(BSONObj());
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
 
-    auto hmacApplied = findShapifier.makeQueryStatsKey(opts, expCtx);
+    auto hmacApplied = makeQueryStatsKeyFindRequest(
+        fcr, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -518,7 +514,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
-    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
 
     fcr.setFilter(BSON("b" << 1));
     fcr.setHint(BSON("z" << 1 << "c" << 1));
@@ -683,16 +678,19 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     // Note that this ExpressionContext will not have the let variables defined - we expect the
     // 'makeQueryStatsKey' call to do that.
     auto opCtx = makeOperationContext();
-    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
-    fcr.setLet(BSON("var" << 2));
-    fcr.setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
-    fcr.setProjection(fromjson("{varIs: '$$var'}"));
+    auto fcr = std::make_unique<FindCommandRequest>(
+        NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    fcr->setLet(BSON("var" << 2));
+    fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
+    fcr->setProjection(fromjson("{varIs: '$$var'}"));
 
-    const auto cmdObj = fcr.toBSON(BSON("$db"
-                                        << "testDB"));
+    const auto cmdObj = fcr->toBSON(BSON("$db"
+                                         << "testDB"));
+    auto&& [expCtx, parsedFind] =
+        uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
     QueryStatsEntry testMetrics{
-        std::make_unique<query_stats::FindRequestShapifier>(fcr, opCtx.get()),
-        fcr.getNamespaceOrUUID(),
+        std::make_unique<query_stats::FindRequestShapifier>(opCtx.get(), *parsedFind),
+        parsedFind->findCommandRequest->getNamespaceOrUUID(),
         cmdObj};
 
     bool applyHmacToIdentifiers = false;
