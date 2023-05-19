@@ -112,7 +112,7 @@ protected:
         return originalNss();
     }
 
-    virtual std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) {
+    virtual std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) {
         return {};
     };
 
@@ -172,6 +172,11 @@ private:
 
     ExecutorFuture<bool> _removeDocumentUntillSuccessOrStepdown(
         std::shared_ptr<executor::TaskExecutor> executor);
+
+    ExecutorFuture<void> _acquireAllLocksAsync(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& token);
 
     ExecutorFuture<void> _acquireLockAsync(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                            const CancellationToken& token,

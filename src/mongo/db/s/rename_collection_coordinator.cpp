@@ -469,9 +469,9 @@ void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
-std::vector<StringData> RenameCollectionCoordinator::_acquireAdditionalLocks(
+std::set<NamespaceString> RenameCollectionCoordinator::_getAdditionalLocksToAcquire(
     OperationContext* opCtx) {
-    return {_request.getTo().ns()};
+    return {_request.getTo()};
 }
 
 void RenameCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {

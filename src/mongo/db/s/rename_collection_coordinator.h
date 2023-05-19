@@ -70,7 +70,7 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) override;
+    std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
 
     boost::optional<RenameCollectionResponse> _response;
     const RenameCollectionRequest _request;
