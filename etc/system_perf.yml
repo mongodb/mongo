@@ -2113,14 +2113,14 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: *classic_engine_1nodereplset_tasks
 
-  - name: linux-standalone-telemetry
-    display_name: Linux Standalone 2022-11 (Telemetry)
-    # Match the baseline non-telemetry cron
+  - name: linux-standalone-query-stats
+    display_name: Linux Standalone 2022-11 (QueryStats)
+    # Match the baseline non-query-stats cron
     cron: *linux-standalone-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone-telemetry
+      mongodb_setup: standalone-query-stats
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2280,13 +2280,13 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: *audit-tasks
 
-  - name: linux-1-node-replSet-telemetry
-    display_name: Linux 1-Node ReplSet 2022-11 (Telemetry)
+  - name: linux-1-node-replSet-query-stats
+    display_name: Linux 1-Node ReplSet 2022-11 (QueryStats)
     cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica-telemetry
+      mongodb_setup: single-replica-query-stats
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2522,13 +2522,13 @@ buildvariants:
       - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
 
-  - name: linux-3-shard-telemetry
-    display_name: Linux 3-Shard Cluster 2022-11 (Telemetry)
+  - name: linux-3-shard-query-stats
+    display_name: Linux 3-Shard Cluster 2022-11 (QueryStats)
     cron: *linux-3-shard-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: shard-telemetry
+      mongodb_setup: shard-query-stats
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: shard
       workload_setup: 2022-11
@@ -3157,13 +3157,13 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
 
-  - name: linux-3-node-replSet-telemetry
-    display_name: Linux 3-Node ReplSet 2022-11 (Telemetry)
+  - name: linux-3-node-replSet-query-stats
+    display_name: Linux 3-Node ReplSet 2022-11 (QueryStats)
     cron: *linux-3-node-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: replica-telemetry
+      mongodb_setup: replica-query-stats
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: replica
       workload_setup: 2022-11
@@ -3266,13 +3266,13 @@ buildvariants:
     - name: compound_wildcard_index_write_commands
     - name: compound_wildcard_index_read_commands
 
-# Variant: Microbenchmarks with Telemetry
+# Variant: Microbenchmarks with QueryStats
   - <<: *linux-microbenchmarks-standalone-arm
-    name: linux-microbenchmarks-standalone-arm-telemetry.2023-01
-    display_name: MicroBenchmarks Arm Standalone inMemory.2023-01 (Telemetry)
+    name: linux-microbenchmarks-standalone-arm-query-stats.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory.2023-01 (QueryStats)
     expansions:
       <<: *standalone-arm-expansions
-      mongodb_setup: mongo-perf-standalone-telemetry
+      mongodb_setup: mongo-perf-standalone-query-stats
 
   - &linux-microbenchmarks-repl-arm
     name: linux-microbenchmarks-repl-arm.2023-01
