@@ -71,6 +71,8 @@ let testDB = null;
 let st = null;
 let primaryShard = null;
 let otherShard = null;
+let mongos0DB = null;
+let mongos1DB = null;
 
 /**
  * Composes and returns a bucket-level filter for timeseries arbitrary writes.
@@ -95,42 +97,49 @@ function getTestDB() {
     return testDB;
 }
 
-function prepareCollection({collName, initialDocList}) {
-    const testDB = getTestDB();
-    const coll = testDB.getCollection(collName);
+function prepareCollection({dbToUse, collName, initialDocList}) {
+    if (!dbToUse) {
+        dbToUse = getTestDB();
+    }
+    const coll = dbToUse.getCollection(collName);
     coll.drop();
-    assert.commandWorked(testDB.createCollection(
+    assert.commandWorked(dbToUse.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     assert.commandWorked(coll.insert(initialDocList));
 
     return coll;
 }
 
-function prepareShardedCollection({collName, initialDocList, includeMeta}) {
-    assert.neq(null, testDB, "testDB must be initialized before calling prepareShardedCollection");
+function prepareShardedCollection({dbToUse, collName, initialDocList, includeMeta = true}) {
+    if (!dbToUse) {
+        assert.neq(
+            null, testDB, "testDB must be initialized before calling prepareShardedCollection");
+        dbToUse = testDB;
+    }
 
-    const coll = testDB.getCollection(collName);
+    const coll = dbToUse.getCollection(collName);
     const sysCollName = sysCollNamePrefix + coll.getName();
     coll.drop();
 
     const tsOptions = includeMeta
         ? {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}
         : {timeseries: {timeField: timeFieldName}};
-    assert.commandWorked(testDB.createCollection(coll.getName(), tsOptions));
+    assert.commandWorked(dbToUse.createCollection(coll.getName(), tsOptions));
     assert.commandWorked(coll.insert(initialDocList));
 
     const shardKey = includeMeta ? {[metaFieldName]: 1} : {[timeFieldName]: 1};
     assert.commandWorked(coll.createIndex(shardKey));
-    assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
+    assert.commandWorked(
+        dbToUse.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
 
     const splitPoint =
         includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
     // [MinKey, splitPoint) and [splitPoint, MaxKey) are the two chunks after the split.
     assert.commandWorked(
-        testDB.adminCommand({split: testDB[sysCollName].getFullName(), middle: splitPoint}));
+        dbToUse.adminCommand({split: dbToUse[sysCollName].getFullName(), middle: splitPoint}));
 
-    assert.commandWorked(testDB.adminCommand({
-        moveChunk: testDB[sysCollName].getFullName(),
+    assert.commandWorked(dbToUse.adminCommand({
+        moveChunk: dbToUse[sysCollName].getFullName(),
         find: splitPoint,
         to: otherShard.shardName,
         _waitForDelete: true
@@ -585,20 +594,31 @@ function testFindOneAndRemoveOnShardedCollection({
 }
 
 /**
- * Sets up a sharded cluster.
+ * Sets up a sharded cluster. 'nMongos' is the number of mongos in the cluster.
  */
-function setUpShardedCluster() {
+function setUpShardedCluster({nMongos} = {
+    nMongos: 1
+}) {
     assert.eq(null, st, "A sharded cluster must not be initialized yet");
     assert.eq(null, primaryShard, "The primary shard must not be initialized yet");
     assert.eq(null, otherShard, "The other shard must not be initialized yet");
     assert.eq(null, testDB, "testDB must be not initialized yet");
+    assert.eq(null, mongos0DB, "mongos0DB must be not initialized yet");
+    assert.eq(null, mongos1DB, "mongos1DB must be not initialized yet");
+    assert(nMongos === 1 || nMongos === 2, "nMongos must be 1 or 2");
 
-    st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    st = new ShardingTest({mongos: nMongos, shards: 2, rs: {nodes: 2}});
+
     testDB = st.s.getDB(jsTestName());
     assert.commandWorked(testDB.dropDatabase());
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
     primaryShard = st.getPrimaryShard(testDB.getName());
+    st.ensurePrimaryShard(testDB.getName(), primaryShard.shardName);
     otherShard = st.getOther(primaryShard);
+    mongos0DB = st.s0.getDB(testDB.getName());
+    if (nMongos > 1) {
+        mongos1DB = st.s1.getDB(testDB.getName());
+    }
 }
 
 /**
