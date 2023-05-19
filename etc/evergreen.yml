@@ -3854,6 +3854,20 @@ tasks:
           --detect-odr-violations
           --separate-debug
 
+- name: compile_half
+  tags: []
+  depends_on: []
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: >-
+        compile_first_half_non_test_source
+        ${additional_compile_targets|}
+      task_compile_flags: >-
+        --detect-odr-violations
+        --separate-debug
+        PREFIX=dist-test
+
 - name: compile_ninja
   commands:
     - func: "scons compile"
@@ -8600,6 +8614,13 @@ task_groups:
   - compile
   - package
 - <<: *compile_task_group_template
+  name: small_compile_TG
+  tasks:
+  - compile_half
+  - compile
+  - package
+
+- <<: *compile_task_group_template
   name: compile_core_tools_TG
   tasks:
   - compile_core_tools
@@ -11221,7 +11242,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: small_compile_TG
     distros:
     - rhel72-zseries-build
   - name: .aggregation .common
