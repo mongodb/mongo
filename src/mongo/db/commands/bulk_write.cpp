@@ -48,6 +48,7 @@
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/delete_request_gen.h"
@@ -251,6 +252,65 @@ public:
         _responses.addInsertReplies(opCtx, idx, out);
     }
 
+    // Return true if the insert was done by FLE.
+    // FLE skips inserts with no encrypted fields, in which case the caller of this method
+    // is expected to fallback to its non-FLE code path.
+    bool attemptProcessFLEInsert(OperationContext* opCtx, write_ops_exec::WriteResult& out) {
+        CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
+        // For BulkWrite, re-entry is un-expected.
+        invariant(!_currentNs.getEncryptionInformation()->getCrudProcessed().value_or(false));
+
+        std::vector<mongo::BSONObj> documents;
+        std::transform(_batch.cbegin(),
+                       _batch.cend(),
+                       std::back_inserter(documents),
+                       [](const InsertStatement& insert) { return insert.doc; });
+
+        write_ops::InsertCommandRequest request(_currentNs.getNs(), documents);
+        auto& requestBase = request.getWriteCommandRequestBase();
+        requestBase.setEncryptionInformation(_currentNs.getEncryptionInformation());
+        requestBase.setOrdered(_req.getOrdered());
+
+        write_ops::InsertCommandReply insertReply;
+
+        FLEBatchResult batchResult = processFLEInsert(opCtx, request, &insertReply);
+
+        if (batchResult == FLEBatchResult::kProcessed) {
+            size_t inserted = static_cast<size_t>(insertReply.getN());
+
+            SingleWriteResult result;
+            result.setN(1);
+
+            if (documents.size() == inserted) {
+                invariant(!insertReply.getWriteErrors().has_value());
+                out.results.reserve(inserted);
+                std::fill_n(std::back_inserter(out.results), inserted, std::move(result));
+            } else {
+                invariant(insertReply.getWriteErrors().has_value());
+                const auto& errors = insertReply.getWriteErrors().value();
+
+                out.results.reserve(inserted + errors.size());
+                std::fill_n(
+                    std::back_inserter(out.results), inserted + errors.size(), std::move(result));
+
+                for (const auto& error : errors) {
+                    out.results[error.getIndex()] = error.getStatus();
+                }
+
+                if (_req.getOrdered()) {
+                    out.canContinue = false;
+                }
+            }
+
+            if (insertReply.getRetriedStmtIds().has_value()) {
+                out.retriedStmtIds = insertReply.getRetriedStmtIds().value();
+            }
+            return true;
+        }
+        return false;
+    }
+
     // Returns true if the bulkWrite operation can continue and false if it should stop.
     bool flush(OperationContext* opCtx) {
         if (empty()) {
@@ -264,14 +324,45 @@ public:
         auto size = _batch.size();
         out.results.reserve(size);
 
-        out.canContinue = write_ops_exec::insertBatchAndHandleErrors(opCtx,
-                                                                     _currentNs.getNs(),
-                                                                     _currentNs.getCollectionUUID(),
-                                                                     _req.getOrdered(),
-                                                                     _batch,
-                                                                     &_lastOpFixer,
-                                                                     &out,
-                                                                     OperationSource::kStandard);
+        bool insertedByFLE = false;
+        if (_currentNs.getEncryptionInformation().has_value()) {
+            insertedByFLE = attemptProcessFLEInsert(opCtx, out);
+
+            if (!insertedByFLE) {
+                // It is unexpected for processFLEInsert (inside attemptProcessFLEInsert)
+                // to return kNotProcessed for multiple documents. In the case of retyrable write
+                // with FLE, we have to fallthrough to our normal code path below
+                // on !insertedByFLE, but we are past the point where that code path normally checks
+                // for checkStatementExecutedNoOplogEntryFetch (in handleInsertOp).
+                invariant(_batch.size() == 1);
+
+                auto txnParticipant = TransactionParticipant::get(opCtx);
+                invariant(_batch[0].stmtIds.size() == 1);
+                if (opCtx->isRetryableWrite() &&
+                    txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx,
+                                                                           _batch[0].stmtIds[0])) {
+                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                    addRetryableWriteResult(opCtx, _firstOpIdx.get(), _batch[0].stmtIds[0]);
+                    _batch.clear();
+                    _currentNs = NamespaceInfoEntry();
+                    _firstOpIdx = boost::none;
+                    return out.canContinue;
+                }
+            }
+        }
+
+        if (!insertedByFLE) {
+            out.canContinue =
+                write_ops_exec::insertBatchAndHandleErrors(opCtx,
+                                                           _currentNs.getNs(),
+                                                           _currentNs.getCollectionUUID(),
+                                                           _req.getOrdered(),
+                                                           _batch,
+                                                           &_lastOpFixer,
+                                                           &out,
+                                                           OperationSource::kStandard);
+        }
+
         _batch.clear();
         _responses.addInsertReplies(opCtx, _firstOpIdx.get(), out);
         _currentNs = NamespaceInfoEntry();
@@ -485,7 +576,9 @@ bool handleInsertOp(OperationContext* opCtx,
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
-    if (opCtx->isRetryableWrite() &&
+    // For FLE + RetryableWrite, we let FLE handle stmtIds and retryability, so we skip
+    // checkStatementExecutedNoOplogEntryFetch here.
+    if (!nsInfo[idx].getEncryptionInformation().has_value() && opCtx->isRetryableWrite() &&
         txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId)) {
         if (!batch.flush(opCtx)) {
             return false;
@@ -909,6 +1002,9 @@ public:
                 if (!retriedStmtIds.empty()) {
                     reply.setRetriedStmtIds(std::move(retriedStmtIds));
                 }
+
+                setElectionIdandOpTime(opCtx, reply);
+
                 return reply;
             }
 
@@ -939,7 +1035,20 @@ public:
             if (!retriedStmtIds.empty()) {
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
             }
+
+            setElectionIdandOpTime(opCtx, reply);
+
             return reply;
+        }
+
+        void setElectionIdandOpTime(OperationContext* opCtx, BulkWriteCommandReply& reply) {
+            // Undocumented repl fields that mongos depends on.
+            auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+            const auto replMode = replCoord->getReplicationMode();
+            if (replMode != repl::ReplicationCoordinator::modeNone) {
+                reply.setOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
+                reply.setElectionId(replCoord->getElectionId());
+            }
         }
     };
 
@@ -982,6 +1091,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         }
     });
 
+    bool hasEncryptionInformation = false;
+
     // Tell mongod what the shard and database versions are. This will cause writes to fail in
     // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.
@@ -989,6 +1100,16 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         // TODO (SERVER-72767, SERVER-72804, SERVER-72805): Support timeseries collections.
         OperationShardingState::setShardRole(
             opCtx, nsInfo.getNs(), nsInfo.getShardVersion(), nsInfo.getDatabaseVersion());
+
+        if (nsInfo.getEncryptionInformation().has_value()) {
+            hasEncryptionInformation = true;
+        }
+    }
+
+    if (hasEncryptionInformation) {
+        uassert(ErrorCodes::BadValue,
+                "BulkWrite with Queryable Encryption supports only a single namespace.",
+                req.getNsInfo().size() == 1);
     }
 
     for (; idx < ops.size(); ++idx) {
@@ -1010,6 +1131,12 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             if (!batch.flush(opCtx)) {
                 break;
             }
+            if (hasEncryptionInformation) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "BulkWrite update with Queryable Encryption supports only a single operation.",
+                    ops.size() == 1);
+            }
             if (!handleUpdateOp(opCtx, curOp, op.getUpdate(), req, idx, lastOpFixer, responses)) {
                 // Update write failed can no longer continue.
                 break;
@@ -1018,6 +1145,12 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             // Flush insert ops before handling delete ops.
             if (!batch.flush(opCtx)) {
                 break;
+            }
+            if (hasEncryptionInformation) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "BulkWrite delete with Queryable Encryption supports only a single operation.",
+                    ops.size() == 1);
             }
             if (!handleDeleteOp(opCtx, curOp, op.getDelete(), req, idx, lastOpFixer, responses)) {
                 // Delete write failed can no longer continue.

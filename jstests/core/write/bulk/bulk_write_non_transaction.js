@@ -15,6 +15,8 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
+load("jstests/libs/bulk_write_utils.js");  // For cursorEntryValidator.
+
 (function() {
 "use strict";
 
@@ -22,14 +24,6 @@ var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
 coll.drop();
 coll1.drop();
-
-const cursorEntryValidator = function(entry, expectedEntry) {
-    assert.eq(entry.ok, expectedEntry.ok);
-    assert.eq(entry.idx, expectedEntry.idx);
-    assert.eq(entry.n, expectedEntry.n);
-    assert.eq(entry.nModified, expectedEntry.nModified);
-    assert.eq(entry.code, expectedEntry.code);
-};
 
 var maxWriteBatchSize = db.hello().maxWriteBatchSize;
 var insertOp = {insert: 0, document: {_id: 1, skey: "MongoDB"}};
@@ -375,7 +369,7 @@ assert.eq(res.numErrors, 1);
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 11000});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: 11000});
 // Make sure that error extra info was correctly added
 assert.docEq(res.cursor.firstBatch[1].keyPattern, {_id: 1});
 assert.docEq(res.cursor.firstBatch[1].keyValue, {_id: 1});
@@ -403,7 +397,7 @@ assert.eq(res.numErrors, 1);
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 11000});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: 11000});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, n: 1, idx: 2});
 assert(!res.cursor.firstBatch[3]);
 

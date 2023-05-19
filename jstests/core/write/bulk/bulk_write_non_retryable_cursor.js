@@ -14,6 +14,8 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
+load("jstests/libs/bulk_write_utils.js");  // For cursorEntryValidator.
+
 (function() {
 "use strict";
 
@@ -21,13 +23,6 @@ var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
 coll.drop();
 coll1.drop();
-
-const cursorEntryValidator = function(entry, expectedEntry) {
-    assert.eq(entry.ok, expectedEntry.ok);
-    assert.eq(entry.idx, expectedEntry.idx);
-    assert.eq(entry.n, expectedEntry.n);
-    assert.eq(entry.code, expectedEntry.code);
-};
 
 // TODO SERVER-31242 findAndModify retry doesn't apply 'fields' to response.
 // This causes _id to not get projected out and the assert fails.

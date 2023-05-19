@@ -156,5 +156,15 @@ int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx) 
     return firstStmtId + currentOpIdx;
 }
 
+NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite) {
+    BulkWriteCommandRequest bulk =
+        BulkWriteCommandRequest::parse(IDLParserContext("bulkWrite"), bulkWrite);
+    const std::vector<NamespaceInfoEntry>& nss = bulk.getNsInfo();
+    uassert(ErrorCodes::BadValue,
+            "BulkWrite with Queryable Encryption supports only a single namespace",
+            nss.size() == 1);
+    return nss[0];
+}
+
 }  // namespace bulk_write_common
 }  // namespace mongo

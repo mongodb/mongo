@@ -146,9 +146,7 @@ BSONObj BulkWriteReplyItem::serialize() const {
         invariant(_ok == 1.0);
     }
 
-    if (_n) {
-        builder.append(kNFieldName, _n.get());
-    }
+    builder.append(kNFieldName, _n.value_or(0));
 
     if (_nModified) {
         builder.append(kNModifiedFieldName, _nModified.get());

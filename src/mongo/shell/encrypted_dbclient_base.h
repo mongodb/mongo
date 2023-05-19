@@ -66,7 +66,7 @@ constexpr uint8_t kRandomEncryptionBit = 0x02;
 
 static constexpr auto kExplain = "explain"_sd;
 
-constexpr std::array<StringData, 14> kEncryptedCommands = {"aggregate"_sd,
+constexpr std::array<StringData, 15> kEncryptedCommands = {"aggregate"_sd,
                                                            "count"_sd,
                                                            "delete"_sd,
                                                            "distinct"_sd,
@@ -79,7 +79,8 @@ constexpr std::array<StringData, 14> kEncryptedCommands = {"aggregate"_sd,
                                                            "update"_sd,
                                                            "create"_sd,
                                                            "createIndexes"_sd,
-                                                           "collMod"_sd};
+                                                           "collMod"_sd,
+                                                           "bulkWrite"_sd};
 
 class EncryptedDBClientBase : public DBClientBase,
                               public mozjs::EncryptionCallbacks,

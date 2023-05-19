@@ -55,5 +55,11 @@ std::vector<Privilege> getPrivileges(const BulkWriteCommandRequest& req);
  */
 int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx);
 
+/**
+ * From a serialized BulkWriteCommandRequest containing a single NamespaceInfoEntry,
+ * extract that NamespaceInfoEntry. For bulkWrite with queryable encryption.
+ */
+NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite);
+
 }  // namespace bulk_write_common
 }  // namespace mongo
