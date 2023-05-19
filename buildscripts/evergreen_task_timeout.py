@@ -9,14 +9,10 @@ from typing import Optional
 import yaml
 
 COMMIT_QUEUE_ALIAS = "__commit_queue"
-UNITTEST_TASK = "run_unittests"
 
-COMMIT_QUEUE_TIMEOUT = timedelta(minutes=40)
+COMMIT_QUEUE_TIMEOUT = timedelta(minutes=20)
 DEFAULT_REQUIRED_BUILD_TIMEOUT = timedelta(hours=1, minutes=20)
 DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
-# 2x the longest "run tests" phase for unittests as of c9bf1dbc9cc46e497b2f12b2d6685ef7348b0726,
-# which is 5 mins 47 secs, excluding outliers below
-UNITTESTS_TIMEOUT = timedelta(minutes=12)
 
 SPECIFIC_TASK_OVERRIDES = {
     "linux-64-debug": {"auth": timedelta(minutes=60)},
@@ -51,20 +47,7 @@ SPECIFIC_TASK_OVERRIDES = {
     "enterprise-macos": {"replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30), },
     "enterprise-rhel-72-s390x": {"integration_tests_sharded": timedelta(hours=4)},
     "enterprise-rhel-72-s390x-inmem": {"integration_tests_sharded": timedelta(hours=4)},
-
-    # unittests outliers
-    # repeated execution runs a suite 10 times
-    "linux-64-repeated-execution": {UNITTEST_TASK: 10 * UNITTESTS_TIMEOUT},
-    # some of the a/ub/t san variants need a little extra time
-    "enterprise-ubuntu2004-debug-tsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
-    "ubuntu1804-asan": {
-        UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT,
-        "aggregation_timeseries_fuzzer": timedelta(hours=2, minutes=30),
-    },
-    "ubuntu1804-ubsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
-    "ubuntu1804-debug-asan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
-    "ubuntu1804-debug-aubsan-lite": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
-    "ubuntu1804-debug-ubsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
+    "ubuntu1804-asan": {"aggregation_timeseries_fuzzer": timedelta(hours=2, minutes=30), },
 }
 
 
@@ -105,9 +88,6 @@ def determine_timeout(task_name: str, variant: str, idle_timeout: Optional[timed
 
     if exec_timeout and exec_timeout.total_seconds() != 0:
         determined_timeout = exec_timeout
-
-    elif task_name == UNITTEST_TASK and not _has_override(variant, task_name):
-        determined_timeout = UNITTESTS_TIMEOUT
 
     elif evg_alias == COMMIT_QUEUE_ALIAS:
         determined_timeout = COMMIT_QUEUE_TIMEOUT
