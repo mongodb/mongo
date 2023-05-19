@@ -207,6 +207,20 @@ def join_commands(commands: List[str], sep: str = ' && ') -> str:
     return sep.join(commands)
 
 
+def run_test_with_timeout(test: Test, client: DockerClient, timeout: int) -> Result:
+    start_time = time.time()
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run_test, test, client)
+        try:
+            result = future.result(timeout=timeout)
+        except futures.TimeoutError:
+            end_time = time.time()
+            logging.debug("Test %s timed out", test)
+            result = Result(status="fail", test_file=test.name(), start=start_time,
+                            log_raw="test timed out", end=end_time, exit_code=1)
+    return result
+
+
 def run_test(test: Test, client: DockerClient) -> Result:
     result = Result(status="pass", test_file=test.name(), start=time.time(), log_raw="")
 
@@ -216,7 +230,6 @@ def run_test(test: Test, client: DockerClient) -> Result:
     test_external_root = Path(__file__).parent.resolve()
     logging.debug(test_external_root)
     log_external_path = Path.joinpath(test_external_root, log_name)
-
     commands: List[str] = ["export PYTHONIOENCODING=UTF-8"]
 
     if test.os_name.startswith('rhel'):
@@ -533,8 +546,13 @@ else:
     logging.warning("Skipping docker login")
 
 report = Report(results=[], failures=0)
-with futures.ThreadPoolExecutor() as tpe:
-    test_futures = {tpe.submit(run_test, test, docker_client): test for test in tests}
+with futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as tpe:
+    # Set a timeout of 10mins timeout for a single test
+    SINGLE_TEST_TIMEOUT = 10 * 60
+    test_futures = {
+        tpe.submit(run_test_with_timeout, test, docker_client, SINGLE_TEST_TIMEOUT): test
+        for test in tests
+    }
     completed_tests: int = 0
     retried_tests: int = 0
     total_tests: int = len(tests)
