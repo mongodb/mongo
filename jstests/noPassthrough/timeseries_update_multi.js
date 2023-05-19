@@ -27,6 +27,11 @@ assert.commandWorked(testDB.dropDatabase());
 
 /**
  * Confirms that a set of updates returns the expected set of documents.
+ *
+ * If this is an upsert and we expect a document to be inserted, 'upsertedDoc' must be non-null. We
+ * will use the 'upsertedId' returned from the update command unioned with 'upsertedDoc' to
+ * construct the inserted document. This will be added to 'resultDocList' to validate the
+ * collection's contents.
  */
 function testUpdate({
     initialDocList,
@@ -35,6 +40,7 @@ function testUpdate({
     resultDocList,
     nMatched,
     nModified = nMatched,
+    upsertedDoc,
     failCode,
 }) {
     const coll = testDB.getCollection(collNamePrefix + count++);
@@ -47,20 +53,34 @@ function testUpdate({
     assert.commandWorked(coll.insert(initialDocList));
 
     const updateCommand = {update: coll.getName(), updates: updateList};
-    const res = failCode ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
-                         : assert.commandWorked(testDB.runCommand(updateCommand));
+    const res = failCode ? assert.commandFailedWithCode(coll.runCommand(updateCommand), failCode)
+                         : assert.commandWorked(coll.runCommand(updateCommand));
 
-    assert.eq(nMatched, res.n);
-    assert.eq(nModified, res.nModified);
+    if (!failCode) {
+        if (upsertedDoc) {
+            assert.eq(1, res.n, tojson(res));
+            assert.eq(0, res.nModified, tojson(res));
+            assert(res.hasOwnProperty("upserted"), tojson(res));
+            assert.eq(1, res.upserted.length);
+
+            if (upsertedDoc.hasOwnProperty("_id")) {
+                assert.eq(upsertedDoc._id, res.upserted[0]._id);
+            } else {
+                upsertedDoc["_id"] = res.upserted[0]._id;
+            }
+            resultDocList.push(upsertedDoc);
+        } else {
+            assert.eq(nMatched, res.n);
+            assert.eq(nModified, res.nModified);
+            assert(!res.hasOwnProperty("upserted"), tojson(res));
+        }
+    }
+
     const resDocs = coll.find().toArray();
     assert.eq(resDocs.length, resultDocList.length);
 
-    resultDocList.forEach(resultDoc => {
-        assert.docEq(resultDoc,
-                     coll.findOne({_id: resultDoc._id}),
-                     "Expected document " + resultDoc["_id"] +
-                         " not found in result collection:" + tojson(resDocs));
-    });
+    assert.sameMembers(
+        resultDocList, resDocs, "Collection contents did not match expected after update");
 }
 
 const doc_id_1_a_b_no_metrics = {
@@ -664,23 +684,179 @@ const doc_id_8_array_meta = {
 /**
  * Tests upsert with multi:true.
  */
-// TODO SERVER-76551 Enable this test.
-// testUpdate({
-//     initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-//     updateList: [{
-//         q: {[metaFieldName]: {z: "Z"}},
-//         u: {$set: {[timeFieldName]: dateTime}},
-//         upsert: true,
-//         multi: true,
-//     }],
-//     resultDocList: [
-//         doc_id_1_a_b_no_metrics,
-//         doc_id_2_a_b_array_metric,
-//         {[timeFieldName]: dateTime},
-//     ],
-//     nMatched: 1,
-//     nModified: 0,
-// });
+// Run an upsert that doesn't include an _id.
+(function testUpsertWithNoId() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {z: "Z"}},
+            u: {$set: {[timeFieldName]: dateTime}},
+            upsert: true,
+            multi: true,
+        }],
+        resultDocList: [
+            doc_id_1_a_b_no_metrics,
+            doc_id_2_a_b_array_metric,
+        ],
+        upsertedDoc: {[metaFieldName]: {z: "Z"}, [timeFieldName]: dateTime},
+    });
+})();
+
+// Run an upsert that includes an _id.
+(function testUpsertWithId() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics],
+        updateList: [{
+            q: {_id: 100},
+            u: {$set: {[timeFieldName]: dateTime}},
+            upsert: true,
+            multi: true,
+        }],
+        resultDocList: [
+            doc_id_1_a_b_no_metrics,
+        ],
+        upsertedDoc: {_id: 100, [timeFieldName]: dateTime},
+    });
+})();
+
+// Run an upsert that updates documents and skips the upsert.
+(function testUpsertUpdatesDocs() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName + ".a"]: "A"},
+            u: {$set: {f: 10}},
+            upsert: true,
+            multi: true,
+        }],
+        resultDocList: [
+            {
+                _id: 1,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {a: "A", b: "B"},
+                f: 10,
+            },
+            {
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {a: "A", b: "B"},
+                f: 10,
+            }
+        ],
+        nMatched: 2,
+    });
+})();
+
+// Run an upsert that matches documents with no-op updates and skips the upsert.
+(function testUpsertMatchesDocs() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName + ".a"]: "A"},
+            u: {$set: {[timeFieldName]: dateTime}},
+            upsert: true,
+            multi: true,
+        }],
+        resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+        nMatched: 2,
+        nModified: 0,
+    });
+})();
+
+// Run an upsert that matches a bucket but no documents in it, and inserts the document into a
+// bucket with the same parameters.
+(function testUpsertIntoMatchedBucket() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", b: "B"}, f: 111},
+            u: {$set: {[timeFieldName]: dateTime}},
+            upsert: true,
+            multi: true,
+        }],
+        upsertedDoc: {[metaFieldName]: {a: "A", b: "B"}, [timeFieldName]: dateTime, f: 111},
+        resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+    });
+})();
+
+// Run an upsert that doesn't insert a time field.
+(function testUpsertNoTimeField() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics],
+        updateList: [{
+            q: {[metaFieldName]: {z: "Z"}},
+            u: {$set: {f: 10}},
+            upsert: true,
+            multi: true,
+        }],
+        resultDocList: [
+            doc_id_1_a_b_no_metrics,
+        ],
+        failCode: ErrorCodes.BadValue,
+    });
+})();
+
+// Run an upsert where the time field is provided in the query.
+(function testUpsertQueryOnTimeField() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics],
+        updateList: [{
+            q: {[timeFieldName]: dateTimeUpdated},
+            u: {$set: {f: 10}},
+            upsert: true,
+            multi: true,
+        }],
+        upsertedDoc: {
+            [timeFieldName]: dateTimeUpdated,
+            f: 10,
+        },
+        resultDocList: [
+            doc_id_1_a_b_no_metrics,
+        ],
+    });
+})();
+
+// Run an upsert where a document to insert is supplied by the request.
+(function testUpsertSupplyDoc() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics],
+        updateList: [{
+            q: {[timeFieldName]: dateTimeUpdated},
+            u: [{$set: {f: 10}}],
+            upsert: true,
+            multi: true,
+            upsertSupplied: true,
+            c: {new: {[timeFieldName]: dateTime, f: 100}}
+        }],
+        upsertedDoc: {
+            [timeFieldName]: dateTime,
+            f: 100,
+        },
+        resultDocList: [
+            doc_id_1_a_b_no_metrics,
+        ],
+    });
+})();
+
+// Run an upsert where a document to insert is supplied by the request and does not have a time
+// field.
+(function testUpsertSupplyDocNoTimeField() {
+    testUpdate({
+        initialDocList: [doc_id_1_a_b_no_metrics],
+        updateList: [{
+            q: {[timeFieldName]: dateTimeUpdated},
+            u: [{$set: {f: 10}}],
+            upsert: true,
+            multi: true,
+            upsertSupplied: true,
+            c: {new: {[metaFieldName]: {a: "A"}, f: 100}}
+        }],
+        resultDocList: [
+            doc_id_1_a_b_no_metrics,
+        ],
+        failCode: ErrorCodes.BadValue,
+    });
+})();
 
 MongoRunner.stopMongod(conn);
 })();

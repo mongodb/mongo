@@ -88,6 +88,17 @@ public:
     Status parseQueryToCQ();
 
     /**
+     * Parses the given filter to a CanonicalQuery. This does a direct transformation and doesn't do
+     * any special handling, e.g. for timeseries.
+     */
+    static StatusWith<std::unique_ptr<CanonicalQuery>> parseQueryToCQ(
+        OperationContext* opCtx,
+        ExpressionContext* expCtx,
+        const ExtensionsCallback& extensionsCallback,
+        const UpdateRequest& request,
+        const BSONObj& filter);
+
+    /**
      * Get the raw request.
      */
     const UpdateRequest* getRequest() const;
@@ -159,6 +170,12 @@ private:
      * Parses the update-descriptor portion of the update request.
      */
     void parseUpdate();
+
+    /**
+     * Handles splitting and/or translating the timeseries query predicate, if applicable. Must be
+     * called before parsing the query and update.
+     */
+    Status maybeTranslateTimeseriesUpdate();
 
     // Unowned pointer to the transactional context.
     OperationContext* _opCtx;

@@ -1170,7 +1170,7 @@ struct TimeseriesModifyStats final : public SpecificStats {
     }
 
     uint64_t estimateObjectSizeInBytes() const {
-        return sizeof(*this);
+        return objInserted.objsize() + sizeof(*this);
     }
 
     void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
@@ -1187,6 +1187,12 @@ struct TimeseriesModifyStats final : public SpecificStats {
     size_t nBucketsUnpacked = 0u;
     size_t nMeasurementsMatched = 0u;
     size_t nMeasurementsModified = 0u;
+
+    // Will be 1 if this is an {upsert: true} update that did an insert, 0 otherwise.
+    size_t nMeasurementsUpserted = 0u;
+
+    // The object that was inserted. This is an empty document if no insert was performed.
+    BSONObj objInserted;
 
     // True iff this is a $mod update.
     bool isModUpdate;

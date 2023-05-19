@@ -1483,6 +1483,7 @@ execEnv.Library(
         'exec/text_match.cpp',
         'exec/text_or.cpp',
         'exec/timeseries_modify.cpp',
+        'exec/timeseries_upsert.cpp',
         'exec/trial_period_utils.cpp',
         'exec/trial_stage.cpp',
         'exec/unpack_timeseries_bucket.cpp',

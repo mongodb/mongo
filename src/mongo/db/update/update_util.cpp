@@ -100,7 +100,7 @@ void produceDocumentForUpsert(OperationContext* opCtx,
     // First: populate the document's immutable paths with equality predicate values from the query,
     // if available. This generates the pre-image document that we will run the update against.
     if (auto* cq = canonicalQuery) {
-        uassertStatusOK(driver->populateDocumentWithQueryFields(*cq, immutablePaths, doc));
+        uassertStatusOK(driver->populateDocumentWithQueryFields(*cq->root(), immutablePaths, doc));
     } else {
         fassert(17354, CanonicalQuery::isSimpleIdQuery(request->getQuery()));
         fassert(17352, doc.root().appendElement(request->getQuery()[idFieldName]));

@@ -75,12 +75,13 @@ stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> 
  *
  * All the modifications are written and replicated atomically.
  */
-void performAtomicWrites(OperationContext* opCtx,
-                         const CollectionPtr& coll,
-                         const RecordId& recordId,
-                         const stdx::variant<write_ops::UpdateCommandRequest,
-                                             write_ops::DeleteCommandRequest>& modificationOp,
-                         const std::vector<write_ops::InsertCommandRequest>& insertOps,
-                         bool fromMigrate,
-                         StmtId stmtId);
+void performAtomicWrites(
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    const RecordId& recordId,
+    const boost::optional<stdx::variant<write_ops::UpdateCommandRequest,
+                                        write_ops::DeleteCommandRequest>>& modificationOp,
+    const std::vector<write_ops::InsertCommandRequest>& insertOps,
+    bool fromMigrate,
+    StmtId stmtId);
 }  // namespace mongo::timeseries

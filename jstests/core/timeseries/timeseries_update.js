@@ -1036,18 +1036,20 @@ TimeseriesTest.run((insert) => {
     });
 
     // Do the same test case as above but with upsert:true, which should fail.
-    testUpdate({
-        initialDocList: [doc1, doc4, doc5],
-        updateList: [{
-            q: {[metaFieldName]: "Z"},
-            u: {$set: {[metaFieldName]: 5}},
-            multi: true,
-            upsert: true,
-        }],
-        resultDocList: [doc1, doc4, doc5],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, doc4, doc5],
+            updateList: [{
+                q: {[metaFieldName]: "Z"},
+                u: {$set: {[metaFieldName]: 5}},
+                multi: true,
+                upsert: true,
+            }],
+            resultDocList: [doc1, doc4, doc5],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Variables defined in the let option can only be used in the update if the update is an
     // pipeline update. Since this update is an update document, the literal name of the variable

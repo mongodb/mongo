@@ -98,7 +98,7 @@ struct TimeseriesModifyParams {
  * The stage processes one bucket at a time, unpacking all the measurements and writing the output
  * bucket in a single doWork() call.
  */
-class TimeseriesModifyStage final : public RequiresWritableCollectionStage {
+class TimeseriesModifyStage : public RequiresWritableCollectionStage {
 public:
     static const char* kStageType;
 
@@ -114,7 +114,7 @@ public:
         return STAGE_TIMESERIES_MODIFY;
     }
 
-    bool isEOF() final;
+    bool isEOF() override;
 
     std::unique_ptr<PlanStageStats> getStats();
 
@@ -134,6 +134,14 @@ protected:
     }
 
     void doRestoreStateRequiresCollection() final;
+
+    // A user-initiated write is one which is not caused by oplog application and is not part of a
+    // chunk migration.
+    bool _isUserInitiatedUpdate;
+
+    TimeseriesModifyParams _params;
+
+    TimeseriesModifyStats _specificStats{};
 
 private:
     bool _isMultiWrite() const {
@@ -184,8 +192,6 @@ private:
      */
     void _prepareToReturnDeletedMeasurement(WorkingSetID& out, BSONObj measurement);
 
-    TimeseriesModifyParams _params;
-
     WorkingSet* _ws;
 
     //
@@ -208,8 +214,6 @@ private:
      * It's refreshed after yielding and reacquiring the locks.
      */
     write_stage_common::PreWriteFilter _preWriteFilter;
-
-    TimeseriesModifyStats _specificStats{};
 
     // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
     // established. This can be set when a write fails or when a fetch fails.

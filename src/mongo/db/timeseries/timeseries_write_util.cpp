@@ -189,14 +189,17 @@ stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> 
     return op;
 }
 
-void performAtomicWrites(OperationContext* opCtx,
-                         const CollectionPtr& coll,
-                         const RecordId& recordId,
-                         const stdx::variant<write_ops::UpdateCommandRequest,
-                                             write_ops::DeleteCommandRequest>& modificationOp,
-                         const std::vector<write_ops::InsertCommandRequest>& insertOps,
-                         bool fromMigrate,
-                         StmtId stmtId) {
+void performAtomicWrites(
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    const RecordId& recordId,
+    const boost::optional<stdx::variant<write_ops::UpdateCommandRequest,
+                                        write_ops::DeleteCommandRequest>>& modificationOp,
+    const std::vector<write_ops::InsertCommandRequest>& insertOps,
+    bool fromMigrate,
+    StmtId stmtId) {
+    tassert(
+        7655102, "must specify at least one type of write", modificationOp || !insertOps.empty());
     NamespaceString ns = coll->ns();
 
     DisableDocumentValidation disableDocumentValidation{opCtx};
@@ -212,55 +215,57 @@ void performAtomicWrites(OperationContext* opCtx,
     // Groups all operations in one or several chained oplog entries to ensure the writes are
     // replicated atomically.
     // TODO(SERVER-76432): Handle the updateOne case for retryable writes.
-    auto groupOplogEntries = !opCtx->getTxnNumber() && !insertOps.empty();
+    auto groupOplogEntries = !opCtx->getTxnNumber() && !insertOps.empty() && modificationOp;
     WriteUnitOfWork wuow{opCtx, groupOplogEntries};
 
-    stdx::visit(
-        OverloadedVisitor{
-            [&](const write_ops::UpdateCommandRequest& updateOp) {
-                invariant(updateOp.getUpdates().size() == 1);
-                auto& update = updateOp.getUpdates().front();
+    if (modificationOp) {
+        stdx::visit(
+            OverloadedVisitor{
+                [&](const write_ops::UpdateCommandRequest& updateOp) {
+                    invariant(updateOp.getUpdates().size() == 1);
+                    auto& update = updateOp.getUpdates().front();
 
-                invariant(coll->isClustered());
+                    invariant(coll->isClustered());
 
-                auto original = coll->docFor(opCtx, recordId);
+                    auto original = coll->docFor(opCtx, recordId);
 
-                CollectionUpdateArgs args{original.value()};
-                args.criteria = update.getQ();
-                args.stmtIds = {stmtId};
-                if (fromMigrate) {
-                    args.source = OperationSource::kFromMigrate;
-                }
+                    CollectionUpdateArgs args{original.value()};
+                    args.criteria = update.getQ();
+                    args.stmtIds = {stmtId};
+                    if (fromMigrate) {
+                        args.source = OperationSource::kFromMigrate;
+                    }
 
-                BSONObj diffFromUpdate;
-                const BSONObj* diffOnIndexes =
-                    collection_internal::kUpdateAllIndexes;  // Assume all indexes are affected.
+                    BSONObj diffFromUpdate;
+                    const BSONObj* diffOnIndexes =
+                        collection_internal::kUpdateAllIndexes;  // Assume all indexes are affected.
 
-                // Overwrites the original bucket.
-                invariant(update.getU().type() ==
-                          write_ops::UpdateModification::Type::kReplacement);
-                auto updated = update.getU().getUpdateReplacement();
-                args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
+                    // Overwrites the original bucket.
+                    invariant(update.getU().type() ==
+                              write_ops::UpdateModification::Type::kReplacement);
+                    auto updated = update.getU().getUpdateReplacement();
+                    args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
 
-                collection_internal::updateDocument(opCtx,
-                                                    coll,
-                                                    recordId,
-                                                    original,
-                                                    updated,
-                                                    diffOnIndexes,
-                                                    nullptr /* indexesAffected */,
-                                                    &curOp->debug(),
-                                                    &args);
-            },
-            [&](const write_ops::DeleteCommandRequest& deleteOp) {
-                invariant(deleteOp.getDeletes().size() == 1);
-                auto deleteId =
-                    record_id_helpers::keyForOID(deleteOp.getDeletes().front().getQ()["_id"].OID());
-                invariant(recordId == deleteId);
-                collection_internal::deleteDocument(
-                    opCtx, coll, stmtId, recordId, &curOp->debug(), fromMigrate);
-            }},
-        modificationOp);
+                    collection_internal::updateDocument(opCtx,
+                                                        coll,
+                                                        recordId,
+                                                        original,
+                                                        updated,
+                                                        diffOnIndexes,
+                                                        nullptr /* indexesAffected */,
+                                                        &curOp->debug(),
+                                                        &args);
+                },
+                [&](const write_ops::DeleteCommandRequest& deleteOp) {
+                    invariant(deleteOp.getDeletes().size() == 1);
+                    auto deleteId = record_id_helpers::keyForOID(
+                        deleteOp.getDeletes().front().getQ()["_id"].OID());
+                    invariant(recordId == deleteId);
+                    collection_internal::deleteDocument(
+                        opCtx, coll, stmtId, recordId, &curOp->debug(), fromMigrate);
+                }},
+            *modificationOp);
+    }
 
     if (!insertOps.empty()) {
         std::vector<InsertStatement> insertStatements;

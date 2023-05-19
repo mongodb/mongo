@@ -1148,10 +1148,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 "Cannot perform a non-multi update on a time-series collection",
                 updateRequest->isMulti());
 
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform an upsert on a time-series collection",
-                !updateRequest->isUpsert());
-
         // Only translate the hint if it is specified with an index key.
         if (timeseries::isHintIndexKey(updateRequest->getHint())) {
             updateRequest->setHint(
@@ -1161,6 +1157,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
         if (!feature_flags::gTimeseriesUpdatesSupport.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot perform an upsert on a time-series collection",
+                    !updateRequest->isUpsert());
+
             auto metaField = timeseriesOptions->getMetaField();
             uassert(ErrorCodes::InvalidOptions,
                     "Cannot perform an update on a time-series collection that does not have a "
@@ -1315,17 +1315,11 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
             return ret;
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
             const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-            // We are only using this to check if we should retry the command, so we don't need to
-            // pass it a real collection object.
-            ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, CollectionPtr::null);
-            uassertStatusOK(parsedUpdate.parseRequest());
+            auto cq = uassertStatusOK(ParsedUpdate::parseQueryToCQ(
+                opCtx, nullptr /* expCtx */, extensionsCallback, request, request.getQuery()));
 
-            if (!parsedUpdate.hasParsedQuery()) {
-                uassertStatusOK(parsedUpdate.parseQueryToCQ());
-            }
-
-            if (!shouldRetryDuplicateKeyException(parsedUpdate,
-                                                  *ex.extraInfo<DuplicateKeyErrorInfo>())) {
+            if (!write_ops_exec::shouldRetryDuplicateKeyException(
+                    request, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
                 throw;
             }
 
@@ -1915,18 +1909,15 @@ bool matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
 }
 }  // namespace
 
-bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
+bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
+                                      const CanonicalQuery& cq,
                                       const DuplicateKeyErrorInfo& errorInfo) {
-    invariant(parsedUpdate.hasParsedQuery());
-
-    const auto updateRequest = parsedUpdate.getRequest();
-
     // In order to be retryable, the update must be an upsert with multi:false.
-    if (!updateRequest->isUpsert() || updateRequest->isMulti()) {
+    if (!updateRequest.isUpsert() || updateRequest.isMulti()) {
         return false;
     }
 
-    auto matchExpr = parsedUpdate.getParsedQuery()->root();
+    auto matchExpr = cq.root();
     invariant(matchExpr);
 
     // In order to be retryable, the update query must contain no expressions other than AND and EQ.

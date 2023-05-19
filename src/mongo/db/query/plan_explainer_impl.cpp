@@ -498,6 +498,8 @@ void statsToBSON(const PlanStageStats& stats,
                                   static_cast<long long>(spec->nMeasurementsMatched));
                 bob->appendNumber("nMeasurementsUpdated",
                                   static_cast<long long>(spec->nMeasurementsModified));
+                bob->appendNumber("nMeasurementsUpserted",
+                                  static_cast<long long>(spec->nMeasurementsUpserted));
             } else {
                 bob->appendNumber("nMeasurementsDeleted",
                                   static_cast<long long>(spec->nMeasurementsModified));
