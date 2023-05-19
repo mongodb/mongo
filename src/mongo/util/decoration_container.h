@@ -96,8 +96,7 @@ public:
      */
     explicit DecorationContainer(Decorable<DecoratedType>* const decorated,
                                  const DecorationRegistry<DecoratedType>* const registry)
-        : _registry(registry),
-          _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]{}) {
+        : _registry(registry) {
         // Because the decorations live in the externally allocated storage buffer at
         // `_decorationData`, there needs to be a way to get back from a known location within this
         // buffer to the type which owns those decorations.  We place a pointer to ourselves, a
@@ -116,8 +115,7 @@ public:
     explicit DecorationContainer(Decorable<DecoratedType>* const decorated,
                                  const DecorationRegistry<DecoratedType>* const registry,
                                  const DecorationContainer& other)
-        : _registry(registry),
-          _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]) {
+        : _registry(registry) {
         // Because the decorations live in the externally allocated storage buffer at
         // `_decorationData`, there needs to be a way to get back from a known location within this
         // buffer to the type which owns those decorations.  We place a pointer to ourselves, a
@@ -166,7 +164,8 @@ public:
 
 private:
     const DecorationRegistry<DecoratedType>* const _registry;
-    const std::unique_ptr<unsigned char[]> _decorationData;
+    const std::unique_ptr<unsigned char[]> _decorationData =
+        std::make_unique<unsigned char[]>(_registry->getDecorationBufferSizeBytes());
 };
 
 }  // namespace mongo
