@@ -181,9 +181,9 @@ function verifyExplain(
     jsTestLog(`Explain: ${tojson(explain)}`);
     if (!rootStageName) {
         rootStageName = "TS_MODIFY";
-    } else {
-        assert.eq("PROJECTION_DEFAULT", rootStageName, "Only PROJECTION_DEFAULT is allowed");
     }
+    assert("PROJECTION_DEFAULT" === rootStageName || "TS_MODIFY" === rootStageName,
+           "Only PROJECTION_DEFAULT or TS_MODIFY is allowed");
 
     let foundStage = getPlanStage(explain.queryPlanner.winningPlan, rootStageName);
     assert.neq(null,
@@ -212,10 +212,16 @@ function verifyExplain(
     }
     assert.eq(
         "TS_MODIFY", tsModifyStage.stage, `Can't find TS_MODIFY stage: ${tojson(execStages)}`);
-    assert.eq(nBucketsUnpacked,
-              tsModifyStage.nBucketsUnpacked,
-              `Got wrong nBucketsUnpacked ${tojson(tsModifyStage)}`);
-    assert.eq(nReturned, tsModifyStage.nReturned, `Got wrong nReturned ${tojson(tsModifyStage)}`);
+
+    if (nBucketsUnpacked) {
+        assert.eq(nBucketsUnpacked,
+                  tsModifyStage.nBucketsUnpacked,
+                  `Got wrong nBucketsUnpacked ${tojson(tsModifyStage)}`);
+    }
+    if (nReturned) {
+        assert.eq(
+            nReturned, tsModifyStage.nReturned, `Got wrong nReturned ${tojson(tsModifyStage)}`);
+    }
 }
 
 /**
@@ -288,38 +294,17 @@ function testFindOneAndRemove({
     const shouldRetryWrites = session.getOptions().shouldRetryWrites();
     // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
     if (!shouldRetryWrites && !errorCode) {
-        const bucketColl = getBucketCollection(coll);
-        // TODO SERVER-76906 Enable explain for findAndModify on a sharded timeseries collection.
-        if (!FixtureHelpers.isSharded(bucketColl)) {
+        if (bucketFilter) {
             const explainRes = assert.commandWorked(
                 coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
-            if (bucketFilter) {
-                verifyExplain({
-                    explain: explainRes,
-                    rootStageName: rootStage,
-                    bucketFilter: bucketFilter,
-                    residualFilter: residualFilter,
-                    nBucketsUnpacked: nBucketsUnpacked,
-                    nReturned: nReturned,
-                });
-            }
-        } else {
-            jsTestLog("Skipping explain for sharded timeseries collections");
-
-            const collMetadata =
-                db.getSiblingDB("config").collections.findOne({_id: bucketColl.getFullName()});
-            jsTestLog(`Collection metadata -\n${tojson(collMetadata)}`);
-            if (collMetadata.timestamp) {
-                jsTestLog(`Shard info -\n${
-                    tojson(db.getSiblingDB("config")
-                               .chunks.find({uuid: collMetadata.uuid})
-                               .toArray())}`);
-            } else {
-                jsTestLog(`Shard info -\n${
-                    tojson(db.getSiblingDB("config")
-                               .chunks.find({uuid: collMetadata.uuid})
-                               .toArray())}`);
-            }
+            verifyExplain({
+                explain: explainRes,
+                rootStageName: rootStage,
+                bucketFilter: bucketFilter,
+                residualFilter: residualFilter,
+                nBucketsUnpacked: nBucketsUnpacked,
+                nReturned: nReturned,
+            });
         }
 
         const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
@@ -509,6 +494,11 @@ function restartProfiler() {
  *                  we can from the query.
  * - res.dataBearingShard: "primary", "other", "none", or "any". For "none" and "any", only
  *                         the "twoPhaseProtocol" is allowed.
+ * - res.rootStage: The expected root stage of the explain plan.
+ * - res.bucketFilter: The expected bucket filter of the TS_MODIFY stage.
+ * - res.residualFilter: The expected residual filter of the TS_MODIFY stage.
+ * - res.nBucketsUnpacked: The expected number of buckets unpacked by the TS_MODIFY stage.
+ * - res.nReturned: The expected number of documents returned by the TS_MODIFY stage.
  */
 function testFindOneAndRemoveOnShardedCollection({
     initialDocList,
@@ -520,6 +510,11 @@ function testFindOneAndRemoveOnShardedCollection({
         deletedDoc,
         writeType,
         dataBearingShard,
+        rootStage,
+        bucketFilter,
+        residualFilter,
+        nBucketsUnpacked,
+        nReturned,
     },
 }) {
     const callerName = getCallerName();
@@ -535,7 +530,25 @@ function testFindOneAndRemoveOnShardedCollection({
     const shouldRetryWrites = session.getOptions().shouldRetryWrites();
     // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
     if (!shouldRetryWrites && !errorCode) {
-        // TODO SERVER-76906 Verify explain for findAndModify on sharded timeseries collections.
+        if (bucketFilter) {
+            // Due to the limitation of two-phase write protocol, the TS_MODIFY stage's execution
+            // stats can't really show the results close to real execution. We can just verify
+            // plan part.
+            assert(writeType !== "twoPhaseProtocol" || (!nBucketsUnpacked && !nReturned),
+                   "Can't verify nBucketsUnpacked and nReturned for the two-phase protocol.");
+
+            const explainRes = assert.commandWorked(
+                coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
+            verifyExplain({
+                explain: explainRes,
+                rootStageName: rootStage,
+                bucketFilter: bucketFilter,
+                residualFilter: residualFilter,
+                nBucketsUnpacked: nBucketsUnpacked,
+                nReturned: nReturned,
+            });
+        }
+
         restartProfiler();
         const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
         jsTestLog(`findAndModify remove result: ${tojson(res)}`);
