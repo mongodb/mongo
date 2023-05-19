@@ -165,6 +165,7 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
+  - name: run_pretty_printer_tests
   - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit

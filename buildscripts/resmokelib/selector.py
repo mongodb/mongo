@@ -604,6 +604,39 @@ class _CppTestSelector(_Selector):
         return _Selector.select(self, selector_config)
 
 
+class _PrettyPrinterTestSelectorConfig(_SelectorConfig):
+    """_SelectorConfig subclass for pretty-printer-tests."""
+
+    def __init__(self, root=config.DEFAULT_INTEGRATION_TEST_LIST, roots=None, include_files=None,
+                 exclude_files=None):
+        """Initialize _PrettyPrinterTestSelectorConfig."""
+        if roots:
+            # The 'roots' argument is only present when tests are specified on the command line
+            # and in that case they take precedence over the tests in the root file.
+            _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
+                                     exclude_files=exclude_files)
+        else:
+            _SelectorConfig.__init__(self, root=root, include_files=include_files,
+                                     exclude_files=exclude_files)
+
+
+class _PrettyPrinterTestSelector(_Selector):
+    """_Selector subclass for pretty-printer-tests."""
+
+    def __init__(self, test_file_explorer):
+        """Initialize _PrettyPrinterTestSelector."""
+        _Selector.__init__(self, test_file_explorer)
+
+    def select(self, selector_config):
+        """Return selected tests."""
+        if selector_config.roots:
+            # Tests have been specified on the command line. We use them without additional
+            # filtering.
+            test_list = _TestList(self._test_file_explorer, selector_config.roots)
+            return test_list.get_tests()
+        return _Selector.select(self, selector_config)
+
+
 class _DbTestSelectorConfig(_SelectorConfig):
     """_Selector config subclass for db_test tests."""
 
@@ -715,6 +748,7 @@ _DEFAULT_TEST_FILE_EXPLORER = TestFileExplorer()
 _SELECTOR_REGISTRY = {
     "cpp_integration_test": (_CppTestSelectorConfig, _CppTestSelector),
     "cpp_unit_test": (_CppTestSelectorConfig, _CppTestSelector),
+    "pretty_printer_test": (_PrettyPrinterTestSelectorConfig, _PrettyPrinterTestSelector),
     "benchmark_test": (_CppTestSelectorConfig, _CppTestSelector),
     "sdam_json_test": (_FileBasedSelectorConfig, _Selector),
     "server_selection_json_test": (_FileBasedSelectorConfig, _Selector),

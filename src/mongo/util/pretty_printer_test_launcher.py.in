@@ -7,23 +7,34 @@ interpolated by scons.
 
 import subprocess
 import os
-
+import shlex
+verbose = @VERBOSE@
+test_script = r'@pretty_printer_test_py@'
+test_args = @test_args@
 gdb_path = '@gdb_path@'
 args = [
     gdb_path,
     '-nx',
     '-batch',
     '-ex',
-    r'source @pretty_printer_test_py@',
+    f'source {test_script}',
     '-args',
     r'@pretty_printer_test_program@',
-]
-print(f"Pretty printer test running command:\n{' '.join(args)}")
+] + test_args
+
+
+if verbose:
+    print(f"Pretty printer test running command:\n{shlex.join(args)}")
 # We assume we are running from project root, and require modules buried in the src directory
 python_env = os.environ.copy()
 python_env['PYTHONPATH'] = os.getcwd() + os.pathsep + python_env.get('PYTHONPATH', "")
 
 proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                       env=python_env)
-print(proc.stdout)
+
+if verbose:
+    out = '\n'.join([f'[{os.path.basename(test_script)}] {line}' for line in proc.stdout.split('\n')])
+    print(out)
+else:
+    print(f'[{os.path.basename(test_script)}] {"passed" if proc.returncode == 0 else "failed"}')
 exit(proc.returncode)

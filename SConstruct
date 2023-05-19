@@ -917,6 +917,7 @@ def variable_tools_converter(val):
         "mongo_integrationtest",
         "mongo_unittest",
         "mongo_libfuzzer",
+        "mongo_pretty_printer_tests",
         "textfile",
     ]
 
@@ -1641,6 +1642,8 @@ envDict = dict(
     # TODO: Move unittests.txt to $BUILD_DIR, but that requires
     # changes to MCI.
     UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
+    PRETTY_PRINTER_TEST_ALIAS='install-pretty-printer-tests',
+    PRETTY_PRINTER_TEST_LIST='$BUILD_DIR/pretty_printer_tests.txt',
     LIBFUZZER_TEST_ALIAS='install-fuzzertests',
     LIBFUZZER_TEST_LIST='$BUILD_ROOT/libfuzzer_tests.txt',
     INTEGRATION_TEST_ALIAS='install-integration-tests',
@@ -6019,6 +6022,14 @@ env.AddPackageNameAlias(
     # defined when AIB correctly uses environments instead of hooking into
     # the first environment used.
     name="mh-debugsymbols",
+)
+
+env.AutoInstall(
+    target='$PREFIX',
+    source='$PRETTY_PRINTER_TEST_LIST',
+    AIB_ROLE='runtime',
+    AIB_COMPONENT='pretty-printer-tests',
+    AIB_COMPONENTS_EXTRA=['dist-test'],
 )
 
 env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'

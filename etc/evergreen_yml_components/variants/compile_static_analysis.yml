@@ -79,6 +79,7 @@ buildvariants:
     - name: compile_test_and_package_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
+    - name: run_pretty_printer_tests
     - name: server_discovery_and_monitoring_json_test_TG
       distros:
       - rhel80-large
@@ -224,6 +225,7 @@ buildvariants:
     - name: resmoke_validation_tests
     - name: server_discovery_and_monitoring_json_test_TG
     - name: server_selection_json_test_TG
+    - name: run_pretty_printer_tests
 
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile

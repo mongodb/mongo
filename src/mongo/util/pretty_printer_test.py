@@ -3,15 +3,6 @@
 
 import gdb
 import re
-import sys
-
-# Here we substitute in the pip_requirements verification code, so this test
-# can remain a self contained test with little complexity. This is essentially an
-# import we are generating into the file instead to avoid and complex importer logic.
-# Start of pip verification code
-@verify_requirements@
-# End of pip verification code
-
 
 expected_patterns = [
     r'Decorable<MyDecorable\> with 3 elems',
@@ -23,10 +14,12 @@ up_pattern = r'std::unique_ptr<int\> = \{get\(\) \= 0x[0-9a-fA-F]+\}'
 set_pattern = r'std::[__debug::]*set with 4 elements'
 static_member_pattern = '128'
 
+
 def search(pattern, s):
     match = re.search(pattern, s)
     assert match is not None, 'Did not find {!s} in {!s}'.format(pattern, s)
     return match
+
 
 def test_decorable():
     gdb.execute('run')
@@ -35,25 +28,13 @@ def test_decorable():
     for pattern in expected_patterns:
         search(pattern, d1_str)
 
-    search(up_pattern,  gdb.execute('print up', to_string=True))
+    search(up_pattern, gdb.execute('print up', to_string=True))
     search(set_pattern, gdb.execute('print set_type', to_string=True))
     search(static_member_pattern, gdb.execute('print testClass::static_member', to_string=True))
 
 
-def configure_gdb():
-    import os,subprocess,sys
-    cmd = 'python -c "import os,sys;print(os.linesep.join(sys.path).strip())"'
-    paths = subprocess.check_output(cmd,shell=True).decode("utf-8").split()
-    sys.path.extend(paths)
-    gdb.execute('source .gdbinit')
-    try:
-        verify_requirements('etc/pip/components/core.req', executable=f"@python_executable@")
-    except MissingRequirements as ex:
-        print(ex)
-
 if __name__ == '__main__':
     try:
-        configure_gdb()
         test_decorable()
         gdb.write('TEST PASSED\n')
     except Exception as err:

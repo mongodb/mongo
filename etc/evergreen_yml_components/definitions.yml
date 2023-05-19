@@ -535,7 +535,11 @@ functions:
     params:
       binary: bash
       args:
-      - "src/evergreen/functions/binaries_extract.sh"
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/functions/binaries_extract.py"
+      - "--tarball=mongo-binaries.tgz"
+      - "--extraction-command=${decompress}"
+      - "--change-dir=${extraction_change_dir}"
 
   "get version expansions": &get_version_expansions
     command: s3.get
@@ -2981,6 +2985,45 @@ tasks:
     vars:
       suite: unittests
       install_dir: build/install/bin
+
+## pretty_printer ##
+- <<: *task_template
+  name: run_pretty_printer_tests
+  tags: []
+  commands:
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - func: "do setup"
+    vars:
+      extraction_change_dir: build/install/
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_debugsymbols}
+      bucket: mciuploads
+      local_file: src/mongo-debugsymbols.tgz
+      optional: true
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/functions/binaries_extract.py"
+      - "--tarball=mongo-debugsymbols.tgz"
+      - "--extraction-command=${decompress}"
+      - "--change-dir=build/install/"
+    optional: true
+  - func: "run tests"
+    vars:
+      suite: pretty-printer-tests
+      install_dir: build/install/dist-test/bin
+
 
 ## run_unittests with UndoDB live-record ##
 #- name: run_unittests_with_recording

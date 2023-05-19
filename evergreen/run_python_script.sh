@@ -8,4 +8,5 @@ set -o verbose
 cd src
 
 activate_venv
-$python $@
+echo $python $@
+$python "$@"

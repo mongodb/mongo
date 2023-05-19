@@ -1,4 +1,5 @@
 # -*- mode: python -*-
+import sys
 
 Import("env")
 
@@ -105,3 +106,5 @@ env.CppUnitTest(
         'lock_manager',
     ],
 )
+
+env.PrettyPrinterTest(target="lock_gdb_test.py")
