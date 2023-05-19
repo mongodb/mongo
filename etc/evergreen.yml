@@ -1898,6 +1898,18 @@ tasks:
           --separate-debug
           PREFIX=dist-test
 
+- name: compile_dist_test_half
+  tags: []
+  depends_on: []
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: >-
+        compile_first_half_non_test_source
+        ${additional_compile_targets|}
+      task_compile_flags: >-
+        PREFIX=dist-test
+
 - name: archive_dist_test
   depends_on:
     - name: compile_dist_test
@@ -7048,6 +7060,23 @@ task_groups:
   - compile_all
   - package
 
+# SERVER-76006
+# This is a compile stream meant for non-cached and/or underpowered systems.
+# It joins most of the compile tasks together under a single host spread out
+# across different tasks.
+- <<: *compile_task_group_template
+  name: small_compile_test_and_package_serial_TG
+  tasks:
+  - compile_dist_test_half
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - package
+
+
 - <<: *compile_task_group_template
   name: compile_and_test_TG
   tasks:
@@ -9913,7 +9942,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: small_compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
   - name: generate_buildid_to_debug_symbols_mapping
@@ -9945,7 +9974,7 @@ buildvariants:
     multiversion_edition: enterprise
     test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: small_compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
   - name: build_variant_gen
