@@ -62,8 +62,15 @@ public:
         RecordId& highestSeenRecordId,
         Date_t& highestSeenWallTime);
 
+    /**
+     * Returns whether there are no more markers and no partial marker pending creation.
+     */
+    bool isEmpty() const {
+        return CollectionTruncateMarkers::isEmpty();
+    }
+
 private:
-    friend class PreImagesTruncateMarkersPerCollectionTest;
+    friend class PreImagesRemoverTest;
 
     bool _hasExcessMarkers(OperationContext* opCtx) const override;
 

@@ -590,6 +590,27 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='change_stream_pre_images_manager_test',
+    source=[
+        'change_stream_pre_images_remover_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
+        '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
+        '$BUILD_DIR/mongo/db/storage/record_store_base',
+        'change_stream_options',
+        'change_stream_options_manager',
+        'change_stream_pre_image_util',
+        'change_stream_pre_images_collection_manager',
+        'change_stream_serverless_helpers',
+        'change_streams_cluster_parameter',
+    ],
+)
+
 env.Library(
     target='write_block_bypass',
     source=[

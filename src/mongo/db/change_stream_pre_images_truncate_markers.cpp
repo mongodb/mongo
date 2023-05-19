@@ -46,7 +46,7 @@ bool isExpired(OperationContext* opCtx,
                const RecordId& highestRecordId,
                Date_t highestWallTime) {
     auto currentTimeForTimeBasedExpiration =
-        change_stream_pre_image_util::getCurrentTimeForPreImageRemoval();
+        change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
 
     if (tenantId) {
         // In a serverless environment, the 'expireAfterSeconds' is set per tenant and is the only

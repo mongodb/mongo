@@ -589,7 +589,6 @@ env.CppUnitTest(
         'aggregation_request_test.cpp',
         'change_stream_document_diff_parser_test.cpp',
         'change_stream_event_transform_test.cpp',
-        'change_stream_expired_pre_image_remover_test.cpp',
         'change_stream_rewrites_test.cpp',
         'change_stream_split_event_helpers_test.cpp',
         'dependencies_test.cpp',

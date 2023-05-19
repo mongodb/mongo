@@ -54,7 +54,7 @@ protected:
     void tearDown() override;
 
 private:
-    std::unique_ptr<repl::StorageInterface> _storage;
+    repl::StorageInterface* _storage;
     ServiceContext::UniqueOperationContext _opCtx;
 };
 

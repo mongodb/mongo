@@ -80,6 +80,6 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
  *
  * Returns the current time.
  */
-Date_t getCurrentTimeForPreImageRemoval();
+Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx);
 }  // namespace change_stream_pre_image_util
 }  // namespace mongo

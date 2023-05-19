@@ -236,6 +236,16 @@ protected:
         return _markers;
     }
 
+    /**
+     * Returns whether the truncate markers instace has no markers, whether partial or whole. Note
+     * that this method can provide a stale result unless the caller can guarantee that no more
+     * markers will be created.
+     */
+    bool isEmpty() const {
+        stdx::lock_guard<Latch> lk(_markersMutex);
+        return _markers.size() == 0 && _currentBytes.load() == 0 && _currentRecords.load() == 0;
+    }
+
     Marker& createNewMarker(const RecordId& lastRecord, Date_t wallTime);
 
     template <typename F>
