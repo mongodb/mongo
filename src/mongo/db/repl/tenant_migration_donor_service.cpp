@@ -43,7 +43,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"

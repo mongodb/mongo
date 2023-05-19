@@ -1563,13 +1563,10 @@ class QueryRequestTest : public ServiceContextTest {};
 
 TEST_F(QueryRequestTest, ParseFromUUID) {
     const UUID uuid = UUID::gen();
-
-
     NamespaceStringOrUUID nssOrUUID("test", uuid);
     FindCommandRequest findCommand(nssOrUUID);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.testns");
-    // Ensure a call to refreshNSS succeeds.
-    query_request_helper::refreshNSS(nss, &findCommand);
+    findCommand.setNss(nss);
     ASSERT_EQ(nss, *findCommand.getNamespaceOrUUID().nss());
 }
 

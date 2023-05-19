@@ -30,7 +30,7 @@
 #include "mongo/db/query/query_shape.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_request_helper.h"

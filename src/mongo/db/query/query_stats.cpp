@@ -38,7 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"

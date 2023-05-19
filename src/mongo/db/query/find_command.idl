@@ -68,12 +68,11 @@ types:
 
 commands:
   find:
-    cpp_name: FindCommandRequest
+    cpp_name: FindCommandRequestBase
     command_name: find
     description: "A struct representing the find command"
     strict: true
     namespace: concatenate_with_db_or_uuid
-    non_const_getter: true
     api_version: "1"
     access_check:
         complex:

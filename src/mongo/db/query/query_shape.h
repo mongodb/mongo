@@ -31,7 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 
 namespace mongo::query_shape {

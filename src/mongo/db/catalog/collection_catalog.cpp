@@ -1705,7 +1705,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValida
 
 NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID) const {
-    if (auto& nss = nsOrUUID.nss()) {
+    if (auto nss = nsOrUUID.nss()) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Namespace " << (*nss).toStringForErrorMsg()
                               << " is not a valid collection name",

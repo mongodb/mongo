@@ -393,10 +393,11 @@ public:
                     !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
                       !findCommand->getAllowSpeculativeMajorityRead()));
 
+            const bool isFindByUUID = findCommand->getNamespaceOrUUID().uuid().has_value();
             uassert(ErrorCodes::InvalidOptions,
                     "When using the find command by UUID, the collectionUUID parameter cannot also "
                     "be specified",
-                    !findCommand->getNamespaceOrUUID().uuid() || !findCommand->getCollectionUUID());
+                    !isFindByUUID || !findCommand->getCollectionUUID());
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -495,13 +496,16 @@ public:
             const auto& collection = ctx->getCollection();
 
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().value()
+                    str::stream() << "UUID " << *findCommand->getNamespaceOrUUID().uuid()
                                   << " specified in query request not found",
-                    collection || !findCommand->getNamespaceOrUUID().uuid());
+                    collection || !isFindByUUID);
 
             if (collection) {
-                // Set the namespace if a collection was found, as opposed to nothing or a view.
-                query_request_helper::refreshNSS(ctx->getNss(), findCommand.get());
+                if (isFindByUUID) {
+                    // Replace the UUID in the find command with the fully qualified namespace of
+                    // the looked up Collection.
+                    findCommand->setNss(ctx->getNss());
+                }
 
                 // Tailing a replicated capped clustered collection requires majority read concern.
                 const bool isTailable = findCommand->getTailable();

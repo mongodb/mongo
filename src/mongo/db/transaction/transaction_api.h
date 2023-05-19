@@ -32,7 +32,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/executor/inline_executor.h"

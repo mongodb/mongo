@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,33 +29,40 @@
 
 #pragma once
 
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/query/find_command_gen.h"
 
-namespace mongo::query_stats {
+namespace mongo {
 
-/**
- * Handles shapification for FindCommandRequests.
- */
-class FindRequestShapifier final : public RequestShapifier {
+class FindCommandRequest : public FindCommandRequestBase {
 public:
-    FindRequestShapifier(
-        FindCommandRequest request,  // We pass FindCommandRequest by value in order to make a copy
-                                     // since this instance may outlive the original request once
-                                     // the RequestShapifier is moved to the telemetry store.
-        OperationContext* opCtx,
-        const boost::optional<std::string> applicationName = boost::none)
-        : RequestShapifier(opCtx, applicationName), _request(std::move(request)) {}
+    explicit FindCommandRequest(
+        NamespaceStringOrUUID nssOrUUID,
+        boost::optional<SerializationContext> serializationContext = boost::none)
+        : FindCommandRequestBase(std::move(nssOrUUID), std::move(serializationContext)) {}
 
-    virtual ~FindRequestShapifier() = default;
+    const NamespaceStringOrUUID& getNamespaceOrUUID() const {
+        if (_overrideNssOrUUID) {
+            return _overrideNssOrUUID.value();
+        }
 
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              OperationContext* opCtx) const final;
+        return FindCommandRequestBase::getNamespaceOrUUID();
+    }
 
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    void setNss(const NamespaceString& nss) {
+        _overrideNssOrUUID = NamespaceStringOrUUID{nss};
+    }
+
+    static FindCommandRequest parse(const IDLParserContext& ctxt, const BSONObj& bsonObject) {
+        NamespaceString localNS;
+        FindCommandRequest object(localNS);
+        object.parseProtected(ctxt, bsonObject);
+        return object;
+    }
 
 private:
-    FindCommandRequest _request;
+    // This value is never serialized, instead we will serialize out the NamespaceStringOrUUID we
+    // parsed when building the FindCommandRequest.
+    boost::optional<NamespaceStringOrUUID> _overrideNssOrUUID;
 };
-}  // namespace mongo::query_stats
+
+}  // namespace mongo
