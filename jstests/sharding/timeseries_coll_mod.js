@@ -27,13 +27,6 @@ function runBasicTest() {
     const mongos = st.s0;
     const db = mongos.getDB(dbName);
 
-    if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-        jsTestLog(
-            "Skipping test because the sharded time-series collection feature flag is disabled");
-        st.stop();
-        return;
-    }
-
     assert.commandWorked(
         db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
 

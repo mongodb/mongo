@@ -25,12 +25,6 @@ assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
 const shard0DB = st.shard0.getDB(dbName);
 const shard1DB = st.shard1.getDB(dbName);
 
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 // Helpers.
 let currentId = 0;
 function generateId() {

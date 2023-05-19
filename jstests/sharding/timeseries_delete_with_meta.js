@@ -23,19 +23,6 @@ const metaField = 'hostid';
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const mongos = st.s0;
 
-// Sanity checks.
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
-const deletesEnabled = TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0);
-if (!deletesEnabled) {
-    jsTestLog(
-        "Sharded time-series updates and deletes feature flag is disabled, expecting all delete commands to fail.");
-}
-
 // Databases.
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 const mainDB = mongos.getDB(dbName);
@@ -228,14 +215,6 @@ function runTest(collConfig, reqConfig, insert) {
 
     const isBulkOperation = !reqConfig.deleteQuery;
     if (!isBulkOperation) {
-        // If sharded updates and deletes feature flag is disabled, we only test that the delete
-        // command fails.
-        if (!deletesEnabled) {
-            assert.throwsWithCode(() => coll.deleteMany(reqConfig.deleteQuery),
-                                  ErrorCodes.NotImplemented);
-            return;
-        }
-
         // The 'isTimeseriesNamespace' parameter is not allowed on mongos.
         const failingDeleteCommand = {
             delete: `system.buckets.${collName}`,
@@ -282,12 +261,7 @@ function runTest(collConfig, reqConfig, insert) {
         for (let predicate of predicates) {
             bulk.find(predicate).remove();
         }
-        if (deletesEnabled) {
-            assert.commandWorked(bulk.execute());
-        } else {
-            assert.throws(() => bulk.execute());
-            return;
-        }
+        assert.commandWorked(bulk.execute());
     }
 
     // Check that the query was routed to the correct shards.

@@ -22,23 +22,6 @@ const collName = 'weather';
 const bucketCollName = `system.buckets.${collName}`;
 const bucketCollFullName = `${dbName}.${bucketCollName}`;
 
-//
-// Checks for feature flags.
-//
-
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
-if (!TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
-    jsTestLog(
-        "Skipping test because the updates and deletes on sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const primary = st.shard0;

@@ -779,19 +779,6 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             !ShardKeyPattern(*_request.getShardKey()).isHashedPattern() ||
                 !_request.getUnique().value_or(false));
 
-    if (_timeseriesNssResolvedByCommandHandler()) {
-        // Ensure that a time-series collection cannot be sharded unless the feature flag is
-        // enabled.
-        if (originalNss().isTimeseriesBucketsCollection()) {
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "can't shard time-series collection "
-                                  << nss().toStringForErrorMsg(),
-                    feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                        !timeseries::getTimeseriesOptions(opCtx, nss(), false));
-        }
-    }
-
     if (_request.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
         // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
@@ -866,10 +853,6 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
     // patched yet.
     const auto& resolvedNamespace = bucketsNs;
     performCheckOnCollectionUUID(resolvedNamespace);
-    uassert(ErrorCodes::IllegalOperation,
-            "Sharding a timeseries collection feature is not enabled",
-            feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                serverGlobalParams.featureCompatibility));
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Namespace too long. Namespace: "

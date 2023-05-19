@@ -22,13 +22,6 @@ const metaField = 'hostid';
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const mongos = st.s0;
 
-// Sanity checks.
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 // Databases.
 const mainDB = mongos.getDB(dbName);
 const configDB = mongos.getDB('config');

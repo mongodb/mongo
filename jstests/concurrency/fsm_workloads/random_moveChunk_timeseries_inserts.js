@@ -32,8 +32,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.numInitialDocs = 60 * 24 * 30;
     $config.data.numMetaCount = 30;
 
-    $config.data.featureFlagDisabled = true;
-
     $config.data.bucketPrefix = "system.buckets.";
 
     $config.data.metaField = 'm';
@@ -52,10 +50,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.startState = "init";
 
     $config.states.insert = function insert(db, collName, connCache) {
-        if (this.featureFlagDisabled) {
-            return;
-        }
-
         for (let i = 0; i < 10; i++) {
             // Generate a random timestamp between 'startTime' and largest timestamp we inserted.
             const timer =
@@ -76,10 +70,6 @@ var $config = extendWorkload($config, function($config, $super) {
      * Moves a random chunk in the target collection.
      */
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        if (this.featureFlagDisabled) {
-            return;
-        }
-
         const configDB = db.getSiblingDB('config');
         const ns = db[this.bucketPrefix + collName].getFullName();
         const chunks = findChunksUtil.findChunksByNs(configDB, ns).toArray();
@@ -102,11 +92,7 @@ var $config = extendWorkload($config, function($config, $super) {
                               waitForDelete);
     };
 
-    $config.states.init = function init(db, collName, connCache) {
-        if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
-            this.featureFlagDisabled = false;
-        }
-    };
+    $config.states.init = function init(db, collName, connCache) {};
 
     $config.transitions = {
         init: {insert: 1},
@@ -124,10 +110,6 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        if (this.featureFlagDisabled) {
-            return;
-        }
-
         const numBuckets = db[this.bucketPrefix + collName].find({}).itcount();
         const numInitialDocs = db[collName].find().itcount();
 
@@ -165,12 +147,6 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.setup = function setup(db, collName, cluster) {
-        if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
-            this.featureFlagDisabled = false;
-        } else {
-            return;
-        }
-
         db[collName].drop();
         db[this.nonShardCollName].drop();
 

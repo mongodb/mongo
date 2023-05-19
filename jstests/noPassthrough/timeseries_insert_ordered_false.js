@@ -113,12 +113,6 @@ assert.commandWorked(mongos.adminCommand({enableSharding: jsTestName()}));
 // Run test on sharded cluster before sharding the collection.
 runTest(mongos, st.getPrimaryShard(jsTestName()), false);
 
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 // Run test on sharded cluster after sharding the collection.
 runTest(mongos, st.getPrimaryShard(jsTestName()), true);
 st.stop();

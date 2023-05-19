@@ -40,19 +40,6 @@ var TimeseriesTest = class {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesScalabilityImprovements");
     }
 
-    /**
-     * Returns whether sharded time-series updates and deletes are supported.
-     * TODO SERVER-69320 remove this helper.
-     */
-    static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "ShardedTimeSeriesUpdateDelete");
-    }
-
-    // TODO SERVER-69320 remove this helper.
-    static shardedtimeseriesCollectionsEnabled(conn) {
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "ShardedTimeSeries");
-    }
-
     // TODO SERVER-65082 remove this helper.
     static timeseriesMetricIndexesEnabled(conn) {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesMetricIndexes");

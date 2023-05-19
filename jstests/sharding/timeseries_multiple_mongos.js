@@ -28,12 +28,6 @@ const mongos1 = st.s1.getDB(dbName);
 const shard0DB = st.shard0.getDB(dbName);
 const shard1DB = st.shard1.getDB(dbName);
 
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 // Databases and collections.
 assert.commandWorked(mongos0.adminCommand({enableSharding: dbName}));
 
@@ -289,109 +283,107 @@ runTest({
     numProfilerEntries: {sharded: 1, unsharded: 1},
 });
 
-if (TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
-    // Tests for updates.
-    runTest({
-        shardKey: {[metaField + ".a"]: 1},
-        cmdObj: {
-            update: collName,
-            updates: [{
-                q: {},
-                u: {$inc: {[metaField + ".b"]: 1}},
-                multi: true,
-            }]
-        },
-        numProfilerEntries: {sharded: 2, unsharded: 1},
-    });
+// Tests for updates.
+runTest({
+    shardKey: {[metaField + ".a"]: 1},
+    cmdObj: {
+        update: collName,
+        updates: [{
+            q: {},
+            u: {$inc: {[metaField + ".b"]: 1}},
+            multi: true,
+        }]
+    },
+    numProfilerEntries: {sharded: 2, unsharded: 1},
+});
 
-    runTest({
-        shardKey: {[metaField + ".a"]: 1},
-        cmdObj: {
-            update: collName,
-            updates: [{
-                q: {[metaField + ".a"]: 1},
-                u: {$inc: {[metaField + ".b"]: -1}},
-                multi: true,
-            }]
-        },
-        numProfilerEntries: {sharded: 1, unsharded: 1},
-    });
+runTest({
+    shardKey: {[metaField + ".a"]: 1},
+    cmdObj: {
+        update: collName,
+        updates: [{
+            q: {[metaField + ".a"]: 1},
+            u: {$inc: {[metaField + ".b"]: -1}},
+            multi: true,
+        }]
+    },
+    numProfilerEntries: {sharded: 1, unsharded: 1},
+});
 
-    runTest({
-        shardKey: {[metaField + ".a"]: 1},
-        cmdObj: {
-            update: bucketsCollName,
-            updates: [{
-                q: {},
-                u: {$inc: {["meta.b"]: 1}},
-                multi: true,
-            }]
-        },
-        numProfilerEntries: {sharded: 2, unsharded: 1},
-    });
+runTest({
+    shardKey: {[metaField + ".a"]: 1},
+    cmdObj: {
+        update: bucketsCollName,
+        updates: [{
+            q: {},
+            u: {$inc: {["meta.b"]: 1}},
+            multi: true,
+        }]
+    },
+    numProfilerEntries: {sharded: 2, unsharded: 1},
+});
 
-    runTest({
-        shardKey: {[metaField + ".a"]: 1},
-        cmdObj: {
-            update: bucketsCollName,
-            updates: [{
-                q: {["meta.a"]: 1},
-                u: {$inc: {["meta.b"]: -1}},
-                multi: true,
-            }]
-        },
-        numProfilerEntries: {sharded: 1, unsharded: 1},
-    });
+runTest({
+    shardKey: {[metaField + ".a"]: 1},
+    cmdObj: {
+        update: bucketsCollName,
+        updates: [{
+            q: {["meta.a"]: 1},
+            u: {$inc: {["meta.b"]: -1}},
+            multi: true,
+        }]
+    },
+    numProfilerEntries: {sharded: 1, unsharded: 1},
+});
 
-    // Tests for deletes.
-    runTest({
-        shardKey: {[metaField]: 1},
-        cmdObj: {
-            delete: collName,
-            deletes: [{
-                q: {},
-                limit: 0,
-            }],
-        },
-        numProfilerEntries: {sharded: 2, unsharded: 1},
-    });
+// Tests for deletes.
+runTest({
+    shardKey: {[metaField]: 1},
+    cmdObj: {
+        delete: collName,
+        deletes: [{
+            q: {},
+            limit: 0,
+        }],
+    },
+    numProfilerEntries: {sharded: 2, unsharded: 1},
+});
 
-    runTest({
-        shardKey: {[metaField]: 1},
-        cmdObj: {
-            delete: collName,
-            deletes: [{
-                q: {[metaField]: 0},
-                limit: 0,
-            }],
-        },
-        numProfilerEntries: {sharded: 1, unsharded: 1},
-    });
+runTest({
+    shardKey: {[metaField]: 1},
+    cmdObj: {
+        delete: collName,
+        deletes: [{
+            q: {[metaField]: 0},
+            limit: 0,
+        }],
+    },
+    numProfilerEntries: {sharded: 1, unsharded: 1},
+});
 
-    runTest({
-        shardKey: {[metaField]: 1},
-        cmdObj: {
-            delete: bucketsCollName,
-            deletes: [{
-                q: {},
-                limit: 0,
-            }],
-        },
-        numProfilerEntries: {sharded: 2, unsharded: 1},
-    });
+runTest({
+    shardKey: {[metaField]: 1},
+    cmdObj: {
+        delete: bucketsCollName,
+        deletes: [{
+            q: {},
+            limit: 0,
+        }],
+    },
+    numProfilerEntries: {sharded: 2, unsharded: 1},
+});
 
-    runTest({
-        shardKey: {[metaField]: 1},
-        cmdObj: {
-            delete: bucketsCollName,
-            deletes: [{
-                q: {meta: 0},
-                limit: 0,
-            }],
-        },
-        numProfilerEntries: {sharded: 1, unsharded: 1},
-    });
-}
+runTest({
+    shardKey: {[metaField]: 1},
+    cmdObj: {
+        delete: bucketsCollName,
+        deletes: [{
+            q: {meta: 0},
+            limit: 0,
+        }],
+    },
+    numProfilerEntries: {sharded: 1, unsharded: 1},
+});
 
 st.stop();
 })();
