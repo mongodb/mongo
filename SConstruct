@@ -2031,13 +2031,15 @@ if env.get('ENABLE_OOM_RETRY'):
                 ': out of memory',
                 'virtual memory exhausted: Cannot allocate memory',
                 ': fatal error: Killed signal terminated program cc1',
+                # TODO: SERVER-77322 remove this non memory related ICE.
+                r'during IPA pass: cp.+g\+\+: internal compiler error',
             ]
         elif env.ToolchainIs('msvc'):
             env['OOM_RETRY_MESSAGES'] = [
                 'LNK1102: out of memory',
                 'C1060: compiler is out of heap space',
                 'c1xx : fatal error C1063: INTERNAL COMPILER ERROR',
-                'LNK1171: unable to load mspdbcore.dll',
+                r'LNK1171: unable to load mspdbcore\.dll',
                 "LNK1201: error writing to program database ''",
             ]
             env['OOM_RETRY_RETURNCODES'] = [1102]
