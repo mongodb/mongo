@@ -3135,6 +3135,9 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
 
 // Verifies a WUOW that would result in a an oplog entry >16MB fails with TransactionTooLarge.
 TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagLargeBatchedOperations",
+                                                               false);
+
     // Setup.
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
