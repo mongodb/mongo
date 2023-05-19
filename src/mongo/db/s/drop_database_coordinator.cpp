@@ -208,23 +208,21 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         opCtx, nss.ns(), coorName, DDLLockManager::kDefaultLockTimeout);
 
     if (!_isPre70Compatible()) {
-        _updateSession(opCtx);
         ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);
         blockCRUDOperationsRequest.setBlockType(
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
         blockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
         blockCRUDOperationsRequest.setAllowViews(true);
         const auto cmdObj =
-            CommandHelpers::appendMajorityWriteConcern(blockCRUDOperationsRequest.toBSON({}));
+            CommandHelpers::appendMajorityWriteConcern(blockCRUDOperationsRequest.toBSON({}))
+                .addFields(getNewSession(opCtx).toBSON());
         sharding_ddl_util::sendAuthenticatedCommandToShards(
             opCtx,
-            nss.db(),
-            cmdObj.addFields(getCurrentSession().toBSON()),
+            nss.db().toString(),
+            cmdObj,
             Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
             **executor);
     }
-
-    _updateSession(opCtx);
 
     // This always runs in the shard role so should use a cluster transaction to guarantee
     // targeting the config server.
@@ -235,15 +233,13 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         Grid::get(opCtx)->catalogClient(),
         coll,
         ShardingCatalogClient::kMajorityWriteConcern,
-        getCurrentSession(),
+        getNewSession(opCtx),
         useClusterTransaction,
         **executor);
 
-    _updateSession(opCtx);
-    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getCurrentSession());
+    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getNewSession(opCtx));
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-    _updateSession(opCtx);
 
     // We need to send the drop to all the shards because both movePrimary and
     // moveChunk leave garbage behind for sharded collections.
@@ -252,27 +248,27 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
                        participants.end());
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss, participants, **executor, getCurrentSession(), true /* fromMigrate */);
+        opCtx, nss, participants, **executor, getNewSession(opCtx), true /* fromMigrate */);
 
     // The sharded collection must be dropped on the primary shard after it has been dropped on all
     // of the other shards to ensure it can only be re-created as unsharded with a higher optime
     // than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss, {primaryShardId}, **executor, getCurrentSession(), false /* fromMigrate */);
+        opCtx, nss, {primaryShardId}, **executor, getNewSession(opCtx), false /* fromMigrate */);
 
     if (!_isPre70Compatible()) {
-        _updateSession(opCtx);
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
         unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         unblockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
         unblockCRUDOperationsRequest.setAllowViews(true);
 
         const auto cmdObj =
-            CommandHelpers::appendMajorityWriteConcern(unblockCRUDOperationsRequest.toBSON({}));
+            CommandHelpers::appendMajorityWriteConcern(unblockCRUDOperationsRequest.toBSON({}))
+                .addFields(getNewSession(opCtx).toBSON());
         sharding_ddl_util::sendAuthenticatedCommandToShards(
             opCtx,
-            nss.db(),
-            cmdObj.addFields(getCurrentSession().toBSON()),
+            nss.db().toString(),
+            cmdObj,
             Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
             **executor);
     }
@@ -319,9 +315,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // Perform a noop write on the participants in order to advance the txnNumber
                     // for this coordinator's lsid so that requests with older txnNumbers can no
                     // longer execute.
-                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
                 }
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", _dbName);
@@ -353,7 +348,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 }
 
                 if (_doc.getCollInfo()) {
-                    const auto& coll = _doc.getCollInfo().value();
+                    const auto coll = _doc.getCollInfo().value();
                     LOGV2_DEBUG(5494504,
                                 2,
                                 "Completing collection drop from previous primary",
@@ -365,9 +360,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     const auto& nss = coll.getNss();
                     LOGV2_DEBUG(5494505, 2, "Dropping collection", logAttrs(nss));
 
-                    _updateSession(opCtx);
                     sharding_ddl_util::stopMigrations(
-                        opCtx, nss, coll.getUuid(), getCurrentSession());
+                        opCtx, nss, coll.getUuid(), getNewSession(opCtx));
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);
@@ -384,9 +378,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 const auto& nssWithZones =
                     catalogClient->getAllNssThatHaveZonesForDatabase(opCtx, _dbName);
                 for (const auto& nss : nssWithZones) {
-                    _updateSession(opCtx);
                     sharding_ddl_util::removeTagsMetadataFromConfig(
-                        opCtx, nss, getCurrentSession());
+                        opCtx, nss, getNewSession(opCtx));
                 }
 
                 // Remove the query sampling configuration documents for all collections in this
@@ -470,13 +463,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _clearDatabaseInfoOnPrimary(opCtx);
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
-                    _updateSession(opCtx);
+                    const auto& osi = getNewSession(opCtx);
                     removeDatabaseFromConfigAndUpdatePlacementHistory(
-                        opCtx,
-                        **executor,
-                        _dbName,
-                        *metadata().getDatabaseVersion(),
-                        getCurrentSession());
+                        opCtx, **executor, _dbName, *metadata().getDatabaseVersion(), osi);
 
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                 }
