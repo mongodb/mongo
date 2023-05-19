@@ -36,7 +36,7 @@ namespace bulk_write_common {
 
 void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) {
     const auto& ops = req.getOps();
-    const auto& nsInfo = req.getNsInfo();
+    const auto& nsInfos = req.getNsInfo();
 
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "May not specify both stmtId and stmtIds in bulkWrite command. Got "
@@ -54,6 +54,14 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) 
             stmtIds->size() == ops.size());
     }
 
+    // Validate the namespaces in nsInfo.
+    for (const auto& nsInfo : nsInfos) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid namespace specified for bulkWrite: '" << nsInfo.getNs()
+                              << "'",
+                nsInfo.getNs().isValid());
+    }
+
     // Validate that every ops entry has a valid nsInfo index.
     // Also validate that we only have one findAndModify for retryable writes.
     bool seenFindAndModify = false;
@@ -63,7 +71,7 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) 
         uassert(ErrorCodes::BadValue,
                 str::stream() << "BulkWrite ops entry " << bulkWriteOp.toBSON()
                               << " has an invalid nsInfo index.",
-                nsInfoIdx < nsInfo.size());
+                nsInfoIdx < nsInfos.size());
 
         if (isRetryableWrite) {
             switch (bulkWriteOp.getType()) {
