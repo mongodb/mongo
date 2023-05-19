@@ -54,6 +54,28 @@ public:
                          CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
                          WiredTigerRecordStore* rs);
 
+    /**
+     * Whether the instance is going to get destroyed.
+     */
+    bool isDead();
+
+    /**
+     * Mark this instance as serving a non-existent RecordStore. This is the case if either the
+     * RecordStore has been deleted or we're shutting down. Doing this will mark the instance as
+     * ready for destruction.
+     */
+    void kill();
+
+    void awaitHasExcessMarkersOrDead(OperationContext* opCtx);
+
+    // Clears all the markers of the instance whenever the current WUOW commits.
+    void clearMarkersOnCommit(OperationContext* opCtx);
+
+    // Updates the metadata about the collection markers after a rollback occurs.
+    void updateMarkersAfterCappedTruncateAfter(int64_t recordsRemoved,
+                                               int64_t bytesRemoved,
+                                               const RecordId& firstRemovedId);
+
     void getOplogTruncateMarkersStats(BSONObjBuilder& builder) const {
         builder.append("totalTimeProcessingMicros", _totalTimeProcessing.count());
         builder.append("processingMethod", _processBySampling ? "sampling" : "scanning");
@@ -69,7 +91,7 @@ public:
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
     RecordId firstRecord;
 
-    static WiredTigerRecordStore::OplogTruncateMarkers createOplogTruncateMarkers(
+    static std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers> createOplogTruncateMarkers(
         OperationContext* opCtx, WiredTigerRecordStore* rs, const NamespaceString& ns);
     //
     // The following methods are public only for use in tests.
@@ -81,6 +103,17 @@ public:
 
 private:
     virtual bool _hasExcessMarkers(OperationContext* opCtx) const final;
+
+    virtual void _notifyNewMarkerCreation() final {
+        _reclaimCv.notify_all();
+    }
+
+    Mutex _reclaimMutex = MONGO_MAKE_LATCH("OplogTruncateMarkers::_reclaimMutex");
+    stdx::condition_variable _reclaimCv;
+
+    // True if '_rs' has been destroyed, e.g. due to repairDatabase being called on the collection's
+    // database, and false otherwise.
+    bool _isDead = false;
 
     WiredTigerRecordStore* _rs;
 
