@@ -164,11 +164,7 @@ function testMultiversionRollbackLatestFromDowngrading(testName, upgradeImmediat
     printFCVDoc(newPrimaryAdminDB, "New primary's FCV after rolling back: ");
     checkFCV(newPrimaryAdminDB, lastLTSFCV, lastLTSFCV);
 
-    if (upgradeImmediately &&
-        FeatureFlagUtil.isEnabled(newPrimaryAdminDB,
-                                  "DowngradingToUpgrading",
-                                  null /* user not specified */,
-                                  true /* ignores FCV */)) {
+    if (upgradeImmediately) {
         // We can upgrade immediately.
         assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
