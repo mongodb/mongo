@@ -445,9 +445,11 @@ void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
+    auto queryNss = query.nss();
+
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
-    csn->name = query.ns().toString();
+    csn->name = queryNss.ns().toString();
     csn->filter = query.root()->clone();
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =

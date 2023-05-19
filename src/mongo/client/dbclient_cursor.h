@@ -34,7 +34,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/rpc/message.h"
 
 namespace mongo {

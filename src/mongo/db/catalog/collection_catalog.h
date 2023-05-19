@@ -821,7 +821,7 @@ private:
 
     // Inserts a catalogId for namespace and UUID at given Timestamp, if not boost::none. Used after
     // scanning the durable catalog for a correct mapping at the given timestamp.
-    void _insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<const NamespaceString&> nss,
+    void _insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<NamespaceString> nss,
                                                 boost::optional<UUID> uuid,
                                                 boost::optional<RecordId> catalogId,
                                                 Timestamp ts);

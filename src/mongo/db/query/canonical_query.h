@@ -119,7 +119,7 @@ public:
      */
     static Status isValidNormalized(const MatchExpression* root);
 
-    const NamespaceString& nss() const {
+    NamespaceString nss() const {
         invariant(_findCommand->getNamespaceOrUUID().nss());
         return *_findCommand->getNamespaceOrUUID().nss();
     }

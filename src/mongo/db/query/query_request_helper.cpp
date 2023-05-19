@@ -150,26 +150,12 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
     return Status::OK();
 }
 
-void refreshNSS(const NamespaceString& nss, FindCommandRequest* findCommand) {
-    if (findCommand->getNamespaceOrUUID().uuid()) {
-        auto& nssOrUUID = findCommand->getNamespaceOrUUID();
-        nssOrUUID.setNss(nss);
-    }
-    invariant(findCommand->getNamespaceOrUUID().nss());
-}
-
 std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
                                                         boost::optional<NamespaceString> nss,
                                                         bool apiStrict) {
     auto findCommand = std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
         IDLParserContext("FindCommandRequest", apiStrict, nss ? nss->tenantId() : boost::none),
         cmdObj));
-
-    // If there is an explicit namespace specified overwite it.
-    if (nss) {
-        auto& nssOrUuid = findCommand->getNamespaceOrUUID();
-        nssOrUuid.setNss(*nss);
-    }
 
     addMetaProjection(findCommand.get());
 

@@ -37,7 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/cursor_response_gen.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_targeter.h"

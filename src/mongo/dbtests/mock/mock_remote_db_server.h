@@ -34,7 +34,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"

@@ -4060,22 +4060,6 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
 
     // Test we can roundtrip from the just parsed document.
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
-
-    // Test mutable getter modifies the command object.
-    {
-        auto& nssOrUuid = testStruct.getNamespaceOrUUID();
-        const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-        nssOrUuid.setNss(nss);
-        nssOrUuid.preferNssForSerialization();
-
-        BSONObjBuilder builder;
-        testStruct.serialize(BSONObj(), &builder);
-
-        // Verify that nss was used for serialization over uuid.
-        ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON(BasicNamespaceConstGetterCommand::kCommandName << "coll"
-                                                                              << "field1" << 3));
-    }
 }
 
 TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {

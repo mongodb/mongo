@@ -1166,16 +1166,9 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
 
     auto writeCatalogIdAfterScan = [&](const boost::optional<DurableCatalogEntry>& catalogEntry) {
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            // Convert from 'const boost::optional<NamespaceString>&' to 'boost::optional<const
-            // NamespaceString&>' without copy.
-            auto nss = [&]() -> boost::optional<const NamespaceString&> {
-                if (const boost::optional<NamespaceString>& ns = nssOrUUID.nss())
-                    return ns.value();
-                return boost::none;
-            }();
             // Insert catalogId for both the namespace and UUID if the catalog entry is found.
             catalog._insertCatalogIdForNSSAndUUIDAfterScan(
-                catalogEntry ? catalogEntry->metadata->nss : nss,
+                catalogEntry ? catalogEntry->metadata->nss : nssOrUUID.nss(),
                 catalogEntry ? catalogEntry->metadata->options.uuid : nssOrUUID.uuid(),
                 catalogEntry ? boost::make_optional(catalogEntry->catalogId) : boost::none,
                 *readTimestamp);
@@ -1799,7 +1792,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValida
 
 NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID) const {
-    if (auto& nss = nsOrUUID.nss()) {
+    if (auto nss = nsOrUUID.nss()) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Namespace " << *nss << " is not a valid collection name",
                 nss->isValid());
@@ -2336,11 +2329,10 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
     }
 }
 
-void CollectionCatalog::_insertCatalogIdForNSSAndUUIDAfterScan(
-    boost::optional<const NamespaceString&> nss,
-    boost::optional<UUID> uuid,
-    boost::optional<RecordId> catalogId,
-    Timestamp ts) {
+void CollectionCatalog::_insertCatalogIdForNSSAndUUIDAfterScan(boost::optional<NamespaceString> nss,
+                                                               boost::optional<UUID> uuid,
+                                                               boost::optional<RecordId> catalogId,
+                                                               Timestamp ts) {
     // TODO SERVER-68674: Remove feature flag check.
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
