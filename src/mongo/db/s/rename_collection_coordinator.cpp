@@ -670,15 +670,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
                 }
 
                 const auto& fromNss = nss();
-
-                _updateSession(opCtx);
-                const OperationSessionInfo osi = getCurrentSession();
 
                 // On participant shards:
                 // - Block CRUD on source and target collection in case at least one
@@ -692,7 +688,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                                         renameCollParticipantRequest.toBSON({}))
-                                        .addFields(osi.toBSON());
+                                        .addFields(getNewSession(opCtx).toBSON());
 
                 // We need to send the command to all the shards because both
                 // movePrimary and moveChunk leave garbage behind for sharded
@@ -731,11 +727,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // For an unsharded collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
-                _updateSession(opCtx);
-
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
                 }
 
                 if (!_isPre70Compatible() &&
@@ -744,10 +738,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     ShardsvrRenameIndexMetadata does not require gGlobalIndexesShardingCatalog to be
                     enabled since it's guaranteed to be present in case of FCV >= 7.0
                     */
-                    renameIndexMetadataInShards(
-                        opCtx, nss(), _request, getCurrentSession(), **executor, &_doc);
+                    const auto& osi = getNewSession(opCtx);
+                    renameIndexMetadataInShards(opCtx, nss(), _request, osi, **executor, &_doc);
                 }
 
+                const auto& osi = getNewSession(opCtx);
                 if (_isPre70Compatible()) {
                     ConfigsvrRenameCollectionMetadata req(nss(), _request.getTo());
                     req.setOptFromCollection(_doc.getOptShardedCollInfo());
@@ -758,7 +753,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         configShard->runCommand(opCtx,
                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                                 "admin",
-                                                cmdObj.addFields(getCurrentSession().toBSON()),
+                                                cmdObj.addFields(osi.toBSON()),
                                                 Shard::RetryPolicy::kIdempotent)));
                 } else {
                     renameCollectionMetadataInTransaction(
@@ -768,7 +763,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         _doc.getTargetUUID(),
                         ShardingCatalogClient::kMajorityWriteConcern,
                         **executor,
-                        getCurrentSession());
+                        osi);
                 }
             }))
         .then(_buildPhaseHandler(
@@ -779,9 +774,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
                 }
 
                 const auto& fromNss = nss();
@@ -791,15 +785,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     fromNss, _doc.getSourceUUID().value());
                 unblockParticipantRequest.setDbName(fromNss.dbName());
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
-                auto const cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                    unblockParticipantRequest.toBSON({}));
+                auto const cmdObj =
+                    CommandHelpers::appendMajorityWriteConcern(unblockParticipantRequest.toBSON({}))
+                        .addFields(getNewSession(opCtx).toBSON());
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-                _updateSession(opCtx);
-                const OperationSessionInfo osi = getCurrentSession();
-
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);
+                    opCtx, fromNss.db(), cmdObj, participants, **executor);
 
                 // Delete chunks belonging to the previous incarnation of the target collection.
                 // This is performed after releasing the critical section in order to

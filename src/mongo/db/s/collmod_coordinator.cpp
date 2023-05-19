@@ -120,9 +120,8 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
         return participants;
     }();
 
-    _updateSession(opCtx);
     sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getCurrentSession(), executor);
+        opCtx, shardsAndConfigsvr, getNewSession(opCtx), executor);
 }
 
 void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
@@ -214,8 +213,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _updateSession(opCtx);
-
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_isPre61Compatible() && _collInfo->isSharded) {
@@ -256,8 +253,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _updateSession(opCtx);
-
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
@@ -265,7 +260,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     hasTimeSeriesBucketingUpdate(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     const auto cmdObj =
-                        CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
+                        CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))
+                            .addFields(getNewSession(opCtx).toBSON());
 
                     const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
@@ -282,8 +278,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
-
-                _updateSession(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
