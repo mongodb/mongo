@@ -493,6 +493,14 @@ std::string NamespaceStringOrUUID::toStringForErrorMsg() const {
     return get<1>(get<UUIDWithDbName>(_nssOrUUID)).toString();
 }
 
+std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID) {
+    if (auto nss = nssOrUUID.nss()) {
+        return toStringForLogging(nss.get());
+    } else {
+        return nssOrUUID.uuid()->toString();
+    }
+}
+
 void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, StringData fieldName) const {
     if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
         builder->append(fieldName, nss->coll());

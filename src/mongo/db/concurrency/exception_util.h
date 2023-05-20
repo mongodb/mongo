@@ -144,9 +144,8 @@ auto writeConflictRetry(OperationContext* opCtx,
             return f();
         } catch (TemporarilyUnavailableException const& e) {
             if (opCtx->inMultiDocumentTransaction()) {
-                // TODO SERVER-76897: use nssOrUUID.toStringForLogging().
                 handleTemporarilyUnavailableExceptionInTransaction(
-                    opCtx, opStr, nssOrUUID.toStringForErrorMsg(), e);
+                    opCtx, opStr, toStringForLogging(nssOrUUID), e);
             }
             throw;
         }
@@ -160,15 +159,15 @@ auto writeConflictRetry(OperationContext* opCtx,
         } catch (WriteConflictException const& e) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             logWriteConflictAndBackoff(
-                writeConflictAttempts, opStr, e.reason(), nssOrUUID.toStringForErrorMsg());
+                writeConflictAttempts, opStr, e.reason(), toStringForLogging(nssOrUUID));
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
         } catch (TemporarilyUnavailableException const& e) {
             handleTemporarilyUnavailableException(
-                opCtx, ++attemptsTempUnavailable, opStr, nssOrUUID.toStringForErrorMsg(), e);
+                opCtx, ++attemptsTempUnavailable, opStr, toStringForLogging(nssOrUUID), e);
         } catch (TransactionTooLargeForCacheException const& e) {
             handleTransactionTooLargeForCacheException(
-                opCtx, &writeConflictAttempts, opStr, nssOrUUID.toStringForErrorMsg(), e);
+                opCtx, &writeConflictAttempts, opStr, toStringForLogging(nssOrUUID), e);
         }
     }
 }

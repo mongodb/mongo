@@ -1023,7 +1023,15 @@ public:
 
     std::string toString() const;
 
+    /**
+     * This function should only be used when logging a NamespaceStringOrUUID in an error message.
+     */
     std::string toStringForErrorMsg() const;
+
+    /**
+     * Method to be used only when logging a NamespaceStringOrUUID in a log message.
+     */
+    friend std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID);
 
     void serialize(BSONObjBuilder* builder, StringData fieldName) const;
 
