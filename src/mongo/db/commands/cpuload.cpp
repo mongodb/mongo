@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -73,6 +74,10 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        const Date_t startTime(Date_t::now());
+        const auto service = txn->getServiceContext();
+        const auto clock = service->getFastClockSource();
+
         double cpuFactor = 1;
         if (cmdObj["cpuFactor"].isNumber()) {
             cpuFactor = cmdObj["cpuFactor"].number();
@@ -85,6 +90,10 @@ public:
             x *= 13;
         }
         lresult = x;
+
+        auto durationTime = clock->now() - startTime;
+        result.append("durationMillis", durationCount<Milliseconds>(durationTime));
+        result.append("durationSeconds", durationCount<Seconds>(durationTime));
         return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const {
