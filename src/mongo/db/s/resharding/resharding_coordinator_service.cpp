@@ -1296,7 +1296,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
     BSONObjBuilder bob;
     bob.append("newState", CoordinatorState_serializer(doc.getState()));
     bob.append("oldState", CoordinatorState_serializer(_coordinatorDoc.getState()));
-    bob.append("namespace", doc.getSourceNss().toString());
+    bob.append("namespace", NamespaceStringUtil::serialize(doc.getSourceNss()));
     bob.append("collectionUUID", doc.getSourceUUID().toString());
     bob.append("reshardingUUID", doc.getReshardingUUID().toString());
 
@@ -1315,7 +1315,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "resharding.coordinator.transition",
-                                           doc.getSourceNss().toString(),
+                                           NamespaceStringUtil::serialize(doc.getSourceNss()),
                                            bob.obj(),
                                            kMajorityWriteConcern);
 }

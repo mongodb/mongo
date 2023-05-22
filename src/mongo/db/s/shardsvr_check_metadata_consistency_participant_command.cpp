@@ -128,8 +128,10 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
         const auto& nss = coll.getNss();
 
         // Serialize with concurrent DDL operations that modify indexes
-        const auto collectionDDLLock = ddlLockManager->lock(
-            opCtx, nss.toString(), kLockReason, DDLLockManager::kDefaultLockTimeout);
+        const auto collectionDDLLock = ddlLockManager->lock(opCtx,
+                                                            NamespaceStringUtil::serialize(nss),
+                                                            kLockReason,
+                                                            DDLLockManager::kDefaultLockTimeout);
 
         AggregateCommandRequest aggRequest{nss, rawPipelineStages};
 

@@ -234,7 +234,7 @@ protected:
 
         // Append static info
         bob.append("type", "op");
-        bob.append("ns", originalNss().toString());
+        bob.append("ns", NamespaceStringUtil::serialize(originalNss()));
         bob.append("desc", _coordinatorName);
         bob.append("op", "command");
         bob.append("active", true);

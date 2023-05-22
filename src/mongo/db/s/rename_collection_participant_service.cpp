@@ -161,8 +161,8 @@ boost::optional<BSONObj> RenameParticipantInstance::reportForCurrentOp(
     bob.append("type", "op");
     bob.append("desc", "RenameParticipantInstance");
     bob.append("op", "command");
-    bob.append("ns", fromNss().toString());
-    bob.append("to", toNss().toString());
+    bob.append("ns", NamespaceStringUtil::serialize(fromNss()));
+    bob.append("to", NamespaceStringUtil::serialize(toNss()));
     bob.append("command", cmdBob.obj());
     bob.append("currentPhase", _doc.getPhase());
     bob.append("active", true);
@@ -394,10 +394,10 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 // migration. It is not needed for the source collection because no migration can
                 // start until it first becomes sharded, which cannot happen until the DDLLock is
                 // released.
-                const auto reason =
-                    BSON("command"
-                         << "rename"
-                         << "from" << fromNss().toString() << "to" << toNss().toString());
+                const auto reason = BSON("command"
+                                         << "rename"
+                                         << "from" << NamespaceStringUtil::serialize(fromNss())
+                                         << "to" << NamespaceStringUtil::serialize(toNss()));
                 auto service = ShardingRecoveryService::get(opCtx);
                 service->releaseRecoverableCriticalSection(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);

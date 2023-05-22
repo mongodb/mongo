@@ -252,8 +252,7 @@ void DropCollectionCoordinator::_freezeMigrations(
 
     if (_doc.getCollInfo()) {
         const auto collUUID = _doc.getCollInfo()->getUuid();
-        sharding_ddl_util::stopMigrations(
-            opCtx, NamespaceString{nss().toString()}, collUUID, getNewSession(opCtx));
+        sharding_ddl_util::stopMigrations(opCtx, nss(), collUUID, getNewSession(opCtx));
     }
 }
 
@@ -295,7 +294,9 @@ void DropCollectionCoordinator::_commitDropCollection(
 
     // Remove the query sampling configuration document for this collection, if it exists.
     sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
-        opCtx, BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName << nss().toString()));
+        opCtx,
+        BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
+             << NamespaceStringUtil::serialize(nss())));
 
     if (collIsSharded) {
         invariant(_doc.getCollInfo());
@@ -316,8 +317,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     }
 
     // Remove tags even if the collection is not sharded or didn't exist
-    sharding_ddl_util::removeTagsMetadataFromConfig(
-        opCtx, NamespaceString{nss().toString()}, getNewSession(opCtx));
+    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getNewSession(opCtx));
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
@@ -329,23 +329,13 @@ void DropCollectionCoordinator::_commitDropCollection(
                        participants.end());
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx,
-        NamespaceString{nss().toString()},
-        participants,
-        **executor,
-        getNewSession(opCtx),
-        true /*fromMigrate*/);
+        opCtx, nss(), participants, **executor, getNewSession(opCtx), true /*fromMigrate*/);
 
     // The sharded collection must be dropped on the primary shard after it has been
     // dropped on all of the other shards to ensure it can only be re-created as
     // unsharded with a higher optime than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx,
-        NamespaceString{nss().toString()},
-        {primaryShardId},
-        **executor,
-        getNewSession(opCtx),
-        false /*fromMigrate*/);
+        opCtx, nss(), {primaryShardId}, **executor, getNewSession(opCtx), false /*fromMigrate*/);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));

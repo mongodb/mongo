@@ -51,7 +51,7 @@ public:
           _request(_doc.getCreateCollectionRequest()),
           _critSecReason(BSON("command"
                               << "createCollection"
-                              << "ns" << originalNss().toString())) {}
+                              << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
 
     ~CreateCollectionCoordinator() = default;
 

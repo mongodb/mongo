@@ -46,7 +46,7 @@ public:
         : RecoverableShardingDDLCoordinator(service, "DropCollectionCoordinator", initialState),
           _critSecReason(BSON("command"
                               << "dropCollection"
-                              << "ns" << originalNss().toString())) {}
+                              << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
 
     ~DropCollectionCoordinator() = default;
 

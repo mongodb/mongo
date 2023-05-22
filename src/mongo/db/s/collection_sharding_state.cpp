@@ -49,7 +49,8 @@ public:
 
     struct CSSAndLock {
         CSSAndLock(std::unique_ptr<CollectionShardingState> css)
-            : cssMutex("CSSMutex::" + css->nss().toString()), css(std::move(css)) {}
+            : cssMutex("CSSMutex::" + NamespaceStringUtil::serialize(css->nss())),
+              css(std::move(css)) {}
 
         const Lock::ResourceMutex cssMutex;
         std::unique_ptr<CollectionShardingState> css;

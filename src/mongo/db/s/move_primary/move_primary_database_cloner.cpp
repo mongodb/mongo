@@ -270,8 +270,9 @@ void MovePrimaryDatabaseCloner::postStage() {
                         "namespace"_attr = coll.ns,
                         "migrationId"_attr = getSharedData()->getMigrationId(),
                         "error"_attr = collStatus.toString());
-            auto message = collStatus.withContext(str::stream() << "Error cloning collection '"
-                                                                << coll.ns.toString() << "'");
+            auto message = collStatus.withContext(
+                str::stream() << "Error cloning collection '"
+                              << NamespaceStringUtil::serialize(coll.ns) << "'");
             // Abort the MovePrimaryDatabaseCloner if the collection clone failed.
             setSyncFailedStatus(collStatus.withReason(message.toString()));
             return;

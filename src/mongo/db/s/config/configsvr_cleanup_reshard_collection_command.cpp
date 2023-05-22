@@ -50,7 +50,7 @@ using namespace fmt::literals;
 
 auto constructFinalMetadataRemovalUpdateOperation(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
-    auto query = BSON(CollectionType::kNssFieldName << nss.toString());
+    auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss));
 
     auto collEntryFieldsToUnset = BSON(CollectionType::kReshardingFieldsFieldName
                                        << 1 << CollectionType::kAllowMigrationsFieldName << 1);

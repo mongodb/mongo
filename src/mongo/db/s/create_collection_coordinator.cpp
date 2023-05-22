@@ -536,10 +536,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             cleanupPartialChunksFromPreviousAttempt(
                                 opCtx, *uuid, getNewSession(opCtx));
 
-                            broadcastDropCollection(opCtx,
-                                                    NamespaceString{nss().toString()},
-                                                    **executor,
-                                                    getNewSession(opCtx));
+                            broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
                         }
                     }
                 }
@@ -584,7 +581,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 _createCollectionAndIndexes(opCtx, shardKeyPattern);
 
                 audit::logShardCollection(opCtx->getClient(),
-                                          nss().toString(),
+                                          NamespaceStringUtil::serialize(nss()),
                                           *_request.getShardKey(),
                                           _request.getUnique().value_or(false));
 

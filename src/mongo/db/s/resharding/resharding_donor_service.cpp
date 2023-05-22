@@ -234,7 +234,8 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       }())),
       _critSecReason(BSON("command"
                           << "resharding_donor"
-                          << "collection" << _metadata.getSourceNss().toString())),
+                          << "collection"
+                          << NamespaceStringUtil::serialize(_metadata.getSourceNss()))),
       _isAlsoRecipient([&] {
           auto myShardId = _externalState->myShardId(_serviceContext);
           return std::find(_recipientShardIds.begin(), _recipientShardIds.end(), myShardId) !=
@@ -726,9 +727,9 @@ void ReshardingDonorService::DonorStateMachine::
             oplog.setOpType(repl::OpTypeEnum::kNoop);
             oplog.setUuid(_metadata.getSourceUUID());
             oplog.setDestinedRecipient(destinedRecipient);
-            oplog.setObject(
-                BSON("msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
-                                          _metadata.getSourceNss().toString())));
+            oplog.setObject(BSON(
+                "msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
+                                     NamespaceStringUtil::serialize(_metadata.getSourceNss()))));
             oplog.setObject2(BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
                                          << _metadata.getReshardingUUID()));
             oplog.setOpTime(OplogSlot());

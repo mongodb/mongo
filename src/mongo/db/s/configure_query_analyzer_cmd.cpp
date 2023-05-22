@@ -171,7 +171,7 @@ public:
                 // existing stop time.
                 request.setQuery(BSON(
                     doc::kNsFieldName
-                    << nss.toString() << doc::kModeFieldName
+                    << NamespaceStringUtil::serialize(nss) << doc::kModeFieldName
                     << BSON("$ne" << QueryAnalyzerMode_serializer(QueryAnalyzerModeEnum::kOff))));
 
                 std::vector<BSONObj> updates;
@@ -182,12 +182,13 @@ public:
                 request.setUpdate(write_ops::UpdateModification(updates));
             } else {
                 request.setUpsert(true);
-                request.setQuery(BSON(doc::kNsFieldName << nss.toString()));
+                request.setQuery(BSON(doc::kNsFieldName << NamespaceStringUtil::serialize(nss)));
 
                 std::vector<BSONObj> updates;
                 BSONObjBuilder setBuilder;
                 setBuilder.appendElements(BSON(doc::kCollectionUuidFieldName
-                                               << collUuid << doc::kNsFieldName << nss.toString()));
+                                               << collUuid << doc::kNsFieldName
+                                               << NamespaceStringUtil::serialize(nss)));
                 setBuilder.appendElements(newConfig.toBSON());
                 // If the mode or collection UUID is different, set a new start time. Otherwise,
                 // keep the original start time.

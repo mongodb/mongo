@@ -105,7 +105,8 @@ private:
 
 template <typename T>
 PersistentTaskQueue<T>::PersistentTaskQueue(OperationContext* opCtx, NamespaceString storageNss)
-    : _storageNss(std::move(storageNss)), _mutex("persistentQueueLock:" + _storageNss.toString()) {
+    : _storageNss(std::move(storageNss)),
+      _mutex("persistentQueueLock:" + NamespaceStringUtil::serialize(_storageNss)) {
 
     DBDirectClient client(opCtx);
 
@@ -224,7 +225,8 @@ PersistentTaskQueue<T>::_loadNextRecord(DBDirectClient& client) {
     if (!bson.isEmpty()) {
         result = typename PersistentTaskQueue<T>::Record{
             bson.getField("_id").Long(),
-            T::parse(IDLParserContext("PersistentTaskQueue:" + _storageNss.toString()),
+            T::parse(IDLParserContext("PersistentTaskQueue:" +
+                                      NamespaceStringUtil::serialize(_storageNss)),
                      bson.getObjectField("task"))};
     }
 

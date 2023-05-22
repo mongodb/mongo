@@ -649,7 +649,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     opCtx,
                     "renameCollection.start",
                     fromNss.ns(),
-                    BSON("source" << fromNss.toString() << "destination" << toNss.toString()),
+                    BSON("source" << NamespaceStringUtil::serialize(fromNss) << "destination"
+                                  << NamespaceStringUtil::serialize(toNss)),
                     ShardingCatalogClient::kMajorityWriteConcern);
 
                 // Block migrations on involved sharded collections
@@ -721,8 +722,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
                     opCtx,
                     BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
-                         << BSON("$in"
-                                 << BSON_ARRAY(nss().toString() << _request.getTo().toString()))));
+                         << BSON("$in" << BSON_ARRAY(
+                                     NamespaceStringUtil::serialize(nss())
+                                     << NamespaceStringUtil::serialize(_request.getTo())))));
 
                 // For an unsharded collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
@@ -801,7 +803,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 opCtx,
                 "renameCollection.end",
                 nss().ns(),
-                BSON("source" << nss().toString() << "destination" << _request.getTo().toString()),
+                BSON("source" << NamespaceStringUtil::serialize(nss()) << "destination"
+                              << NamespaceStringUtil::serialize(_request.getTo())),
                 ShardingCatalogClient::kMajorityWriteConcern);
             LOGV2(5460504, "Collection renamed", logAttrs(nss()));
         }));

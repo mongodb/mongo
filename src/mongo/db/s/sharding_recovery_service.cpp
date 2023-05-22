@@ -179,8 +179,8 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
 
         DBDirectClient dbClient(opCtx);
         FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
-        findRequest.setFilter(
-            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        findRequest.setFilter(BSON(CollectionCriticalSectionDocument::kNssFieldName
+                                   << NamespaceStringUtil::serialize(nss)));
         auto cursor = dbClient.find(std::move(findRequest));
 
         // if there is a doc with the same nss -> in order to not fail it must have the same
@@ -291,8 +291,8 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
 
         DBDirectClient dbClient(opCtx);
         FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
-        findRequest.setFilter(
-            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        findRequest.setFilter(BSON(CollectionCriticalSectionDocument::kNssFieldName
+                                   << NamespaceStringUtil::serialize(nss)));
         auto cursor = dbClient.find(std::move(findRequest));
 
         tassert(7032361,
@@ -338,9 +338,10 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         // - Otherwise this call will fail and the CS won't be advanced (neither persisted nor
         // in-mem)
         auto commandResponse = dbClient.runCommand([&] {
-            const auto query = BSON(
-                CollectionCriticalSectionDocument::kNssFieldName
-                << nss.toString() << CollectionCriticalSectionDocument::kReasonFieldName << reason);
+            const auto query =
+                BSON(CollectionCriticalSectionDocument::kNssFieldName
+                     << NamespaceStringUtil::serialize(nss)
+                     << CollectionCriticalSectionDocument::kReasonFieldName << reason);
             const auto update = BSON(
                 "$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName << true));
 
@@ -419,8 +420,8 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
 
         DBDirectClient dbClient(opCtx);
 
-        const auto queryNss =
-            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString());
+        const auto queryNss = BSON(CollectionCriticalSectionDocument::kNssFieldName
+                                   << NamespaceStringUtil::serialize(nss));
         FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
         findRequest.setFilter(queryNss);
         auto cursor = dbClient.find(std::move(findRequest));
