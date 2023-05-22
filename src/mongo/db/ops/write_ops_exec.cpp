@@ -1144,10 +1144,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 "Time-series buckets collection is missing time-series options",
                 timeseriesOptions);
 
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform a non-multi update on a time-series collection",
-                updateRequest->isMulti());
-
         // Only translate the hint if it is specified with an index key.
         if (timeseries::isHintIndexKey(updateRequest->getHint())) {
             updateRequest->setHint(
@@ -1157,6 +1153,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
         if (!feature_flags::gTimeseriesUpdatesSupport.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot perform a non-multi update on a time-series collection",
+                    updateRequest->isMulti());
+
             uassert(ErrorCodes::InvalidOptions,
                     "Cannot perform an upsert on a time-series collection",
                     !updateRequest->isUpsert());

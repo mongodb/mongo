@@ -58,7 +58,7 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
             _isSingletonWrite() || _residualPredicate || _params.isUpdate);
     tassert(7308300,
             "Can return the deleted measurement only if deleting one",
-            !_params.returnDeleted || _isSingletonWrite());
+            !_params.returnDeleted || (_isSingletonWrite() && !_params.isUpdate));
     _children.emplace_back(std::move(child));
 
     // These three properties are only used for the queryPlanner explain and will not change while
