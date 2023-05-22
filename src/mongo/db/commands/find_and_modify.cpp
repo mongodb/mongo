@@ -318,8 +318,7 @@ void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx)
         actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    ResourcePattern resource(
-        CommandHelpers::resourcePatternForNamespace(request.getNamespace().toString()));
+    ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(request.getNamespace()));
     uassert(17138,
             "Invalid target namespace " + resource.toString(),
             resource.isExactNamespacePattern());

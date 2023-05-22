@@ -416,7 +416,7 @@ Status FindAndModifyCmd::checkAuthForOperation(OperationContext* opCtx,
     }
 
     auto nss = CommandHelpers::parseNsFromCommand(dbName, cmdObj);
-    ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(nss.ns()));
+    ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(nss));
     uassert(17137,
             "Invalid target namespace " + resource.toString(),
             resource.isExactNamespacePattern());

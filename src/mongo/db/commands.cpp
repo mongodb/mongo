@@ -335,11 +335,13 @@ NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
                                                           cmdObj.firstElement().valueStringData());
 }
 
-ResourcePattern CommandHelpers::resourcePatternForNamespace(StringData ns) {
-    if (!NamespaceString::validCollectionComponent(ns)) {
-        return ResourcePattern::forDatabaseName(ns);
+ResourcePattern CommandHelpers::resourcePatternForNamespace(const NamespaceString& ns) {
+    const auto& nss = NamespaceStringUtil::serialize(ns);
+    if (!NamespaceString::validCollectionComponent(nss)) {
+        // TODO (SERVER-76195) pass a NamespaceString/object directly here instead of StringData.
+        return ResourcePattern::forDatabaseName(nss);
     }
-    return ResourcePattern::forExactNamespace(NamespaceString(ns));
+    return ResourcePattern::forExactNamespace(ns);
 }
 
 Command* CommandHelpers::findCommand(StringData name) {
