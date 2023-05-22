@@ -4334,6 +4334,7 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-long
+      distros: ubuntu2004-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
