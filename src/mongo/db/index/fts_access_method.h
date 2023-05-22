@@ -54,6 +54,7 @@ private:
      */
     void doGetKeys(OperationContext* opCtx,
                    const CollectionPtr& collection,
+                   const IndexCatalogEntry* entry,
                    SharedBufferFragmentBuilder& pooledBufferBuilder,
                    const BSONObj& obj,
                    GetKeysContext context,

@@ -1416,18 +1416,14 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
     AutoGetCollectionForRead autoColl(_opCtx, nss);
     auto wildcardIndexDescriptor =
         autoColl.getCollection()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
-    const IndexAccessMethod* wildcardIndexAccessMethod = autoColl.getCollection()
-                                                             ->getIndexCatalog()
-                                                             ->getEntry(wildcardIndexDescriptor)
-                                                             ->accessMethod();
+    const IndexCatalogEntry* entry =
+        autoColl.getCollection()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
         OneOffRead oor(_opCtx, insertTime1.asTimestamp());
-        const WildcardAccessMethod* wam =
-            dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(wam, _opCtx, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1440,10 +1436,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         // we were to construct a query plan that incorrectly believes a path is NOT multikey,
         // it could produce incorrect results.
         OneOffRead oor(_opCtx, insertTime0.asTimestamp());
-        const WildcardAccessMethod* wam =
-            dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(wam, _opCtx, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1515,18 +1509,14 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     AutoGetCollectionForRead autoColl(_opCtx, nss);
     auto wildcardIndexDescriptor =
         autoColl.getCollection()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
-    const IndexAccessMethod* wildcardIndexAccessMethod = autoColl.getCollection()
-                                                             ->getIndexCatalog()
-                                                             ->getEntry(wildcardIndexDescriptor)
-                                                             ->accessMethod();
+    const IndexCatalogEntry* entry =
+        autoColl.getCollection()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
         OneOffRead oor(_opCtx, updateTime1.asTimestamp());
-        const WildcardAccessMethod* wam =
-            dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(wam, _opCtx, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1539,10 +1529,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
         // we were to construct a query plan that incorrectly believes a path is NOT multikey,
         // it could produce incorrect results.
         OneOffRead oor(_opCtx, insertTime0.asTimestamp());
-        const WildcardAccessMethod* wam =
-            dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(wam, _opCtx, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }

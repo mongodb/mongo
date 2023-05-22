@@ -147,10 +147,12 @@ void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::s
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    ASSERT(indexDescriptor);
-    ASSERT_OK(collection.getWritableCollection(opCtx)->getIndexCatalog()->dropIndex(
-        opCtx, collection.getWritableCollection(opCtx), indexDescriptor));
+    auto writableCollection = collection.getWritableCollection(opCtx);
+    auto writableEntry =
+        writableCollection->getIndexCatalog()->getWritableEntryByName(opCtx, indexName);
+    ASSERT(writableEntry);
+    ASSERT_OK(writableCollection->getIndexCatalog()->dropIndexEntry(
+        opCtx, collection.getWritableCollection(opCtx), writableEntry));
 
     ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(
         repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));
@@ -230,7 +232,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
 
         // Make sure all of the indexes were found and cursors opened against them. Including the
         // _id index.
-        ASSERT_EQ(validateState.getIndexes().size(), 5);
+        ASSERT_EQ(validateState.getIndexIdents().size(), 5);
     }
 
     // Checkpoint of all of the data: it should not make any difference for foreground validation
@@ -246,7 +248,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
         CollectionValidation::RepairMode::kNone,
         /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
-    ASSERT_EQ(validateState.getIndexes().size(), 5);
+    ASSERT_EQ(validateState.getIndexIdents().size(), 5);
 }
 
 // Open cursors against checkpoint'ed indexes with {background:true}.
@@ -277,7 +279,7 @@ TEST_F(ValidateStateDiskTest, OpenCursorsOnCheckpointedIndexes) {
 
     // Make sure the uncheckpoint'ed indexes are not found.
     // (Note the _id index was create with collection creation, so we have 3 indexes.)
-    ASSERT_EQ(validateState.getIndexes().size(), 3);
+    ASSERT_EQ(validateState.getIndexIdents().size(), 3);
 }
 
 // Indexes in the checkpoint that were dropped in the present should not have cursors opened against
@@ -312,7 +314,7 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
             CollectionValidation::RepairMode::kNone,
             /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
-        ASSERT_EQ(validateState.getIndexes().size(), 3);
+        ASSERT_EQ(validateState.getIndexIdents().size(), 3);
     }
 
     // Checkpoint the index drops and recheck that the indexes are not found.
@@ -326,7 +328,7 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
         CollectionValidation::RepairMode::kNone,
         /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
-    ASSERT_EQ(validateState.getIndexes().size(), 3);
+    ASSERT_EQ(validateState.getIndexIdents().size(), 3);
 }
 
 }  // namespace

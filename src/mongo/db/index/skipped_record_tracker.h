@@ -54,10 +54,7 @@ public:
         kKeyGenerationAndInsertion
     };
 
-    explicit SkippedRecordTracker(const IndexCatalogEntry* indexCatalogEntry);
-    SkippedRecordTracker(OperationContext* opCtx,
-                         const IndexCatalogEntry* indexCatalogEntry,
-                         boost::optional<StringData> ident);
+    SkippedRecordTracker(OperationContext* opCtx, boost::optional<StringData> ident);
 
     /**
      * Records a RecordId that was unable to be indexed due to a key generation error. At the
@@ -86,6 +83,7 @@ public:
     Status retrySkippedRecords(
         OperationContext* opCtx,
         const CollectionPtr& collection,
+        const IndexCatalogEntry* indexCatalogEntry,
         RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     boost::optional<std::string> getTableIdent() const {
@@ -98,8 +96,6 @@ public:
     }
 
 private:
-    const IndexCatalogEntry* _indexCatalogEntry;
-
     // This temporary record store is owned by the duplicate key tracker.
     std::unique_ptr<TemporaryRecordStore> _skippedRecordsTable;
 

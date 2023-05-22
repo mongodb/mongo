@@ -78,6 +78,11 @@ protected:
         return contents;
     }
 
+    const IndexDescriptor* getIndexDescriptor(const std::string& indexName) {
+        return _coll->getCollection()->getIndexCatalog()->findIndexByName(operationContext(),
+                                                                          indexName);
+    }
+
     void setUp() override {
         CatalogTestFixture::setUp();
         ASSERT_OK(storageInterface()->createCollection(operationContext(), _nss, {}));
@@ -96,6 +101,7 @@ private:
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
     auto interceptor = createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    const IndexDescriptor* desc = getIndexDescriptor("a_1");
 
     KeyString::HeapBuilder ksBuilder(KeyString::Version::kLatestVersion);
     ksBuilder.appendNumberLong(10);
@@ -103,8 +109,13 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
 
     WriteUnitOfWork wuow(operationContext());
     int64_t numKeys = 0;
-    ASSERT_OK(interceptor->sideWrite(
-        operationContext(), {keyString}, {}, {}, IndexBuildInterceptor::Op::kInsert, &numKeys));
+    ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                     desc->getEntry(),
+                                     {keyString},
+                                     {},
+                                     {},
+                                     IndexBuildInterceptor::Op::kInsert,
+                                     &numKeys));
     ASSERT_EQ(1, numKeys);
     wuow.commit();
 
@@ -125,6 +136,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnInsertIsSavedToSideWritesTable) 
     RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+    const IndexDescriptor* desc = getIndexDescriptor("columnstore");
 
     std::vector<column_keygen::CellPatch> columnChanges;
     columnChanges.emplace_back(
@@ -134,7 +146,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnInsertIsSavedToSideWritesTable) 
     int64_t numKeysInserted = 0;
     int64_t numKeysDeleted = 0;
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(1, numKeysInserted);
     ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();
@@ -159,6 +171,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnDeleteIsSavedToSideWritesTable) 
     RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+    const IndexDescriptor* desc = getIndexDescriptor("columnstore");
 
     std::vector<column_keygen::CellPatch> columnChanges;
     columnChanges.emplace_back(
@@ -168,7 +181,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnDeleteIsSavedToSideWritesTable) 
     int64_t numKeysInserted = 0;
     int64_t numKeysDeleted = 0;
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(0, numKeysInserted);
     ASSERT_EQ(1, numKeysDeleted);
     wuow.commit();
@@ -193,6 +206,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnUpdateIsSavedToSideWritesTable) 
     RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+    const IndexDescriptor* desc = getIndexDescriptor("columnstore");
 
     // create path + cell + rid
     std::vector<column_keygen::CellPatch> columnChanges;
@@ -203,7 +217,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnUpdateIsSavedToSideWritesTable) 
     int64_t numKeysInserted = 0;
     int64_t numKeysDeleted = 0;
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(1, numKeysInserted);
     ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();
@@ -228,6 +242,7 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnInsertsAreSavedToSideWritesTab
     RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+    const IndexDescriptor* desc = getIndexDescriptor("columnstore");
 
     std::vector<column_keygen::CellPatch> columnChanges;
     columnChanges.emplace_back("changedPath1",
@@ -252,7 +267,7 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnInsertsAreSavedToSideWritesTab
     int64_t numKeysDeleted = 0;
 
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(4, numKeysInserted);
     ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();
@@ -303,6 +318,7 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWrites
     RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
+    const IndexDescriptor* desc = getIndexDescriptor("columnstore");
 
     WriteUnitOfWork wuow(operationContext());
     int64_t numKeysInserted = 0;
@@ -314,7 +330,7 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWrites
                                RecordId(1),
                                column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(1, numKeysInserted);
     ASSERT_EQ(0, numKeysDeleted);
 
@@ -322,7 +338,7 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWrites
     columnChanges2.emplace_back(
         "changedPath1", "", RecordId(1), column_keygen::ColumnKeyGenerator::DiffAction::kDelete);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges2, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges2, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(0, numKeysInserted);
     ASSERT_EQ(1, numKeysDeleted);
 
@@ -334,7 +350,7 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWrites
     columnChanges3.emplace_back(
         "changedPath3", "", RecordId(2), column_keygen::ColumnKeyGenerator::DiffAction::kDelete);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges3, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges3, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(1, numKeysInserted);
     ASSERT_EQ(1, numKeysDeleted);
 
@@ -344,7 +360,7 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWrites
                                 RecordId(2),
                                 column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnChanges4, &numKeysInserted, &numKeysDeleted));
+        operationContext(), desc->getEntry(), columnChanges4, &numKeysInserted, &numKeysDeleted));
     ASSERT_EQ(1, numKeysInserted);
     ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();

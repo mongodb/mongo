@@ -50,6 +50,24 @@
 
 namespace mongo {
 
+namespace {
+
+/**
+ * Returns wildcardProjection or columnstoreProjection projection
+ */
+BSONObj createPathProjection(const BSONObj& infoObj) {
+    if (const auto wildcardProjection = infoObj[IndexDescriptor::kWildcardProjectionFieldName]) {
+        return wildcardProjection.Obj().getOwned();
+    } else if (const auto columnStoreProjection =
+                   infoObj[IndexDescriptor::kColumnStoreProjectionFieldName]) {
+        return columnStoreProjection.Obj().getOwned();
+    } else {
+        return BSONObj();
+    }
+}
+
+}  // namespace
+
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
@@ -124,6 +142,9 @@ constexpr StringData IndexDescriptor::kColumnStoreCompressorFieldName;
  *   infoObj          - options information
  */
 IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
+    : _shared(make_intrusive<SharedState>(accessMethodName, infoObj)) {}
+
+IndexDescriptor::SharedState::SharedState(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
       _indexType(IndexNames::nameToType(accessMethodName)),
       _infoObj(infoObj.getOwned()),
@@ -222,8 +243,8 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // the original and normalized projections will be empty BSON objects, so we can still do the
     // comparison based on the normalized projection.
     static const UnorderedFieldsBSONObjComparator kUnorderedBSONCmp;
-    if (kUnorderedBSONCmp.evaluate(_normalizedProjection !=
-                                   existingIndexDesc->_normalizedProjection)) {
+    if (kUnorderedBSONCmp.evaluate(_shared->_normalizedProjection !=
+                                   existingIndexDesc->_shared->_normalizedProjection)) {
         return Comparison::kDifferent;
     }
 
@@ -309,14 +330,14 @@ std::vector<const char*> IndexDescriptor::getFieldNames() const {
     };
 
     // Iterate over the key pattern and add the field names to the 'fieldNames' vector.
-    BSONObjIterator keyPatternIter(_keyPattern);
+    BSONObjIterator keyPatternIter(_shared->_keyPattern);
     while (keyPatternIter.more()) {
         BSONElement KeyPatternElem = keyPatternIter.next();
         auto fieldName = KeyPatternElem.fieldNameStringData();
 
         // If the index type is text and the field name is either '_fts' or '_ftsx', then append the
         // index fields to the field names, otherwise add the field name from the key pattern.
-        if ((_indexType == IndexType::INDEX_TEXT) &&
+        if ((_shared->_indexType == IndexType::INDEX_TEXT) &&
             (fieldName == kFTSFieldName || fieldName == kFTSXFieldName)) {
             maybeAppendFtsIndexField();
         } else {
@@ -326,7 +347,7 @@ std::vector<const char*> IndexDescriptor::getFieldNames() const {
 
     // If the index type is text and the 'hasSeenFtsOrFtsxFields' is set to false, then append the
     // index fields.
-    if (_indexType == IndexType::INDEX_TEXT) {
+    if (_shared->_indexType == IndexType::INDEX_TEXT) {
         maybeAppendFtsIndexField();
     }
 

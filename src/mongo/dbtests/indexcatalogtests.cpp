@@ -150,8 +150,12 @@ public:
             WriteUnitOfWork wuow(&opCtx);
             ASSERT_OK(autoColl.getDb()->dropCollection(&opCtx, _nss));
             wuow.commit();
-            ASSERT_TRUE(entry->isDropped());
         }
+
+        // The original index entry is not marked as dropped. When dropping the collection, a
+        // copy-on-write is performed on the index entry and the previous index entry is left
+        // untouched.
+        ASSERT_FALSE(entry->isDropped());
     }
 };
 

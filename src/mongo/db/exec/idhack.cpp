@@ -91,8 +91,8 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
         collection()->ns().ns(),
         [&] {
             // Look up the key by going directly to the index.
-            auto recordId =
-                indexAccessMethod()->asSortedData()->findSingle(opCtx(), collection(), _key);
+            auto recordId = indexAccessMethod()->asSortedData()->findSingle(
+                opCtx(), collection(), indexDescriptor()->getEntry(), _key);
 
             // Key not found.
             if (recordId.isNull()) {

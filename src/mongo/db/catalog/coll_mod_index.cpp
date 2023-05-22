@@ -142,28 +142,6 @@ void _processCollModIndexRequestHidden(OperationContext* opCtx,
 }
 
 /**
- * Returns set of keys for a document in an index.
- */
-void getKeysForIndex(OperationContext* opCtx,
-                     const CollectionPtr& collection,
-                     const SortedDataIndexAccessMethod* accessMethod,
-                     const BSONObj& doc,
-                     KeyStringSet* keys) {
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
-
-    accessMethod->getKeys(opCtx,
-                          collection,
-                          pooledBuilder,
-                          doc,
-                          InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
-                          SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                          keys,
-                          nullptr,       //  multikeyMetadataKeys
-                          nullptr,       //  multikeyPaths
-                          boost::none);  // loc
-}
-
-/**
  * Adjusts unique setting on an index to true.
  */
 void _processCollModIndexRequestUnique(OperationContext* opCtx,

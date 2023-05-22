@@ -41,8 +41,8 @@ struct IndexBounds;
 struct IndexKeyEntry;
 struct Interval;
 struct MultikeyMetadataAccessStats;
+class IndexCatalogEntry;
 class OperationContext;
-class WildcardAccessMethod;
 
 /**
  * Returns an exact set or super-set of the bounds required to fetch the multikey metadata keys
@@ -54,8 +54,8 @@ std::vector<Interval> getMultikeyPathIndexIntervalsForField(FieldRef field);
  * Returns the intersection of 'fields' and the set of multikey metadata paths stored in the
  * wildcard index. Statistics reporting index seeks and keys examined are written to 'stats'.
  */
-std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
-                                              OperationContext* opCtx,
+std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
+                                              const IndexCatalogEntry* entry,
                                               const stdx::unordered_set<std::string>& fieldSet,
                                               MultikeyMetadataAccessStats* stats);
 
@@ -63,8 +63,8 @@ std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
  * Returns the set of all paths for which the wildcard index has multikey metadata keys.
  * Statistics reporting index seeks and keys examined are written to 'stats'.
  */
-std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
-                                              OperationContext* opCtx,
+std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
+                                              const IndexCatalogEntry* entry,
                                               MultikeyMetadataAccessStats* stats);
 
 }  // namespace mongo

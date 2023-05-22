@@ -346,12 +346,17 @@ TEST_F(IndexSignatureTest,
     // signature.
     auto* wildcardIndex =
         unittest::assertGet(createIndex(fromjson("{v: 2, name: 'wc_all', key: {'$**': 1}}")));
+    const std::string wildcardIndexIdent = wildcardIndex->getIdent();
+
+    auto getWildcardIndex = [&]() -> const IndexCatalogEntry* {
+        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wildcardIndexIdent)->getEntry();
+    };
 
     // Verifies that another wildcard index with empty wildcardProjection compares identical
     // to 'wildcardIndex' after normalizing the index spec.
     auto anotherWcAllSpec = normalizeIndexSpec(fromjson("{v: 2, key: {'$**': 1}}"));
     auto anotherWcAllProjDesc = makeIndexDescriptor(anotherWcAllSpec);
-    ASSERT(anotherWcAllProjDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+    ASSERT(anotherWcAllProjDesc->compareIndexOptions(opCtx(), coll()->ns(), getWildcardIndex()) ==
            IndexDescriptor::Comparison::kIdentical);
     ASSERT_EQ(createIndex(anotherWcAllProjDesc->infoObj().addFields(fromjson("{name: 'wc_all'}"))),
               ErrorCodes::IndexAlreadyExists);
@@ -361,20 +366,25 @@ TEST_F(IndexSignatureTest,
 
     // Verifies that an index with non-empty value for 'wildcardProjection' option compares
     // different from the base wildcard index and thus can be created.
-    auto wcProjADesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto wcProjADesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: 1}}"))));
-    ASSERT(wcProjADesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+    ASSERT(wcProjADesc->compareIndexOptions(opCtx(), coll()->ns(), getWildcardIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     auto* wcProjAIndex = unittest::assertGet(
         createIndex(wcProjADesc->infoObj().addFields(fromjson("{name: 'wc_a'}"))));
+    const std::string wcProjAIndexIdent = wcProjAIndex->getIdent();
+
+    auto getWcProjAIndex = [&]() -> const IndexCatalogEntry* {
+        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wcProjAIndexIdent)->getEntry();
+    };
 
     // Verifies that an index with the same value for 'wildcardProjection' option as the
     // wcProjAIndex compares identical.
-    auto anotherWcProjADesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto anotherWcProjADesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: 1}}"))));
-    ASSERT(anotherWcProjADesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjAIndex) ==
+    ASSERT(anotherWcProjADesc->compareIndexOptions(opCtx(), coll()->ns(), getWcProjAIndex()) ==
            IndexDescriptor::Comparison::kIdentical);
 
     // Verifies that creating an index with the same value for 'wildcardProjection' option and the
@@ -388,24 +398,24 @@ TEST_F(IndexSignatureTest,
 
     // Verifies that an index with a different value for 'wildcardProjection' option compares
     // different from the base wildcard index or 'wc_a' and thus can be created.
-    auto wcProjABDesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto wcProjABDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: 1, b: 1}}"))));
-    ASSERT(wcProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+    ASSERT(wcProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), getWildcardIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
-    ASSERT(wcProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjAIndex) ==
+    ASSERT(wcProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), getWcProjAIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     auto* wcProjABIndex = unittest::assertGet(
         createIndex(wcProjABDesc->infoObj().addFields(fromjson("{name: 'wc_a_b'}"))));
 
     // Verifies that an index with sub fields for 'wildcardProjection' option compares
     // different from the base wildcard index or 'wc_a' or 'wc_a_b' and thus can be created.
-    auto wcProjASubBCDesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto wcProjASubBCDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: {b: 1, c: 1}}}"))));
-    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), getWildcardIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
-    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjAIndex) ==
+    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), getWcProjAIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjABIndex) ==
            IndexDescriptor::Comparison::kDifferent);
@@ -413,8 +423,8 @@ TEST_F(IndexSignatureTest,
         createIndex(wcProjASubBCDesc->infoObj().addFields(fromjson("{name: 'wc_a_sub_b_c'}"))));
 
     // Verifies that two indexes with the same projection in different order compares identical.
-    auto wcProjASubCBDesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto wcProjASubCBDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: {c: 1, b: 1}}}"))));
     ASSERT(wcProjASubCBDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjASubBCIndex) ==
            IndexDescriptor::Comparison::kIdentical);
@@ -430,7 +440,7 @@ TEST_F(IndexSignatureTest,
     // non-signature index option compares equivalent as the 'wcProjAIndex'
     auto wcProjAWithNonSigDesc = makeIndexDescriptor(
         anotherWcProjADesc->infoObj().addFields(fromjson("{storageEngine: {wiredTiger: {}}}")));
-    ASSERT(wcProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjAIndex) ==
+    ASSERT(wcProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), getWcProjAIndex()) ==
            IndexDescriptor::Comparison::kEquivalent);
 
     // Verifies that an index with the same value for 'wildcardProjection' option, non-signature
@@ -452,6 +462,11 @@ TEST_F(IndexSignatureTest,
     // signature.
     auto* wildcardIndex = unittest::assertGet(createIndex(
         fromjson("{v: 2, name: 'cwi_all', key: {'$**': 1, b: 1}, wildcardProjection: {b: 0}}")));
+    const std::string wildcardIndexIdent = wildcardIndex->getIdent();
+
+    auto getWildcardIndex = [&]() -> const IndexCatalogEntry* {
+        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wildcardIndexIdent)->getEntry();
+    };
 
     // Verifies that an index with the same value for 'wildcardProjection' option as the
     // wcProjAIndex compares identical.
@@ -473,20 +488,20 @@ TEST_F(IndexSignatureTest,
 
     // Verifies that an index with a different value for 'wildcardProjection' option compares
     // different from the base wildcard index or 'cwi_a' and thus can be created.
-    auto wcProjABDesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto wcProjABDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: 1}}"))));
-    ASSERT(wcProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+    ASSERT(wcProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), getWildcardIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     auto* wcProjABIndex = unittest::assertGet(
         createIndex(wcProjABDesc->infoObj().addFields(fromjson("{name: 'cwi_a_b'}"))));
 
     // Verifies that an index with sub fields for 'wildcardProjection' option compares
     // different from the base wildcard index or 'cwi_a' or 'cwi_a_b' and thus can be created.
-    auto wcProjASubBCDesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto wcProjASubBCDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: {b: 1, c: 1}}}"))));
-    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+    ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), getWildcardIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     ASSERT(wcProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjABIndex) ==
            IndexDescriptor::Comparison::kDifferent);
@@ -494,8 +509,8 @@ TEST_F(IndexSignatureTest,
         createIndex(wcProjASubBCDesc->infoObj().addFields(fromjson("{name: 'cwi_a_sub_b_c'}"))));
 
     // Verifies that two indexes with the same projection in different order compares identical.
-    auto wcProjASubCBDesc =
-        makeIndexDescriptor(normalizeIndexSpec(wildcardIndex->descriptor()->infoObj().addFields(
+    auto wcProjASubCBDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{wildcardProjection: {a: {c: 1, b: 1}}}"))));
     ASSERT(wcProjASubCBDesc->compareIndexOptions(opCtx(), coll()->ns(), wcProjASubBCIndex) ==
            IndexDescriptor::Comparison::kIdentical);
@@ -510,9 +525,9 @@ TEST_F(IndexSignatureTest,
     // Verifies that an index with the same value for 'wildcardProjection' option and an
     // non-signature index option compares equivalent as the 'wcProjAIndex'
     auto wcProjAWithNonSigDesc =
-        makeIndexDescriptor(wildcardIndex->descriptor()->infoObj().addFields(
+        makeIndexDescriptor(getWildcardIndex()->descriptor()->infoObj().addFields(
             fromjson("{storageEngine: {wiredTiger: {}}}")));
-    ASSERT(wcProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
+    ASSERT(wcProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), getWildcardIndex()) ==
            IndexDescriptor::Comparison::kEquivalent);
 
     // Verifies that an index with the same value for 'wildcardProjection' option, non-signature
@@ -550,14 +565,23 @@ TEST_F(IndexSignatureTest,
     // signature.
     auto* columnstoreIndex = unittest::assertGet(
         createIndex(fromjson("{v: 2, name: 'cs_all', key: {'$**': 'columnstore'}}")));
+    const std::string columnstoreIndexIdent = columnstoreIndex->getIdent();
+
+    auto getColumnstoreIndex = [&]() -> const IndexCatalogEntry* {
+        return coll()
+            ->getIndexCatalog()
+            ->findIndexByIdent(opCtx(), columnstoreIndexIdent)
+            ->getEntry();
+    };
 
     // Verifies that another columnstore index with empty columnstoreProjection compares identical
     // to 'columnstoreIndex' after normalizing the index spec.
     auto anotherCsAllSpec = normalizeIndexSpec(fromjson("{v: 2, key: {'$**': 'columnstore'}}"));
     auto anotherCsAllProjDesc = makeIndexDescriptor(anotherCsAllSpec);
 
-    ASSERT(anotherCsAllProjDesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
-           IndexDescriptor::Comparison::kIdentical);
+    ASSERT(
+        anotherCsAllProjDesc->compareIndexOptions(opCtx(), coll()->ns(), getColumnstoreIndex()) ==
+        IndexDescriptor::Comparison::kIdentical);
 
     ASSERT_EQ(createIndex(anotherCsAllProjDesc->infoObj().addFields(fromjson("{name: 'cs_all'}"))),
               ErrorCodes::IndexAlreadyExists);
@@ -567,19 +591,24 @@ TEST_F(IndexSignatureTest,
 
     // Verifies that an index with non-empty value for 'columnstoreProjection' option compares
     // different from the base columnstore index and thus can be created.
-    auto csProjADesc =
-        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+    auto csProjADesc = makeIndexDescriptor(
+        normalizeIndexSpec(getColumnstoreIndex()->descriptor()->infoObj().addFields(
             fromjson("{columnstoreProjection: {a: 1}}"))));
-    ASSERT(csProjADesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
+    ASSERT(csProjADesc->compareIndexOptions(opCtx(), coll()->ns(), getColumnstoreIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     auto* csProjAIndex = unittest::assertGet(
         createIndex(csProjADesc->infoObj().addFields(fromjson("{name: 'cs_a'}"))));
+    const std::string csProjAIndexIdent = csProjAIndex->getIdent();
+
+    auto getCsProjAIndex = [&]() -> const IndexCatalogEntry* {
+        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), csProjAIndexIdent)->getEntry();
+    };
 
 
     // Verifies that an index with the same value for 'columnstoreProjection' option as the
     // csProjAIndex compares identical.
-    auto anotherCsProjADesc =
-        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+    auto anotherCsProjADesc = makeIndexDescriptor(
+        normalizeIndexSpec(getColumnstoreIndex()->descriptor()->infoObj().addFields(
             fromjson("{columnstoreProjection: {a: 1}}"))));
 
     ASSERT(anotherCsProjADesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
@@ -596,24 +625,24 @@ TEST_F(IndexSignatureTest,
 
     // Verifies that an index with a different value for 'columnstoreProjection' option compares
     // different from the base columnstore index or 'cs_a' and thus can be created.
-    auto csProjABDesc =
-        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+    auto csProjABDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getColumnstoreIndex()->descriptor()->infoObj().addFields(
             fromjson("{columnstoreProjection: {a: 1, b: 1}}"))));
-    ASSERT(csProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
+    ASSERT(csProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), getColumnstoreIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
-    ASSERT(csProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
+    ASSERT(csProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), getCsProjAIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     auto* csProjABIndex = unittest::assertGet(
         createIndex(csProjABDesc->infoObj().addFields(fromjson("{name: 'cs_a_b'}"))));
 
     // Verifies that an index with sub fields for 'columnstoreProjection' option compares
     // different from the base columnstore index or 'cs_a' or 'cs_a_b' and thus can be created.
-    auto csProjASubBCDesc =
-        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+    auto csProjASubBCDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getColumnstoreIndex()->descriptor()->infoObj().addFields(
             fromjson("{columnstoreProjection: {a: {b: 1, c: 1}}}"))));
-    ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
+    ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), getColumnstoreIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
-    ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
+    ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), getCsProjAIndex()) ==
            IndexDescriptor::Comparison::kDifferent);
     ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjABIndex) ==
            IndexDescriptor::Comparison::kDifferent);
@@ -621,8 +650,8 @@ TEST_F(IndexSignatureTest,
         createIndex(csProjASubBCDesc->infoObj().addFields(fromjson("{name: 'cs_a_sub_b_c'}"))));
 
     // Verifies that two indexes with the same projection in different order compares identical.
-    auto csProjASubCBDesc =
-        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+    auto csProjASubCBDesc = makeIndexDescriptor(
+        normalizeIndexSpec(getColumnstoreIndex()->descriptor()->infoObj().addFields(
             fromjson("{columnstoreProjection: {a: {c: 1, b: 1}}}"))));
     ASSERT(csProjASubCBDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjASubBCIndex) ==
            IndexDescriptor::Comparison::kIdentical);
@@ -638,7 +667,7 @@ TEST_F(IndexSignatureTest,
     // non-signature index option compares equivalent as the 'csProjAIndex'
     auto csProjAWithNonSigDesc = makeIndexDescriptor(
         anotherCsProjADesc->infoObj().addFields(fromjson("{storageEngine: {wiredTiger: {}}}")));
-    ASSERT(csProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
+    ASSERT(csProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), getCsProjAIndex()) ==
            IndexDescriptor::Comparison::kEquivalent);
 
     // Verifies that an index with the same value for 'columnstoreProjection' option, non-signature

@@ -73,7 +73,9 @@ public:
     /**
      * Given a duplicate key, insert it into the key constraint table.
      */
-    Status recordKey(OperationContext* opCtx, const KeyString::Value& key);
+    Status recordKey(OperationContext* opCtx,
+                     const IndexCatalogEntry* indexCatalogEntry,
+                     const KeyString::Value& key);
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been
@@ -82,15 +84,14 @@ public:
      *
      * Must not be in a WriteUnitOfWork.
      */
-    Status checkConstraints(OperationContext* opCtx) const;
+    Status checkConstraints(OperationContext* opCtx,
+                            const IndexCatalogEntry* indexCatalogEntry) const;
 
     std::string getTableIdent() const {
         return _keyConstraintsTable->rs()->getIdent();
     }
 
 private:
-    const IndexCatalogEntry* _indexCatalogEntry;
-
     AtomicWord<long long> _duplicateCounter{0};
 
     // This temporary record store is owned by the duplicate key tracker and dropped along with it.

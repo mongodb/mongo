@@ -66,13 +66,6 @@ public:
         return _keyGen.getWildcardProjection();
     }
 
-    /**
-     * Returns the Wildcard Index's key pattern.
-     */
-    const BSONObj& getKeyPattern() const {
-        return _descriptor->keyPattern();
-    }
-
     /*
      * We should make a new Ordering for wildcard key generator because the index keys generated for
      * wildcard indexes include a "$_path" field prior to the wildcard field and the Ordering passed
@@ -83,6 +76,7 @@ public:
 private:
     void doGetKeys(OperationContext* opCtx,
                    const CollectionPtr& collection,
+                   const IndexCatalogEntry* entry,
                    SharedBufferFragmentBuilder& pooledBufferBuilder,
                    const BSONObj& obj,
                    GetKeysContext context,

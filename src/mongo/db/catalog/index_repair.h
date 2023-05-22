@@ -52,7 +52,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
  * in a local lost and found collection.
  */
 int repairMissingIndexEntry(OperationContext* opCtx,
-                            std::shared_ptr<const IndexCatalogEntry>& index,
+                            const IndexCatalogEntry* index,
                             const KeyString::Value& ks,
                             const KeyFormat& keyFormat,
                             const NamespaceString& nss,

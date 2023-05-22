@@ -50,45 +50,44 @@ static constexpr StringData kKeyField = "key"_sd;
 }
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* entry)
-    : _indexCatalogEntry(entry),
-      _keyConstraintsTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
+    : _keyConstraintsTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
           opCtx, KeyFormat::Long)) {
 
-    invariant(_indexCatalogEntry->descriptor()->unique());
+    invariant(entry->descriptor()->unique());
 }
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
                                          const IndexCatalogEntry* entry,
-                                         StringData ident)
-    : _indexCatalogEntry(entry) {
+                                         StringData ident) {
     _keyConstraintsTable =
         opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
             opCtx, ident);
 
-    invariant(_indexCatalogEntry->descriptor()->unique(),
+    invariant(entry->descriptor()->unique(),
               str::stream() << "Duplicate key tracker table exists on disk with ident: " << ident
-                            << " but the index is not unique: "
-                            << _indexCatalogEntry->descriptor());
+                            << " but the index is not unique: " << entry->descriptor());
 }
 
 void DuplicateKeyTracker::keepTemporaryTable() {
     _keyConstraintsTable->keep();
 }
 
-Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::Value& key) {
+Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
+                                      const IndexCatalogEntry* indexCatalogEntry,
+                                      const KeyString::Value& key) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     LOGV2_DEBUG(20676,
                 1,
                 "Index build: recording duplicate key conflict on unique index",
-                "index"_attr = _indexCatalogEntry->descriptor()->indexName());
+                "index"_attr = indexCatalogEntry->descriptor()->indexName());
 
     // The KeyString::Value will be serialized in the format [KeyString][TypeBits]. We need to
     // store the TypeBits for error reporting later on. The RecordId does not need to be stored, so
     // we exclude it from the serialization.
     BufBuilder builder;
     if (KeyFormat::Long ==
-        _indexCatalogEntry->accessMethod()
+        indexCatalogEntry->accessMethod()
             ->asSortedData()
             ->getSortedDataInterface()
             ->rsKeyFormat()) {
@@ -109,20 +108,21 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::
     if (numDuplicates % 1000 == 0) {
         LOGV2_INFO(4806700,
                    "Index build: high number of duplicate keys on unique index",
-                   "index"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                   "index"_attr = indexCatalogEntry->descriptor()->indexName(),
                    "numDuplicateKeys"_attr = numDuplicates);
     }
 
     return Status::OK();
 }
 
-Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
+Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
+                                             const IndexCatalogEntry* indexCatalogEntry) const {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
     auto record = constraintsCursor->next();
 
-    auto index = _indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();
+    auto index = indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();
 
     static const char* curopMessage = "Index Build: checking for duplicate keys";
     ProgressMeterHolder progress;
@@ -171,7 +171,7 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
                 logLevel,
                 "index build: resolved duplicate key conflicts for unique index",
                 "numResolved"_attr = resolved,
-                "indexName"_attr = _indexCatalogEntry->descriptor()->indexName());
+                "indexName"_attr = indexCatalogEntry->descriptor()->indexName());
     return Status::OK();
 }
 

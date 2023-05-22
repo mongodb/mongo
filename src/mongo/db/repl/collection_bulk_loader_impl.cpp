@@ -303,6 +303,7 @@ Status CollectionBulkLoaderImpl::commit() {
                                     _opCtx.get(),
                                     pooledBuilder,
                                     _acquisition.getCollectionPtr(),
+                                    entry,
                                     doc.value(),
                                     rid,
                                     false /* logIfError */,

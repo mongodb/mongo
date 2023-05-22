@@ -68,7 +68,7 @@ const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
     auto pitFeatureEnabled =
         feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe();
     while (_iterator != _endIterator) {
-        IndexCatalogEntry* entry = _iterator->get();
+        const IndexCatalogEntry* entry = _iterator->get();
         ++_iterator;
 
         // When the PointInTimeCatalogLookups feature flag is not enabled, it is necessary to check
@@ -102,7 +102,8 @@ const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
 }
 
 AllIndexesIterator::AllIndexesIterator(
-    OperationContext* const opCtx, std::unique_ptr<std::vector<IndexCatalogEntry*>> ownedContainer)
+    OperationContext* const opCtx,
+    std::unique_ptr<std::vector<const IndexCatalogEntry*>> ownedContainer)
     : _opCtx(opCtx), _ownedContainer(std::move(ownedContainer)) {
     // Explicitly order calls onto the ownedContainer with respect to its move.
     _iterator = _ownedContainer->begin();
@@ -114,7 +115,7 @@ const IndexCatalogEntry* AllIndexesIterator::_advance() {
         return nullptr;
     }
 
-    IndexCatalogEntry* entry = *_iterator;
+    const IndexCatalogEntry* entry = *_iterator;
     ++_iterator;
     return entry;
 }

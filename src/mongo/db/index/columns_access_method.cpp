@@ -66,16 +66,18 @@ inline void dec(int64_t* counter) {
 ColumnStoreAccessMethod::ColumnStoreAccessMethod(IndexCatalogEntry* ice,
                                                  std::unique_ptr<ColumnStore> store)
     : _store(std::move(store)),
-      _indexCatalogEntry(ice),
-      _descriptor(ice->descriptor()),
-      _keyGen(_descriptor->keyPattern(), _descriptor->pathProjection()) {}
+      _keyGen(ice->descriptor()->keyPattern(), ice->descriptor()->pathProjection()) {}
 
 class ColumnStoreAccessMethod::BulkBuilder final
     : public BulkBuilderCommon<ColumnStoreAccessMethod::BulkBuilder> {
 public:
-    BulkBuilder(ColumnStoreAccessMethod* index, size_t maxMemoryUsageBytes, StringData dbName);
+    BulkBuilder(ColumnStoreAccessMethod* index,
+                const IndexCatalogEntry* entry,
+                size_t maxMemoryUsageBytes,
+                StringData dbName);
 
     BulkBuilder(ColumnStoreAccessMethod* index,
+                const IndexCatalogEntry* entry,
                 size_t maxMemoryUsageBytes,
                 const IndexStateInfo& stateInfo,
                 StringData dbName);
@@ -86,6 +88,7 @@ public:
 
     Status insert(OperationContext* opCtx,
                   const CollectionPtr& collection,
+                  const IndexCatalogEntry* entry,
                   const BSONObj& obj,
                   const RecordId& rid,
                   const InsertDeleteOptions& options,
@@ -102,10 +105,12 @@ public:
     std::unique_ptr<ColumnStoreSorter::Iterator> finalizeSort();
 
     std::unique_ptr<ColumnStore::BulkBuilder> setUpBulkInserter(OperationContext* opCtx,
+                                                                const IndexCatalogEntry* entry,
                                                                 bool dupsAllowed);
     void debugEnsureSorted(const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& data);
 
     bool duplicateCheck(OperationContext* opCtx,
+                        const IndexCatalogEntry* entry,
                         const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& data,
                         bool dupsAllowed,
                         const RecordIdHandlerFn& onDuplicateRecord);
@@ -127,23 +132,25 @@ private:
 };
 
 ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index,
+                                                  const IndexCatalogEntry* entry,
                                                   size_t maxMemoryUsageBytes,
                                                   StringData dbName)
     : BulkBuilderCommon(0,
                         "Index Build: inserting keys from external sorter into columnstore index",
-                        index->_descriptor->indexName()),
+                        entry->descriptor()->indexName()),
       _columnsAccess(index),
       _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats(), bulkBuilderTracker()) {
     countNewBuildInStats();
 }
 
 ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index,
+                                                  const IndexCatalogEntry* entry,
                                                   size_t maxMemoryUsageBytes,
                                                   const IndexStateInfo& stateInfo,
                                                   StringData dbName)
     : BulkBuilderCommon(stateInfo.getNumKeys().value_or(0),
                         "Index Build: inserting keys from external sorter into columnstore index",
-                        index->_descriptor->indexName()),
+                        entry->descriptor()->indexName()),
       _columnsAccess(index),
       _sorter(maxMemoryUsageBytes,
               dbName,
@@ -157,6 +164,7 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
 Status ColumnStoreAccessMethod::BulkBuilder::insert(
     OperationContext* opCtx,
     const CollectionPtr& collection,
+    const IndexCatalogEntry* entry,
     const BSONObj& obj,
     const RecordId& rid,
     const InsertDeleteOptions& options,
@@ -206,8 +214,8 @@ std::unique_ptr<ColumnStoreSorter::Iterator> ColumnStoreAccessMethod::BulkBuilde
 }
 
 std::unique_ptr<ColumnStore::BulkBuilder> ColumnStoreAccessMethod::BulkBuilder::setUpBulkInserter(
-    OperationContext* opCtx, bool dupsAllowed) {
-    _ns = _columnsAccess->_indexCatalogEntry->getNSSFromCatalog(opCtx);
+    OperationContext* opCtx, const IndexCatalogEntry* entry, bool dupsAllowed) {
+    _ns = entry->getNSSFromCatalog(opCtx);
     return _columnsAccess->_store->makeBulkBuilder(opCtx);
 }
 
@@ -234,6 +242,7 @@ void ColumnStoreAccessMethod::BulkBuilder::debugEnsureSorted(
 
 bool ColumnStoreAccessMethod::BulkBuilder::duplicateCheck(
     OperationContext* opCtx,
+    const IndexCatalogEntry* entry,
     const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& data,
     bool dupsAllowed,
     const RecordIdHandlerFn& onDuplicateRecord) {
@@ -279,6 +288,7 @@ void ColumnStoreAccessMethod::_visitCellsForIndexInsert(
 Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
                                        SharedBufferFragmentBuilder& pooledBufferBuilder,
                                        const CollectionPtr& coll,
+                                       const IndexCatalogEntry* entry,
                                        const std::vector<BsonRecord>& bsonRecords,
                                        const InsertDeleteOptions& options,
                                        int64_t* keysInsertedOut) {
@@ -286,7 +296,7 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
         PooledFragmentBuilder buf(pooledBufferBuilder);
         // We cannot write to the index during its initial build phase, so we defer this insert as a
         // "side write" to be applied after the build completes.
-        if (_indexCatalogEntry->isHybridBuilding()) {
+        if (entry->isHybridBuilding()) {
             auto columnChanges = StorageExecutionContext::get(opCtx).columnChanges();
             _visitCellsForIndexInsert(
                 opCtx, buf, bsonRecords, [&](StringData path, const BsonRecord& rec) {
@@ -304,8 +314,8 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
                 }
                 invariant(deleted == 0);
             });
-            uassertStatusOK(_indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-                opCtx, *columnChanges, &inserted, &deleted));
+            uassertStatusOK(entry->indexBuildInterceptor()->sideWrite(
+                opCtx, entry, *columnChanges, &inserted, &deleted));
             return Status::OK();
         } else {
             auto cursor = _store->newWriteCursor(opCtx);
@@ -324,13 +334,14 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
 void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
                                      SharedBufferFragmentBuilder& pooledBufferBuilder,
                                      const CollectionPtr& coll,
+                                     const IndexCatalogEntry* entry,
                                      const BSONObj& obj,
                                      const RecordId& rid,
                                      bool logIfError,
                                      const InsertDeleteOptions& options,
                                      int64_t* keysDeletedOut,
                                      CheckRecordId checkRecordId) {
-    if (_indexCatalogEntry->isHybridBuilding()) {
+    if (entry->isHybridBuilding()) {
         auto columnChanges = StorageExecutionContext::get(opCtx).columnChanges();
         _keyGen.visitPathsForDelete(obj, [&](StringData path) {
             columnChanges->emplace_back(path.toString(),
@@ -341,8 +352,8 @@ void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
         int64_t inserted = 0;
         int64_t removed = 0;
         fassert(6597801,
-                _indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-                    opCtx, *columnChanges, &inserted, &removed));
+                entry->indexBuildInterceptor()->sideWrite(
+                    opCtx, entry, *columnChanges, &inserted, &removed));
         if (keysDeletedOut) {
             *keysDeletedOut += removed;
         }
@@ -363,12 +374,13 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
                                        const BSONObj& newDoc,
                                        const RecordId& rid,
                                        const CollectionPtr& coll,
+                                       const IndexCatalogEntry* entry,
                                        const InsertDeleteOptions& options,
                                        int64_t* keysInsertedOut,
                                        int64_t* keysDeletedOut) {
     PooledFragmentBuilder buf(pooledBufferBuilder);
 
-    if (_indexCatalogEntry->isHybridBuilding()) {
+    if (entry->isHybridBuilding()) {
         auto columnChanges = StorageExecutionContext::get(opCtx).columnChanges();
         _keyGen.visitDiffForUpdate(
             oldDoc,
@@ -405,8 +417,8 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
         int64_t inserted = 0;
         int64_t deleted = 0;
         if (columnChanges->size() > 0) {
-            uassertStatusOK(_indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-                opCtx, *columnChanges, &inserted, &deleted));
+            uassertStatusOK(entry->indexBuildInterceptor()->sideWrite(
+                opCtx, entry, *columnChanges, &inserted, &deleted));
         }
         if (keysInsertedOut) {
             *keysInsertedOut += inserted;
@@ -484,12 +496,13 @@ Status ColumnStoreAccessMethod::compact(OperationContext* opCtx) {
 
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> ColumnStoreAccessMethod::initiateBulk(
+    const IndexCatalogEntry* entry,
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
     StringData dbName) {
     return (stateInfo && stateInfo->getFileName())
-        ? std::make_unique<BulkBuilder>(this, maxMemoryUsageBytes, *stateInfo, dbName)
-        : std::make_unique<BulkBuilder>(this, maxMemoryUsageBytes, dbName);
+        ? std::make_unique<BulkBuilder>(this, entry, maxMemoryUsageBytes, *stateInfo, dbName)
+        : std::make_unique<BulkBuilder>(this, entry, maxMemoryUsageBytes, dbName);
 }
 
 std::shared_ptr<Ident> ColumnStoreAccessMethod::getSharedIdent() const {
@@ -502,6 +515,7 @@ void ColumnStoreAccessMethod::setIdent(std::shared_ptr<Ident> ident) {
 
 Status ColumnStoreAccessMethod::applyIndexBuildSideWrite(OperationContext* opCtx,
                                                          const CollectionPtr& coll,
+                                                         const IndexCatalogEntry* entry,
                                                          const BSONObj& operation,
                                                          const InsertDeleteOptions& unusedOptions,
                                                          KeyHandlerFn&& unusedFn,

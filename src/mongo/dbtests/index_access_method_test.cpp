@@ -250,13 +250,15 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
     int64_t numInserted;
 
     // Checks duplicates and returns the error code when constraints are enforced.
-    auto status = indexAccessMethod->insertKeys(opCtx, coll, keys, options, {}, &numInserted);
+    auto status = indexAccessMethod->insertKeys(
+        opCtx, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
     ASSERT_EQ(numInserted, 0);
 
     // Skips the check on duplicates when constraints are not enforced.
     opCtx->setEnforceConstraints(false);
-    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, keys, options, {}, &numInserted));
+    ASSERT_OK(indexAccessMethod->insertKeys(
+        opCtx, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted));
     ASSERT_EQ(numInserted, 2);
 }
 
@@ -291,7 +293,8 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
         int64_t numInserted;
 
         // Disallows new duplicates in a regular index and rejects the insert.
-        auto status = indexAccessMethod->insertKeys(opCtx, coll, keys, options, {}, &numInserted);
+        auto status = indexAccessMethod->insertKeys(
+            opCtx, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted);
         ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
         ASSERT_EQ(numInserted, 0);
     }
@@ -336,13 +339,16 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
         int64_t numDeleted;
 
         // Inserts two keys.
-        ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, key1, options, {}, &numInserted));
+        ASSERT_OK(indexAccessMethod->insertKeys(
+            opCtx, coll, indexDescriptor->getEntry(), key1, options, {}, &numInserted));
         ASSERT_EQ(numInserted, 1);
-        ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, key2_old, options, {}, &numInserted));
+        ASSERT_OK(indexAccessMethod->insertKeys(
+            opCtx, coll, indexDescriptor->getEntry(), key2_old, options, {}, &numInserted));
         ASSERT_EQ(numInserted, 1);
 
         // Disallows new duplicates in a regular index and rejects the update.
-        auto status = indexAccessMethod->doUpdate(opCtx, coll, ticket, &numInserted, &numDeleted);
+        auto status = indexAccessMethod->doUpdate(
+            opCtx, coll, indexDescriptor->getEntry(), ticket, &numInserted, &numDeleted);
         ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
         ASSERT_EQ(numInserted, 0);
         ASSERT_EQ(numDeleted, 0);

@@ -150,11 +150,12 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::string& idxName) {
     CollectionWriter coll(opCtx, nss);
-    auto desc =
-        coll.getWritableCollection(opCtx)->getIndexCatalog()->findIndexByName(opCtx, idxName);
-    ASSERT(desc);
-    ASSERT_OK(coll.getWritableCollection(opCtx)->getIndexCatalog()->dropIndex(
-        opCtx, coll.getWritableCollection(opCtx), desc));
+    auto writableEntry =
+        coll.getWritableCollection(opCtx)->getIndexCatalog()->getWritableEntryByName(opCtx,
+                                                                                     idxName);
+    ASSERT(writableEntry);
+    ASSERT_OK(coll.getWritableCollection(opCtx)->getIndexCatalog()->dropIndexEntry(
+        opCtx, coll.getWritableCollection(opCtx), writableEntry));
 }
 
 }  // namespace

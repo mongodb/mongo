@@ -31,6 +31,7 @@
 
 #include "mongo/db/index/index_descriptor_fwd.h"
 
+#include <boost/intrusive_ptr.hpp>
 #include <set>
 #include <string>
 
@@ -39,6 +40,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -119,7 +121,7 @@ public:
      * Example: {foo: 1, bar: -1}
      */
     const BSONObj& keyPattern() const {
-        return _keyPattern;
+        return _shared->_keyPattern;
     }
 
     /**
@@ -138,7 +140,7 @@ public:
      *   return (unnormalized) object: {"a.b":{"$numberDouble":"1"}}
      */
     const BSONObj& pathProjection() const {
-        return _projection;
+        return _shared->_projection;
     }
 
     /**
@@ -159,12 +161,12 @@ public:
      *   return (normalized) object: {"a":{"b":true},"_id":false}
      */
     const BSONObj& normalizedPathProjection() const {
-        return _normalizedProjection;
+        return _shared->_normalizedProjection;
     }
 
     // How many fields do we index / are in the key pattern?
     int getNumFields() const {
-        return _numFields;
+        return _shared->_numFields;
     }
 
     //
@@ -173,24 +175,28 @@ public:
 
     // Return the name of the index.
     const std::string& indexName() const {
-        return _indexName;
+        return _shared->_indexName;
     }
 
     // Return the name of the access method we must use to access this index's data.
     const std::string& getAccessMethodName() const {
-        return _accessMethodName;
+        return _shared->_accessMethodName;
     }
 
     // Returns the type of the index associated with this descriptor.
     IndexType getIndexType() const {
-        return _indexType;
+        return _shared->_indexType;
     }
 
     /**
      * Return a pointer to the IndexCatalogEntry that owns this descriptor, or null if orphaned.
      */
-    IndexCatalogEntry* getEntry() const {
+    const IndexCatalogEntry* getEntry() const {
         return _entry;
+    }
+
+    void setEntry(IndexCatalogEntry* entry) {
+        _entry = entry;
     }
 
     //
@@ -199,49 +205,49 @@ public:
 
     // Return what version of index this is.
     IndexVersion version() const {
-        return _version;
+        return _shared->_version;
     }
 
     // Return the 'Ordering' of the index keys.
     const Ordering& ordering() const {
-        return _ordering;
+        return _shared->_ordering;
     }
 
     // May each key only occur once?
     bool unique() const {
-        return _unique;
+        return _shared->_unique;
     }
 
     bool hidden() const {
-        return _hidden;
+        return _shared->_hidden;
     }
 
     // Is this index sparse?
     bool isSparse() const {
-        return _sparse;
+        return _shared->_sparse;
     }
 
     // Is this a partial index?
     bool isPartial() const {
-        return _partial;
+        return _shared->_partial;
     }
 
     bool isIdIndex() const {
-        return _isIdIndex;
+        return _shared->_isIdIndex;
     }
 
     // Return a (rather compact) std::string representation.
     std::string toString() const {
-        return _infoObj.toString();
+        return _shared->_infoObj.toString();
     }
 
     // Return the info object.
     const BSONObj& infoObj() const {
-        return _infoObj;
+        return _shared->_infoObj;
     }
 
     BSONObj toBSON() const {
-        return _infoObj;
+        return _shared->_infoObj;
     }
 
     /**
@@ -254,19 +260,20 @@ public:
                                    const IndexCatalogEntry* existingIndex) const;
 
     const BSONObj& collation() const {
-        return _collation;
+        return _shared->_collation;
     }
 
     const BSONObj& partialFilterExpression() const {
-        return _partialFilterExpression;
+        return _shared->_partialFilterExpression;
     }
 
     bool prepareUnique() const {
-        return _prepareUnique;
+        return _shared->_prepareUnique;
     }
 
     boost::optional<StringData> compressor() const {
-        return _compressor ? boost::make_optional<StringData>(*_compressor) : boost::none;
+        return _shared->_compressor ? boost::make_optional<StringData>(*_shared->_compressor)
+                                    : boost::none;
     }
 
     /**
@@ -302,53 +309,48 @@ public:
     }
 
 private:
-    /**
-     * Returns wildcardProjection or columnstoreProjection projection
+    /*
+     * Holder of shared state between IndexDescriptor clones.
      */
-    BSONObj createPathProjection(const BSONObj& infoObj) const {
-        if (const auto wildcardProjection =
-                infoObj[IndexDescriptor::kWildcardProjectionFieldName]) {
-            return wildcardProjection.Obj().getOwned();
-        } else if (const auto columnStoreProjection =
-                       infoObj[IndexDescriptor::kColumnStoreProjectionFieldName]) {
-            return columnStoreProjection.Obj().getOwned();
-        } else {
-            return BSONObj();
-        }
-    }
+    struct SharedState : public RefCountable {
+        SharedState(const std::string& accessMethodName, BSONObj infoObj);
 
-    // What access method should we use for this index?
-    std::string _accessMethodName;
+        // What access method should we use for this index?
+        std::string _accessMethodName;
 
-    IndexType _indexType;
+        IndexType _indexType;
 
-    // The BSONObj describing the index.  Accessed through the various members above.
-    BSONObj _infoObj;
+        // The BSONObj describing the index.  Accessed through the various members above.
+        BSONObj _infoObj;
 
-    // --- cached data from _infoObj
+        // --- cached data from _infoObj
 
-    int64_t _numFields;  // How many fields are indexed?
-    BSONObj _keyPattern;
-    BSONObj _projection;            // for wildcardProjection / columnstoreProjection; never changes
-    BSONObj _normalizedProjection;  // for wildcardProjection / columnstoreProjection; never changes
-    std::string _indexName;
-    bool _isIdIndex;
-    bool _sparse;
-    bool _unique;
-    bool _hidden;
-    bool _partial;
-    IndexVersion _version;
-    // '_ordering' should be initialized after '_indexType' because different index types may
-    // require different handling of the Ordering.
-    Ordering _ordering;
-    BSONObj _collation;
-    BSONObj _partialFilterExpression;
-    bool _prepareUnique = false;
-    boost::optional<std::string> _compressor;
+        int64_t _numFields;  // How many fields are indexed?
+        BSONObj _keyPattern;
+        BSONObj _projection;  // for wildcardProjection / columnstoreProjection; never changes
+        BSONObj
+            _normalizedProjection;  // for wildcardProjection / columnstoreProjection; never changes
+        std::string _indexName;
+        bool _isIdIndex;
+        bool _sparse;
+        bool _unique;
+        bool _hidden;
+        bool _partial;
+        IndexVersion _version;
+        // '_ordering' should be initialized after '_indexType' because different index types may
+        // require different handling of the Ordering.
+        Ordering _ordering;
+        BSONObj _collation;
+        BSONObj _partialFilterExpression;
+        bool _prepareUnique = false;
+        boost::optional<std::string> _compressor;
+    };
+
+    boost::intrusive_ptr<SharedState> _shared;
 
     // Many query stages require going from an IndexDescriptor to its IndexCatalogEntry, so for
     // now we need this.
-    IndexCatalogEntry* _entry = nullptr;
+    const IndexCatalogEntry* _entry = nullptr;
 
     friend class IndexCatalog;
     friend class IndexCatalogEntryImpl;

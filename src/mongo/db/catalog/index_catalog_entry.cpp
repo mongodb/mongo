@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-std::shared_ptr<IndexCatalogEntry> IndexCatalogEntryContainer::release(
+std::shared_ptr<const IndexCatalogEntry> IndexCatalogEntryContainer::release(
     const IndexDescriptor* desc) {
     for (auto i = _entries.begin(); i != _entries.end(); ++i) {
         if ((*i)->descriptor() != desc)

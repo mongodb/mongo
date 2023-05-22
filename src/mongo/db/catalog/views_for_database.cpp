@@ -45,12 +45,9 @@ namespace {
 RecordId find(OperationContext* opCtx,
               const CollectionPtr& systemViews,
               const NamespaceString& viewName) {
-    return systemViews->getIndexCatalog()
-        ->findIdIndex(opCtx)
-        ->getEntry()
-        ->accessMethod()
-        ->asSortedData()
-        ->findSingle(opCtx, systemViews, BSON("_id" << NamespaceStringUtil::serialize(viewName)));
+    const IndexCatalogEntry* entry = systemViews->getIndexCatalog()->findIdIndex(opCtx)->getEntry();
+    return entry->accessMethod()->asSortedData()->findSingle(
+        opCtx, systemViews, entry, BSON("_id" << NamespaceStringUtil::serialize(viewName)));
 }
 
 StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
