@@ -2358,6 +2358,9 @@ struct __wt_connection {
      * for files that are inactive and close them., an integer between \c 1 and \c 100000; default
      * \c 10.}
      * @config{ ),,}
+     * @config{generation_drain_timeout_ms, the number of milliseconds to wait for a resource to
+     * drain before timing out in diagnostic mode.  Default will wait for 4 minutes\, 0 will wait
+     * forever., an integer greater than or equal to \c 0; default \c 240000.}
      * @config{history_store = (, history store configuration options., a set of related
      * configuration options defined as follows.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
@@ -3159,6 +3162,9 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in seconds at which to check for
  * files that are inactive and close them., an integer between \c 1 and \c 100000; default \c 10.}
  * @config{ ),,}
+ * @config{generation_drain_timeout_ms, the number of milliseconds to wait for a resource to drain
+ * before timing out in diagnostic mode.  Default will wait for 4 minutes\, 0 will wait forever., an
+ * integer greater than or equal to \c 0; default \c 240000.}
  * @config{hash = (, manage resources used by hash bucket arrays.  All values must be a power of
  * two.  Note that setting large values can significantly increase memory usage inside WiredTiger.,
  * a set of related configuration options defined as follows.}
