@@ -31,6 +31,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/stdx/unordered_set.h"
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobj.h"
@@ -410,6 +411,7 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
                                const ShardKeyPattern& keyPattern) {
     boost::optional<bool> hasMinMax = boost::none;
     std::vector<ShardKeyRange> validShards;
+    stdx::unordered_set<ShardId> shardIds;
     for (const auto& shard : shardDistribution) {
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shard.getShard()));
         uassert(ErrorCodes::InvalidOptions,
@@ -421,6 +423,9 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
         uassert(ErrorCodes::InvalidOptions,
                 "ShardKeyRange max should follow shard key's keyPattern",
                 (!shard.getMax().has_value()) || keyPattern.isShardKey(*shard.getMax()));
+        uassert(ErrorCodes::InvalidOptions,
+                "ShardDistribution should have unique shardIds",
+                shardIds.find(shard.getShard()) == shardIds.end());
 
         // Check all shardKeyRanges have min/max or none of them has min/max.
         if (hasMinMax.has_value()) {
@@ -432,6 +437,7 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
         }
 
         validShards.push_back(shard);
+        shardIds.insert(shard.getShard());
     }
 
     // If the shardDistribution contains min/max, validate whether they are continuous and complete.

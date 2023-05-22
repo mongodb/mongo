@@ -106,12 +106,17 @@ ShardId selectBestShard(const ChunkDistributionMap& chunkMap,
 
     for (const auto& shard : shards) {
         auto candidateIter = chunkMap.find(shard);
+        // If limitedShardIds is provided, only pick shard in that set.
         if (bestShardIter == chunkMap.end() || candidateIter->second < bestShardIter->second) {
             bestShardIter = candidateIter;
         }
     }
 
-    invariant(bestShardIter != chunkMap.end());
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "No shards found for chunk: " << chunkRange.toString()
+                          << " in zone: " << zone,
+            bestShardIter != chunkMap.end());
+
     return bestShardIter->first;
 }
 
@@ -685,20 +690,30 @@ SamplingBasedSplitPolicy SamplingBasedSplitPolicy::make(
     const ShardKeyPattern& shardKey,
     int numInitialChunks,
     boost::optional<std::vector<TagsType>> zones,
+    boost::optional<std::vector<ShardId>> availableShardIds,
     int samplesPerChunk) {
     uassert(4952603, "samplesPerChunk should be > 0", samplesPerChunk > 0);
     return SamplingBasedSplitPolicy(
         numInitialChunks,
         zones,
-        _makePipelineDocumentSource(opCtx, nss, shardKey, numInitialChunks, samplesPerChunk));
+        _makePipelineDocumentSource(opCtx, nss, shardKey, numInitialChunks, samplesPerChunk),
+        availableShardIds);
 }
 
-SamplingBasedSplitPolicy::SamplingBasedSplitPolicy(int numInitialChunks,
-                                                   boost::optional<std::vector<TagsType>> zones,
-                                                   std::unique_ptr<SampleDocumentSource> samples)
-    : _numInitialChunks(numInitialChunks), _zones(std::move(zones)), _samples(std::move(samples)) {
+SamplingBasedSplitPolicy::SamplingBasedSplitPolicy(
+    int numInitialChunks,
+    boost::optional<std::vector<TagsType>> zones,
+    std::unique_ptr<SampleDocumentSource> samples,
+    boost::optional<std::vector<ShardId>> availableShardIds)
+    : _numInitialChunks(numInitialChunks),
+      _zones(std::move(zones)),
+      _samples(std::move(samples)),
+      _availableShardIds(std::move(availableShardIds)) {
     uassert(4952602, "numInitialChunks should be > 0", numInitialChunks > 0);
     uassert(4952604, "provided zones should not be empty", !_zones || _zones->size());
+    uassert(7679103,
+            "provided availableShardIds should not be empty",
+            !_availableShardIds || !_availableShardIds->empty());
 }
 
 BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* opCtx,
@@ -749,7 +764,12 @@ InitialSplitPolicy::ShardCollectionConfig SamplingBasedSplitPolicy::createFirstC
         }
     }
 
-    {
+    if (_availableShardIds) {
+        for (const auto& shardId : *_availableShardIds) {
+            chunkDistribution.emplace(shardId, 0);
+        }
+        zoneToShardMap.emplace("", *_availableShardIds);
+    } else {
         auto allShardIds = getAllShardIdsShuffled(opCtx);
         for (const auto& shard : allShardIds) {
             chunkDistribution.emplace(shard, 0);
@@ -909,8 +929,8 @@ InitialSplitPolicy::ShardCollectionConfig ShardDistributionSplitPolicy::createFi
 
     auto splitPoints = extractSplitPointsFromZones(shardKeyPattern, _zones);
     std::vector<ChunkType> chunks;
-    uassert(ErrorCodes::InvalidOptions,
-            "ShardDistribution without min/max is not supported.",
+    uassert(7679102,
+            "ShardDistribution without min/max must not use this split policy.",
             _shardDistribution[0].getMin());
 
     unsigned long shardDistributionIdx = 0;
