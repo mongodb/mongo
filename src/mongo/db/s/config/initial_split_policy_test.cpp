@@ -394,8 +394,8 @@ public:
 
     TagsType makeTag(const ChunkRange range, std::string zoneName) {
         BSONObjBuilder tagDocBuilder;
-        tagDocBuilder.append("_id",
-                             BSON(TagsType::ns(nss().toString()) << TagsType::min(range.getMin())));
+        tagDocBuilder.append(
+            "_id", BSON(TagsType::ns(nss().toString_forTest()) << TagsType::min(range.getMin())));
         tagDocBuilder.append(TagsType::ns(), nss().ns_forTest());
         tagDocBuilder.append(TagsType::min(), range.getMin());
         tagDocBuilder.append(TagsType::max(), range.getMax());

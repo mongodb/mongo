@@ -1341,7 +1341,7 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetectedLegacyFormat) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
-    auto o2Field = D{{"migrateChunkToNewShard", nss.toString()},
+    auto o2Field = D{{"migrateChunkToNewShard", nss.toString_forTest()},
                      {"fromShardId", "fromShard"_sd},
                      {"toShardId", "toShard"_sd}};
     auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,

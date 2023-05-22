@@ -116,10 +116,10 @@ public:
                     return boost::optional<UUID>(boost::none);
                 }
 
-                if (nssToUuid.find(nss.toString()) == nssToUuid.end())
-                    nssToUuid.emplace(nss.toString(), UUID::gen());
+                if (nssToUuid.find(nss.toString_forTest()) == nssToUuid.end())
+                    nssToUuid.emplace(nss.toString_forTest(), UUID::gen());
 
-                const UUID& collUuid = nssToUuid.at(nss.toString());
+                const UUID& collUuid = nssToUuid.at(nss.toString_forTest());
                 return boost::optional<UUID>(collUuid);
             }();
 

@@ -109,7 +109,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
     const auto opDescription = Document{{"viewOn", "baseColl"_sd}, {"pipeline", viewPipeline}};
     auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kInsert,  // op type
                                      systemViewNss,              // namespace
-                                     BSON("_id" << viewNss.toString() << "viewOn"
+                                     BSON("_id" << viewNss.toString_forTest() << "viewOn"
                                                 << "baseColl"
                                                 << "pipeline" << viewPipeline),  // o
                                      testUuid(),                                 // uuid
@@ -142,7 +142,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
         NamespaceString::createNamespaceString_forTest(boost::none, "viewDB.view.name");
     const auto viewPipeline =
         Value(fromjson("[{$match: {field: 'value'}}, {$project: {field: 1}}]"));
-    const auto document = BSON("_id" << viewNss.toString() << "viewOn"
+    const auto document = BSON("_id" << viewNss.toString_forTest() << "viewOn"
                                      << "baseColl"
                                      << "pipeline" << viewPipeline);
     const auto documentKey = Value(Document{{"_id", document["_id"]}});
@@ -373,7 +373,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransformWithTenantId) {
     const auto opDescription = Document{{"viewOn", "baseColl"_sd}, {"pipeline", viewPipeline}};
     auto createView = makeOplogEntry(repl::OpTypeEnum::kInsert,  // op type
                                      systemViewNss,              // namespace
-                                     BSON("_id" << viewNss.toString() << "viewOn"
+                                     BSON("_id" << viewNss.toString_forTest() << "viewOn"
                                                 << "baseColl"
                                                 << "pipeline" << viewPipeline),  // o
                                      testUuid());                                // uuid
@@ -392,7 +392,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransformWithTenantId) {
 
     auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kInsert,  // op type
                                      systemViewNss,              // namespace
-                                     BSON("_id" << viewNss.toString() << "viewOn"
+                                     BSON("_id" << viewNss.toString_forTest() << "viewOn"
                                                 << "baseColl"
                                                 << "pipeline" << viewPipeline),  // o
                                      testUuid());

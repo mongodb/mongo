@@ -682,7 +682,7 @@ TEST_F(StorageInterfaceImplTest, CreateOplogCreateCappedCollection) {
     {
         AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         ASSERT_TRUE(autoColl.getCollection());
-        ASSERT_EQ(nss.toString(), autoColl.getCollection()->ns().toString());
+        ASSERT_EQ(nss.toString_forTest(), autoColl.getCollection()->ns().toString());
         ASSERT_TRUE(autoColl.getCollection()->isCapped());
     }
 }
@@ -714,7 +714,7 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionFailsIfCollectionExists) {
     {
         AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         ASSERT_TRUE(autoColl.getCollection());
-        ASSERT_EQ(nss.toString(), autoColl.getCollection()->ns().toString());
+        ASSERT_EQ(nss.toString_forTest(), autoColl.getCollection()->ns().toString());
     }
     auto status = storage.createCollection(opCtx, nss, generateOptionsWithUuid());
     ASSERT_EQUALS(ErrorCodes::NamespaceExists, status);

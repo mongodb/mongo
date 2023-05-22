@@ -68,7 +68,7 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
 
     const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-    ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+    ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns());
 
     const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
     ASSERT_EQUALS(expected.size(), inserted.size());
@@ -113,7 +113,7 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
 
     const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-    ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+    ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns());
 
     const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
     ASSERT_EQUALS(expected.size(), inserted.size());
@@ -165,7 +165,7 @@ BSONObj expectInsertsReturnTenantMigrationAbortedErrorsBase(
 
     const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-    ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+    ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns());
 
     const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
     ASSERT_EQUALS(expected.size(), inserted.size());
@@ -261,7 +261,7 @@ public:
 
             const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
             const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+            ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns());
 
             const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
             const size_t expectedSize = std::distance(expectedFrom, expectedTo);
@@ -311,7 +311,7 @@ public:
                 const auto opMsgRequest(
                     OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
                 const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-                ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+                ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns());
 
                 const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
                 ASSERT_EQUALS(expected.size(), inserted.size());
@@ -2456,7 +2456,7 @@ public:
 
             const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
             const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+            ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns());
 
             const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
             ASSERT_EQUALS(expected.size(), inserted.size());

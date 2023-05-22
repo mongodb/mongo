@@ -73,7 +73,8 @@ public:
     boost::optional<CollectionCriticalSectionDocument> readCriticalSectionDocument(
         const NamespaceString& nss, const BSONObj& reason) {
         FindCommandRequest findOp(NamespaceString::kCollectionCriticalSectionsNamespace);
-        findOp.setFilter(BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        findOp.setFilter(
+            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()));
 
         DBDirectClient dbClient(opCtx());
         auto cursor = dbClient.find(std::move(findOp));
@@ -109,10 +110,11 @@ public:
         ASSERT_NE(doc->getBlockReads(), blockReads);
 
         DBDirectClient dbClient(opCtx());
-        dbClient.update(NamespaceString::kCollectionCriticalSectionsNamespace,
-                        BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()),
-                        BSON("$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName
-                                            << blockReads)));
+        dbClient.update(
+            NamespaceString::kCollectionCriticalSectionsNamespace,
+            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()),
+            BSON("$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName
+                                << blockReads)));
     }
 
     void deleteReadCriticalSectionDocument(const NamespaceString& nss, const BSONObj& reason) {
@@ -120,9 +122,10 @@ public:
         ASSERT(readCriticalSectionDocument(nss, reason));
 
         DBDirectClient dbClient(opCtx());
-        dbClient.remove(NamespaceString::kCollectionCriticalSectionsNamespace,
-                        BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()),
-                        false /* removeMany */);
+        dbClient.remove(
+            NamespaceString::kCollectionCriticalSectionsNamespace,
+            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()),
+            false /* removeMany */);
     }
 
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {

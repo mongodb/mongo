@@ -304,7 +304,7 @@ TEST(NamespaceStringUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
         auto nss = NamespaceStringUtil::deserializeForCommands(
             boost::none, nsPrefixString, ctxt_noTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsString);
+        ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 
     {  // No prefix, has tenantId.
@@ -312,7 +312,7 @@ TEST(NamespaceStringUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
         auto nss =
             NamespaceStringUtil::deserializeForCommands(tenantId, nsString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsString);
+        ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
@@ -320,7 +320,7 @@ TEST(NamespaceStringUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
         auto nss = NamespaceStringUtil::deserializeForCommands(
             tenantId, nsPrefixString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsPrefixString);
+        ASSERT_EQ(nss.toString_forTest(), nsPrefixString);
     }
 }
 
@@ -355,7 +355,7 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
         // can't expect nss.toString == nsPrefixString as we will still attempt to parse the prefix
         // as usual.
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsString);
+        ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 
     {  // No prefix, has tenantId.
@@ -363,7 +363,7 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
         auto nss =
             NamespaceStringUtil::deserializeForCommands(tenantId, nsString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsString);
+        ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
@@ -371,7 +371,7 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
         auto nss = NamespaceStringUtil::deserializeForCommands(
             tenantId, nsPrefixString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsPrefixString);
+        ASSERT_EQ(nss.toString_forTest(), nsPrefixString);
     }
 }
 
@@ -403,7 +403,7 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
         auto nss = NamespaceStringUtil::deserializeForCommands(
             boost::none, nsPrefixString, ctxt_noTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsString);
+        ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 
     {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
@@ -419,7 +419,7 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
         auto nss = NamespaceStringUtil::deserializeForCommands(
             tenantId, nsPrefixString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString(), nsString);
+        ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 }
 

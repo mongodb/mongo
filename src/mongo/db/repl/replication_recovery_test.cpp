@@ -302,7 +302,7 @@ repl::OplogEntry _makeTransactionOplogEntry(repl::OpTime opTime,
     builder.append("t", opTime.getTerm());
     builder.append("v", repl::OplogEntry::kOplogVersion);
     builder.append("op", "c");
-    builder.append("ns", testNs.toString());
+    builder.append("ns", testNs.toString_forTest());
     builder.append("o", object);
     builder.append("wall", wallTime);
     builder.append("stmtId", stmtId);
@@ -1134,7 +1134,7 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
 
     const auto txnOperations = BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << testNs.toString() << "o"
+                                               << "ns" << testNs.toString_forTest() << "o"
                                                << BSON("_id" << 1)));
     const auto prepareDate = Date_t::now();
     const auto prepareOp =
@@ -1209,7 +1209,7 @@ TEST_F(ReplicationRecoveryTest,
 
     const auto txnOperations = BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << testNs.toString() << "o"
+                                               << "ns" << testNs.toString_forTest() << "o"
                                                << BSON("_id" << 1)));
     const auto prepareDate = Date_t::now();
     const auto prepareOp =

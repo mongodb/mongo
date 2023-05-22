@@ -231,12 +231,12 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsSameCollectionUUid) {
 
     auto analyzerDocPostUpdate =
         makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 1.5, now());
-    uassertStatusOK(
-        updateToConfigCollection(operationContext(),
-                                 NamespaceString::kConfigQueryAnalyzersNamespace,
-                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
-                                 analyzerDocPostUpdate.toBSON(),
-                                 false /* upsert */));
+    uassertStatusOK(updateToConfigCollection(
+        operationContext(),
+        NamespaceString::kConfigQueryAnalyzersNamespace,
+        BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
+        analyzerDocPostUpdate.toBSON(),
+        false /* upsert */));
 
     // The update should cause the configuration to have the new sample rate.
     configurations = coordinator->getConfigurationsForTest();
@@ -265,12 +265,12 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationDifferentCollectionUUid)
 
     auto analyzerDocPostUpdate = makeConfigQueryAnalyzersDocument(
         nss0, UUID::gen(), QueryAnalyzerModeEnum::kFull, 1.5, now());
-    uassertStatusOK(
-        updateToConfigCollection(operationContext(),
-                                 NamespaceString::kConfigQueryAnalyzersNamespace,
-                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
-                                 analyzerDocPostUpdate.toBSON(),
-                                 false /* upsert */));
+    uassertStatusOK(updateToConfigCollection(
+        operationContext(),
+        NamespaceString::kConfigQueryAnalyzersNamespace,
+        BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
+        analyzerDocPostUpdate.toBSON(),
+        false /* upsert */));
 
     // The update should cause the configuration to have the new collection uuid, sample rate and
     // start time.
@@ -298,12 +298,12 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveOrCreateConfigurationsOnModeUpdate) {
 
     auto analyzerDocPostUpdate0 =
         makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kOff);
-    uassertStatusOK(
-        updateToConfigCollection(operationContext(),
-                                 NamespaceString::kConfigQueryAnalyzersNamespace,
-                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
-                                 analyzerDocPostUpdate0.toBSON(),
-                                 false /* upsert */));
+    uassertStatusOK(updateToConfigCollection(
+        operationContext(),
+        NamespaceString::kConfigQueryAnalyzersNamespace,
+        BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
+        analyzerDocPostUpdate0.toBSON(),
+        false /* upsert */));
 
     // The update to mode "off" should cause the configuration to get removed.
     configurations = coordinator->getConfigurationsForTest();
@@ -311,12 +311,12 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveOrCreateConfigurationsOnModeUpdate) {
 
     auto analyzerDocPostUpdate1 =
         makeConfigQueryAnalyzersDocument(nss0, collUuid0, QueryAnalyzerModeEnum::kFull, 15);
-    uassertStatusOK(
-        updateToConfigCollection(operationContext(),
-                                 NamespaceString::kConfigQueryAnalyzersNamespace,
-                                 BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString()),
-                                 analyzerDocPostUpdate1.toBSON(),
-                                 false /* upsert */));
+    uassertStatusOK(updateToConfigCollection(
+        operationContext(),
+        NamespaceString::kConfigQueryAnalyzersNamespace,
+        BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
+        analyzerDocPostUpdate1.toBSON(),
+        false /* upsert */));
 
     // The update to mode "on" should cause the configuration to get recreated.
     configurations = coordinator->getConfigurationsForTest();

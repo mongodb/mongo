@@ -154,7 +154,7 @@ BSONObj makeCursorResponse(CursorId cursorId,
     {
         BSONObjBuilder cursorBob(bob.subobjStart("cursor"));
         cursorBob.append("id", cursorId);
-        cursorBob.append("ns", nss.toString());
+        cursorBob.append("ns", nss.toString_forTest());
         {
             BSONArrayBuilder batchBob(
                 cursorBob.subarrayStart(isFirstBatch ? "firstBatch" : "nextBatch"));

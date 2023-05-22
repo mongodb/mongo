@@ -440,6 +440,15 @@ public:
         return ns();
     }
 
+    /**
+     * Gets a namespace string without tenant id.
+     *
+     * MUST only be used for tests.
+     */
+    std::string toString_forTest() const {
+        return toString();
+    }
+
     std::string toString() const {
         return ns().toString();
     }

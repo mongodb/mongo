@@ -361,7 +361,7 @@ TEST_F(TenantCollectionClonerTest, BeginCollectionFailed) {
     auto createCollectionFp =
         globalFailPointRegistry().find("hangAndFailAfterCreateCollectionReservesOpTime");
     auto initialTimesEntered =
-        createCollectionFp->setMode(FailPoint::alwaysOn, 0, BSON("nss" << _nss.toString()));
+        createCollectionFp->setMode(FailPoint::alwaysOn, 0, BSON("nss" << _nss.toString_forTest()));
 
     auto cloner = makeCollectionCloner();
     cloner->setStopAfterStage_forTest("createCollection");
@@ -482,7 +482,8 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsFailed) {
     auto cloner = makeCollectionCloner();
 
     // Enable failpoint to make collection inserts to fail.
-    FailPointEnableBlock fp("failCollectionInserts", BSON("collectionNS" << _nss.toString()));
+    FailPointEnableBlock fp("failCollectionInserts",
+                            BSON("collectionNS" << _nss.toString_forTest()));
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {

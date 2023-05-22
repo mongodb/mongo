@@ -63,7 +63,7 @@ TEST(ViewResponseFormatter, FormatSubsequentCountResponseSuccessfully) {
 TEST(ViewResponseFormatter, FormatInitialCountResponseWithTenantIdSuccessfully) {
     const TenantId tenantId(OID::gen());
     const NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString());
+        NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString_forTest());
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
@@ -121,7 +121,7 @@ TEST(ViewResponseFormatter, FormatSubsequentDistinctResponseSuccessfully) {
 TEST(ViewResponseFormatter, FormatInitialDistinctResponseWithTenantIdSuccessfully) {
     const TenantId tenantId(OID::gen());
     const NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString());
+        NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString_forTest());
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 

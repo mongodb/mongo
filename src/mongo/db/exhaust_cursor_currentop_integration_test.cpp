@@ -86,7 +86,7 @@ void setWaitAfterCommandFinishesExecutionFailpoint(DBClientBase* conn, bool enab
     auto cmdObj = BSON("configureFailPoint"
                        << "waitAfterCommandFinishesExecution"
                        << "mode" << (enable ? "alwaysOn" : "off") << "data"
-                       << BSON("ns" << testNSS.toString()));
+                       << BSON("ns" << testNSS.toString_forTest()));
     auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }

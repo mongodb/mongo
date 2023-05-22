@@ -330,7 +330,7 @@ protected:
         _storageInterface->dropCollFn = [this](OperationContext* opCtx,
                                                const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
-            _storageInterfaceWorkDone.droppedCollections.push_back(nss.toString());
+            _storageInterfaceWorkDone.droppedCollections.push_back(nss.toString_forTest());
             return Status::OK();
         };
         _storageInterface->dropUserDBsFn = [this](OperationContext* opCtx) {
@@ -602,7 +602,7 @@ RemoteCommandResponse makeCursorResponse(CursorId cursorId,
     {
         BSONObjBuilder cursorBob(bob.subobjStart("cursor"));
         cursorBob.append("id", cursorId);
-        cursorBob.append("ns", nss.toString());
+        cursorBob.append("ns", nss.toString_forTest());
         {
             BSONArrayBuilder batchBob(
                 cursorBob.subarrayStart(isFirstBatch ? "firstBatch" : "nextBatch"));

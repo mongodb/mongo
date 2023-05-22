@@ -350,7 +350,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
-        NamespaceString::createNamespaceString_forTest(longEnoughNss.toString() + 'x');
+        NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
     ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
                            opCtx, true /* sourceIsSharded */, tooLongNss, false /* dropTarget */),
                        AssertionException,
