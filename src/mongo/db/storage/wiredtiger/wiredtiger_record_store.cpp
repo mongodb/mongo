@@ -1031,11 +1031,32 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         for (size_t i = 0; i < nRecords; i++) {
             auto& record = records[i];
             if (_isOplog) {
-                StatusWith<RecordId> status =
-                    record_id_helpers::extractKeyOptime(record.data.data(), record.data.size());
-                if (!status.isOK())
-                    return status.getStatus();
-                record.id = std::move(status.getValue());
+                auto swRecordId = record_id_helpers::keyForOptime(timestamps[i], KeyFormat::Long);
+                if (!swRecordId.isOK())
+                    return swRecordId.getStatus();
+
+                // In the normal write paths, a timestamp is always set. It is only in unusual cases
+                // like inserting the oplog seed document where the caller does not provide a
+                // timestamp.
+                if (MONGO_unlikely(timestamps[i].isNull() || kDebugBuild)) {
+                    auto swRecordIdFromBSON =
+                        record_id_helpers::extractKeyOptime(record.data.data(), record.data.size());
+                    if (!swRecordIdFromBSON.isOK())
+                        return swRecordIdFromBSON.getStatus();
+
+                    // Double-check that the 'ts' field in the oplog entry matches the assigned
+                    // timestamp, if it was provided.
+                    dassert(timestamps[i].isNull() ||
+                                swRecordIdFromBSON.getValue() == swRecordId.getValue(),
+                            fmt::format(
+                                "ts field in oplog entry {} does not equal assigned timestamp {}",
+                                swRecordIdFromBSON.getValue().toString(),
+                                swRecordId.getValue().toString()));
+
+                    record.id = std::move(swRecordIdFromBSON.getValue());
+                } else {
+                    record.id = std::move(swRecordId.getValue());
+                }
             } else {
                 // Some RecordStores, like TemporaryRecordStores, may want to set their own
                 // RecordIds.
