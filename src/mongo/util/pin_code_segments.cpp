@@ -61,10 +61,17 @@ int appendCodeSegments(dl_phdr_info* info, size_t size, void* data) {
             // Code segments must be of LOAD type.
             continue;
         }
-        if (auto f = phdr.p_flags; f & PF_R && f & PF_X && !(f & PF_W)) {
-            // Code segments typically have read and execute permissions, but not writable
-            // permissions. Meanwhile, data segments, which we want to ignore, typically have
-            // read, write and execute permissions.
+        const auto f = phdr.p_flags;
+        if (!(f & PF_R)) {
+            // Code segments have read permissions so exclude segments that do not.
+            continue;
+        }
+        if (!(f & PF_X)) {
+            // Code segments have execute permissions so exclude segments that do not.
+            continue;
+        }
+        if (f & PF_W) {
+            // Code segments don't have write permissions so exclude segments that do.
             continue;
         }
         segments->push_back(
@@ -94,7 +101,8 @@ MONGO_INITIALIZER(PinCodeSegments)(InitializerContext*) {
                 "Failed to lock code segment, ensure system ulimits are properly configured",
                 "error"_attr = errorMessage(ec),
                 "address"_attr = unsignedHex(reinterpret_cast<uintptr_t>(segment.addr)),
-                "memSize"_attr = segment.memSize);
+                "memSize"_attr = segment.memSize,
+                "memLockedSoFar"_attr = lockedMemSize);
         }
         lockedMemSize += segment.memSize;
     }
