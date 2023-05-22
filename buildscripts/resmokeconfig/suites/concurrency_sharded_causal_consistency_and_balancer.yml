@@ -90,6 +90,9 @@ selector:
   # this may cause the finds to return incomplete results.
   - jstests/concurrency/fsm_workloads/indexed_insert_where.js
 
+  # TODO Undenylist (SERVER-71819).
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   # This suite uses secondary read preference, which isn't currently compatible with transactions.

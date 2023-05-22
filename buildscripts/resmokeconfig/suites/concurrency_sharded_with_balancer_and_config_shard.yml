@@ -94,6 +94,9 @@ selector:
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
+  # TODO Undenylist (SERVER-71819).
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+
   exclude_with_any_tags:
   - assumes_balancer_off
   - requires_replication
