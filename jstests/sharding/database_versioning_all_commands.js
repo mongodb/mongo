@@ -385,6 +385,7 @@ let testCases = {
             }
         }
     },
+    cpuload: {skip: "executes locally on mongos (not sent to any remote node)"},
     create: {
         run: {
             sendsDbVersion: true,

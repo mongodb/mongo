@@ -28,6 +28,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",
     "coordinateCommitTransaction",
+    "cpuload",
     "createSearchIndexes",
     "dropSearchIndex",
     "getClusterParameter",

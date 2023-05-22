@@ -41,6 +41,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -86,6 +88,8 @@ public:
         if (cmdObj["cpuFactor"].isNumber()) {
             cpuFactor = cmdObj["cpuFactor"].number();
         }
+
+        Timer t{};
         long long limit = 10000 * cpuFactor;
         // volatile used to ensure that loop is not optimized away
         volatile uint64_t lresult [[maybe_unused]] = 0;  // NOLINT
@@ -94,6 +98,11 @@ public:
             x *= 13;
         }
         lresult = x;
+
+        // add time-consuming statistics
+        auto micros = t.elapsed();
+        result.append("durationMillis", durationCount<Milliseconds>(micros));
+        result.append("durationSeconds", durationCount<Seconds>(micros));
         return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const {
