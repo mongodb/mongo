@@ -76,6 +76,63 @@ void MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(
     }
 }
 
+void MigrationChunkClonerSourceOpObserver::onUnpreparedTransactionCommit(
+    OperationContext* opCtx,
+    const TransactionOperations& transactionOperations,
+    OpStateAccumulator* const opAccumulator) {
+    // Return early if we are secondary or in some replication state in which we are not
+    // appending entries to the oplog.
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
+
+    // It is possible that the transaction resulted in no changes.  In that case, we should
+    // not write an empty applyOps entry.
+    if (statements.empty()) {
+        return;
+    }
+
+    if (!opAccumulator) {
+        return;
+    }
+
+    const auto& commitOpTime = opAccumulator->opTime.writeOpTime;
+    invariant(!commitOpTime.isNull());
+
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<LogTransactionOperationsForShardingHandler>(
+            *opCtx->getLogicalSessionId(), statements, commitOpTime));
+}
+
+void MigrationChunkClonerSourceOpObserver::onTransactionPrepare(
+    OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
+    const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    size_t numberOfPrePostImagesToWrite,
+    Date_t wallClockTime) {
+    // Return early if we are secondary or in some replication state in which we are not
+    // appending entries to the oplog.
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
+    if (reservedSlots.empty()) {
+        return;
+    }
+
+    const auto& prepareOpTime = reservedSlots.back();
+    invariant(!prepareOpTime.isNull());
+
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
+
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<LogTransactionOperationsForShardingHandler>(
+            *opCtx->getLogicalSessionId(), statements, prepareOpTime));
+}
+
 void MigrationChunkClonerSourceOpObserver::onTransactionPrepareNonPrimary(
     OperationContext* opCtx,
     const LogicalSessionId& lsid,

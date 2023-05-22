@@ -66,6 +66,18 @@ public:
      */
     static void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss);
 
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime) final;
+
     void onTransactionPrepareNonPrimary(OperationContext* opCtx,
                                         const LogicalSessionId& lsid,
                                         const std::vector<repl::OplogEntry>& statements,

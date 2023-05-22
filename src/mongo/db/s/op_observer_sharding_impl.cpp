@@ -179,12 +179,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
 void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
     OperationContext* opCtx,
     const std::vector<repl::ReplOperation>& stmts,
-    const repl::OpTime& prepareOrCommitOptime) {
-
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<LogTransactionOperationsForShardingHandler>(
-            *opCtx->getLogicalSessionId(), stmts, prepareOrCommitOptime));
-}
+    const repl::OpTime& prepareOrCommitOptime) {}
 
 void OpObserverShardingImpl::shardObserveNonPrimaryTransactionPrepare(
     OperationContext* opCtx,
