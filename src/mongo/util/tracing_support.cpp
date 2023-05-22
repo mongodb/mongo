@@ -137,7 +137,7 @@ private:
  * Trace Event Format
  * Defined: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/edit
  *
- * Consumed by Google Chome Tracing, Catapult, and https://perfetto.dev
+ * Consumed by Google Chrome Tracing, Catapult, and https://perfetto.dev
  */
 class TraceEventTracerFactory final : public Tracer::Factory {
 public:
