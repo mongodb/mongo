@@ -2100,7 +2100,7 @@ fast:
          * If there's a chance the Btree was fully evicted, update the evicted flag in the handle.
          */
         if (__wt_btree_bytes_evictable(session) == 0)
-            F_SET(session->dhandle, WT_DHANDLE_EVICTED);
+            FLD_SET(session->dhandle->advisory_flags, WT_DHANDLE_ADVISORY_EVICTED);
     } else if (btree->evict_walk_period > 0)
         btree->evict_walk_period /= 2;
 
