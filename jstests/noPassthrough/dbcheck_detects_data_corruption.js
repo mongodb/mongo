@@ -41,8 +41,11 @@ assert(!res.valid, res);
 assert.commandWorked(db.runCommand({"dbCheck": 1}));
 
 // Wait for both nodes to finish checking.
-const healthlogSecondary = secondary.getDB('local').system.healthlog;
-assert.soon(() => healthlogSecondary.find({operation: "dbCheckStop"}).itcount() == 1);
+[primary, secondary].forEach((node) => {
+    print("waiting for node to finish: " + tojson(node));
+    const healthlog = node.getDB('local').system.healthlog;
+    assert.soon(() => healthlog.find({operation: "dbCheckStop"}).itcount() == 1);
+});
 
 [primary, secondary].forEach((node) => {
     print("checking " + tojson(node));
