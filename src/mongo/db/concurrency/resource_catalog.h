@@ -32,15 +32,23 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 
 namespace mongo {
+
 class ResourceCatalog {
 public:
-    static ResourceCatalog& get(ServiceContext* scvCtx);
+    static ResourceCatalog& get();
+
+    // TODO (SERVER-77227): Remove this getter
+    static ResourceCatalog& get(ServiceContext*) {
+        return get();
+    }
 
     void add(ResourceId id, const NamespaceString& ns);
     void add(ResourceId id, const DatabaseName& dbName);
 
     void remove(ResourceId id, const NamespaceString& ns);
     void remove(ResourceId id, const DatabaseName& dbName);
+
+    ResourceId newResourceIdForMutex(std::string resourceLabel);
 
     void clear();
 
@@ -55,7 +63,12 @@ private:
 
     void _remove(ResourceId id, const std::string& name);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ResourceCatalog");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ResourceCatalog::_mutex");
     stdx::unordered_map<ResourceId, StringSet> _resources;
+
+    mutable Mutex _mutexResourceIdLabelsMutex =
+        MONGO_MAKE_LATCH("ResourceCatalog::_mutexResourceIdLabelsMutex");
+    std::vector<std::string> _mutexResourceIdLabels;
 };
+
 }  // namespace mongo

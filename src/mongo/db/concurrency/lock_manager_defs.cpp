@@ -29,6 +29,9 @@
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
 
+#include "mongo/db/concurrency/resource_catalog.h"
+#include "mongo/db/service_context.h"
+
 namespace mongo {
 
 // Hardcoded resource IDs.
@@ -42,5 +45,19 @@ const ResourceId resourceIdFeatureCompatibilityVersion = ResourceId(
     RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kFeatureCompatibilityVersion));
 const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(
     RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kReplicationStateTransitionLock));
+
+std::string ResourceId::toString() const {
+    StringBuilder ss;
+    ss << "{" << _fullHash << ": " << resourceTypeName(getType()) << ", " << getHashId();
+    if (getType() == RESOURCE_MUTEX || getType() == RESOURCE_DATABASE ||
+        getType() == RESOURCE_COLLECTION) {
+        if (auto resourceName = ResourceCatalog::get(getGlobalServiceContext()).name(*this)) {
+            ss << ", " << *resourceName;
+        }
+    }
+    ss << "}";
+
+    return ss.str();
+}
 
 }  // namespace mongo

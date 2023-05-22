@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/concurrency/lock_manager.h"
 
 #include <fmt/format.h>
@@ -42,7 +39,6 @@
 #include "mongo/config.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -51,7 +47,6 @@
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace {
@@ -968,28 +963,6 @@ LockHead* LockManager::LockBucket::findOrInsert(ResourceId resId) {
     }
     return lock;
 }
-
-//
-// ResourceId
-//
-std::string ResourceId::toString() const {
-    StringBuilder ss;
-    ss << "{" << _fullHash << ": " << resourceTypeName(getType()) << ", " << getHashId();
-    if (getType() == RESOURCE_MUTEX) {
-        ss << ", " << Lock::ResourceMutex::getName(*this);
-    }
-
-    if (getType() == RESOURCE_DATABASE || getType() == RESOURCE_COLLECTION) {
-        if (auto resourceName = ResourceCatalog::get(getGlobalServiceContext()).name(*this)) {
-            ss << ", " << *resourceName;
-        }
-    }
-
-    ss << "}";
-
-    return ss.str();
-}
-
 
 //
 // LockRequest

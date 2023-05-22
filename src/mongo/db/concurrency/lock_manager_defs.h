@@ -289,13 +289,9 @@ public:
     }
 
 private:
-    ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
+    friend class ResourceCatalog;
 
-    // Used to allow Lock::ResourceMutex to create ResourceIds with RESOURCE_MUTEX type
-    static ResourceId makeMutexResourceId(uint64_t hashId) {
-        return ResourceId(fullHash(ResourceType::RESOURCE_MUTEX, hashId));
-    }
-    friend class Lock;
+    ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 
     void verifyNoResourceMutex(ResourceType type) {
         invariant(

@@ -29,16 +29,14 @@
 
 #include "mongo/db/concurrency/resource_catalog.h"
 
-#include "mongo/db/service_context.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
-namespace {
-const auto getResourceCatalog = ServiceContext::declareDecoration<ResourceCatalog>();
-}  // namespace
 
-ResourceCatalog& ResourceCatalog::get(ServiceContext* svcCtx) {
-    return getResourceCatalog(svcCtx);
+ResourceCatalog& ResourceCatalog::get() {
+    static StaticImmortal<ResourceCatalog> resourceCatalog;
+    return resourceCatalog.value();
 }
 
 void ResourceCatalog::add(ResourceId id, const NamespaceString& ns) {
@@ -66,6 +64,14 @@ void ResourceCatalog::remove(ResourceId id, const DatabaseName& dbName) {
     _remove(id, DatabaseNameUtil::serializeForCatalog(dbName));
 }
 
+ResourceId ResourceCatalog::newResourceIdForMutex(std::string resourceLabel) {
+    stdx::lock_guard<Latch> lk(_mutexResourceIdLabelsMutex);
+    _mutexResourceIdLabels.emplace_back(std::move(resourceLabel));
+
+    return ResourceId(
+        ResourceId::fullHash(ResourceType::RESOURCE_MUTEX, _mutexResourceIdLabels.size() - 1));
+}
+
 void ResourceCatalog::_remove(ResourceId id, const std::string& name) {
     stdx::lock_guard<Latch> lk{_mutex};
 
@@ -87,12 +93,20 @@ void ResourceCatalog::clear() {
 }
 
 boost::optional<std::string> ResourceCatalog::name(ResourceId id) const {
-    invariant(id.getType() == RESOURCE_DATABASE || id.getType() == RESOURCE_COLLECTION);
-    stdx::lock_guard<Latch> lk{_mutex};
+    if (id.getType() == RESOURCE_DATABASE || id.getType() == RESOURCE_COLLECTION) {
+        stdx::lock_guard<Latch> lk{_mutex};
 
-    auto it = _resources.find(id);
-    return it == _resources.end() || it->second.size() > 1
-        ? boost::none
-        : boost::make_optional(*it->second.begin());
+        auto it = _resources.find(id);
+        return it == _resources.end() || it->second.size() > 1
+            ? boost::none
+            : boost::make_optional(*it->second.begin());
+    } else if (id.getType() == RESOURCE_MUTEX) {
+        stdx::lock_guard<Latch> lk{_mutexResourceIdLabelsMutex};
+
+        return _mutexResourceIdLabels.at(id.getHashId());
+    }
+
+    return boost::none;
 }
+
 }  // namespace mongo

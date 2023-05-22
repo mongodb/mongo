@@ -869,9 +869,10 @@ env.Library(
         'catalog/collection.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/common_s',
         'catalog/clustered_collection_options',
         'catalog/index_catalog',
+        'query/collation/collator_factory_interface',
         'server_base',
     ],
 )
@@ -1855,7 +1856,6 @@ env.Library(
     LIBDEPS=[
         'commands',
         'pipeline/lite_parsed_document_source',
-        'query/op_metrics',
         'session/logical_session_id',
     ],
 )

@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -45,12 +46,7 @@
 namespace mongo {
 
 Lock::ResourceMutex::ResourceMutex(std::string resourceLabel)
-    : _rid(ResourceIdFactory::newResourceIdForMutex(std::move(resourceLabel))) {}
-
-std::string Lock::ResourceMutex::getName(ResourceId resourceId) {
-    invariant(resourceId.getType() == RESOURCE_MUTEX);
-    return ResourceIdFactory::nameForId(resourceId);
-}
+    : _rid(ResourceCatalog::get().newResourceIdForMutex(std::move(resourceLabel))) {}
 
 bool Lock::ResourceMutex::isExclusivelyLocked(Locker* locker) {
     return locker->isLockHeldForMode(_rid, MODE_X);
@@ -60,29 +56,33 @@ bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
     return locker->isLockHeldForMode(_rid, MODE_IS);
 }
 
-ResourceId Lock::ResourceMutex::ResourceIdFactory::newResourceIdForMutex(
-    std::string resourceLabel) {
-    return _resourceIdFactory()._newResourceIdForMutex(std::move(resourceLabel));
+void Lock::ResourceLock::_lock(LockMode mode, Date_t deadline) {
+    invariant(_result == LOCK_INVALID);
+    if (_opCtx)
+        _opCtx->lockState()->lock(_opCtx, _rid, mode, deadline);
+    else
+        _locker->lock(_rid, mode, deadline);
+
+    _result = LOCK_OK;
 }
 
-std::string Lock::ResourceMutex::ResourceIdFactory::nameForId(ResourceId resourceId) {
-    stdx::lock_guard<Latch> lk(_resourceIdFactory().labelsMutex);
-    return _resourceIdFactory().labels.at(resourceId.getHashId());
+void Lock::ResourceLock::_unlock() {
+    if (_isLocked()) {
+        if (_opCtx)
+            _opCtx->lockState()->unlock(_rid);
+        else
+            _locker->unlock(_rid);
+
+        _result = LOCK_INVALID;
+    }
 }
 
-Lock::ResourceMutex::ResourceIdFactory&
-Lock::ResourceMutex::ResourceIdFactory::_resourceIdFactory() {
-    static StaticImmortal<Lock::ResourceMutex::ResourceIdFactory> resourceIdFactory;
-    return resourceIdFactory.value();
-}
-
-ResourceId Lock::ResourceMutex::ResourceIdFactory::_newResourceIdForMutex(
-    std::string resourceLabel) {
-    stdx::lock_guard<Latch> lk(labelsMutex);
-    invariant(nextId == labels.size());
-    labels.push_back(std::move(resourceLabel));
-
-    return ResourceId::makeMutexResourceId(nextId++);
+void Lock::ExclusiveLock::lock() {
+    // The contract of the condition_variable-like utilities is that that the lock is returned in
+    // the locked state so the acquisition below must be guaranteed to always succeed.
+    invariant(_opCtx);
+    UninterruptibleLockGuard ulg(_opCtx->lockState());  // NOLINT.
+    _lock(MODE_X);
 }
 
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
@@ -318,26 +318,5 @@ Lock::CollectionLock::~CollectionLock() {
 Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(OperationContext* opCtx)
     : _pbwm(opCtx, resourceIdParallelBatchWriterMode, MODE_X),
       _shouldNotConflictBlock(opCtx->lockState()) {}
-
-void Lock::ResourceLock::_lock(LockMode mode, Date_t deadline) {
-    invariant(_result == LOCK_INVALID);
-    if (_opCtx)
-        _opCtx->lockState()->lock(_opCtx, _rid, mode, deadline);
-    else
-        _locker->lock(_rid, mode, deadline);
-
-    _result = LOCK_OK;
-}
-
-void Lock::ResourceLock::_unlock() {
-    if (_isLocked()) {
-        if (_opCtx)
-            _opCtx->lockState()->unlock(_rid);
-        else
-            _locker->unlock(_rid);
-
-        _result = LOCK_INVALID;
-    }
-}
 
 }  // namespace mongo

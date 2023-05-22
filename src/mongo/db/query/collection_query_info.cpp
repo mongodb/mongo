@@ -27,17 +27,11 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/collection_query_info.h"
-
-#include <memory>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_utils.h"
@@ -55,9 +49,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-
 namespace mongo {
-
 namespace {
 
 CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {

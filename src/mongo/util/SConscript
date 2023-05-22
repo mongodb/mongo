@@ -235,19 +235,10 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='namespace_string_util_test',
-    source=[
-        'namespace_string_util_test.cpp',
-    ],
-    LIBDEPS=[
-        'namespace_string_database_name_util',
-    ],
-)
-
-env.CppUnitTest(
-    target='database_name_util_test',
+    target='namespace_string_database_name_util_test',
     source=[
         'database_name_util_test.cpp',
+        'namespace_string_util_test.cpp',
     ],
     LIBDEPS=[
         'namespace_string_database_name_util',

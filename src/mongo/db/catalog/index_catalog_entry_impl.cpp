@@ -27,17 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
-
-#include <algorithm>
-#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -58,11 +51,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
-
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(skipUpdateIndexMultikey);
 
-using std::string;
+MONGO_FAIL_POINT_DEFINE(skipUpdateIndexMultikey);
 
 IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
                                              const CollectionPtr& collection,
