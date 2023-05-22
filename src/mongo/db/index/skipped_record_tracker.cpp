@@ -46,13 +46,8 @@ namespace {
 static constexpr StringData kRecordIdField = "recordId"_sd;
 }
 
-SkippedRecordTracker::SkippedRecordTracker(const IndexCatalogEntry* indexCatalogEntry)
-    : SkippedRecordTracker(nullptr, indexCatalogEntry, boost::none) {}
-
 SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
-                                           const IndexCatalogEntry* indexCatalogEntry,
-                                           boost::optional<StringData> ident)
-    : _indexCatalogEntry(indexCatalogEntry) {
+                                           boost::optional<StringData> ident) {
     if (!ident) {
         return;
     }
@@ -109,6 +104,7 @@ bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
 
 Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                                                  const CollectionPtr& collection,
+                                                 const IndexCatalogEntry* indexCatalogEntry,
                                                  RetrySkippedRecordMode mode) {
 
     const bool keyGenerationOnly = mode == RetrySkippedRecordMode::kKeyGeneration;
@@ -122,8 +118,8 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     InsertDeleteOptions options;
     collection->getIndexCatalog()->prepareInsertDeleteOptions(
         opCtx,
-        _indexCatalogEntry->getNSSFromCatalog(opCtx),
-        _indexCatalogEntry->descriptor(),
+        indexCatalogEntry->getNSSFromCatalog(opCtx),
+        indexCatalogEntry->descriptor(),
         &options);
 
     // This should only be called when constraints are being enforced, on a primary. It does not
@@ -178,7 +174,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
             auto keys = executionCtx.keys();
             auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
             auto multikeyPaths = executionCtx.multikeyPaths();
-            auto iam = _indexCatalogEntry->accessMethod()->asSortedData();
+            auto iam = indexCatalogEntry->accessMethod()->asSortedData();
 
             try {
                 // Because constraint enforcement is set, this will throw if there are any indexing
@@ -186,6 +182,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                 // normally happen if constraints were relaxed.
                 iam->getKeys(opCtx,
                              collection,
+                             indexCatalogEntry,
                              pooledBuilder,
                              skippedDoc,
                              options.getKeysMode,
@@ -200,13 +197,19 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                     onResolved();
                     continue;
                 }
-                auto status = iam->insertKeys(opCtx, collection, *keys, options, nullptr, nullptr);
+                auto status = iam->insertKeys(
+                    opCtx, collection, indexCatalogEntry, *keys, options, nullptr, nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
 
-                status = iam->insertKeys(
-                    opCtx, collection, *multikeyMetadataKeys, options, nullptr, nullptr);
+                status = iam->insertKeys(opCtx,
+                                         collection,
+                                         indexCatalogEntry,
+                                         *multikeyMetadataKeys,
+                                         options,
+                                         nullptr,
+                                         nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -244,13 +247,13 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         LOGV2_DEBUG(7333101,
                     logLevel,
                     "Index build: verified key generation for skipped records",
-                    "index"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                    "index"_attr = indexCatalogEntry->descriptor()->indexName(),
                     "numResolved"_attr = resolved);
     } else {
         LOGV2_DEBUG(23883,
                     logLevel,
                     "Index build: reapplied skipped records",
-                    "index"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                    "index"_attr = indexCatalogEntry->descriptor()->indexName(),
                     "numResolved"_attr = resolved);
     }
     return Status::OK();

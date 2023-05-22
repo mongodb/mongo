@@ -806,6 +806,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
 
             iam->getKeys(opCtx,
                          collection,
+                         entry,
                          pooledBuilder,
                          nextRecord.data.toBson(),
                          InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,

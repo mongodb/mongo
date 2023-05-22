@@ -260,6 +260,7 @@ private:
      * inconsistent hash buckets during the first phase of validation to document keys.
      */
     void addIndexKey(OperationContext* opCtx,
+                     const IndexCatalogEntry* entry,
                      const KeyString::Value& ks,
                      IndexInfo* indexInfo,
                      const RecordId& recordId,

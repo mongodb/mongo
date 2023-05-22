@@ -575,13 +575,15 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
     SharedBufferFragmentBuilder pool(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
-    for (const auto& index : _validateState->getIndexes()) {
-        const IndexDescriptor* descriptor = index->descriptor();
-        if (descriptor->isPartial() && !index->getFilterExpression()->matchesBSON(recordBson))
+    for (const auto& indexIdent : _validateState->getIndexIdents()) {
+        const IndexDescriptor* descriptor =
+            coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
+        if (descriptor->isPartial() &&
+            !descriptor->getEntry()->getFilterExpression()->matchesBSON(recordBson))
             continue;
 
 
-        this->traverseRecord(opCtx, coll, index.get(), recordId, recordBson, results);
+        this->traverseRecord(opCtx, coll, descriptor->getEntry(), recordId, recordBson, results);
     }
     return Status::OK();
 }

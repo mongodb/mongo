@@ -118,7 +118,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
 }
 
 int repairMissingIndexEntry(OperationContext* opCtx,
-                            std::shared_ptr<const IndexCatalogEntry>& index,
+                            const IndexCatalogEntry* index,
                             const KeyString::Value& ks,
                             const KeyFormat& keyFormat,
                             const NamespaceString& nss,
@@ -135,6 +135,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
         insertStatus =
             accessMethod->insertKeysAndUpdateMultikeyPaths(opCtx,
                                                            coll,
+                                                           index,
                                                            {ks},
                                                            {},
                                                            {},
@@ -198,7 +199,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
                     writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss, [&] {
                         WriteUnitOfWork wunit(opCtx);
                         insertStatus = accessMethod->insertKeysAndUpdateMultikeyPaths(
-                            opCtx, coll, {ks}, {}, {}, options, nullptr, nullptr);
+                            opCtx, coll, index, {ks}, {}, {}, options, nullptr, nullptr);
                         wunit.commit();
                     });
                     if (!insertStatus.isOK()) {

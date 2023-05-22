@@ -91,16 +91,14 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       IndexBuildPhaseEnum phase) {
 
     _indexName = _spec.getStringField("name").toString();
-    auto descriptor = collection->getIndexCatalog()->findIndexByName(
+    auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
         _indexName,
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
 
-    auto indexCatalogEntry = descriptor->getEntry();
-
     uassert(4945000,
             "Index catalog entry not found while attempting to resume index build",
-            indexCatalogEntry);
+            writableEntry);
     uassert(
         4945001, "Cannot resume a non-hybrid index build", _method == IndexBuildMethod::kHybrid);
 
@@ -111,19 +109,19 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
             opCtx,
             collection->ns(),
             collection->getCollectionOptions(),
-            descriptor,
-            indexCatalogEntry->getIdent());
+            writableEntry->descriptor(),
+            writableEntry->getIdent());
         if (!status.isOK())
             return status;
     }
 
     _indexBuildInterceptor =
         std::make_unique<IndexBuildInterceptor>(opCtx,
-                                                indexCatalogEntry,
+                                                writableEntry,
                                                 stateInfo.getSideWritesTable(),
                                                 stateInfo.getDuplicateKeyTrackerTable(),
                                                 stateInfo.getSkippedRecordTrackerTable());
-    indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
+    writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);
 
@@ -136,10 +134,9 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
 
     // need this first for names, etc...
     BSONObj keyPattern = _spec.getObjectField("key");
-    auto descriptor =
-        std::make_unique<IndexDescriptor>(IndexNames::findPluginName(keyPattern), _spec);
+    auto descriptor = IndexDescriptor(IndexNames::findPluginName(keyPattern), _spec);
 
-    _indexName = descriptor->indexName();
+    _indexName = descriptor.indexName();
 
     // Since the index build block is being initialized, the index build for _indexName is
     // beginning. Accordingly, emit an audit event indicating this.
@@ -162,7 +159,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
         // Setup on-disk structures. We skip this during startup recovery for unfinished indexes as
         // everything is already in-place.
         Status status = collection->prepareForIndexBuild(
-            opCtx, descriptor.get(), _buildUUID, isBackgroundSecondaryBuild);
+            opCtx, &descriptor, _buildUUID, isBackgroundSecondaryBuild);
         if (!status.isOK())
             return status;
     }
@@ -170,9 +167,8 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
     auto indexCatalog = collection->getIndexCatalog();
     IndexCatalogEntry* indexCatalogEntry = nullptr;
     if (forRecovery) {
-        auto desc = indexCatalog->findIndexByName(
+        indexCatalogEntry = indexCatalog->getWritableEntryByName(
             opCtx, _indexName, IndexCatalog::InclusionPolicy::kUnfinished);
-        indexCatalogEntry = indexCatalog->getEntryShared(desc).get();
     } else {
         indexCatalogEntry = indexCatalog->createIndexEntry(
             opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
@@ -293,12 +289,10 @@ const IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx,
 }
 
 IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx, Collection* collection) {
-    auto descriptor = collection->getIndexCatalog()->findIndexByName(
+    return collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
         _indexName,
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
-
-    return descriptor->getEntry();
 }
 
 }  // namespace mongo

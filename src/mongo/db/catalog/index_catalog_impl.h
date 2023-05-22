@@ -117,9 +117,18 @@ public:
 
     const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const override;
 
-    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
+    IndexCatalogEntry* getWritableEntryByName(
+        OperationContext* opCtx,
+        StringData name,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) override;
 
-    std::shared_ptr<IndexCatalogEntry> getEntryShared(const IndexDescriptor*) override;
+    IndexCatalogEntry* getWritableEntryByKeyPatternAndOptions(
+        OperationContext* opCtx,
+        const BSONObj& key,
+        const BSONObj& indexSpec,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) override;
+
+    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
 
@@ -129,7 +138,7 @@ public:
 
     IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
                                         Collection* collection,
-                                        std::unique_ptr<IndexDescriptor> descriptor,
+                                        IndexDescriptor&& descriptor,
                                         CreateIndexEntryFlags flags) override;
 
     StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* opCtx,
@@ -162,17 +171,13 @@ public:
                         bool includingIdIndex,
                         std::function<void(const IndexDescriptor*)> onDropFn) override;
 
-    Status dropIndex(OperationContext* opCtx,
-                     Collection* collection,
-                     const IndexDescriptor* desc) override;
-
     Status resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                            Collection* collection,
-                                           const IndexDescriptor* desc) override;
+                                           IndexCatalogEntry* entry) override;
 
     Status dropUnfinishedIndex(OperationContext* opCtx,
                                Collection* collection,
-                               const IndexDescriptor* desc) override;
+                               IndexCatalogEntry* entry) override;
 
     Status dropIndexEntry(OperationContext* opCtx,
                           Collection* collection,
@@ -339,6 +344,13 @@ private:
                            const CollectionPtr& collection,
                            long long numIndexesInCollectionCatalogEntry,
                            const std::vector<std::string>& indexNamesToDrop);
+
+    /**
+     * Returns a writable IndexCatalogEntry copy that will be returned by current and future calls
+     * to this function. Any previous IndexCatalogEntry/IndexDescriptor pointers that were returned
+     * may be invalidated.
+     */
+    IndexCatalogEntry* _getWritableEntry(const IndexDescriptor* descriptor);
 
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;

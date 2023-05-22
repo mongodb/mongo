@@ -65,7 +65,7 @@ ReadyIndexesIterator::ReadyIndexesIterator(OperationContext* const opCtx,
 
 const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
     while (_iterator != _endIterator) {
-        IndexCatalogEntry* entry = _iterator->get();
+        const IndexCatalogEntry* entry = _iterator->get();
         ++_iterator;
         return entry;
     }
@@ -74,7 +74,8 @@ const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
 }
 
 AllIndexesIterator::AllIndexesIterator(
-    OperationContext* const opCtx, std::unique_ptr<std::vector<IndexCatalogEntry*>> ownedContainer)
+    OperationContext* const opCtx,
+    std::unique_ptr<std::vector<const IndexCatalogEntry*>> ownedContainer)
     : _opCtx(opCtx), _ownedContainer(std::move(ownedContainer)) {
     // Explicitly order calls onto the ownedContainer with respect to its move.
     _iterator = _ownedContainer->begin();
@@ -86,7 +87,7 @@ const IndexCatalogEntry* AllIndexesIterator::_advance() {
         return nullptr;
     }
 
-    IndexCatalogEntry* entry = *_iterator;
+    const IndexCatalogEntry* entry = *_iterator;
     ++_iterator;
     return entry;
 }

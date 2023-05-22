@@ -58,10 +58,13 @@ protected:
         int64_t rowId = ++_lastRowId;
 
         WriteUnitOfWork wuow(operationContext());
+        const auto desc =
+            collection()->getIndexCatalog()->findIndexByName(operationContext(), "columnstore");
         Status status = _accessMethod->insert(
             operationContext(),
             _pooledBuilder,
             collection(),
+            desc->getEntry(),
             std::vector<BsonRecord>{BsonRecord{RecordId(rowId), Timestamp(1, rowId), &obj}},
             {},
             &keysInserted);

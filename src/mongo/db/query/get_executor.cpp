@@ -227,8 +227,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        auto wam = static_cast<const WildcardAccessMethod*>(accessMethod);
-        wildcardProjection = wam->getWildcardProjection();
+        wildcardProjection =
+            static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
         if (isMultikey) {
             MultikeyMetadataAccessStats mkAccessStats;
 
@@ -244,9 +244,9 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                 }
 
                 multikeyPathSet =
-                    getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);
+                    getWildcardMultikeyPathSet(opCtx, &ice, projectedFields, &mkAccessStats);
             } else {
-                multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx, &mkAccessStats);
+                multikeyPathSet = getWildcardMultikeyPathSet(opCtx, &ice, &mkAccessStats);
             }
 
             LOGV2_DEBUG(20920,

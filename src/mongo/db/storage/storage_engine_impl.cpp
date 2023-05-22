@@ -925,22 +925,9 @@ Status StorageEngineImpl::_dropCollections(OperationContext* opCtx,
     for (auto& uuid : toDrop) {
         auto coll = collectionCatalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
 
-        // No need to remove the indexes from the IndexCatalog because eliminating the Collection
-        // will have the same effect.
-        auto ii = coll->getIndexCatalog()->getIndexIterator(
-            opCtx,
-            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
-                IndexCatalog::InclusionPolicy::kFrozen);
-        while (ii->more()) {
-            const IndexCatalogEntry* ice = ii->next();
-
-            audit::logDropIndex(opCtx->getClient(), ice->descriptor()->indexName(), coll->ns());
-
-            catalog::removeIndex(opCtx,
-                                 ice->descriptor()->indexName(),
-                                 coll,
-                                 coll->getIndexCatalog()->getEntryShared(ice->descriptor()));
-        }
+        // Drop all indexes in the collection.
+        coll->getIndexCatalog()->dropAllIndexes(
+            opCtx, coll, /*includingIdIndex=*/true, /*onDropFn=*/{});
 
         audit::logDropCollection(opCtx->getClient(), coll->ns());
 

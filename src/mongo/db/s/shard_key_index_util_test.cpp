@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/s/shard_key_index_util.h"
 

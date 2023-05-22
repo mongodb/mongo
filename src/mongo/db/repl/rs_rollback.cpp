@@ -864,11 +864,11 @@ void dropIndex(OperationContext* opCtx,
                const string& indexName,
                NamespaceString& nss) {
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    auto indexDescriptor = indexCatalog->findIndexByName(
+    auto writableEntry = indexCatalog->getWritableEntryByName(
         opCtx,
         indexName,
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
-    if (!indexDescriptor) {
+    if (!writableEntry) {
         LOGV2_WARNING(21725,
                       "Rollback failed to drop index {indexName} in {namespace}: index not found.",
                       "Rollback failed to drop index: index not found",
@@ -877,9 +877,8 @@ void dropIndex(OperationContext* opCtx,
         return;
     }
 
-    auto entry = indexCatalog->getEntry(indexDescriptor);
-    if (entry->isReady()) {
-        auto status = indexCatalog->dropIndex(opCtx, collection, indexDescriptor);
+    if (writableEntry->isReady()) {
+        auto status = indexCatalog->dropIndexEntry(opCtx, collection, writableEntry);
         if (!status.isOK()) {
             LOGV2_ERROR(21738,
                         "Rollback failed to drop index {indexName} in {namespace}: {error}",
@@ -889,7 +888,7 @@ void dropIndex(OperationContext* opCtx,
                         "error"_attr = redact(status));
         }
     } else {
-        auto status = indexCatalog->dropUnfinishedIndex(opCtx, collection, indexDescriptor);
+        auto status = indexCatalog->dropUnfinishedIndex(opCtx, collection, writableEntry);
         if (!status.isOK()) {
             LOGV2_ERROR(
                 21739,

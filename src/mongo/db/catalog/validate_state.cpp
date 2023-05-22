@@ -188,13 +188,16 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
 
     // Check if any of the indexes we were validating were dropped. Indexes created while
     // yielding will be ignored.
-    for (const auto& index : _indexes) {
+    for (const auto& indexIdent : _indexIdents) {
+        const IndexDescriptor* desc =
+            _collection->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         uassert(ErrorCodes::Interrupted,
                 str::stream()
                     << "Interrupted due to: index being validated was dropped from collection: "
                     << _nss.toStringForErrorMsg() << " (" << *_uuid
-                    << "), index: " << index->descriptor()->indexName(),
-                !index->isDropped());
+                    << "), index ident: " << indexIdent,
+                desc);
+        invariant(!desc->getEntry()->isDropped());
     }
 };
 
@@ -228,7 +231,7 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
-              _columnStoreIndexCursors.size() == 0 && _indexes.size() == 0);
+              _columnStoreIndexCursors.size() == 0 && _indexIdents.size() == 0);
 
     // Background validation reads from the last stable checkpoint instead of the latest data. This
     // allows concurrent writes to go ahead without interfering with validation's view of the data.
@@ -253,7 +256,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     uint64_t currCheckpointId = 0;
     do {
         _indexCursors.clear();
-        _indexes.clear();
+        _indexIdents.clear();
         StringSet readyDurableIndexes;
         try {
             _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
@@ -351,7 +354,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                 continue;
             }
 
-            _indexes.push_back(indexCatalog->getEntryShared(desc));
+            _indexIdents.push_back(desc->getEntry()->getIdent());
         }
         // For foreground validation which doesn't use checkpoint cursors, the checkpoint id will
         // always be zero.

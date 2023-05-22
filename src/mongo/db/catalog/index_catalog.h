@@ -186,15 +186,15 @@ public:
          * it should pass in a null value.
          */
         AllIndexesIterator(OperationContext* opCtx,
-                           std::unique_ptr<std::vector<IndexCatalogEntry*>> ownedContainer);
+                           std::unique_ptr<std::vector<const IndexCatalogEntry*>> ownedContainer);
 
     private:
         const IndexCatalogEntry* _advance() override;
 
         OperationContext* const _opCtx;
-        std::vector<IndexCatalogEntry*>::const_iterator _iterator;
-        std::vector<IndexCatalogEntry*>::const_iterator _endIterator;
-        std::unique_ptr<std::vector<IndexCatalogEntry*>> _ownedContainer;
+        std::vector<const IndexCatalogEntry*>::const_iterator _iterator;
+        std::vector<const IndexCatalogEntry*>::const_iterator _endIterator;
+        std::unique_ptr<std::vector<const IndexCatalogEntry*>> _ownedContainer;
     };
 
     enum class InclusionPolicy {
@@ -315,12 +315,26 @@ public:
     virtual const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const = 0;
 
     /**
+     * Returns a writable IndexCatalogEntry copy that will be returned by current and future calls
+     * to this function. Any previous IndexCatalogEntry/IndexDescriptor pointers that were returned
+     * may be invalidated.
+     */
+    virtual IndexCatalogEntry* getWritableEntryByName(
+        OperationContext* opCtx,
+        StringData name,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) = 0;
+    virtual IndexCatalogEntry* getWritableEntryByKeyPatternAndOptions(
+        OperationContext* opCtx,
+        const BSONObj& key,
+        const BSONObj& indexSpec,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) = 0;
+
+    /**
      * Returns a pointer to the index catalog entry associated with 'desc', where the caller assumes
      * shared ownership of the entry. Returns null if the entry does not exist.
      */
     virtual std::shared_ptr<const IndexCatalogEntry> getEntryShared(
         const IndexDescriptor*) const = 0;
-    virtual std::shared_ptr<IndexCatalogEntry> getEntryShared(const IndexDescriptor*) = 0;
 
     /**
      * Returns a vector of shared pointers to all index entries. Excludes unfinished indexes.
@@ -343,7 +357,7 @@ public:
 
     virtual IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
                                                 Collection* collection,
-                                                std::unique_ptr<IndexDescriptor> descriptor,
+                                                IndexDescriptor&& descriptor,
                                                 CreateIndexEntryFlags flags) = 0;
 
     /**
@@ -425,16 +439,6 @@ public:
                                 std::function<void(const IndexDescriptor*)> onDropFn) = 0;
 
     /**
-     * Drops the index given its descriptor.
-     *
-     * The caller must hold the collection X lock and ensure no index builds are in progress on the
-     * collection.
-     */
-    virtual Status dropIndex(OperationContext* opCtx,
-                             Collection* collection,
-                             const IndexDescriptor* desc) = 0;
-
-    /**
      * Resets the index given its descriptor.
      *
      * This can only be called during startup recovery as it involves recreating the index table to
@@ -442,7 +446,7 @@ public:
      */
     virtual Status resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                                    Collection* collection,
-                                                   const IndexDescriptor* desc) = 0;
+                                                   IndexCatalogEntry* entry) = 0;
 
     /**
      * Drops an unfinished index given its descriptor.
@@ -451,7 +455,7 @@ public:
      */
     virtual Status dropUnfinishedIndex(OperationContext* opCtx,
                                        Collection* collection,
-                                       const IndexDescriptor* desc) = 0;
+                                       IndexCatalogEntry* entry) = 0;
 
     /**
      * Drops the index given its catalog entry.

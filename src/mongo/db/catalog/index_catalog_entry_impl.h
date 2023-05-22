@@ -29,18 +29,21 @@
 
 #pragma once
 
+#include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -52,18 +55,15 @@ class OperationContext;
 class ExpressionContext;
 
 class IndexCatalogEntryImpl : public IndexCatalogEntry {
-    IndexCatalogEntryImpl(const IndexCatalogEntryImpl&) = delete;
-    IndexCatalogEntryImpl& operator=(const IndexCatalogEntryImpl&) = delete;
-
 public:
     IndexCatalogEntryImpl(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const std::string& ident,
-                          std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
+                          IndexDescriptor&& descriptor,
                           bool isFrozen);
 
     const std::string& getIdent() const final {
-        return _ident;
+        return _shared->_ident;
     }
 
     std::shared_ptr<Ident> getSharedIdent() const final;
@@ -71,14 +71,14 @@ public:
     void setIdent(std::shared_ptr<Ident> newIdent) final;
 
     IndexDescriptor* descriptor() final {
-        return _descriptor.get();
+        return &_descriptor;
     }
     const IndexDescriptor* descriptor() const final {
-        return _descriptor.get();
+        return &_descriptor;
     }
 
     IndexAccessMethod* accessMethod() const final {
-        return _accessMethod.get();
+        return _shared->_accessMethod.get();
     }
 
     void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final;
@@ -98,11 +98,11 @@ public:
     const Ordering& ordering() const final;
 
     const MatchExpression* getFilterExpression() const final {
-        return _filterExpression.get();
+        return _shared->_filterExpression.get();
     }
 
     const CollatorInterface* getCollator() const final {
-        return _collator.get();
+        return _shared->_collator.get();
     }
 
     NamespaceString getNSSFromCatalog(OperationContext* opCtx) const final;
@@ -114,11 +114,11 @@ public:
     void setIsFrozen(bool newIsFrozen) final;
 
     void setDropped() final {
-        _isDropped.store(true);
+        _isDropped = true;
     }
 
     bool isDropped() const final {
-        return _isDropped.load();
+        return _isDropped;
     }
 
     // --
@@ -174,7 +174,7 @@ public:
     bool shouldValidateDocument() const final;
 
     const UpdateIndexData& getIndexedPaths() const final {
-        return _indexedPaths;
+        return _shared->_indexedPaths;
     }
 
 private:
@@ -202,36 +202,43 @@ private:
                              const CollectionPtr& collection,
                              const MultikeyPaths& multikeyPaths) const;
 
-    // -----
+    /**
+     * Holder of shared state between IndexCatalogEntryImpl clones
+     */
+    struct SharedState : public RefCountable {
+        SharedState(const std::string& ident, const RecordId& catalogId)
+            : _ident(ident), _catalogId(catalogId) {}
 
-    const std::string _ident;
+        const std::string _ident;
 
-    std::unique_ptr<IndexDescriptor> _descriptor;  // owned here
+        const RecordId _catalogId;  // Location in the durable catalog of the collection entry
+                                    // containing this index entry.
 
-    std::unique_ptr<IndexAccessMethod> _accessMethod;
+        std::unique_ptr<IndexAccessMethod> _accessMethod;
+
+        std::unique_ptr<CollatorInterface> _collator;
+        std::unique_ptr<MatchExpression> _filterExpression;
+
+        // Special ExpressionContext used to evaluate the partial filter expression.
+        boost::intrusive_ptr<ExpressionContext> _expCtxForFilter;
+
+        // Describes the paths indexed by this index.
+        UpdateIndexData _indexedPaths;
+    };
 
     IndexBuildInterceptor* _indexBuildInterceptor = nullptr;  // not owned here
 
-    std::unique_ptr<CollatorInterface> _collator;
-    std::unique_ptr<MatchExpression> _filterExpression;
-    // Special ExpressionContext used to evaluate the partial filter expression.
-    boost::intrusive_ptr<ExpressionContext> _expCtxForFilter;
+    boost::intrusive_ptr<SharedState> _shared;
 
-    // cached stuff
+    IndexDescriptor _descriptor;
 
-    const RecordId _catalogId;  // Location in the durable catalog of the collection entry
-                                // containing this index entry.
-    bool _isReady;              // cache of NamespaceDetails info
+    bool _isReady;
     bool _isFrozen;
     bool _shouldValidateDocument;
-    AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
+    bool _isDropped;  // Whether the index drop is committed.
 
-    // Offset of this index within the Collection metadata.
-    // Used to improve lookups without having to search for the index name
-    // accessing the collection metadata.
+    // Offset of this index within the Collection metadata. Used to improve lookups without having
+    // to search for the index name accessing the collection metadata.
     int _indexOffset;
-
-    // Describes the paths indexed by this index.
-    UpdateIndexData _indexedPaths;
 };
 }  // namespace mongo

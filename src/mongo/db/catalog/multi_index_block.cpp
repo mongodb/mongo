@@ -383,8 +383,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (!status.isOK())
                 return status;
 
-            index.bulk = index.real->initiateBulk(
-                eachIndexBuildMaxMemoryUsageBytes, stateInfo, collection->ns().db());
+            index.bulk = index.real->initiateBulk(indexCatalogEntry,
+                                                  eachIndexBuildMaxMemoryUsageBytes,
+                                                  stateInfo,
+                                                  collection->ns().db());
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -551,8 +553,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
         _lastRecordIdInserted = boost::none;
         for (auto& index : _indexes) {
+            auto indexCatalogEntry = index.block->getEntry(opCtx, collection);
             index.bulk =
-                index.real->initiateBulk(getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()),
+                index.real->initiateBulk(indexCatalogEntry,
+                                         getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()),
                                          /*stateInfo=*/boost::none,
                                          collection->ns().db());
         }
@@ -790,6 +794,8 @@ Status MultiIndexBlock::_insert(
             continue;
         }
 
+        auto indexCatalogEntry = _indexes[i].block->getEntry(opCtx, collection);
+
         Status idxStatus = Status::OK();
 
         // When calling insert, BulkBuilderImpl's Sorter performs file I/O that may result in an
@@ -797,6 +803,7 @@ Status MultiIndexBlock::_insert(
         try {
             idxStatus = _indexes[i].bulk->insert(opCtx,
                                                  collection,
+                                                 indexCatalogEntry,
                                                  doc,
                                                  loc,
                                                  _indexes[i].options,
@@ -860,9 +867,11 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
         // SERVER-41918 This call to bulk->commit() results in file I/O that may result in an
         // exception.
         try {
+            const IndexCatalogEntry* entry = _indexes[i].block->getEntry(opCtx, collection);
             Status status = _indexes[i].bulk->commit(
                 opCtx,
                 collection,
+                entry,
                 dupsAllowed,
                 kYieldIterations,
                 [=, this](const KeyString::Value& duplicateKey) {
@@ -874,7 +883,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                                 entry->indexBuildInterceptor()) {
                                 WriteUnitOfWork wuow(opCtx);
                                 Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
-                                    opCtx, duplicateKey);
+                                    opCtx, entry, duplicateKey);
                                 if (!status.isOK()) {
                                     return status;
                                 }
@@ -930,8 +939,12 @@ Status MultiIndexBlock::drainBackgroundWrites(
         // _ignoreUnique is set explicitly.
         auto trackDups = !_ignoreUnique ? IndexBuildInterceptor::TrackDuplicates::kTrack
                                         : IndexBuildInterceptor::TrackDuplicates::kNoTrack;
-        auto status = interceptor->drainWritesIntoIndex(
-            opCtx, coll, _indexes[i].options, trackDups, drainYieldPolicy);
+        auto status = interceptor->drainWritesIntoIndex(opCtx,
+                                                        coll,
+                                                        _indexes[i].block->getEntry(opCtx, coll),
+                                                        _indexes[i].options,
+                                                        trackDups,
+                                                        drainYieldPolicy);
         if (!status.isOK()) {
             return status;
         }
@@ -948,7 +961,8 @@ Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx,
         if (!interceptor)
             continue;
 
-        auto status = interceptor->retrySkippedRecords(opCtx, collection, mode);
+        auto status = interceptor->retrySkippedRecords(
+            opCtx, collection, index.block->getEntry(opCtx, collection), mode);
         if (!status.isOK()) {
             return status;
         }
@@ -967,7 +981,8 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collecti
         if (!interceptor)
             continue;
 
-        auto status = interceptor->checkDuplicateKeyConstraints(opCtx);
+        auto status = interceptor->checkDuplicateKeyConstraints(
+            opCtx, _indexes[i].block->getEntry(opCtx, collection));
         if (!status.isOK()) {
             return status;
         }
