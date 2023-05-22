@@ -453,7 +453,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
     }();
 
     return ExecutorFuture<void>(_executor)
-        .then([=]() {
+        .then([=, this]() {
             ThreadClient tc("ShardServerCatalogCacheLoader::getChunksSince",
                             getGlobalServiceContext());
             auto context = _contexts.makeOperationContext(*tc);

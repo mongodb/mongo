@@ -7,7 +7,14 @@ Import([
     'serverJs',
 ])
 
-env.Library(
+scripting_common_env = env.Clone()
+# TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+scripting_common_env.Append(
+    CXXFLAGS=[] if scripting_common_env.TargetOSIs('windows') else [
+        '-Wno-deprecated',
+    ], )
+
+scripting_common_env.Library(
     target='scripting_common',
     source=[
         'deadline_monitor.cpp',
@@ -54,8 +61,9 @@ if jsEngine:
             # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
             '-Wno-unknown-warning-option',
             '-Wno-class-memaccess',
+            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+            '-Wno-deprecated',
         ], )
-
     scriptingEnv.InjectMozJS()
 
     scriptingEnv.JSHeader(

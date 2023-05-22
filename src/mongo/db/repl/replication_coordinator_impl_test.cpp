@@ -1557,7 +1557,7 @@ protected:
         bool force, Milliseconds waitTime, Milliseconds stepDownTime) {
         using PromisedClientAndOperation = stdx::promise<SharedClientAndOperation>;
         auto task = stdx::packaged_task<boost::optional<Status>(PromisedClientAndOperation)>(
-            [=](PromisedClientAndOperation operationPromise) -> boost::optional<Status> {
+            [=, this](PromisedClientAndOperation operationPromise) -> boost::optional<Status> {
                 auto result = SharedClientAndOperation::make(getServiceContext());
                 operationPromise.set_value(result);
                 try {

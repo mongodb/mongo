@@ -61,7 +61,7 @@ inline int idx(T enumType) {
  */
 void mongo::sdam::TopologyStateMachine::initTransitionTable() {
     auto bindThis = [&](auto&& pmf) {
-        return [=](auto&&... a) {
+        return [=, this](auto&&... a) {
             (this->*pmf)(a...);
         };
     };

@@ -553,7 +553,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
     auto handle =
-        _replExecutor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {
+        _replExecutor->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& args) {
             _finishLoadLocalConfig(args, localConfig, lastOpTimeAndWallTimeResult, lastVote);
         });
     if (handle == ErrorCodes::ShutdownInProgress) {
@@ -817,15 +817,16 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
                       "error"_attr = opTimeStatus.getStatus());
                 lock.unlock();
                 clearSyncSourceDenylist();
-                _scheduleWorkAt(_replExecutor->now(),
-                                [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-                                    _startInitialSync(
-                                        cc().makeOperationContext().get(),
-                                        [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
-                                            _initialSyncerCompletionFunction(opTimeStatus);
-                                        },
-                                        true /* fallbackToLogical */);
-                                });
+                _scheduleWorkAt(
+                    _replExecutor->now(),
+                    [=, this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                        _startInitialSync(
+                            cc().makeOperationContext().get(),
+                            [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
+                                _initialSyncerCompletionFunction(opTimeStatus);
+                            },
+                            true /* fallbackToLogical */);
+                    });
                 return;
             } else {
                 LOGV2_ERROR(21416,
@@ -2931,7 +2932,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     updateMemberState();
 
     // Schedule work to (potentially) step back up once the stepdown period has ended.
-    _scheduleWorkAt(stepDownUntil, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+    _scheduleWorkAt(stepDownUntil, [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
         _handleTimePassing(cbData);
     });
 
@@ -3536,7 +3537,7 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* opCt
 }
 
 Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
-    auto result = [=]() {
+    auto result = [=, this]() {
         stdx::lock_guard<Latch> lock(_mutex);
         return _topCoord->prepareFreezeResponse(_replExecutor->now(), secs, resultObj);
     }();
@@ -3768,7 +3769,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
     _setConfigState_inlock(kConfigReconfiguring);
     auto configStateGuard =
-        ScopeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
+        ScopeGuard([&] { lockAndCall(&lk, [=, this] { _setConfigState_inlock(kConfigSteady); }); });
 
     ReplSetConfig oldConfig = _rsConfig;
     int myIndex = _selfIndex;
@@ -4317,7 +4318,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     _setConfigState_inlock(kConfigInitiating);
 
     ScopeGuard configStateGuard = [&] {
-        lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigUninitialized); });
+        lockAndCall(&lk, [=, this] { _setConfigState_inlock(kConfigUninitialized); });
     };
 
     // When writing our first oplog entry below, disable advancement of the stable timestamp so that
@@ -4671,7 +4672,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     if (_memberState.removed() && !newState.arbiter()) {
         LOGV2(5268000, "Scheduling a task to begin or continue replication");
         _scheduleWorkAt(_replExecutor->now(),
-                        [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                        [=, this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
                             _externalState->startThreads();
                             auto opCtx = cc().makeOperationContext();
                             _startDataReplication(opCtx.get());
@@ -5348,7 +5349,7 @@ void ReplicationCoordinatorImpl::_undenylistSyncSource(
 void ReplicationCoordinatorImpl::denylistSyncSource(const HostAndPort& host, Date_t until) {
     stdx::lock_guard<Latch> lock(_mutex);
     _topCoord->denylistSyncSource(host, until);
-    _scheduleWorkAt(until, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+    _scheduleWorkAt(until, [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
         _undenylistSyncSource(cbData, host);
     });
 }

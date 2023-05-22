@@ -309,7 +309,8 @@ asio::mutable_buffer engine::get_output(const asio::mutable_buffer& data) {
     const auto requested = *data_len;
     *data_len = std::min<size_t>(requested, max_outbuf_size - this_->_outbuf.size());
     this_->_outbuf.insert(this_->_outbuf.end(), p, p + *data_len);
-    return (requested == *data_len) ? ::errSecSuccess : ::errSSLWouldBlock;
+    return (requested == *data_len) ? static_cast<OSStatus>(::errSecSuccess)
+                                    : static_cast<OSStatus>(::errSSLWouldBlock);
 }
 
 boost::optional<std::string> engine::get_sni() {

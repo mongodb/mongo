@@ -210,8 +210,9 @@ if get_option('ssl') == 'on':
                 # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
                 '-Wno-unknown-warning-option',
                 '-Wno-class-memaccess',
+                # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+                '-Wno-deprecated',
             ], )
-
         scriptingEnv.InjectMozJS()
 
         scriptingEnv.Library(

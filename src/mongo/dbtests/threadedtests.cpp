@@ -79,7 +79,7 @@ private:
         if (!remaining)
             return;
 
-        stdx::thread athread([=] { subthread(remaining); });
+        stdx::thread athread([=, this] { subthread(remaining); });
         launch_subthreads(remaining - 1);
         athread.join();
     }
@@ -134,7 +134,7 @@ public:
         tp.startup();
 
         for (unsigned i = 0; i < iterations; i++) {
-            tp.schedule([=](auto status) {
+            tp.schedule([=, this](auto status) {
                 ASSERT_OK(status);
                 increment(2);
             });

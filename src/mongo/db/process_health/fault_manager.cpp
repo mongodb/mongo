@@ -223,7 +223,7 @@ void FaultManager::setupStateMachine() {
     });
 
     auto bindThis = [&](auto&& pmf) {
-        return [=](auto&&... a) {
+        return [=, this](auto&&... a) {
             return (this->*pmf)(a...);
         };
     };

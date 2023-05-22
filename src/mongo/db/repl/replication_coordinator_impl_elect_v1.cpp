@@ -221,7 +221,7 @@ void ReplicationCoordinatorImpl::ElectionState::start(WithLock lk, StartElection
     fassert(28685, nextPhaseEvh.getStatus());
     _replExecutor
         ->onEvent(nextPhaseEvh.getValue(),
-                  [=](const executor::TaskExecutor::CallbackArgs&) {
+                  [=, this](const executor::TaskExecutor::CallbackArgs&) {
                       _processDryRunResult(term, reason);
                   })
         .status_with_transitional_ignore();
@@ -402,7 +402,7 @@ void ReplicationCoordinatorImpl::ElectionState::_requestVotesForRealElection(
     fassert(28643, nextPhaseEvh.getStatus());
     _replExecutor
         ->onEvent(nextPhaseEvh.getValue(),
-                  [=](const executor::TaskExecutor::CallbackArgs&) {
+                  [=, this](const executor::TaskExecutor::CallbackArgs&) {
                       if (MONGO_unlikely(hangBeforeOnVoteRequestCompleteCallback.shouldFail())) {
                           LOGV2(7277400,
                                 "Hang due to hangBeforeOnVoteRequestCompleteCallback failpoint");
