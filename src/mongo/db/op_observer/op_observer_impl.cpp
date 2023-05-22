@@ -1848,7 +1848,6 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         opAccumulator->opTime.writeOpTime = commitOpTime;
         opAccumulator->opTime.wallClockTime = wallClockTime;
     }
-    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
 }
 
 void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
@@ -2138,16 +2137,12 @@ void OpObserverImpl::onTransactionPrepare(
             wuow.commit();
         });
     }
-
-    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, prepareOpTime);
 }
 
 void OpObserverImpl::onTransactionPrepareNonPrimary(OperationContext* opCtx,
                                                     const LogicalSessionId& lsid,
                                                     const std::vector<repl::OplogEntry>& statements,
-                                                    const repl::OpTime& prepareOpTime) {
-    shardObserveNonPrimaryTransactionPrepare(opCtx, lsid, statements, prepareOpTime);
-}
+                                                    const repl::OpTime& prepareOpTime) {}
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
                                         boost::optional<OplogSlot> abortOplogEntryOpTime) {

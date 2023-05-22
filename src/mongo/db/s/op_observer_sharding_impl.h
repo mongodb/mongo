@@ -62,15 +62,6 @@ protected:
                               const repl::OpTime& opTime,
                               const ShardingWriteRouter& shardingWriteRouter,
                               bool inMultiDocumentTransaction) override;
-    void shardObserveTransactionPrepareOrUnpreparedCommit(
-        OperationContext* opCtx,
-        const std::vector<repl::ReplOperation>& stmts,
-        const repl::OpTime& prepareOrCommitOptime) override;
-    void shardObserveNonPrimaryTransactionPrepare(
-        OperationContext* opCtx,
-        const LogicalSessionId& lsid,
-        const std::vector<repl::OplogEntry>& stmts,
-        const repl::OpTime& prepareOrCommitOptime) override;
 };
 
 }  // namespace mongo

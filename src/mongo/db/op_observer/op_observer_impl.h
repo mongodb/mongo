@@ -261,15 +261,6 @@ private:
                                       const repl::OpTime& opTime,
                                       const ShardingWriteRouter& shardingWriteRouter,
                                       const bool inMultiDocumentTransaction) {}
-    virtual void shardObserveTransactionPrepareOrUnpreparedCommit(
-        OperationContext* opCtx,
-        const std::vector<repl::ReplOperation>& stmts,
-        const repl::OpTime& prepareOrCommitOptime) {}
-    virtual void shardObserveNonPrimaryTransactionPrepare(
-        OperationContext* opCtx,
-        const LogicalSessionId& lsid,
-        const std::vector<repl::OplogEntry>& stmts,
-        const repl::OpTime& prepareOrCommitOptime) {}
 
     std::unique_ptr<OplogWriter> _oplogWriter;
 };
