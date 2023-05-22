@@ -1308,6 +1308,7 @@ tasks:
 
   # Base compile for nonstandalone build
   - name: compile-nonstandalone
+    tags: ["pull_request"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2510,7 +2511,6 @@ tasks:
 
             ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} --hook tiered=tier_storage_source='s3_store' ${smp_command|} 2>&1
 
-
   - name: unit-test-hook-tiered-timestamp
     tags: ["python"]
     depends_on:
@@ -2690,7 +2690,152 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: -v 2 -b 11/12
+  
+  - name: unit-test-nonstandalone-bucket00
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 0/12
+    
+  - name: unit-test-nonstandalone-bucket01
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 1/12
+    
+  - name: unit-test-nonstandalone-bucket02
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 2/12
+            
+  - name: unit-test-nonstandalone-bucket03
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 3/12
 
+            
+  - name: unit-test-nonstandalone-bucket04
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 4/12
+            
+  - name: unit-test-nonstandalone-bucket05
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 5/12
+            
+  - name: unit-test-nonstandalone-bucket06
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 6/12
+            
+  - name: unit-test-nonstandalone-bucket07
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 7/12
+            
+  - name: unit-test-nonstandalone-bucket08
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 8/12
+            
+  - name: unit-test-nonstandalone-bucket09
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 9/12
+            
+  - name: unit-test-nonstandalone-bucket10
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 10/12
+
+  - name: unit-test-nonstandalone-bucket11
+    tags: ["python", "pull_request"]
+    depends_on:
+    - name: compile-nonstandalone
+    commands:
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: compile-nonstandalone
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook nonstandalone -v 2 -b 11/12
+                      
   - name: unit-test-long-bucket00
     tags: ["python", "unit_test_long"]
     patch_only: true
@@ -5374,7 +5519,6 @@ buildvariants:
     - name: bench-tiered-push-pull
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
-    - name: unit-test-nonstandalone
     - name: unit-test-extra-long-nonstandalone
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test-nonstandalone"
