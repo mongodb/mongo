@@ -30,6 +30,7 @@
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager.h"
 
@@ -73,6 +74,16 @@ void MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(
         uasserted(ErrorCodes::MovePrimaryInProgress,
                   "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
     }
+}
+
+void MigrationChunkClonerSourceOpObserver::onTransactionPrepareNonPrimary(
+    OperationContext* opCtx,
+    const LogicalSessionId& lsid,
+    const std::vector<repl::OplogEntry>& statements,
+    const repl::OpTime& prepareOpTime) {
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<LogTransactionOperationsForShardingHandler>(
+            lsid, statements, prepareOpTime));
 }
 
 }  // namespace mongo

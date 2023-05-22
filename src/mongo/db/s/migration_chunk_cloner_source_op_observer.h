@@ -65,6 +65,11 @@ public:
      * Ensures that there is no movePrimary operation in progress for the given namespace.
      */
     static void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss);
+
+    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const LogicalSessionId& lsid,
+                                        const std::vector<repl::OplogEntry>& statements,
+                                        const repl::OpTime& prepareOpTime) final;
 };
 
 }  // namespace mongo

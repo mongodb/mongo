@@ -190,11 +190,6 @@ void OpObserverShardingImpl::shardObserveNonPrimaryTransactionPrepare(
     OperationContext* opCtx,
     const LogicalSessionId& lsid,
     const std::vector<repl::OplogEntry>& stmts,
-    const repl::OpTime& prepareOrCommitOptime) {
-
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<LogTransactionOperationsForShardingHandler>(
-            lsid, stmts, prepareOrCommitOptime));
-}
+    const repl::OpTime& prepareOrCommitOptime) {}
 
 }  // namespace mongo
