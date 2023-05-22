@@ -17,7 +17,7 @@ function runTest(conn) {
 
     db.test.find({v: 1}).toArray();
 
-    let telemetry = getTelemetryRedacted(admin);
+    let telemetry = getQueryStatsFindCmd(admin, /*applyHmacToIdentifiers*/ true);
 
     assert.eq(1, telemetry.length);
     assert.eq("find", telemetry[0].key.queryShape.command);
@@ -26,14 +26,14 @@ function runTest(conn) {
     db.test.insert({v: 2});
 
     const cursor = db.test.find({v: {$gt: 0, $lt: 3}}).batchSize(1);
-    telemetry = getTelemetryRedacted(admin);
+    telemetry = getQueryStatsFindCmd(admin, /*applyHmacToIdentifiers*/ true);
     // Cursor isn't exhausted, so there shouldn't be another entry yet.
     assert.eq(1, telemetry.length);
 
     assert.commandWorked(
         db.runCommand({getMore: cursor.getId(), collection: db.test.getName(), batchSize: 2}));
 
-    telemetry = getTelemetryRedacted(admin);
+    telemetry = getQueryStatsFindCmd(admin, /*applyHmacToIdentifiers*/ true);
     assert.eq(2, telemetry.length);
     assert.eq("find", telemetry[1].key.queryShape.command);
     assert.eq({

@@ -97,9 +97,19 @@ struct SerializationOptions {
                          LiteralSerializationPolicy policy)
         : literalPolicy(policy),
           applyHmacToIdentifiers(fieldNamesHmacPolicy_),
-          identifierHmacPolicy(fieldNamesHmacPolicy_) {}
+          identifierHmacPolicy(fieldNamesHmacPolicy_) {
+        // TODO SERVER-75400 Remove replacementForLiteralArgs
+        if (policy == LiteralSerializationPolicy::kToDebugTypeString) {
+            replacementForLiteralArgs = "?";
+        }
+    }
 
-    SerializationOptions(LiteralSerializationPolicy policy) : literalPolicy(policy) {}
+    SerializationOptions(LiteralSerializationPolicy policy) : literalPolicy(policy) {
+        // TODO SERVER-75400 Remove replacementForLiteralArgs
+        if (policy == LiteralSerializationPolicy::kToDebugTypeString) {
+            replacementForLiteralArgs = "?";
+        }
+    }
 
     /**
      * Checks if this SerializationOptions represents the same options as another

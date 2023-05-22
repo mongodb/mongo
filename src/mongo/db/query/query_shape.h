@@ -68,7 +68,7 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
-                          const std::vector<BSONObj>& serializedPipeline,
+                          const Pipeline& pipeline,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
 }  // namespace mongo::query_shape

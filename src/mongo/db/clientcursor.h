@@ -447,14 +447,12 @@ private:
     boost::optional<uint32_t> _planCacheKey;
     boost::optional<uint32_t> _queryHash;
 
-    // If boost::none, telemetry should not be collected for this cursor.
+    // If boost::none, query stats should not be collected for this cursor.
     boost::optional<std::size_t> _queryStatsStoreKeyHash;
-    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
-    boost::optional<BSONObj> _queryStatsStoreKey;
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
-    // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
+    // The RequestShapifier used by query stats to shapify the request payload into the query stats
     // store key.
     std::unique_ptr<query_stats::RequestShapifier> _queryStatsRequestShapifier;
 
@@ -590,12 +588,12 @@ void startClientCursorMonitor();
 
 /**
  * Records certain metrics for the current operation on OpDebug and aggregates those metrics for
- * telemetry use. If a cursor pin is provided, metrics are aggregated on the cursor; otherwise,
- * metrics are written directly to the telemetry store.
+ * query stats use. If a cursor pin is provided, metrics are aggregated on the cursor; otherwise,
+ * metrics are written directly to the query stats store.
  * NOTE: Metrics are taken from opDebug.additiveMetrics, so CurOp::setEndOfOpMetrics must be called
  * *prior* to calling these.
  *
- * Currently, telemetry is only collected for find and aggregate requests (and their subsequent
+ * Currently, query stats are only collected for find and aggregate requests (and their subsequent
  * getMore requests), so these should only be called from those request paths.
  */
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);

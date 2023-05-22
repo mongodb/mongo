@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/query/aggregate_request_shapifier.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
@@ -835,15 +836,6 @@ Status runAggregate(OperationContext* opCtx,
         collections.clear();
     };
 
-    auto registerTelemetry = [&]() -> void {
-        // Register queryStats. Exclude queries against collections with encrypted fields.
-        // We still collect queryStats on collection-less aggregations.
-        if (!(ctx && ctx->getCollection() &&
-              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerAggRequest(request, opCtx);
-        }
-    };
-
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
@@ -919,7 +911,6 @@ Status runAggregate(OperationContext* opCtx,
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
             initContext(auto_get_collection::ViewMode::kViewsForbidden);
-            registerTelemetry();
             uassert(ErrorCodes::ChangeStreamNotEnabled,
                     "Change streams must be enabled before being used",
                     !isServerless ||
@@ -944,11 +935,9 @@ Status runAggregate(OperationContext* opCtx,
             tassert(6235101,
                     "A collection-less aggregate should not take any locks",
                     ctx == boost::none);
-            registerTelemetry();
         } else {
             // This is a regular aggregation. Lock the collection or view.
             initContext(auto_get_collection::ViewMode::kViewsPermitted);
-            registerTelemetry();
             auto [collator, match] = resolveCollator(opCtx,
                                                      request.getCollation().get_value_or(BSONObj()),
                                                      collections.getMainCollection());
@@ -1010,6 +999,17 @@ Status runAggregate(OperationContext* opCtx,
         curOp->beginQueryPlanningTimer();
         expCtx->stopExpressionCounters();
 
+        // Register query stats with the pre-optimized pipeline. Exclude queries against collections
+        // with encrypted fields. We still collect query stats on collection-less aggregations.
+        // TODO SERVER-75912 make sure query shape is unresolved for queries on views
+        if (!(ctx && ctx->getCollection() &&
+              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
+            query_stats::registerRequest(expCtx, nss, [&]() {
+                return std::make_unique<query_stats::AggregateRequestShapifier>(
+                    request, *pipeline, expCtx);
+            });
+        }
+
         // This prevents opening a new change stream in the critical section of a serverless shard
         // split or merge operation to prevent resuming on the recipient with a resume token higher
         // than that operation's blockTimestamp.
@@ -1050,10 +1050,6 @@ Status runAggregate(OperationContext* opCtx,
                     opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
-
-            // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done a
-            // FLE rewrite.
-            CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
         }
 
         pipeline->optimizePipeline();
@@ -1222,11 +1218,7 @@ Status runAggregate(OperationContext* opCtx,
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->setEndOfOpMetrics(stats.nReturned);
 
-        if (keepCursor) {
-            collectQueryStatsMongod(opCtx, pins[0]);
-        } else {
-            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsRequestShapifier));
-        }
+        collectQueryStatsMongod(opCtx, pins[0]);
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.

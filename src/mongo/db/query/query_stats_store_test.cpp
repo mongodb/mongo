@@ -29,8 +29,8 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/pipeline/aggregate_request_shapifier.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/aggregate_request_shapifier.h"
 #include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_stats.h"
@@ -68,12 +68,32 @@ public:
             opts.replacementForLiteralArgs = "?";
             opts.literalPolicy = literalPolicy;
         }
-
         if (applyHmac) {
             opts.applyHmacToIdentifiers = true;
             opts.identifierHmacPolicy = applyHmacForTest;
         }
         return findShapifier.makeQueryStatsKey(opts, expCtx);
+    }
+
+    BSONObj makeTelemetryKeyAggregateRequest(
+        AggregateCommandRequest acr,
+        const Pipeline& pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        bool applyHmac = false,
+        LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
+        AggregateRequestShapifier aggShapifier(acr, pipeline, expCtx);
+
+        SerializationOptions opts;
+        if (literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+            // TODO SERVER-75419 Use only 'literalPolicy.'
+            opts.replacementForLiteralArgs = "?";
+            opts.literalPolicy = literalPolicy;
+        }
+        if (applyHmac) {
+            opts.applyHmacToIdentifiers = true;
+            opts.identifierHmacPolicy = applyHmacForTest;
+        }
+        return aggShapifier.makeQueryStatsKey(opts, expCtx);
     }
 };
 
@@ -89,8 +109,7 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
         std::shared_ptr<QueryStatsEntry> metrics;
         auto lookupResult = telStore.lookup(hash(key));
         if (!lookupResult.isOK()) {
-            telStore.put(hash(key),
-                         std::make_shared<QueryStatsEntry>(nullptr, NamespaceString{}, key));
+            telStore.put(hash(key), std::make_shared<QueryStatsEntry>(nullptr, NamespaceString{}));
             lookupResult = telStore.lookup(hash(key));
         }
         metrics = *lookupResult.getValue();
@@ -141,17 +160,17 @@ TEST_F(QueryStatsStoreTest, EvictEntries) {
     const auto numPartitions = 2;
     QueryStatsStore telStore{cacheSize, numPartitions};
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 30; i++) {
         auto query = BSON("query" + std::to_string(i) << 1 << "xEquals" << 42);
-        telStore.put(hash(query),
-                     std::make_shared<QueryStatsEntry>(nullptr, NamespaceString{}, BSONObj{}));
+        telStore.put(hash(query), std::make_shared<QueryStatsEntry>(nullptr, NamespaceString{}));
     }
     int numKeys = 0;
     telStore.forEach(
         [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
 
-    int entriesPerPartition = (cacheSize / numPartitions) /
-        (sizeof(std::size_t) + sizeof(QueryStatsEntry) + BSONObj().objsize());
+    int entriesPerPartition =
+        (cacheSize / numPartitions) / (sizeof(std::size_t) + sizeof(QueryStatsEntry));
+
     ASSERT_EQ(numKeys, entriesPerPartition * numPartitions);
 }
 
@@ -690,8 +709,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
         uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
     QueryStatsEntry testMetrics{
         std::make_unique<query_stats::FindRequestShapifier>(opCtx.get(), *parsedFind),
-        parsedFind->findCommandRequest->getNamespaceOrUUID(),
-        cmdObj};
+        parsedFind->findCommandRequest->getNamespaceOrUUID()};
 
     bool applyHmacToIdentifiers = false;
     auto hmacApplied =
@@ -782,22 +800,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
     auto rawPipeline = {matchStage, unwindStage, groupStage, limitStage, outStage};
     acr.setPipeline(rawPipeline);
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-    AggregateRequestShapifier aggShapifier(acr, *pipeline, expCtx->opCtx);
 
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
-    opts.applyHmacToIdentifiers = false;
-    opts.identifierHmacPolicy = applyHmacForTest;
-
-    auto shapified = aggShapifier.makeQueryStatsKey(opts, expCtx);
+    auto shapified = makeTelemetryKeyAggregateRequest(acr, *pipeline, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
-                "ns": {
+                "cmdNs": {
                     "db": "testDB",
                     "coll": "testColl"
                 },
-                "aggregate": "testColl",
+                "command": "aggregate",
                 "pipeline": [
                     {
                         "$match": {
@@ -844,19 +856,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
         })",
         shapified);
 
-    // TODO SERVER-75400 Use only 'literalPolicy.'
-    opts.replacementForLiteralArgs = "?";
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    shapified = aggShapifier.makeQueryStatsKey(opts, expCtx);
+    shapified = makeTelemetryKeyAggregateRequest(
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
-                "ns": {
+                "cmdNs": {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "aggregate": "HASH<testColl>",
+                "command": "aggregate",
                 "pipeline": [
                     {
                         "$match": {
@@ -910,15 +919,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
     acr.setHint(BSON("z" << 1 << "c" << 1));
     acr.setCollation(BSON("locale"
                           << "simple"));
-    shapified = aggShapifier.makeQueryStatsKey(opts, expCtx);
+    shapified = makeTelemetryKeyAggregateRequest(
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
-                "ns": {
+                "cmdNs": {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "aggregate": "HASH<testColl>",
+                "command": "aggregate",
                 "pipeline": [
                     {
                         "$match": {
@@ -980,15 +990,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                     << "$foo"
                     << "var2"
                     << "bar"));
-    shapified = aggShapifier.makeQueryStatsKey(opts, expCtx);
+    shapified = makeTelemetryKeyAggregateRequest(
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
-                "ns": {
+                "cmdNs": {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "aggregate": "HASH<testColl>",
+                "command": "aggregate",
                 "pipeline": [
                     {
                         "$match": {
@@ -1057,15 +1068,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
     acr.setBypassDocumentValidation(true);
     expCtx->opCtx->setComment(BSON("comment"
                                    << "note to self"));
-    shapified = aggShapifier.makeQueryStatsKey(opts, expCtx);
+    shapified = makeTelemetryKeyAggregateRequest(
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
-                "ns": {
+                "cmdNs": {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "aggregate": "HASH<testColl>",
+                "command": "aggregate",
                 "pipeline": [
                     {
                         "$match": {
@@ -1127,7 +1139,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                 "batchSize": "?number"
             },
             "maxTimeMS": "?number",
-            "bypassDocumentValidation": "?bool"
+            "bypassDocumentValidation": "?bool",
+            "comment": "?string"
         })",
         shapified);
 }
@@ -1136,24 +1149,17 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) 
     AggregateCommandRequest acr(NamespaceString("testDB.testColl"));
     acr.setPipeline({});
     auto pipeline = Pipeline::parse({}, expCtx);
-    AggregateRequestShapifier aggShapifier(acr, *pipeline, expCtx->opCtx);
 
-    SerializationOptions opts;
-    // TODO SERVER-75400 Use only 'literalPolicy.'
-    opts.replacementForLiteralArgs = "?";
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
-
-    auto shapified = aggShapifier.makeQueryStatsKey(opts, expCtx);
+    auto shapified = makeTelemetryKeyAggregateRequest(
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
-                "ns": {
+                "cmdNs": {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
-                "aggregate": "HASH<testColl>",
+                "command": "aggregate",
                 "pipeline": []
             }
         })",

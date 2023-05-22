@@ -59,11 +59,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFro
 }
 
 Value DocumentSourceListSampledQueries::serialize(SerializationOptions opts) const {
-    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(6876002);
-    }
-
-    return Value(Document{{getSourceName(), _spec.toBSON()}});
+    return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
 }
 
 DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {

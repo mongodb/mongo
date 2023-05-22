@@ -25,7 +25,9 @@ function runTestWithMongodOptions(mongodOptions, test, testOptions) {
 function evictionTest(conn, testDB, coll, testOptions) {
     const evictedBefore = testDB.serverStatus().metrics.queryStats.numEvicted;
     assert.eq(evictedBefore, 0);
-    for (var i = 0; i < 4000; i++) {
+    // Each telemetry entry is 208 bytes (key and value included). We must create at least ~5000
+    // entries to reach 1MB.
+    for (var i = 0; i < 10000; i++) {
         let query = {};
         query["foo" + i] = "bar";
         coll.aggregate([{$match: query}]).itcount();
@@ -49,7 +51,7 @@ function evictionTest(conn, testDB, coll, testOptions) {
  * due to rate-limiting.
  *
  * testOptions must include `samplingRate` and `numRequests` number fields;
- *  e.g., { samplingRate: 2147483647, numRequests: 20 }
+ *  e.g., { samplingRate: -1, numRequests: 20 }
  */
 function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
     const numRateLimitedRequestsBefore =
@@ -119,9 +121,7 @@ function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
     }
 
     // Make sure that we recorded a write error for each run.
-    // TODO SERVER-73152 we attempt to write to the telemetry store twice for each aggregate, which
-    // seems wrong.
-    assert.eq(testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors, 10);
+    assert.eq(testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors, 5);
 }
 
 /**

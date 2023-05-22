@@ -146,14 +146,13 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
                                    extensionsCallback,
                                    MatchExpressionParser::kAllowAllSpecialFeatures));
 
-    // Collect telemetry. Exclude queries against non-existent collections and collections
-    // with encrypted fields. It is important to do this before canonicalizing and
+    // Register query stats collection. Exclude queries against non-existent collections and
+    // collections with encrypted fields. It is important to do this before canonicalizing and
     // optimizing the query, each of which would alter the query shape.
     if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
-        query_stats::registerRequest(
-            expCtx,
-            std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedRequest),
-            collection.get()->ns());
+        query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
+            return std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedRequest);
+        });
     }
 
     return uassertStatusOK(
@@ -811,9 +810,6 @@ public:
                     processFLEFindD(
                         opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
                 }
-                // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done
-                // a FLE rewrite.
-                CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
             }
 

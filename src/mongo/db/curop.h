@@ -291,11 +291,9 @@ public:
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
     // The shape of the original query serialized with readConcern, application name, and namespace.
-    // If boost::none, telemetry should not be collected for this operation.
+    // If boost::none, query stats should not be collected for this operation.
     boost::optional<std::size_t> queryStatsStoreKeyHash;
-    // TODO: SERVER-73152 remove telemetryStoreKey when RequestShapifier is used for agg.
-    boost::optional<BSONObj> queryStatsStoreKey;
-    // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
+    // The RequestShapifier used by query stats to shapify the request payload into the query stats
     // store key.
     std::unique_ptr<query_stats::RequestShapifier> queryStatsRequestShapifier;
 

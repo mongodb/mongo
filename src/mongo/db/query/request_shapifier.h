@@ -39,14 +39,14 @@ namespace mongo::query_stats {
 /**
  * An abstract base class to handle query shapification for queryStats. Each request type should
  * define its own shapification strategy in its implementation of makeQueryStatsKey(), and then a
- * request should be registered with queryStats via query_stats::registerRequest(RequestShapifier).
+ * request should be registered with queryStats via query_stats::registerRequest().
  */
 class RequestShapifier {
 public:
     virtual ~RequestShapifier() = default;
 
     /**
-     * makeQueryStatsKey generates the telemetry key representative of the specific request's
+     * makeQueryStatsKey generates the query stats key representative of the specific request's
      * payload. If there exists an ExpressionContext set up to parse and evaluate the request,
      * makeQueryStatsKey should be called with that ExpressionContext. If not, you can call the
      * overload that accepts the OperationContext and will construct a minimally-acceptable

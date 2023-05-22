@@ -270,22 +270,20 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
 }
 
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
-                          const std::vector<BSONObj>& serializedPipeline,
+                          const Pipeline& pipeline,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     BSONObjBuilder bob;
 
-    // TODO SERVER-73152 update to newest query shape definition
-
     // namespace
-    bob.append("ns", extractNamespaceShape(aggregateCommand.getNamespace(), opts));
-    bob.append(AggregateCommandRequest::kCommandName,
-               opts.serializeIdentifier(aggregateCommand.getNamespace().coll()));
+    bob.append("cmdNs", extractNamespaceShape(aggregateCommand.getNamespace(), opts));
+    bob.append("command", "aggregate");
 
     // pipeline
     {
         BSONArrayBuilder pipelineBab(
             bob.subarrayStart(AggregateCommandRequest::kPipelineFieldName));
+        auto serializedPipeline = pipeline.serializeToBson(opts);
         for (const auto& stage : serializedPipeline) {
             pipelineBab.append(stage);
         }

@@ -125,7 +125,6 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _queryStatsStoreKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsStoreKeyHash),
-      _queryStatsStoreKey(CurOp::get(operationUsingCursor)->debug().queryStatsStoreKey),
       _queryStatsRequestShapifier(
           std::move(CurOp::get(operationUsingCursor)->debug().queryStatsRequestShapifier)),
       _shouldOmitDiagnosticInformation(
@@ -164,7 +163,6 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     if (_queryStatsStoreKeyHash && opCtx) {
         query_stats::writeQueryStats(opCtx,
                                      _queryStatsStoreKeyHash,
-                                     _queryStatsStoreKey,
                                      std::move(_queryStatsRequestShapifier),
                                      _metrics.executionTime.value_or(Microseconds{0}).count(),
                                      _metrics.nreturned.value_or(0));
@@ -404,12 +402,11 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
 void collectQueryStatsMongod(OperationContext* opCtx,
                              std::unique_ptr<query_stats::RequestShapifier> requestShapifier) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
-    // telemetry directly.
+    // query stats directly.
     auto& opDebug = CurOp::get(opCtx)->debug();
     query_stats::writeQueryStats(
         opCtx,
         opDebug.queryStatsStoreKeyHash,
-        opDebug.queryStatsStoreKey,
         std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
         opDebug.additiveMetrics.nreturned.value_or(0));
