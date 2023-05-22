@@ -86,9 +86,12 @@ selector:
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
-  # Performs finds with $where, which are slow. Because 'orphanCleanupDelaySecs' is set to 1 second,
-  # this may cause the finds to return incomplete results.
+  # Because 'orphanCleanupDelaySecs' is set to 1 second, this may cause the finds to return
+  # incomplete results.
+  # TODO SERVER-77354: Allow the following tests to run in this suite after 'orphanCleanupDelaySecs'
+  # is increased.
   - jstests/concurrency/fsm_workloads/indexed_insert_where.js
+  - jstests/concurrency/fsm_workloads/agg_sort.js
 
   # TODO Undenylist (SERVER-71819).
   - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
