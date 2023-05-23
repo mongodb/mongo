@@ -548,7 +548,7 @@ intrusive_ptr<Expression> ExpressionAnd::optimize() {
     */
     const size_t n = pAnd->_children.size();
     // ExpressionNary::optimize() generates an ExpressionConstant for {$and:[]}.
-    verify(n > 0);
+    MONGO_verify(n > 0);
     intrusive_ptr<Expression> pLast(pAnd->_children[n - 1]);
     const ExpressionConstant* pConst = dynamic_cast<ExpressionConstant*>(pLast.get());
     if (!pConst)
@@ -1163,7 +1163,7 @@ intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
     if (expr.type() != Object) {
         return Base::parse(expCtx, expr, vps);
     }
-    verify(expr.fieldNameStringData() == "$cond");
+    MONGO_verify(expr.fieldNameStringData() == "$cond");
 
     intrusive_ptr<ExpressionCond> ret = new ExpressionCond(expCtx);
     ret->_children.resize(3);
@@ -1913,7 +1913,7 @@ REGISTER_STABLE_EXPRESSION(dateToString, ExpressionDateToString::parse);
 intrusive_ptr<Expression> ExpressionDateToString::parse(ExpressionContext* const expCtx,
                                                         BSONElement expr,
                                                         const VariablesParseState& vps) {
-    verify(expr.fieldNameStringData() == "$dateToString");
+    MONGO_verify(expr.fieldNameStringData() == "$dateToString");
 
     uassert(18629,
             "$dateToString only supports an object as its argument",
@@ -2686,7 +2686,7 @@ REGISTER_STABLE_EXPRESSION(filter, ExpressionFilter::parse);
 intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn) {
-    verify(expr.fieldNameStringData() == "$filter");
+    MONGO_verify(expr.fieldNameStringData() == "$filter");
 
     uassert(28646, "$filter only supports an object as its argument", expr.type() == Object);
 
@@ -2883,7 +2883,7 @@ REGISTER_STABLE_EXPRESSION(let, ExpressionLet::parse);
 intrusive_ptr<Expression> ExpressionLet::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vpsIn) {
-    verify(expr.fieldNameStringData() == "$let");
+    MONGO_verify(expr.fieldNameStringData() == "$let");
 
     uassert(16874, "$let only supports an object as its argument", expr.type() == Object);
     const BSONObj args = expr.embeddedObject();
@@ -2991,7 +2991,7 @@ REGISTER_STABLE_EXPRESSION(map, ExpressionMap::parse);
 intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vpsIn) {
-    verify(expr.fieldNameStringData() == "$map");
+    MONGO_verify(expr.fieldNameStringData() == "$map");
 
     uassert(16878, "$map only supports an object as its argument", expr.type() == Object);
 
@@ -4219,7 +4219,7 @@ intrusive_ptr<Expression> ExpressionOr::optimize() {
     */
     const size_t n = pOr->_children.size();
     // ExpressionNary::optimize() generates an ExpressionConstant for {$or:[]}.
-    verify(n > 0);
+    MONGO_verify(n > 0);
     intrusive_ptr<Expression> pLast(pOr->_children[n - 1]);
     const ExpressionConstant* pConst = dynamic_cast<ExpressionConstant*>(pLast.get());
     if (!pConst)

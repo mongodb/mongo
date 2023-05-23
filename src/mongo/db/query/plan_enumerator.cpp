@@ -398,9 +398,9 @@ void PlanEnumerator::allocateAssignment(MatchExpression* expr,
     size_t newID = _memo.size() + 1;
 
     // Shouldn't be anything there already.
-    verify(_nodeToId.end() == _nodeToId.find(expr));
+    MONGO_verify(_nodeToId.end() == _nodeToId.find(expr));
     _nodeToId[expr] = newID;
-    verify(_memo.end() == _memo.find(newID));
+    MONGO_verify(_memo.end() == _memo.find(newID));
     NodeAssignment* newAssignment = new NodeAssignment();
     _memo[newID] = newAssignment;
     *assign = newAssignment;
@@ -1641,7 +1641,7 @@ void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
 void PlanEnumerator::tagMemo(size_t id) {
     LOGV2_DEBUG(20944, 5, "Tagging memoID", "id"_attr = id);
     NodeAssignment* assign = _memo[id];
-    verify(nullptr != assign);
+    MONGO_verify(nullptr != assign);
 
     if (nullptr != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();
@@ -1658,7 +1658,7 @@ void PlanEnumerator::tagMemo(size_t id) {
         tagMemo(aa->subnodes[aa->counter]);
     } else if (nullptr != assign->andAssignment) {
         AndAssignment* aa = assign->andAssignment.get();
-        verify(aa->counter < aa->choices.size());
+        MONGO_verify(aa->counter < aa->choices.size());
 
         const AndEnumerableState& aes = aa->choices[aa->counter];
 
@@ -1692,7 +1692,7 @@ void PlanEnumerator::tagMemo(size_t id) {
             }
         }
     } else {
-        verify(0);
+        MONGO_verify(0);
     }
 }
 
@@ -1814,7 +1814,7 @@ bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
 
 bool PlanEnumerator::nextMemo(size_t id) {
     NodeAssignment* assign = _memo[id];
-    verify(nullptr != assign);
+    MONGO_verify(nullptr != assign);
 
     if (nullptr != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();

@@ -184,7 +184,7 @@ struct Cloner::BatchHandler {
                 msgasserted(28531, ss);
             }
 
-            verify(collection);
+            MONGO_verify(collection);
             ++numSeen;
 
             writeConflictRetry(opCtx, "cloner insert", nss.ns(), [&] {

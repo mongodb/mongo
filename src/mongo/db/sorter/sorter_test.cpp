@@ -166,7 +166,7 @@ public:
         return false;
     }
     Data next() {
-        verify(false);
+        MONGO_verify(false);
     }
     const Data& current() {
         MONGO_UNREACHABLE;
@@ -177,7 +177,7 @@ class LimitIterator : public IWIterator {
 public:
     LimitIterator(long long limit, std::shared_ptr<IWIterator> source)
         : _remaining(limit), _source(source) {
-        verify(limit > 0);
+        MONGO_verify(limit > 0);
     }
 
     void openSource() {}
@@ -187,7 +187,7 @@ public:
         return _remaining && _source->more();
     }
     Data next() {
-        verify(more());
+        MONGO_verify(more());
         _remaining--;
         return _source->next();
     }

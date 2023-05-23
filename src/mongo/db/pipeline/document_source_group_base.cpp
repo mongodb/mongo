@@ -575,7 +575,7 @@ void DocumentSourceGroupBase::readyGroups() {
             _currentAccumulators.push_back(accumulatedField.makeAccumulator());
         }
 
-        verify(_sorterIterator->more());  // we put data in, we should get something out.
+        MONGO_verify(_sorterIterator->more());  // we put data in, we should get something out.
         _firstPartOfNextGroup = _sorterIterator->next();
     } else {
         // start the group iterator

@@ -124,7 +124,7 @@ Message DBClientCursor::assembleGetMore() {
 bool DBClientCursor::init() {
     invariant(!_connectionHasPendingReplies);
     Message toSend = assembleInit();
-    verify(_client);
+    MONGO_verify(_client);
     Message reply;
     try {
         _client->call(toSend, reply, &_originalHost);
@@ -152,7 +152,7 @@ void DBClientCursor::requestMore() {
     }
 
     invariant(!_connectionHasPendingReplies);
-    verify(_cursorId && _batch.pos == _batch.objs.size());
+    MONGO_verify(_cursorId && _batch.pos == _batch.objs.size());
 
     auto doRequestMore = [&] {
         Message toSend = assembleGetMore();
@@ -176,10 +176,10 @@ void DBClientCursor::requestMore() {
  * cursor id of 0.
  */
 void DBClientCursor::exhaustReceiveMore() {
-    verify(_cursorId);
-    verify(_batch.pos == _batch.objs.size());
+    MONGO_verify(_cursorId);
+    MONGO_verify(_batch.pos == _batch.objs.size());
     Message response;
-    verify(_client);
+    MONGO_verify(_client);
     uassertStatusOK(
         _client->recv(response, _lastRequestId).withContext("recv failed while exhausting cursor"));
     dataReceived(response);
@@ -300,11 +300,11 @@ bool DBClientCursor::peekError(BSONObj* error) {
     vector<BSONObj> v;
     peek(v, 1);
 
-    verify(v.size() == 1);
+    MONGO_verify(v.size() == 1);
     // We check both the legacy error format, and the new error format. hasErrField checks for
     // $err, and getStatusFromCommandResult checks for modern errors of the form '{ok: 0.0, code:
     // <...>, errmsg: ...}'.
-    verify(hasErrField(v[0]) || !getStatusFromCommandResult(v[0]).isOK());
+    MONGO_verify(hasErrField(v[0]) || !getStatusFromCommandResult(v[0]).isOK());
 
     if (error)
         *error = v[0].getOwned();
@@ -312,9 +312,9 @@ bool DBClientCursor::peekError(BSONObj* error) {
 }
 
 void DBClientCursor::attach(AScopedConnection* conn) {
-    verify(_scopedHost.size() == 0);
-    verify(conn);
-    verify(conn->get());
+    MONGO_verify(_scopedHost.size() == 0);
+    MONGO_verify(conn);
+    MONGO_verify(conn->get());
 
     if (conn->get()->type() == ConnectionString::ConnectionType::kReplicaSet) {
         if (_client)

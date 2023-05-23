@@ -61,7 +61,7 @@ DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(nullptr), _mark(n
 }
 
 const char* DbMessage::getns() const {
-    verify(messageShouldHaveNs());
+    MONGO_verify(messageShouldHaveNs());
     return _nsStart;
 }
 
@@ -91,8 +91,8 @@ BSONObj DbMessage::nextJsObj() {
     }
 
     BSONObj js(_nextjsobj);
-    verify(js.objsize() >= 5);
-    verify(js.objsize() <= (_theEnd - _nextjsobj));
+    MONGO_verify(js.objsize() >= 5);
+    MONGO_verify(js.objsize() <= (_theEnd - _nextjsobj));
 
     _nextjsobj += js.objsize();
     if (_nextjsobj >= _theEnd)
@@ -105,7 +105,7 @@ void DbMessage::markReset(const char* toMark = nullptr) {
         toMark = _mark;
     }
 
-    verify(toMark);
+    MONGO_verify(toMark);
     _nextjsobj = toMark;
 }
 

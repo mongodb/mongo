@@ -464,7 +464,7 @@ public:
     }
 
     Data next() {
-        verify(_remaining);
+        MONGO_verify(_remaining);
 
         _remaining--;
 
@@ -479,7 +479,7 @@ public:
 
     void advance() {
         if (!_current->advance()) {
-            verify(!_heap.empty());
+            MONGO_verify(!_heap.empty());
             std::pop_heap(_heap.begin(), _heap.end(), _greater);
             _current = _heap.back();
             _heap.pop_back();
@@ -841,7 +841,7 @@ public:
 
     LimitOneSorter(const SortOptions& opts, const Comparator& comp)
         : Sorter<Key, Value>(opts), _comp(comp), _haveData(false) {
-        verify(opts.limit == 1);
+        MONGO_verify(opts.limit == 1);
     }
 
     template <typename DataProducer>
@@ -1392,7 +1392,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
 
     std::string compressed;
     snappy::Compress(outBuffer, size, &compressed);
-    verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
+    MONGO_verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
 
     const bool shouldCompress = compressed.size() < (size_t(_buffer.len()) / 10 * 9);
     if (shouldCompress) {

@@ -207,7 +207,7 @@ Status BackgroundJob::cancel() {
 }
 
 bool BackgroundJob::wait(unsigned msTimeOut) {
-    verify(!_selfDelete);  // you cannot call wait on a self-deleting job
+    MONGO_verify(!_selfDelete);  // you cannot call wait on a self-deleting job
     const auto deadline = Date_t::now() + Milliseconds(msTimeOut);
     stdx::unique_lock<Latch> l(_status->mutex);
     while (_status->state != Done) {

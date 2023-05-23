@@ -202,7 +202,7 @@ TEST(R2RegionCoverer, RandomCells) {
 }
 
 double randDouble(double lowerBound, double upperBound) {
-    verify(lowerBound <= upperBound);
+    MONGO_verify(lowerBound <= upperBound);
     const int NUMBITS = 53;
     // Random double in [0, 1)
     long long randLong =

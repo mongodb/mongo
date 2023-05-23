@@ -86,7 +86,7 @@ public:
 
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
-        verify(statusWithMatcher.isOK());
+        MONGO_verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();

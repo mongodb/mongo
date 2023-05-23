@@ -97,7 +97,7 @@ public:
         // Make the filter.
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
-        verify(statusWithMatcher.isOK());
+        MONGO_verify(statusWithMatcher.isOK());
         std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Make a scan and have the runner own it.
@@ -141,7 +141,7 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasRecordId());
+                MONGO_verify(member->hasRecordId());
                 out->push_back(member->recordId);
             }
         }

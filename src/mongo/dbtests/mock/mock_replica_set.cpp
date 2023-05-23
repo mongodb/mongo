@@ -188,7 +188,7 @@ void MockReplicaSet::setConfig(const repl::ReplSetConfig& newConfig) {
 }
 
 void MockReplicaSet::kill(const string& hostAndPort) {
-    verify(_nodeMap.count(hostAndPort) == 1);
+    MONGO_verify(_nodeMap.count(hostAndPort) == 1);
     _nodeMap[hostAndPort]->shutdown();
 }
 
@@ -199,7 +199,7 @@ void MockReplicaSet::kill(const vector<string>& hostList) {
 }
 
 void MockReplicaSet::restore(const string& hostAndPort) {
-    verify(_nodeMap.count(hostAndPort) == 1);
+    MONGO_verify(_nodeMap.count(hostAndPort) == 1);
     _nodeMap[hostAndPort]->reboot();
 }
 

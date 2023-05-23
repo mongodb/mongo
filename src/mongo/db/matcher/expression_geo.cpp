@@ -466,7 +466,7 @@ bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
     if (GeoExpression::WITHIN == queryPredicate) {
         return queryGeom.contains(*geometry);
     } else {
-        verify(GeoExpression::INTERSECT == queryPredicate);
+        MONGO_verify(GeoExpression::INTERSECT == queryPredicate);
         return queryGeom.intersects(*geometry);
     }
 }

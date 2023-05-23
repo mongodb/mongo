@@ -456,7 +456,7 @@ BSONObj writeBsonArrayToFile(const BSONObj& args, void* data) {
 BSONObj getHostName(const BSONObj& a, void* data) {
     uassert(13411, "getHostName accepts no arguments", a.nFields() == 0);
     char buf[260];  // HOST_NAME_MAX is usually 255
-    verify(gethostname(buf, 260) == 0);
+    MONGO_verify(gethostname(buf, 260) == 0);
     buf[259] = '\0';
     return BSON("" << buf);
 }

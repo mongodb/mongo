@@ -817,7 +817,7 @@ public:
 
     /// Get next item and advance iterator
     Document::FieldPair next() {
-        verify(more());
+        MONGO_verify(more());
 
         Document::FieldPair fp(_it->nameSD(), _it->val);
         _it.advance();

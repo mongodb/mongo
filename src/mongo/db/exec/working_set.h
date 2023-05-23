@@ -76,7 +76,7 @@ struct IndexKeyDatum {
 
             while (keyPatternIt.more()) {
                 BSONElement keyPatternElt = keyPatternIt.next();
-                verify(keyDataIt.more());
+                MONGO_verify(keyDataIt.more());
                 BSONElement keyDataElt = keyDataIt.next();
 
                 if (field == keyPatternElt.fieldName())

@@ -416,7 +416,7 @@ public:
 
     // Document uses these
     const ValueElement& getField(Position pos) const {
-        verify(pos.found());
+        MONGO_verify(pos.found());
         return *(_firstElement->plusBytes(pos.index));
     }
 
@@ -437,7 +437,7 @@ public:
     // MutableDocument uses these
     ValueElement& getField(Position pos) {
         _modified = true;
-        verify(pos.found());
+        MONGO_verify(pos.found());
         return *(_firstElement->plusBytes(pos.index));
     }
 

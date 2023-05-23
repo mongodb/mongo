@@ -60,7 +60,7 @@ MockRemoteDBServer::CircularBSONIterator::CircularBSONIterator(
 }
 
 StatusWith<BSONObj> MockRemoteDBServer::CircularBSONIterator::next() {
-    verify(_iter != _replyObjs.end());
+    MONGO_verify(_iter != _replyObjs.end());
 
     StatusWith<BSONObj> reply = _iter->isOK() ? StatusWith(_iter->getValue().copy()) : *_iter;
     ++_iter;

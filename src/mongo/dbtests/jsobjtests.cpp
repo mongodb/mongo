@@ -170,7 +170,7 @@ FieldCompareResult compareDottedFieldNames(const string& l,
           "compareDottedFieldNames ERROR  l: {l} r: {r}  TOO MANY LOOPS",
           "l"_attr = l,
           "r"_attr = r);
-    verify(0);
+    MONGO_verify(0);
     return SAME;  // will never get here
 }
 }  // namespace mongo
@@ -290,9 +290,9 @@ public:
         }
         {
             BSONObj k = BSON("x" << 1);
-            verify(k.isFieldNamePrefixOf(BSON("x"
-                                              << "hi")));
-            verify(!k.isFieldNamePrefixOf(BSON("a" << 1)));
+            MONGO_verify(k.isFieldNamePrefixOf(BSON("x"
+                                                    << "hi")));
+            MONGO_verify(!k.isFieldNamePrefixOf(BSON("a" << 1)));
         }
     }
 };

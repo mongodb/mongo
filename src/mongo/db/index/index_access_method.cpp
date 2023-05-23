@@ -223,7 +223,7 @@ SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry
     : _indexCatalogEntry(btreeState),
       _descriptor(btreeState->descriptor()),
       _newInterface(std::move(btree)) {
-    verify(IndexDescriptor::isIndexVersionSupported(_descriptor->version()));
+    MONGO_verify(IndexDescriptor::isIndexVersionSupported(_descriptor->version()));
 }
 
 Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
