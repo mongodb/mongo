@@ -1587,6 +1587,7 @@ buildvariants:
     scons_cache_mode: all
     resmoke_jobs_factor: 0.5
     bv_future_git_tag: r100.0.0-9999
+    compile_variant: linux-x86-dynamic-compile-future-tag-multiversion
     test_flags: >-
       --excludeWithAnyTags=future_git_tag_incompatible
   depends_on:
@@ -1597,12 +1598,16 @@ buildvariants:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: archive_dist_test_debug
-    variant: *linux_x86_dynamic_compile_variant_name
+  - name: archive_dist_test
+    variant: linux-x86-dynamic-compile-future-tag-multiversion
   tasks:
   - name: .multiversion !.future_git_tag_incompatible
   - name: .multiversion_future_git_tag
-  - name: generate_buildid_to_debug_symbols_mapping
+  # This task does not work because it depends on archive_dist_test_debug
+  # Because we override the task dependencies in the future git tag varients we can't have
+  # multiple tasks in one varient depend on muliple different compile variant tasks
+  # If we decide we need this task we can add it to its own variant that depends on archive_dist_test_debug
+  # - name: generate_buildid_to_debug_symbols_mapping
 
 # This variant exists becuase this is the only way to correctly have
 # enterprise-rhel-80-64-bit-future-git-tag-multiversion depend the the "correct" version_expansions_gen task
