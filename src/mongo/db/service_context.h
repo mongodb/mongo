@@ -31,8 +31,8 @@
 
 #include <boost/optional.hpp>
 #include <functional>
+#include <iostream>
 #include <list>
-#include <memory>
 #include <vector>
 
 #include "mongo/db/operation_id.h"
@@ -52,8 +52,6 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/uuid.h"
-
-#include <iostream>
 
 namespace mongo {
 

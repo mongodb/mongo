@@ -57,7 +57,7 @@ class Locker {
 public:
     using LockTimeoutCallback = std::function<void()>;
 
-    virtual ~Locker();
+    virtual ~Locker() = default;
 
     /**
      * Returns true if this is an instance of LockerNoop. Because LockerNoop doesn't implement many

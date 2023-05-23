@@ -30,11 +30,9 @@
 #include "mongo/db/shard_role.h"
 
 #include <boost/utility/in_place_factory.hpp>
-#include <exception>
 #include <map>
 
 #include "mongo/db/catalog/catalog_helper.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/concurrency/exception_util.h"

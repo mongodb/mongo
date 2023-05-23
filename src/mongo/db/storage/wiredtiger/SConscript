@@ -104,7 +104,6 @@ wtEnv.Library(
         'wiredtiger_global_options.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
@@ -114,6 +113,7 @@ wtEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],

@@ -46,7 +46,7 @@ public:
 
     void onDestroyClient(Client* client) final {}
 
-    void onCreateOperationContext(OperationContext* opCtx) override;
+    void onCreateOperationContext(OperationContext* opCtx) final;
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}
 };

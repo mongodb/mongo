@@ -53,7 +53,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/concurrency_adjustment_parameters',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
     ],
     LIBDEPS_PRIVATE=[
@@ -61,6 +60,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/split_horizon.h"
 
 #include <utility>
@@ -39,15 +36,12 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-
-using namespace std::literals::string_literals;
-
-using std::begin;
-using std::end;
-
 namespace mongo {
 namespace repl {
 namespace {
+
+using namespace std::literals::string_literals;
+
 const auto getSplitHorizonParameters = Client::declareDecoration<SplitHorizon::Parameters>();
 
 using AllMappings = SplitHorizon::AllMappings;
@@ -125,8 +119,10 @@ SplitHorizon::ForwardMapping computeForwardMappings(
 
         const auto horizonEntries = [&] {
             std::vector<MapMember> rv;
-            std::transform(
-                begin(*horizonsObject), end(*horizonsObject), inserter(rv, end(rv)), convert);
+            std::transform(std::begin(*horizonsObject),
+                           std::end(*horizonsObject),
+                           inserter(rv, end(rv)),
+                           convert);
             return rv;
         }();
 
