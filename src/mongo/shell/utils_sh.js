@@ -234,19 +234,27 @@ sh.startBalancer = function(timeoutMs, interval) {
 sh.startAutoMerger = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    return assert.commandWorked(
-        configDB.settings.update({_id: 'automerge'},
-                                 {$set: {enabled: true}},
-                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
+
+    // Set retryable write since mongos doesn't do it automatically.
+    const mongosSession = configDB.getMongo().startSession({retryWrites: true});
+    const sessionConfigDB = mongosSession.getDatabase('config');
+    return assert.commandWorked(sessionConfigDB.settings.update(
+        {_id: 'automerge'},
+        {$set: {enabled: true}},
+        {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
 };
 
 sh.stopAutoMerger = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    return assert.commandWorked(
-        configDB.settings.update({_id: 'automerge'},
-                                 {$set: {enabled: false}},
-                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
+
+    // Set retryable write since mongos doesn't do it automatically.
+    const mongosSession = configDB.getMongo().startSession({retryWrites: true});
+    const sessionConfigDB = mongosSession.getDatabase('config');
+    return assert.commandWorked(sessionConfigDB.settings.update(
+        {_id: 'automerge'},
+        {$set: {enabled: false}},
+        {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
 };
 
 sh.shouldAutoMerge = function(configDB) {
