@@ -128,7 +128,7 @@ protected:
         auto opCtx = makeOperationContext();
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+        opCtx->getClient()->swapLockState(std::make_unique<LockerNoop>());
         return opCtx;
     }
 
@@ -144,7 +144,7 @@ protected:
             auto opCtx = client->makeOperationContext();
             opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
                                    WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-            opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+            opCtx->getClient()->swapLockState(std::make_unique<LockerNoop>());
 
             opCtxs.emplace_back(std::move(client), std::move(opCtx));
         }

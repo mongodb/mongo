@@ -46,6 +46,7 @@ env.Library(
         'lock_stats.cpp',
         'locker.cpp',
         'locker_impl.cpp',
+        'locker_impl_client_observer.cpp',
         'replication_state_transition_lock_guard.cpp',
         'resource_catalog.cpp',
     ],

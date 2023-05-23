@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <sstream>
 #include <string>
 
@@ -47,11 +44,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-
 namespace mongo {
-
-using std::string;
-using std::stringstream;
+namespace {
 
 class WiredTigerConnection {
 public:
@@ -62,7 +56,7 @@ public:
         std::stringstream ss;
         ss << "create,";
         ss << extraStrings;
-        string config = ss.str();
+        std::string config = ss.str();
         _fastClockSource = std::make_unique<SystemClockSource>();
         int ret = wiredtiger_open(dbpath.toString().c_str(), eventHandler, config.c_str(), &_conn);
         ASSERT_OK(wtRCToStatus(ret, nullptr));
@@ -540,4 +534,6 @@ TEST_F(WiredTigerUtilTest, RemoveEncryptionFromConfigString) {
         ASSERT_EQUALS(input, expectedOutput);
     }
 }
+
+}  // namespace
 }  // namespace mongo

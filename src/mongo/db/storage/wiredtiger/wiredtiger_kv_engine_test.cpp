@@ -132,7 +132,7 @@ protected:
         opCtx->setRecoveryUnit(
             std::unique_ptr<RecoveryUnit>(_helper.getEngine()->newRecoveryUnit()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+        opCtx->getClient()->swapLockState(std::make_unique<LockerNoop>());
         return opCtx;
     }
 

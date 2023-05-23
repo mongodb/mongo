@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,27 +29,24 @@
 
 #pragma once
 
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/concurrency/locker_mongos.h"
 
 namespace mongo {
 
 /**
- * ServiceContext hook that ensures OperationContexts are created with a valid
- * Locker instance. Intended for use in mongos.
+ * ServiceContext hook that ensures OperationContexts are created with a valid Locker instance.
  */
-class LockerMongosClientObserver : public ServiceContext::ClientObserver {
+class LockerImplClientObserver : public ServiceContext::ClientObserver {
 public:
-    LockerMongosClientObserver() = default;
-    ~LockerMongosClientObserver() = default;
+    LockerImplClientObserver();
+    ~LockerImplClientObserver();
 
     void onCreateClient(Client* client) final {}
 
     void onDestroyClient(Client* client) final {}
 
-    void onCreateOperationContext(OperationContext* opCtx) final {
-        opCtx->setLockState(std::make_unique<LockerMongos>());
-    }
+    void onCreateOperationContext(OperationContext* opCtx) override;
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}
 };

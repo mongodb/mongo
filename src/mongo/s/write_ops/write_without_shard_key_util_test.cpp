@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/unittest/unittest.h"
@@ -90,7 +90,7 @@ public:
     void setUp() override {
         ServiceContextTest::setUp();
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtx = makeOperationContext();
     }
 

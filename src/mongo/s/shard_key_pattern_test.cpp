@@ -28,10 +28,10 @@
  */
 
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/unittest/death_test.h"
 
@@ -42,7 +42,7 @@ class ShardKeyPatternTest : public ServiceContextTest {
 protected:
     ShardKeyPatternTest() {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }

@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_version_factory.h"
@@ -122,7 +122,7 @@ class BulkWriteOpTest : public ServiceContextTest {
 protected:
     BulkWriteOpTest() {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }

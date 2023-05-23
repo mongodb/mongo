@@ -47,6 +47,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -76,7 +77,6 @@
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/commands/kill_sessions_remote.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
@@ -984,8 +984,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
 
     try {
         auto serviceContextHolder = ServiceContext::make();
-        serviceContextHolder->registerClientObserver(
-            std::make_unique<LockerMongosClientObserver>());
+        serviceContextHolder->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         setGlobalServiceContext(std::move(serviceContextHolder));
     } catch (...) {
         auto cause = exceptionToStatus();

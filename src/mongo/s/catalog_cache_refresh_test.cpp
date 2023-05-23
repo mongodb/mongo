@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_noop.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -163,17 +163,8 @@ TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
     ASSERT_EQ(2, cri.cm.numChunks());
 }
 
-class MockLockerAlwaysReportsToBeLocked : public LockerNoop {
-public:
-    using LockerNoop::LockerNoop;
-
-    bool isLocked() const final {
-        return true;
-    }
-};
-
 DEATH_TEST_F(CatalogCacheRefreshTest, ShouldFailToRefreshWhenLocksAreHeld, "Invariant") {
-    operationContext()->setLockState(std::make_unique<MockLockerAlwaysReportsToBeLocked>());
+    Lock::GlobalLock globalLock(operationContext(), MODE_X);
     scheduleRoutingInfoUnforcedRefresh(kNss);
 }
 

@@ -32,30 +32,13 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
 namespace {
-
-class LockerImplClientObserver : public ServiceContext::ClientObserver {
-public:
-    LockerImplClientObserver() = default;
-    ~LockerImplClientObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-
-    void onDestroyClient(Client* client) final {}
-
-    void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
-
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
 
 const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
     "CollectionCatalogBenchmarkClientObserver",

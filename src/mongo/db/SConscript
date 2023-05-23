@@ -2138,17 +2138,15 @@ env.Library(
         'service_context_d_test_fixture.cpp',
     ],
     LIBDEPS=[
+        'service_context_d',
         'service_context_test_fixture',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'catalog/catalog_impl',
-        'catalog/database_holder',
         'commands/mongod',
-        'index/index_access_method',
         'index_builds_coordinator_mongod',
         's/sharding_runtime_d',
-        'service_context_d',
         'storage/devnull/storage_devnull',
         'storage/storage_control',
         'storage/storage_options',
@@ -2421,23 +2419,11 @@ env.Library(
         'read_write_concern_defaults_cache_lookup_mongod.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        # NOTE: Do not add new libdeps (public or private) here unless
-        # required by the linker to satisfy symbol dependencies from
-        # the files listed above in `sources`. If you need to add a
-        # library to inject a static or mongo initializer to mongod,
-        # please add that library as a private libdep of
-        # mongod_initializers.
+        # NOTE: Do not add new libdeps (public or private) here unless required by the linker to
+        # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongod, please add that library as a
+        # private libdep of mongod_initializers.
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/change_collection_expired_change_remover',
-        '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
-        '$BUILD_DIR/mongo/db/change_stream_options_manager',
-        '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
-        '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
-        '$BUILD_DIR/mongo/db/query/stats/query_stats',
-        '$BUILD_DIR/mongo/db/s/query_analysis_writer',
-        '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
-        '$BUILD_DIR/mongo/db/set_change_stream_state_coordinator',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_initializer',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_op_observer',
@@ -2459,8 +2445,13 @@ env.Library(
         'auth/auth_op_observer',
         'catalog/catalog_helpers',
         'catalog/catalog_impl',
+        'catalog/collection_crud',
         'catalog/health_log',
         'catalog/health_log_interface',
+        'change_collection_expired_change_remover',
+        'change_stream_change_collection_manager',
+        'change_stream_options_manager',
+        'change_streams_cluster_parameter',
         'commands/mongod',
         'commands/mongod_fsync',
         'commands/test_commands',
@@ -2483,7 +2474,9 @@ env.Library(
         'op_observer/oplog_writer_transaction_proxy',
         'op_observer/user_write_block_mode_op_observer',
         'periodic_runner_job_abort_expired_transactions',
+        'pipeline/change_stream_expired_pre_image_remover',
         'pipeline/process_interface/mongod_process_interface_factory',
+        'query/stats/query_stats',
         'repl/drop_pending_collection_reaper',
         'repl/initial_syncer',
         'repl/repl_coordinator_impl',
@@ -2495,6 +2488,7 @@ env.Library(
         'repl/tenant_migration_recipient_service',
         'repl/topology_coordinator',
         'repl/wait_for_majority_service',
+        's/query_analysis_writer',
         's/sessions_collection_config_server',
         's/sharding_commands_d',
         's/sharding_runtime_d',
@@ -2504,9 +2498,11 @@ env.Library(
         'service_liaison_mongod',
         'session/kill_sessions',
         'session/kill_sessions_local',
+        'session/logical_session_cache_impl',
         'session/session_catalog_mongod',
         'session/sessions_collection_rs',
         'session/sessions_collection_standalone',
+        'set_change_stream_state_coordinator',
         'shard_role',
         'startup_recovery',
         'startup_warnings_mongod',
@@ -2516,7 +2512,6 @@ env.Library(
         'storage/flow_control_parameters',
         'storage/oplog_cap_maintainer_thread',
         'storage/storage_control',
-        'storage/storage_engine_common',
         'system_index',
         'timeseries/timeseries_op_observer',
         'ttl_d',
@@ -2544,29 +2539,27 @@ if env.TargetOSIs('windows'):
     env.Depends("mongod.res", generatedDbManifest)
 
 env.Program(
-    target="mongod",
-    source=['mongod.cpp'] + env.WindowsResourceFile("mongod.rc"),
+    target='mongod',
+    source=['mongod.cpp'] + env.WindowsResourceFile('mongod.rc'),
     LIBDEPS=[
-        # NOTE: Do not add new libdeps (public or private) here unless
-        # required by the linker to satisfy symbol dependencies from
-        # the files listed above in `sources`. If you need to add a
-        # library to inject a static or mongo initializer to mongod,
-        # please add that library as a private libdep of
-        # mongod_initializers.
-        '$BUILD_DIR/mongo/base',
+        # NOTE: Do not add new libdeps (public or private) here unless required by the linker to
+        # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongod, please add that library as a
+        # private libdep of mongod_initializers.
         'mongod_main',
+        'server_base',
     ],
-    AIB_COMPONENT="mongod",
+    AIB_COMPONENT='mongod',
     AIB_COMPONENTS_EXTRA=[
-        "core",
-        "default",
-        "devcore",
-        "dist",
-        "dist-test",
-        "integration-tests",
-        "serverless",
-        "serverless-test",
-        "servers",
+        'core',
+        'default',
+        'devcore',
+        'dist',
+        'dist-test',
+        'integration-tests',
+        'serverless',
+        'serverless-test',
+        'servers',
     ],
 )
 
@@ -2753,7 +2746,6 @@ if wiredtiger:
             'server_base',
             'server_options_servers',
             'service_context',
-            'service_context_d',
             'service_context_d_test_fixture',
             'service_context_devnull_test_fixture',
             'service_context_test_fixture',
