@@ -57,6 +57,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/async_rpc_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -706,12 +707,19 @@ void executeMetadataChangesInTxn(
                                             ShardingCatalogClient::kLocalWriteConcern);
 }
 
-BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
+std::shared_ptr<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>
+makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
+                                         const std::shared_ptr<executor::TaskExecutor>& exec,
+                                         CancellationToken token,
+                                         async_rpc::GenericArgs args) {
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
-    return cmd.toBSON(
-        BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON()));
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<FlushRoutingTableCacheUpdatesWithWriteConcern>>(
+            cmd, exec, token, args);
+    return opts;
 }
 
 }  // namespace
@@ -1163,13 +1171,12 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             initialChunks};
 }
 
-void ReshardingCoordinatorExternalStateImpl::sendCommandToShards(
+template <typename CommandType>
+void ReshardingCoordinatorExternalState::sendCommandToShards(
     OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, dbName, command, shardIds, executor);
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
+    const std::vector<ShardId>& shardIds) {
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
@@ -1330,22 +1337,33 @@ void markCompleted(const Status& status, ReshardingMetrics* metrics) {
     }
 }
 
-BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss,
-                                                const UUID& reshardingUUID) {
+std::shared_ptr<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>
+createFlushReshardingStateChangeOptions(const NamespaceString& nss,
+                                        const UUID& reshardingUUID,
+                                        const std::shared_ptr<executor::TaskExecutor>& exec,
+                                        CancellationToken token,
+                                        async_rpc::GenericArgs args) {
     _flushReshardingStateChange cmd(nss);
     cmd.setDbName(DatabaseName::kAdmin);
     cmd.setReshardingUUID(reshardingUUID);
-    return cmd.toBSON(
-        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>(
+        cmd, exec, token, args);
+    return opts;
 }
 
-BSONObj createShardsvrCommitReshardCollectionCmd(const NamespaceString& nss,
-                                                 const UUID& reshardingUUID) {
+std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitReshardCollection>>
+createShardsvrCommitReshardCollectionOptions(const NamespaceString& nss,
+                                             const UUID& reshardingUUID,
+                                             const std::shared_ptr<executor::TaskExecutor>& exec,
+                                             CancellationToken token,
+                                             async_rpc::GenericArgs args) {
     ShardsvrCommitReshardCollection cmd(nss);
     cmd.setDbName(DatabaseName::kAdmin);
     cmd.setReshardingUUID(reshardingUUID);
-    return cmd.toBSON(
-        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitReshardCollection>>(
+        cmd, exec, token, args);
+    return opts;
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarted(
@@ -2247,13 +2265,14 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                     Grid::get(opCtx.get())->shardRegistry()->getAllShardIds(opCtx.get());
                 const auto& nss = coordinatorDoc.getSourceNss();
                 const auto& notMatchingThisUUID = coordinatorDoc.getReshardingUUID();
-                // TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0
-                // is lastLTS.
-                const auto cmdObj =
-                    ShardsvrDropCollectionIfUUIDNotMatchingRequest(nss, notMatchingThisUUID)
-                        .toBSON({});
+                const auto cmd =
+                    ShardsvrDropCollectionIfUUIDNotMatchingRequest(nss, notMatchingThisUUID);
+
+                auto opts = std::make_shared<
+                    async_rpc::AsyncRPCOptions<ShardsvrDropCollectionIfUUIDNotMatchingRequest>>(
+                    cmd, **executor, _ctHolder->getStepdownToken());
                 _reshardingCoordinatorExternalState->sendCommandToShards(
-                    opCtx.get(), nss.db(), cmdObj, allShardIds, **executor);
+                    opCtx.get(), opts, allShardIds);
             }
 
             reshardingPauseCoordinatorBeforeRemovingStateDoc.pauseWhileSetAndNotCanceled(
@@ -2288,8 +2307,10 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 }
 
+template <typename CommandType>
 void ReshardingCoordinator::_sendCommandToAllParticipants(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     auto donorShardIds =
         resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
@@ -2299,53 +2320,53 @@ void ReshardingCoordinator::_sendCommandToAllParticipants(
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
-        opCtx.get(),
-        DatabaseName::kAdmin.db(),
-        command,
-        {participantShardIds.begin(), participantShardIds.end()},
-        **executor);
+        opCtx.get(), opts, {participantShardIds.begin(), participantShardIds.end()});
 }
 
+template <typename CommandType>
 void ReshardingCoordinator::_sendCommandToAllRecipients(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     auto recipientShardIds =
         resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
-        opCtx.get(),
-        DatabaseName::kAdmin.db(),
-        command,
-        {recipientShardIds.begin(), recipientShardIds.end()},
-        **executor);
+        opCtx.get(), opts, {recipientShardIds.begin(), recipientShardIds.end()});
 }
 
+template <typename CommandType>
 void ReshardingCoordinator::_sendCommandToAllDonors(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     auto donorShardIds =
         resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
-        opCtx.get(),
-        DatabaseName::kAdmin.db(),
-        command,
-        {donorShardIds.begin(), donorShardIds.end()},
-        **executor);
+        opCtx.get(), opts, {donorShardIds.begin(), donorShardIds.end()});
 }
 
 void ReshardingCoordinator::_establishAllDonorsAsParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
-    auto flushCmd = makeFlushRoutingTableCacheUpdatesCmd(_coordinatorDoc.getSourceNss());
-    _sendCommandToAllDonors(executor, flushCmd);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = makeFlushRoutingTableCacheUpdatesOptions(
+        _coordinatorDoc.getSourceNss(), **executor, _ctHolder->getStepdownToken(), args);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    _sendCommandToAllDonors(executor, opts);
 }
 
 void ReshardingCoordinator::_establishAllRecipientsAsParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
-    auto flushCmd = makeFlushRoutingTableCacheUpdatesCmd(_coordinatorDoc.getTempReshardingNss());
-    _sendCommandToAllRecipients(executor, flushCmd);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = makeFlushRoutingTableCacheUpdatesOptions(
+        _coordinatorDoc.getTempReshardingNss(), **executor, _ctHolder->getStepdownToken(), args);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    _sendCommandToAllRecipients(executor, opts);
 }
 
 void ReshardingCoordinator::_tellAllRecipientsToRefresh(
@@ -2360,32 +2381,49 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
         nssToRefresh = _coordinatorDoc.getSourceNss();
     }
 
-    auto refreshCmd =
-        createFlushReshardingStateChangeCommand(nssToRefresh, _coordinatorDoc.getReshardingUUID());
-    _sendCommandToAllRecipients(executor, refreshCmd);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = createFlushReshardingStateChangeOptions(nssToRefresh,
+                                                        _coordinatorDoc.getReshardingUUID(),
+                                                        **executor,
+                                                        _ctHolder->getStepdownToken(),
+                                                        args);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    _sendCommandToAllRecipients(executor, opts);
 }
 
 void ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto refreshCmd = createFlushReshardingStateChangeCommand(_coordinatorDoc.getSourceNss(),
-                                                              _coordinatorDoc.getReshardingUUID());
-    _sendCommandToAllDonors(executor, refreshCmd);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = createFlushReshardingStateChangeOptions(_coordinatorDoc.getSourceNss(),
+                                                        _coordinatorDoc.getReshardingUUID(),
+                                                        **executor,
+                                                        _ctHolder->getStepdownToken(),
+                                                        args);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    _sendCommandToAllDonors(executor, opts);
 }
 
 void ReshardingCoordinator::_tellAllParticipantsToCommit(
     const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto commitCmd =
-        createShardsvrCommitReshardCollectionCmd(nss, _coordinatorDoc.getReshardingUUID());
-    _sendCommandToAllParticipants(executor, commitCmd);
+    auto opts = createShardsvrCommitReshardCollectionOptions(
+        nss, _coordinatorDoc.getReshardingUUID(), **executor, _ctHolder->getStepdownToken(), {});
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    _sendCommandToAllParticipants(executor, opts);
 }
 
 void ReshardingCoordinator::_tellAllParticipantsToAbort(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, bool isUserAborted) {
     ShardsvrAbortReshardCollection abortCmd(_coordinatorDoc.getReshardingUUID(), isUserAborted);
+    // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
+    // TODO SERVER-62491: Use system tenant id.
     abortCmd.setDbName(DatabaseName::kAdmin);
-    _sendCommandToAllParticipants(executor,
-                                  abortCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                                       << WriteConcernOptions::Majority)));
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrAbortReshardCollection>>(
+        abortCmd, **executor, _ctHolder->getStepdownToken(), args);
+    _sendCommandToAllParticipants(executor, opts);
 }
 
 void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& nss) {

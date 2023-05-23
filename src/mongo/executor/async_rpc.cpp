@@ -33,7 +33,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
-#include <vector>
 
 namespace mongo::async_rpc {
 namespace detail {
@@ -82,7 +81,7 @@ public:
             .then([targetsUsed](TaskExecutor::ResponseOnAnyStatus r) {
                 auto s = makeErrorIfNeeded(r, *targetsUsed);
                 uassertStatusOK(s);
-                return AsyncRPCInternalResponse{r.data, r.target.get()};
+                return AsyncRPCInternalResponse{r.data, r.target.get(), *r.elapsed};
             });
     }
 };

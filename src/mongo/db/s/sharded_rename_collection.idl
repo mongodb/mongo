@@ -80,6 +80,7 @@ commands:
                 type: uuid
                 description: "ID of the existing collection getting dropped."
                 optional: true
+        reply_type: OkReply
 
     _shardsvrRenameCollectionParticipantUnblock:
         command_name: _shardsvrRenameCollectionParticipantUnblock
@@ -94,6 +95,7 @@ commands:
             sourceUUID:
                 type: uuid
                 description: "ID of the collection getting renamed."
+        reply_type: OkReply
 
 structs:
     RenameCollectionCoordinatorDocument:

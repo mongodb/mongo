@@ -31,12 +31,14 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -47,8 +49,11 @@
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_error_info.h"
+#include "mongo/executor/async_rpc_util.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -306,10 +311,12 @@ void checkCollectionUUIDConsistencyAcrossShards(
     const std::vector<mongo::ShardId>& shardIds,
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     const BSONObj filterObj = BSON("name" << nss.coll());
-    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
-
-    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, nss.db().toString(), cmdObj, shardIds, **executor);
+    ListCollections command;
+    command.setFilter(filterObj);
+    command.setDbName(nss.dbName());
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
+        command, **executor, CancellationToken::uncancelable());
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     struct MismatchedShard {
         std::string shardId;
@@ -356,10 +363,12 @@ void checkTargetCollectionDoesNotExistInCluster(
     const std::vector<mongo::ShardId>& shardIds,
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     const BSONObj filterObj = BSON("name" << toNss.coll());
-    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
-
-    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, toNss.db(), cmdObj, shardIds, **executor);
+    ListCollections command;
+    command.setFilter(filterObj);
+    command.setDbName(toNss.dbName());
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
+        command, **executor, CancellationToken::uncancelable());
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     std::vector<std::string> shardsContainingTargetCollection;
     for (const auto& cmdResponse : responses) {
@@ -396,23 +405,6 @@ void linearizeCSRSReads(OperationContext* opCtx) {
         NamespaceString::kServerConfigurationNamespace.ns(),
         {},
         ShardingCatalogClient::kMajorityWriteConcern));
-}
-
-std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
-    OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
-
-    // The AsyncRequestsSender ignore impersonation metadata so we need to manually attach them to
-    // the command
-    BSONObjBuilder bob(command);
-    rpc::writeAuthDataToImpersonatedUserMetadata(opCtx, &bob);
-    WriteBlockBypass::get(opCtx).writeAsMetadata(&bob);
-    auto authenticatedCommand = bob.obj();
-    return sharding_util::sendCommandToShards(
-        opCtx, dbName, authenticatedCommand, shardIds, executor);
 }
 
 void removeTagsMetadataFromConfig(OperationContext* opCtx,
@@ -819,13 +811,12 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
                                        const OperationSessionInfo& osi,
                                        const std::shared_ptr<executor::TaskExecutor>& executor) {
     const auto updateOp = buildNoopWriteRequestCommand();
-
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx,
-        updateOp.getDbName().db(),
-        CommandHelpers::appendMajorityWriteConcern(updateOp.toBSON(osi.toBSON())),
-        shardIds,
-        executor);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
+        updateOp, executor, CancellationToken::uncancelable(), args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void performNoopMajorityWriteLocally(OperationContext* opCtx) {
@@ -855,12 +846,12 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   bool fromMigrate) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
-
-    const auto cmdObj =
-        CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
-
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, nss.db(), cmdObj.addFields(osi.toBSON()), shardIds, executor);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
+        dropCollectionParticipant, executor, CancellationToken::uncancelable(), args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to) {

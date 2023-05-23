@@ -41,6 +41,7 @@ imports:
     - "mongo/db/s/forwardable_operation_metadata.idl"
     - "mongo/db/write_concern_options.idl"       
     - "mongo/rpc/metadata/client_metadata.idl"
+    - "mongo/rpc/metadata/impersonated_user_metadata.idl"
     - "mongo/s/sharding_types.idl"
 
 # This file lists the generic arguments accepted by all commands, and generic
@@ -139,7 +140,7 @@ structs:
         is_generic_cmd_list: "arg"
         fields:
             $audit:
-                type: AuthenticationMetadata
+                type: ImpersonatedUserMetadata
                 cpp_name: "dollarAudit"
                 forward_to_shards: false
                 optional: true

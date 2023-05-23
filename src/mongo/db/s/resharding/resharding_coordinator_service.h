@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/executor/async_rpc.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -111,23 +112,16 @@ public:
     boost::optional<CollectionIndexes> getCatalogIndexVersionForCommit(OperationContext* opCtx,
                                                                        const NamespaceString& nss);
 
-    virtual void sendCommandToShards(OperationContext* opCtx,
-                                     StringData dbName,
-                                     const BSONObj& command,
-                                     const std::vector<ShardId>& shardIds,
-                                     const std::shared_ptr<executor::TaskExecutor>& executor) = 0;
+    template <typename CommandType>
+    void sendCommandToShards(OperationContext* opCtx,
+                             std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
+                             const std::vector<ShardId>& shardIds);
 };
 
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
 public:
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
-
-    void sendCommandToShards(OperationContext* opCtx,
-                             StringData dbName,
-                             const BSONObj& command,
-                             const std::vector<ShardId>& shardIds,
-                             const std::shared_ptr<executor::TaskExecutor>& executor) override;
 };
 
 /**
@@ -477,12 +471,16 @@ private:
     /**
      * Sends the command to the specified participants asynchronously.
      */
+    template <typename CommandType>
     void _sendCommandToAllParticipants(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
+    template <typename CommandType>
     void _sendCommandToAllDonors(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                 const BSONObj& command);
+                                 std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
+    template <typename CommandType>
     void _sendCommandToAllRecipients(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                     const BSONObj& command);
+                                     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
 
     /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation

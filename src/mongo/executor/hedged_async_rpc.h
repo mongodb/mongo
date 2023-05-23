@@ -40,6 +40,7 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/executor/async_rpc_util.h"
 #include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/hedging_metrics.h"
 #include "mongo/executor/remote_command_response.h"
@@ -62,46 +63,6 @@ namespace mongo {
 namespace async_rpc {
 
 namespace hedging_rpc_details {
-/**
- * Given a vector of input Futures, whenAnyThat returns a Future which holds the value
- * of the first of those futures to resolve with a status, value, and index that
- * satisfies the conditions in the ConditionCallable Callable.
- */
-template <typename SingleResponse, typename ConditionCallable>
-Future<SingleResponse> whenAnyThat(std::vector<ExecutorFuture<SingleResponse>>&& futures,
-                                   ConditionCallable&& shouldAccept) {
-    invariant(futures.size() > 0);
-
-    struct SharedBlock {
-        SharedBlock(Promise<SingleResponse> result) : resultPromise(std::move(result)) {}
-        // Tracks whether or not the resultPromise has been set.
-        AtomicWord<bool> done{false};
-        // The promise corresponding to the resulting SemiFuture returned by this function.
-        Promise<SingleResponse> resultPromise;
-    };
-
-    Promise<SingleResponse> promise{NonNullPromiseTag{}};
-    auto future = promise.getFuture();
-    auto sharedBlock = std::make_shared<SharedBlock>(std::move(promise));
-
-    for (size_t i = 0; i < futures.size(); ++i) {
-        std::move(futures[i])
-            .getAsync(
-                [sharedBlock, myIndex = i, shouldAccept](StatusOrStatusWith<SingleResponse> value) {
-                    if (shouldAccept(value, myIndex)) {
-                        // If this is the first input future to complete and satisfy the
-                        // shouldAccept condition, change done to true and set the value on the
-                        // promise.
-                        if (!sharedBlock->done.swap(true)) {
-                            sharedBlock->resultPromise.setFrom(std::move(value));
-                        }
-                    }
-                });
-    }
-
-    return future;
-}
-
 HedgingMetrics* getHedgingMetrics(ServiceContext* svcCtx) {
     auto hm = HedgingMetrics::get(svcCtx);
     invariant(hm);
@@ -269,7 +230,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                  * "authoritative" request. This is the codepath followed when we are not
                  * hedging or there is only 1 target provided.
                  */
-                return hedging_rpc_details::whenAnyThat(
+                return whenAnyThat(
                            std::move(requests),
                            [&](StatusWith<SingleResponse> response, size_t index) {
                                Status commandStatus = response.getStatus();

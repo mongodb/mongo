@@ -314,6 +314,7 @@ commands:
         api_version: ""
         cpp_name: ShardsvrDropDatabaseParticipant
         strict: false
+        reply_type: OkReply
 
     _shardsvrDropCollection:
         description: "Parser for the _shardsvrDropCollection command"
@@ -340,6 +341,7 @@ commands:
                 type: bool 
                 description: "Whether the drop comes as a result of an interrupted migration process."
                 optional: true
+        reply_type: OkReply
 
     _shardsvrRenameCollection:
         command_name: _shardsvrRenameCollection
@@ -356,6 +358,7 @@ commands:
                               C2C needs to do the renames to replicate create collection."
                 type: bool
                 optional: true
+        reply_type: OkReply
 
     _shardsvrSetAllowMigrations:
         command_name: _shardsvrSetAllowMigrations

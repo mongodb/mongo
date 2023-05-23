@@ -29,16 +29,31 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/write_block_bypass.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_error_info.h"
+#include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/executor/async_rpc_util.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/async_rpc_shard_retry_policy.h"
+#include "mongo/s/async_rpc_shard_targeter.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 
 namespace mongo {
 
@@ -60,12 +75,65 @@ void linearizeCSRSReads(OperationContext* opCtx);
 /**
  * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
  */
+template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor);
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
+    const std::vector<ShardId>& shardIds) {
+    if (shardIds.size() == 0) {
+        return {};
+    }
+
+    // AsyncRPC ignores impersonation metadata so we need to manually attach them to
+    // the command
+    if (auto meta = rpc::getAuthDataToImpersonatedUserMetadata(opCtx)) {
+        originalOpts->genericArgs.unstable.setDollarAudit(*meta);
+    }
+    originalOpts->genericArgs.unstable.setMayBypassWriteBlocking(
+        WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
+
+    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>> futures;
+    auto indexToShardId = std::make_shared<stdx::unordered_map<int, ShardId>>();
+
+    for (size_t i = 0; i < shardIds.size(); ++i) {
+        ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly);
+        std::unique_ptr<async_rpc::Targeter> targeter =
+            std::make_unique<async_rpc::ShardIdTargeter>(
+                shardIds[i], opCtx, readPref, originalOpts->exec);
+        bool startTransaction = originalOpts->genericArgs.stable.getStartTransaction()
+            ? *originalOpts->genericArgs.stable.getStartTransaction()
+            : false;
+        auto retryPolicy = std::make_shared<async_rpc::ShardRetryPolicyWithIsStartingTransaction>(
+            Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
+        auto opts =
+            std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(originalOpts->cmd,
+                                                                      originalOpts->exec,
+                                                                      originalOpts->token,
+                                                                      originalOpts->genericArgs,
+                                                                      retryPolicy);
+        futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
+        (*indexToShardId)[i] = shardIds[i];
+    }
+
+    auto responses = async_rpc::getAllResponsesOrFirstErrorWithCancellation<
+        AsyncRequestsSender::Response,
+        async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
+        std::move(futures),
+        originalOpts->token,
+        [indexToShardId](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
+                         size_t index) -> AsyncRequestsSender::Response {
+            BSONObjBuilder replyBob;
+            reply.response.serialize(&replyBob);
+            reply.genericReplyFields.stable.serialize(&replyBob);
+            reply.genericReplyFields.unstable.serialize(&replyBob);
+            return AsyncRequestsSender::Response{
+                (*indexToShardId)[index],
+                executor::RemoteCommandOnAnyResponse(
+                    reply.targetUsed, replyBob.obj(), reply.elapsed)};
+        });
+
+    return responses.get(opCtx);
+}
 
 /**
  * Erase tags metadata from config server for the given namespace, using the _configsvrRemoveTags

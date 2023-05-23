@@ -59,6 +59,7 @@ commands:
         namespace: type
         api_version: ""
         type: namespacestring
+        reply_type: OkReply
         fields:
             syncFromConfig:
                 type: bool
