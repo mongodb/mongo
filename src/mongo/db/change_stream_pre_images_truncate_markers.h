@@ -29,38 +29,44 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/util/concurrent_shared_values_map.h"
 
 /**
  * There is up to one 'config.system.preimages' collection per tenant. This pre-images
- * collection contains pre-images for every collection UUID with pre-images enabled on the tenant.
- * The pre-images collection is ordered by collection UUID, so that pre-images belonging to a given
- * collection are grouped together. Additionally, pre-images for a given collection UUID are stored
- * in timestamp order, which makes range truncation possible.
+ * collection contains pre-images for every collection 'nsUUID' with pre-images enabled on the
+ * tenant. The pre-images collection is ordered by collection 'nsUUID', so that pre-images belonging
+ * to a given collection are grouped together. Additionally, pre-images for a given collection
+ * 'nsUUID' are stored in timestamp order, which makes range truncation possible.
  *
- * Implementation of truncate markers for pre-images associated with a single collection UUID within
- * a pre-images collection.
+ * Implementation of truncate markers for pre-images associated with a single collection 'nsUUID'
+ * within a pre-images collection.
  */
 namespace mongo {
 
-class PreImagesTruncateMarkersPerCollection final
+class PreImagesTruncateMarkersPerNsUUID final
     : public CollectionTruncateMarkersWithPartialExpiration {
 public:
-    PreImagesTruncateMarkersPerCollection(boost::optional<TenantId> tenantId,
-                                          std::deque<Marker> markers,
-                                          int64_t leftoverRecordsCount,
-                                          int64_t leftoverRecordsBytes,
-                                          int64_t minBytesPerMarker);
+    PreImagesTruncateMarkersPerNsUUID(boost::optional<TenantId> tenantId,
+                                      std::deque<Marker> markers,
+                                      int64_t leftoverRecordsCount,
+                                      int64_t leftoverRecordsBytes,
+                                      int64_t minBytesPerMarker);
 
     /**
      * Creates an initial set of markers for pre-images from 'nsUUID'.
      */
-    static CollectionTruncateMarkers::InitialSetOfMarkers createTruncateMarkersByScanning(
+    static CollectionTruncateMarkers::InitialSetOfMarkers createInitialMarkersScanning(
         OperationContext* opCtx,
         RecordStore* rs,
         const UUID& nsUUID,
         RecordId& highestSeenRecordId,
-        Date_t& highestSeenWallTime);
+        Date_t& highestSeenWallTime,
+        int64_t minBytesPerMarker);
+
+    static CollectionTruncateMarkers::RecordIdAndWallTime getRecordIdAndWallTime(
+        const Record& record);
 
     /**
      * Returns whether there are no more markers and no partial marker pending creation.
@@ -80,5 +86,91 @@ private:
      * When initialized, indicates this is a serverless environment.
      */
     boost::optional<TenantId> _tenantId;
+};
+
+/**
+ * Manages the truncation of expired pre-images for pre-images collection(s). There is up to one
+ * "system.config.preimages" pre-images collection per tenant.
+ *
+ * In a single-tenant environment, there is only one "system.config.preimages" pre-images
+ * collection. In which case, the corresponding truncate markers are mapped to TenantId
+ * 'boost::none'.
+ *
+ * Responsible for constructing and managing truncate markers across tenants - and for each tenant,
+ * across all 'nsUUID's with pre-images enabled on the tenant.
+ */
+class PreImagesTruncateManager {
+public:
+    /**
+     * Statistcs for a truncate pass over a given tenant's pre-images collection.
+     */
+    struct TruncateStats {
+        int64_t bytesDeleted{0};
+        int64_t docsDeleted{0};
+
+        // The number of 'nsUUID's scanned in the truncate pass.
+        int64_t scannedInternalCollections{0};
+
+        // The maximum wall time from the pre-images truncated across the collection.
+        Date_t maxStartWallTime{};
+    };
+
+    /**
+     * If truncate markers do not exist for 'tenantId', create the initial set of markers by
+     * sampling or scanning records in the collection. Otherwise, this is a no-op.
+     */
+    void ensureMarkersInitialized(OperationContext* opCtx,
+                                  boost::optional<TenantId> tenantId,
+                                  const CollectionPtr& preImagesColl);
+
+    /*
+     * Truncates expired pre-images spanning the 'preImagesColl' associated with the 'tenantId'.
+     * Performs in-memory cleanup of the tenant's truncate markers whenever an underlying 'nsUUID'
+     * associated with pre-images is dropped.
+     */
+    TruncateStats truncateExpiredPreImages(OperationContext* opCtx,
+                                           boost::optional<TenantId> tenantId,
+                                           const CollectionPtr& preImagesColl);
+
+    /**
+     * Exclusively used when the config.preimages collection associated with 'tenantId' is dropped.
+     * All markers will be dropped immediately.
+     */
+    void dropAllMarkersForTenant(boost::optional<TenantId> tenantId);
+
+    /**
+     * Updates truncate markers to account for a newly inserted 'preImage' into the tenant's
+     * pre-images collection. If no truncate markers have been created for the 'tenantId's
+     * pre-images collection, this is a no-op.
+     */
+    void updateMarkersOnInsert(OperationContext* opCtx,
+                               boost::optional<TenantId> tenantId,
+                               const ChangeStreamPreImage& preImage,
+                               int64_t bytesInserted);
+
+    using TenantTruncateMarkers =
+        absl::flat_hash_map<UUID, std::shared_ptr<PreImagesTruncateMarkersPerNsUUID>, UUID::Hash>;
+    /**
+     * Similar to the 'TenantTruncateMarkers' type, but with an added wrapper which enables copy on
+     * write semantics.
+     */
+    using TenantTruncateMarkersCopyOnWrite =
+        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>;
+
+    static TenantTruncateMarkers createInitialTruncateMapScanning(
+        OperationContext* opCtx,
+        boost::optional<TenantId> tenantId,
+        const CollectionPtr& preImagesCollectionPtr);
+
+    static void initialisePreImagesCollectionTruncateMarkers(
+        OperationContext* opCtx,
+        boost::optional<TenantId> tenantId,
+        const CollectionPtr& preImagesCollectionPtr,
+        TenantTruncateMarkersCopyOnWrite& finalTruncateMap);
+
+private:
+    using TenantMap =
+        ConcurrentSharedValuesMap<boost::optional<TenantId>, TenantTruncateMarkersCopyOnWrite>;
+    TenantMap _tenantMap;
 };
 }  // namespace mongo

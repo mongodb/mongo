@@ -40,7 +40,7 @@ namespace change_stream_pre_image_util {
  * Returns pre-images expiry time in milliseconds since the epoch time if configured, boost::none
  * otherwise.
  *
- * Only suitable for a single-tenant enviornment. Otherwise, callers should defer to serverless
+ * Only suitable for a single-tenant environment. Otherwise, callers should defer to serverless
  * methods which compute expireAfterSeconds according to the tenantId.
  */
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime);
@@ -64,6 +64,8 @@ RecordId toRecordId(ChangeStreamPreImageId id);
 RecordIdBound getAbsoluteMinPreImageRecordIdBoundForNs(const UUID& nsUUID);
 RecordIdBound getAbsoluteMaxPreImageRecordIdBoundForNs(const UUID& nsUUID);
 
+UUID getPreImageNsUUID(const BSONObj& preImageObj);
+
 /**
  * Finds the next collection UUID in 'preImagesCollPtr' greater than 'currentNsUUID'. Returns
  * boost::none if the next collection is not found. Stores the wall time of the first record in the
@@ -76,7 +78,7 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
 
 /**
  * Preferred method for getting the current time in pre-image removal code - in testing
- * enviornments, the 'changeStreamPreImageRemoverCurrentTime' failpoint can alter the return value.
+ * environments, the 'changeStreamPreImageRemoverCurrentTime' failpoint can alter the return value.
  *
  * Returns the current time.
  */

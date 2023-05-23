@@ -99,183 +99,6 @@ bool useUnreplicatedTruncates() {
         serverGlobalParams.featureCompatibility);
     return res;
 }
-
-void truncateRange(OperationContext* opCtx,
-                   const CollectionPtr& preImagesColl,
-                   const RecordId& minRecordId,
-                   const RecordId& maxRecordId,
-                   int64_t bytesDeleted,
-                   int64_t docsDeleted) {
-    // The session might be in use from marker initialisation so we must
-    // reset it here in order to allow an untimestamped write.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    opCtx->recoveryUnit()->allowOneUntimestampedWrite();
-
-    WriteUnitOfWork wuow(opCtx);
-    auto rs = preImagesColl->getRecordStore();
-    auto status = rs->rangeTruncate(opCtx, minRecordId, maxRecordId, -bytesDeleted, -docsDeleted);
-    invariantStatusOK(status);
-    wuow.commit();
-}
-
-// Performs a ranged truncate over each expired marker in 'truncateMarkersForNss'. Updates the
-// "Output" parameters to communicate the respective docs deleted, bytes deleted, and and maximum
-// wall time of documents deleted to the caller.
-void truncateExpiredMarkersForCollection(
-    OperationContext* opCtx,
-    std::shared_ptr<PreImagesTruncateMarkersPerCollection> truncateMarkersForNss,
-    const CollectionPtr& preImagesColl,
-    const UUID& nsUUID,
-    const RecordId& minRecordIdForNs,
-    int64_t& totalDocsDeletedOutput,
-    int64_t& totalBytesDeletedOutput,
-    Date_t& maxWallTimeForNsTruncateOutput) {
-    while (auto marker = truncateMarkersForNss->peekOldestMarkerIfNeeded(opCtx)) {
-        writeConflictRetry(
-            opCtx, "truncate pre-images collection for UUID", preImagesColl->ns(), [&] {
-                auto bytesDeleted = marker->bytes;
-                auto docsDeleted = marker->records;
-
-                truncateRange(opCtx,
-                              preImagesColl,
-                              minRecordIdForNs,
-                              marker->lastRecord,
-                              bytesDeleted,
-                              docsDeleted);
-
-                if (marker->wallTime > maxWallTimeForNsTruncateOutput) {
-                    maxWallTimeForNsTruncateOutput = marker->wallTime;
-                }
-
-                truncateMarkersForNss->popOldestMarker();
-
-                totalDocsDeletedOutput += docsDeleted;
-                totalBytesDeletedOutput += bytesDeleted;
-            });
-    }
-}
-
-void updateTruncateMarkersOnInsert(
-    OperationContext* opCtx,
-    boost::optional<TenantId> tenantId,
-    const ChangeStreamPreImage& preImage,
-    int64_t bytesInserted,
-    std::shared_ptr<
-        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerCollection, UUID::Hash>>
-        preImagesCollectionTruncateMap) {
-    auto nsUuid = preImage.getId().getNsUUID();
-
-    auto truncateMarkersForNs = preImagesCollectionTruncateMap->find(nsUuid);
-
-    if (!truncateMarkersForNs) {
-        // There are 2 possible scenarios here:
-        //  (1) The 'preImagesCollectionTruncateMap' has been created, but isn't done with
-        //  initialisation. In this case, the truncate markers created for 'nsUUID' may or may not
-        //  be overwritten in the initialisation process. This is okay, lazy initialisation is
-        //  performed by the remover thread to avoid blocking writes on startup and is strictly best
-        //  effort.
-        //
-        //  (2) Pre-images were either recently enabled on 'nsUUID' or 'nsUUID' was just created.
-        //  Either way, the first pre-images enabled insert to call 'getOrEmplace()' creates the
-        //  truncate markers for the 'nsUUID'. Any following calls to 'getOrEmplace()' return a
-        //  pointer to the existing truncate markers.
-        truncateMarkersForNs = preImagesCollectionTruncateMap->getOrEmplace(
-            nsUuid,
-            tenantId,
-            std::deque<CollectionTruncateMarkers::Marker>{},
-            0,
-            0,
-            gPreImagesCollectionTruncateMarkersMinBytes);
-    }
-
-    auto wallTime = preImage.getOperationTime();
-    auto recordId = change_stream_pre_image_util::toRecordId(preImage.getId());
-    truncateMarkersForNs->updateCurrentMarkerAfterInsertOnCommit(
-        opCtx, bytesInserted, recordId, wallTime, 1);
-}
-
-// Parses the pre-images collection to create an initial mapping between collections which generate
-// pre-images and their corresponding truncate markers.
-using Map =
-    absl::flat_hash_map<UUID, std::shared_ptr<PreImagesTruncateMarkersPerCollection>, UUID::Hash>;
-Map createInitialPreImagesCollectionMapScanning(OperationContext* opCtx,
-                                                boost::optional<TenantId> tenantId,
-                                                const CollectionPtr* preImagesCollectionPtr) {
-
-    WriteUnitOfWork wuow(opCtx);
-    auto rs = preImagesCollectionPtr->get()->getRecordStore();
-
-    Map truncateMap;
-    auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
-    boost::optional<UUID> currentCollectionUUID = boost::none;
-    Date_t firstWallTime{};
-
-    while ((currentCollectionUUID = change_stream_pre_image_util::findNextCollectionUUID(
-                opCtx, preImagesCollectionPtr, currentCollectionUUID, firstWallTime))) {
-        Date_t highestSeenWallTime{};
-        RecordId highestSeenRecordId{};
-        auto initialSetOfMarkers =
-            PreImagesTruncateMarkersPerCollection::createTruncateMarkersByScanning(
-                opCtx, rs, currentCollectionUUID.get(), highestSeenRecordId, highestSeenWallTime);
-
-        auto truncateMarkers = std::make_shared<PreImagesTruncateMarkersPerCollection>(
-            tenantId,
-            std::move(initialSetOfMarkers.markers),
-            initialSetOfMarkers.leftoverRecordsCount,
-            initialSetOfMarkers.leftoverRecordsBytes,
-            minBytesPerMarker);
-
-        // Enable immediate partial marker expiration by updating the highest seen recordId and
-        // wallTime in case the initialisation resulted in a partially built marker.
-        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
-            opCtx, 0, highestSeenRecordId, highestSeenWallTime, 0);
-
-        truncateMap.emplace(currentCollectionUUID.get(), truncateMarkers);
-    }
-
-    wuow.commit();
-    return truncateMap;
-}
-
-using PreImagesCollectionTruncateMap =
-    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerCollection, UUID::Hash>;
-using TenantToPreImagesCollectionTruncateMap =
-    ConcurrentSharedValuesMap<boost::optional<TenantId>, PreImagesCollectionTruncateMap>;
-
-// TODO SERVER-76586: Finalize initialisation methods for constructing truncate markers for
-// pre-images.
-void initialisePreImagesCollectionTruncateMarkers(
-    OperationContext* opCtx,
-    boost::optional<TenantId> tenantId,
-    const CollectionPtr* preImagesCollectionPtr,
-    PreImagesCollectionTruncateMap& finalTruncateMap) {
-
-    // Initialisation requires scanning/sampling the underlying pre-images collection. To reduce the
-    // amount of time writes are blocked trying to access the 'finalTruncateMap', first create a
-    // temporary map whose contents will eventually replace those of the 'finalTruncateMap'.
-    auto initTruncateMap =
-        createInitialPreImagesCollectionMapScanning(opCtx, tenantId, preImagesCollectionPtr);
-
-    finalTruncateMap.updateWith([&](const Map& oldMap) {
-        // Critical section where no other threads can modify the 'finalTruncateMap'.
-
-        // While scanning/sampling the pre-images collection, it's possible additional entries and
-        // collections were added to the 'oldMap'.
-        //
-        // If the 'oldMap' contains markers for a collection UUID not captured in the
-        // 'initTruncateMap', it is safe to append them to the final map.
-        //
-        // However, if both 'oldMap' and the 'initTruncateMap' contain truncate markers for the same
-        // collection UUID, ignore the entries captured in the 'oldMap' since this initialisation is
-        // best effort and is prohibited from blocking writes during startup.
-        for (const auto& [nsUUID, nsTruncateMarkers] : oldMap) {
-            if (initTruncateMap.find(nsUUID) == initTruncateMap.end()) {
-                initTruncateMap.emplace(nsUUID, nsTruncateMarkers);
-            }
-        }
-        return initTruncateMap;
-    });
-}
 }  // namespace
 
 BSONObj ChangeStreamPreImagesCollectionManager::PurgingJobStats::toBSON() const {
@@ -339,7 +162,7 @@ void ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
 
     if (useUnreplicatedTruncates()) {
-        _tenantTruncateMarkersMap.erase(tenantId);
+        _truncateManager.dropAllMarkersForTenant(tenantId);
     }
 }
 
@@ -383,15 +206,11 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             insertionStatus != ErrorCodes::DuplicateKey);
     uassertStatusOK(insertionStatus);
 
-    // If the map for this tenant's 'pre-images' collection doesn't exist yet, it will be lazily
-    // initialised when its time to delete expired documents.
-    auto preImagesCollectionTruncateMap =
-        useUnreplicatedTruncates() ? _tenantTruncateMarkersMap.find(tenantId) : nullptr;
-    auto bytesInserted = insertStatement.doc.objsize();
-
-    if (preImagesCollectionTruncateMap && bytesInserted > 0) {
-        updateTruncateMarkersOnInsert(
-            opCtx, tenantId, preImage, bytesInserted, preImagesCollectionTruncateMap);
+    if (useUnreplicatedTruncates()) {
+        // This is a no-op until the 'tenantId' is registered with the 'truncateManager' in the
+        // expired pre-image removal path.
+        auto bytesInserted = insertStatement.doc.objsize();
+        _truncateManager.updateMarkersOnInsert(opCtx, tenantId, preImage, bytesInserted);
     }
 }
 
@@ -420,7 +239,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
             }
         } else {
             if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
-                // A serverless enviornment is enabled and removal logic must take the tenantId into
+                // A serverless environment is enabled and removal logic must take the tenantId into
                 // account.
                 const auto tenantIds =
                     change_stream_serverless_helpers::getConfigDbTenants(opCtx.get());
@@ -591,73 +410,21 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
         return 0;
     }
 
-    auto preImagesCollectionMap = _tenantTruncateMarkersMap.find(tenantId);
-    if (!preImagesCollectionMap) {
-        // Lazy initialisation of truncate markers to reduce the time writes are blocked
-        // on startup.
-        preImagesCollectionMap = _tenantTruncateMarkersMap.getOrEmplace(tenantId);
-        initialisePreImagesCollectionTruncateMarkers(
-            opCtx, tenantId, &preImagesColl.getCollectionPtr(), *preImagesCollectionMap);
-    }
+    // Prevent unnecessary latency on an end-user write operation by intialising the truncate
+    // markers lazily during the background cleanup.
+    _truncateManager.ensureMarkersInitialized(opCtx, tenantId, preImagesColl.getCollectionPtr());
 
-    auto snapShottedTruncateMap = preImagesCollectionMap->getUnderlyingSnapshot();
-    int64_t numRecordsDeleted = 0;
-    for (auto& [nsUUID, truncateMarkersForNss] : *snapShottedTruncateMap) {
-        RecordId minRecordId =
-            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID)
-                .recordId();
+    auto truncateStats = _truncateManager.truncateExpiredPreImages(
+        opCtx, tenantId, preImagesColl.getCollectionPtr());
 
-        int64_t docsDeletedForNs = 0;
-        int64_t bytesDeletedForNs = 0;
-        Date_t maxWallTimeForNsTruncate{};
-        truncateExpiredMarkersForCollection(opCtx,
-                                            truncateMarkersForNss,
-                                            preImagesColl.getCollectionPtr(),
-                                            nsUUID,
-                                            minRecordId,
-                                            docsDeletedForNs,
-                                            bytesDeletedForNs,
-                                            maxWallTimeForNsTruncate);
-
-        // Best effort for removing all expired pre-images from 'nsUUID'. If there is a partial
-        // marker which can be made into an expired marker, try to remove the new marker as well.
-        truncateMarkersForNss->createPartialMarkerIfNecessary(opCtx);
-        truncateExpiredMarkersForCollection(opCtx,
-                                            truncateMarkersForNss,
-                                            preImagesColl.getCollectionPtr(),
-                                            nsUUID,
-                                            minRecordId,
-                                            docsDeletedForNs,
-                                            bytesDeletedForNs,
-                                            maxWallTimeForNsTruncate);
-
-        if (maxWallTimeForNsTruncate > _purgingJobStats.maxStartWallTime.load()) {
-            _purgingJobStats.maxStartWallTime.store(maxWallTimeForNsTruncate);
-        }
-        _purgingJobStats.docsDeleted.fetchAndAddRelaxed(docsDeletedForNs);
-        _purgingJobStats.bytesDeleted.fetchAndAddRelaxed(bytesDeletedForNs);
-        _purgingJobStats.scannedInternalCollections.fetchAndAddRelaxed(1);
-
-        // If the source collection doesn't exist and there's no more data to erase we can safely
-        // remove the markers. Perform a final truncate to remove all elements just in case.
-        if (CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, nsUUID) == nullptr &&
-            truncateMarkersForNss->isEmpty()) {
-
-            RecordId maxRecordId =
-                change_stream_pre_image_util::getAbsoluteMaxPreImageRecordIdBoundForNs(nsUUID)
-                    .recordId();
-
-            writeConflictRetry(opCtx, "final truncate", preImagesColl.nss(), [&] {
-                truncateRange(
-                    opCtx, preImagesColl.getCollectionPtr(), minRecordId, maxRecordId, 0, 0);
-            });
-
-            preImagesCollectionMap->erase(nsUUID);
-        }
-    }
+    _purgingJobStats.docsDeleted.fetchAndAddRelaxed(truncateStats.docsDeleted);
+    _purgingJobStats.bytesDeleted.fetchAndAddRelaxed(truncateStats.bytesDeleted);
+    _purgingJobStats.scannedInternalCollections.fetchAndAddRelaxed(
+        truncateStats.scannedInternalCollections);
 
     _purgingJobStats.scannedCollections.fetchAndAddRelaxed(1);
-    return numRecordsDeleted;
+
+    return truncateStats.docsDeleted;
 }
 
 }  // namespace mongo
