@@ -71,7 +71,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy,
-                                    bool preparingFromCache = false);
+                                    bool preparingFromCache);
 
 /**
  * The ParameterizedIndexScanSlots struct is used by SlotBasedStageBuilder while building the index
@@ -440,7 +440,8 @@ struct IndexBoundsEvaluationInfo {
 
 /**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
- * is needed to execute the PlanStage tree.
+ * is needed to execute the PlanStage tree. New data members also need to be added to its copyFrom()
+ * method so they will be correctly cloned when a plan is reused from cache.
  */
 struct PlanStageData {
     PlanStageData(PlanStageData&&) = default;
@@ -476,6 +477,19 @@ struct PlanStageData {
     bool shouldTrackLatestOplogTimestamp{false};
     bool shouldTrackResumeToken{false};
     bool shouldUseTailableScan{false};
+
+    // Scan direction if this plan has a collection scan: 1 means forward; -1 means reverse.
+    int direction{1};
+
+    // True iff this plan does an SBE clustered collection scan.
+    bool doSbeClusteredCollectionScan{false};
+
+    // Iff 'doSbeClusteredCollectionScan', this holds the cluster key field name.
+    std::string clusterKeyFieldName;
+
+    // Iff 'doSbeClusteredCollectionScan', this holds the clustered collection's native collator,
+    // needed to compute scan bounds.
+    std::shared_ptr<CollatorInterface> ccCollator;
 
     // If this execution tree was built as a result of replanning of the cached plan, this string
     // will include the reason for replanning.
@@ -526,6 +540,12 @@ private:
         shouldTrackLatestOplogTimestamp = other.shouldTrackLatestOplogTimestamp;
         shouldTrackResumeToken = other.shouldTrackResumeToken;
         shouldUseTailableScan = other.shouldUseTailableScan;
+        direction = other.direction;
+        doSbeClusteredCollectionScan = other.doSbeClusteredCollectionScan;
+        if (doSbeClusteredCollectionScan) {
+            clusterKeyFieldName = other.clusterKeyFieldName;
+            ccCollator = other.ccCollator;
+        }
         replanReason = other.replanReason;
         if (other.savedStatsOnEarlyExit) {
             savedStatsOnEarlyExit.reset(other.savedStatsOnEarlyExit->clone());

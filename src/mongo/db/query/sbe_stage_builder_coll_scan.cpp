@@ -142,7 +142,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     sbe::value::SlotId seekRecordIdSlot,
     std::unique_ptr<sbe::EExpression> seekRecordIdExpression,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch,
+    bool isResumingTailableScan,
     bool resumeAfterRecordId) {
     invariant(seekRecordIdExpression);
 
@@ -190,7 +190,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // $_resumeAfter.
     auto unusedSlot = state.slotId();
     auto [errorCode, errorMessage] = [&]() -> std::pair<ErrorCodes::Error, std::string> {
-        if (isTailableResumeBranch) {
+        if (isResumingTailableScan) {
             return {ErrorCodes::CappedPositionLost,
                     "CollectionScan died due to failure to restore tailable cursor position."};
         }
@@ -217,7 +217,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // the supplied position. For a resume token case we also inject a 'skip 1' stage on top of the
     // inner branch, as we need to start _after_ the resume RecordId. In both cases we inject a
     // 'limit 1' stage on top of the outer branch, as it should produce just a single seek recordId.
-    auto innerStage = isTailableResumeBranch || !resumeAfterRecordId
+    auto innerStage = isResumingTailableScan || !resumeAfterRecordId
         ? std::move(inputStage)
         : sbe::makeS<sbe::LimitSkipStage>(std::move(inputStage), boost::none, 1, csn->nodeId());
     return sbe::makeS<sbe::LoopJoinStage>(
@@ -255,7 +255,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     const CollectionScanNode* csn,
     std::vector<std::string> scanFieldNames,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch) {
+    bool isResumingTailableScan) {
+
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
     sbe::RuntimeEnvironment* env = state.data->env;
 
@@ -279,7 +280,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     // scan from. Otherwise we must create a slot for it.
     auto [seekRecordIdSlot, seekRecordIdExpression] =
         [&]() -> std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::EExpression>> {
-        if (isTailableResumeBranch) {
+        if (isResumingTailableScan) {
             sbe::value::SlotId resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
         } else if (csn->resumeAfterRecordId) {
@@ -337,7 +338,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
                                                *seekRecordIdSlot,
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
-                                               isTailableResumeBranch,
+                                               isResumingTailableScan,
                                                csn->resumeAfterRecordId.has_value());
     }
 
@@ -367,7 +368,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
  * Generates a generic collection scan sub-tree.
  *  - If a resume token has been provided, the scan will start from a RecordId contained within this
  *    token.
- *  - Else if 'isTailableResumeBranch' is true, the scan will start from a RecordId contained in
+ *  - Else if 'isResumingTailableScan' is true, the scan will start from a RecordId contained in
  *    slot "resumeRecordId".
  *  - Otherwise the scan will start from the beginning of the collection.
  */
@@ -377,7 +378,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     const CollectionScanNode* csn,
     std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch) {
+    bool isResumingTailableScan) {
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
 
     invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
@@ -404,7 +405,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         if (csn->resumeAfterRecordId) {
             auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
             return {state.slotId(), makeConstant(tag, val)};
-        } else if (isTailableResumeBranch) {
+        } else if (isResumingTailableScan) {
             auto resumeRecordIdSlot = state.data->env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
         }
@@ -446,7 +447,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                *seekRecordIdSlot,
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
-                                               isTailableResumeBranch,
+                                               isResumingTailableScan,
                                                true /* resumeAfterRecordId  */);
     }
 
@@ -479,14 +480,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     const CollectionScanNode* csn,
     std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch) {
+    bool isResumingTailableScan) {
 
     if (csn->doSbeClusteredCollectionScan()) {
         return generateClusteredCollScan(
-            state, collection, csn, std::move(fields), yieldPolicy, isTailableResumeBranch);
+            state, collection, csn, std::move(fields), yieldPolicy, isResumingTailableScan);
     } else {
         return generateGenericCollScan(
-            state, collection, csn, std::move(fields), yieldPolicy, isTailableResumeBranch);
+            state, collection, csn, std::move(fields), yieldPolicy, isResumingTailableScan);
     }
 }
 }  // namespace mongo::stage_builder

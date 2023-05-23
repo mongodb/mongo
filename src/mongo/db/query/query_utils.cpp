@@ -83,16 +83,6 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
         return false;
     }
 
-    // TODO SERVER-75715: Remove this code block once SBE support for clustered collection scans is
-    // fully implemented.
-    // (Ignore FCV check): This is intentional because we always want to use this feature once the
-    // feature flag is enabled.
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
-    if (!sbeFull && (*collection && collection->get()->isClustered())) {
-        // Queries against a clustered collection are not currently supported by SBE.
-        return false;
-    }
-
     const auto& sortPattern = cq->getSortPattern();
     // If the sort has meta or numeric path components, we cannot use SBE.
     return !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {

@@ -89,11 +89,6 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
  */
 plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
 
-// TODO SERVER-75715: Remove hasSbeClusteredCollectionScan() and its calls once SBE support
-// for clustered collection scans is fully implemented. This method exists temporarily to
-// prevent caching of CC scan plans until the mentioned ticket adds parameterization for them.
-bool hasSbeClusteredCollectionScan(const QuerySolutionNode* qsn);
-
 /**
  * Caches the best candidate execution plan for 'query', chosen from the given 'candidates' based on
  * the 'ranking' decision, if the 'query' is of a type that can be cached. Otherwise, does nothing.
@@ -188,13 +183,8 @@ void updatePlanCacheFromCandidates(
 
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
-    // TODO SERVER-75715: remove hasSbeClusteredCollectionScan. This exists temporarily to prevent
-    // caching SBE clustered collection scan execution plans as they are not yet parameterized.
-    bool hasSbeCCScan = false;
-    if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-        hasSbeCCScan = hasSbeClusteredCollectionScan(winningPlan.solution.get()->root());
-    }
-    if (shouldCacheQuery(query) && canCache && !hasSbeCCScan) {
+    if (canCache && shouldCacheQuery(query)) {
+        const CollectionPtr& collection = collections.getMainCollection();
         auto rankingDecision = ranking.get();
         auto cacheClassicPlan = [&]() {
             auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
@@ -206,7 +196,6 @@ void updatePlanCacheFromCandidates(
                 callbacks{query, buildDebugInfoFn};
             winningPlan.solution->cacheData->indexFilterApplied =
                 winningPlan.solution->indexFilterApplied;
-            auto& collection = collections.getMainCollection();
             auto isSensitive = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
@@ -231,6 +220,15 @@ void updatePlanCacheFromCandidates(
                     std::move(winningPlan.clonedPlan->first),
                     std::move(winningPlan.clonedPlan->second.stageData));
                 cachedPlan->indexFilterApplied = winningPlan.solution->indexFilterApplied;
+
+                // Clustered collection scans need to cache 'ccCollator' for bounds computation.
+                stage_builder::PlanStageData& stageData = cachedPlan->planStageData;
+                if (stageData.doSbeClusteredCollectionScan) {
+                    const CollatorInterface* ccCollator = collection->getDefaultCollator();
+                    if (ccCollator) {
+                        stageData.ccCollator = ccCollator->cloneShared();
+                    }
+                }
 
                 auto buildDebugInfoFn =
                     [soln = winningPlan.solution.get()]() -> plan_cache_debug_info::DebugInfoSBE {
@@ -272,6 +270,6 @@ void updatePlanCache(OperationContext* opCtx,
                      const CanonicalQuery& query,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
-                     const stage_builder::PlanStageData& data);
+                     stage_builder::PlanStageData& stageData);
 }  // namespace plan_cache_util
 }  // namespace mongo

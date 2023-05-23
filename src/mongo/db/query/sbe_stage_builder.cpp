@@ -31,6 +31,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -166,6 +167,15 @@ sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
     return outputSlots;
 }
 
+/**
+ * Performs necessary initialization steps to execute an SBE tree 'root', including binding params
+ * from the current query 'cq' into the plan if it was cloned from the SBE plan cache.
+ *   root - root node of the execution tree
+ *   data - slot metadata (not actual parameter data!) that goes with the execution tree
+ *   preparingFromCache - if true, 'root' and 'data' may have come from the SBE plan cache (though
+ *     sometimes the caller says true even for non-cached plans). This means current parameters from
+ *     'cq' need to be substituted into the execution plan.
+ */
 void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     sbe::PlanStage* root,
                                     PlanStageData* data,
@@ -237,7 +247,11 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     for (auto&& indexBoundsInfo : data->indexBoundsEvaluationInfos) {
         input_params::bindIndexBounds(cq, indexBoundsInfo, env, &indexBoundsEvaluationCache);
     }
-}
+
+    if (preparingFromCache && data->doSbeClusteredCollectionScan) {
+        input_params::bindClusteredCollectionBounds(cq, root, data, env);
+    }
+}  // prepareSlotBasedExecutableTree
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                sbe::value::SlotIdGenerator* slotIdGenerator) {
@@ -384,10 +398,16 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
             count <= 1);
 
     if (node) {
-        auto csn = static_cast<const CollectionScanNode*>(node);
+        const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(node);
         _data.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
         _data.shouldTrackResumeToken = csn->requestResumeToken;
         _data.shouldUseTailableScan = csn->tailable;
+        _data.direction = csn->direction;
+        _data.doSbeClusteredCollectionScan = csn->doSbeClusteredCollectionScan();
+        if (_data.doSbeClusteredCollectionScan) {
+            _data.clusterKeyFieldName =
+                clustered_util::getClusterKeyFieldName(*(csn->clusteredIndex)).toString();
+        }
     }
 }
 

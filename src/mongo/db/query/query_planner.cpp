@@ -1635,7 +1635,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     invariant(out.size() > 0);
     return {std::move(out)};
-}
+}  // QueryPlanner::plan
 
 /**
  * The 'query' might contain parts of aggregation pipeline. For now, we plan those separately and

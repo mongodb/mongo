@@ -61,6 +61,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     const CollectionScanNode* csn,
     std::vector<std::string> scanFieldNames,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch);
+    bool isResumingTailableScan);
 
 }  // namespace mongo::stage_builder

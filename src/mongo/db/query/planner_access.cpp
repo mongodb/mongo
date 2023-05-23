@@ -207,6 +207,26 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
     return me->path() == repl::OpTime::kTimestampFieldName;
 }
 
+/**
+ * Sets the lowPriority parameter on the given index scan node.
+ */
+void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
+                                    const FindCommandRequest& findCommand) {
+    auto sort = findCommand.getSort();
+    if (findCommand.getLimit() &&
+        (sort.isEmpty() || sort[query_request_helper::kNaturalSortField])) {
+        // There is a limit with either no sort or the natural sort.
+        return;
+    }
+
+    auto indexScan = checked_cast<IndexScanNode*>(solnRoot);
+    if (!indexScan->bounds.isUnbounded()) {
+        return;
+    }
+
+    indexScan->lowPriority = true;
+}
+
 // True if the element type is affected by a collator (i.e. it is or contains a String).
 bool affectedByCollator(const BSONElement& element) {
     switch (element.type()) {
@@ -250,22 +270,22 @@ void setHighestRecord(boost::optional<RecordIdBound>& curr, const BSONObj& newMa
 
 // Returns whether element is not affected by collators or query and collection collators are
 // compatible.
-bool compatibleCollator(const QueryPlannerParams& params,
+bool compatibleCollator(const CollatorInterface* collCollator,
                         const CollatorInterface* queryCollator,
                         const BSONElement& element) {
-    auto const collCollator = params.clusteredCollectionCollator;
     bool compatible = CollatorInterface::collatorsMatch(queryCollator, collCollator);
     return compatible || !affectedByCollator(element);
 }
+}  // namespace
 
-/**
- * Helper function that checks to see if min() or max() were provided along with the query. If so,
- * adjusts the collection scan bounds to fit the constraints.
- */
-void handleRIDRangeMinMax(const CanonicalQuery& query,
-                          CollectionScanNode* collScan,
-                          const QueryPlannerParams& params,
-                          const CollatorInterface* collator) {
+void QueryPlannerAccess::handleRIDRangeMinMax(
+    const CanonicalQuery& query,
+    const int direction,
+    const CollatorInterface* queryCollator,
+    const CollatorInterface* ccCollator,
+    boost::optional<RecordIdBound>& minRecord,
+    boost::optional<RecordIdBound>& maxRecord,
+    CollectionScanParams::ScanBoundInclusion& boundInclusion) {
     BSONObj minObj = query.getFindCommandRequest().getMin();
     BSONObj maxObj = query.getFindCommandRequest().getMax();
     if (minObj.isEmpty() && maxObj.isEmpty()) {
@@ -279,58 +299,46 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
     uassert(
         6137402,
         "min() / max() are only supported for forward collection scans on clustered collections",
-        collScan->direction == 1);
+        direction == 1);
 
     boost::optional<RecordId> newMinRecord, newMaxRecord;
-    if (!maxObj.isEmpty() && compatibleCollator(params, collator, maxObj.firstElement())) {
+    if (!maxObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, maxObj.firstElement())) {
         // max() is exclusive.
         // Assumes clustered collection scans are only supported with the forward direction.
-        collScan->boundInclusion =
-            CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
-        setLowestRecord(collScan->maxRecord,
-                        IndexBoundsBuilder::objFromElement(maxObj.firstElement(), collator));
+        boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
+        setLowestRecord(maxRecord,
+                        IndexBoundsBuilder::objFromElement(maxObj.firstElement(), queryCollator));
     }
 
-    if (!minObj.isEmpty() && compatibleCollator(params, collator, minObj.firstElement())) {
+    if (!minObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, minObj.firstElement())) {
         // The min() is inclusive as are bounded collection scans by default.
-        setHighestRecord(collScan->minRecord,
-                         IndexBoundsBuilder::objFromElement(minObj.firstElement(), collator));
+        setHighestRecord(minRecord,
+                         IndexBoundsBuilder::objFromElement(minObj.firstElement(), queryCollator));
     }
 }
 
-/**
- * Helper function to add an RID range to collection scans.
- * If the query solution tree contains a collection scan node with a suitable comparison predicate
- * on '_id', we add a minRecord and maxRecord on the collection node.
- *
- * Returns true if the MatchExpression is a comparison against the cluster key which either:
- * 1) is guaranteed to exclude values of the cluster key which are affected by collation or
- * 2) may return values of the cluster key which are affected by collation, but the query and
- *    collection collations match.
- * Otherwise, returns false.
- *
- * For example, assuming the cluster key is "_id":
- * Given {a: {$eq: 2}}, we return false, because the comparison is not against the cluster key.
- * Given {_id: {$gte: 5}}, we return true, because this comparison against the cluster key excludes
- *    keys which are affected by collations.
- * Given {_id: {$eq: "str"}}, we return true only if the query and collection collations match.
- *
- */
-[[nodiscard]] bool handleRIDRangeScan(const MatchExpression* conjunct,
-                                      CollectionScanNode* collScan,
-                                      const QueryPlannerParams& params,
-                                      const CollatorInterface* collator) {
-    invariant(params.clusteredInfo);
-
+[[nodiscard]] bool QueryPlannerAccess::handleRIDRangeScan(
+    const MatchExpression* conjunct,
+    const CollatorInterface* queryCollator,
+    const CollatorInterface* ccCollator,
+    const StringData& clusterKeyFieldName,
+    boost::optional<RecordIdBound>& minRecord,
+    boost::optional<RecordIdBound>& maxRecord) {
     if (conjunct == nullptr) {
         return false;
     }
 
-    auto* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
+    const AndMatchExpression* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
     if (andMatchPtr != nullptr) {
         bool atLeastOneConjunctCompatibleCollation = false;
         for (size_t index = 0; index < andMatchPtr->numChildren(); index++) {
-            if (handleRIDRangeScan(andMatchPtr->getChild(index), collScan, params, collator)) {
+            // Recursive call on each branch of 'andMatchPtr'.
+            if (handleRIDRangeScan(andMatchPtr->getChild(index),
+                                   queryCollator,
+                                   ccCollator,
+                                   clusterKeyFieldName,
+                                   minRecord,
+                                   maxRecord)) {
                 atLeastOneConjunctCompatibleCollation = true;
             }
         }
@@ -340,14 +348,14 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
         return atLeastOneConjunctCompatibleCollation;
     }
 
-    if (conjunct->path() !=
-        clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec())) {
-        // No match on the cluster key.
+    // If 'conjunct' does not apply to the cluster key, return early here, as updating bounds based
+    // on this conjunct is incorrect and can result in garbage bounds.
+    if (conjunct->path() != clusterKeyFieldName) {
         return false;
     }
 
     // TODO SERVER-62707: Allow $in with regex to use a clustered index.
-    auto inMatch = dynamic_cast<const InMatchExpression*>(conjunct);
+    const InMatchExpression* inMatch = dynamic_cast<const InMatchExpression*>(conjunct);
     if (inMatch && !inMatch->hasRegex()) {
         // Iterate through the $in equalities to find the min/max values. The min/max bounds for the
         // collscan need to be loose enough to cover all of these values.
@@ -355,9 +363,9 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
         boost::optional<RecordIdBound> maxBound;
 
         bool allEltsCollationCompatible = true;
-        for (const auto& element : inMatch->getEqualities()) {
-            if (compatibleCollator(params, collator, element)) {
-                const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
+        for (const BSONElement& element : inMatch->getEqualities()) {
+            if (compatibleCollator(ccCollator, queryCollator, element)) {
+                const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
                 setLowestRecord(minBound, collated);
                 setHighestRecord(maxBound, collated);
             } else {
@@ -376,10 +384,10 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
 
         // Finally, tighten the collscan bounds with the min/max bounds for the $in.
         if (minBound) {
-            setHighestRecord(collScan->minRecord, *minBound);
+            setHighestRecord(minRecord, *minBound);
         }
         if (maxBound) {
-            setLowestRecord(collScan->maxRecord, *maxBound);
+            setLowestRecord(maxRecord, *maxBound);
         }
         return allEltsCollationCompatible;
     }
@@ -389,60 +397,39 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
         return false;  // Not a comparison match expression.
     }
 
-    const auto& element = match->getData();
+    const BSONElement& element = match->getData();
 
     // Set coarse min/max bounds based on type in case we can't set tight bounds.
     BSONObjBuilder minb;
     minb.appendMinForType("", element.type());
-    setHighestRecord(collScan->minRecord, minb.obj());
+    setHighestRecord(minRecord, minb.obj());
 
     BSONObjBuilder maxb;
     maxb.appendMaxForType("", element.type());
-    setLowestRecord(collScan->maxRecord, maxb.obj());
+    setLowestRecord(maxRecord, maxb.obj());
 
-    bool compatible = compatibleCollator(params, collator, element);
+    bool compatible = compatibleCollator(ccCollator, queryCollator, element);
     if (!compatible) {
-        return false;  // Collator affects probe and it's not compatible with collection's collator.
+        // Collator affects probe and it's not compatible with collection's collator.
+        return false;
     }
 
     // Even if the collations don't match at this point, it's fine,
     // because the bounds exclude values that use it
-    const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
+    const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
     if (dynamic_cast<const EqualityMatchExpression*>(match)) {
-        setHighestRecord(collScan->minRecord, collated);
-        setLowestRecord(collScan->maxRecord, collated);
+        setHighestRecord(minRecord, collated);
+        setLowestRecord(maxRecord, collated);
     } else if (dynamic_cast<const LTMatchExpression*>(match) ||
                dynamic_cast<const LTEMatchExpression*>(match)) {
-        setLowestRecord(collScan->maxRecord, collated);
+        setLowestRecord(maxRecord, collated);
     } else if (dynamic_cast<const GTMatchExpression*>(match) ||
                dynamic_cast<const GTEMatchExpression*>(match)) {
-        setHighestRecord(collScan->minRecord, collated);
+        setHighestRecord(minRecord, collated);
     }
 
     return true;
 }
-
-/**
- * Sets the lowPriority parameter on the given index scan node.
- */
-void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
-                                    const FindCommandRequest& findCommand) {
-    auto sort = findCommand.getSort();
-    if (findCommand.getLimit() &&
-        (sort.isEmpty() || sort[query_request_helper::kNaturalSortField])) {
-        // There is a limit with either no sort or the natural sort.
-        return;
-    }
-
-    auto indexScan = checked_cast<IndexScanNode*>(solnRoot);
-    if (!indexScan->bounds.isUnbounded()) {
-        return;
-    }
-
-    indexScan->lowPriority = true;
-}
-
-}  // namespace
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
@@ -553,15 +540,26 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // query is guaranteed to exclude values of the cluster key which are affected by collation.
         // If so, then even if the query and collection collations differ, the collation difference
         // won't affect the query results. In that case, we can say hasCompatibleCollation is true.
-        bool compatibleCollation =
-            handleRIDRangeScan(csn->filter.get(), csn.get(), params, queryCollator);
+        bool compatibleCollation = handleRIDRangeScan(
+            csn->filter.get(),
+            queryCollator,
+            collCollator,
+            clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec()),
+            csn->minRecord,
+            csn->maxRecord);
         csn->hasCompatibleCollation |= compatibleCollation;
 
-        handleRIDRangeMinMax(query, csn.get(), params, queryCollator);
+        handleRIDRangeMinMax(query,
+                             csn->direction,
+                             queryCollator,
+                             collCollator,
+                             csn->minRecord,
+                             csn->maxRecord,
+                             csn->boundInclusion);
     }
 
     return csn;
-}
+}  // makeCollectionScan
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     const CanonicalQuery& query,

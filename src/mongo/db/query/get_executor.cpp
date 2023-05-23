@@ -1418,7 +1418,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(yieldPolicy),
                                        planningResult->isRecoveredFromPlanCache(),
                                        false /* generatedByBonsai */);
-}
+}  // getSlotBasedExecutor
 
 /**
  * Checks if the result of query planning is SBE compatible. If any of the query solutions in

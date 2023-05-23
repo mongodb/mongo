@@ -296,11 +296,16 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         }
         winner.root = winner.clonedPlan->first->clone();
 
-        stage_builder::prepareSlotBasedExecutableTree(
-            _opCtx, winner.root.get(), &winner.data.stageData, _cq, _collections, _yieldPolicy);
+        stage_builder::prepareSlotBasedExecutableTree(_opCtx,
+                                                      winner.root.get(),
+                                                      &winner.data.stageData,
+                                                      _cq,
+                                                      _collections,
+                                                      _yieldPolicy,
+                                                      false /* preparingFromCache */);
         // Clear the results queue.
         winner.results = {};
-        winner.root->open(false);
+        winner.root->open(false /* reOpen*/);
     }
 
     // Extend the winning candidate with the agg pipeline and rebuild the execution tree. Because
@@ -322,8 +327,13 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         // cache prior to preparation, whereas the original copy of the tree will be prepared and
         // used to execute this query.
         auto clonedPlan = std::make_pair(rootStage->clone(), plan_ranker::CandidatePlanData{data});
-        stage_builder::prepareSlotBasedExecutableTree(
-            _opCtx, rootStage.get(), &data, _cq, _collections, _yieldPolicy);
+        stage_builder::prepareSlotBasedExecutableTree(_opCtx,
+                                                      rootStage.get(),
+                                                      &data,
+                                                      _cq,
+                                                      _collections,
+                                                      _yieldPolicy,
+                                                      false /* preparingFromCache */);
         candidates[winnerIdx] =
             sbe::plan_ranker::CandidatePlan{std::move(solution),
                                             std::move(rootStage),
