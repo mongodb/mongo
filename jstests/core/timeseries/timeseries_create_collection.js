@@ -1,7 +1,7 @@
 /**
  * Tests basic create and drop timeseries Collection behavior. Also test that we fail with
  * NamespaceExists when namespace is already used and that we don't leave orphaned bucket collection
- * in that case.
+ * in that case. Finally, verify we cannot create a view on a system.buckets collection.
  *
  * @tags: [
  *   # "Overriding safe failed response for :: create"
@@ -70,4 +70,8 @@ collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).curs
 jsTestLog('Checking listCollections result: ' + tojson(collections));
 assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
 assert(collections.find(entry => entry.name === coll.getName()));
+
+// Ensure we cannot create a view on a system.buckets collection.
+assert.commandFailedWithCode(testDB.createView("badView", "system.buckets." + coll.getName(), []),
+                             ErrorCodes.InvalidNamespace);
 })();
