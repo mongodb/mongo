@@ -72,10 +72,6 @@ BSONObj FindRequestShapifier::makeQueryStatsKey(
 
     bob.append("queryShape", query_shape::extractQueryShape(parsedRequest, opts, expCtx));
 
-    if (auto optObj = parsedRequest.findCommandRequest->getReadConcern()) {
-        // Read concern should not be considered a literal.
-        bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
-    }
     // has_value() returns true if allowParitalResults was populated by the original query.
     if (_request.getAllowPartialResults().has_value()) {
         // Note we are intentionally avoiding opts.appendLiteral() here and want to keep the exact
@@ -88,11 +84,46 @@ BSONObj FindRequestShapifier::makeQueryStatsKey(
 
     // Fields for literal redaction. Adds batchSize, maxTimeMS, and noCursorTimeOut.
     addNonShapeObjCmdLiterals(&bob, _request, opts, expCtx);
+
     if (_comment) {
         opts.appendLiteral(&bob, "comment", *_comment);
     }
+
     if (_applicationName.has_value()) {
         bob.append("applicationName", _applicationName.value());
+    }
+
+
+    if (const auto& apiVersion = _apiParams->getAPIVersion()) {
+        bob.append("apiVersion", apiVersion.value());
+    }
+
+    if (const auto& apiStrict = _apiParams->getAPIStrict()) {
+        bob.append("apiStrict", apiStrict.value());
+    }
+
+    if (const auto& apiDeprecationErrors = _apiParams->getAPIDeprecationErrors()) {
+        bob.append("apiDeprecationErrors", apiDeprecationErrors.value());
+    }
+
+    if (auto optObj = _request.getReadConcern()) {
+        // afterClusterTime is distinct for every operation with causal consistency enabled. We
+        // normalize it in order not to blow out the telemetry store cache.
+        if (optObj.get()["afterClusterTime"]) {
+            BSONObjBuilder subObj = bob.subobjStart(FindCommandRequest::kReadConcernFieldName);
+
+            if (auto levelElem = optObj.get()["level"]) {
+                subObj.append(levelElem);
+            }
+            opts.appendLiteral(&subObj, "afterClusterTime", optObj.get()["afterClusterTime"]);
+            subObj.done();
+        } else {
+            bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
+        }
+    }
+
+    if (_readPreference) {
+        bob.append("$readPreference", *_readPreference);
     }
 
     return bob.obj();

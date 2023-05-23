@@ -57,6 +57,27 @@ function getTelemetry(conn) {
     assert.commandWorked(result);
     return result.cursor.firstBatch;
 }
+/**
+ * TODO SERVER-77279: refactor to have single getTelemetry function that is passed a test options
+ * object
+ */
+function getTelemetryReplSet(conn, collectionName) {
+    const kApplicationName = "MongoDB Shell";
+    // const result = conn.adminCommand({
+    //     aggregate: 1,
+    const pipeline = [
+        {$queryStats: {}},
+        // Sort on telemetry key so entries are in a deterministic order.
+        {$sort: {key: 1}},
+        {
+            $match: {
+                "key.applicationName": kApplicationName,
+                "key.queryShape.cmdNs.coll": collectionName
+            }
+        }
+    ];
+    return conn.getDB("admin").aggregate(pipeline).toArray();
+}
 
 // TODO SERVER-77279 refactor to pass options as object
 function getQueryStatsFindCmd(

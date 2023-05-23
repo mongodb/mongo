@@ -30,9 +30,11 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include <memory>
 
 namespace mongo::query_stats {
 
@@ -73,10 +75,19 @@ protected:
             _commentObj = commentBuilder.obj();
             _comment = _commentObj.firstElement();
         }
+
+        _apiParams = std::make_unique<APIParameters>(APIParameters::get(opCtx));
+
+        if (!ReadPreferenceSetting::get(opCtx).toInnerBSON().isEmpty() &&
+            !ReadPreferenceSetting::get(opCtx).usedDefaultReadPrefValue()) {
+            _readPreference = boost::make_optional(ReadPreferenceSetting::get(opCtx).toInnerBSON());
+        }
     }
 
     boost::optional<std::string> _applicationName;
+    std::unique_ptr<APIParameters> _apiParams;
     BSONObj _commentObj;
     boost::optional<BSONElement> _comment = boost::none;
+    boost::optional<BSONObj> _readPreference = boost::none;
 };
 }  // namespace mongo::query_stats

@@ -39,7 +39,10 @@ function confirmAllFieldsPresent(queryStatsEntries) {
         "noCursorTimeout",
         "readConcern",
         "allowPartialResults",
-        "applicationName"
+        "applicationName",
+        "apiDeprecationErrors",
+        "apiVersion",
+        "apiStrict"
     ];
 
     for (const entry of queryStatsEntries) {
@@ -100,6 +103,9 @@ let commandObj = {
     singleBatch: true,
     let : {},
     projection: {_id: 0},
+    apiDeprecationErrors: false,
+    apiVersion: "1",
+    apiStrict: false,
 };
 
 assert.commandWorked(testDB.runCommand(commandObj));

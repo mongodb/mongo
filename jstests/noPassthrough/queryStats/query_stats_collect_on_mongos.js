@@ -75,9 +75,9 @@ const assertExpectedResults = (results,
             command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
-        readConcern: {level: "local", provenance: "implicitDefault"},
         batchSize: "?number",
         applicationName: "MongoDB Shell",
+        readConcern: {level: "local", provenance: "implicitDefault"},
     };
 
     const cursor = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
@@ -214,9 +214,9 @@ const assertExpectedResults = (results,
             command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
-        readConcern: {level: "local", provenance: "implicitDefault"},
         batchSize: "?number",
-        applicationName: "MongoDB Shell"
+        applicationName: "MongoDB Shell",
+        readConcern: {level: "local", provenance: "implicitDefault"},
     };
 
     const cursor1 = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc

@@ -106,13 +106,17 @@ ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref,
       hedgingMode(std::move(hedgingMode)) {}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds)
-    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref), maxStalenessSeconds) {}
+    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref), maxStalenessSeconds) {
+    _usedDefaultReadPrefValue = true;
+}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, TagSet tags)
     : pref(std::move(pref)), tags(std::move(tags)) {}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref)
-    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref)) {}
+    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref)) {
+    _usedDefaultReadPrefValue = true;
+}
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONObj& readPrefObj) {
     std::string modeStr;

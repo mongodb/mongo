@@ -123,7 +123,9 @@ struct ReadPreferenceSetting {
     ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
-    ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {}
+    ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {
+        _usedDefaultReadPrefValue = true;
+    }
 
     inline bool equals(const ReadPreferenceSetting& other) const {
         auto hedgingModeEquals = [](const boost::optional<HedgingMode>& hedgingModeA,
@@ -168,7 +170,9 @@ struct ReadPreferenceSetting {
         toContainingBSON(&bob);
         return bob.obj();
     }
-
+    bool usedDefaultReadPrefValue() const {
+        return _usedDefaultReadPrefValue;
+    }
     /**
      * Parses a ReadPreferenceSetting from a BSON document of the form:
      * { mode: <mode>, tags: <array of tags>, maxStalenessSeconds: Number, hedge: <hedgingMode>}.
@@ -226,6 +230,9 @@ struct ReadPreferenceSetting {
      * Either way, it must be that a node opTime of X implies ClusterTime >= X.
      */
     Timestamp minClusterTime{};
+
+private:
+    bool _usedDefaultReadPrefValue = false;
 };
 
 }  // namespace mongo
