@@ -207,17 +207,6 @@ Status ViewsForDatabase::update(OperationContext* opCtx,
 
 Status ViewsForDatabase::_upsertIntoMap(OperationContext* opCtx,
                                         std::shared_ptr<ViewDefinition> view) {
-    // Cannot have a secondary view on a system.buckets collection, only the time-series
-    // collection view.
-    if (view->viewOn().isTimeseriesBucketsCollection() &&
-        view->name() != view->viewOn().getTimeseriesViewNamespace()) {
-        return {
-            ErrorCodes::InvalidNamespace,
-            "Invalid view: cannot define a view over a system.buckets namespace except by "
-            "creating a time-series collection",
-        };
-    }
-
     if (!view->name().isOnInternalDb() && !view->name().isSystem()) {
         if (view->timeseries()) {
             _stats.userTimeseries += 1;
