@@ -85,10 +85,12 @@ namespace {
 void generatePlannerInfo(PlanExecutor* exec,
                          const MultipleCollectionAccessor& collections,
                          BSONObj extraInfo,
+                         const SerializationContext& serializationContext,
                          BSONObjBuilder* out) {
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
 
-    plannerBob.append("namespace", NamespaceStringUtil::serialize(exec->nss()));
+    plannerBob.append("namespace",
+                      NamespaceStringUtil::serialize(exec->nss(), serializationContext));
 
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet' field
     // will always be false in the case of EOF or idhack plans.
@@ -346,6 +348,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             Status executePlanStatus,
                             boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
                             BSONObj extraInfo,
+                            const SerializationContext& serializationContext,
                             const BSONObj& command,
                             BSONObjBuilder* out) {
     //
@@ -356,7 +359,7 @@ void Explain::explainStages(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, collections, extraInfo, out);
+        generatePlannerInfo(exec, collections, extraInfo, serializationContext, out);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -398,6 +401,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             const MultipleCollectionAccessor& collections,
                             ExplainOptions::Verbosity verbosity,
                             BSONObj extraInfo,
+                            const SerializationContext& serializationContext,
                             const BSONObj& command,
                             BSONObjBuilder* out) {
     auto&& explainer = exec->getPlanExplainer();
@@ -428,6 +432,7 @@ void Explain::explainStages(PlanExecutor* exec,
                   executePlanStatus,
                   winningPlanTrialStats,
                   extraInfo,
+                  serializationContext,
                   command,
                   out);
 
@@ -439,9 +444,16 @@ void Explain::explainStages(PlanExecutor* exec,
                             const CollectionPtr& collection,
                             ExplainOptions::Verbosity verbosity,
                             BSONObj extraInfo,
+                            const SerializationContext& serializationContext,
                             const BSONObj& command,
                             BSONObjBuilder* out) {
-    explainStages(exec, MultipleCollectionAccessor(collection), verbosity, extraInfo, command, out);
+    explainStages(exec,
+                  MultipleCollectionAccessor(collection),
+                  verbosity,
+                  extraInfo,
+                  serializationContext,
+                  command,
+                  out);
 }
 
 void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {

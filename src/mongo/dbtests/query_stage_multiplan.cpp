@@ -534,6 +534,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
                            ctx.getCollection(),
                            ExplainOptions::Verbosity::kExecAllPlans,
                            BSONObj(),
+                           SerializationContext::stateCommandReply(),
                            BSONObj(),
                            &bob);
     BSONObj explained = bob.done();

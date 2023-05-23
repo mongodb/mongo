@@ -1197,12 +1197,14 @@ Status runAggregate(OperationContext* opCtx,
             // appropriate collection lock must be already held. Make sure it has not been released
             // yet.
             invariant(ctx);
-            Explain::explainStages(explainExecutor,
-                                   collections,
-                                   *(expCtx->explain),
-                                   BSON("optimizedPipeline" << true),
-                                   cmdObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                explainExecutor,
+                collections,
+                *(expCtx->explain),
+                BSON("optimizedPipeline" << true),
+                SerializationContext::stateCommandReply(request.getSerializationContext()),
+                cmdObj,
+                &bodyBuilder);
         }
     } else {
         // Cursor must be specified, if explain is not.

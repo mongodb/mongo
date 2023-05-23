@@ -203,8 +203,15 @@ public:
             getExecutorDistinct(&collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
-        Explain::explainStages(
-            executor.get(), collection, verbosity, BSONObj(), cmdObj, &bodyBuilder);
+        // TODO SERVER-75930: expose serializatonContext from when ParseDistinct calls
+        // ParseDistinctRequest, and pass it onto explainStages
+        Explain::explainStages(executor.get(),
+                               collection,
+                               verbosity,
+                               BSONObj(),
+                               SerializationContext::stateCommandReply(),
+                               cmdObj,
+                               &bodyBuilder);
         return Status::OK();
     }
 

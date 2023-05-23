@@ -385,7 +385,13 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
-            exec.get(), collection.getCollectionPtr(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
+            exec.get(),
+            collection.getCollectionPtr(),
+            verbosity,
+            BSONObj(),
+            SerializationContext::stateCommandReply(request.getSerializationContext()),
+            cmdObj,
+            &bodyBuilder);
     } else {
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nss);
@@ -413,7 +419,13 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
-            exec.get(), collection.getCollectionPtr(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
+            exec.get(),
+            collection.getCollectionPtr(),
+            verbosity,
+            BSONObj(),
+            SerializationContext::stateCommandReply(request.getSerializationContext()),
+            cmdObj,
+            &bodyBuilder);
     }
 }
 

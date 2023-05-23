@@ -590,12 +590,14 @@ public:
             auto exec = uassertStatusOK(getExecutorUpdate(
                 &CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(),
-                                   collection.getCollectionPtr(),
-                                   verbosity,
-                                   BSONObj(),
-                                   _commandObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(),
+                collection.getCollectionPtr(),
+                verbosity,
+                BSONObj(),
+                SerializationContext::stateCommandReply(request().getSerializationContext()),
+                _commandObj,
+                &bodyBuilder);
         }
 
         BSONObj _commandObj;
@@ -775,12 +777,14 @@ public:
             auto exec = uassertStatusOK(getExecutorDelete(
                 &CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(),
-                                   collection.getCollectionPtr(),
-                                   verbosity,
-                                   BSONObj(),
-                                   _commandObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(),
+                collection.getCollectionPtr(),
+                verbosity,
+                BSONObj(),
+                SerializationContext::stateCommandReply(request().getSerializationContext()),
+                _commandObj,
+                &bodyBuilder);
         }
 
         const BSONObj& _commandObj;

@@ -387,8 +387,13 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
-            Explain::explainStages(
-                exec.get(), collection, verbosity, BSONObj(), _request.body, &bodyBuilder);
+            Explain::explainStages(exec.get(),
+                                   collection,
+                                   verbosity,
+                                   BSONObj(),
+                                   SerializationContext::stateCommandReply(reqSerializationContext),
+                                   _request.body,
+                                   &bodyBuilder);
         }
 
         /**

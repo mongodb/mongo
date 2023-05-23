@@ -249,6 +249,7 @@ Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
                                _execStatus,
                                _winningPlanTrialStats,
                                BSONObj(),
+                               SerializationContext::stateCommandReply(pExpCtx->serializationCtxt),
                                BSONObj(),
                                &explainStatsBuilder);
     }
