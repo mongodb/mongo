@@ -59,4 +59,3 @@ commands:
                 # WARNING: This flag can be used only by coordinators running exclusively in FCV >= 7.0
                 # TODO SERVER-68084: remove this flag
                 type: optionalBool
-        reply_type: OkReply

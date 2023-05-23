@@ -47,7 +47,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/executor/mock_async_rpc.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -91,6 +90,12 @@ class ExternalStateForTest : public ReshardingCoordinatorExternalState {
         return ParticipantShardsAndChunks(
             {coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks});
     }
+
+    void sendCommandToShards(OperationContext* opCtx,
+                             StringData dbName,
+                             const BSONObj& command,
+                             const std::vector<ShardId>& shardIds,
+                             const std::shared_ptr<executor::TaskExecutor>& executor) override {}
 };
 
 class ReshardingCoordinatorServiceForTest : public ReshardingCoordinatorService {
@@ -144,9 +149,6 @@ public:
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         repl::createOplog(opCtx);
-
-        auto asyncRPCMock = std::make_unique<async_rpc::NoopMockAsyncRPCRunner>();
-        async_rpc::detail::AsyncRPCRunner::set(getServiceContext(), std::move(asyncRPCMock));
 
         _opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());

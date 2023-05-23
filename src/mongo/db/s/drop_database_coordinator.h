@@ -69,8 +69,7 @@ private:
 
     void _dropShardedCollection(OperationContext* opCtx,
                                 const CollectionType& coll,
-                                std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                const CancellationToken& token);
+                                std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
     void _clearDatabaseInfoOnPrimary(OperationContext* opCtx);
 

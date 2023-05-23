@@ -53,6 +53,8 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
+
 /**
  * This header provides an API of `sendCommand(...)` functions that can be used to asynchronously
  * invoke well-typed commands on a remote node. Each takes an IDL-defined or similarly specified
@@ -85,7 +87,6 @@ template <typename CommandReplyType>
 struct AsyncRPCResponse {
     CommandReplyType response;
     HostAndPort targetUsed;
-    Microseconds elapsed;
     GenericReplyFields genericReplyFields;
 };
 
@@ -96,28 +97,15 @@ struct AsyncRPCResponse {
 template <>
 struct AsyncRPCResponse<void> {
     HostAndPort targetUsed;
-    Microseconds elapsed;
 };
 
 template <typename CommandType>
 struct AsyncRPCOptions {
     AsyncRPCOptions(CommandType cmd,
-                    const std::shared_ptr<executor::TaskExecutor>& exec,
+                    std::shared_ptr<executor::TaskExecutor> exec,
                     CancellationToken token,
                     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
                     GenericArgs genericArgs = GenericArgs(),
-                    BatonHandle baton = nullptr)
-        : cmd{cmd},
-          exec{exec},
-          token{token},
-          retryPolicy{retryPolicy},
-          genericArgs{genericArgs},
-          baton{std::move(baton)} {}
-    AsyncRPCOptions(CommandType cmd,
-                    const std::shared_ptr<executor::TaskExecutor>& exec,
-                    CancellationToken token,
-                    GenericArgs genericArgs,
-                    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
                     BatonHandle baton = nullptr)
         : cmd{cmd},
           exec{exec},
@@ -141,7 +129,6 @@ namespace detail {
 struct AsyncRPCInternalResponse {
     BSONObj response;
     HostAndPort targetUsed;
-    Microseconds elapsed;
 };
 
 /**
@@ -272,10 +259,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
                 IDLParserContext("AsyncRPCRunner"), r.response);
             auto unstableReplyFields = GenericReplyFieldsWithTypesUnstableV1::parseSharingOwnership(
                 IDLParserContext("AsyncRPCRunner"), r.response);
-            return {res,
-                    r.targetUsed,
-                    r.elapsed,
-                    GenericReplyFields{stableReplyFields, unstableReplyFields}};
+            return {res, r.targetUsed, GenericReplyFields{stableReplyFields, unstableReplyFields}};
         })
         .unsafeToInlineFuture()
         .onError(

@@ -41,7 +41,6 @@
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/executor/async_rpc_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -150,26 +149,26 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                                      _freezeMigrations(executor);
                                  }))
 
-        .then([this, token, executor = executor, anchor = shared_from_this()] {
+        .then([this, executor = executor, anchor = shared_from_this()] {
             if (_isPre70Compatible())
                 return;
 
             _buildPhaseHandler(Phase::kEnterCriticalSection,
-                               [this, token, executor = executor, anchor = shared_from_this()] {
-                                   _enterCriticalSection(executor, token);
+                               [this, executor = executor, anchor = shared_from_this()] {
+                                   _enterCriticalSection(executor);
                                })();
         })
         .then(_buildPhaseHandler(Phase::kDropCollection,
                                  [this, executor = executor, anchor = shared_from_this()] {
                                      _commitDropCollection(executor);
                                  }))
-        .then([this, token, executor = executor, anchor = shared_from_this()] {
+        .then([this, executor = executor, anchor = shared_from_this()] {
             if (_isPre70Compatible())
                 return;
 
             _buildPhaseHandler(Phase::kReleaseCriticalSection,
-                               [this, token, executor = executor, anchor = shared_from_this()] {
-                                   _exitCriticalSection(executor, token);
+                               [this, executor = executor, anchor = shared_from_this()] {
+                                   _exitCriticalSection(executor);
                                })();
         });
 }
@@ -258,7 +257,7 @@ void DropCollectionCoordinator::_freezeMigrations(
 }
 
 void DropCollectionCoordinator::_enterCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     LOGV2_DEBUG(7038100, 2, "Acquiring critical section", logAttrs(nss()));
 
     auto opCtxHolder = cc().makeOperationContext();
@@ -270,13 +269,15 @@ void DropCollectionCoordinator::_enterCriticalSection(
     blockCRUDOperationsRequest.setReason(_critSecReason);
     blockCRUDOperationsRequest.setAllowViews(true);
 
-    async_rpc::GenericArgs args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        blockCRUDOperationsRequest, **executor, token, args);
+    const auto cmdObj =
+        CommandHelpers::appendMajorityWriteConcern(blockCRUDOperationsRequest.toBSON({}))
+            .addFields(getNewSession(opCtx).toBSON());
     sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
+        opCtx,
+        nss().db().toString(),
+        cmdObj,
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+        **executor);
 
     LOGV2_DEBUG(7038101, 2, "Acquired critical section", logAttrs(nss()));
 }
@@ -341,7 +342,7 @@ void DropCollectionCoordinator::_commitDropCollection(
 }
 
 void DropCollectionCoordinator::_exitCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     LOGV2_DEBUG(7038102, 2, "Releasing critical section", logAttrs(nss()));
 
     auto opCtxHolder = cc().makeOperationContext();
@@ -353,13 +354,15 @@ void DropCollectionCoordinator::_exitCriticalSection(
     unblockCRUDOperationsRequest.setReason(_critSecReason);
     unblockCRUDOperationsRequest.setAllowViews(true);
 
-    async_rpc::GenericArgs args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        unblockCRUDOperationsRequest, **executor, token, args);
+    const auto cmdObj =
+        CommandHelpers::appendMajorityWriteConcern(unblockCRUDOperationsRequest.toBSON({}))
+            .addFields(getNewSession(opCtx).toBSON());
     sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
+        opCtx,
+        nss().db().toString(),
+        cmdObj,
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+        **executor);
 
     LOGV2_DEBUG(7038103, 2, "Released critical section", logAttrs(nss()));
 }

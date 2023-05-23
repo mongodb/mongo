@@ -31,7 +31,6 @@
 
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/server_options.h"
 
@@ -83,11 +82,10 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
     *getForOpCtx(opCtx) = std::move(newData);
 }
 
-boost::optional<ImpersonatedUserMetadata> getAuthDataToImpersonatedUserMetadata(
-    OperationContext* opCtx) {
+void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBuilder* out) {
     // If we have no opCtx, which does appear to happen, don't do anything.
     if (!opCtx) {
-        return {};
+        return;
     }
 
     // Otherwise construct a metadata section from the list of authenticated users/roles
@@ -101,7 +99,7 @@ boost::optional<ImpersonatedUserMetadata> getAuthDataToImpersonatedUserMetadata(
 
     // If there are no users/roles being impersonated just exit
     if (!userName && !roleNames.more()) {
-        return {};
+        return;
     }
 
     ImpersonatedUserMetadata metadata;
@@ -110,14 +108,9 @@ boost::optional<ImpersonatedUserMetadata> getAuthDataToImpersonatedUserMetadata(
     }
 
     metadata.setRoles(roleNameIteratorToContainer<std::vector<RoleName>>(roleNames));
-    return metadata;
-}
 
-void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBuilder* out) {
-    if (auto meta = getAuthDataToImpersonatedUserMetadata(opCtx)) {
-        BSONObjBuilder section(out->subobjStart(kImpersonationMetadataSectionName));
-        meta->serialize(&section);
-    }
+    BSONObjBuilder section(out->subobjStart(kImpersonationMetadataSectionName));
+    metadata.serialize(&section);
 }
 
 std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx) {

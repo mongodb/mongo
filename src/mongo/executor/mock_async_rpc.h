@@ -357,32 +357,4 @@ std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Expecta
     return s << o.name;
 }
 
-/**
- * The NoopMockAsyncRPCRunner is a mock implementation that returns silently and successfully when a
- * command is sent.
- */
-class NoopMockAsyncRPCRunner : public detail::AsyncRPCRunner {
-public:
-    /**
-     * Mock implementation of the core functionality of the RCR. Records the provided request, and
-     * notifies waiters that a new request has been scheduled.
-     */
-    ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
-        StringData dbName,
-        BSONObj cmdBSON,
-        Targeter* targeter,
-        OperationContext* opCtx,
-        std::shared_ptr<TaskExecutor> exec,
-        CancellationToken token,
-        BatonHandle) final {
-
-        return ExecutorFuture(exec).then([] {
-            detail::AsyncRPCInternalResponse response;
-            response.response = BSON("ok" << 1);
-            response.targetUsed = HostAndPort("localhost", serverGlobalParams.port);
-            return response;
-        });
-    }
-};
-
 }  // namespace mongo::async_rpc

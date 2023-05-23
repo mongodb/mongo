@@ -62,4 +62,3 @@ commands:
             performViewChange:
                 type: optionalBool
                 description: "Whether should perform view catalog change, set only for commands sent to the primary shard"
-        reply_type: CollModReply

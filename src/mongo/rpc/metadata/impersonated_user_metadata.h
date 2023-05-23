@@ -66,12 +66,6 @@ MaybeImpersonatedUserMetadata getImpersonatedUserMetadata(OperationContext* opCt
 void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opCtx);
 
 /*
- * Get impersonation metadata off the opCtx
- */
-boost::optional<ImpersonatedUserMetadata> getAuthDataToImpersonatedUserMetadata(
-    OperationContext* opCtx);
-
-/*
  * Writes the current impersonation metadata off the opCtx and into a BSONObjBuilder
  */
 void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBuilder* out);

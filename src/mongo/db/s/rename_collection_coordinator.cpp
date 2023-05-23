@@ -47,7 +47,6 @@
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/executor/async_rpc_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
@@ -99,8 +98,7 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
                                  const RenameCollectionRequest& request,
                                  const OperationSessionInfo& osi,
                                  const std::shared_ptr<executor::TaskExecutor>& executor,
-                                 RenameCollectionCoordinatorDocument* doc,
-                                 const CancellationToken& token) {
+                                 RenameCollectionCoordinatorDocument* doc) {
     const auto [configTime, newIndexVersion] = [opCtx]() -> std::pair<LogicalTime, Timestamp> {
         VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
         return {vt.configTime(), vt.clusterTime().asTimestamp()};
@@ -121,13 +119,14 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     ShardsvrRenameIndexMetadata renameIndexCatalogReq(
         nss, toNss, {doc->getSourceUUID().value(), newIndexVersion});
-    renameIndexCatalogReq.setDbName(toNss.dbName());
-    async_rpc::GenericArgs args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrRenameIndexMetadata>>(
-        renameIndexCatalogReq, executor, token, args);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
+    const auto renameIndexCatalogCmdObj =
+        CommandHelpers::appendMajorityWriteConcern(renameIndexCatalogReq.toBSON({}));
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx,
+        toNss.db(),
+        renameIndexCatalogCmdObj.addFields(osi.toBSON()),
+        participants,
+        executor);
 }
 
 std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx,
@@ -667,7 +666,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kBlockCrudAndRename,
-            [this, token, executor = executor, anchor = shared_from_this()] {
+            [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -689,6 +688,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 renameCollParticipantRequest.setDbName(fromNss.dbName());
                 renameCollParticipantRequest.setTargetUUID(_doc.getTargetUUID());
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
+                const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
+                                        renameCollParticipantRequest.toBSON({}))
+                                        .addFields(getNewSession(opCtx).toBSON());
 
                 // We need to send the command to all the shards because both movePrimary and
                 // moveChunk leave garbage behind for sharded collections. At the same time, the
@@ -702,18 +704,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
 
-                async_rpc::GenericArgs args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
-                auto opts = std::make_shared<
-                    async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionParticipant>>(
-                    renameCollParticipantRequest, **executor, token, args);
-                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
-                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {primaryShardId});
+                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                    opCtx, fromNss.db(), cmdObj, participants, **executor);
+
+                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                    opCtx, fromNss.db(), cmdObj, {primaryShardId}, **executor);
             }))
         .then(_buildPhaseHandler(
             Phase::kRenameMetadata,
-            [this, token, executor = executor, anchor = shared_from_this()] {
+            [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -736,8 +735,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 if ((_doc.getTargetIsSharded() || _doc.getOptShardedCollInfo())) {
                     const auto& osi = getNewSession(opCtx);
-                    renameIndexMetadataInShards(
-                        opCtx, nss(), _request, osi, **executor, &_doc, token);
+                    renameIndexMetadataInShards(opCtx, nss(), _request, osi, **executor, &_doc);
                 }
 
                 const auto& osi = getNewSession(opCtx);
@@ -751,7 +749,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
-            [this, token, executor = executor, anchor = shared_from_this()] {
+            [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -768,15 +766,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     fromNss, _doc.getSourceUUID().value());
                 unblockParticipantRequest.setDbName(fromNss.dbName());
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
+                auto const cmdObj =
+                    CommandHelpers::appendMajorityWriteConcern(unblockParticipantRequest.toBSON({}))
+                        .addFields(getNewSession(opCtx).toBSON());
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-                async_rpc::GenericArgs args;
-                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
-                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
-                auto opts = std::make_shared<
-                    async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionUnblockParticipant>>(
-                    unblockParticipantRequest, **executor, token, args);
-                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
+                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                    opCtx, fromNss.db(), cmdObj, participants, **executor);
 
                 // Delete chunks belonging to the previous incarnation of the target collection.
                 // This is performed after releasing the critical section in order to reduce stalls

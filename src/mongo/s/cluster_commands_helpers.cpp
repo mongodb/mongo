@@ -533,7 +533,6 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     return std::move(responses.front());
 }
 
-// TODO SERVER-74478: Rewrite function to process AsyncRPC responses
 RawResponsesResult appendRawResponses(
     OperationContext* opCtx,
     std::string* errmsg,
