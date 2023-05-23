@@ -1102,9 +1102,10 @@ BSONObj TransactionRouter::Router::commitTransaction(
     OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
     invariant(isInitialized());
 
+    const auto isFirstCommitAttempt = !p().terminationInitiated;
     p().terminationInitiated = true;
 
-    auto commitRes = _commitTransaction(opCtx, recoveryToken);
+    auto commitRes = _commitTransaction(opCtx, recoveryToken, isFirstCommitAttempt);
 
     auto commitStatus = getStatusFromCommandResult(commitRes);
     auto commitWCStatus = getWriteConcernStatusFromCommandResult(commitRes);
@@ -1130,7 +1131,9 @@ BSONObj TransactionRouter::Router::commitTransaction(
 }
 
 BSONObj TransactionRouter::Router::_commitTransaction(
-    OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
+    OperationContext* opCtx,
+    const boost::optional<TxnRecoveryToken>& recoveryToken,
+    bool isFirstCommitAttempt) {
 
     if (p().isRecoveringCommit) {
         uassert(50940,
@@ -1200,6 +1203,50 @@ BSONObj TransactionRouter::Router::_commitTransaction(
 
 
         return sendCommitDirectlyToShards(opCtx, {shardId});
+    }
+
+    if (writeShards.size() == 1) {
+        LOGV2_DEBUG(22894,
+                    3,
+                    "Committing single-write-shard transaction",
+                    "sessionId"_attr = _sessionId().getId(),
+                    "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                    "numReadOnlyShards"_attr = readOnlyShards.size(),
+                    "writeShardId"_attr = writeShards.front());
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            o(lk).commitType = CommitType::kSingleWriteShard;
+            _onStartCommit(lk, opCtx);
+        }
+
+        if (!isFirstCommitAttempt) {
+            // For a retried single write shard commit, fall back to the recovery token protocol to
+            // guarantee returning the correct outcome. The client should have provided a recovery
+            // token, but it isn't necessary since the write shard must be the recovery shard, so we
+            // can use a synthetic token instead.
+            tassert(4834000, "Expected to have a recovery shard", p().recoveryShardId);
+            tassert(4834001,
+                    "Expected recovery shard to equal the single write shard",
+                    p().recoveryShardId == writeShards[0]);
+
+            TxnRecoveryToken syntheticRecoveryToken;
+            syntheticRecoveryToken.setRecoveryShardId(writeShards[0]);
+
+            return _commitWithRecoveryToken(opCtx, syntheticRecoveryToken);
+        }
+
+        auto readOnlyShardsResponse = sendCommitDirectlyToShards(opCtx, readOnlyShards);
+
+        auto readOnlyCmdStatus = getStatusFromCommandResult(readOnlyShardsResponse);
+        auto readOnlyWCE = getWriteConcernStatusFromCommandResult(readOnlyShardsResponse);
+        if (!readOnlyCmdStatus.isOK()) {
+            return readOnlyShardsResponse;
+        } else if (!readOnlyWCE.isOK()) {
+            // Rethrow the write concern error as a command error since the transaction's effects
+            // can't be durable as we haven't started commit on the write shard.
+            uassertStatusOK(readOnlyWCE);
+        }
+        return sendCommitDirectlyToShards(opCtx, writeShards);
     }
 
     if (writeShards.size() == 0) {

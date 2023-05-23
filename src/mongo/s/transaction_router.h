@@ -610,7 +610,8 @@ public:
          * commit.
          */
         BSONObj _commitTransaction(OperationContext* opCtx,
-                                   const boost::optional<TxnRecoveryToken>& recoveryToken);
+                                   const boost::optional<TxnRecoveryToken>& recoveryToken,
+                                   bool isFirstCommitAttempt);
 
         /**
          * Retrieves the transaction's outcome from the shard specified in the recovery token.

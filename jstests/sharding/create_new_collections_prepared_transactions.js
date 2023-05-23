@@ -20,6 +20,9 @@ const st = new ShardingTest({
     mongos: 1,
 });
 
+const versionSupportsSingleWriteShardCommitOptimization =
+    MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "7.1") >= 0;
+
 // Create two databases with different shards as their primaries.
 
 assert.commandWorked(
@@ -58,13 +61,16 @@ assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                              ErrorCodes.OperationNotSupportedInTransaction);
 
 jsTest.log("Testing collection creation in a single-shard write transaction.");
-// TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
 session.startTransaction(txnOptions);
 assert.commandWorked(sessionDBShard0.createCollection(newCollName));
 doc2 = sessionDBShard2.getCollection(collName).findOne({_id: 4});
 assert.eq(doc2._id, 4);
-assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+if (!versionSupportsSingleWriteShardCommitOptimization) {
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                 ErrorCodes.OperationNotSupportedInTransaction);
+} else {
+    assert.commandWorked(session.commitTransaction_forTesting());
+}
 
 st.stop();
 })();

@@ -27,7 +27,9 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
 
     let res = clientFunction.apply(mongo, clientFunctionArguments);
 
-    if (isRetryableWriteCmd && canRetryWrites) {
+    if ((isRetryableWriteCmd && canRetryWrites)
+        // Commit is always considered a retryable write.
+        || cmdName === "commitTransaction") {
         print("*** Initial response: " + tojsononeline(res));
         let retryAttempt = 1;
         do {

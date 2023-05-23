@@ -25,6 +25,7 @@ selector:
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_kill_sessions.js
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_read_write_kill_sessions.js
 
   exclude_with_any_tags:
   # Workloads that use a write concern will fail since the workload only connects to the primary.
