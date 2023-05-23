@@ -77,7 +77,6 @@ boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
 // Returns pre-images expiry time in milliseconds since the epoch time if configured, boost::none
 // otherwise.
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime) {
-    invariant(!change_stream_serverless_helpers::isChangeCollectionsModeActive());
     boost::optional<std::int64_t> expireAfterSeconds = boost::none;
 
     // Get the expiration time directly from the change stream manager.

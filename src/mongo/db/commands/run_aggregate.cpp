@@ -879,7 +879,7 @@ Status runAggregate(OperationContext* opCtx,
             nss = NamespaceString::kRsOplogNamespace;
 
             // In case of serverless the change stream will be opened on the change collection.
-            if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+            if (change_stream_serverless_helpers::isServerlessEnvironment()) {
                 const auto tenantId =
                     change_stream_serverless_helpers::resolveTenantId(origNss.tenantId());
 

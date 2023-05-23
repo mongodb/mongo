@@ -49,7 +49,7 @@ Status validateChangeStreamsClusterParameter(
         return {ErrorCodes::IllegalOperation,
                 "The 'changeStreams' parameter is unsupported in standalone."};
     }
-    if (!change_stream_serverless_helpers::canRunInTargetEnvironment()) {
+    if (!change_stream_serverless_helpers::isServerlessEnvironment()) {
         return Status(
             ErrorCodes::CommandNotSupported,
             "The 'changeStreams' cluster-wide parameter is only available in serverless.");
