@@ -122,7 +122,8 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     //     }
     // }
     stages.emplace_back(DocumentSourceMatch::create(
-        Doc{{CollectionType::kNssFieldName, nss.toString()}}.toBson(), expCtx));
+        Doc{{CollectionType::kNssFieldName, NamespaceStringUtil::serialize(nss)}}.toBson(),
+        expCtx));
 
     // 2. Two $unionWith stages guarded by a mutually exclusive condition on whether the refresh is
     // incremental ('lastmodEpoch' matches sinceVersion.epoch), so that only a single one of them
@@ -246,7 +247,9 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
         return Doc{
             {"coll", CollectionType::ConfigNS.coll()},
             {"pipeline",
-             Arr{Value{Doc{{"$match", Doc{{CollectionType::kNssFieldName, nss.toString()}}}}},
+             Arr{Value{Doc{
+                     {"$match",
+                      Doc{{CollectionType::kNssFieldName, NamespaceStringUtil::serialize(nss)}}}}},
                  Value{Doc{{"$match", Doc{{CollectionType::kEpochFieldName, lastmodEpochMatch}}}}},
                  Value{Doc{{"$lookup", lookupPipeline}}},
                  Value{Doc{{"$unwind", Doc{{"path", "$" + chunksLookupOutputFieldName}}}}},
@@ -290,7 +293,8 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
     //     }
     // }
     stages.emplace_back(DocumentSourceMatch::create(
-        Doc{{CollectionType::kNssFieldName, nss.toString()}}.toBson(), expCtx));
+        Doc{{CollectionType::kNssFieldName, NamespaceStringUtil::serialize(nss)}}.toBson(),
+        expCtx));
 
     // 2. Retrieve config.csrs.indexes entries with the same uuid as the one from the
     // config.collections document.

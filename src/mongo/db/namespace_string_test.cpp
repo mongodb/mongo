@@ -54,7 +54,7 @@ TEST(NamespaceStringTest, CheckNamespaceStringLogAttrs) {
     startCapturingLogMessages();
     LOGV2(7311500, "Msg nss:", logAttrs(nss));
 
-    std::string nssAsString = str::stream() << *(nss.tenantId()) << '_' << nss.ns();
+    std::string nssAsString = str::stream() << *(nss.tenantId()) << '_' << nss.ns_forTest();
 
     ASSERT_EQUALS(
         1, countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("namespace" << nssAsString))));
@@ -340,8 +340,8 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
         ASSERT_EQ(nss.size(), 7);
-        ASSERT_EQ(nss.ns(), "foo.bar");
-        ASSERT_EQ(nss.toString(), "foo.bar");
+        ASSERT_EQ(nss.ns_forTest(), "foo.bar");
+        ASSERT_EQ(nss.toString_forTest(), "foo.bar");
         ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss.db(), "foo");
         ASSERT_EQ(nss.coll(), "bar");
@@ -357,8 +357,8 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo");
         ASSERT_EQ(nss.size(), 3);
-        ASSERT_EQ(nss.ns(), "foo");
-        ASSERT_EQ(nss.toString(), "foo");
+        ASSERT_EQ(nss.ns_forTest(), "foo");
+        ASSERT_EQ(nss.toString_forTest(), "foo");
         ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss.db(), "foo");
         ASSERT_EQ(nss.coll(), "");
@@ -375,8 +375,8 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
         NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "bar");
         ASSERT_EQ(nss2.size(), 7);
-        ASSERT_EQ(nss2.ns(), "foo.bar");
-        ASSERT_EQ(nss2.toString(), "foo.bar");
+        ASSERT_EQ(nss2.ns_forTest(), "foo.bar");
+        ASSERT_EQ(nss2.toString_forTest(), "foo.bar");
         ASSERT_EQ(nss2.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss2.db(), "foo");
         ASSERT_EQ(nss2.coll(), "bar");
@@ -391,8 +391,8 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
         NamespaceString nss3("foo", "bar", tenantId);
         ASSERT_EQ(nss3.size(), 7);
-        ASSERT_EQ(nss3.ns(), "foo.bar");
-        ASSERT_EQ(nss3.toString(), "foo.bar");
+        ASSERT_EQ(nss3.ns_forTest(), "foo.bar");
+        ASSERT_EQ(nss3.toString_forTest(), "foo.bar");
         ASSERT_EQ(nss3.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss3.db(), "foo");
         ASSERT_EQ(nss3.coll(), "bar");
@@ -407,8 +407,8 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
         NamespaceString nss4(dbName);
         ASSERT_EQ(nss4.size(), 3);
-        ASSERT_EQ(nss4.ns(), "foo");
-        ASSERT_EQ(nss4.toString(), "foo");
+        ASSERT_EQ(nss4.ns_forTest(), "foo");
+        ASSERT_EQ(nss4.toString_forTest(), "foo");
         ASSERT_EQ(nss4.toStringWithTenantId_forTest(), "{}_foo"_format(tenantId.toString()));
         ASSERT_EQ(nss4.db(), "foo");
         ASSERT_EQ(nss4.coll(), "");
@@ -423,8 +423,8 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         NamespaceString multiNss("config.system.change_collection", tenantId);
         ASSERT(multiNss.isConfigDB());
         ASSERT_EQ(multiNss.size(), 31);
-        ASSERT_EQ(multiNss.ns(), "config.system.change_collection");
-        ASSERT_EQ(multiNss.toString(), "config.system.change_collection");
+        ASSERT_EQ(multiNss.ns_forTest(), "config.system.change_collection");
+        ASSERT_EQ(multiNss.toString_forTest(), "config.system.change_collection");
         ASSERT_EQ(multiNss.toStringWithTenantId_forTest(),
                   "{}_config.system.change_collection"_format(tenantId.toString()));
         ASSERT_EQ(multiNss.db(), "config");
@@ -442,7 +442,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(empty.db(), "");
         ASSERT_EQ(empty.coll(), "");
         ASSERT_EQ(empty.tenantId(), boost::none);
-        ASSERT_EQ(empty.toString(), "");
+        ASSERT_EQ(empty.toString_forTest(), "");
         ASSERT_EQ(empty.toStringWithTenantId_forTest(), "");
         ASSERT_EQ(empty.dbName().db(), "");
         ASSERT_EQ(empty.dbName().tenantId(), boost::none);
@@ -457,7 +457,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(emptyWithTenant.coll(), "");
         ASSERT(emptyWithTenant.tenantId());
         ASSERT_EQ(*emptyWithTenant.tenantId(), tenantId);
-        ASSERT_EQ(emptyWithTenant.toString(), "");
+        ASSERT_EQ(emptyWithTenant.toString_forTest(), "");
         ASSERT_EQ(emptyWithTenant.toStringWithTenantId_forTest(),
                   "{}_"_format(tenantId.toString()));
         ASSERT_EQ(emptyWithTenant.dbName().db(), "");
@@ -474,7 +474,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(dbWithoutColl.db(), "foo");
         ASSERT_EQ(dbWithoutColl.coll(), "");
         ASSERT_FALSE(dbWithoutColl.tenantId());
-        ASSERT_EQ(dbWithoutColl.toString(), "foo");
+        ASSERT_EQ(dbWithoutColl.toString_forTest(), "foo");
         ASSERT_EQ(dbWithoutColl.toStringWithTenantId_forTest(), "foo");
         ASSERT_EQ(dbWithoutColl.dbName().db(), "foo");
         ASSERT_FALSE(dbWithoutColl.dbName().tenantId());
@@ -489,7 +489,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(dbWithoutCollWithTenant.coll(), "");
         ASSERT(dbWithoutCollWithTenant.tenantId());
         ASSERT_EQ(*dbWithoutCollWithTenant.tenantId(), tenantId);
-        ASSERT_EQ(dbWithoutCollWithTenant.toString(), "foo");
+        ASSERT_EQ(dbWithoutCollWithTenant.toString_forTest(), "foo");
         ASSERT_EQ(dbWithoutCollWithTenant.toStringWithTenantId_forTest(),
                   fmt::format("{}_foo", tenantId.toString()));
         ASSERT_EQ(dbWithoutCollWithTenant.dbName().db(), "foo");
@@ -506,8 +506,9 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo";
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo");
-    ASSERT_EQ(nss.ns(), "foo");
-    ASSERT_EQ(nss.toString(), "foo");
+
+    ASSERT_EQ(nss.ns_forTest(), "foo");
+    ASSERT_EQ(nss.toString_forTest(), "foo");
     ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
@@ -530,7 +531,7 @@ TEST(NamespaceStringTest, ParseNSSWithTenantId) {
 
     NamespaceString nss =
         NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(tenantNsStr);
-    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
     ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);

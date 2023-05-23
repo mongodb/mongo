@@ -40,4 +40,4 @@ db-contrib-tool setup-repro-env \
   --resmokeCmd "python buildscripts/resmoke.py" \
   --debug \
   $last_lts_arg \
-  $last_continuous_arg 4.4 5.0
+  $last_continuous_arg 4.4 5.0 6.0

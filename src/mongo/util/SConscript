@@ -235,19 +235,10 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='namespace_string_util_test',
-    source=[
-        'namespace_string_util_test.cpp',
-    ],
-    LIBDEPS=[
-        'namespace_string_database_name_util',
-    ],
-)
-
-env.CppUnitTest(
-    target='database_name_util_test',
+    target='namespace_string_database_name_util_test',
     source=[
         'database_name_util_test.cpp',
+        'namespace_string_util_test.cpp',
     ],
     LIBDEPS=[
         'namespace_string_database_name_util',
@@ -936,95 +927,17 @@ env.Benchmark(
     ],
 )
 
-if env.ToolchainIs('gcc', 'clang') and env.GetOption('ninja') == 'disabled':
-    # Always prefer v4 gdb, otherwise try anything in the path
-    gdb_bin = env.WhereIs('gdb', ['/opt/mongodbtoolchain/v4/bin']) or env.WhereIs('gdb')
-    if not gdb_bin:
-        Return()
-
-    # GDB has a built in python interpreter, but it may have a python binary on the system which
-    # we can use to check package requirements.
-    python_bin = None
-    result = subprocess.run([gdb_bin, '--configuration'], capture_output=True, text=True)
-    if result.returncode == 0:
-        for line in result.stdout.splitlines():
-            if line.strip().startswith('--with-python='):
-                python_root = line.strip()[len('--with-python=') - 1:]
-                if python_root.endswith(' (relocatable)'):
-                    python_root = python_root[:-len(' (relocatable)')]
-                python_bin = os.path.join(python_root, 'bin/python3')
-    if not python_bin:
-        python_bin = sys.executable
-
-    pretty_printer_test_program = env.Program(target='pretty_printer_test_program', source=[
+pretty_printer_test_program = env.Program(
+    target='pretty_printer_test_program',
+    source=[
         'pretty_printer_test_program.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ], AIB_COMPONENT='pretty-printer-test', AIB_COMPONENTS_EXTRA=[
-        'unittests',
-        'tests',
-    ])
-    pretty_printer_test_program_installed = env.GetAutoInstalledFiles(
-        pretty_printer_test_program[0])
+    ],
+    AIB_COMPONENT='pretty-printer-test',
+    AIB_COMPONENTS_EXTRA=['dist-test'],
+)
+pretty_printer_test_program_installed = env.GetAutoInstalledFiles(pretty_printer_test_program[0])
 
-    verify_reqs_file = env.File('#site_scons/mongo/pip_requirements.py')
-    pretty_printer_test = env.Substfile(
-        target='pretty_printer_test.py', source='pretty_printer_test.py.in', SUBST_DICT={
-            '@verify_requirements@':
-                verify_reqs_file.get_contents().decode('utf-8').replace('\\', '\\\\'),
-            '@python_executable@':
-                python_bin
-        })
-    env.Depends(pretty_printer_test, verify_reqs_file)
-    pretty_printer_test_installed = env.AutoInstall(
-        target='$PREFIX_BINDIR',
-        source=pretty_printer_test,
-        AIB_ROLE='runtime',
-        AIB_COMPONENT='pretty-printer-test',
-        AIB_COMPONENTS_EXTRA=[
-            'unittests',
-            'tests',
-        ],
-    )
-
-    pretty_printer_test_launcher = env.Substfile(
-        target='pretty_printer_test_launcher.py',
-        source='pretty_printer_test_launcher.py.in',
-        SUBST_DICT={
-            '@pretty_printer_test_py@': pretty_printer_test_installed[0].path,
-            '@gdb_path@': gdb_bin,
-            '@pretty_printer_test_program@': pretty_printer_test_program_installed[0].path,
-        },
-        AIB_ROLE='runtime',
-        AIB_COMPONENT='pretty-printer-test',
-        AIB_COMPONENTS_EXTRA=[
-            'unittests',
-            'tests',
-        ],
-    )
-    env.Depends(
-        pretty_printer_test_launcher[0],
-        [
-            pretty_printer_test_program,
-            pretty_printer_test,
-        ],
-    )
-    env.AddPostAction(pretty_printer_test_launcher[0],
-                      Chmod(pretty_printer_test_launcher[0], 'ugo+x'))
-
-    pretty_printer_test_launcher_install = env.AutoInstall(
-        target='$PREFIX_BINDIR',
-        source=pretty_printer_test_launcher,
-        AIB_ROLE='runtime',
-        AIB_COMPONENT='pretty-printer-test',
-        AIB_COMPONENTS_EXTRA=[
-            'unittests',
-            'tests',
-        ],
-    )
-    env.Depends(pretty_printer_test_launcher_install,
-                [pretty_printer_test_installed, pretty_printer_test_program_installed])
-    test_env = env.Clone()
-    test_env['ENV'] = os.environ.copy()
-    test_env.RegisterTest('$UNITTEST_LIST', pretty_printer_test_launcher_install[0])
-    test_env.Alias("$UNITTEST_ALIAS", pretty_printer_test_launcher_install[0])
+env.PrettyPrinterTest('pretty_printer_test.py', TEST_PROGRAM=pretty_printer_test_program_installed)

@@ -157,7 +157,7 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
     builder.append(_fieldNames->getForType(), "op");
     builder.append(_fieldNames->getForDescription(), createOperationDescription());
     builder.append(_fieldNames->getForOp(), "command");
-    builder.append(_fieldNames->getForNamespace(), _sourceNs.toString());
+    builder.append(_fieldNames->getForNamespace(), NamespaceStringUtil::serialize(_sourceNs));
     builder.append(_fieldNames->getForOriginatingCommand(), _originalCommand);
     builder.append(_fieldNames->getForOpTimeElapsed(), getOperationRunningTimeSecs().count());
     switch (_role) {

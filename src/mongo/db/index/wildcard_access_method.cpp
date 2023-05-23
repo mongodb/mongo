@@ -41,9 +41,9 @@ namespace mongo {
 WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
                                            std::unique_ptr<SortedDataInterface> btree)
     : SortedDataIndexAccessMethod(wildcardState, std::move(btree)),
-      _keyGen(_descriptor->keyPattern(),
-              _descriptor->pathProjection(),
-              _indexCatalogEntry->getCollator(),
+      _keyGen(wildcardState->descriptor()->keyPattern(),
+              wildcardState->descriptor()->pathProjection(),
+              wildcardState->getCollator(),
               getSortedDataInterface()->getKeyStringVersion(),
               getSortedDataInterface()->getOrdering(),
               getSortedDataInterface()->rsKeyFormat()) {}
@@ -56,6 +56,7 @@ bool WildcardAccessMethod::shouldMarkIndexAsMultikey(size_t numberOfKeys,
 
 void WildcardAccessMethod::doGetKeys(OperationContext* opCtx,
                                      const CollectionPtr& collection,
+                                     const IndexCatalogEntry* entry,
                                      SharedBufferFragmentBuilder& pooledBufferBuilder,
                                      const BSONObj& obj,
                                      GetKeysContext context,

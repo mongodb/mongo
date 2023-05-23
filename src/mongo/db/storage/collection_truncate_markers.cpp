@@ -41,52 +41,6 @@ namespace mongo {
 // TODO SERVER-74250: Change to slowCollectionSamplingReads once 7.0 is released.
 MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
 
-CollectionTruncateMarkers::CollectionTruncateMarkers(CollectionTruncateMarkers&& other) {
-    stdx::lock_guard lk(other._collectionMarkersReclaimMutex);
-    stdx::lock_guard lk2(other._markersMutex);
-
-    _currentRecords.store(other._currentRecords.swap(0));
-    _currentBytes.store(other._currentBytes.swap(0));
-    _minBytesPerMarker = other._minBytesPerMarker;
-    _markers = std::move(other._markers);
-    _isDead = other._isDead;
-}
-
-bool CollectionTruncateMarkers::isDead() {
-    stdx::lock_guard<Latch> lk(_collectionMarkersReclaimMutex);
-    return _isDead;
-}
-
-void CollectionTruncateMarkers::kill() {
-    stdx::lock_guard<Latch> lk(_collectionMarkersReclaimMutex);
-    _isDead = true;
-    _reclaimCv.notify_one();
-}
-
-
-void CollectionTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
-    // Wait until kill() is called or there are too many collection markers.
-    stdx::unique_lock<Latch> lock(_collectionMarkersReclaimMutex);
-    while (!_isDead) {
-        {
-            MONGO_IDLE_THREAD_BLOCK;
-            stdx::lock_guard<Latch> lk(_markersMutex);
-            if (_hasExcessMarkers(opCtx)) {
-                const auto& oldestMarker = _markers.front();
-                invariant(oldestMarker.lastRecord.isValid());
-
-                LOGV2_DEBUG(7393215,
-                            2,
-                            "Collection has excess markers",
-                            "lastRecord"_attr = oldestMarker.lastRecord,
-                            "wallTime"_attr = oldestMarker.wallTime);
-                return;
-            }
-        }
-        _reclaimCv.wait(lock);
-    }
-}
-
 boost::optional<CollectionTruncateMarkers::Marker>
 CollectionTruncateMarkers::peekOldestMarkerIfNeeded(OperationContext* opCtx) const {
     stdx::lock_guard<Latch> lk(_markersMutex);
@@ -119,15 +73,9 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(OperationContext* opCtx,
                     "lock"_attr = lock);
     };
 
-    // Try to lock both mutexes, if we fail to lock a mutex then someone else is either already
-    // creating a new marker or popping the oldest one. In the latter case, we let the next insert
-    // trigger the new marker's creation.
-    stdx::unique_lock<Latch> reclaimLk(_collectionMarkersReclaimMutex, stdx::try_to_lock);
-    if (!reclaimLk) {
-        logFailedLockAcquisition("_collectionMarkersReclaimMutex");
-        return;
-    }
-
+    // Try to lock the mutex, if we fail to lock then someone else is either already creating a new
+    // marker or popping the oldest one. In the latter case, we let the next insert trigger the new
+    // marker's creation.
     stdx::unique_lock<Latch> lk(_markersMutex, stdx::try_to_lock);
     if (!lk) {
         logFailedLockAcquisition("_markersMutex");
@@ -155,7 +103,7 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(OperationContext* opCtx,
                 "wallTime"_attr = marker.wallTime,
                 "numMarkers"_attr = _markers.size());
 
-    pokeReclaimThread(opCtx);
+    _notifyNewMarkerCreation();
 }
 
 void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
@@ -183,56 +131,12 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
     });
 }
 
-void CollectionTruncateMarkers::clearMarkersOnCommit(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
-        stdx::lock_guard<Latch> lk(_markersMutex);
-
-        _currentRecords.store(0);
-        _currentBytes.store(0);
-        _markers.clear();
-    });
-}
-
-void CollectionTruncateMarkers::updateMarkersAfterCappedTruncateAfter(
-    int64_t recordsRemoved, int64_t bytesRemoved, const RecordId& firstRemovedId) {
-    stdx::lock_guard<Latch> lk(_markersMutex);
-
-    int64_t numMarkersToRemove = 0;
-    int64_t recordsInMarkersToRemove = 0;
-    int64_t bytesInMarkersToRemove = 0;
-
-    // Compute the number and associated sizes of the records from markers that are either fully or
-    // partially truncated.
-    for (auto it = _markers.rbegin(); it != _markers.rend(); ++it) {
-        if (it->lastRecord < firstRemovedId) {
-            break;
-        }
-        numMarkersToRemove++;
-        recordsInMarkersToRemove += it->records;
-        bytesInMarkersToRemove += it->bytes;
-    }
-
-    // Remove the markers corresponding to the records that were deleted.
-    int64_t offset = _markers.size() - numMarkersToRemove;
-    _markers.erase(_markers.begin() + offset, _markers.end());
-
-    // Account for any remaining records from a partially truncated marker in the marker currently
-    // being filled.
-    _currentRecords.addAndFetch(recordsInMarkersToRemove - recordsRemoved);
-    _currentBytes.addAndFetch(bytesInMarkersToRemove - bytesRemoved);
-}
-
 void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
     invariant(size > 0);
 
     stdx::lock_guard<Latch> lk(_markersMutex);
 
     _minBytesPerMarker = size;
-}
-
-
-void CollectionTruncateMarkers::pokeReclaimThread(OperationContext* opCtx) {
-    _reclaimCv.notify_one();
 }
 
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersByScanning(
@@ -482,14 +386,6 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
                                                               std::move(getRecordIdAndWallTime));
 }
 
-CollectionTruncateMarkersWithPartialExpiration::CollectionTruncateMarkersWithPartialExpiration(
-    CollectionTruncateMarkersWithPartialExpiration&& other)
-    : CollectionTruncateMarkers(std::move(other)) {
-    stdx::lock_guard lk3(other._lastHighestRecordMutex);
-    _lastHighestRecordId = std::exchange(other._lastHighestRecordId, RecordId());
-    _lastHighestWallTime = std::exchange(other._lastHighestWallTime, Date_t());
-}
-
 void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterInsertOnCommit(
     OperationContext* opCtx,
     int64_t bytesInserted,
@@ -533,11 +429,6 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
     // Try to lock all mutexes, if we fail to lock a mutex then someone else is either already
     // creating a new marker or popping the oldest one. In the latter case, we let the next check
     // trigger the new partial marker's creation.
-    stdx::unique_lock<Latch> reclaimLk(_collectionMarkersReclaimMutex, stdx::try_to_lock);
-    if (!reclaimLk) {
-        logFailedLockAcquisition("_collectionMarkersReclaimMutex");
-        return;
-    }
 
     stdx::unique_lock<Latch> lk(_markersMutex, stdx::try_to_lock);
     if (!lk) {
@@ -565,7 +456,7 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
                     "lastRecord"_attr = marker.lastRecord,
                     "wallTime"_attr = marker.wallTime,
                     "numMarkers"_attr = _markers.size());
-        pokeReclaimThread(opCtx);
+        _notifyNewMarkerCreation();
     }
 }
 

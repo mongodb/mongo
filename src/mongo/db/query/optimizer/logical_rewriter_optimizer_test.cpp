@@ -1329,6 +1329,131 @@ TEST(LogicalRewriter, NotPushdownToplevelFailureMultikey) {
         latest);
 }
 
+TEST(LogicalRewriter, NotPushdownComposeA) {
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_evalf(
+                _get("top",
+                     _traverse1(_pconst(_unary(
+                         "Not",
+                         _evalf(_composea(
+                                    // A ComposeA where both args can be negated.
+                                    _composea(_get("a", _cmp("Eq", "2"_cint64)),
+                                              _get("b", _cmp("Eq", "3"_cint64))),
+                                    // A ComposeA where only one arg can be negated.
+                                    _composea(_get("c", _cmp("Eq", "4"_cint64)),
+                                              _get("d", _traverse1(_cmp("Eq", "5"_cint64))))),
+                                "scan_0"_var))))),
+                "scan_0"_var))
+            .finish(_scan("scan_0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should push the Not down as far as possible, so that some leaves become Neq.
+    // Leaves with a Traverse in the way residualize a Not instead.
+
+    // Note that the top level traverse is to prevent ComposeM from being decomposed into filter
+    // nodes.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{scan_0}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [top]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathConstant []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathComposeM []\n"
+        "|   |   |   PathLambda []\n"
+        "|   |   |   LambdaAbstraction [tmp_bool_0]\n"
+        "|   |   |   UnaryOp [Not]\n"
+        "|   |   |   EvalFilter []\n"
+        "|   |   |   |   Variable [tmp_bool_0]\n"
+        "|   |   |   PathGet [d]\n"
+        "|   |   |   PathTraverse [1]\n"
+        "|   |   |   PathCompare [Eq]\n"
+        "|   |   |   Const [5]\n"
+        "|   |   PathGet [c]\n"
+        "|   |   PathCompare [Neq]\n"
+        "|   |   Const [4]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathCompare [Neq]\n"
+        "|   |   Const [3]\n"
+        "|   PathGet [a]\n"
+        "|   PathCompare [Neq]\n"
+        "|   Const [2]\n"
+        "Scan [coll, {scan_0}]\n",
+        latest);
+}
+
+TEST(LogicalRewriter, NotPushdownComposeABothPathsCannotBeNegated) {
+    ABT rootNode =
+        NodeBuilder{}
+            .root("scan_0")
+            .filter(_unary(
+                "Not",
+                _evalf(_composea(
+                           // A ComposeA where both args cannot be negated.
+                           _composea(_get("a", _traverse1(_cmp("Eq", "2"_cint64))),
+                                     _get("b", _traverse1(_cmp("Eq", "3"_cint64)))),
+                           // A ComposeA where both args cannot be negated but can be simplified
+                           _composea(_get("c", _traverse1(_pconst(_unary("Not", _cbool(true))))),
+                                     _get("d", _traverse1(_pconst(_unary("Not", _cbool(false))))))),
+                       "scan_0"_var)))
+            .finish(_scan("scan_0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We should keep ComposeA if both paths cannot be negated. If a path can be simplified (for
+    // example, Unary [Not] Constant [true] -> Constant [false]), the simplified path should
+    // reflected in ComposeA even if it is not negated.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{scan_0}]\n"
+        "Filter []\n"
+        "|   UnaryOp [Not]\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathComposeA []\n"
+        "|   |   |   PathGet [d]\n"
+        "|   |   |   PathTraverse [1]\n"
+        "|   |   |   PathConstant []\n"
+        "|   |   |   Const [true]\n"
+        "|   |   PathGet [c]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathConstant []\n"
+        "|   |   Const [false]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [3]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [2]\n"
+        "Scan [coll, {scan_0}]\n",
+        latest);
+}
+
 TEST(LogicalRewriter, NotPushdownComposeM) {
     using namespace unit_test_abt_literals;
     using namespace properties;

@@ -53,6 +53,14 @@ setUpShardedCluster();
             },
             writeType: "twoPhaseProtocol",
             dataBearingShard: "other",
+            rootStage: "PROJECTION_DEFAULT",
+            bucketFilter: makeBucketFilter({
+                $and: [
+                    {"control.min.f": {$_internalExprLte: 106}},
+                    {"control.max.f": {$_internalExprGte: 106}},
+                ]
+            }),
+            residualFilter: {f: {$eq: 106}},
         },
     });
 })();
@@ -73,6 +81,10 @@ setUpShardedCluster();
             deletedDoc: doc3_a_f102,
             writeType: "twoPhaseProtocol",
             dataBearingShard: "primary",
+            rootStage: "TS_MODIFY",
+            bucketFilter:
+                makeBucketFilter({"meta": {$eq: "a"}}, {"control.max.f": {$_internalExprGt: 101}}),
+            residualFilter: {f: {$gt: 101}},
         },
     });
 })();
@@ -82,7 +94,21 @@ setUpShardedCluster();
     testFindOneAndRemoveOnShardedCollection({
         initialDocList: docs,
         cmd: {filter: {[metaFieldName]: "C", f: 17}},
-        res: {nDeleted: 0, writeType: "targeted", dataBearingShard: "other"},
+        res: {
+            nDeleted: 0,
+            writeType: "targeted",
+            dataBearingShard: "other",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({"meta": {$eq: "C"}}, {
+                $and: [
+                    {"control.min.f": {$_internalExprLte: 17}},
+                    {"control.max.f": {$_internalExprGte: 17}},
+                ]
+            }),
+            residualFilter: {f: {$eq: 17}},
+            nBucketsUnpacked: 0,
+            nReturned: 0,
+        },
     });
 })();
 
@@ -91,7 +117,19 @@ setUpShardedCluster();
     testFindOneAndRemoveOnShardedCollection({
         initialDocList: docs,
         cmd: {filter: {f: 17}},
-        res: {nDeleted: 0, writeType: "twoPhaseProtocol", dataBearingShard: "none"},
+        res: {
+            nDeleted: 0,
+            writeType: "twoPhaseProtocol",
+            dataBearingShard: "none",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({
+                $and: [
+                    {"control.min.f": {$_internalExprLte: 17}},
+                    {"control.max.f": {$_internalExprGte: 17}},
+                ]
+            }),
+            residualFilter: {f: {$eq: 17}},
+        },
     });
 })();
 
@@ -106,6 +144,16 @@ setUpShardedCluster();
             deletedDoc: doc4_b_f103,
             writeType: "targeted",
             dataBearingShard: "other",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({"meta": {$eq: "B"}}, {
+                $and: [
+                    {"control.min.f": {$_internalExprLte: 103}},
+                    {"control.max.f": {$_internalExprGte: 103}},
+                ]
+            }),
+            residualFilter: {f: {$eq: 103}},
+            nBucketsUnpacked: 1,
+            nReturned: 1,
         },
     });
 })();
@@ -122,6 +170,24 @@ setUpShardedCluster();
             deletedDoc: doc4_b_f103,
             writeType: "twoPhaseProtocol",
             dataBearingShard: "other",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({
+                $and: [
+                    {
+                        $and: [
+                            {[`control.min.${metaFieldName}`]: {$_internalExprLte: "B"}},
+                            {[`control.max.${metaFieldName}`]: {$_internalExprGte: "B"}},
+                        ]
+                    },
+                    {
+                        $and: [
+                            {"control.min.f": {$_internalExprLte: 103}},
+                            {"control.max.f": {$_internalExprGte: 103}},
+                        ]
+                    }
+                ]
+            }),
+            residualFilter: {$and: [{[metaFieldName]: {$eq: "B"}}, {f: {$eq: 103}}]},
         },
     });
 })();
@@ -137,6 +203,15 @@ setUpShardedCluster();
             deletedDoc: doc2_a_f101,
             writeType: "targeted",
             dataBearingShard: "primary",
+            rootStage: "TS_MODIFY",
+            bucketFilter:
+                makeBucketFilter({"meta": {$eq: "A"}}, {"control.min.f": {$_internalExprLt: 103}}),
+            residualFilter: {f: {$lt: 103}},
+            // 'doc1_a_nofields' and 'doc1_a_f101' are in different buckets because the time values
+            // are distant enough and $_internalExprLt matches no 'control.min.f' field too. So, the
+            // TS_MODIFY stage will unpack two buckets.
+            nBucketsUnpacked: 2,
+            nReturned: 1,
         },
     });
 })();
@@ -153,6 +228,19 @@ setUpShardedCluster();
             deletedDoc: doc2_a_f101,
             writeType: "twoPhaseProtocol",
             dataBearingShard: "primary",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({
+                $and: [
+                    {
+                        $and: [
+                            {[`control.min.${metaFieldName}`]: {$_internalExprLte: "A"}},
+                            {[`control.max.${metaFieldName}`]: {$_internalExprGte: "A"}},
+                        ]
+                    },
+                    {"control.min.f": {$_internalExprLt: 103}}
+                ]
+            }),
+            residualFilter: {$and: [{[metaFieldName]: {$eq: "A"}}, {f: {$lt: 103}}]},
         },
     });
 })();
@@ -169,6 +257,36 @@ setUpShardedCluster();
             deletedDoc: doc6_c_f105,
             writeType: "targeted",
             dataBearingShard: "other",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({
+                $and: [
+                    {
+                        [`control.min.${timeFieldName}`]:
+                            {$_internalExprLte: doc6_c_f105[timeFieldName]}
+                    },
+                    // -1 hour
+                    {
+                        [`control.min.${timeFieldName}`]:
+                            {$_internalExprGte: ISODate("2005-12-31T23:00:00Z")}
+                    },
+                    {
+                        [`control.max.${timeFieldName}`]:
+                            {$_internalExprGte: doc6_c_f105[timeFieldName]}
+                    },
+                    // +1 hour
+                    {
+                        [`control.max.${timeFieldName}`]:
+                            {$_internalExprLte: ISODate("2006-01-01T01:00:00Z")}
+                    },
+                    // The bucket's _id encodes the time info and so the bucket filter will include
+                    // the _id range filter.
+                    {"_id": {"$lte": ObjectId("43b71b80ffffffffffffffff")}},
+                    {"_id": {"$gte": ObjectId("43b70d700000000000000000")}}
+                ]
+            }),
+            residualFilter: {[timeFieldName]: {$eq: doc6_c_f105[timeFieldName]}},
+            nBucketsUnpacked: 1,
+            nReturned: 1,
         },
     });
 })();
@@ -184,6 +302,34 @@ setUpShardedCluster();
             deletedDoc: doc7_c_f106,
             writeType: "twoPhaseProtocol",
             dataBearingShard: "other",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({
+                $and: [
+                    {
+                        [`control.min.${timeFieldName}`]:
+                            {$_internalExprLte: doc7_c_f106[timeFieldName]}
+                    },
+                    // -1 hour
+                    {
+                        [`control.min.${timeFieldName}`]:
+                            {$_internalExprGte: ISODate("2006-12-31T23:00:00Z")}
+                    },
+                    {
+                        [`control.max.${timeFieldName}`]:
+                            {$_internalExprGte: doc7_c_f106[timeFieldName]}
+                    },
+                    // +1 hour
+                    {
+                        [`control.max.${timeFieldName}`]:
+                            {$_internalExprLte: ISODate("2007-01-01T01:00:00Z")}
+                    },
+                    // The bucket's _id encodes the time info and so the bucket filter will include
+                    // the _id range filter.
+                    {"_id": {"$lte": ObjectId("45984f00ffffffffffffffff")}},
+                    {"_id": {"$gte": ObjectId("459840f00000000000000000")}}
+                ]
+            }),
+            residualFilter: {[timeFieldName]: {$eq: doc7_c_f106[timeFieldName]}},
         },
     });
 })();
@@ -194,7 +340,14 @@ setUpShardedCluster();
         initialDocList: docs,
         cmd: {filter: {}},
         // Don't validate exact results as we could delete any doc from any shard.
-        res: {nDeleted: 1, writeType: "twoPhaseProtocol", dataBearingShard: "any"},
+        res: {
+            nDeleted: 1,
+            writeType: "twoPhaseProtocol",
+            dataBearingShard: "any",
+            rootStage: "TS_MODIFY",
+            bucketFilter: makeBucketFilter({}),
+            residualFilter: {},
+        },
     });
 })();
 

@@ -64,7 +64,7 @@ class PlanExecutorInvalidationTest : public unittest::Test {
 public:
     PlanExecutorInvalidationTest()
         : _client(&_opCtx), _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss)) {
-        _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
+        _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns_forTest()));
         _client.dropCollection(nss);
 
         for (int i = 0; i < N(); ++i) {
@@ -75,7 +75,7 @@ public:
     }
 
     /**
-     * Return a plan executor that is going over the collection in nss.ns().
+     * Return a plan executor that is going over the collection in nss.ns_forTest().
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollscan() {
         unique_ptr<WorkingSet> ws(new WorkingSet());
@@ -150,7 +150,7 @@ public:
         BSONObj info;
         ASSERT_TRUE(_client.runCommand(
             DatabaseName::kAdmin,
-            BSON("renameCollection" << nss.ns() << "to" << to << "dropTarget" << true),
+            BSON("renameCollection" << nss.ns_forTest() << "to" << to << "dropTarget" << true),
             info));
         _refreshCollection();
     }
@@ -253,7 +253,7 @@ TEST_F(PlanExecutorInvalidationTest, PlanExecutorThrowsOnRestoreWhenCollectionIs
 
     exec->saveState();
 
-    dropCollection(nss.ns());
+    dropCollection(nss.ns_forTest());
 
     ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
@@ -262,7 +262,7 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenAllIndicesDro
     auto exec = getCollscan();
     BSONObj obj;
 
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), BSON("foo" << 1)));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("foo" << 1)));
 
     // Read some of it.
     for (int i = 0; i < 10; ++i) {
@@ -285,7 +285,7 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenOneIndexDropp
     auto exec = getCollscan();
     BSONObj obj;
 
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), BSON("foo" << 1)));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("foo" << 1)));
 
     // Read some of it.
     for (int i = 0; i < 10; ++i) {
@@ -306,10 +306,10 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenOneIndexDropp
 
 TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenAllIndexesDropped) {
     BSONObj keyPattern = BSON("foo" << 1);
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), keyPattern));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
     // Create a second index which is not used by the plan executor.
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), BSON("bar" << 1)));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("bar" << 1)));
 
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 
@@ -330,7 +330,7 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenAllIndexesDropped) {
 
 TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenIndexBeingScannedIsDropped) {
     BSONObj keyPattern = BSON("foo" << 1);
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), keyPattern));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 
@@ -352,8 +352,8 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenIndexBeingScannedIsDr
 TEST_F(PlanExecutorInvalidationTest, IxscanExecutorSurvivesWhenUnrelatedIndexIsDropped) {
     BSONObj keyPatternFoo = BSON("foo" << 1);
     BSONObj keyPatternBar = BSON("bar" << 1);
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), keyPatternFoo));
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), keyPatternBar));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPatternFoo));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPatternBar));
 
     auto exec = makeIxscanPlan(keyPatternFoo, BSON("foo" << 0), BSON("foo" << N()));
 
@@ -393,7 +393,7 @@ TEST_F(PlanExecutorInvalidationTest, ExecutorThrowsOnRestoreWhenDatabaseIsDroppe
     // requires a "global write lock."
     _ctx.reset();
     dropDatabase("somesillydb");
-    _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
+    _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns_forTest()));
     exec->restoreState(&collection());
 
     ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
@@ -404,7 +404,7 @@ TEST_F(PlanExecutorInvalidationTest, ExecutorThrowsOnRestoreWhenDatabaseIsDroppe
     // Drop our DB.  Once again, must give up the lock.
     _ctx.reset();
     dropDatabase("unittests");
-    _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
+    _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns_forTest()));
     ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
@@ -429,7 +429,7 @@ TEST_F(PlanExecutorInvalidationTest, CollScanDiesOnCollectionRenameWithinDatabas
 // TODO SERVER-31695: Allow PlanExecutors to remain valid after collection rename.
 TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase) {
     BSONObj keyPattern = BSON("foo" << 1);
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), keyPattern));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 
@@ -449,7 +449,7 @@ TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase)
 
 TEST_F(PlanExecutorInvalidationTest, IxscanDiesWhenTruncateCollectionDropsAllIndices) {
     BSONObj keyPattern = BSON("foo" << 1);
-    ASSERT_OK(createIndex(&_opCtx, nss.ns(), keyPattern));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 

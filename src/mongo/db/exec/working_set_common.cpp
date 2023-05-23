@@ -189,6 +189,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             auto* iam = desc->getEntry()->accessMethod()->asSortedData();
             iam->getKeys(opCtx,
                          collection,
+                         desc->getEntry(),
                          pool,
                          member->doc.value().toBson(),
                          InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,

@@ -33,12 +33,6 @@ assert.commandWorked(result);
 // Tests that sharded time-series collection can be queried (invoking $_internalUnpackBucket stage)
 // from an external client with 'apiStrict'.
 (function testInternalUnpackBucketAllowance() {
-    if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-        jsTestLog(
-            "Skipping test because the sharded time-series collection feature flag is disabled");
-        return;
-    }
-
     const collName = 'timeseriesColl';
     const timeField = 'tm';
     const coll = db[collName];

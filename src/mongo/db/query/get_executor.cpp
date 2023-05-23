@@ -55,6 +55,7 @@
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/timeseries_modify.h"
+#include "mongo/db/exec/timeseries_upsert.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -226,8 +227,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        auto wam = static_cast<const WildcardAccessMethod*>(accessMethod);
-        wildcardProjection = wam->getWildcardProjection();
+        wildcardProjection =
+            static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
         if (isMultikey) {
             MultikeyMetadataAccessStats mkAccessStats;
 
@@ -243,9 +244,9 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                 }
 
                 multikeyPathSet =
-                    getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);
+                    getWildcardMultikeyPathSet(opCtx, &ice, projectedFields, &mkAccessStats);
             } else {
-                multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx, &mkAccessStats);
+                multikeyPathSet = getWildcardMultikeyPathSet(opCtx, &ice, &mkAccessStats);
             }
 
             LOGV2_DEBUG(20920,
@@ -2118,23 +2119,35 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     updateStageParams.canonicalQuery = cq.get();
     const bool isUpsert = updateStageParams.request->isUpsert();
-    if (isUpsert) {
-        root = std::make_unique<UpsertStage>(
-            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
-    } else if (parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
+    if (parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
         if (request->isMulti()) {
             // If this is a multi-update, we need to spool the data before beginning to apply
             // updates, in order to avoid the Halloween problem.
             root = std::make_unique<SpoolStage>(cq->getExpCtxRaw(), ws.get(), std::move(root));
         }
-        root = std::make_unique<TimeseriesModifyStage>(
-            cq->getExpCtxRaw(),
-            TimeseriesModifyParams(&updateStageParams),
-            ws.get(),
-            std::move(root),
-            coll,
-            BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-            parsedUpdate->releaseResidualExpr());
+        if (isUpsert) {
+            root = std::make_unique<TimeseriesUpsertStage>(
+                cq->getExpCtxRaw(),
+                TimeseriesModifyParams(&updateStageParams),
+                ws.get(),
+                std::move(root),
+                coll,
+                BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+                parsedUpdate->releaseResidualExpr(),
+                *request);
+        } else {
+            root = std::make_unique<TimeseriesModifyStage>(
+                cq->getExpCtxRaw(),
+                TimeseriesModifyParams(&updateStageParams),
+                ws.get(),
+                std::move(root),
+                coll,
+                BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+                parsedUpdate->releaseResidualExpr());
+        }
+    } else if (isUpsert) {
+        root = std::make_unique<UpsertStage>(
+            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
     } else {
         root = std::make_unique<UpdateStage>(
             cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());

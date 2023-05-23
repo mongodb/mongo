@@ -179,8 +179,9 @@ bool Helpers::findById(OperationContext* opCtx,
     if (indexFound)
         *indexFound = 1;
 
-    auto recordId = catalog->getEntry(desc)->accessMethod()->asSortedData()->findSingle(
-        opCtx, CollectionPtr(collection), query["_id"].wrap());
+    const IndexCatalogEntry* entry = catalog->getEntry(desc);
+    auto recordId = entry->accessMethod()->asSortedData()->findSingle(
+        opCtx, CollectionPtr(collection), entry, query["_id"].wrap());
     if (recordId.isNull())
         return false;
     result = collection->docFor(opCtx, recordId).value();
@@ -201,8 +202,9 @@ RecordId Helpers::findById(OperationContext* opCtx,
     }
 
     uassert(13430, "no _id index", desc);
-    return catalog->getEntry(desc)->accessMethod()->asSortedData()->findSingle(
-        opCtx, collection, idquery["_id"].wrap());
+    const IndexCatalogEntry* entry = catalog->getEntry(desc);
+    return entry->accessMethod()->asSortedData()->findSingle(
+        opCtx, collection, entry, idquery["_id"].wrap());
 }
 
 // Acquires necessary locks to read the collection with the given namespace. If this is an oplog

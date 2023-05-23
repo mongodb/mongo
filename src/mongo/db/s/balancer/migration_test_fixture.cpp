@@ -79,9 +79,9 @@ void MigrationTestFixture::setUpZones(const NamespaceString& collName,
     for (auto const& zoneChunkRange : zoneChunkRanges) {
         BSONObjBuilder zoneDocBuilder;
         zoneDocBuilder.append("_id",
-                              BSON(TagsType::ns(collName.ns().toString())
+                              BSON(TagsType::ns(collName.toString())
                                    << TagsType::min(zoneChunkRange.second.getMin())));
-        zoneDocBuilder.append(TagsType::ns(), collName.ns());
+        zoneDocBuilder.append(TagsType::ns(), collName.ns_forTest());
         zoneDocBuilder.append(TagsType::min(), zoneChunkRange.second.getMin());
         zoneDocBuilder.append(TagsType::max(), zoneChunkRange.second.getMax());
         zoneDocBuilder.append(TagsType::tag(), zoneChunkRange.first);
@@ -92,7 +92,7 @@ void MigrationTestFixture::setUpZones(const NamespaceString& collName,
 }
 
 void MigrationTestFixture::removeAllZones(const NamespaceString& collName) {
-    const auto query = BSON("ns" << collName.ns());
+    const auto query = BSON("ns" << collName.ns_forTest());
     ASSERT_OK(catalogClient()->removeConfigDocuments(
         operationContext(), TagsType::ConfigNS, query, kMajorityWriteConcern));
     auto findStatus = findOneOnConfigCollection(operationContext(), collName, query);

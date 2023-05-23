@@ -116,21 +116,32 @@ void _validateIndexes(OperationContext* opCtx,
                       ValidateAdaptor* indexValidator,
                       ValidateResults* results) {
     // Validate Indexes, checking for mismatch between index entries and collection records.
-    for (const auto& index : validateState->getIndexes()) {
+    for (const auto& indexIdent : validateState->getIndexIdents()) {
         opCtx->checkForInterrupt();
 
-        const IndexDescriptor* descriptor = index->descriptor();
+        // Make a copy of the index name. The `traverseIndex()` function below will yield
+        // periodically, so it's unsafe to hold a pointer to the index here.
+        const std::string indexName = validateState->getCollection()
+                                          ->getIndexCatalog()
+                                          ->findIndexByIdent(opCtx, indexIdent)
+                                          ->indexName();
 
         LOGV2_OPTIONS(20296,
                       {LogComponent::kIndex},
                       "Validating index consistency",
-                      "index"_attr = descriptor->indexName(),
+                      "index"_attr = indexName,
                       logAttrs(validateState->nss()));
 
         int64_t numTraversedKeys;
-        indexValidator->traverseIndex(opCtx, index.get(), &numTraversedKeys, results);
+        indexValidator->traverseIndex(opCtx,
+                                      validateState->getCollection()
+                                          ->getIndexCatalog()
+                                          ->findIndexByIdent(opCtx, indexIdent)
+                                          ->getEntry(),
+                                      &numTraversedKeys,
+                                      results);
 
-        auto& curIndexResults = (results->indexResultsMap)[descriptor->indexName()];
+        auto& curIndexResults = (results->indexResultsMap)[indexName];
         curIndexResults.keysTraversed = numTraversedKeys;
 
         if (!curIndexResults.valid) {
@@ -170,10 +181,11 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
 
     // Iterate through all the indexes in the collection and only record the index entry keys that
     // had inconsistencies during the first phase.
-    for (const auto& index : validateState->getIndexes()) {
+    for (const auto& indexIdent : validateState->getIndexIdents()) {
         opCtx->checkForInterrupt();
 
-        const IndexDescriptor* descriptor = index->descriptor();
+        const IndexDescriptor* descriptor =
+            validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
 
         LOGV2_OPTIONS(20300,
                       {LogComponent::kIndex},
@@ -181,7 +193,7 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                       "index"_attr = descriptor->indexName());
 
         indexValidator->traverseIndex(opCtx,
-                                      index.get(),
+                                      descriptor->getEntry(),
                                       /*numTraversedKeys=*/nullptr,
                                       result);
     }
@@ -205,28 +217,24 @@ void _validateIndexKeyCount(OperationContext* opCtx,
                             ValidateState* validateState,
                             ValidateAdaptor* indexValidator,
                             ValidateResultsMap* indexNsResultsMap) {
-    for (const auto& index : validateState->getIndexes()) {
-        const IndexDescriptor* descriptor = index->descriptor();
+    for (const auto& indexIdent : validateState->getIndexIdents()) {
+        const IndexDescriptor* descriptor =
+            validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         auto& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
         if (curIndexResults.valid) {
-            indexValidator->validateIndexKeyCount(opCtx, index.get(), curIndexResults);
+            indexValidator->validateIndexKeyCount(opCtx, descriptor->getEntry(), curIndexResults);
         }
     }
 }
 
-void _printIndexSpec(const ValidateState* validateState, StringData indexName) {
-    auto& indexes = validateState->getIndexes();
-    auto indexEntry =
-        std::find_if(indexes.begin(),
-                     indexes.end(),
-                     [&](const std::shared_ptr<const IndexCatalogEntry> indexEntry) -> bool {
-                         return indexEntry->descriptor()->indexName() == indexName;
-                     });
-    if (indexEntry != indexes.end()) {
-        auto indexSpec = (*indexEntry)->descriptor()->infoObj();
-        LOGV2_ERROR(7463100, "Index failed validation", "spec"_attr = indexSpec);
-    }
+void _printIndexSpec(OperationContext* opCtx,
+                     const ValidateState* validateState,
+                     StringData indexName) {
+    const IndexDescriptor* descriptor =
+        validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    auto indexSpec = descriptor->infoObj();
+    LOGV2_ERROR(7463100, "Index failed validation", "spec"_attr = indexSpec);
 }
 
 /**
@@ -310,7 +318,7 @@ void _reportValidationResults(OperationContext* opCtx,
     for (const auto& [indexName, vr] : results->indexResultsMap) {
         if (!vr.valid) {
             results->valid = false;
-            _printIndexSpec(validateState, indexName);
+            _printIndexSpec(opCtx, validateState, indexName);
         }
 
         if (validateState->getSkippedIndexes().contains(indexName)) {

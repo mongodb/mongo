@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -1103,25 +1104,48 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
         }
 
         InitialSplitPolicy::ShardCollectionConfig splitResult;
+
+        // If shardDistribution is specified with min/max, use ShardDistributionSplitPolicy.
         if (const auto& shardDistribution = coordinatorDoc.getShardDistribution()) {
             uassert(ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, should not have shardDistribution in "
-                    "coordinatorDoc",
+                    "Resharding improvements is not enabled, should not have "
+                    "shardDistribution in coordinatorDoc",
                     resharding::gFeatureFlagReshardingImprovements.isEnabled(
                         serverGlobalParams.featureCompatibility));
-            auto initialSplitter = ShardDistributionSplitPolicy::make(
-                opCtx, shardKey, *shardDistribution, std::move(parsedZones));
+            uassert(ErrorCodes::InvalidOptions,
+                    "ShardDistribution should not be empty if provided",
+                    shardDistribution->size() > 0);
             const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
                                                 *donorShardIds.begin()};
-            splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
+            // If shardDistribution is specified with min/max, create chunks based on the shard
+            // min/max. If not, do sampling based split on limited shards.
+            if ((*shardDistribution)[0].getMin()) {
+                auto initialSplitter = ShardDistributionSplitPolicy::make(
+                    opCtx, shardKey, *shardDistribution, std::move(parsedZones));
+                splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
+            } else {
+                std::vector<ShardId> availableShardIds;
+                for (const auto& shardDist : *shardDistribution) {
+                    availableShardIds.emplace_back(shardDist.getShard());
+                }
+                auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
+                                                                      coordinatorDoc.getSourceNss(),
+                                                                      shardKey,
+                                                                      numInitialChunks,
+                                                                      std::move(parsedZones),
+                                                                      availableShardIds);
+                splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
+            }
         } else {
-            auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
-                                                                  coordinatorDoc.getSourceNss(),
-                                                                  shardKey,
-                                                                  numInitialChunks,
-                                                                  std::move(parsedZones));
-            // Note: The resharding initial split policy doesn't care about what is the real primary
-            // shard, so just pass in a random shard.
+            auto initialSplitter =
+                SamplingBasedSplitPolicy::make(opCtx,
+                                               coordinatorDoc.getSourceNss(),
+                                               shardKey,
+                                               numInitialChunks,
+                                               std::move(parsedZones),
+                                               boost::none /*availableShardIds*/);
+            // Note: The resharding initial split policy doesn't care about what is the real
+            // primary shard, so just pass in a random shard.
             const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
                                                 *donorShardIds.begin()};
             splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
@@ -1272,7 +1296,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
     BSONObjBuilder bob;
     bob.append("newState", CoordinatorState_serializer(doc.getState()));
     bob.append("oldState", CoordinatorState_serializer(_coordinatorDoc.getState()));
-    bob.append("namespace", doc.getSourceNss().toString());
+    bob.append("namespace", NamespaceStringUtil::serialize(doc.getSourceNss()));
     bob.append("collectionUUID", doc.getSourceUUID().toString());
     bob.append("reshardingUUID", doc.getReshardingUUID().toString());
 
@@ -1291,7 +1315,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "resharding.coordinator.transition",
-                                           doc.getSourceNss().toString(),
+                                           NamespaceStringUtil::serialize(doc.getSourceNss()),
                                            bob.obj(),
                                            kMajorityWriteConcern);
 }

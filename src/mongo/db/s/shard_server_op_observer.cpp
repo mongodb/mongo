@@ -398,7 +398,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           const CollectionPtr& coll,
-                                          BSONObj const& doc) {
+                                          BSONObj const& doc,
+                                          OpStateAccumulator* opAccumulator) {
 
     if (coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace ||
         coll->ns() == NamespaceString::kRangeDeletionNamespace) {

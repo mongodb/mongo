@@ -1,0 +1,5 @@
+Upgrade/Downgrade Compatibility Tests
+=====================================
+
+This directory contains a collection of upgrade/downgrade compatibility tests. This is meant to
+supplement our standard upgrade/downgrade testing with additional smaller tests.

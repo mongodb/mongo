@@ -387,7 +387,7 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
 
         new_installed_files = env.Install(target=target_for_source, source=s)
         setattr(s.attributes, INSTALLED_FILES, new_installed_files)
-
+        setattr(new_installed_files[0].attributes, 'AIB_INSTALL_FROM', s)
         installed_files.extend(new_installed_files)
 
     entry.files.update(installed_files)

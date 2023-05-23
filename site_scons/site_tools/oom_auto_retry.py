@@ -28,6 +28,7 @@ import sys
 import time
 import random
 import os
+import re
 
 from typing import Callable, List, Dict
 
@@ -38,7 +39,10 @@ def command_spawn_func(sh: str, escape: Callable[[str], str], cmd: str, args: Li
     success = False
 
     build_env = target[0].get_build_env()
-    oom_messages = build_env.get('OOM_RETRY_MESSAGES', [])
+    oom_messages = [
+        re.compile(msg, re.MULTILINE | re.DOTALL)
+        for msg in build_env.get('OOM_RETRY_MESSAGES', [])
+    ]
     oom_returncodes = [int(returncode) for returncode in build_env.get('OOM_RETRY_RETURNCODES', [])]
     max_retries = build_env.get('OOM_RETRY_ATTEMPTS', 10)
     oom_max_retry_delay = build_env.get('OOM_RETRY_MAX_DELAY_SECONDS', 120)
@@ -59,7 +63,7 @@ def command_spawn_func(sh: str, escape: Callable[[str], str], cmd: str, args: Li
         except subprocess.CalledProcessError as exc:
             print(f"{os.path.basename(__file__)} captured error:")
             print(exc.stdout)
-            if any([oom_message in exc.stdout for oom_message in oom_messages]) or any(
+            if any([re.findall(oom_message, exc.stdout) for oom_message in oom_messages]) or any(
                 [oom_returncode == exc.returncode for oom_returncode in oom_returncodes]):
                 retries += 1
                 retry_delay = int((time.time() - start_time) +

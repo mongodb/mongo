@@ -110,8 +110,8 @@ TEST(OplogEntryTest, Create) {
 TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     const BSONObj oplogEntryExtraField = BSON("ts" << Timestamp(0, 0) << "t" << 0LL << "op"
                                                    << "c"
-                                                   << "ns" << nss.ns() << "wall" << Date_t() << "o"
-                                                   << BSON("_id" << 1) << "extraField" << 3);
+                                                   << "ns" << nss.ns_forTest() << "wall" << Date_t()
+                                                   << "o" << BSON("_id" << 1) << "extraField" << 3);
 
     // OpTimeBase should be successfully created from an OplogEntry, even though it has
     // extraneous fields.
@@ -128,7 +128,7 @@ TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     const BSONObj oplogEntryMissingTimestamp =
         BSON("t" << 0LL << "op"
                  << "c"
-                 << "ns" << nss.ns() << "wall" << Date_t() << "o" << BSON("_id" << 1));
+                 << "ns" << nss.ns_forTest() << "wall" << Date_t() << "o" << BSON("_id" << 1));
 
     // When an OplogEntryBase is created with a missing required field in a chained struct, it
     // should throw an exception.
@@ -161,7 +161,7 @@ TEST(OplogEntryTest, ParseMutableOplogEntryIncludesTidField) {
     const TenantId tid(OID::gen());
 
     const NamespaceString nssWithTid =
-        NamespaceString::createNamespaceString_forTest(tid, nss.ns());
+        NamespaceString::createNamespaceString_forTest(tid, nss.ns_forTest());
 
     const BSONObj oplogBson = [&] {
         BSONObjBuilder bob;
@@ -169,7 +169,7 @@ TEST(OplogEntryTest, ParseMutableOplogEntryIncludesTidField) {
         bob.append("t", 0LL);
         bob.append("op", "c");
         tid.serializeToBSON("tid", &bob);
-        bob.append("ns", nssWithTid.ns());
+        bob.append("ns", nssWithTid.ns_forTest());
         bob.append("wall", Date_t());
         BSONObjBuilder{bob.subobjStart("o")}.append("_id", 1);
         return bob.obj();
@@ -187,7 +187,7 @@ TEST(OplogEntryTest, ParseDurableOplogEntryIncludesTidField) {
 
     const TenantId tid(OID::gen());
     const NamespaceString nssWithTid =
-        NamespaceString::createNamespaceString_forTest(tid, nss.ns());
+        NamespaceString::createNamespaceString_forTest(tid, nss.ns_forTest());
 
     const BSONObj oplogBson = [&] {
         BSONObjBuilder bob;
@@ -195,7 +195,7 @@ TEST(OplogEntryTest, ParseDurableOplogEntryIncludesTidField) {
         bob.append("t", 0LL);
         bob.append("op", "i");
         tid.serializeToBSON("tid", &bob);
-        bob.append("ns", nssWithTid.ns());
+        bob.append("ns", nssWithTid.ns_forTest());
         bob.append("wall", Date_t());
         BSONObjBuilder{bob.subobjStart("o")}.append("_id", 1).append("data", "x");
         BSONObjBuilder{bob.subobjStart("o2")}.append("_id", 1);
@@ -214,7 +214,8 @@ TEST(OplogEntryTest, ParseReplOperationIncludesTidField) {
 
     UUID uuid(UUID::gen());
     TenantId tid(OID::gen());
-    NamespaceString nssWithTid = NamespaceString::createNamespaceString_forTest(tid, nss.ns());
+    NamespaceString nssWithTid =
+        NamespaceString::createNamespaceString_forTest(tid, nss.ns_forTest());
 
     auto op = repl::DurableOplogEntry::makeInsertOperation(
         nssWithTid,
@@ -234,7 +235,7 @@ TEST(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
     auto tid = TenantId(OID::gen());
-    auto nssWithTid = NamespaceString::createNamespaceString_forTest(tid, nss.ns());
+    auto nssWithTid = NamespaceString::createNamespaceString_forTest(tid, nss.ns_forTest());
     auto opType = repl::OpTypeEnum::kCommand;
     auto uuid = UUID::gen();
     std::vector<StmtId> stmtIds{StmtId(0), StmtId(1), StmtId(2)};

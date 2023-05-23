@@ -213,24 +213,20 @@ public:
 
             Impl::checkCanRunHere(opCtx);
 
-            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-
-            const boost::intrusive_ptr<ExpressionContext> expCtx;
-            auto cq = uassertStatusOK(
-                CanonicalQuery::canonicalize(opCtx,
-                                             std::move(findCommand),
-                                             false, /* isExplain */
-                                             expCtx,
-                                             ExtensionsCallbackNoop(),
-                                             MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto&& parsedFindResult = uassertStatusOK(parsed_find_command::parse(
+                opCtx,
+                _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body),
+                ExtensionsCallbackNoop(),
+                MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto& expCtx = parsedFindResult.first;
+            auto& parsedFind = parsedFindResult.second;
 
             if (!_didDoFLERewrite) {
-                query_stats::registerRequest(std::make_unique<query_stats::FindRequestShapifier>(
-                                                 cq->getFindCommandRequest(), opCtx),
-                                             cq->nss(),
-                                             opCtx,
-                                             cq->getExpCtx());
+                query_stats::registerRequest(expCtx, expCtx->ns, [&]() {
+                    return std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedFind);
+                });
             }
+            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(expCtx, std::move(parsedFind)));
 
             try {
                 // Do the work to generate the first batch of results. This blocks waiting to get

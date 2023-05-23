@@ -1195,8 +1195,8 @@ TEST_F(ChangeStreamStageTest, TransformCreate) {
 
 TEST_F(ChangeStreamStageTest, TransformRename) {
     NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()), testUuid());
 
     const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
@@ -1227,9 +1227,10 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
 TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
     NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
     auto dropTarget = UUID::gen();
-    OplogEntry rename = createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()
-                                                              << "dropTarget" << dropTarget),
-                                      testUuid());
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()
+                                              << "dropTarget" << dropTarget),
+                      testUuid());
 
     const auto opDesc = V{
         D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
@@ -1271,10 +1272,10 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
     bool dropDBFromMigrate = true;
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, dropDBFromMigrate);
     bool renameFromMigrate = true;
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()),
-                      boost::none,
-                      renameFromMigrate);
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()),
+        boost::none,
+        renameFromMigrate);
 
     for (auto& entry : {dropColl, dropDB, rename}) {
         checkTransformation(entry, boost::none);
@@ -1283,8 +1284,8 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
 
 TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
     NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()), testUuid());
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << otherColl.ns_forTest() << "to" << nss.ns_forTest()), testUuid());
 
     const auto opDesc = Value(D{{"to", D{{"db", nss.db()}, {"coll", nss.coll()}}}});
     Document expectedRename{
@@ -1340,7 +1341,7 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetectedLegacyFormat) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
-    auto o2Field = D{{"migrateChunkToNewShard", nss.toString()},
+    auto o2Field = D{{"migrateChunkToNewShard", nss.toString_forTest()},
                      {"fromShardId", "fromShard"_sd},
                      {"toShardId", "toShard"_sd}};
     auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
@@ -1518,7 +1519,7 @@ DEATH_TEST_F(ChangeStreamStageTest, ShouldCrashWithNoopInsideApplyOps, "Unexpect
         Document{{"applyOps",
                   Value{std::vector<Document>{
                       Document{{"op", "n"_sd},
-                               {"ns", nss.ns()},
+                               {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
@@ -1531,7 +1532,7 @@ DEATH_TEST_F(ChangeStreamStageTest,
     Document applyOpsDoc =
         Document{{"applyOps",
                   Value{std::vector<Document>{
-                      Document{{"ns", nss.ns()},
+                      Document{{"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
@@ -1545,7 +1546,7 @@ DEATH_TEST_F(ChangeStreamStageTest,
         Document{{"applyOps",
                   Value{std::vector<Document>{
                       Document{{"op", 2},
-                               {"ns", nss.ns()},
+                               {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
@@ -1557,7 +1558,7 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {
         Document{{"applyOps",
                   Value{std::vector<Document>{
                       Document{{"op", "i"_sd},
-                               {"ns", nss.ns()},
+                               {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
 
@@ -1582,15 +1583,15 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
         {"applyOps",
          Value{std::vector<Document>{
              Document{{"op", "d"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 10}}}}},
              Document{{"op", "d"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 11}}}}},
              Document{{"op", "d"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 12}}}}},
          }}},
@@ -1642,7 +1643,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionApplyOpsEntriesAreIgnored) {
         Document{{"applyOps",
                   Value{std::vector<Document>{
                       Document{{"op", "i"_sd},
-                               {"ns", nss.ns()},
+                               {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}},
                  {"prepare", true}};
@@ -1660,7 +1661,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
         {"applyOps",
          Value{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 123}}}},
                {"o2", V{D{}}}},
@@ -1732,12 +1733,12 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{Document{{"_id", 123}}}},
                {"o2", V{Document{{"_id", 123}}}}},
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{Document{{"_id", 456}}}},
                {"o2", V{Document{{"_id", 456}}}}},
@@ -1760,7 +1761,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 789}}}},
                {"o2", V{D{{"_id", 789}}}}},
@@ -1877,7 +1878,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{Document{{"_id", 123}}}},
                {"o2", V{Document{{"_id", 123}}}}},
@@ -1915,7 +1916,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     Document applyOps4{
         {"applyOps",
          V{std::vector<Document>{D{{"op", "i"_sd},
-                                   {"ns", nss.ns()},
+                                   {"ns", nss.ns_forTest()},
                                    {"ui", testUuid()},
                                    {"o", V{Document{{"_id", 456}}}},
                                    {"o2", V{Document{{"_id", 456}}}}}}}},
@@ -2069,12 +2070,12 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 123}}}},
                {"o2", V{D{{"_id", 123}}}}},
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 456}}}},
                {"o2", V{D{{"_id", 456}}}}},
@@ -2097,7 +2098,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 789}}}},
                {"o2", V{D{{"_id", 789}}}}},
@@ -2220,12 +2221,12 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 123}}}},
                {"o2", V{D{{"_id", 123}}}}},
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 456}}}},
                {"o2", V{D{{"_id", 456}}}}},
@@ -2342,11 +2343,11 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
         {"applyOps",
          Value{std::vector<Document>{
              Document{{"op", "i"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
              Document{{"op", "u"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o",
                        Value{Document{
@@ -2402,7 +2403,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
                       {"o", Value{Document{{"create", nss.coll()}, {"idIndex", idIndexDef}}}},
                       {"ts", Timestamp(0, 1)}},
              Document{{"op", "i"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
              Document{
@@ -2481,11 +2482,11 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
 
     // Test the 'clusterTime' field is copied from the oplog entry for a collection rename.
     NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()),
-                      testUuid(),
-                      boost::none,
-                      opTime);
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()),
+        testUuid(),
+        boost::none,
+        opTime);
 
     const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
@@ -2878,8 +2879,9 @@ TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotif
     // Renaming to a non-system collection will include a notification in the stream.
     NamespaceString systemColl =
         NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << systemColl.ns() << "to" << nss.ns()), testUuid());
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << systemColl.ns_forTest() << "to" << nss.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
     const auto opDesc = Value(D{{"to", D{{"db", nss.db()}, {"coll", nss.coll()}}}});
@@ -2899,8 +2901,9 @@ TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotif
     // Renaming to a system collection will include a notification in the stream.
     NamespaceString systemColl =
         NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << systemColl.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
     const auto opDesc = Value(D{{"to", D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}}});
@@ -3268,8 +3271,8 @@ TEST_F(ChangeStreamStageDBTest, TransformDrop) {
 
 TEST_F(ChangeStreamStageDBTest, TransformRename) {
     NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()), testUuid());
 
     const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
@@ -3351,8 +3354,9 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
     // Rename from a 'system' collection to another 'system' collection should not include a
     // notification.
     NamespaceString renamedSystemColl(NamespaceString::makeSystemDotViewsNamespace(nss.dbName()));
-    OplogEntry rename = createCommand(
-        BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
+    OplogEntry rename = createCommand(BSON("renameCollection" << systemColl.ns_forTest() << "to"
+                                                              << renamedSystemColl.ns_forTest()),
+                                      testUuid());
     checkTransformation(rename, boost::none);
 }
 
@@ -3363,7 +3367,8 @@ TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNot
     NamespaceString renamedColl =
         NamespaceString::createNamespaceString_forTest(nss.dbName(), "non_system_coll");
     OplogEntry rename = createCommand(
-        BSON("renameCollection" << systemColl.ns() << "to" << renamedColl.ns()), testUuid());
+        BSON("renameCollection" << systemColl.ns_forTest() << "to" << renamedColl.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
     const auto opDesc = Value(D{{"to", D{{"db", renamedColl.db()}, {"coll", renamedColl.coll()}}}});
@@ -3384,8 +3389,9 @@ TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNot
     // Renaming to a system collection will include a notification in the stream.
     NamespaceString systemColl =
         NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << systemColl.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
     const auto opDesc = Value(D{{"to", D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}}});

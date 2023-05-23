@@ -528,8 +528,8 @@ void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
 
     // The message expected by change streams
     const auto o2Message =
-        BSON("migrateChunkToNewShard" << collNss.toString() << "fromShardId" << fromShardId
-                                      << "toShardId" << toShardId);
+        BSON("migrateChunkToNewShard" << NamespaceStringUtil::serialize(collNss) << "fromShardId"
+                                      << fromShardId << "toShardId" << toShardId);
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
@@ -562,7 +562,8 @@ void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
 
     // The message expected by change streams
     const auto o2Message =
-        BSON("migrateLastChunkFromShard" << collNss.toString() << "shardId" << donorShardId);
+        BSON("migrateLastChunkFromShard" << NamespaceStringUtil::serialize(collNss) << "shardId"
+                                         << donorShardId);
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
@@ -826,7 +827,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
         NamespaceString::kMigrationCoordinatorsNamespace);
     store.forEach(
         opCtx,
-        BSON(MigrationCoordinatorDocument::kNssFieldName << nss.toString()),
+        BSON(MigrationCoordinatorDocument::kNssFieldName << NamespaceStringUtil::serialize(nss)),
         [&opCtx, &nss, &migrationRecoveryCount, &cancellationToken](
             const MigrationCoordinatorDocument& doc) {
             LOGV2_DEBUG(4798502,

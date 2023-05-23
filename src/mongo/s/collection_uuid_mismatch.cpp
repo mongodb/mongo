@@ -61,8 +61,8 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     opCtx = alternativeOpCtx.get();
     AlternativeClientRegion acr{client};
 
-    auto swDbInfo =
-        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, info->dbName().toStringWithTenantId());
+    auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(
+        opCtx, DatabaseNameUtil::serializeForCatalog(info->dbName()));
     if (!swDbInfo.isOK()) {
         return swDbInfo.getStatus();
     }

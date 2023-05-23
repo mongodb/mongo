@@ -490,7 +490,7 @@ private:
     int _getConfigDocumentsCount(const NamespaceString& configNss,
                                  const NamespaceString& collNss) const {
         DBDirectClient client(operationContext());
-        return client.count(configNss, BSON("ns" << collNss.toString()));
+        return client.count(configNss, BSON("ns" << collNss.toString_forTest()));
     }
 
     /**

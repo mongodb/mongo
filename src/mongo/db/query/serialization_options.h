@@ -70,6 +70,10 @@ enum class LiteralSerializationPolicy {
  * A struct with options for how you want to serialize a match or aggregation expression.
  */
 struct SerializationOptions {
+    // The default serialization options for a query shape. No need to redact identifiers for the
+    // this purpose. We may do that on the $queryStats read path.
+    static const SerializationOptions kDefaultQueryShapeSerializeOptions;
+
     SerializationOptions() {}
 
     SerializationOptions(bool explain_)
@@ -93,9 +97,34 @@ struct SerializationOptions {
                          LiteralSerializationPolicy policy)
         : literalPolicy(policy),
           applyHmacToIdentifiers(fieldNamesHmacPolicy_),
-          identifierHmacPolicy(fieldNamesHmacPolicy_) {}
+          identifierHmacPolicy(fieldNamesHmacPolicy_) {
+        // TODO SERVER-75400 Remove replacementForLiteralArgs
+        if (policy == LiteralSerializationPolicy::kToDebugTypeString) {
+            replacementForLiteralArgs = "?";
+        }
+    }
 
-    SerializationOptions(LiteralSerializationPolicy policy) : literalPolicy(policy) {}
+    SerializationOptions(LiteralSerializationPolicy policy) : literalPolicy(policy) {
+        // TODO SERVER-75400 Remove replacementForLiteralArgs
+        if (policy == LiteralSerializationPolicy::kToDebugTypeString) {
+            replacementForLiteralArgs = "?";
+        }
+    }
+
+    /**
+     * Checks if this SerializationOptions represents the same options as another
+     * SerializationOptions. Note it cannot compare whether the two 'identifierHmacPolicy's are the
+     * same - the language purposefully leaves the comparison operator undefined.
+     */
+    bool operator==(const SerializationOptions& other) const {
+        return this->applyHmacToIdentifiers == other.applyHmacToIdentifiers &&
+            this->includePath == other.includePath &&
+            this->replacementForLiteralArgs == other.replacementForLiteralArgs &&
+            // You cannot well determine std::function equivalence in C++, so this is the best we'll
+            // do.
+            (this->identifierHmacPolicy == nullptr) == (other.identifierHmacPolicy == nullptr) &&
+            this->literalPolicy == other.literalPolicy && this->verbosity == other.verbosity;
+    }
 
     // Helper function for removing identifiable information (like collection/db names).
     // Note: serializeFieldPath/serializeFieldPathFromString should be used for field

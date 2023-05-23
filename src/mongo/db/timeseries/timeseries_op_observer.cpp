@@ -94,7 +94,8 @@ void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
 
 void TimeSeriesOpObserver::aboutToDelete(OperationContext* opCtx,
                                          const CollectionPtr& coll,
-                                         const BSONObj& doc) {
+                                         const BSONObj& doc,
+                                         OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
     if (!nss.isTimeseriesBucketsCollection()) {

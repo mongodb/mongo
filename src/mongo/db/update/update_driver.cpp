@@ -205,10 +205,10 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     }
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    return populateDocumentWithQueryFields(*cq, immutablePaths, doc);
+    return populateDocumentWithQueryFields(*cq->root(), immutablePaths, doc);
 }
 
-Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query,
+Status UpdateDriver::populateDocumentWithQueryFields(const MatchExpression& query,
                                                      const FieldRefSet& immutablePaths,
                                                      mutablebson::Document& doc) const {
     EqualityMatches equalities;
@@ -216,11 +216,10 @@ Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query
 
     if (_updateType == UpdateType::kReplacement) {
         // Extract only immutable fields.
-        status =
-            pathsupport::extractFullEqualityMatches(*query.root(), immutablePaths, &equalities);
+        status = pathsupport::extractFullEqualityMatches(query, immutablePaths, &equalities);
     } else {
         // Extract all fields from op-style update.
-        status = pathsupport::extractEqualityMatches(*query.root(), &equalities);
+        status = pathsupport::extractEqualityMatches(query, &equalities);
     }
 
     if (!status.isOK())

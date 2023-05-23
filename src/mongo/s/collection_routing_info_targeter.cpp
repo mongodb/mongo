@@ -420,10 +420,6 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     auto query = updateOp.getFilter();
 
     if (_isRequestOnTimeseriesViewNamespace) {
-        uassert(ErrorCodes::NotImplemented,
-                str::stream() << "Updates are disallowed on sharded timeseries collections.",
-                feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabled(
-                    serverGlobalParams.featureCompatibility));
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
@@ -552,11 +548,6 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     BSONObj shardKey;
     if (_cri.cm.isSharded()) {
         if (_isRequestOnTimeseriesViewNamespace) {
-            uassert(ErrorCodes::NotImplemented,
-                    "Deletes on sharded time-series collections feature is not enabled",
-                    feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot perform a non-multi delete on a time-series collection",
                     feature_flags::gTimeseriesDeletesSupport.isEnabled(

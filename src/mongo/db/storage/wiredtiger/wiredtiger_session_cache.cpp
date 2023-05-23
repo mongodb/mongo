@@ -356,6 +356,13 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     if (token) {
         journalListener->onDurable(token.value());
     }
+
+    // The session is reset periodically so that WT doesn't consider it a rogue session and log
+    // about it. The session doesn't actually pin any resources that need to be released.
+    if (_timeSinceLastDurabilitySessionReset.millis() > (5 * 60 * 1000 /* 5 minutes */)) {
+        _waitUntilDurableSession->reset(_waitUntilDurableSession);
+        _timeSinceLastDurabilitySessionReset.reset();
+    }
 }
 
 void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx,

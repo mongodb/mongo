@@ -16,19 +16,6 @@
 load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/fixture_helpers.js");
 
-if (FixtureHelpers.isMongos(db) &&
-    !TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the sharded time-series feature flag is disabled");
-    return;
-}
-
-if (FixtureHelpers.isMongos(db) &&
-    !TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
-    jsTestLog(
-        "Skipping test because the sharded time-series updates and deletes feature flag is disabled");
-    return;
-}
-
 const arbitraryUpdatesEnabled = TimeseriesTest.arbitraryUpdatesEnabled(db);
 
 const timeFieldName = "time";
@@ -97,13 +84,15 @@ TimeseriesTest.run((insert) => {
     const arrayDoc3 = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [3, 6, 10]};
 
     /************************************ multi:false updates ************************************/
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [{q: {[metaFieldName]: {b: "B"}}, u: {$set: {[metaFieldName]: {b: "C"}}}}],
-        resultDocList: [doc1],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [{q: {[metaFieldName]: {b: "B"}}, u: {$set: {[metaFieldName]: {b: "C"}}}}],
+            resultDocList: [doc1],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     /************************************ multi:true updates *************************************/
     /************************** Tests updating with an update document ***************************/
@@ -1049,18 +1038,20 @@ TimeseriesTest.run((insert) => {
     });
 
     // Do the same test case as above but with upsert:true, which should fail.
-    testUpdate({
-        initialDocList: [doc1, doc4, doc5],
-        updateList: [{
-            q: {[metaFieldName]: "Z"},
-            u: {$set: {[metaFieldName]: 5}},
-            multi: true,
-            upsert: true,
-        }],
-        resultDocList: [doc1, doc4, doc5],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1, doc4, doc5],
+            updateList: [{
+                q: {[metaFieldName]: "Z"},
+                u: {$set: {[metaFieldName]: 5}},
+                multi: true,
+                upsert: true,
+            }],
+            resultDocList: [doc1, doc4, doc5],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     // Variables defined in the let option can only be used in the update if the update is an
     // pipeline update. Since this update is an update document, the literal name of the variable

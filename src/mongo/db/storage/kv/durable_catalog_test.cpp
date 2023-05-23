@@ -144,7 +144,7 @@ public:
             spec.textDefaultLanguage("swedish");
         }
 
-        auto desc = std::make_unique<IndexDescriptor>(indexType, spec.toBSON());
+        auto desc = IndexDescriptor(indexType, spec.toBSON());
 
         IndexCatalogEntry* entry = nullptr;
         auto collWriter = getCollectionWriter();
@@ -152,11 +152,10 @@ public:
             WriteUnitOfWork wuow(operationContext());
             const bool isSecondaryBackgroundIndexBuild = false;
             boost::optional<UUID> buildUUID(twoPhase, UUID::gen());
-            ASSERT_OK(collWriter.getWritableCollection(operationContext())
-                          ->prepareForIndexBuild(operationContext(),
-                                                 desc.get(),
-                                                 buildUUID,
-                                                 isSecondaryBackgroundIndexBuild));
+            ASSERT_OK(
+                collWriter.getWritableCollection(operationContext())
+                    ->prepareForIndexBuild(
+                        operationContext(), &desc, buildUUID, isSecondaryBackgroundIndexBuild));
             entry = collWriter.getWritableCollection(operationContext())
                         ->getIndexCatalog()
                         ->createIndexEntry(operationContext(),

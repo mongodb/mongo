@@ -274,7 +274,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
     DBDirectClient client(opCtx.get());
     NamespaceString sourceNss("sourcedb", "sourcecollection");
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-    findRequest.setFilter(BSON("ns" << sourceNss.toString()));
+    findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest()));
     auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";

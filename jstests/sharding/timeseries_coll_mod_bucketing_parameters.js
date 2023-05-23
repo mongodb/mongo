@@ -47,13 +47,6 @@ const checkConfigParametersAfterCollMod = function() {
     const mongos = st.s0;
     const db = mongos.getDB(dbName);
 
-    if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-        jsTestLog(
-            "Skipping test because the sharded time-series collection feature flag is disabled");
-        st.stop();
-        return;
-    }
-
     if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0)) {
         jsTestLog("Skipping test because the timeseries scalability feature flag is disabled");
         st.stop();

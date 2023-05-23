@@ -93,6 +93,11 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
     }
 }
 
+std::string DatabaseNameUtil::serializeForAuth(const DatabaseName& dbName,
+                                               const SerializationContext& context) {
+    return dbName.toStringWithTenantId();
+}
+
 DatabaseName DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode(
     StringData dbName) {
     if (!gMultitenancySupport) {

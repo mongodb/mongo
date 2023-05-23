@@ -104,7 +104,7 @@ public:
                                     const std::string& asKey) {
         // Documents from the local collection are provided using collection scan.
         auto localScanNode = std::make_unique<CollectionScanNode>();
-        localScanNode->name = _nss.toString();
+        localScanNode->name = _nss.toString_forTest();
 
         // Construct logical query solution.
         auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),

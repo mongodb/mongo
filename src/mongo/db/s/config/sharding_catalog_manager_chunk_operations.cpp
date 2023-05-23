@@ -2203,8 +2203,8 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
             uassertStatusOK(updateCollResponse.toStatus());
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Expected to match one doc but matched "
-                                  << updateCollResponse.getNModified(),
-                    updateCollResponse.getNModified() == 1);
+                                  << updateCollResponse.getN(),
+                    updateCollResponse.getN() == 1);
 
             FindCommandRequest collQuery{CollectionType::ConfigNS};
             collQuery.setFilter(BSON(CollectionType::kNssFieldName << nss.ns()));

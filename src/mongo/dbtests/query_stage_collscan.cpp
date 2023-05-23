@@ -68,7 +68,7 @@ static const NamespaceString kNss{"unittests.QueryStageCollectionScan"};
 class QueryStageCollectionScanTest : public unittest::Test {
 public:
     QueryStageCollectionScanTest() : _client(&_opCtx) {
-        dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
 
         for (int i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -78,7 +78,7 @@ public:
     }
 
     virtual ~QueryStageCollectionScanTest() {
-        dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
         _client.dropCollection(kNss);
     }
 
@@ -437,7 +437,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
 // Scan through half the objects, delete the one we're about to fetch, then expect to get the "next"
 // object we would have gotten after that.
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
-    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
 
     const CollectionPtr& coll = ctx.getCollection();
 
@@ -491,7 +491,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
 // Scan through half the objects, delete the one we're about to fetch, then expect to get the "next"
 // object we would have gotten after that.  But, do it in reverse!
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackward) {
-    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
     const CollectionPtr& coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
@@ -589,7 +589,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
 
 // Verify that if we fail to seek to the resumeAfterRecordId, the plan stage fails.
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFailure) {
-    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
     auto coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.

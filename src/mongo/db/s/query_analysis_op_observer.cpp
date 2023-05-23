@@ -115,7 +115,8 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx,
 
 void QueryAnalysisOpObserver::aboutToDelete(OperationContext* opCtx,
                                             const CollectionPtr& coll,
-                                            BSONObj const& doc) {
+                                            BSONObj const& doc,
+                                            OpStateAccumulator* opAccumulator) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace ||
             coll->ns() == MongosType::ConfigNS) {

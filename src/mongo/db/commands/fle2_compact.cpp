@@ -53,6 +53,7 @@ MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCAnchorInsert);
 MONGO_FAIL_POINT_DEFINE(fleCleanupHangBeforeNullAnchorUpdate);
 MONGO_FAIL_POINT_DEFINE(fleCleanupFailAfterTransactionCommit);
 MONGO_FAIL_POINT_DEFINE(fleCompactFailAfterTransactionCommit);
+MONGO_FAIL_POINT_DEFINE(fleCleanupFailDuringAnchorDeletes);
 
 namespace mongo {
 namespace {
@@ -770,12 +771,17 @@ void cleanupESCAnchors(OperationContext* opCtx,
 
         opEntry.setQ(queryBuilder.obj());
 
+        if (MONGO_unlikely(fleCleanupFailDuringAnchorDeletes.shouldFail())) {
+            uasserted(7723800, "Failing due to fleCleanupFailDuringAnchorDeletes failpoint");
+        }
+
         auto reply = client.remove(deleteRequest);
         if (reply.getWriteCommandReplyBase().getWriteErrors()) {
             LOGV2_WARNING(7618814,
                           "Queryable Encryption compaction encountered write errors",
                           "namespace"_attr = escNss,
                           "reply"_attr = reply);
+            checkWriteErrors(reply.getWriteCommandReplyBase());
         }
         deleted += reply.getN();
     }

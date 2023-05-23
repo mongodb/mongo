@@ -700,8 +700,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
         resharding::constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
 
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-    findRequest.setFilter(
-        BSON("ns" << sourceNss.toString() << "o2.reshardDoneCatchUp" << BSON("$exists" << true)));
+    findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest() << "o2.reshardDoneCatchUp"
+                                    << BSON("$exists" << true)));
     auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
@@ -746,8 +746,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
         resharding::constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
 
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-    findRequest.setFilter(
-        BSON("ns" << sourceNss.toString() << "o2.shardCollection" << BSON("$exists" << true)));
+    findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest() << "o2.shardCollection"
+                                    << BSON("$exists" << true)));
     auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
@@ -762,8 +762,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
         << shardCollectionOp.getEntry();
     ASSERT_FALSE(shardCollectionOp.getFromMigrate());
 
-    auto shardCollEventExpected =
-        BSON("shardCollection" << sourceNss.toString() << "shardKey" << newShardKeyPattern());
+    auto shardCollEventExpected = BSON("shardCollection" << sourceNss.toString_forTest()
+                                                         << "shardKey" << newShardKeyPattern());
     ASSERT_BSONOBJ_EQ(*shardCollectionOp.getObject2(), shardCollEventExpected);
 }
 

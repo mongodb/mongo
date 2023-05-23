@@ -64,7 +64,7 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj keyPattern, bo
     using V = Value;
 
     return Doc{{"originatingCommand",
-                V{Doc{{"createIndexes", V{StringData{nss.toString()}}},
+                V{Doc{{"createIndexes", V{StringData{NamespaceStringUtil::serialize(nss)}}},
                       {"key", std::move(keyPattern)},
                       {"unique", V{unique}}}}}}
         .toBson();

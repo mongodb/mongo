@@ -20,14 +20,6 @@ load('jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_inserts.js')
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function(db, collName, connCache) {
-        if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(db) &&
-            TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db)) {
-            this.featureFlagDisabled = false;
-        } else {
-            jsTestLog(
-                "Skipping executing this test as the requisite feature flags are not enabled.");
-        }
-
         $super.states.init(db, collName);
     };
 
@@ -46,10 +38,6 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.update = function(db, collName, connCache) {
-        if (this.featureFlagDisabled) {
-            return;
-        }
-
         const shardedColl = db[collName];
         const unshardedColl = db[this.nonShardCollName];
         const updateField = "tid" + this.tid;

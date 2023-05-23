@@ -1298,7 +1298,8 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
         auto fetcher = std::make_unique<Fetcher>(
             _executorForAddShard.get(),
             host,
-            NamespaceString::makeClusterParametersNSS(tenantId).dbName().toStringWithTenantId(),
+            DatabaseNameUtil::serialize(
+                NamespaceString::makeClusterParametersNSS(tenantId).dbName()),
             findCmdBuilder.obj(),
             fetcherCallback,
             BSONObj(), /* metadata tracking, only used for shards */
@@ -1331,16 +1332,16 @@ void ShardingCatalogManager::_removeAllClusterParametersFromShard(OperationConte
 
     // Remove possible leftovers config.clusterParameters documents from the new shard.
     for (const auto& tenantId : tenantsOnTarget) {
-        write_ops::DeleteCommandRequest deleteOp(
-            NamespaceString::makeClusterParametersNSS(tenantId));
+        const auto& nss = NamespaceString::makeClusterParametersNSS(tenantId);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         write_ops::DeleteOpEntry query({}, true /*multi*/);
         deleteOp.setDeletes({query});
 
-        const auto swCommandResponse = _runCommandForAddShard(
-            opCtx,
-            targeter.get(),
-            NamespaceString::makeClusterParametersNSS(tenantId).dbName().toStringWithTenantId(),
-            CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
+        const auto swCommandResponse =
+            _runCommandForAddShard(opCtx,
+                                   targeter.get(),
+                                   DatabaseNameUtil::serialize(nss.dbName()),
+                                   CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
         uassertStatusOK(swCommandResponse.getStatus());
         uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
     }
@@ -1357,21 +1358,20 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
     LOGV2(6360600, "Pushing cluster parameters into new shard");
 
     for (const auto& [tenantId, clusterParameters] : allClusterParameters) {
+        const auto& dbName = DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db());
         // Push cluster parameters into the newly added shard.
         for (auto& parameter : clusterParameters) {
             ShardsvrSetClusterParameter setClusterParamsCmd(
                 BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
                          BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
-            setClusterParamsCmd.setDbName(
-                DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db()));
+            setClusterParamsCmd.setDbName(dbName);
             setClusterParamsCmd.setClusterParameterTime(
                 parameter["clusterParameterTime"].timestamp());
 
             const auto cmdResponse = _runCommandForAddShard(
                 opCtx,
                 targeter.get(),
-                DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db())
-                    .toStringWithTenantId(),
+                DatabaseNameUtil::serialize(dbName),
                 CommandHelpers::appendMajorityWriteConcern(setClusterParamsCmd.toBSON({})));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }

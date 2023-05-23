@@ -85,7 +85,8 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
 
     auto parsedOutgoingResponse = CursorResponse::parseFromBSON(outgoingCursorResponse.getValue());
     ASSERT_OK(parsedOutgoingResponse.getStatus());
-    ASSERT_EQ(nss.toString(), parsedOutgoingResponse.getValue().getNSS().toString());
+    ASSERT_EQ(nss.toString_forTest(),
+              parsedOutgoingResponse.getValue().getNSS().toString_forTest());
     ASSERT_EQ(0U, parsedOutgoingResponse.getValue().getCursorId());
     ASSERT_EQ(2U, parsedOutgoingResponse.getValue().getBatch().size());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), parsedOutgoingResponse.getValue().getBatch()[0]);

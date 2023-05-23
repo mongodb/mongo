@@ -29,21 +29,6 @@ function getRandomTimeseriesView(db) {
 
 var $config = (function() {
     const setup = function(db, collName, cluster) {
-        // Check that necessary feature flags are enabled on each of the mongods.
-        let isEnabled = true;
-        cluster.executeOnMongodNodes(function(db) {
-            if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(db)) {
-                isEnabled = false;
-            }
-        });
-        this.isShardedTimeseriesEnabled = isEnabled;
-
-        if (!this.isShardedTimeseriesEnabled) {
-            jsTestLog(
-                "Feature flags for sharded time-series collections are not enabled. This test will do nothing.");
-            return;
-        }
-
         // Enable sharding for the test databases.
         for (var i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
@@ -54,10 +39,6 @@ var $config = (function() {
     const states = {
         init: function(db, collName) {},
         create: function(db, collName) {
-            if (!this.isShardedTimeseriesEnabled) {
-                return;
-            }
-
             const coll = getRandomTimeseriesView(db);
             jsTestLog("Executing create state on: " + coll.getFullName());
             assertAlways.commandWorked(db.adminCommand({
@@ -67,10 +48,6 @@ var $config = (function() {
             }));
         },
         dropView: function(db, collName) {
-            if (!this.isShardedTimeseriesEnabled) {
-                return;
-            }
-
             const coll = getRandomTimeseriesView(db);
             jsTestLog("Executing dropView state on: " + coll.getFullName());
             assertAlways.commandWorked(coll.getDB().runCommand({drop: coll.getName()}));

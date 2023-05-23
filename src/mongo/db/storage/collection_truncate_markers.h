@@ -99,20 +99,6 @@ public:
           _currentBytes(leftoverRecordsBytes),
           _markers(std::move(markers)) {}
 
-    /**
-     * Whether the instance is going to get destroyed.
-     */
-    bool isDead();
-
-    /**
-     * Mark this instance as serving a non-existent RecordStore. This is the case if either the
-     * RecordStore has been deleted or we're shutting down. Doing this will mark the instance as
-     * ready for destruction.
-     */
-    void kill();
-
-    void awaitHasExcessMarkersOrDead(OperationContext* opCtx);
-
     boost::optional<Marker> peekOldestMarkerIfNeeded(OperationContext* opCtx) const;
 
     void popOldestMarker();
@@ -127,14 +113,6 @@ public:
                                                         const RecordId& highestInsertedRecordId,
                                                         Date_t wallTime,
                                                         int64_t countInserted);
-
-    // Clears all the markers of the instance whenever the current WUOW commits.
-    void clearMarkersOnCommit(OperationContext* opCtx);
-
-    // Updates the metadata about the collection markers after a rollback occurs.
-    void updateMarkersAfterCappedTruncateAfter(int64_t recordsRemoved,
-                                               int64_t bytesRemoved,
-                                               const RecordId& firstRemovedId);
 
     // The method used for creating the initial set of markers.
     enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
@@ -212,18 +190,14 @@ private:
 
     // Used to decide whether the oldest marker has expired. Implementations are free to use
     // whichever process they want to discern if there are expired markers.
-    // This method will get called holding the _collectionMarkersReclaimMutex and _markersMutex.
+    // This method will get called holding the _markersMutex.
     virtual bool _hasExcessMarkers(OperationContext* opCtx) const = 0;
 
+    // Method used to notify the implementation of a new marker being created. Implementations are
+    // free to implement this however they see fit by overriding it. By default this is a no-op.
+    virtual void _notifyNewMarkerCreation(){};
+
     static constexpr uint64_t kRandomSamplesPerMarker = 10;
-
-    Mutex _collectionMarkersReclaimMutex =
-        MONGO_MAKE_LATCH("CollectionTruncateMarkers::_collectionMarkersReclaimMutex");
-    stdx::condition_variable _reclaimCv;
-
-    // True if '_rs' has been destroyed, e.g. due to repairDatabase being called on the collection's
-    // database, and false otherwise.
-    bool _isDead = false;
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.
@@ -237,7 +211,10 @@ private:
     std::deque<Marker> _markers;  // front = oldest, back = newest.
 
 protected:
-    CollectionTruncateMarkers(CollectionTruncateMarkers&& other);
+    struct PartialMarkerMetrics {
+        AtomicWord<int64_t>* currentRecords;
+        AtomicWord<int64_t>* currentBytes;
+    };
 
     template <typename F>
     auto modifyMarkersWith(F&& f) {
@@ -259,9 +236,25 @@ protected:
         return _markers;
     }
 
-    void pokeReclaimThread(OperationContext* opCtx);
+    /**
+     * Returns whether the truncate markers instace has no markers, whether partial or whole. Note
+     * that this method can provide a stale result unless the caller can guarantee that no more
+     * markers will be created.
+     */
+    bool isEmpty() const {
+        stdx::lock_guard<Latch> lk(_markersMutex);
+        return _markers.size() == 0 && _currentBytes.load() == 0 && _currentRecords.load() == 0;
+    }
 
     Marker& createNewMarker(const RecordId& lastRecord, Date_t wallTime);
+
+    template <typename F>
+    auto modifyPartialMarker(F&& f) {
+        static_assert(std::is_invocable_v<F, PartialMarkerMetrics>,
+                      "Function must be of type T(PartialMarkerMetrics)");
+        PartialMarkerMetrics metrics{&_currentRecords, &_currentBytes};
+        return f(metrics);
+    }
 };
 
 /**
@@ -307,9 +300,6 @@ private:
     }
 
 protected:
-    CollectionTruncateMarkersWithPartialExpiration(
-        CollectionTruncateMarkersWithPartialExpiration&& other);
-
     std::pair<const RecordId&, const Date_t&> getPartialMarker() const {
         return {_lastHighestRecordId, _lastHighestWallTime};
     }

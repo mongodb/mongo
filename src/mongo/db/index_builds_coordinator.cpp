@@ -654,13 +654,13 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             // using the same ident to avoid doing untimestamped writes to the catalog.
             for (const auto& indexName : indexNames) {
                 auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
-                auto desc =
-                    indexCatalog->findIndexByName(opCtx,
-                                                  indexName,
-                                                  IndexCatalog::InclusionPolicy::kUnfinished |
-                                                      IndexCatalog::InclusionPolicy::kFrozen);
+                auto writableEntry = indexCatalog->getWritableEntryByName(
+                    opCtx,
+                    indexName,
+                    IndexCatalog::InclusionPolicy::kUnfinished |
+                        IndexCatalog::InclusionPolicy::kFrozen);
                 Status status = indexCatalog->resetUnfinishedIndexForRecovery(
-                    opCtx, collection.getWritableCollection(opCtx), desc);
+                    opCtx, collection.getWritableCollection(opCtx), writableEntry);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -713,11 +713,11 @@ Status IndexBuildsCoordinator::_dropIndexesForRepair(OperationContext* opCtx,
     invariant(collection->isInitialized());
     for (const auto& indexName : indexNames) {
         auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
-        auto descriptor =
-            indexCatalog->findIndexByName(opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
-        if (descriptor) {
-            Status s =
-                indexCatalog->dropIndex(opCtx, collection.getWritableCollection(opCtx), descriptor);
+        auto writableEntry = indexCatalog->getWritableEntryByName(
+            opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
+        if (writableEntry->descriptor()) {
+            Status s = indexCatalog->dropIndexEntry(
+                opCtx, collection.getWritableCollection(opCtx), writableEntry);
             if (!s.isOK()) {
                 return s;
             }
@@ -725,13 +725,13 @@ Status IndexBuildsCoordinator::_dropIndexesForRepair(OperationContext* opCtx,
         }
 
         // The index must be unfinished or frozen if it isn't ready.
-        descriptor = indexCatalog->findIndexByName(opCtx,
-                                                   indexName,
-                                                   IndexCatalog::InclusionPolicy::kUnfinished |
-                                                       IndexCatalog::InclusionPolicy::kFrozen);
-        invariant(descriptor);
+        writableEntry = indexCatalog->getWritableEntryByName(
+            opCtx,
+            indexName,
+            IndexCatalog::InclusionPolicy::kUnfinished | IndexCatalog::InclusionPolicy::kFrozen);
+        invariant(writableEntry);
         Status s = indexCatalog->dropUnfinishedIndex(
-            opCtx, collection.getWritableCollection(opCtx), descriptor);
+            opCtx, collection.getWritableCollection(opCtx), writableEntry);
         if (!s.isOK()) {
             return s;
         }
@@ -1095,20 +1095,20 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
                         str::stream() << "Index spec is missing the 'name' field " << spec,
                         !name.empty());
 
-                if (auto desc = indexCatalog->findIndexByName(
+                if (auto writableEntry = indexCatalog->getWritableEntryByName(
                         opCtx, name, IndexCatalog::InclusionPolicy::kReady)) {
-                    uassertStatusOK(
-                        indexCatalog->dropIndex(opCtx, coll.getWritableCollection(opCtx), desc));
+                    uassertStatusOK(indexCatalog->dropIndexEntry(
+                        opCtx, coll.getWritableCollection(opCtx), writableEntry));
                 }
 
-                const IndexDescriptor* desc = indexCatalog->findIndexByKeyPatternAndOptions(
+                auto writableEntry = indexCatalog->getWritableEntryByKeyPatternAndOptions(
                     opCtx,
                     spec.getObjectField(IndexDescriptor::kKeyPatternFieldName),
                     spec,
                     IndexCatalog::InclusionPolicy::kReady);
-                if (desc) {
-                    uassertStatusOK(
-                        indexCatalog->dropIndex(opCtx, coll.getWritableCollection(opCtx), desc));
+                if (writableEntry) {
+                    uassertStatusOK(indexCatalog->dropIndexEntry(
+                        opCtx, coll.getWritableCollection(opCtx), writableEntry));
                 }
             }
 
@@ -1290,7 +1290,7 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
 
         auto indexCatalog = autoColl.getWritableCollection(opCtx)->getIndexCatalog();
         for (const auto& indexSpec : oplogEntry.indexSpecs) {
-            const IndexDescriptor* desc = indexCatalog->findIndexByName(
+            auto writableEntry = indexCatalog->getWritableEntryByName(
                 opCtx,
                 indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName),
                 IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
@@ -1300,9 +1300,9 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
                   "Dropping unfinished index during oplog recovery as standalone",
                   "spec"_attr = indexSpec);
 
-            invariant(desc && desc->getEntry()->isFrozen());
+            invariant(writableEntry && writableEntry->isFrozen());
             invariant(indexCatalog->dropUnfinishedIndex(
-                opCtx, autoColl.getWritableCollection(opCtx), desc));
+                opCtx, autoColl.getWritableCollection(opCtx), writableEntry));
         }
 
         wuow.commit();

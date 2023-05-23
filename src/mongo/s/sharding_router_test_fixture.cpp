@@ -321,7 +321,7 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
         const auto& update = updates.front();
         ASSERT_EQ(expectUpsert, update.getUpsert());
         ASSERT(!update.getMulti());
-        ASSERT_BSONOBJ_EQ(BSON(CollectionType::kNssFieldName << coll.getNss().toString()),
+        ASSERT_BSONOBJ_EQ(BSON(CollectionType::kNssFieldName << coll.getNss().toString_forTest()),
                           update.getQ());
         const auto& updateBSON =
             update.getU().type() == write_ops::UpdateModification::Type::kReplacement
@@ -346,7 +346,7 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
         const std::string cmdName(request.cmdObj.firstElement().fieldName());
         ASSERT_EQUALS("count", cmdName);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQUALS(expectedNs.toString(), nss.toString());
+        ASSERT_EQUALS(expectedNs.toString_forTest(), nss.toString_forTest());
 
         if (expectedQuery.isEmpty()) {
             auto queryElem = request.cmdObj["query"];

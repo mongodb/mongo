@@ -67,10 +67,10 @@ void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
     OldClientContext ctx(opCtx, nss);
     {
         WriteUnitOfWork uow(opCtx);
-        ASSERT(!collectionExists(opCtx, &ctx, nss.ns()));
+        ASSERT(!collectionExists(opCtx, &ctx, nss.ns_forTest()));
         CollectionOptions defaultCollectionOptions;
         ASSERT_OK(ctx.db()->userCreateNS(opCtx, nss, defaultCollectionOptions, false));
-        ASSERT(collectionExists(opCtx, &ctx, nss.ns()));
+        ASSERT(collectionExists(opCtx, &ctx, nss.ns_forTest()));
         uow.commit();
     }
 }
@@ -150,11 +150,12 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::string& idxName) {
     CollectionWriter coll(opCtx, nss);
-    auto desc =
-        coll.getWritableCollection(opCtx)->getIndexCatalog()->findIndexByName(opCtx, idxName);
-    ASSERT(desc);
-    ASSERT_OK(coll.getWritableCollection(opCtx)->getIndexCatalog()->dropIndex(
-        opCtx, coll.getWritableCollection(opCtx), desc));
+    auto writableEntry =
+        coll.getWritableCollection(opCtx)->getIndexCatalog()->getWritableEntryByName(opCtx,
+                                                                                     idxName);
+    ASSERT(writableEntry);
+    ASSERT_OK(coll.getWritableCollection(opCtx)->getIndexCatalog()->dropIndexEntry(
+        opCtx, coll.getWritableCollection(opCtx), writableEntry));
 }
 
 }  // namespace
@@ -265,34 +266,34 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            ASSERT(!collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(!collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(!collectionExists(&opCtx, &ctx, target.ns_forTest()));
             auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             CollectionOptions collectionOptions =
                 assertGet(CollectionOptions::parse(options, CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, source, collectionOptions, defaultIndexes));
             uow.commit();
         }
-        ASSERT(collectionExists(&opCtx, &ctx, source.ns()));
-        ASSERT(!collectionExists(&opCtx, &ctx, target.ns()));
+        ASSERT(collectionExists(&opCtx, &ctx, source.ns_forTest()));
+        ASSERT(!collectionExists(&opCtx, &ctx, target.ns_forTest()));
 
         // END OF SETUP / START OF TEST
 
         {
             WriteUnitOfWork uow(&opCtx);
             ASSERT_OK(renameCollection(&opCtx, source, target));
-            ASSERT(!collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(collectionExists(&opCtx, &ctx, target.ns_forTest()));
             if (!rollback) {
                 uow.commit();
             }
         }
         if (rollback) {
-            ASSERT(collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(!collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(!collectionExists(&opCtx, &ctx, target.ns_forTest()));
         } else {
-            ASSERT(!collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(collectionExists(&opCtx, &ctx, target.ns_forTest()));
         }
     }
 };
@@ -324,8 +325,8 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            ASSERT(!collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(!collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(!collectionExists(&opCtx, &ctx, target.ns_forTest()));
             auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             CollectionOptions collectionOptions =
                 assertGet(CollectionOptions::parse(options, CollectionOptions::parseForCommand));
@@ -338,8 +339,8 @@ public:
 
             uow.commit();
         }
-        ASSERT(collectionExists(&opCtx, &ctx, source.ns()));
-        ASSERT(collectionExists(&opCtx, &ctx, target.ns()));
+        ASSERT(collectionExists(&opCtx, &ctx, source.ns_forTest()));
+        ASSERT(collectionExists(&opCtx, &ctx, target.ns_forTest()));
         assertOnlyRecord(&opCtx, source, sourceDoc);
         assertOnlyRecord(&opCtx, target, targetDoc);
 
@@ -353,21 +354,21 @@ public:
                 {},
                 DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
             ASSERT_OK(renameCollection(&opCtx, source, target));
-            ASSERT(!collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(collectionExists(&opCtx, &ctx, target.ns_forTest()));
             assertOnlyRecord(&opCtx, target, sourceDoc);
             if (!rollback) {
                 uow.commit();
             }
         }
         if (rollback) {
-            ASSERT(collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(collectionExists(&opCtx, &ctx, target.ns_forTest()));
             assertOnlyRecord(&opCtx, source, sourceDoc);
             assertOnlyRecord(&opCtx, target, targetDoc);
         } else {
-            ASSERT(!collectionExists(&opCtx, &ctx, source.ns()));
-            ASSERT(collectionExists(&opCtx, &ctx, target.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, source.ns_forTest()));
+            ASSERT(collectionExists(&opCtx, &ctx, target.ns_forTest()));
             assertOnlyRecord(&opCtx, target, sourceDoc);
         }
     }
@@ -392,14 +393,14 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, nss.ns_forTest()));
             CollectionOptions collectionOptions =
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             insertRecord(&opCtx, nss, oldDoc);
             uow.commit();
         }
-        ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
+        ASSERT(collectionExists(&opCtx, &ctx, nss.ns_forTest()));
         assertOnlyRecord(&opCtx, nss, oldDoc);
 
         // END OF SETUP / START OF TEST
@@ -411,18 +412,18 @@ public:
                 nss,
                 {},
                 DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-            ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, nss.ns_forTest()));
             CollectionOptions collectionOptions =
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
-            ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
+            ASSERT(collectionExists(&opCtx, &ctx, nss.ns_forTest()));
             insertRecord(&opCtx, nss, newDoc);
             assertOnlyRecord(&opCtx, nss, newDoc);
             if (!rollback) {
                 uow.commit();
             }
         }
-        ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
+        ASSERT(collectionExists(&opCtx, &ctx, nss.ns_forTest()));
         if (rollback) {
             assertOnlyRecord(&opCtx, nss, oldDoc);
         } else {
@@ -446,14 +447,14 @@ public:
         BSONObj doc = BSON("_id"
                            << "foo");
 
-        ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
+        ASSERT(!collectionExists(&opCtx, &ctx, nss.ns_forTest()));
         {
             WriteUnitOfWork uow(&opCtx);
 
             CollectionOptions collectionOptions =
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
-            ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
+            ASSERT(collectionExists(&opCtx, &ctx, nss.ns_forTest()));
             insertRecord(&opCtx, nss, doc);
             assertOnlyRecord(&opCtx, nss, doc);
             uow.commit();
@@ -466,14 +467,14 @@ public:
             WriteUnitOfWork uow(&opCtx);
 
             ASSERT_OK(truncateCollection(&opCtx, nss));
-            ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
+            ASSERT(collectionExists(&opCtx, &ctx, nss.ns_forTest()));
             assertEmpty(&opCtx, nss);
 
             if (!rollback) {
                 uow.commit();
             }
         }
-        ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
+        ASSERT(collectionExists(&opCtx, &ctx, nss.ns_forTest()));
         if (rollback) {
             assertOnlyRecord(&opCtx, nss, doc);
         } else {
@@ -649,11 +650,11 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
+            ASSERT(!collectionExists(&opCtx, &ctx, nss.ns_forTest()));
             CollectionOptions collectionOptions =
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, false));
-            ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
+            ASSERT(collectionExists(&opCtx, &ctx, nss.ns_forTest()));
             CollectionWriter coll(&opCtx, nss);
             auto writableColl = coll.getWritableCollection(&opCtx);
             IndexCatalog* catalog = writableColl->getIndexCatalog();

@@ -81,11 +81,14 @@ awaitStepUp();
 
 // Wait for the index build to be aborted before asserting that it doesn't exist.
 IndexBuildTest.waitForIndexBuildToStop(secondaryDB, coll.getName(), "a_1");
-rst.awaitReplication();
-IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
 const secondaryColl = secondaryDB.getCollection(coll.getName());
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
+// Although the index is aborted on the secondary that's stepping up, as of
+// featureFlagIndexBuildGracefulErrorHandling we abort builds on secondaries (that is, we replicate
+// 'abortIndexBuild') asynchronously wrt the index builder thread on the primary. Wait for the
+// secondaries to complete the abort.
+IndexBuildTest.assertIndexesSoon(coll, 1, ['_id_']);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ['_id_']);
 
 rst.stopSet();
 })();

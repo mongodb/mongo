@@ -133,8 +133,8 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
     return {std::move(parsedUUID.getValue())};
 }
 
-Date_t getCurrentTimeForPreImageRemoval() {
-    auto currentTime = Date_t::now();
+Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx) {
+    auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
     changeStreamPreImageRemoverCurrentTime.execute([&](const BSONObj& data) {
         // Populate the current time for time based expiration of pre-images.
         if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {

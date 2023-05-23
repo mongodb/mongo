@@ -31,7 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 
 namespace mongo::query_shape {
@@ -64,11 +64,11 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const SerializationOptions& opts);
 
-BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
-                          const std::vector<BSONObj>& serializedPipeline,
+                          const Pipeline& pipeline,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
 }  // namespace mongo::query_shape

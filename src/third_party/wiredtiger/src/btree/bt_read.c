@@ -308,7 +308,7 @@ read:
 
             /* We just read a page, don't evict it before we have a chance to use it. */
             evict_skip = true;
-            F_CLR(session->dhandle, WT_DHANDLE_EVICTED);
+            FLD_CLR(session->dhandle->advisory_flags, WT_DHANDLE_ADVISORY_EVICTED);
 
             /*
              * If configured to not trash the cache, leave the page generation unset, we'll set it

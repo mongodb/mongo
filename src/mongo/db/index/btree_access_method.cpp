@@ -50,7 +50,7 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState,
     vector<const char*> fieldNames;
     vector<BSONElement> fixed;
 
-    BSONObjIterator it(_descriptor->keyPattern());
+    BSONObjIterator it(btreeState->descriptor()->keyPattern());
     while (it.more()) {
         BSONElement elt = it.next();
         fieldNames.push_back(elt.fieldName());
@@ -60,7 +60,7 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState,
     _keyGenerator =
         std::make_unique<BtreeKeyGenerator>(fieldNames,
                                             fixed,
-                                            _descriptor->isSparse(),
+                                            btreeState->descriptor()->isSparse(),
                                             getSortedDataInterface()->getKeyStringVersion(),
                                             getSortedDataInterface()->getOrdering());
 }
@@ -73,6 +73,7 @@ void BtreeAccessMethod::validateDocument(const CollectionPtr& collection,
 
 void BtreeAccessMethod::doGetKeys(OperationContext* opCtx,
                                   const CollectionPtr& collection,
+                                  const IndexCatalogEntry* entry,
                                   SharedBufferFragmentBuilder& pooledBufferBuilder,
                                   const BSONObj& obj,
                                   GetKeysContext context,
@@ -80,15 +81,10 @@ void BtreeAccessMethod::doGetKeys(OperationContext* opCtx,
                                   KeyStringSet* multikeyMetadataKeys,
                                   MultikeyPaths* multikeyPaths,
                                   const boost::optional<RecordId>& id) const {
-    const auto skipMultikey = context == GetKeysContext::kValidatingKeys &&
-        !_descriptor->getEntry()->isMultikey(opCtx, collection);
-    _keyGenerator->getKeys(pooledBufferBuilder,
-                           obj,
-                           skipMultikey,
-                           keys,
-                           multikeyPaths,
-                           _indexCatalogEntry->getCollator(),
-                           id);
+    const auto skipMultikey =
+        context == GetKeysContext::kValidatingKeys && !entry->isMultikey(opCtx, collection);
+    _keyGenerator->getKeys(
+        pooledBufferBuilder, obj, skipMultikey, keys, multikeyPaths, entry->getCollator(), id);
 }
 
 }  // namespace mongo

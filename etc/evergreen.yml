@@ -1572,7 +1572,7 @@ buildvariants:
     # No feature flag tests since they aren't compatible with the older binaries.
     test_flags: >-
       --runNoFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_shard_merge,DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+      --excludeWithAnyTags=incompatible_with_shard_merge,
 
 # This variant exists becuase this is the only way to test future multiversion tags
 # version_expansions_gen will pretend we are upgrading to "bv_future_git_tag"

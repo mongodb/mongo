@@ -202,9 +202,9 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     DBDirectClient client(opCtx);
 
     const NamespaceString fromNss = NamespaceString::createNamespaceString_forTest("test.from");
-    const auto fromCollQuery = BSON(CollectionType::kNssFieldName << fromNss.ns());
+    const auto fromCollQuery = BSON(CollectionType::kNssFieldName << fromNss.ns_forTest());
 
-    const auto toCollQuery = BSON(CollectionType::kNssFieldName << kToNss.ns());
+    const auto toCollQuery = BSON(CollectionType::kNssFieldName << kToNss.ns_forTest());
 
     const Timestamp collTimestamp(1);
     const auto collUUID = UUID::gen();
@@ -350,7 +350,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
-        NamespaceString::createNamespaceString_forTest(longEnoughNss.ns().toString() + 'x');
+        NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
     ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
                            opCtx, true /* sourceIsSharded */, tooLongNss, false /* dropTarget */),
                        AssertionException,

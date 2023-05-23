@@ -199,7 +199,8 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Insert 3 keys with the value A.
     auto rs = kvEngine->getRecordStore(opCtx.get(), nss, ident, collectionOptions);
-    ASSERT(rs) << fmt::format("failed to look up record store with namespace {}", nss.toString());
+    ASSERT(rs) << fmt::format("failed to look up record store with namespace {}",
+                              nss.toString_forTest());
     {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());

@@ -298,9 +298,9 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     auto idIndex = idxCatalog->findIdIndex(opCtx);
     auto userIdx = idxCatalog->findIndexByName(opCtx, indexName);
     auto oldRecordId = idIndex->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, BSON("_id" << 1));
+        opCtx, coll, idIndex->getEntry(), BSON("_id" << 1));
     auto oldIndexRecordID = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, BSON("a" << 1));
+        opCtx, coll, userIdx->getEntry(), BSON("a" << 1));
     ASSERT_TRUE(!oldRecordId.isNull());
     ASSERT_EQ(oldRecordId, oldIndexRecordID);
     {
@@ -326,10 +326,10 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
         wuow.commit();
     }
     auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, BSON("a" << 1));
+        opCtx, coll, userIdx->getEntry(), BSON("a" << 1));
     ASSERT_TRUE(indexRecordId.isNull());
     indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, BSON("a" << 5));
+        opCtx, coll, userIdx->getEntry(), BSON("a" << 5));
     ASSERT_EQ(indexRecordId, oldRecordId);
 }
 
@@ -354,7 +354,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     auto idIndex = idxCatalog->findIdIndex(opCtx);
     auto userIdx = idxCatalog->findIndexByName(opCtx, indexName);
     auto oldRecordId = idIndex->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, BSON("_id" << 1));
+        opCtx, coll, idIndex->getEntry(), BSON("_id" << 1));
     ASSERT_TRUE(!oldRecordId.isNull());
 
     auto newDoc = BSON("_id" << 1 << "a" << 5 << "b" << 32);
@@ -381,10 +381,10 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
         wuow.commit();
     }
     auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, BSON("a" << 1));
+        opCtx, coll, userIdx->getEntry(), BSON("a" << 1));
     ASSERT_TRUE(indexRecordId.isNull());
     indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, BSON("a" << 5));
+        opCtx, coll, userIdx->getEntry(), BSON("a" << 5));
     ASSERT_EQ(indexRecordId, oldRecordId);
 }
 

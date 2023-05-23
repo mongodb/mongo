@@ -722,6 +722,25 @@ static void convertFilterToSargableNode(ABT::reference_type node,
 }
 
 /**
+ * Type utilities to negate PathComposeA and PathComposeM.
+ */
+template <class T>
+struct negate_compose;
+
+template <>
+struct negate_compose<PathComposeM> {
+    using type = PathComposeA;
+};
+
+template <>
+struct negate_compose<PathComposeA> {
+    using type = PathComposeM;
+};
+
+template <class T>
+using negate_compose_t = typename negate_compose<T>::type;
+
+/**
  * Takes an expression or path and attempts to remove Not nodes by pushing them
  * down toward the leaves. We push a Not if we can combine it into a PathCompare,
  * push though PathConstant, or cancel it out with another Not.
@@ -882,30 +901,31 @@ public:
         }
     }
 
-    Result operator()(const ABT& /*n*/, const PathComposeM& compose, const bool negate) {
-        auto simplified1 = compose.getPath1().visit(*this, negate);
-        auto simplified2 = compose.getPath2().visit(*this, negate);
+    template <class ComposeType>
+    Result handleComposition(const ABT& path1, const ABT& path2, const bool negate) {
+        auto simplified1 = path1.visit(*this, negate);
+        auto simplified2 = path2.visit(*this, negate);
         if (!simplified1 && !simplified2) {
             // Neither child is simplified.
             return {};
         }
+
         // At least one child is simplified, so we're going to rebuild a node.
         // If either child was not simplified, we're going to copy the original
         // unsimplified child.
         if (!simplified1) {
-            simplified1 = {{false, compose.getPath1()}};
+            simplified1 = {{false, path1}};
         }
         if (!simplified2) {
-            simplified2 = {{false, compose.getPath2()}};
+            simplified2 = {{false, path2}};
         }
-
         if (!simplified1->negated && !simplified2->negated) {
-            // Neither is negated: keep the ComposeM.
+            // Neither is negated: keep the original composition.
             return {{false,
-                     make<PathComposeM>(std::move(simplified1->newNode),
-                                        std::move(simplified2->newNode))}};
+                     make<ComposeType>(std::move(simplified1->newNode),
+                                       std::move(simplified2->newNode))}};
         }
-        // At least one child is negated, so we're going to rewrite to ComposeA.
+        // At least one child is negated, so we're going to rewrite to the negated composition.
         // If either child was not able to aborb a Not, we'll add an explicit Not to its root.
         if (!simplified1->negated) {
             simplified1 = {{true, negatePath(std::move(simplified1->newNode))}};
@@ -913,9 +933,17 @@ public:
         if (!simplified2->negated) {
             simplified2 = {{true, negatePath(std::move(simplified2->newNode))}};
         }
-        return {
-            {true,
-             make<PathComposeA>(std::move(simplified1->newNode), std::move(simplified2->newNode))}};
+        return {{true,
+                 make<negate_compose_t<ComposeType>>(std::move(simplified1->newNode),
+                                                     std::move(simplified2->newNode))}};
+    }
+
+    Result operator()(const ABT& /*n*/, const PathComposeA& compose, const bool negate) {
+        return handleComposition<PathComposeA>(compose.getPath1(), compose.getPath2(), negate);
+    }
+
+    Result operator()(const ABT& /*n*/, const PathComposeM& compose, const bool negate) {
+        return handleComposition<PathComposeM>(compose.getPath1(), compose.getPath2(), negate);
     }
 
     Result operator()(const ABT& /*n*/, const EvalFilter& evalF, const bool negate) {

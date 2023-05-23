@@ -77,6 +77,61 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
         _expCtx->enabledCounters = false;
     }
     _expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+
+    tassert(
+        7655104, "timeseries collection must already exist", _collection || !isRequestToTimeseries);
+}
+
+Status ParsedUpdate::maybeTranslateTimeseriesUpdate() {
+    if (!_timeseriesUpdateQueryExprs) {
+        // Not a timeseries update, bail out.
+        return Status::OK();
+    }
+
+    // TODO: Due to the complexity which is related to the efficient sort support, we don't support
+    // yet findAndModify with a query and sort but it should not be impossible. This code assumes
+    // that in findAndModify code path, the parsed update constructor should be called with source
+    // == kTimeseriesUpdate for a time-series collection.
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot perform a findAndModify with a query and sort on a time-series collection.",
+            _request->isMulti() || _request->getSort().isEmpty());
+
+    // If we're updating documents in a time-series collection, splits the match expression into a
+    // bucket-level match expression and a residual expression so that we can push down the
+    // bucket-level match expression to the system bucket collection scan or fetch/ixscan.
+    *_timeseriesUpdateQueryExprs = timeseries::getMatchExprsForWrites(
+        _expCtx, *_collection->getTimeseriesOptions(), _request->getQuery());
+
+    // At this point, we parsed user-provided match expression. After this point, the new canonical
+    // query is internal to the bucket SCAN or FETCH and will have additional internal match
+    // expression. We do not need to track the internal match expression counters and so we stop the
+    // counters because we do not want to count the internal match expression.
+    _expCtx->stopExpressionCounters();
+
+    if (_request->isMulti() && !_timeseriesUpdateQueryExprs->_residualExpr) {
+        // If we don't have a residual predicate and this is not a single update, we might be able
+        // to perform this update directly on the buckets collection. Attempt to translate the
+        // update modification accordingly, if it succeeds, we can do a direct write. If we can't
+        // translate it (due to referencing data fields), go ahead with the arbitrary updates path.
+        const auto& timeseriesOptions = _collection->getTimeseriesOptions();
+        auto swModification =
+            timeseries::translateUpdate(*_modification, timeseriesOptions->getMetaField());
+        if (swModification.isOK()) {
+            _modification =
+                std::make_unique<write_ops::UpdateModification>(swModification.getValue());
+
+            // We need to capture off the correct translated timeseries filter expressions in the
+            // canonical query before we clear out the timeseries state (this is kind of a hacky way
+            // to do it, but this whole fallback optimization is kind of hacky.).
+            if (auto status = parseQueryToCQ(); !status.isOK()) {
+                return status;
+            }
+
+            _timeseriesUpdateQueryExprs = nullptr;
+        }
+    }
+
+    return Status::OK();
 }
 
 Status ParsedUpdate::parseRequest() {
@@ -116,37 +171,10 @@ Status ParsedUpdate::parseRequest() {
     }
     _arrayFilters = std::move(statusWithArrayFilters.getValue());
 
-    if (_timeseriesUpdateQueryExprs) {
-        tassert(7314206, "collection must not be null", _collection);
+    _expCtx->startExpressionCounters();
 
-        // With timeseries updates, we have to parse the query first to determine whether we will be
-        // performing the update directly on the bucket document (and therefore need to translate
-        // the update modifications), or if we will unpack the measurements first and be able to use
-        // the modifications as-is.
-        // (We know that we will always need to produce a query for this case because timeseries is
-        // not eligible for idhack.)
-        Status status = parseQueryToCQ();
-        if (!status.isOK()) {
-            return status;
-        }
-
-        if (_request->isMulti() && !_timeseriesUpdateQueryExprs->_residualExpr) {
-            // If we don't have a residual predicate and this is not a single update, we might be
-            // able to perform this update directly on the buckets collection. Attempt to translate
-            // the update modification accordingly, if it succeeds, bail out and do a direct write.
-            // If we can't translate it (due to referencing data fields), go ahead with the
-            // arbitrary updates path.
-            const auto& timeseriesOptions = _collection->getTimeseriesOptions();
-            auto swModification =
-                timeseries::translateUpdate(*_modification, timeseriesOptions->getMetaField());
-            if (swModification.isOK()) {
-                _modification =
-                    std::make_unique<write_ops::UpdateModification>(swModification.getValue());
-                _timeseriesUpdateQueryExprs = nullptr;
-            }
-        }
-        parseUpdate();
-        return Status::OK();
+    if (auto status = maybeTranslateTimeseriesUpdate(); !status.isOK()) {
+        return status;
     }
 
     // We parse the update portion before the query portion because the dispostion of the update
@@ -160,57 +188,38 @@ Status ParsedUpdate::parseRequest() {
     // $$USER_ROLES for the update.
     _expCtx->setUserRoles();
 
-    if (!status.isOK())
-        return status;
-    return Status::OK();
+    return status;
 }
 
 Status ParsedUpdate::parseQuery() {
-    dassert(!_canonicalQuery.get());
-    tassert(7314204,
-            "timeseries updates should always require a canonical query to be parsed",
-            !_timeseriesUpdateQueryExprs);
+    if (_canonicalQuery) {
+        // Query is already parsed.
+        return Status::OK();
+    }
 
-    if (!_driver.needMatchDetails() && CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
+    if (!_timeseriesUpdateQueryExprs && !_driver.needMatchDetails() &&
+        CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
     }
 
     return parseQueryToCQ();
 }
 
-Status ParsedUpdate::parseQueryToCQ() {
-    dassert(!_canonicalQuery.get());
+StatusWith<std::unique_ptr<CanonicalQuery>> ParsedUpdate::parseQueryToCQ(
+    OperationContext* opCtx,
+    ExpressionContext* expCtx,
+    const ExtensionsCallback& extensionsCallback,
+    const UpdateRequest& request,
+    const BSONObj& filter) {
 
     // The projection needs to be applied after the update operation, so we do not specify a
     // projection during canonicalization.
-    auto findCommand = std::make_unique<FindCommandRequest>(_request->getNamespaceString());
+    auto findCommand = std::make_unique<FindCommandRequest>(request.getNamespaceString());
 
-    _expCtx->startExpressionCounters();
-
-    if (_timeseriesUpdateQueryExprs) {
-        // If we're updating documents in a time-series collection, splits the match expression
-        // into a bucket-level match expression and a residual expression so that we can push down
-        // the bucket-level match expression to the system bucket collection scan or fetch/ixscan.
-        *_timeseriesUpdateQueryExprs = timeseries::getMatchExprsForWrites(
-            _expCtx, *_collection->getTimeseriesOptions(), _request->getQuery());
-
-        // At this point, we parsed user-provided match expression. After this point, the new
-        // canonical query is internal to the bucket SCAN or FETCH and will have additional internal
-        // match expression. We do not need to track the internal match expression counters and so
-        // we stop the counters because we do not want to count the internal match expression.
-        _expCtx->stopExpressionCounters();
-
-        // At least, the bucket-level filter must contain the closed bucket filter.
-        tassert(7314200,
-                "Bucket-level filter must not be null",
-                _timeseriesUpdateQueryExprs->_bucketExpr);
-        findCommand->setFilter(_timeseriesUpdateQueryExprs->_bucketExpr->serialize());
-    } else {
-        findCommand->setFilter(_request->getQuery());
-    }
-    findCommand->setSort(_request->getSort());
-    findCommand->setHint(_request->getHint());
-    findCommand->setCollation(_request->getCollation().getOwned());
+    findCommand->setFilter(filter);
+    findCommand->setSort(request.getSort());
+    findCommand->setHint(request.getHint());
+    findCommand->setCollation(request.getCollation().getOwned());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
@@ -218,14 +227,7 @@ Status ParsedUpdate::parseQueryToCQ() {
     // deleted/modified under it, but a limit could inhibit that and give an EOF when the update
     // has not actually updated a document. This behavior is fine for findAndModify, but should
     // not apply to update in general.
-    if (!_request->isMulti() && !_request->getSort().isEmpty()) {
-        // TODO: Due to the complexity which is related to the efficient sort support, we don't
-        // support yet findAndModify with a query and sort but it should not be impossible.
-        // This code assumes that in findAndModify code path, the parsed update constructor should
-        // be called with source == kTimeseriesUpdate for a time-series collection.
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform a findAndModify with a query and sort on a time-series collection.",
-                !_timeseriesUpdateQueryExprs);
+    if (!request.isMulti() && !request.getSort().isEmpty()) {
         findCommand->setLimit(1);
     }
 
@@ -233,25 +235,38 @@ Status ParsedUpdate::parseQueryToCQ() {
     // extraction behavior for $expr should be.
     MatchExpressionParser::AllowedFeatureSet allowedMatcherFeatures =
         MatchExpressionParser::kAllowAllSpecialFeatures;
-    if (_request->isUpsert()) {
+    if (request.isUpsert()) {
         allowedMatcherFeatures &= ~MatchExpressionParser::AllowedFeatures::kExpr;
     }
 
     // If the update request has runtime constants or let parameters attached to it, pass them to
     // the FindCommandRequest.
-    if (auto& runtimeConstants = _request->getLegacyRuntimeConstants()) {
+    if (auto& runtimeConstants = request.getLegacyRuntimeConstants()) {
         findCommand->setLegacyRuntimeConstants(*runtimeConstants);
     }
-    if (auto& letParams = _request->getLetParameters()) {
+    if (auto& letParams = request.getLetParameters()) {
         findCommand->setLet(*letParams);
     }
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(_opCtx,
-                                                     std::move(findCommand),
-                                                     static_cast<bool>(_request->explain()),
-                                                     _expCtx,
-                                                     _extensionsCallback,
-                                                     allowedMatcherFeatures);
+    return CanonicalQuery::canonicalize(opCtx,
+                                        std::move(findCommand),
+                                        static_cast<bool>(request.explain()),
+                                        expCtx,
+                                        extensionsCallback,
+                                        allowedMatcherFeatures);
+}
+
+Status ParsedUpdate::parseQueryToCQ() {
+    dassert(!_canonicalQuery.get());
+
+    auto statusWithCQ = parseQueryToCQ(_expCtx->opCtx,
+                                       _expCtx.get(),
+                                       _extensionsCallback,
+                                       *_request,
+                                       _timeseriesUpdateQueryExprs
+                                           ? _timeseriesUpdateQueryExprs->_bucketExpr->serialize()
+                                           : _request->getQuery());
+
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());
     }

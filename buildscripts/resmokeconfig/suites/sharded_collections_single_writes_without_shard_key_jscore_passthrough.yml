@@ -279,6 +279,7 @@ selector:
   - jstests/core/txns/commands_in_txns_read_concern.js
 
   exclude_with_any_tags:
+  - assumes_unsharded_collection
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.

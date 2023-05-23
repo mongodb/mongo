@@ -165,7 +165,7 @@ struct CommandHelpers {
      * pattern or a database resource pattern, depending on whether parseNs returns a fully qualifed
      * collection name or just a database name.
      */
-    static ResourcePattern resourcePatternForNamespace(StringData ns);
+    static ResourcePattern resourcePatternForNamespace(const NamespaceString& ns);
 
     static Command* findCommand(StringData name);
 
@@ -881,7 +881,7 @@ public:
     }
 
     ResourcePattern parseResourcePattern(const DatabaseName& dbName, const BSONObj& cmdObj) const {
-        return CommandHelpers::resourcePatternForNamespace(parseNs(dbName, cmdObj).ns());
+        return CommandHelpers::resourcePatternForNamespace(parseNs(dbName, cmdObj));
     }
 
     //

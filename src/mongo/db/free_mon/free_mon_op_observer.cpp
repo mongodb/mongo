@@ -124,7 +124,8 @@ void FreeMonOpObserver::onUpdate(OperationContext* opCtx,
 
 void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
                                       const CollectionPtr& coll,
-                                      const BSONObj& doc) {
+                                      const BSONObj& doc,
+                                      OpStateAccumulator* opAccumulator) {
 
     bool isFreeMonDoc = (coll->ns() == NamespaceString::kServerConfigurationNamespace) &&
         (doc["_id"].str() == FreeMonStorage::kFreeMonDocIdKey);

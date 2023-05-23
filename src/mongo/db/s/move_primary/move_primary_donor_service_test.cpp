@@ -233,7 +233,7 @@ protected:
                         fromjson(fmt::format("{{failCommands:['insert', 'update', 'delete'], "
                                              "namespace: '{}', failLocalClients: true, "
                                              "failInternalCommands: true, errorCode: {}}}",
-                                             nss.toString(),
+                                             nss.toString_forTest(),
                                              code)));
         return std::tuple{fp, count};
     }

@@ -44,10 +44,6 @@
 
 namespace mongo {
 
-class OpDebug;
-class AggregateCommandRequest;
-class FindCommandRequest;
-
 namespace {
 /**
  * Type we use to render values to BSON.
@@ -96,21 +92,24 @@ struct AggregatedMetric {
 };
 
 extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
-// Used to aggregate the metrics for one telemetry key over all its executions.
+// Used to aggregate the metrics for one query stats key over all its executions.
 class QueryStatsEntry {
 public:
-    QueryStatsEntry(std::unique_ptr<RequestShapifier> requestShapifier,
-                    NamespaceStringOrUUID nss,
-                    const BSONObj& cmdObj)
+    QueryStatsEntry(std::unique_ptr<RequestShapifier> requestShapifier, NamespaceStringOrUUID nss)
         : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0),
           requestShapifier(std::move(requestShapifier)),
-          nss(nss),
-          oldQueryStatsKey(cmdObj.copy()) {
-        queryStatsStoreSizeEstimateBytesMetric.increment(sizeof(QueryStatsEntry) + sizeof(BSONObj));
+          nss(nss) {
+        // Increment by size of query stats store key (hash returns size_t) and value
+        // (QueryStatsEntry)
+        queryStatsStoreSizeEstimateBytesMetric.increment(sizeof(QueryStatsEntry) +
+                                                         sizeof(std::size_t));
     }
 
     ~QueryStatsEntry() {
-        queryStatsStoreSizeEstimateBytesMetric.decrement(sizeof(QueryStatsEntry) + sizeof(BSONObj));
+        // Decrement by size of query stats store key (hash returns size_t) and value
+        // (QueryStatsEntry)
+        queryStatsStoreSizeEstimateBytesMetric.decrement(sizeof(QueryStatsEntry) +
+                                                         sizeof(std::size_t));
     }
 
     BSONObj toBSON() const {
@@ -124,7 +123,8 @@ public:
     }
 
     /**
-     * Redact a given queryStats key and set _keySize.
+     * Generate the queryStats key for this entry's request. If applyHmacToIdentifiers is true, any
+     * identifying information (field names, namespace) will be anonymized.
      */
     BSONObj computeQueryStatsKey(OperationContext* opCtx,
                                  bool applyHmacToIdentifiers,
@@ -149,12 +149,12 @@ public:
 
     AggregatedMetric docsReturned;
 
+    /**
+     * The RequestShapifier that can generate the query stats key for this request.
+     */
     std::unique_ptr<RequestShapifier> requestShapifier;
 
     NamespaceStringOrUUID nss;
-
-    // TODO: SERVER-73152 remove oldQueryStatsKey when RequestShapifier is used for agg.
-    BSONObj oldQueryStatsKey;
 };
 
 struct TelemetryPartitioner {
@@ -170,10 +170,9 @@ struct QueryStatsStoreEntryBudgetor {
         // and the size of the metrics, including the bson object used for generating the telemetry
         // key at read time.
 
-        return sizeof(QueryStatsEntry) + sizeof(std::size_t) + value->oldQueryStatsKey.objsize();
+        return sizeof(QueryStatsEntry) + sizeof(std::size_t);
     }
 };
-
 using QueryStatsStore = PartitionedCache<std::size_t,
                                          std::shared_ptr<QueryStatsEntry>,
                                          QueryStatsStoreEntryBudgetor,
@@ -185,40 +184,56 @@ using QueryStatsStore = PartitionedCache<std::size_t,
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
 
 /**
- * Register a request for queryStats collection. The queryStats machinery may decide not to
- * collect anything but this should be called for all requests. The decision is made based on
- * the feature flag and queryStats parameters such as rate limiting.
+ * Registers a request for query stats collection. The function may decide not to collect anything,
+ * so this should be called for all requests. The decision is made based on the feature flag and
+ * query stats rate limiting.
  *
- * The caller is still responsible for subsequently calling writeQueryStats() once the request is
- * completed.
+ * The originating command/query does not persist through the end of query execution due to
+ * optimizations made to the original query and the expiration of OpCtx across getMores. In order
+ * to pair the query stats metrics that are collected at the end of execution with the original
+ * query, it is necessary to store the original query during planning and persist it through
+ * getMores.
  *
- * Note that calling this affects internal state. It should be called once for each request for
- * which telemetry may be collected.
- * TODO SERVER-73152 remove request-specific registers, leave only registerRequest
+ * During planning, registerRequest is called to serialize the query stats key and save it to
+ * OpDebug. If a query's execution is complete within the original operation,
+ * collectQueryStatsMongod/collectQueryStatsMongos will call writeQueryStats() and pass along the
+ * query stats key to be saved in the query stats store alongside metrics collected.
+ *
+ * However, OpDebug does not persist through cursor iteration, so if a query's execution will span
+ * more than one request/operation, it's necessary to save the query stats context to the cursor
+ * upon cursor registration. In these cases, collectQueryStatsMongod/collectQueryStatsMongos will
+ * aggregate each operation's metrics within the cursor. Once the request is eventually complete,
+ * the cursor calls writeQueryStats() on its destruction.
+ *
+ * Notes:
+ * - It's important to call registerRequest with the original request, before canonicalizing or
+ *   optimizing it, in order to preserve the user's input for the query shape.
+ * - Calling this affects internal state. It should be called exactly once for each request for
+ *   which query stats may be collected.
+ * - The std::function argument to construct an abstracted RequestShapifier is provided to break
+ *   library cycles so this library does not need to know how to parse everything. It is done as a
+ *   deferred construction callback to ensure that this feature does not impact performance if
+ *   collecting stats is not needed due to the feature being disabled or the request being rate
+ *   limited.
  */
-void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx);
-void registerRequest(std::unique_ptr<RequestShapifier> requestShapifier,
+void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const NamespaceString& collection,
-                     OperationContext* opCtx,
-                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                     std::function<std::unique_ptr<RequestShapifier>(void)> makeShapifier);
 
 /**
- * Writes queryStats to the queryStats store for the operation identified by `queryStatsKey`.
+ * Writes query stats to the query stats store for the operation identified by `queryStatsKeyHash`.
+ *
+ * Direct calls to writeQueryStats in new code should be avoided in favor of calling existing
+ * functions:
+ *  - collectQueryStatsMongod/collectQueryStatsMongos in the case of requests that span one
+ *    operation
+ *  - ClientCursor::dispose/ClusterClientCursorImpl::kill in the case of requests that span
+ *    multiple operations (via getMore)
  */
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     boost::optional<BSONObj> queryStatsKey,
                      std::unique_ptr<RequestShapifier> requestShapifier,
                      uint64_t queryExecMicros,
                      uint64_t docsReturned);
-
-/**
- * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
- * with hmac applied to all field names and literals.
- */
-BSONObj makeQueryStatsKey(const FindCommandRequest& findCommand,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          boost::optional<const QueryStatsEntry&> existingMetrics = boost::none);
 }  // namespace query_stats
 }  // namespace mongo

@@ -106,6 +106,11 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
+            // TODO: SERVER-76953 Remove this.
+            uassert(ErrorCodes::CommandNotSupported,
+                    "BulkWrite may not be run with ordered: false",
+                    request().getOrdered());
+
             bulk_write_common::validateRequest(request(), opCtx->isRetryableWrite());
 
             auto replyItems = cluster::bulkWrite(opCtx, request());

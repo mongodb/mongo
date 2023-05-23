@@ -219,7 +219,7 @@ CollectionNamespaceOrUUIDLock::CollectionNamespaceOrUUIDLock(OperationContext* o
                                                              LockMode mode,
                                                              Date_t deadline)
     : _lock([opCtx, &nsOrUUID, mode, deadline] {
-          if (auto& ns = nsOrUUID.nss()) {
+          if (auto ns = nsOrUUID.nss()) {
               return Lock::CollectionLock{opCtx, *ns, mode, deadline};
           }
 

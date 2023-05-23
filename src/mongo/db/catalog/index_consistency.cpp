@@ -138,9 +138,11 @@ KeyStringIndexConsistency::KeyStringIndexConsistency(
     CollectionValidation::ValidateState* validateState,
     const size_t numHashBuckets)
     : IndexConsistency(opCtx, validateState, numHashBuckets) {
-    for (const auto& index : _validateState->getIndexes()) {
-        const auto descriptor = index->descriptor();
-        IndexAccessMethod* accessMethod = const_cast<IndexAccessMethod*>(index->accessMethod());
+    for (const auto& indexIdent : _validateState->getIndexIdents()) {
+        const IndexDescriptor* descriptor =
+            validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
+        IndexAccessMethod* accessMethod =
+            const_cast<IndexAccessMethod*>(descriptor->getEntry()->accessMethod());
         _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor, accessMethod));
     }
 }
@@ -198,26 +200,17 @@ bool KeyStringIndexConsistency::haveEntryMismatch() const {
 
 void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
                                                    ValidateResults* results) {
-    invariant(_validateState->getIndexes().size() > 0);
-    std::shared_ptr<const IndexCatalogEntry> index = _validateState->getIndexes().front();
+    invariant(_validateState->getIndexIdents().size() > 0);
     for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end();) {
         const KeyString::Value& ks = it->second.keyString;
         const KeyFormat keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
 
         const std::string& indexName = it->first.first;
-        if (indexName != index->descriptor()->indexName()) {
-            // Assuming that _missingIndexEntries is sorted by indexName, this lookup should not
-            // happen often.
-            for (const auto& currIndex : _validateState->getIndexes()) {
-                if (currIndex->descriptor()->indexName() == indexName) {
-                    index = currIndex;
-                    break;
-                }
-            }
-        }
-
+        const IndexDescriptor* descriptor =
+            _validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx, indexName);
+        const IndexCatalogEntry* entry = descriptor->getEntry();
         int64_t numInserted = index_repair::repairMissingIndexEntry(opCtx,
-                                                                    index,
+                                                                    entry,
                                                                     ks,
                                                                     keyFormat,
                                                                     _validateState->nss(),
@@ -450,6 +443,7 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
 }
 
 void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
+                                            const IndexCatalogEntry* entry,
                                             const KeyString::Value& ks,
                                             IndexInfo* indexInfo,
                                             const RecordId& recordId,
@@ -500,7 +494,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                 writeConflictRetry(opCtx, "removingExtraIndexEntries", _validateState->nss(), [&] {
                     WriteUnitOfWork wunit(opCtx);
                     Status status = indexInfo->accessMethod->asSortedData()->removeKeys(
-                        opCtx, {ks}, options, &numDeleted);
+                        opCtx, entry, {ks}, options, &numDeleted);
                     wunit.commit();
                 });
                 auto& indexResults = results->indexResultsMap[indexInfo->indexName];
@@ -738,7 +732,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                                                  const IndexCatalogEntry* index,
                                                  ProgressMeterHolder& _progress,
                                                  ValidateResults* results) {
-    const auto descriptor = index->descriptor();
+    const IndexDescriptor* descriptor = index->descriptor();
     const auto indexName = descriptor->indexName();
     auto& indexResults = results->indexResultsMap[indexName];
     IndexInfo& indexInfo = this->getIndexInfo(indexName);
@@ -804,7 +798,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         } else {
             try {
                 this->addIndexKey(
-                    opCtx, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
+                    opCtx, index, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
             } catch (const DBException& e) {
                 StringBuilder ss;
                 ss << "Parsing index key for " << indexInfo.indexName << " recId "
@@ -824,7 +818,16 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         if (numKeys % kInterruptIntervalNumRecords == 0) {
             // Periodically checks for interrupts and yields.
             opCtx->checkForInterrupt();
+
+            const std::string indexIdent = index->getIdent();
             _validateState->yield(opCtx);
+
+            // After yielding, the latest instance of the collection is fetched and can be different
+            // from the collection instance prior to yielding. For this reason we need to refresh
+            // the index entry pointer.
+            descriptor = _validateState->getCollection()->getIndexCatalog()->findIndexByIdent(
+                opCtx, indexIdent);
+            index = descriptor->getEntry();
         }
 
         try {
@@ -935,6 +938,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
 
     iam->getKeys(opCtx,
                  coll,
+                 index,
                  pool,
                  recordBson,
                  InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,

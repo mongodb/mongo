@@ -151,11 +151,9 @@ protected:
         ASSERT_EQ(expectedPaths.size(), expectedFieldRefs.size());
 
         AutoGetCollectionForRead collection(opCtx(), nss);
-        auto indexAccessMethod = getIndex(collection.getCollection(), indexName);
+        auto indexEntry = getIndexCatalogEntry(collection.getCollection(), indexName);
         MultikeyMetadataAccessStats stats;
-        auto wam = dynamic_cast<const WildcardAccessMethod*>(indexAccessMethod);
-        ASSERT(wam != nullptr);
-        auto multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx(), &stats);
+        auto multikeyPathSet = getWildcardMultikeyPathSet(opCtx(), indexEntry, &stats);
 
         ASSERT(expectedFieldRefs == multikeyPathSet);
     }
@@ -241,17 +239,17 @@ protected:
         return collection->getIndexCatalog()->findIndexByName(opCtx(), indexName);
     }
 
-    const SortedDataIndexAccessMethod* getIndex(const CollectionPtr& collection,
-                                                const StringData indexName) {
-        return collection->getIndexCatalog()
-            ->getEntry(getIndexDesc(collection, indexName))
-            ->accessMethod()
-            ->asSortedData();
+    const IndexCatalogEntry* getIndexCatalogEntry(const CollectionPtr& collection,
+                                                  const StringData indexName) {
+        return collection->getIndexCatalog()->getEntry(getIndexDesc(collection, indexName));
     }
 
     std::unique_ptr<SortedDataInterface::Cursor> getIndexCursor(const CollectionPtr& collection,
                                                                 const StringData indexName) {
-        return getIndex(collection, indexName)->newCursor(opCtx());
+        return getIndexCatalogEntry(collection, indexName)
+            ->accessMethod()
+            ->asSortedData()
+            ->newCursor(opCtx());
     }
 
     CollectionOptions collOptions() {

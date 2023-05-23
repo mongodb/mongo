@@ -223,13 +223,14 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
 
         op.setWriteCommandRequestBase(std::move(base));
 
-        ASSERT_DOES_NOT_THROW(performAtomicWrites(opCtx,
-                                                  bucketsColl.getCollection(),
-                                                  recordId,
-                                                  op,
-                                                  {},
-                                                  /*fromMigrate=*/false,
-                                                  /*stmtId=*/kUninitializedStmtId));
+        ASSERT_DOES_NOT_THROW(performAtomicWrites(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId,
+            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
+            {},
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId));
     }
 
     // Checks the document is removed.
@@ -291,13 +292,14 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
 
         op.setWriteCommandRequestBase(std::move(base));
 
-        ASSERT_DOES_NOT_THROW(performAtomicWrites(opCtx,
-                                                  bucketsColl.getCollection(),
-                                                  recordId,
-                                                  op,
-                                                  {},
-                                                  /*fromMigrate=*/false,
-                                                  /*stmtId=*/kUninitializedStmtId));
+        ASSERT_DOES_NOT_THROW(performAtomicWrites(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId,
+            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
+            {},
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId));
     }
 
     // Checks the document is updated.
@@ -370,13 +372,15 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
         write_ops::InsertCommandRequest insertOp(ns.makeTimeseriesBucketsNamespace(), {bucketDoc2});
         insertOp.setWriteCommandRequestBase(base);
 
-        ASSERT_DOES_NOT_THROW(performAtomicWrites(opCtx,
-                                                  bucketsColl.getCollection(),
-                                                  recordId1,
-                                                  deleteOp,
-                                                  {insertOp},
-                                                  /*fromMigrate=*/false,
-                                                  /*stmtId=*/kUninitializedStmtId));
+        ASSERT_DOES_NOT_THROW(performAtomicWrites(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId1,
+            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
+                deleteOp},
+            {insertOp},
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId));
     }
 
     // Checks document1 is removed and document2 is added.
@@ -477,13 +481,15 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
                                                   {bucketDoc3});
         insertOp2.setWriteCommandRequestBase(base);
 
-        ASSERT_DOES_NOT_THROW(performAtomicWrites(opCtx,
-                                                  bucketsColl.getCollection(),
-                                                  recordId1,
-                                                  updateOp,
-                                                  {insertOp1, insertOp2},
-                                                  /*fromMigrate=*/false,
-                                                  /*stmtId=*/kUninitializedStmtId));
+        ASSERT_DOES_NOT_THROW(performAtomicWrites(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId1,
+            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
+                updateOp},
+            {insertOp1, insertOp2},
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId));
     }
 
     // Checks document1 is updated and document2 and document3 are added.

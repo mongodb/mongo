@@ -136,8 +136,8 @@ public:
         return _collection;
     }
 
-    const std::vector<std::shared_ptr<const IndexCatalogEntry>>& getIndexes() const {
-        return _indexes;
+    const std::vector<std::string>& getIndexIdents() const {
+        return _indexIdents;
     }
 
     const StringSet& getSkippedIndexes() const {
@@ -248,11 +248,11 @@ private:
     // constructor
     boost::optional<UUID> _uuid;
 
-    // Stores the indexes that are going to be validated. When validate yields periodically we'll
-    // use this list to determine if validation should abort when an existing index that was
+    // Stores the index idents that are going to be validated. When validate yields periodically
+    // we'll use this list to determine if validation should abort when an existing index that was
     // being validated is dropped. Additionally we'll use this list to determine which indexes to
     // skip during validation that may have been created in-between yields.
-    std::vector<std::shared_ptr<const IndexCatalogEntry>> _indexes;
+    std::vector<std::string> _indexIdents;
 
     // Shared cursors to be used during validation, created in 'initializeCursors()'.
     StringMap<std::unique_ptr<SortedDataInterfaceThrottleCursor>> _indexCursors;

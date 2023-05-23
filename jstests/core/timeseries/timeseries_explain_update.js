@@ -40,6 +40,7 @@ function testUpdateExplain({
     expectedResidualFilter = null,
     expectedNumUpdated,
     expectedNumMatched = expectedNumUpdated,
+    expectedNumUpserted = 0,
     expectedNumUnpacked = null,
     expectedUsedIndexName = null
 }) {
@@ -103,6 +104,9 @@ function testUpdateExplain({
         assert.eq(expectedNumMatched,
                   execStages[0].nMeasurementsMatched,
                   `Got wrong nMeasurementsMatched: ${tojson(execStages[0])}`);
+        assert.eq(expectedNumUpserted,
+                  execStages[0].nMeasurementsUpserted,
+                  `Got wrong nMeasurementsUpserted: ${tojson(execStages[0])}`);
         assert.eq(expectedNumUnpacked,
                   execStages[0].nBucketsUnpacked,
                   `Got wrong nBucketsUnpacked: ${tojson(execStages[0])}`);
@@ -176,6 +180,44 @@ function testUpdateExplain({
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,
         expectedUsedIndexName: metaFieldName + "_1"
+    });
+})();
+
+(function testUpsert() {
+    testUpdateExplain({
+        singleUpdateOp: {
+            q: {[metaFieldName]: 100},
+            u: {$set: {[timeFieldName]: dateTime}},
+            multi: true,
+            upsert: true,
+        },
+        expectedUpdateStageName: "TS_MODIFY",
+        expectedOpType: "updateMany",
+        expectedBucketFilter: makeBucketFilter({meta: {$eq: 100}}),
+        expectedResidualFilter: {},
+        expectedNumUpdated: 0,
+        expectedNumMatched: 0,
+        expectedNumUnpacked: 0,
+        expectedNumUpserted: 1,
+    });
+})();
+
+(function testUpsertNoop() {
+    testUpdateExplain({
+        singleUpdateOp: {
+            q: {[metaFieldName]: 1},
+            u: {$set: {f: 10}},
+            multi: true,
+            upsert: true,
+        },
+        expectedUpdateStageName: "TS_MODIFY",
+        expectedOpType: "updateMany",
+        expectedBucketFilter: makeBucketFilter({meta: {$eq: 1}}),
+        expectedResidualFilter: {},
+        expectedNumUpdated: 2,
+        expectedNumMatched: 2,
+        expectedNumUnpacked: 1,
+        expectedNumUpserted: 0,
     });
 })();
 

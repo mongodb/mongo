@@ -1,6 +1,13 @@
 import gdb
 import bson
+import sys
+import os
 from pprint import pprint
+from pathlib import Path
+
+if not gdb:
+    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
+    from buildscripts.gdb.mongo import lookup_type
 
 DEBUGGING = False
 '''
@@ -21,7 +28,7 @@ Some behaviors/limitations:
 
 
 def dump_pages_for_table(ident):
-    conn_impl_type = gdb.lookup_type("WT_CONNECTION_IMPL")
+    conn_impl_type = lookup_type("WT_CONNECTION_IMPL")
     if not conn_impl_type:
         print('WT_CONNECTION_IMPL type not found. Try invoking this function from a different \
 thread and frame.')
@@ -104,7 +111,7 @@ def get_data_handle(conn, handle_name):
 
 
 def get_btree_handle(dhandle):
-    btree = gdb.lookup_type('WT_BTREE').pointer()
+    btree = lookup_type('WT_BTREE').pointer()
     return dhandle['handle'].reinterpret_cast(btree).dereference()
 
 

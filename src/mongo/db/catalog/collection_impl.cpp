@@ -449,10 +449,9 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
     // objects from existing indexes to prevent the index idents from being dropped by the drop
     // pending ident reaper while this collection is still using them.
     for (const auto& sharedIdent : sharedIdents) {
-        auto desc = getIndexCatalog()->findIndexByName(opCtx, sharedIdent.first);
-        invariant(desc);
-        auto entry = getIndexCatalog()->getEntryShared(desc);
-        entry->setIdent(sharedIdent.second);
+        auto writableEntry = getIndexCatalog()->getWritableEntryByName(opCtx, sharedIdent.first);
+        invariant(writableEntry);
+        writableEntry->setIdent(sharedIdent.second);
     }
 
     _initialized = true;

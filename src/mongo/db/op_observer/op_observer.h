@@ -229,7 +229,8 @@ public:
 
     virtual void aboutToDelete(OperationContext* opCtx,
                                const CollectionPtr& coll,
-                               const BSONObj& doc) = 0;
+                               const BSONObj& doc,
+                               OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     /**
      * Handles logging before document is deleted.

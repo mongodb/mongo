@@ -308,7 +308,7 @@ public:
         }
 
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "a"
                                                         << "key" << BSON("a" << 1) << "v"
@@ -378,7 +378,7 @@ public:
         }
 
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "a"
                                                         << "key" << BSON("a" << 1) << "v"
@@ -531,7 +531,7 @@ public:
 
         // Create multi-key index.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "multikey_index"
                                                         << "key" << BSON("a.b" << 1) << "v"
@@ -604,7 +604,7 @@ public:
         // Create a sparse index.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "sparse_index"
                                               << "key" << BSON("a" << 1) << "v"
@@ -671,7 +671,7 @@ public:
         // Create a partial index.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key" << BSON("a" << 1) << "v"
@@ -733,7 +733,7 @@ public:
         // Create a partial geo index that indexes the document. This should return an error.
         ASSERT_NOT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key"
@@ -746,7 +746,7 @@ public:
         // Create a partial geo index that does not index the document.
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name"
                                               << "partial_index"
                                               << "key"
@@ -808,7 +808,7 @@ public:
         // Create two compound indexes, one forward and one reverse, to test
         // validate()'s index direction parsing.
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name"
                                                         << "compound_index_1"
                                                         << "key" << BSON("a" << 1 << "b" << -1)
@@ -817,7 +817,7 @@ public:
         ASSERT_OK(status);
 
         status = dbtests::createIndexFromSpec(&_opCtx,
-                                              coll()->ns().ns(),
+                                              coll()->ns().ns_forTest(),
                                               BSON("name"
                                                    << "compound_index_2"
                                                    << "key" << BSON("a" << -1 << "b" << 1) << "v"
@@ -882,7 +882,7 @@ public:
         const std::string indexName = "bad_index";
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                         << static_cast<int>(kIndexVersion) << "background" << false));
 
@@ -910,6 +910,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
+                descriptor->getEntry(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -919,11 +920,12 @@ public:
                 nullptr,
                 id1);
 
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(
+                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
             auto insertStatus = iam->insert(&_opCtx,
                                             pooledBuilder,
                                             coll(),
+                                            descriptor->getEntry(),
                                             {{id1, Timestamp(), &badKey}},
                                             options,
                                             &numInserted);
@@ -953,7 +955,7 @@ public:
         const std::string indexName = "bad_specs_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion) << "sparse"
                                                      << "false"));
@@ -991,7 +993,7 @@ public:
         const auto indexKey = BSON("$**" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1117,7 +1119,7 @@ public:
         const auto indexKey = BSON("a.$**" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1219,7 +1221,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1315,7 +1317,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1357,6 +1359,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
+                descriptor->getEntry(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -1365,8 +1368,8 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(
+                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1431,7 +1434,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -1518,7 +1521,7 @@ public:
         const auto indexKeyA = BSON("a" << 1);
         ASSERT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexNameA << "key" << indexKeyA << "v"
                                                      << static_cast<int>(kIndexVersion))));
 
@@ -1527,7 +1530,7 @@ public:
         const auto indexKeyB = BSON("b" << 1);
         ASSERT_OK(
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexNameB << "key" << indexKeyB << "v"
                                                      << static_cast<int>(kIndexVersion))));
 
@@ -1703,7 +1706,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << indexKey << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -1745,6 +1748,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
+                descriptor->getEntry(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -1753,8 +1757,8 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(
+                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1881,7 +1885,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << indexKey << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -2041,7 +2045,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2091,6 +2095,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
                              coll(),
+                             entry,
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2108,12 +2113,13 @@ public:
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll(),
+                        entry,
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &interceptor](const KeyString::Value& duplicateKey) {
-                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
 
@@ -2123,7 +2129,7 @@ public:
                     wunit.commit();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
             }
 
             releaseDb();
@@ -2282,7 +2288,7 @@ public:
             const auto indexKeyA = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameA << "key" << indexKeyA << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2293,7 +2299,7 @@ public:
             const auto indexKeyB = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameB << "key" << indexKeyB << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2345,6 +2351,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
                              coll(),
+                             entry,
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2362,12 +2369,13 @@ public:
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll(),
+                        entry,
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &interceptor](const KeyString::Value& duplicateKey) {
-                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
 
@@ -2377,7 +2385,7 @@ public:
                     wunit.commit();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
             }
 
             releaseDb();
@@ -2544,7 +2552,7 @@ public:
             const auto indexKeyA = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameA << "key" << indexKeyA << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2555,7 +2563,7 @@ public:
             const auto indexKeyB = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexNameB << "key" << indexKeyB << "v"
                             << static_cast<int>(kIndexVersion) << "unique" << true));
             ASSERT_OK(status);
@@ -2594,6 +2602,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
+                    descriptor->getEntry(),
                     pooledBuilder,
                     actualKey,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -2602,8 +2611,11 @@ public:
                     nullptr,
                     nullptr,
                     rid1);
-                auto removeStatus =
-                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+                auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    descriptor->getEntry(),
+                                                    {keys.begin(), keys.end()},
+                                                    options,
+                                                    &numDeleted);
 
                 ASSERT_EQUALS(numDeleted, 1);
                 ASSERT_OK(removeStatus);
@@ -2646,6 +2658,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
                              coll(),
+                             entry,
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2663,12 +2676,13 @@ public:
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll(),
+                        entry,
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &interceptor](const KeyString::Value& duplicateKey) {
-                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
 
@@ -2678,7 +2692,7 @@ public:
                     wunit.commit();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
             }
 
             // Insert the key on b.
@@ -2691,6 +2705,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
                              coll(),
+                             entry,
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -2708,12 +2723,13 @@ public:
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll(),
+                        entry,
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &interceptor](const KeyString::Value& duplicateKey) {
-                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
 
@@ -2723,7 +2739,7 @@ public:
                     wunit.commit();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
             }
 
             releaseDb();
@@ -2883,7 +2899,7 @@ public:
         const auto indexName = "non_mk_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -2907,6 +2923,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
+                    descriptor->getEntry(),
                     pooledBuilder,
                     doc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -2918,8 +2935,11 @@ public:
                 ASSERT_EQ(keys.size(), 1);
 
                 int64_t numDeleted;
-                auto removeStatus =
-                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+                auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    descriptor->getEntry(),
+                                                    {keys.begin(), keys.end()},
+                                                    options,
+                                                    &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQUALS(numDeleted, 1);
                 wunit.commit();
@@ -3058,7 +3078,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);
@@ -3069,7 +3089,7 @@ public:
             const auto indexKey = BSON("b" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);
@@ -3112,6 +3132,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
+                descriptor->getEntry(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3120,8 +3141,8 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(
+                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -3149,6 +3170,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
+                descriptor->getEntry(),
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3157,8 +3179,8 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(
+                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -3206,7 +3228,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false << "unique"
                             << true));
@@ -3265,6 +3287,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
                              coll(),
+                             entry,
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -3282,12 +3305,13 @@ public:
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll(),
+                        entry,
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &interceptor](const KeyString::Value& duplicateKey) {
-                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
 
@@ -3297,7 +3321,7 @@ public:
                     wunit.commit();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
             }
 
             // Insert the key on "a".
@@ -3310,6 +3334,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
                              coll(),
+                             entry,
                              pooledBuilder,
                              dupObj,
                              InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
@@ -3327,12 +3352,13 @@ public:
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll(),
+                        entry,
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &interceptor](const KeyString::Value& duplicateKey) {
-                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
 
@@ -3342,7 +3368,7 @@ public:
                     wunit.commit();
                 }
 
-                ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, entry));
             }
 
             releaseDb();
@@ -3641,7 +3667,7 @@ public:
         const auto indexName = "non_mk_index";
         auto status =
             dbtests::createIndexFromSpec(&_opCtx,
-                                         coll()->ns().ns(),
+                                         coll()->ns().ns_forTest(),
                                          BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
                                                      << static_cast<int>(kIndexVersion)));
         ASSERT_OK(status);
@@ -3665,6 +3691,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
+                    descriptor->getEntry(),
                     pooledBuilder,
                     doc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3676,8 +3703,11 @@ public:
                 ASSERT_EQ(keys.size(), 1);
 
                 int64_t numDeleted;
-                auto removeStatus =
-                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+                auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    descriptor->getEntry(),
+                                                    {keys.begin(), keys.end()},
+                                                    options,
+                                                    &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQUALS(numDeleted, 1);
                 wunit.commit();
@@ -3701,6 +3731,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
+                    descriptor->getEntry(),
                     pooledBuilder,
                     mkDoc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3718,6 +3749,7 @@ public:
                 auto keysIterator = keys.begin();
                 auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
                                                                           coll(),
+                                                                          descriptor->getEntry(),
                                                                           {*keysIterator},
                                                                           {},
                                                                           MultikeyPaths{},
@@ -3731,6 +3763,7 @@ public:
                 numInserted = 0;
                 insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
                                                                      coll(),
+                                                                     descriptor->getEntry(),
                                                                      {*keysIterator},
                                                                      {},
                                                                      MultikeyPaths{},
@@ -3864,7 +3897,7 @@ public:
         // Create a multikey index.
         const auto indexName = "mk_index";
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name" << indexName << "key"
                                                                << BSON("a" << 1 << "b" << 1) << "v"
                                                                << static_cast<int>(kIndexVersion)));
@@ -3891,6 +3924,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
+                    descriptor->getEntry(),
                     pooledBuilder,
                     doc1,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3902,8 +3936,11 @@ public:
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numDeleted;
-                auto removeStatus =
-                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
+                auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    descriptor->getEntry(),
+                                                    {keys.begin(), keys.end()},
+                                                    options,
+                                                    &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQ(numDeleted, 2);
                 wunit.commit();
@@ -3928,6 +3965,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
+                    descriptor->getEntry(),
                     pooledBuilder,
                     doc2,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3939,8 +3977,15 @@ public:
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numInserted;
-                auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
-                    &_opCtx, coll(), keys, {}, oldMultikeyPaths, options, nullptr, &numInserted);
+                auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
+                                                                          coll(),
+                                                                          descriptor->getEntry(),
+                                                                          keys,
+                                                                          {},
+                                                                          oldMultikeyPaths,
+                                                                          options,
+                                                                          nullptr,
+                                                                          &numInserted);
 
                 ASSERT_EQUALS(numInserted, 2);
                 ASSERT_OK(insertStatus);
@@ -4060,7 +4105,7 @@ public:
 
         const auto indexName = "mk_index";
         auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll()->ns().ns(),
+                                                   coll()->ns().ns_forTest(),
                                                    BSON("name" << indexName << "key"
                                                                << BSON("a" << 1 << "b" << 1) << "v"
                                                                << static_cast<int>(kIndexVersion)));
@@ -4083,10 +4128,11 @@ public:
         }
 
         // Reload the index from the modified catalog.
-        auto descriptor = coll()->getIndexCatalog()->findIndexByName(&_opCtx, indexName);
+        const IndexDescriptor* descriptor = nullptr;
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto writableCatalog = writer.getWritableCollection(&_opCtx)->getIndexCatalog();
+            descriptor = writableCatalog->findIndexByName(&_opCtx, indexName);
             descriptor = writableCatalog->refreshEntry(&_opCtx,
                                                        writer.getWritableCollection(&_opCtx),
                                                        descriptor,
@@ -4274,7 +4320,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -4385,7 +4431,7 @@ public:
         const auto indexKey = BSON("a" << 1);
         auto status = dbtests::createIndexFromSpec(
             &_opCtx,
-            coll()->ns().ns(),
+            coll()->ns().ns_forTest(),
             BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
                         << "background" << false));
         ASSERT_OK(status);
@@ -4548,7 +4594,7 @@ public:
             const auto indexKey = BSON("a" << 1);
             auto status = dbtests::createIndexFromSpec(
                 &_opCtx,
-                coll()->ns().ns(),
+                coll()->ns().ns_forTest(),
                 BSON("name" << indexName << "key" << indexKey << "v"
                             << static_cast<int>(kIndexVersion) << "background" << false));
             ASSERT_OK(status);

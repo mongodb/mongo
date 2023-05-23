@@ -36,6 +36,22 @@ namespace mongo {
 namespace update {
 
 /**
+ * Generate a new document based on an update modification using an UpdateDriver.
+ */
+void generateNewDocumentFromUpdateOp(OperationContext* opCtx,
+                                     const FieldRefSet& immutablePaths,
+                                     UpdateDriver* driver,
+                                     mutablebson::Document& document);
+
+/**
+ * Generate a new document based on the supplied upsert document.
+ */
+void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
+                                        const FieldRefSet& immutablePaths,
+                                        const UpdateRequest* request,
+                                        mutablebson::Document& document);
+
+/**
  * Use an UpdateDriver and UpdateRequest to produce the document to insert.
  **/
 void produceDocumentForUpsert(OperationContext* opCtx,

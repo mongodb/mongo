@@ -37,20 +37,6 @@ feature_flags:
       version: 5.1
       shouldBeFCVGated: true
 
-    featureFlagShardedTimeSeries:
-      description: "Feature flag for allowing sharding a Time Series collection"
-      cpp_varname: gFeatureFlagShardedTimeSeries
-      default: true
-      version: 5.1
-      shouldBeFCVGated: true
-
-    featureFlagShardedTimeSeriesUpdateDelete:
-      description: "Feature flag for allowing update and delete operations on a sharded Time Series collection"
-      cpp_varname: gFeatureFlagShardedTimeSeriesUpdateDelete
-      default: true
-      version: 5.1
-      shouldBeFCVGated: true
-
     featureFlagChangeStreamsFurtherEnrichedEvents:
       description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
       cpp_varname: gFeatureFlagChangeStreamsFurtherEnrichedEvents

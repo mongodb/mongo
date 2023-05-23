@@ -66,6 +66,7 @@ public:
     Status insert(OperationContext* opCtx,
                   SharedBufferFragmentBuilder& pooledBufferBuilder,
                   const CollectionPtr& coll,
+                  const IndexCatalogEntry* entry,
                   const std::vector<BsonRecord>& bsonRecords,
                   const InsertDeleteOptions& options,
                   int64_t* keysInsertedOut) final;
@@ -73,6 +74,7 @@ public:
     void remove(OperationContext* opCtx,
                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                 const CollectionPtr& coll,
+                const IndexCatalogEntry* entry,
                 const BSONObj& obj,
                 const RecordId& rid,
                 bool logIfError,
@@ -86,12 +88,14 @@ public:
                   const BSONObj& newDoc,
                   const RecordId& rid,
                   const CollectionPtr& coll,
+                  const IndexCatalogEntry* entry,
                   const InsertDeleteOptions& options,
                   int64_t* keysInsertedOut,
                   int64_t* keysDeletedOut) final;
 
     Status applyIndexBuildSideWrite(OperationContext* opCtx,
                                     const CollectionPtr& coll,
+                                    const IndexCatalogEntry* entry,
                                     const BSONObj& operation,
                                     const InsertDeleteOptions& unusedOptions,
                                     KeyHandlerFn&& unusedFn,
@@ -115,6 +119,7 @@ public:
     Status compact(OperationContext* opCtx) final;
 
     std::unique_ptr<IndexAccessMethod::BulkBuilder> initiateBulk(
+        const IndexCatalogEntry* entry,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         StringData dbName) final;
@@ -133,8 +138,8 @@ public:
 
     class BulkBuilder;
 
-    const std::string& indexName() const {
-        return _descriptor->indexName();
+    const std::string& indexName(const IndexCatalogEntry* entry) const {
+        return entry->descriptor()->indexName();
     }
 
     /**
@@ -153,8 +158,6 @@ private:
                                    function_ref<void(StringData, const BsonRecord&)> cb) const;
 
     const std::unique_ptr<ColumnStore> _store;
-    IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
-    const IndexDescriptor* const _descriptor;
     const column_keygen::ColumnKeyGenerator _keyGen;
 };
 }  // namespace mongo

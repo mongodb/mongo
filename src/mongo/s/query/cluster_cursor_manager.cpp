@@ -599,7 +599,6 @@ void collectQueryStatsMongos(OperationContext* opCtx,
     query_stats::writeQueryStats(
         opCtx,
         opDebug.queryStatsStoreKeyHash,
-        opDebug.queryStatsStoreKey,
         std::move(requestShapifier),
         opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
         opDebug.additiveMetrics.nreturned.value_or(0));

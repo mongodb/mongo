@@ -9,7 +9,7 @@ import gdb.printing
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo import get_current_thread_name, get_thread_id, RegisterMongoCommand
+    from buildscripts.gdb.mongo import get_current_thread_name, get_thread_id, lookup_type, RegisterMongoCommand
 
 if sys.version_info[0] < 3:
     raise gdb.GdbError(
@@ -323,7 +323,7 @@ def find_lock_manager_holders(graph, thread_dict, show):
     (_, lock_waiter_lwpid, _) = gdb.selected_thread().ptid
     lock_waiter = thread_dict[lock_waiter_lwpid]
 
-    locker_ptr_type = gdb.lookup_type("mongo::LockerImpl").pointer()
+    locker_ptr_type = lookup_type("mongo::LockerImpl").pointer()
 
     lock_head = gdb.parse_and_eval(
         "mongo::LockManager::get((mongo::ServiceContext*) mongo::getGlobalServiceContext())->_getBucket(resId)->findOrInsert(resId)"

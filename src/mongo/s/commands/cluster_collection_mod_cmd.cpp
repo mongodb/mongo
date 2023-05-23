@@ -98,7 +98,7 @@ public:
                     "command"_attr = redact(cmdObj));
 
         auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(
-            opCtx, cmd.getDbName().toStringWithTenantId());
+            opCtx, DatabaseNameUtil::serializeForCatalog(cmd.getDbName()));
         if (swDbInfo == ErrorCodes::NamespaceNotFound) {
             uassert(
                 CollectionUUIDMismatchInfo(
@@ -123,7 +123,7 @@ public:
         auto cmdResponse =
             uassertStatusOK(executeCommandAgainstDatabasePrimary(
                                 opCtx,
-                                dbName.toStringWithTenantId(),
+                                DatabaseNameUtil::serialize(dbName),
                                 dbInfo,
                                 CommandHelpers::appendMajorityWriteConcern(
                                     collModCommand.toBSON({}), opCtx->getWriteConcern()),

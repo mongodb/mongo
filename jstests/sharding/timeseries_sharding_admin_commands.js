@@ -16,14 +16,6 @@ load("jstests/core/timeseries/libs/timeseries.js");
 
 // Connections.
 const mongo = new ShardingTest({shards: 2, rs: {nodes: 3}});
-
-// Sanity checks.
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(mongo.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    mongo.stop();
-    return;
-}
-
 const dbName = 'testDB';
 const collName = 'testColl';
 const timeField = 'time';

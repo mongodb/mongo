@@ -116,10 +116,10 @@ public:
                     return boost::optional<UUID>(boost::none);
                 }
 
-                if (nssToUuid.find(nss.toString()) == nssToUuid.end())
-                    nssToUuid.emplace(nss.toString(), UUID::gen());
+                if (nssToUuid.find(nss.toString_forTest()) == nssToUuid.end())
+                    nssToUuid.emplace(nss.toString_forTest(), UUID::gen());
 
-                const UUID& collUuid = nssToUuid.at(nss.toString());
+                const UUID& collUuid = nssToUuid.at(nss.toString_forTest());
                 return boost::optional<UUID>(collUuid);
             }();
 
@@ -433,11 +433,11 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_W
     auto opCtx = operationContext();
     PlacementDescriptor _startFcvMarker = {
         Timestamp(1, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {"shard1", "shard2", "shard3", "shard4", "shard5"}};
     PlacementDescriptor _endFcvMarker = {
         Timestamp(3, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {}};
 
     // initialization
@@ -682,11 +682,11 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Wit
     auto opCtx = operationContext();
     PlacementDescriptor _startFcvMarker = {
         Timestamp(1, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {"shard1", "shard2", "shard3", "shard4", "shard5"}};
     PlacementDescriptor _endFcvMarker = {
         Timestamp(3, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {}};
 
     // initialization
@@ -893,11 +893,11 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_WithMark
     auto opCtx = operationContext();
     PlacementDescriptor _startFcvMarker = {
         Timestamp(1, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {"shard1", "shard2", "shard3", "shard4"}};
     PlacementDescriptor _endFcvMarker = {
         Timestamp(3, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {}};
 
     // initialization
@@ -1200,11 +1200,11 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp_
     auto opCtx = operationContext();
     PlacementDescriptor startFcvMarker = {
         Timestamp(1, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {"shard1", "shard2", "shard3", "shard4"}};
     PlacementDescriptor endFcvMarker = {
         Timestamp(3, 0),
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns().toString(),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString(),
         {}};
 
     // initialization

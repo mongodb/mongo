@@ -1323,21 +1323,16 @@ private:
         // Set the isCleaningServerMetadata field to true. This prohibits the downgrading to
         // upgrading transition until the isCleaningServerMetadata is unset when we successfully
         // finish the FCV downgrade and transition to the DOWNGRADED state.
-        // (Ignore FCV check): This is intentional because we want to use this feature even if we
-        // are in downgrading fcv state.
-        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCVUnsafe()) {
-            {
-                const auto fcvChangeRegion(
-                    FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
-                FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-                    opCtx,
-                    actualVersion,
-                    requestedVersion,
-                    isFromConfigServer,
-                    changeTimestamp,
-                    true /* setTargetVersion */,
-                    true /* setIsCleaningServerMetadata*/);
-            }
+        {
+            const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+            FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                opCtx,
+                actualVersion,
+                requestedVersion,
+                isFromConfigServer,
+                changeTimestamp,
+                true /* setTargetVersion */,
+                true /* setIsCleaningServerMetadata*/);
         }
 
         uassert(ErrorCodes::Error(7428201),

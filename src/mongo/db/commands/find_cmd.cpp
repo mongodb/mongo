@@ -122,6 +122,43 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
 }
 
 /**
+ * Parses the grammar elements like 'filter', 'sort', and 'projection' from the raw
+ * 'FindCommandRequest', and tracks internal state like begining the operation's timer and recording
+ * query shape stats (if enabled).
+ */
+std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    BSONObj requestBody,
+    std::unique_ptr<FindCommandRequest> findCommand,
+    const CollectionPtr& collection) {
+    // Fill out curop information.
+    beginQueryOp(opCtx, nss, requestBody);
+    // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+
+    auto expCtx =
+        makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
+
+    auto parsedRequest = uassertStatusOK(
+        parsed_find_command::parse(expCtx,
+                                   std::move(findCommand),
+                                   extensionsCallback,
+                                   MatchExpressionParser::kAllowAllSpecialFeatures));
+
+    // Register query stats collection. Exclude queries against non-existent collections and
+    // collections with encrypted fields. It is important to do this before canonicalizing and
+    // optimizing the query, each of which would alter the query shape.
+    if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
+        query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
+            return std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedRequest);
+        });
+    }
+
+    return uassertStatusOK(
+        CanonicalQuery::canonicalize(std::move(expCtx), std::move(parsedRequest)));
+}
+/**
  * A command for running .find() queries.
  */
 class FindCmd final : public Command {
@@ -372,7 +409,6 @@ public:
 
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.
-            const bool isExplain = false;
             const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, cmdObj);
 
@@ -393,10 +429,11 @@ public:
                     !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
                       !findCommand->getAllowSpeculativeMajorityRead()));
 
+            const bool isFindByUUID = findCommand->getNamespaceOrUUID().uuid().has_value();
             uassert(ErrorCodes::InvalidOptions,
                     "When using the find command by UUID, the collectionUUID parameter cannot also "
                     "be specified",
-                    !findCommand->getNamespaceOrUUID().uuid() || !findCommand->getCollectionUUID());
+                    !isFindByUUID || !findCommand->getCollectionUUID());
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -495,13 +532,16 @@ public:
             const auto& collection = ctx->getCollection();
 
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().value()
+                    str::stream() << "UUID " << *findCommand->getNamespaceOrUUID().uuid()
                                   << " specified in query request not found",
-                    collection || !findCommand->getNamespaceOrUUID().uuid());
+                    collection || !isFindByUUID);
 
             if (collection) {
-                // Set the namespace if a collection was found, as opposed to nothing or a view.
-                query_request_helper::refreshNSS(ctx->getNss(), findCommand.get());
+                if (isFindByUUID) {
+                    // Replace the UUID in the find command with the fully qualified namespace of
+                    // the looked up Collection.
+                    findCommand->setNss(ctx->getNss());
+                }
 
                 // Tailing a replicated capped clustered collection requires majority read concern.
                 const bool isTailable = findCommand->getTailable();
@@ -518,21 +558,9 @@ public:
                 }
             }
 
-            // Fill out curop information.
-            beginQueryOp(opCtx, nss, _request.body);
+            auto cq = parseQueryAndBeginOperation(
+                opCtx, nss, _request.body, std::move(findCommand), collection);
 
-            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
-            const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-
-            auto expCtx =
-                makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
-            auto cq = uassertStatusOK(
-                CanonicalQuery::canonicalize(opCtx,
-                                             std::move(findCommand),
-                                             isExplain,
-                                             std::move(expCtx),
-                                             extensionsCallback,
-                                             MatchExpressionParser::kAllowAllSpecialFeatures));
             // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
             // $$USER_ROLES for the find command.
             cq->getExpCtx()->setUserRoles();
@@ -576,18 +604,6 @@ public:
             }
 
             cq->setUseCqfIfEligible(true);
-
-            if (collection) {
-                // Collect queryStats. Exclude queries against collections with encrypted fields.
-                if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
-                    query_stats::registerRequest(
-                        std::make_unique<query_stats::FindRequestShapifier>(
-                            cq->getFindCommandRequest(), opCtx),
-                        collection.get()->ns(),
-                        opCtx,
-                        cq->getExpCtx());
-                }
-            }
 
             // Get the execution plan for the query.
             bool permitYield = true;
@@ -794,9 +810,6 @@ public:
                     processFLEFindD(
                         opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
                 }
-                // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done
-                // a FLE rewrite.
-                CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
             }
 

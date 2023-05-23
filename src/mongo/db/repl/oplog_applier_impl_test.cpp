@@ -687,8 +687,8 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenant) {
     const NamespaceString targetNss =
         NamespaceString::createNamespaceString_forTest(tid, "test.bar");
 
-    auto oRename = BSON("renameCollection" << sourceNss.toString() << "to" << targetNss.toString()
-                                           << "tid" << tid);
+    auto oRename = BSON("renameCollection" << sourceNss.toString_forTest() << "to"
+                                           << targetNss.toString_forTest() << "tid" << tid);
 
     repl::createCollection(_opCtx.get(), sourceNss, {});
     // createCollection uses an actual opTime, so we must generate an actually opTime in the future.
@@ -748,7 +748,7 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantAcrossTenantsRequ
     const NamespaceString targetNss =
         NamespaceString::createNamespaceString_forTest(tid, "test.bar");
     const NamespaceString wrongTargetNss =
-        NamespaceString::createNamespaceString_forTest(wrongTid, targetNss.toString());
+        NamespaceString::createNamespaceString_forTest(wrongTid, targetNss.toString_forTest());
 
     ASSERT_NE(sourceNss, wrongTargetNss);
 

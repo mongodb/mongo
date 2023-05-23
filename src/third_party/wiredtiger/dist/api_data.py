@@ -732,6 +732,10 @@ connection_runtime_config = [
             interval in seconds at which to check for files that are inactive and close them''',
             min=1, max=100000),
         ]),
+    Config('generation_drain_timeout_ms', '240000', r'''
+        the number of milliseconds to wait for a resource to drain before timing out in diagnostic
+        mode. Default will wait for 4 minutes, 0 will wait forever''',
+        min=0),
     Config('history_store', '', r'''
         history store configuration options''',
         type='category', subconfig=[

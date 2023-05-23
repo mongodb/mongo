@@ -27,22 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 /**
  * Sets up the catalog (via CatalogTestFixture), installs a collection in the catalog and provides
@@ -326,3 +320,4 @@ TEST_F(BatchedCollectionCatalogWriterTest, BatchedTest) {
 }
 
 }  // namespace
+}  // namespace mongo

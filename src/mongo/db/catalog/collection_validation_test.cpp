@@ -888,7 +888,7 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleInvalidIndexEntryCSI) {
             for (int corruptedFldIndex = 1; corruptedFldIndex <= numFields; ++corruptedFldIndex) {
                 for (int corruptedDocIndex = 0; corruptedDocIndex < numDocs; ++corruptedDocIndex) {
                     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-                        kNss.toString() + std::to_string(++testCaseIdx));
+                        kNss.toString_forTest() + std::to_string(++testCaseIdx));
 
                     // Create collection nss for unit tests to use.
                     const CollectionOptions defaultCollectionOptions;
@@ -1011,7 +1011,7 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleExtraIndexEntry) {
                 const int corruptedDocIndex = corruption.second;
 
                 const auto nss = NamespaceString::createNamespaceString_forTest(
-                    kNss.toString() + std::to_string(++testCaseIdx));
+                    kNss.toString_forTest() + std::to_string(++testCaseIdx));
 
                 // Create collection nss for unit tests to use.
                 const CollectionOptions defaultCollectionOptions;
@@ -1099,7 +1099,7 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleMissingIndexEntryCSI) {
             for (int corruptedFldIndex = 1; corruptedFldIndex <= numFields; ++corruptedFldIndex) {
                 for (int corruptedDocIndex = 0; corruptedDocIndex < numDocs; ++corruptedDocIndex) {
                     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-                        kNss.toString() + std::to_string(++testCaseIdx));
+                        kNss.toString_forTest() + std::to_string(++testCaseIdx));
 
                     // Create collection nss for unit tests to use.
                     const CollectionOptions defaultCollectionOptions;

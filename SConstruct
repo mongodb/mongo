@@ -917,6 +917,7 @@ def variable_tools_converter(val):
         "mongo_integrationtest",
         "mongo_unittest",
         "mongo_libfuzzer",
+        "mongo_pretty_printer_tests",
         "textfile",
     ]
 
@@ -1641,6 +1642,8 @@ envDict = dict(
     # TODO: Move unittests.txt to $BUILD_DIR, but that requires
     # changes to MCI.
     UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
+    PRETTY_PRINTER_TEST_ALIAS='install-pretty-printer-tests',
+    PRETTY_PRINTER_TEST_LIST='$BUILD_DIR/pretty_printer_tests.txt',
     LIBFUZZER_TEST_ALIAS='install-fuzzertests',
     LIBFUZZER_TEST_LIST='$BUILD_ROOT/libfuzzer_tests.txt',
     INTEGRATION_TEST_ALIAS='install-integration-tests',
@@ -2028,13 +2031,15 @@ if env.get('ENABLE_OOM_RETRY'):
                 ': out of memory',
                 'virtual memory exhausted: Cannot allocate memory',
                 ': fatal error: Killed signal terminated program cc1',
+                # TODO: SERVER-77322 remove this non memory related ICE.
+                r'during IPA pass: cp.+g\+\+: internal compiler error',
             ]
         elif env.ToolchainIs('msvc'):
             env['OOM_RETRY_MESSAGES'] = [
                 'LNK1102: out of memory',
                 'C1060: compiler is out of heap space',
                 'c1xx : fatal error C1063: INTERNAL COMPILER ERROR',
-                'LNK1171: unable to load mspdbcore.dll',
+                r'LNK1171: unable to load mspdbcore\.dll',
                 "LNK1201: error writing to program database ''",
             ]
             env['OOM_RETRY_RETURNCODES'] = [1102]
@@ -6019,6 +6024,14 @@ env.AddPackageNameAlias(
     # defined when AIB correctly uses environments instead of hooking into
     # the first environment used.
     name="mh-debugsymbols",
+)
+
+env.AutoInstall(
+    target='$PREFIX',
+    source='$PRETTY_PRINTER_TEST_LIST',
+    AIB_ROLE='runtime',
+    AIB_COMPONENT='pretty-printer-tests',
+    AIB_COMPONENTS_EXTRA=['dist-test'],
 )
 
 env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'

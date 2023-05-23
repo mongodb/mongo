@@ -51,7 +51,8 @@ PrimaryOnlyServiceOpObserver::~PrimaryOnlyServiceOpObserver() = default;
 
 void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
-                                                 BSONObj const& doc) {
+                                                 BSONObj const& doc,
+                                                 OpStateAccumulator* opAccumulator) {
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.
     documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;

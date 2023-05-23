@@ -615,8 +615,7 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
                 stats.isModUpdate /* Is this a $mod update? */,
                 stats.nMeasurementsModified /* number of modified docs, no no-ops */,
                 stats.nMeasurementsMatched /* # of docs matched/updated, even no-ops */,
-                // TODO SERVER-76551 Add upsert support.
-                BSONObj() /* objInserted */,
+                stats.objInserted /* objInserted */,
                 static_cast<TimeseriesModifyStage*>(_root.get())->containsDotsAndDollarsField());
         }
         default:

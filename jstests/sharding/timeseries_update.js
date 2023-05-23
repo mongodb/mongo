@@ -24,37 +24,9 @@ const timeField = "time";
 const metaField = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
 
-//
-// Checks for feature flags.
-//
-
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 const testDB = mongos.getDB(dbName);
 testDB.dropDatabase();
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-
-if (!TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
-    // Ensure that the feature flag correctly prevents us from running an update on a sharded
-    // timeseries collection.
-    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField, metaField}}));
-    const coll = testDB.getCollection(collName);
-    assert.commandWorked(coll.createIndex({[timeField]: 1}));
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: {[timeField]: 1},
-    }));
-    assert.commandFailedWithCode(
-        testDB.runCommand(
-            {update: coll.getName(), updates: [{q: {}, u: {[metaField]: 1}, multi: true}]}),
-        [ErrorCodes.NotImplemented, ErrorCodes.InvalidOptions]);
-    st.stop();
-    return;
-}
 
 const arbitraryUpdatesEnabled = TimeseriesTest.arbitraryUpdatesEnabled(st.shard0);
 

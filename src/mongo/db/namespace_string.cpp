@@ -465,44 +465,47 @@ bool NamespaceString::isReplicated() const {
 }
 
 Status NamespaceStringOrUUID::isNssValid() const {
-    if (!_nss || _nss->isValid()) {
-        return Status::OK();
+    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
+        // _nss is set and not valid.
+        if (!nss->isValid()) {
+            return {ErrorCodes::InvalidNamespace,
+                    fmt::format("Namespace {} is not a valid collection name",
+                                nss->toStringForErrorMsg())};
+        }
     }
 
-    // _nss is set and not valid.
-    return {
-        ErrorCodes::InvalidNamespace,
-        fmt::format("Namespace {} is not a valid collection name", _nss->toStringForErrorMsg())};
+    return Status::OK();
 }
 
 std::string NamespaceStringOrUUID::toString() const {
-    if (_nss)
-        return _nss->toString();
-    else
-        return _uuid->toString();
+    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
+        return nss->toString();
+    }
+
+    return get<1>(get<UUIDWithDbName>(_nssOrUUID)).toString();
 }
 
 std::string NamespaceStringOrUUID::toStringForErrorMsg() const {
-    if (_nss)
-        return _nss->toStringForErrorMsg();
-    else
-        return _uuid->toString();
+    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
+        return nss->toStringForErrorMsg();
+    }
+
+    return get<1>(get<UUIDWithDbName>(_nssOrUUID)).toString();
+}
+
+std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID) {
+    if (auto nss = nssOrUUID.nss()) {
+        return toStringForLogging(nss.get());
+    } else {
+        return nssOrUUID.uuid()->toString();
+    }
 }
 
 void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, StringData fieldName) const {
-    invariant(_uuid || _nss);
-    if (_preferNssForSerialization) {
-        if (_nss) {
-            builder->append(fieldName, _nss->coll());
-        } else {
-            _uuid->appendToBuilder(builder, fieldName);
-        }
+    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
+        builder->append(fieldName, nss->coll());
     } else {
-        if (_uuid) {
-            _uuid->appendToBuilder(builder, fieldName);
-        } else {
-            builder->append(fieldName, _nss->coll());
-        }
+        get<1>(get<UUIDWithDbName>(_nssOrUUID)).appendToBuilder(builder, fieldName);
     }
 }
 

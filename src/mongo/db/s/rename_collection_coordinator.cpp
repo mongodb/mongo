@@ -469,9 +469,9 @@ void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
-std::vector<StringData> RenameCollectionCoordinator::_acquireAdditionalLocks(
+std::set<NamespaceString> RenameCollectionCoordinator::_getAdditionalLocksToAcquire(
     OperationContext* opCtx) {
-    return {_request.getTo().ns()};
+    return {_request.getTo()};
 }
 
 void RenameCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
@@ -649,20 +649,19 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     opCtx,
                     "renameCollection.start",
                     fromNss.ns(),
-                    BSON("source" << fromNss.toString() << "destination" << toNss.toString()),
+                    BSON("source" << NamespaceStringUtil::serialize(fromNss) << "destination"
+                                  << NamespaceStringUtil::serialize(toNss)),
                     ShardingCatalogClient::kMajorityWriteConcern);
 
                 // Block migrations on involved sharded collections
                 if (_doc.getOptShardedCollInfo()) {
-                    _updateSession(opCtx);
-                    sharding_ddl_util::stopMigrations(
-                        opCtx, fromNss, _doc.getSourceUUID(), getCurrentSession());
+                    const auto& osi = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(opCtx, fromNss, _doc.getSourceUUID(), osi);
                 }
 
                 if (_doc.getTargetIsSharded()) {
-                    _updateSession(opCtx);
-                    sharding_ddl_util::stopMigrations(
-                        opCtx, toNss, _doc.getTargetUUID(), getCurrentSession());
+                    const auto& osi = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(opCtx, toNss, _doc.getTargetUUID(), osi);
                 }
             }))
         .then(_buildPhaseHandler(
@@ -673,15 +672,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
                 }
 
                 const auto& fromNss = nss();
-
-                _updateSession(opCtx);
-                const OperationSessionInfo osi = getCurrentSession();
 
                 // On participant shards:
                 // - Block CRUD on source and target collection in case at least one of such
@@ -695,7 +690,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                                         renameCollParticipantRequest.toBSON({}))
-                                        .addFields(osi.toBSON());
+                                        .addFields(getNewSession(opCtx).toBSON());
 
                 // We need to send the command to all the shards because both movePrimary and
                 // moveChunk leave garbage behind for sharded collections. At the same time, the
@@ -727,32 +722,30 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
                     opCtx,
                     BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
-                         << BSON("$in"
-                                 << BSON_ARRAY(nss().toString() << _request.getTo().toString()))));
+                         << BSON("$in" << BSON_ARRAY(
+                                     NamespaceStringUtil::serialize(nss())
+                                     << NamespaceStringUtil::serialize(_request.getTo())))));
 
                 // For an unsharded collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
-                _updateSession(opCtx);
-
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
                 }
 
                 if ((_doc.getTargetIsSharded() || _doc.getOptShardedCollInfo())) {
-                    renameIndexMetadataInShards(
-                        opCtx, nss(), _request, getCurrentSession(), **executor, &_doc);
+                    const auto& osi = getNewSession(opCtx);
+                    renameIndexMetadataInShards(opCtx, nss(), _request, osi, **executor, &_doc);
                 }
 
-                _updateSession(opCtx);
-
+                const auto& osi = getNewSession(opCtx);
                 renameCollectionMetadataInTransaction(opCtx,
                                                       _doc.getOptShardedCollInfo(),
                                                       _request.getTo(),
                                                       _doc.getTargetUUID(),
                                                       ShardingCatalogClient::kMajorityWriteConcern,
                                                       **executor,
-                                                      getCurrentSession());
+                                                      osi);
             }))
         .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
@@ -762,9 +755,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
                 }
 
                 const auto& fromNss = nss();
@@ -774,15 +766,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     fromNss, _doc.getSourceUUID().value());
                 unblockParticipantRequest.setDbName(fromNss.dbName());
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
-                auto const cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                    unblockParticipantRequest.toBSON({}));
+                auto const cmdObj =
+                    CommandHelpers::appendMajorityWriteConcern(unblockParticipantRequest.toBSON({}))
+                        .addFields(getNewSession(opCtx).toBSON());
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-                _updateSession(opCtx);
-                const OperationSessionInfo osi = getCurrentSession();
-
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);
+                    opCtx, fromNss.db(), cmdObj, participants, **executor);
 
                 // Delete chunks belonging to the previous incarnation of the target collection.
                 // This is performed after releasing the critical section in order to reduce stalls
@@ -813,7 +803,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 opCtx,
                 "renameCollection.end",
                 nss().ns(),
-                BSON("source" << nss().toString() << "destination" << _request.getTo().toString()),
+                BSON("source" << NamespaceStringUtil::serialize(nss()) << "destination"
+                              << NamespaceStringUtil::serialize(_request.getTo())),
                 ShardingCatalogClient::kMajorityWriteConcern);
             LOGV2(5460504, "Collection renamed", logAttrs(nss()));
         }));

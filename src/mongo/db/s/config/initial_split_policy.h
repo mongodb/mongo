@@ -288,11 +288,13 @@ public:
                                          const ShardKeyPattern& shardKey,
                                          int numInitialChunks,
                                          boost::optional<std::vector<TagsType>> zones,
+                                         boost::optional<std::vector<ShardId>> availableShardIds,
                                          int samplesPerChunk = kDefaultSamplesPerChunk);
 
     SamplingBasedSplitPolicy(int numInitialChunks,
                              boost::optional<std::vector<TagsType>> zones,
-                             std::unique_ptr<SampleDocumentSource> samples);
+                             std::unique_ptr<SampleDocumentSource> samples,
+                             boost::optional<std::vector<ShardId>> availableShardIds);
 
     /**
      * Generates the initial split points and returns them in ascending shard key order. Does not
@@ -342,6 +344,8 @@ private:
     const int _numInitialChunks;
     boost::optional<std::vector<TagsType>> _zones;
     std::unique_ptr<SampleDocumentSource> _samples;
+    // If provided, only pick shard that is in this vector.
+    boost::optional<std::vector<ShardId>> _availableShardIds;
 };
 
 class ShardDistributionSplitPolicy : public InitialSplitPolicy {

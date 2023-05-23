@@ -8,7 +8,7 @@ import gdb.printing
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo import get_boost_optional
+    from buildscripts.gdb.mongo import get_boost_optional, lookup_type
 
 
 def eval_print_fn(val, print_fn):
@@ -893,7 +893,7 @@ class PolyValuePrinter(object):
     def to_string(self):
         dynamic_type = self.get_dynamic_type()
         try:
-            dynamic_type = gdb.lookup_type(dynamic_type).strip_typedefs()
+            dynamic_type = lookup_type(dynamic_type).strip_typedefs()
         except gdb.error:
             return "Unknown PolyValue tag: {}, did you add a new one?".format(self.tag)
         # GDB automatically formats types with children, remove the extra characters to get the
@@ -979,7 +979,7 @@ class ABTPrinter(PolyValuePrinter):
     def get_bound_projections(node):
         # Casts the input node to an ExpressionBinder and returns the set of bound projection names.
         pp = PolyValuePrinter(ABTPrinter.abt_type_set, ABTPrinter.abt_namespace, node)
-        dynamic_type = gdb.lookup_type(pp.get_dynamic_type()).strip_typedefs()
+        dynamic_type = lookup_type(pp.get_dynamic_type()).strip_typedefs()
         binder = pp.cast_control_block(dynamic_type)
         return Vector(binder["_names"])
 
@@ -1111,7 +1111,7 @@ def register_abt_printers(pp):
     # stale.
     try:
         # ABT printer.
-        abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
+        abt_type = lookup_type("mongo::optimizer::ABT").strip_typedefs()
         pp.add('ABT', abt_type.name, False, ABTPrinter)
 
         abt_ref_type = abt_type.name + "::Reference"

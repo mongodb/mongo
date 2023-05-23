@@ -282,16 +282,6 @@ function runReplicaSetTest(downgradeVersion) {
     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
     restartServerReplication(secondary);
 
-    // If downgrading->upgrading feature is not enabled,
-    // upgrading the FCV should fail if a previous downgrade has not yet completed.
-    if (!FeatureFlagUtil.isEnabled(primaryAdminDB,
-                                   "DowngradingToUpgrading",
-                                   null /* user not specified */,
-                                   true /* ignores FCV */)) {
-        assert.commandFailedWithCode(
-            primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}), 5147403);
-    }
-
     if (lastContinuousFCV !== lastLTSFCV) {
         // We will fail if we have not yet completed a downgrade and attempt to downgrade to a
         // different target version.

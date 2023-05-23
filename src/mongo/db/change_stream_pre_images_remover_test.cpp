@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,28 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/change_collection_expired_documents_remover.h"
 #include "mongo/db/change_stream_options_manager.h"
-
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/change_stream_pre_images_truncate_markers.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
-#include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/basic.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 
@@ -114,38 +111,60 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithOf
 }
 }  // namespace
 
-class PreImagesTruncateMarkersPerCollectionTest : public ServiceContextMongoDTest {
+class PreImagesRemoverTest : public CatalogTestFixture {
 protected:
-    explicit PreImagesTruncateMarkersPerCollectionTest() : ServiceContextMongoDTest() {
-        ChangeStreamOptionsManager::create(getServiceContext());
+    const NamespaceString kPreImageEnabledCollection =
+        NamespaceString::createNamespaceString_forTest("test.collection");
+
+    PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {}
+
+    void insertPreImage(NamespaceString nss, Timestamp operationTime) {
+        auto uuid = CollectionCatalog::get(operationContext())
+                        ->lookupCollectionByNamespace(operationContext(), nss)
+                        ->uuid();
+        auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
+        auto opCtx = operationContext();
+        WriteUnitOfWork wuow(opCtx);
+        ChangeStreamPreImageId id;
+        id.setNsUUID(uuid);
+        id.setApplyOpsIndex(0);
+        id.setTs(operationTime);
+
+        ChangeStreamPreImage image;
+        BSONObjBuilder bsonObjBuilder;
+        bsonObjBuilder.append("x", 1);
+        image.setPreImage(bsonObjBuilder.obj());
+        image.setId(id);
+        image.setOperationTime(Date_t::fromDurationSinceEpoch(Seconds{operationTime.getSecs()}));
+        manager.insertPreImage(opCtx, boost::none, image);
+        wuow.commit();
     }
 
-    virtual void setUp() override {
-        ServiceContextMongoDTest::setUp();
-
-        auto service = getServiceContext();
-        auto opCtx = cc().makeOperationContext();
-
-        // Use the full StorageInterfaceImpl so the earliest oplog entry Timestamp is not the
-        // minimum Timestamp.
-        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
-
-        // Set up ReplicationCoordinator and create oplog. The earliest oplog entry Timestamp is
-        // required for computing whether a truncate marker is expired.
-        repl::ReplicationCoordinator::set(
-            service, std::make_unique<repl::ReplicationCoordinatorMock>(service));
-        repl::createOplog(opCtx.get());
-
-        // Ensure that we are primary.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    ClockSourceMock* clockSource() {
+        return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
     }
 
-    void tearDown() override {
-        serverGlobalParams.clusterRole = ClusterRole::None;
+    BSONObj performPass(Milliseconds timeToAdvance) {
+        auto clock = clockSource();
+        clock->advance(timeToAdvance);
+        auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
+        auto newClient = getServiceContext()->makeClient("");
+        AlternativeClientRegion acr(newClient);
+        manager.performExpiredChangeStreamPreImagesRemovalPass(&cc());
+        return manager.getPurgingJobStats().toBSON();
     }
 
-    void serverlessSetExpireAfterSeconds(const TenantId& tenantId, int64_t expireAfterSeconds) {
+    void setExpirationTime(Seconds seconds) {
+        auto opCtx = operationContext();
+        auto& optionsManager = ChangeStreamOptionsManager::get(opCtx);
+        auto options = optionsManager.getOptions(opCtx);
+        auto preAndPostOptions = options.getPreAndPostImages();
+        preAndPostOptions.setExpireAfterSeconds(seconds.count());
+        options.setPreAndPostImages(preAndPostOptions);
+        invariantStatusOK(optionsManager.setOptions(opCtx, options));
+    }
+
+    void setExpirationTime(const TenantId& tenantId, Seconds seconds) {
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
         auto* changeStreamsParam =
             clusterParameters
@@ -153,7 +172,7 @@ protected:
                     "changeStreams");
 
         auto oldSettings = changeStreamsParam->getValue(tenantId);
-        oldSettings.setExpireAfterSeconds(expireAfterSeconds);
+        oldSettings.setExpireAfterSeconds(seconds.count());
         changeStreamsParam->setValue(oldSettings, tenantId).ignore();
     }
 
@@ -175,36 +194,22 @@ protected:
         return markers._hasExcessMarkers(opCtx);
     }
 
-    // The oplog must be populated in order to produce an earliest Timestamp. Creates then
-    // performs an insert on an arbitrary collection in order to populate the oplog.
-    void initEarliestOplogTSWithInsert(OperationContext* opCtx) {
-        NamespaceString arbitraryNss =
-            NamespaceString::createNamespaceString_forTest("test", "coll");
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        ChangeStreamOptionsManager::create(getServiceContext());
 
-        writeConflictRetry(opCtx, "createCollection", arbitraryNss, [&] {
-            WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection collRaii(opCtx, arbitraryNss, MODE_X);
-            invariant(!collRaii);
-            auto db = collRaii.ensureDbExists(opCtx);
-            invariant(db->createCollection(opCtx, arbitraryNss, {}));
-            wunit.commit();
-        });
-
-        std::vector<InsertStatement> insert;
-        insert.emplace_back(BSON("_id" << 0 << "data"
-                                       << "x"));
-        WriteUnitOfWork wuow(opCtx);
-        AutoGetCollection autoColl(opCtx, arbitraryNss, MODE_IX);
-        OpObserverRegistry opObserver;
-        opObserver.addObserver(
+        // Set up OpObserver so that the test will append actual oplog entries to the oplog using
+        // repl::logOp().
+        auto opObserverRegistry =
+            dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        opObserverRegistry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
-        opObserver.onInserts(opCtx,
-                             *autoColl,
-                             insert.begin(),
-                             insert.end(),
-                             /*fromMigrate=*/std::vector<bool>(insert.size(), false),
-                             /*defaultFromMigrate=*/false);
-        wuow.commit();
+
+        auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
+        manager.createPreImagesCollection(operationContext(), boost::none);
+
+        invariantStatusOK(storageInterface()->createCollection(
+            operationContext(), kPreImageEnabledCollection, CollectionOptions{}));
     }
 };
 
@@ -214,9 +219,8 @@ protected:
 // When 'expireAfterSeconds' is on, defaults to comparing the 'lastRecord's wallTime with
 // the current time - 'expireAfterSeconds',  which is already tested as a part of the
 // ChangeStreamPreImageExpirationPolicyTest.
-TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasExcessMarkersExpiredAfterSecondsOff) {
-    auto opCtxPtr = cc().makeOperationContext();
-    auto opCtx = opCtxPtr.get();
+TEST_F(PreImagesRemoverTest, hasExcessMarkersExpiredAfterSecondsOff) {
+    auto opCtx = operationContext();
 
     // With no explicit 'expireAfterSeconds', excess markers are determined by whether the Timestamp
     // of the 'lastRecord' in the oldest marker is greater than the Timestamp of the earliest oplog
@@ -224,7 +228,6 @@ TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasExcessMarkersExpiredAfterSe
     auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
     setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
 
-    initEarliestOplogTSWithInsert(opCtx);
     const auto currentEarliestOplogEntryTs =
         repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
 
@@ -246,9 +249,8 @@ TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasExcessMarkersExpiredAfterSe
     ASSERT_TRUE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
-    auto opCtxPtr = cc().makeOperationContext();
-    auto opCtx = opCtxPtr.get();
+TEST_F(PreImagesRemoverTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
+    auto opCtx = operationContext();
 
     // With no explicit 'expireAfterSeconds', excess markers are determined by whether the Timestamp
     // of the 'lastRecord' in the oldest marker is greater than the Timestamp of the earliest oplog
@@ -256,7 +258,6 @@ TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasNoExcessMarkersExpiredAfter
     auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
     setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
 
-    initEarliestOplogTSWithInsert(opCtx);
     const auto currentEarliestOplogEntryTs =
         repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
 
@@ -278,13 +279,12 @@ TEST_F(PreImagesTruncateMarkersPerCollectionTest, hasNoExcessMarkersExpiredAfter
     ASSERT_FALSE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersPerCollectionTest, serverlessHasNoExcessMarkers) {
-    int64_t expireAfterSeconds = 1000;
+TEST_F(PreImagesRemoverTest, serverlessHasNoExcessMarkers) {
+    Seconds expireAfter{1000};
     auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
-    serverlessSetExpireAfterSeconds(tenantId, expireAfterSeconds);
+    setExpirationTime(tenantId, expireAfter);
 
-    auto opCtxPtr = cc().makeOperationContext();
-    auto opCtx = opCtxPtr.get();
+    auto opCtx = operationContext();
     auto wallTime = opCtx->getServiceContext()->getFastClockSource()->now() + Minutes(120);
     auto lastRecordId = generatePreImageRecordId(wallTime);
     auto numRecords = 1;
@@ -297,13 +297,12 @@ TEST_F(PreImagesTruncateMarkersPerCollectionTest, serverlessHasNoExcessMarkers) 
     ASSERT_FALSE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersPerCollectionTest, serverlessHasExcessMarkers) {
-    int64_t expireAfterSeconds = 1;
+TEST_F(PreImagesRemoverTest, serverlessHasExcessMarkers) {
+    Seconds expireAfter{1};
     auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
-    serverlessSetExpireAfterSeconds(tenantId, expireAfterSeconds);
+    setExpirationTime(tenantId, expireAfter);
 
-    auto opCtxPtr = cc().makeOperationContext();
-    auto opCtx = opCtxPtr.get();
+    auto opCtx = operationContext();
     auto wallTime = opCtx->getServiceContext()->getFastClockSource()->now() - Minutes(120);
     auto lastRecordId = generatePreImageRecordId(wallTime);
     auto numRecords = 1;
@@ -316,7 +315,7 @@ TEST_F(PreImagesTruncateMarkersPerCollectionTest, serverlessHasExcessMarkers) {
     ASSERT_TRUE(excessMarkers);
 }
 
-TEST_F(PreImagesTruncateMarkersPerCollectionTest, RecordIdToPreImageTimstampRetrieval) {
+TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimstampRetrieval) {
     // Basic case.
     {
         Timestamp ts0(Date_t::now());
@@ -383,4 +382,68 @@ TEST_F(PreImagesTruncateMarkersPerCollectionTest, RecordIdToPreImageTimstampRetr
     }
 }
 
+// TODO SERVER-70591: Remove this test as the feature flag will be removed.
+TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithCollectionScans) {
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "featureFlagUseUnreplicatedTruncatesForDeletions", false};
+
+    auto clock = clockSource();
+    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
+    clock->advance(Milliseconds{1});
+    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
+
+    setExpirationTime(Seconds{1});
+    // Verify that expiration works as expected.
+    auto passStats = performPass(Milliseconds{2000});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+
+    // Assert that internal scans do not occur in the old collection scan approach.
+    passStats = performPass(Milliseconds{2000});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+}
+
+TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithTruncates) {
+    RAIIServerParameterControllerForTest minBytesPerMarker{
+        "preImagesCollectionTruncateMarkersMinBytes", 1};
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
+
+    auto clock = clockSource();
+    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
+    clock->advance(Milliseconds{1});
+    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
+
+    setExpirationTime(Seconds{1});
+    // Verify that expiration works as expected.
+    auto passStats = performPass(Milliseconds{2000});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+
+    // Assert that internal scans still occur while the collection exists.
+    passStats = performPass(Milliseconds{2000});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 2);
+
+    // Assert that internal scans don't occur if the collection is dropped and no more documents
+    // exist.
+    invariantStatusOK(
+        storageInterface()->dropCollection(operationContext(), kPreImageEnabledCollection));
+    passStats = performPass(Milliseconds{2000});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 3);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
+    // One more scan occurs after the drop verifying there's no more data and it is safe to ignore
+    // in the future.
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
+
+    passStats = performPass(Milliseconds{2000});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 4);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
+}
 }  // namespace mongo

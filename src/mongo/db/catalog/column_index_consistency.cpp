@@ -57,7 +57,19 @@ int64_t ColumnIndexConsistency::traverseIndex(OperationContext* opCtx,
         if (numIndexEntries % kInterruptIntervalNumRecords == 0) {
             // Periodically checks for interrupts and yields.
             opCtx->checkForInterrupt();
+
+            // Make a copy of the ident as the IndexCatalogEntry pointer may be invalidated after
+            // yielding.
+            const std::string indexIdent = index->getIdent();
             _validateState->yield(opCtx);
+
+            // After yielding, the latest instance of the collection is fetched and can be different
+            // from the collection instance prior to yielding. For this reason we need to refresh
+            // the index entry pointer.
+            index = _validateState->getCollection()
+                        ->getIndexCatalog()
+                        ->findIndexByIdent(opCtx, indexIdent)
+                        ->getEntry();
         }
 
         if (_firstPhase) {
@@ -179,9 +191,9 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
 
     if (!_missingIndexEntries.empty() || !_extraIndexEntries.empty()) {
         StringBuilder ss;
-        ss << "Index with name '" << csam->indexName() << "' has inconsistencies.";
+        ss << "Index with name '" << csam->indexName(index) << "' has inconsistencies.";
         results->errors.push_back(ss.str());
-        results->indexResultsMap.at(csam->indexName()).valid = false;
+        results->indexResultsMap.at(csam->indexName(index)).valid = false;
     }
     if (!_missingIndexEntries.empty()) {
         StringBuilder ss;
@@ -189,8 +201,8 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
         results->warnings.push_back(ss.str());
         results->valid = false;
         for (const auto& ent : _missingIndexEntries) {
-            results->missingIndexEntries.push_back(
-                _generateInfo(csam->indexName(), RecordId(ent.rid), ent.path, ent.rid, ent.value));
+            results->missingIndexEntries.push_back(_generateInfo(
+                csam->indexName(index), RecordId(ent.rid), ent.path, ent.rid, ent.value));
         }
     }
     if (!_extraIndexEntries.empty()) {
@@ -199,8 +211,8 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
         results->warnings.push_back(ss.str());
         results->valid = false;
         for (const auto& ent : _extraIndexEntries) {
-            results->extraIndexEntries.push_back(
-                _generateInfo(csam->indexName(), RecordId(ent.rid), ent.path, ent.rid, ent.value));
+            results->extraIndexEntries.push_back(_generateInfo(
+                csam->indexName(index), RecordId(ent.rid), ent.path, ent.rid, ent.value));
         }
     }
 }
@@ -208,14 +220,15 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
 void ColumnIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
                                                  ValidateResults* results) {
     int numColumnStoreIndexes = 0;
-    for (const auto& index : _validateState->getIndexes()) {
-        const IndexDescriptor* descriptor = index->descriptor();
+    for (const auto& indexIdent : _validateState->getIndexIdents()) {
+        const IndexDescriptor* descriptor =
+            _validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         if (descriptor->getAccessMethodName() == IndexNames::COLUMN) {
             ++numColumnStoreIndexes;
             uassert(7106138,
                     "The current implementation only supports a single column-store index.",
                     numColumnStoreIndexes <= 1);
-            _addIndexEntryErrors(opCtx, index.get(), results);
+            _addIndexEntryErrors(opCtx, descriptor->getEntry(), results);
         }
     }
 }
@@ -228,7 +241,7 @@ void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx,
 
     writeConflictRetry(opCtx, "removingExtraColumnIndexEntries", _validateState->nss(), [&] {
         WriteUnitOfWork wunit(opCtx);
-        auto& indexResults = results->indexResultsMap[csam->indexName()];
+        auto& indexResults = results->indexResultsMap[csam->indexName(index)];
         auto cursor = csam->writableStorage()->newWriteCursor(opCtx);
 
         for (auto it = _extraIndexEntries.begin(); it != _extraIndexEntries.end();) {
@@ -252,14 +265,15 @@ void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx,
 
 void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx, ValidateResults* results) {
     int numColumnStoreIndexes = 0;
-    for (const auto& index : _validateState->getIndexes()) {
-        const IndexDescriptor* descriptor = index->descriptor();
+    for (const auto& indexIdent : _validateState->getIndexIdents()) {
+        const IndexDescriptor* descriptor =
+            _validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         if (descriptor->getAccessMethodName() == IndexNames::COLUMN) {
             ++numColumnStoreIndexes;
             uassert(7106123,
                     "The current implementation only supports a single column-store index.",
                     numColumnStoreIndexes <= 1);
-            repairIndexEntries(opCtx, index.get(), results);
+            repairIndexEntries(opCtx, descriptor->getEntry(), results);
         }
     }
 }

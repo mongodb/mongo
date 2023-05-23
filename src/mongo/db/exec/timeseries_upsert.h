@@ -27,37 +27,38 @@
  *    it in the license file.
  */
 
+
 #pragma once
 
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/exec/timeseries_modify.h"
 
-namespace mongo::query_stats {
+namespace mongo {
 
 /**
- * Handles shapification for AggregateCommandRequests. Requires a pre-parsed pipeline in order to
- * avoid parsing the raw pipeline multiple times, but users should be sure to provide a
- * non-optimized pipeline.
+ * Execution stage for timeseries update requests with {upsert:true}. This is a specialized
+ * TimeseriesModifyStage which, in the event that no documents match the update request's query,
+ * generates and inserts a new document into the collection. All logic related to the insertion
+ * phase is implemented by this class.
  */
-class AggregateRequestShapifier final : public RequestShapifier {
+class TimeseriesUpsertStage final : public TimeseriesModifyStage {
 public:
-    AggregateRequestShapifier(const AggregateCommandRequest& request,
-                              const Pipeline& pipeline,
-                              OperationContext* opCtx,
-                              const boost::optional<std::string> applicationName = boost::none)
-        : RequestShapifier(opCtx, applicationName), _request(request), _pipeline(pipeline) {}
+    TimeseriesUpsertStage(ExpressionContext* expCtx,
+                          TimeseriesModifyParams&& params,
+                          WorkingSet* ws,
+                          std::unique_ptr<PlanStage> child,
+                          const ScopedCollectionAcquisition& coll,
+                          BucketUnpacker bucketUnpacker,
+                          std::unique_ptr<MatchExpression> residualPredicate,
+                          const UpdateRequest& request);
 
-    virtual ~AggregateRequestShapifier() = default;
-
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              OperationContext* opCtx) const final;
-
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    bool isEOF() final;
+    PlanStage::StageState doWork(WorkingSetID* id) final;
 
 private:
-    const AggregateCommandRequest& _request;
-    const Pipeline& _pipeline;
+    BSONObj _produceNewDocumentForInsert();
+    void _performInsert(BSONObj newDocument);
+
+    // The original update request.
+    const UpdateRequest& _request;
 };
-}  // namespace mongo::query_stats
+}  //  namespace mongo

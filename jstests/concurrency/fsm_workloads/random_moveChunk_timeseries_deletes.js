@@ -38,22 +38,11 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.call(this, db, collName, connCache);
 
-        this.featureFlagDisabled = this.featureFlagDisabled ||
-            !TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db);
-        if (this.featureFlagDisabled) {
-            jsTestLog(
-                "Skipping executing this test as the requisite feature flags are not enabled.");
-        }
-
         this.arbitraryDeletesEnabled =
             FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesDeletesSupport");
     };
 
     $config.states.doDelete = function doDelete(db, collName, connCache) {
-        if (this.featureFlagDisabled) {
-            return;
-        }
-
         // Alternate between filtering on the meta field and filtering on a data field. This will
         // cover both the timeseries batch delete and arbitrary delete paths.
         const filterFieldName = !this.arbitraryDeletesEnabled || Random.randInt(2) == 0

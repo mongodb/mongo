@@ -300,7 +300,7 @@ public:
                     dataColl.getCollection()->uuid(),
                     BSON(
                         "msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
-                                             dataColl.getCollection()->ns().toString())),
+                                             dataColl.getCollection()->ns().toString_forTest())),
                     BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
                                 << _reshardingUUID),
                     boost::none,

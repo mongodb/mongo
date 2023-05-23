@@ -168,11 +168,12 @@ protected:
         if (!enableAutoMerge) {
             setBuilder.appendBool(CollectionType::kEnableAutoMergeFieldName, false);
         }
-        ASSERT_OK(updateToConfigCollection(operationContext(),
-                                           CollectionType::ConfigNS,
-                                           BSON(CollectionType::kNssFieldName << nss.toString()),
-                                           BSON("$set" << setBuilder.obj()),
-                                           false /*upsert*/));
+        ASSERT_OK(
+            updateToConfigCollection(operationContext(),
+                                     CollectionType::ConfigNS,
+                                     BSON(CollectionType::kNssFieldName << nss.toString_forTest()),
+                                     BSON("$set" << setBuilder.obj()),
+                                     false /*upsert*/));
     }
 
     void assertAutomergerConsidersCollectionsWithMergeableChunks(

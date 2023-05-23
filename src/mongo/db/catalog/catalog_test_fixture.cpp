@@ -44,7 +44,6 @@ void CatalogTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
 
     auto service = getServiceContext();
-    _storage = std::make_unique<repl::StorageInterfaceImpl>();
     _opCtx = cc().makeOperationContext();
 
     // Set up ReplicationCoordinator and ensure that we are primary.
@@ -52,13 +51,17 @@ void CatalogTestFixture::setUp() {
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
 
+    // Setup ReplicationInterface
+    auto storageInterface = std::make_unique<repl::StorageInterfaceImpl>();
+    _storage = storageInterface.get();
+    repl::StorageInterface::set(service, std::move(storageInterface));
+
     // Set up oplog collection. If the WT storage engine is used, the oplog collection is expected
     // to exist when fetching the next opTime (LocalOplogInfo::getNextOpTimes) to use for a write.
     repl::createOplog(operationContext());
 }
 
 void CatalogTestFixture::tearDown() {
-    _storage.reset();
     _opCtx.reset();
 
     // Tear down mongod.
@@ -70,7 +73,7 @@ OperationContext* CatalogTestFixture::operationContext() {
 }
 
 repl::StorageInterface* CatalogTestFixture::storageInterface() {
-    return _storage.get();
+    return _storage;
 }
 
 }  // namespace mongo

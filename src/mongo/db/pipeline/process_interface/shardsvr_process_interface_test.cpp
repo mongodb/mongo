@@ -81,7 +81,7 @@ TEST_F(ShardedProcessInterfaceTest, TestInsert) {
     const BSONObj indexBSON = BSON("_id" << 1);
     const BSONObj listIndexesResponse = BSON("v" << 1 << "key" << indexBSON << "name"
                                                  << "_id_"
-                                                 << "ns" << kOutNss.toString());
+                                                 << "ns" << kOutNss.toString_forTest());
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return CursorResponse(kTestAggregateNss, CursorId{0}, {listIndexesResponse})
             .toBSON(CursorResponse::ResponseType::InitialResponse);

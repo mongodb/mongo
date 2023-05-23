@@ -31,6 +31,17 @@ const testShardDistribution = (mongos) => {
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
+    jsTest.log("reshardCollection cmd should fail when shardDistribution has duplicate shardId.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [
+            {shard: st.shard0.shardName, min: {newKey: MinKey}},
+            {shard: st.shard0.shardName, max: {newKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.InvalidOptions);
+
     jsTest.log("reshardCollection cmd should fail when shardDistribution is missing min or max.");
     assert.commandFailedWithCode(mongos.adminCommand({
         reshardCollection: ns,
@@ -102,13 +113,13 @@ const testShardDistribution = (mongos) => {
                                  ErrorCodes.ShardNotFound);
 
     jsTest.log("reshardCollection cmd should succeed with shardDistribution parameter.");
-    // TODO(SERVER-76791): This should work after supporting non-explicit form of shardDistribution.
-    assert.commandFailedWithCode(mongos.adminCommand({
+    reshardCmdTest.assertReshardCollOk({
         reshardCollection: ns,
         key: {newKey: 1},
+        numInitialChunks: 2,
         shardDistribution: [{shard: st.shard0.shardName}, {shard: st.shard1.shardName}]
-    }),
-                                 ErrorCodes.InvalidOptions);
+    },
+                                       2);
     reshardCmdTest.assertReshardCollOk(
         {
             reshardCollection: ns,

@@ -72,7 +72,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
         {
             WriteUnitOfWork wuow(opCtx.get());
             BSONObj obj = BSON("not_ts" << Timestamp(2, 1));
-            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp(2, 1))
+            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
                           .getStatus(),
                       ErrorCodes::BadValue);
         }

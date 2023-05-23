@@ -45,9 +45,6 @@ public:
     TwoDAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
 private:
-    const IndexDescriptor* getDescriptor() {
-        return _descriptor;
-    }
     TwoDIndexingParams& getParams() {
         return _params;
     }
@@ -64,6 +61,7 @@ private:
      */
     void doGetKeys(OperationContext* opCtx,
                    const CollectionPtr& collection,
+                   const IndexCatalogEntry* entry,
                    SharedBufferFragmentBuilder& pooledBufferBuilder,
                    const BSONObj& obj,
                    GetKeysContext context,

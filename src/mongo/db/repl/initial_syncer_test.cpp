@@ -330,7 +330,7 @@ protected:
         _storageInterface->dropCollFn = [this](OperationContext* opCtx,
                                                const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
-            _storageInterfaceWorkDone.droppedCollections.push_back(nss.ns().toString());
+            _storageInterfaceWorkDone.droppedCollections.push_back(nss.toString_forTest());
             return Status::OK();
         };
         _storageInterface->dropUserDBsFn = [this](OperationContext* opCtx) {
@@ -602,7 +602,7 @@ RemoteCommandResponse makeCursorResponse(CursorId cursorId,
     {
         BSONObjBuilder cursorBob(bob.subobjStart("cursor"));
         cursorBob.append("id", cursorId);
-        cursorBob.append("ns", nss.toString());
+        cursorBob.append("ns", nss.toString_forTest());
         {
             BSONArrayBuilder batchBob(
                 cursorBob.subarrayStart(isFirstBatch ? "firstBatch" : "nextBatch"));
@@ -3604,7 +3604,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
                                      makeListDatabasesResponse({nss.db().toString()}));
 
         // Set up data for "a"
-        _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
+        _mockServer->assignCollectionUuid(nss.ns_forTest(), *_options1.uuid);
         _mockServer->insert(nss, BSON("_id" << 1 << "a" << 1));
 
         // listCollections for "a"
@@ -3634,7 +3634,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                           << "_id_"
-                          << "ns" << nss.ns())})
+                          << "ns" << nss.ns_forTest())})
                 .data);
 
         {
@@ -4295,7 +4295,7 @@ TEST_F(InitialSyncerTest,
 
 
         // Set up data for "a"
-        _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
+        _mockServer->assignCollectionUuid(nss.ns_forTest(), *_options1.uuid);
         _mockServer->insert(nss, BSON("_id" << 1 << "a" << 1));
 
         // listCollections for "a"
@@ -4325,7 +4325,7 @@ TEST_F(InitialSyncerTest,
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                           << "_id_"
-                          << "ns" << nss.ns())})
+                          << "ns" << nss.ns_forTest())})
                 .data);
 
         {
@@ -4460,7 +4460,9 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
         globalFailPointRegistry().find("initialSyncHangDuringCollectionClone");
     // Hang after all docs have been cloned in collection 'a.a'.
     auto timesEntered = hangDuringCloningFailPoint->setMode(
-        FailPoint::alwaysOn, 0, BSON("namespace" << nss.ns() << "numDocsToClone" << numDocs));
+        FailPoint::alwaysOn,
+        0,
+        BSON("namespace" << nss.ns_forTest() << "numDocsToClone" << numDocs));
 
     {
         // Keep the cloner from finishing so end-of-clone-stage network events don't interfere.
@@ -4502,7 +4504,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
         _mockServer->setCommandReply("dbStats", BSON("dataSize" << dbSize));
 
         // Set up data for "a"
-        _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
+        _mockServer->assignCollectionUuid(nss.ns_forTest(), *_options1.uuid);
         for (int i = 1; i <= 5; ++i) {
             _mockServer->insert(nss, BSON("_id" << i << "a" << i));
         }
@@ -4535,7 +4537,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                           << "_id_"
-                          << "ns" << nss.ns())})
+                          << "ns" << nss.ns_forTest())})
                 .data);
         // Release the 'hangBeforeCloningFailPoint' to continue the cloning phase.
     }
@@ -4748,7 +4750,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         _mockServer->setCommandReply("dbStats", BSON("dataSize" << 10));
 
         // Set up data for "a"
-        _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
+        _mockServer->assignCollectionUuid(nss.ns_forTest(), *_options1.uuid);
         for (int i = 1; i <= 5; ++i) {
             _mockServer->insert(nss, BSON("_id" << i << "a" << i));
         }
@@ -4781,7 +4783,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                           << "_id_"
-                          << "ns" << nss.ns())})
+                          << "ns" << nss.ns_forTest())})
                 .data);
 
         // Play all but last of the successful round of responses.
@@ -5162,7 +5164,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
                     NamespaceString(nss.getCommandNS()),
                     {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                               << "_id_"
-                              << "ns" << nss.ns())})
+                              << "ns" << nss.ns_forTest())})
                     .data);
 
             // Feature Compatibility Version.

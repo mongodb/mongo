@@ -733,7 +733,8 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
                                                           nss,
                                                           shardKeyPattern,
                                                           gNumShardKeyRanges.load(),
-                                                          boost::none,
+                                                          boost::none /*zones*/,
+                                                          boost::none /*availableShardIds*/,
                                                           gNumSamplesPerShardKeyRange.load());
     const SplitPolicyParams splitParams{tempCollUuid, ShardingState::get(opCtx)->shardId()};
     auto splitPoints = [&] {

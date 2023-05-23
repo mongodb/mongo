@@ -111,7 +111,7 @@ public:
                 auto service = ShardingRecoveryService::get(opCtx);
                 const auto reason = BSON("command"
                                          << "ShardSvrParticipantBlockCommand"
-                                         << "ns" << bucketNs.toString());
+                                         << "ns" << NamespaceStringUtil::serialize(bucketNs));
                 service->releaseRecoverableCriticalSection(
                     opCtx, bucketNs, reason, ShardingCatalogClient::kLocalWriteConcern);
             }

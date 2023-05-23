@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -1668,10 +1669,12 @@ TEST_F(DConcurrencyTestFixture, StressPartitioned) {
 }
 
 TEST_F(DConcurrencyTestFixture, ResourceMutexLabels) {
+    auto opCtx = makeOperationContext();
+
     Lock::ResourceMutex mutex("label");
-    ASSERT(mutex.getName() == "label");
+    ASSERT_EQ("label", *ResourceCatalog::get().name(mutex.getRid()));
     Lock::ResourceMutex mutex2("label2");
-    ASSERT(mutex2.getName() == "label2");
+    ASSERT_EQ("label2", *ResourceCatalog::get().name(mutex2.getRid()));
 }
 
 TEST_F(DConcurrencyTestFixture, Throttling) {

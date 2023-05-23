@@ -81,7 +81,8 @@ public:
 
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) override;
+                       const BSONObj& doc,
+                       OpStateAccumulator* opAccumulator = nullptr) override;
 
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,

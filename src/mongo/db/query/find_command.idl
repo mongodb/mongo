@@ -68,12 +68,11 @@ types:
 
 commands:
   find:
-    cpp_name: FindCommandRequest
+    cpp_name: FindCommandRequestBase
     command_name: find
     description: "A struct representing the find command"
     strict: true
     namespace: concatenate_with_db_or_uuid
-    non_const_getter: true
     api_version: "1"
     access_check:
         complex:
@@ -188,25 +187,32 @@ commands:
         optional: true
         stability: stable
       term:
-        description: "Deprecated."
+        description: "Internal usage only. Currently used by the replication system."
         type: safeInt64
         optional: true
         stability: unstable
       readOnce:
-        description: "Deprecated."
+        description: "Deprecated. Used to inform the server whether this operation intends to
+        perform reads that do not need to keep data in the storage engine cache."
         type: optionalBool
         stability: unstable
       allowSpeculativeMajorityRead:
-        description: "Deprecated."
+        description: "Internal usage only. This flag currently allows change stream queries to use
+        speculative majority reads so that they can be used even when
+        enableMajorityReadConcern:false."
         type: optionalBool
         stability: unstable
       $_requestResumeToken:
-        description: "Deprecated."
+        description: "Internal usage only. This flag is currently used by the replication system to
+        request a resumeToken. If the client requested a resume token and we are scanning the
+        oplog, return timestamp-based tokens. Otherwise, returns generic RecordId-based tokens."
         cpp_name: requestResumeToken
         type: optionalBool
         stability: unstable
       $_resumeAfter:
-        description: "Deprecated."
+        description: "Internal usage only. If present, the collection scan will seek to the exact
+        RecordId, or return KeyNotFound if it does not exist. Must only be set on forward collection
+        scans. This field cannot be used in conjunction with 'min' or 'max'."
         cpp_name: resumeAfter
         type: object_owned_nonempty_serialize
         default: mongo::BSONObj()

@@ -107,11 +107,6 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     let primaryAdminDB = primary.getDB('admin');
     let secondaryAdminDB = secondary.getDB('admin');
 
-    const isDowngradingToUpgradingFlagOn = FeatureFlagUtil.isEnabled(primaryAdminDB,
-                                                                     "DowngradingToUpgrading",
-                                                                     null /* user not specified */,
-                                                                     true /* ignores FCV */);
-
     // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
     // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
@@ -137,7 +132,7 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     }, "Failed waiting for server to unset the targetVersion or to set the FCV to " + fromFCV);
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     // The secondary should never have received the update to unset the targetVersion.
-    if (fromFCV == lastLTSFCV && isDowngradingToUpgradingFlagOn) {
+    if (fromFCV == lastLTSFCV) {
         // When downgrading, the secondary should still be in isCleaningServerMetadata.
         checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
     } else {
@@ -159,7 +154,7 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     assert.eq(topologyVersionBeforeRollback.counter + topologyVersionDiff,
               topologyVersionAfterRollback.counter);
     // The primary should have rolled back their FCV to contain the targetVersion.
-    if (fromFCV == lastLTSFCV && isDowngradingToUpgradingFlagOn) {
+    if (fromFCV == lastLTSFCV) {
         // Rolling back from downgraded to isCleaningServerMetadata state.
         checkFCV(primaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
         checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
@@ -175,7 +170,7 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     // server metadata.
     // Ensure that the in-memory and on-disk FCV are consistent by checking that this rule is
     // upheld after rollback.
-    if (fromFCV === lastLTSFCV && toFCV === latestFCV && isDowngradingToUpgradingFlagOn) {
+    if (fromFCV === lastLTSFCV && toFCV === latestFCV) {
         assert.commandFailedWithCode(
             newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}), 7428200);
     } else {
@@ -197,12 +192,6 @@ function rollbackFCVFromUpgradingToDowngrading() {
 
     // Ensure the cluster starts at the correct FCV.
     assert.commandWorked(rollbackNode.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-    if (!FeatureFlagUtil.isEnabled(rollbackNodeAdminDB, "DowngradingToUpgrading")) {
-        jsTestLog(
-            "Skipping rollbackFCVFromUpgradingToDowngrading as featureFlagDowngradingToUpgrading is not enabled");
-        return;
-    }
 
     fcvDoc = rollbackNodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog(`rollbackNode's version at start: ${tojson(fcvDoc)}`);
@@ -304,15 +293,6 @@ function rollbackFCVFromIsCleaningServerMetadataToDowngrading() {
     let secondary = rollbackTest.getSecondary();
     let primaryAdminDB = primary.getDB('admin');
     let secondaryAdminDB = secondary.getDB('admin');
-
-    if (!FeatureFlagUtil.isEnabled(primaryAdminDB,
-                                   "DowngradingToUpgrading",
-                                   null /* user not specified */,
-                                   true /* ignores FCV */)) {
-        jsTestLog(
-            "Skipping rollbackFCVFromIsCleaningServerMetadataToDowngrading test because isDowngradingToUpgrading is not enabled");
-        return;
-    }
 
     // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));

@@ -1772,11 +1772,6 @@ let runAllCommands = function(command, test, conn, fixture) {
 };
 
 let runTest = function(conn, adminDB, fixture) {
-    let runDowngradingToUpgrading = false;
-    if (FeatureFlagUtil.isEnabled(adminDB, "DowngradingToUpgrading")) {
-        runDowngradingToUpgrading = true;
-    }
-
     assert.commandFailed(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
     jsTestLog("Running all commands in the downgradingToLastLTS FCV");
@@ -1803,30 +1798,28 @@ let runTest = function(conn, adminDB, fixture) {
         runAllCommands(command, test, conn, fixture);
     }
 
-    if (runDowngradingToUpgrading) {
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-        jsTestLog("Running all commands after upgrading back to the latest FCV");
-        commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);
-        if (isMongos(adminDB)) {
-            let shardCommandsList =
-                AllCommandsTest.checkCommandCoverage(fixture.shard0.rs.getPrimary(), allCommands);
-            commandsList = new Set(commandsList.concat(shardCommandsList));
+    jsTestLog("Running all commands after upgrading back to the latest FCV");
+    commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);
+    if (isMongos(adminDB)) {
+        let shardCommandsList =
+            AllCommandsTest.checkCommandCoverage(fixture.shard0.rs.getPrimary(), allCommands);
+        commandsList = new Set(commandsList.concat(shardCommandsList));
+    }
+
+    for (const command of commandsList) {
+        const test = allCommands[command];
+
+        // Coverage already guaranteed above, but check again just in case.
+        assert(test, "Coverage failure: must explicitly define a test for " + command);
+
+        if (test.skip !== undefined) {
+            jsTestLog("Skipping " + command + ": " + test.skip);
+            continue;
         }
 
-        for (const command of commandsList) {
-            const test = allCommands[command];
-
-            // Coverage already guaranteed above, but check again just in case.
-            assert(test, "Coverage failure: must explicitly define a test for " + command);
-
-            if (test.skip !== undefined) {
-                jsTestLog("Skipping " + command + ": " + test.skip);
-                continue;
-            }
-
-            runAllCommands(command, test, conn, fixture);
-        }
+        runAllCommands(command, test, conn, fixture);
     }
 };
 

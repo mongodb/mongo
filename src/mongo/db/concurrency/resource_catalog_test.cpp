@@ -100,6 +100,11 @@ TEST_F(ResourceCatalogTest, RemoveTest) {
     ASSERT_EQ(boost::none, resource);
 }
 
+TEST_F(ResourceCatalogTest, ResourceMutexTest) {
+    auto rid = catalog.newResourceIdForMutex("TestLabel");
+    ASSERT_EQ("TestLabel", *catalog.name(rid));
+}
+
 TEST_F(ResourceCatalogTest, CollisionTest) {
     // firstCollection and secondCollection map to the same ResourceId.
     catalog.add(firstResourceId, firstCollection);

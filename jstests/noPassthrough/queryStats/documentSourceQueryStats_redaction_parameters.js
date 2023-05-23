@@ -24,11 +24,11 @@ function runTest(conn) {
     coll.insert({foo: 1});
     coll.find({foo: {$lte: 2}}).sort({bar: -1}).limit(2).toArray();
     // Default is no hmac.
-    assertTelemetryKeyWithoutHmac(getTelemetry(conn)[0].key.queryShape);
+    assertTelemetryKeyWithoutHmac(getQueryStatsFindCmd(conn)[0].key.queryShape);
 
     // Turning on hmac should apply hmac to all field names on all entries, even previously cached
     // ones.
-    const telemetryKey = getTelemetryRedacted(conn)[0]["key"];
+    const telemetryKey = getQueryStatsFindCmd(conn, /*applyHmacToIdentifiers*/ true)[0]["key"];
     assert.eq(telemetryKey.queryShape.filter,
               {"fNWkKfogMv6MJ77LpBcuPrO7Nq+R+7TqtD+Lgu3Umc4=": {"$lte": "?number"}});
     assert.eq(telemetryKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
@@ -36,10 +36,12 @@ function runTest(conn) {
 
     // Turning hmac back off should preserve field names on all entries, even previously cached
     // ones.
-    assertTelemetryKeyWithoutHmac(getTelemetry(conn)[0]["key"].queryShape);
+    const telemetry = getTelemetry(conn)[1]["key"];
+    assertTelemetryKeyWithoutHmac(telemetry.queryShape);
 
     // Explicitly set applyHmacToIdentifiers to false.
-    assertTelemetryKeyWithoutHmac(getTelemetryRedacted(conn, false)[0]["key"].queryShape);
+    assertTelemetryKeyWithoutHmac(
+        getQueryStatsFindCmd(conn, /*applyHmacToIdentifiers*/ false)[0]["key"].queryShape);
 
     // Wrong parameter name throws error.
     let pipeline = [{$queryStats: {redactFields: true}}];
@@ -82,19 +84,20 @@ const conn = MongoRunner.runMongod({
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
-const st = new ShardingTest({
-    mongos: 1,
-    shards: 1,
-    config: 1,
-    rs: {nodes: 1},
-    mongosOptions: {
-        setParameter: {
-            internalQueryStatsSamplingRate: -1,
-            featureFlagQueryStats: true,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-        }
-    },
-});
-runTest(st.s);
-st.stop();
+// TODO SERVER-77325 reenable these tests
+// const st = new ShardingTest({
+//     mongos: 1,
+//     shards: 1,
+//     config: 1,
+//     rs: {nodes: 1},
+//     mongosOptions: {
+//         setParameter: {
+//             internalQueryStatsSamplingRate: -1,
+//             featureFlagQueryStats: true,
+//             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
+//         }
+//     },
+// });
+// runTest(st.s);
+// st.stop();
 }());

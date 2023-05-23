@@ -83,7 +83,7 @@ public:
      */
     void assertNoZoneDocWithNamespace(NamespaceString ns) {
         auto findStatus = findOneOnConfigCollection(
-            operationContext(), TagsType::ConfigNS, BSON("ns" << ns.toString()));
+            operationContext(), TagsType::ConfigNS, BSON("ns" << ns.toString_forTest()));
         ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
     }
 
@@ -225,14 +225,14 @@ TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysSho
 
     // Manually insert a zone with illegal keys in order to bypass the checks performed by
     // assignKeyRangeToZone
-    BSONObj updateQuery(BSON("_id" << BSON(TagsType::ns(shardedNS().ns().toString())
+    BSONObj updateQuery(BSON("_id" << BSON(TagsType::ns(shardedNS().toString_forTest())
                                            << TagsType::min(zoneWithDollarKeys.getMin()))));
 
     BSONObjBuilder updateBuilder;
     updateBuilder.append("_id",
-                         BSON(TagsType::ns(shardedNS().ns().toString())
+                         BSON(TagsType::ns(shardedNS().toString_forTest())
                               << TagsType::min(zoneWithDollarKeys.getMin())));
-    updateBuilder.append(TagsType::ns(), shardedNS().ns());
+    updateBuilder.append(TagsType::ns(), shardedNS().ns_forTest());
     updateBuilder.append(TagsType::min(), zoneWithDollarKeys.getMin());
     updateBuilder.append(TagsType::max(), zoneWithDollarKeys.getMax());
     updateBuilder.append(TagsType::tag(), "TestZone");

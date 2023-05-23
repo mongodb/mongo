@@ -25,12 +25,6 @@ const primaryDB = primary.getDB(dbName);
 const otherShard = st.shard1;
 const otherShardDB = otherShard.getDB(dbName);
 
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(primary)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 let currentId = 0;
 function generateId() {
     return currentId++;

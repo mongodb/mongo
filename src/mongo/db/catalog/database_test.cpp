@@ -352,16 +352,16 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
                        pcre::ANCHORED | pcre::ENDANCHORED);
 
         auto nss1 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
-        if (!re.matchView(nss1.ns())) {
-            FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns()
+        if (!re.matchView(nss1.ns_forTest())) {
+            FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns_forTest()
                                   << "\" does not match regular expression \"" << re.pattern()
                                   << "\"")
                      .str());
         }
 
-        // Create collection using generated namespace so that makeUniqueCollectionNamespace() will
-        // not return the same namespace the next time. This is because we check the existing
-        // collections in the database for collisions while generating the namespace.
+        // Create collection using generated namespace so that makeUniqueCollectionNamespace()
+        // will not return the same namespace the next time. This is because we check the
+        // existing collections in the database for collisions while generating the namespace.
         {
             WriteUnitOfWork wuow(_opCtx.get());
             ASSERT_TRUE(db->createCollection(_opCtx.get(), nss1));
@@ -369,15 +369,15 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         }
 
         auto nss2 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
-        if (!re.matchView(nss2.ns())) {
-            FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns()
+        if (!re.matchView(nss2.ns_forTest())) {
+            FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns_forTest()
                                   << "\" does not match regular expression \"" << re.pattern()
                                   << "\"")
                      .str());
         }
 
-        // Second generated namespace should not collide with the first because a collection with
-        // name matching nss1 now exists.
+        // Second generated namespace should not collide with the first because a collection
+        // with name matching nss1 now exists.
         ASSERT_NOT_EQUALS(nss1, nss2);
     });
 }

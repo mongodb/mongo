@@ -193,10 +193,12 @@ public:
 
     void aboutToDelete(OperationContext* const opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) override {
+                       const BSONObj& doc,
+                       OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
+        OpStateAccumulator opStateAccumulator;
         for (auto& o : _observers)
-            o->aboutToDelete(opCtx, coll, doc);
+            o->aboutToDelete(opCtx, coll, doc, &opStateAccumulator);
     }
 
     void onDelete(OperationContext* const opCtx,

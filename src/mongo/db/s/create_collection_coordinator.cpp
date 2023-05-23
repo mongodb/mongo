@@ -474,9 +474,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // Additionally we want to perform a majority write on the CSRS to ensure that
                     // all the subsequent reads will see all the writes performed from a previous
                     // execution of this coordinator.
-                    _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getCurrentSession(), **executor);
+                        opCtx, getNewSession(opCtx), **executor);
 
                     if (_timeseriesNssResolvedByCommandHandler() ||
                         _doc.getTranslatedRequestParams()) {
@@ -534,12 +533,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                         "Removing partial changes from previous run",
                                         logAttrs(nss()));
 
-                            _updateSession(opCtx);
                             cleanupPartialChunksFromPreviousAttempt(
-                                opCtx, *uuid, getCurrentSession());
+                                opCtx, *uuid, getNewSession(opCtx));
 
-                            _updateSession(opCtx);
-                            broadcastDropCollection(opCtx, nss(), **executor, getCurrentSession());
+                            broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
                         }
                     }
                 }
@@ -584,7 +581,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 _createCollectionAndIndexes(opCtx, shardKeyPattern);
 
                 audit::logShardCollection(opCtx->getClient(),
-                                          nss().toString(),
+                                          NamespaceStringUtil::serialize(nss()),
                                           *_request.getShardKey(),
                                           _request.getUnique().value_or(false));
 
@@ -596,8 +593,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // shard
                     _promoteCriticalSectionsToBlockReads(opCtx);
 
-                    _updateSession(opCtx);
-                    _createCollectionOnNonPrimaryShards(opCtx, getCurrentSession());
+                    _createCollectionOnNonPrimaryShards(opCtx, getNewSession(opCtx));
 
                     _commit(opCtx, **executor);
                 }
@@ -780,19 +776,6 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             !ShardKeyPattern(*_request.getShardKey()).isHashedPattern() ||
                 !_request.getUnique().value_or(false));
 
-    if (_timeseriesNssResolvedByCommandHandler()) {
-        // Ensure that a time-series collection cannot be sharded unless the feature flag is
-        // enabled.
-        if (originalNss().isTimeseriesBucketsCollection()) {
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "can't shard time-series collection "
-                                  << nss().toStringForErrorMsg(),
-                    feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                        !timeseries::getTimeseriesOptions(opCtx, nss(), false));
-        }
-    }
-
     if (_request.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
         // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
@@ -867,10 +850,6 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
     // patched yet.
     const auto& resolvedNamespace = bucketsNs;
     performCheckOnCollectionUUID(resolvedNamespace);
-    uassert(ErrorCodes::IllegalOperation,
-            "Sharding a timeseries collection feature is not enabled",
-            feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                serverGlobalParams.featureCompatibility));
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Namespace too long. Namespace: "
@@ -1200,8 +1179,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     }
 
     // Upsert Chunks.
-    _updateSession(opCtx);
-    insertChunks(opCtx, _initialChunks->chunks, getCurrentSession());
+    insertChunks(opCtx, _initialChunks->chunks, getNewSession(opCtx));
 
     // The coll and shardsHoldingData objects will be used by both this function and
     // insertCollectionAndPlacementEntries(), which accesses their content from a separate thread
@@ -1240,7 +1218,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         coll->setUnique(*_request.getUnique());
     }
 
-    _updateSession(opCtx);
+    const auto& osi = getNewSession(opCtx);
     try {
         notifyChangeStreamsOnShardCollection(opCtx,
                                              nss(),
@@ -1250,7 +1228,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
                                              *shardsHoldingData);
 
         insertCollectionAndPlacementEntries(
-            opCtx, executor, coll, placementVersion, shardsHoldingData, getCurrentSession());
+            opCtx, executor, coll, placementVersion, shardsHoldingData, osi);
 
         notifyChangeStreamsOnShardCollection(
             opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kSuccessful);

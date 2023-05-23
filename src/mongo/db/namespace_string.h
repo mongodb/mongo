@@ -436,6 +436,19 @@ public:
         return StringData{_data.data() + offset, _data.size() - offset};
     }
 
+    StringData ns_forTest() const {
+        return ns();
+    }
+
+    /**
+     * Gets a namespace string without tenant id.
+     *
+     * MUST only be used for tests.
+     */
+    std::string toString_forTest() const {
+        return toString();
+    }
+
     std::string toString() const {
         return ns().toString();
     }
@@ -963,47 +976,52 @@ private:
 class NamespaceStringOrUUID {
 public:
     NamespaceStringOrUUID() = delete;
-    NamespaceStringOrUUID(NamespaceString nss) : _nss(std::move(nss)) {}
+    NamespaceStringOrUUID(NamespaceString nss) : _nssOrUUID(std::move(nss)) {}
     NamespaceStringOrUUID(const NamespaceString::ConstantProxy& nss)
         : NamespaceStringOrUUID{static_cast<const NamespaceString&>(nss)} {}
     NamespaceStringOrUUID(DatabaseName dbname, UUID uuid)
-        : _uuid(std::move(uuid)), _dbname(std::move(dbname)) {}
+        : _nssOrUUID(UUIDWithDbName{std::move(dbname), std::move(uuid)}) {}
     // TODO SERVER-65920 Remove once all call sites have been changed to take tenantId explicitly
     NamespaceStringOrUUID(std::string db,
                           UUID uuid,
                           boost::optional<TenantId> tenantId = boost::none)
-        : _uuid(std::move(uuid)), _dbname(DatabaseName(std::move(tenantId), std::move(db))) {}
+        : _nssOrUUID(
+              UUIDWithDbName{DatabaseName{std::move(tenantId), std::move(db)}, std::move(uuid)}) {}
 
-    const boost::optional<NamespaceString>& nss() const {
-        return _nss;
+    boost::optional<NamespaceString> nss() const {
+        if (!stdx::holds_alternative<NamespaceString>(_nssOrUUID)) {
+            return boost::none;
+        }
+
+        return get<NamespaceString>(_nssOrUUID);
     }
 
-    void setNss(NamespaceString nss) {
-        _nss = std::move(nss);
-    }
+    boost::optional<UUID> uuid() const {
+        if (!stdx::holds_alternative<UUIDWithDbName>(_nssOrUUID)) {
+            return boost::none;
+        }
 
-    const boost::optional<UUID>& uuid() const {
-        return _uuid;
+        return get<1>(get<UUIDWithDbName>(_nssOrUUID));
     }
 
     /**
-     * Returns database name if this object was initialized with a UUID.
+     * Returns database name as a string.
      *
      * TODO SERVER-66887 remove this function for better clarity once call sites have been changed
      */
     std::string dbname() const {
-        return _dbname ? _dbname->db().toString() : "";
-    }
-
-    void preferNssForSerialization() {
-        _preferNssForSerialization = true;
+        return dbName().db().toString();
     }
 
     /**
-     * Returns database name derived from either '_nss' or '_dbname'.
+     * Returns the database name.
      */
     DatabaseName dbName() const {
-        return _nss ? _nss->dbName() : *_dbname;
+        if (stdx::holds_alternative<NamespaceString>(_nssOrUUID)) {
+            return get<NamespaceString>(_nssOrUUID).dbName();
+        }
+
+        return get<0>(get<UUIDWithDbName>(_nssOrUUID));
     }
 
     /**
@@ -1014,7 +1032,15 @@ public:
 
     std::string toString() const;
 
+    /**
+     * This function should only be used when logging a NamespaceStringOrUUID in an error message.
+     */
     std::string toStringForErrorMsg() const;
+
+    /**
+     * Method to be used only when logging a NamespaceStringOrUUID in a log message.
+     */
+    friend std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID);
 
     void serialize(BSONObjBuilder* builder, StringData fieldName) const;
 
@@ -1027,17 +1053,8 @@ public:
     }
 
 private:
-    // At any given time exactly one of these optionals will be initialized.
-    boost::optional<NamespaceString> _nss;
-    boost::optional<UUID> _uuid;
-
-    // When seralizing, if both '_nss' and '_uuid' are present, use '_nss'.
-    bool _preferNssForSerialization = false;
-
-    // Empty when '_nss' is non-none, and contains the database name when '_uuid' is
-    // non-none. Although the UUID specifies a collection uniquely, we must later verify that the
-    // collection belongs to the database named here.
-    boost::optional<DatabaseName> _dbname;
+    using UUIDWithDbName = std::tuple<DatabaseName, UUID>;
+    stdx::variant<NamespaceString, UUIDWithDbName> _nssOrUUID;
 };
 
 /**

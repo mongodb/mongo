@@ -187,8 +187,6 @@ private:
 
     // If boost::none, telemetry should not be collected for this cursor.
     boost::optional<std::size_t> _queryStatsStoreKeyHash;
-    // TODO: SERVER-73152 remove queryStatsStoreKey when RequestShapifier is used for agg.
-    boost::optional<BSONObj> _queryStatsStoreKey;
     // The RequestShapifier used by telemetry to shapify the request payload into the telemetry
     // store key.
     std::unique_ptr<query_stats::RequestShapifier> _queryStatsRequestShapifier;

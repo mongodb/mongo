@@ -420,9 +420,9 @@ void waitForReadyRequest(executor::NetworkInterfaceMock* net) {
 }
 
 BSONObj createEmptyCursorResponse(const NamespaceString& nss, CursorId backupCursorId) {
-    return BSON(
-        "cursor" << BSON("nextBatch" << BSONArray() << "id" << backupCursorId << "ns" << nss.ns())
-                 << "ok" << 1.0);
+    return BSON("cursor" << BSON("nextBatch" << BSONArray() << "id" << backupCursorId << "ns"
+                                             << nss.ns_forTest())
+                         << "ok" << 1.0);
 }
 
 BSONObj createBackupCursorResponse(const Timestamp& checkpointTimestamp,
@@ -439,7 +439,7 @@ BSONObj createBackupCursorResponse(const Timestamp& checkpointTimestamp,
 
     batch.done();
     cursor.append("id", backupCursorId);
-    cursor.append("ns", nss.ns());
+    cursor.append("ns", nss.ns_forTest());
     BSONObjBuilder backupCursorReply;
     backupCursorReply.append("cursor", cursor.obj());
     backupCursorReply.append("ok", 1.0);

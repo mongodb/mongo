@@ -58,7 +58,7 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
             _isSingletonWrite() || _residualPredicate || _params.isUpdate);
     tassert(7308300,
             "Can return the deleted measurement only if deleting one",
-            !_params.returnDeleted || _isSingletonWrite());
+            !_params.returnDeleted || (_isSingletonWrite() && !_params.isUpdate));
     _children.emplace_back(std::move(child));
 
     // These three properties are only used for the queryPlanner explain and will not change while
@@ -79,6 +79,10 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
             _params.updateDriver || !_params.isUpdate);
     _specificStats.isModUpdate =
         _params.isUpdate && _params.updateDriver->type() == UpdateDriver::UpdateType::kOperator;
+
+    _isUserInitiatedUpdate = _params.isUpdate && opCtx()->writesAreReplicated() &&
+        !(_params.isFromOplogApplication ||
+          _params.updateDriver->type() == UpdateDriver::UpdateType::kDelta || _params.fromMigrate);
 }
 
 bool TimeseriesModifyStage::isEOF() {
@@ -107,10 +111,6 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
     // Determine which documents to update based on which ones are actually being changed.
     std::vector<BSONObj> modifiedMeasurements;
 
-    const bool isUserInitiatedWrite = opCtx()->writesAreReplicated() &&
-        !(_params.isFromOplogApplication ||
-          _params.updateDriver->type() == UpdateDriver::UpdateType::kDelta || _params.fromMigrate);
-
     for (auto&& measurement : matchedMeasurements) {
         // Timeseries updates are never in place, because we execute them as a delete of the old
         // measurement plus an insert of the modified one.
@@ -126,7 +126,7 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
             uassertStatusOK(_params.updateDriver->update(opCtx(),
                                                          "",
                                                          &doc,
-                                                         isUserInitiatedWrite,
+                                                         _isUserInitiatedUpdate,
                                                          immutablePaths,
                                                          isInsert,
                                                          nullptr,
@@ -145,7 +145,7 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
                 opCtx(),
                 matchDetails.hasElemMatchKey() ? matchDetails.elemMatchKey() : "",
                 &doc,
-                isUserInitiatedWrite,
+                _isUserInitiatedUpdate,
                 immutablePaths,
                 isInsert,
                 nullptr,

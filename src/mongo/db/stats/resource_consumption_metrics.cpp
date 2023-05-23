@@ -446,7 +446,7 @@ void ResourceConsumption::merge(OperationContext* opCtx,
     }
 
     // Add all metrics into the the globally-aggregated metrics.
-    const auto& dbNameStr = dbName.toStringWithTenantId();
+    const auto& dbNameStr = dbName.toStringForResourceId();
     stdx::lock_guard<Mutex> lk(_mutex);
     _dbMetrics[dbNameStr] += newMetrics;
     _cpuTime += newMetrics.cpuNanos;

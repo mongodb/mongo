@@ -81,10 +81,10 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             auto handleRecoverableCriticalSection = [this](auto opCtx) {
-                const auto reason =
-                    request().getReason().get_value_or(BSON("command"
-                                                            << "ShardSvrParticipantBlockCommand"
-                                                            << "ns" << ns().toString()));
+                const auto reason = request().getReason().get_value_or(
+                    BSON("command"
+                         << "ShardSvrParticipantBlockCommand"
+                         << "ns" << NamespaceStringUtil::serialize(ns())));
                 auto blockType = request().getBlockType().get_value_or(
                     CriticalSectionBlockTypeEnum::kReadsAndWrites);
 

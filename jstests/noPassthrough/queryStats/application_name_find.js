@@ -31,7 +31,7 @@ let telemetry = getTelemetry(conn);
 assert.eq(1, telemetry.length, telemetry);
 assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
 
-telemetry = getTelemetryRedacted(conn, true);
+telemetry = getQueryStatsFindCmd(conn, true);
 assert.eq(1, telemetry.length, telemetry);
 assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
 

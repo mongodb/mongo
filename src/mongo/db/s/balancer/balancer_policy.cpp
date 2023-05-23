@@ -784,7 +784,7 @@ MergeInfo::MergeInfo(const ShardId& shardId,
 std::string MergeInfo::toString() const {
     return "Merging chunk range {} in {} residing on {} with collection placement version {}"_format(
         chunkRange.toString(),
-        nss.toString(),
+        NamespaceStringUtil::serialize(nss),
         shardId.toString(),
         collectionPlacementVersion.toString());
 }
@@ -795,7 +795,7 @@ MergeAllChunksOnShardInfo::MergeAllChunksOnShardInfo(const ShardId& shardId,
 
 std::string MergeAllChunksOnShardInfo::toString() const {
     return "Merging all contiguous chunks residing on shard {} for collection {}"_format(
-        shardId.toString(), nss.toString());
+        shardId.toString(), NamespaceStringUtil::serialize(nss));
 }
 
 DataSizeInfo::DataSizeInfo(const ShardId& shardId,

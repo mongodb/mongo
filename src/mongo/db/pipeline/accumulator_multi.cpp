@@ -168,8 +168,6 @@ template <MinMaxSense s>
 AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility =
-        std::min(expCtx->sbeGroupCompatibility, SbeCompatibility::flagGuarded);
     auto name = [] {
         if constexpr (s == MinMaxSense::kMin) {
             return AccumulatorMinN::getName();
@@ -256,8 +254,6 @@ template <FirstLastSense v>
 AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext* const expCtx,
                                                               BSONElement elem,
                                                               VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility =
-        std::min(expCtx->sbeGroupCompatibility, SbeCompatibility::flagGuarded);
     auto name = [] {
         if constexpr (v == Sense::kFirst) {
             return AccumulatorFirstN::getName();
@@ -520,9 +516,9 @@ AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     auto [sortPattern, sortFieldsExp, hasMeta] =
         parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
 
-    auto sbeCompatibility =
-        hasMeta ? SbeCompatibility::notCompatible : SbeCompatibility::flagGuarded;
-    expCtx->sbeGroupCompatibility = std::min(expCtx->sbeGroupCompatibility, sbeCompatibility);
+    if (hasMeta) {
+        expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    }
 
     // Construct argument expression. If given sortBy: {field1: 1, field2: 1} it will be shaped like
     // {output: <output expression>, sortFields: ["$field1", "$field2"]}. This projects out only the

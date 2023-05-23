@@ -421,7 +421,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                           startPromise = std::move(startPromise),
                           startTimestamp,
                           shardVersion = oss.getShardVersion(nss),
-                          dbVersion = oss.getDbVersion(dbName.toStringWithTenantId()),
+                          dbVersion = oss.getDbVersion(DatabaseNameUtil::serialize(dbName)),
                           resumeInfo,
                           impersonatedClientAttrs = std::move(impersonatedClientAttrs),
                           forwardableOpMetadata =
@@ -464,8 +464,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             sleepmillis(100);
         }
 
-        // Start collecting metrics for the index build. The metrics for this operation will only be
-        // aggregated globally if the node commits or aborts while it is primary.
+        // Start collecting metrics for the index build. The metrics for this operation will
+        // only be aggregated globally if the node commits or aborts while it is primary.
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx.get());
         if (ResourceConsumption::shouldCollectMetricsForDatabase(dbName) &&
             ResourceConsumption::isMetricsCollectionEnabled()) {
@@ -493,16 +493,16 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
         hangBeforeRunningIndexBuild.pauseWhileSet();
 
-        // Runs the remainder of the index build. Sets the promise result and cleans up the index
-        // build.
+        // Runs the remainder of the index build. Sets the promise result and cleans up the
+        // index build.
         _runIndexBuild(opCtx.get(), buildUUID, indexBuildOptions, resumeInfo);
 
         // Do not exit with an incomplete future.
         invariant(replState->sharedPromise.getFuture().isReady());
 
         try {
-            // Logs the index build statistics if it took longer than the server parameter `slowMs`
-            // to complete.
+            // Logs the index build statistics if it took longer than the server parameter
+            // `slowMs` to complete.
             CurOp::get(opCtx.get())
                 ->completeAndLogOperation(MONGO_LOGV2_DEFAULT_COMPONENT,
                                           CollectionCatalog::get(opCtx.get())

@@ -54,7 +54,7 @@ bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
             !cri.cm.isSharded());
 
     auto responses = scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                                dbName.toStringWithTenantId(),
+                                                                DatabaseNameUtil::serialize(dbName),
                                                                 nss,
                                                                 cri,
                                                                 cmdObj,

@@ -323,10 +323,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
 
-    if (!shouldDoFLERewrite) {
-        query_stats::registerAggRequest(request, opCtx);
-    }
-
     // If the routing table is not already taken by the higher level, fill it now.
     if (!cri) {
         // If the routing table is valid, we obtain a reference to it. If the table is not valid,
@@ -396,6 +392,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         // Parse and optimize the full pipeline.
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+
+        // TODO SERVER-77325 register the request for query stats collection
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.

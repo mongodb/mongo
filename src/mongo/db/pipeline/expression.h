@@ -1162,10 +1162,7 @@ public:
 class ExpressionArray final : public ExpressionVariadic<ExpressionArray> {
 public:
     explicit ExpressionArray(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionArray>(expCtx) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+        : ExpressionVariadic<ExpressionArray>(expCtx) {}
 
     ExpressionArray(ExpressionContext* const expCtx,
                     std::vector<boost::intrusive_ptr<Expression>>&& children)
@@ -1266,10 +1263,7 @@ public:
 class ExpressionObjectToArray final : public ExpressionFixedArity<ExpressionObjectToArray, 1> {
 public:
     explicit ExpressionObjectToArray(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+        : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1286,10 +1280,7 @@ public:
 class ExpressionArrayToObject final : public ExpressionFixedArity<ExpressionArrayToObject, 1> {
 public:
     explicit ExpressionArrayToObject(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+        : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx) {}
 
     ExpressionArrayToObject(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx, std::move(children)) {}
@@ -2156,10 +2147,7 @@ public:
                             boost::intrusive_ptr<Expression> date,
                             boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionHour>(
-              expCtx, "$hour", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$hour", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).hour);
@@ -2542,10 +2530,7 @@ public:
                                    boost::intrusive_ptr<Expression> date,
                                    boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionMillisecond>(
-              expCtx, "$millisecond", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$millisecond", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).millisecond);
@@ -2567,10 +2552,7 @@ public:
                               boost::intrusive_ptr<Expression> date,
                               boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionMinute>(
-              expCtx, "$minute", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$minute", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).minute);
@@ -2654,10 +2636,7 @@ public:
                              boost::intrusive_ptr<Expression> date,
                              boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionMonth>(
-              expCtx, "$month", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$month", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).month);
@@ -2952,10 +2931,7 @@ public:
                      boost::intrusive_ptr<Expression> date,
                      boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionSecond>(
-              expCtx, "$second", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$second", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).second);
@@ -3737,10 +3713,7 @@ public:
                    boost::intrusive_ptr<Expression> date,
                    boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionWeek>(
-              expCtx, "$week", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$week", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.week(date));
@@ -3762,10 +3735,7 @@ public:
                           boost::intrusive_ptr<Expression> date,
                           boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoWeekYear>(
-              expCtx, "$isoWeekYear", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$isoWeekYear", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.isoYear(date));
@@ -3788,10 +3758,7 @@ public:
                            boost::intrusive_ptr<Expression> date,
                            boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoDayOfWeek>(
-              expCtx, "$isoDayOfWeek", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$isoDayOfWeek", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.isoDayOfWeek(date));
@@ -3813,10 +3780,7 @@ public:
                       boost::intrusive_ptr<Expression> date,
                       boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoWeek>(
-              expCtx, "$isoWeek", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$isoWeek", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.isoWeek(date));
@@ -3838,10 +3802,7 @@ public:
                    boost::intrusive_ptr<Expression> date,
                    boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionYear>(
-              expCtx, "$year", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+              expCtx, "$year", std::move(date), std::move(timeZone)) {}
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.dateParts(date).year);

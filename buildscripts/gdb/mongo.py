@@ -159,6 +159,36 @@ def get_thread_id():
     raise ValueError("Failed to find thread id in {}".format(thread_info))
 
 
+MAIN_GLOBAL_BLOCK = None
+
+
+def lookup_type(gdb_type_str: str) -> gdb.Type:
+    """
+    Try to find the type object from string.
+
+    GDB says it searches the global blocks, however this appear not to be the
+    case or at least it doesn't search all global blocks, sometimes it required
+    to get the global block based off the current frame.
+    """
+    global MAIN_GLOBAL_BLOCK  # pylint: disable=global-statement
+
+    exceptions = []
+    try:
+        return gdb.lookup_type(gdb_type_str)
+    except Exception as exc:
+        exceptions.append(exc)
+
+    if MAIN_GLOBAL_BLOCK is None:
+        MAIN_GLOBAL_BLOCK = gdb.lookup_symbol("main")[0].symtab.global_block()
+
+    try:
+        return gdb.lookup_type(gdb_type_str, MAIN_GLOBAL_BLOCK)
+    except Exception as exc:
+        exceptions.append(exc)
+
+    raise gdb.error("Failed to get type, tried:\n%s" % '\n'.join([str(exc) for exc in exceptions]))
+
+
 def get_current_thread_name():
     """Return the name of the current GDB thread."""
     fallback_name = '"%s"' % (gdb.selected_thread().name or '')
@@ -217,7 +247,7 @@ def get_wt_session(recovery_unit, recovery_unit_impl_type):
     if not wt_session_handle.dereference().address:
         return None
     wt_session = wt_session_handle.dereference().cast(
-        gdb.lookup_type("mongo::WiredTigerSession"))["_session"]
+        lookup_type("mongo::WiredTigerSession"))["_session"]
     return wt_session
 
 
@@ -230,13 +260,13 @@ def get_decorations(obj):
     TODO: De-duplicate the logic between here and DecorablePrinter. This code was copied from there.
     """
     type_name = str(obj.type).replace("class", "").replace(" ", "")
-    decorable = obj.cast(gdb.lookup_type("mongo::Decorable<{}>".format(type_name)))
+    decorable = obj.cast(lookup_type("mongo::Decorable<{}>".format(type_name)))
     decl_vector = decorable["_decorations"]["_registry"]["_decorationInfo"]
     start = decl_vector["_M_impl"]["_M_start"]
     finish = decl_vector["_M_impl"]["_M_finish"]
 
     decorable_t = decorable.type.template_argument(0)
-    decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
+    decinfo_t = lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
         str(decorable_t).replace("class", "").strip()))
     count = int((int(finish) - int(start)) / decinfo_t.sizeof)
 
@@ -255,7 +285,7 @@ def get_decorations(obj):
             type_name = type_name[0:len(type_name) - 1]
         type_name = type_name.rstrip()
         try:
-            type_t = gdb.lookup_type(type_name)
+            type_t = lookup_type(type_name)
             obj = decoration_data[dindex].cast(type_t)
             yield (type_name, obj)
         except Exception as err:
@@ -501,7 +531,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             val = get_boost_optional(txn_part_observable_state['txnResourceStash'])
             if val:
                 locker_addr = get_unique_ptr(val["_locker"])
-                locker_obj = locker_addr.dereference().cast(gdb.lookup_type("mongo::LockerImpl"))
+                locker_obj = locker_addr.dereference().cast(lookup_type("mongo::LockerImpl"))
                 print('txnResourceStash._locker', "@", locker_addr)
                 print("txnResourceStash._locker._id", "=", locker_obj["_id"])
             else:
@@ -645,7 +675,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
                 recovery_unit_handle = get_unique_ptr(operation_context["_recoveryUnit"])
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
-                    gdb.lookup_type(recovery_unit_impl_type))
+                    lookup_type(recovery_unit_impl_type))
 
             output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
             wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
@@ -690,7 +720,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
                 recovery_unit_handle = get_unique_ptr(txn_resource_stash["_recoveryUnit"])
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
-                    gdb.lookup_type(recovery_unit_impl_type))
+                    lookup_type(recovery_unit_impl_type))
 
         output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
         wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)

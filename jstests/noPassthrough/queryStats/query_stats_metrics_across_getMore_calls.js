@@ -3,7 +3,7 @@
  * calls.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");  // For verifyMetrics.
+load("jstests/libs/telemetry_utils.js");  // For verifyMetrics and getQueryStatsAggCmd.
 
 (function() {
 "use strict";
@@ -26,7 +26,6 @@ for (let i = 0; i < numDocs / 2; ++i) {
     bulk.insert({foo: 1, bar: Math.floor(Math.random() * -2)});
 }
 assert.commandWorked(bulk.execute());
-
 // Assert that two queries with identical structures are represented by the same key.
 {
     // Note: toArray() is necessary for the batchSize-limited query to run to cursor exhaustion
@@ -35,11 +34,13 @@ assert.commandWorked(bulk.execute());
     coll.aggregate([{$match: {foo: 0}}], {cursor: {batchSize: 2}}).toArray();
 
     // This command will return all telemetry store entires.
-    const telemetryResults = testDB.getSiblingDB("admin").aggregate([{$queryStats: {}}]).toArray();
+    const telemetryResults = getQueryStatsAggCmd(testDB);
     // Assert there is only one entry.
     assert.eq(telemetryResults.length, 1, telemetryResults);
     const telemetryEntry = telemetryResults[0];
-    assert.eq(telemetryEntry.key.namespace, `test.${jsTestName()}`);
+    jsTestLog(telemetryEntry);
+    assert.eq(telemetryEntry.key.queryShape.cmdNs.db, "test");
+    assert.eq(telemetryEntry.key.queryShape.cmdNs.coll, jsTestName());
     assert.eq(telemetryEntry.key.applicationName, "MongoDB Shell");
 
     // Assert we update execution count for identically shaped queries.

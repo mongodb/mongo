@@ -57,7 +57,7 @@ public:
         _expCtx = make_intrusive<ExpressionContext>(_opCtx, nullptr, kTestNamespace);
 
         directClient.createCollection(kTestNamespace);
-        ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace.ns(), kTestKeyPattern));
+        ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace.ns_forTest(), kTestKeyPattern));
 
         _autoColl.emplace(_opCtx, kTestNamespace);
         const auto& coll = _autoColl->getCollection();

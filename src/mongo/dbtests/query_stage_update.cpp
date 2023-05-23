@@ -67,13 +67,13 @@ static const NamespaceString nss("unittests.QueryStageUpdate");
 class QueryStageUpdateBase {
 public:
     QueryStageUpdateBase() : _client(&_opCtx) {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
         _client.dropCollection(nss);
         _client.createCollection(nss);
     }
 
     virtual ~QueryStageUpdateBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
         _client.dropCollection(nss);
     }
 

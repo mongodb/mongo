@@ -85,26 +85,26 @@ std::unique_ptr<QuerySolution> createQuerySolution() {
 class QueryStageMultiPlanTest : public unittest::Test {
 public:
     QueryStageMultiPlanTest() : _client(_opCtx.get()) {
-        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns_forTest());
         _client.dropCollection(nss);
     }
 
     virtual ~QueryStageMultiPlanTest() {
-        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns_forTest());
         _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(_opCtx.get(), nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(_opCtx.get(), nss.ns_forTest(), obj));
     }
 
     void insert(const BSONObj& obj) {
-        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns_forTest());
         _client.insert(nss, obj);
     }
 
     void remove(const BSONObj& obj) {
-        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns_forTest());
         _client.remove(nss, obj);
     }
 

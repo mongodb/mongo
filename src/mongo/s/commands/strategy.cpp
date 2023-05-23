@@ -573,7 +573,7 @@ void ParseAndRunCommand::_parseCommand() {
     // Set the logical optype, command object and namespace as soon as we identify the command. If
     // the command does not define a fully-qualified namespace, set CurOp to the generic command
     // namespace db.$cmd.
-    _ns.emplace(_invocation->ns().toString());
+    _ns.emplace(NamespaceStringUtil::serialize(_invocation->ns()));
     auto nss =
         (request.getDatabase() == *_ns ? NamespaceString(*_ns, "$cmd") : NamespaceString(*_ns));
 
@@ -915,7 +915,7 @@ void ParseAndRunCommand::RunAndRetry::_setup() {
         // Re-parse before retrying in case the process of run()-ning the invocation could
         // affect the parsed result.
         _parc->_invocation = command->parse(opCtx, request);
-        invariant(_parc->_invocation->ns().toString() == _parc->_ns,
+        invariant(NamespaceStringUtil::serialize(_parc->_invocation->ns()) == _parc->_ns,
                   "unexpected change of namespace when retrying");
     }
 

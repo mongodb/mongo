@@ -150,7 +150,7 @@ public:
     }
 
     StringData ns() {
-        return _nss.ns();
+        return _nss.ns_forTest();
     }
     const NamespaceString& nss() {
         return _nss;

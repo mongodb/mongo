@@ -550,8 +550,11 @@ struct __wt_connection_impl {
 
     uint64_t stashed_bytes; /* Atomic: stashed memory statistics */
     uint64_t stashed_objects;
+
     /* Generations manager */
     volatile uint64_t generations[WT_GENERATIONS];
+    uint64_t gen_drain_timeout_ms; /* Maximum waiting time for a resource to drain in diagnostic
+                                      mode before timing out */
 
     wt_off_t data_extend_len; /* file_extend data length */
     wt_off_t log_extend_len;  /* file_extend log length */

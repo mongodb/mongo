@@ -379,7 +379,8 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
 
 void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                                               const CollectionPtr& coll,
-                                              BSONObj const& doc) {
+                                              BSONObj const& doc,
+                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;

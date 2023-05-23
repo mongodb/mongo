@@ -17,13 +17,6 @@ load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 load("jstests/libs/analyze_plan.js");                // For planHasStage().
 load("jstests/libs/fixture_helpers.js");             // For 'FixtureHelpers'.
 
-if (FixtureHelpers.isMongos(db) &&
-    TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo()) &&
-    !TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the sharded time-series feature flag is disabled");
-    return;
-}
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection('t');

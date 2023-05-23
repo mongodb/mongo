@@ -23,7 +23,11 @@ env.SConscript(
 
 env.Library(
     target='canonical_query',
-    source=['canonical_query.cpp', 'canonical_query_encoder.cpp'],
+    source=[
+        'canonical_query.cpp',
+        'canonical_query_encoder.cpp',
+        'parsed_find_command.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/cst/cst',
@@ -138,8 +142,6 @@ env.Library(
         "explain_common.cpp",
         "find_common.cpp",
         "parsed_distinct.cpp",
-        # TODO SERVER-73152 move into new query_shape target
-        "find_request_shapifier.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -365,9 +367,26 @@ env.Library(
 )
 
 env.Library(
-    target='op_metrics',
+    target='query_shape',
     source=[
         'query_shape.cpp',
+        'find_request_shapifier.cpp',
+        'aggregate_request_shapifier.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        'canonical_query',
+    ],
+    LIBDEPS_PRIVATE=[
+        'projection_ast',
+        'sort_pattern',
+    ],
+)
+
+env.Library(
+    target='op_metrics',
+    source=[
         'query_stats.cpp',
     ],
     LIBDEPS=[
@@ -391,8 +410,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-        'projection_ast',
-        'sort_pattern',
     ],
 )
 
@@ -494,6 +511,7 @@ env.CppUnitTest(
         "query_planner",
         "query_planner_test_fixture",
         "query_request",
+        "query_shape",
         "query_test_service_context",
         "rate_limiting",
     ],

@@ -459,7 +459,7 @@ template OplogEntry IdempotencyTest::update<const char*>(char const* _id, const 
 BSONObj makeInsertApplyOpsEntry(const NamespaceString& nss, const UUID& uuid, const BSONObj& doc) {
     return BSON("op"
                 << "i"
-                << "ns" << nss.toString() << "ui" << uuid << "o" << doc);
+                << "ns" << nss.toString_forTest() << "ui" << uuid << "o" << doc);
 }
 }  // namespace repl
 }  // namespace mongo

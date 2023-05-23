@@ -112,7 +112,7 @@ protected:
         return originalNss();
     }
 
-    virtual std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) {
+    virtual std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) {
         return {};
     };
 
@@ -148,6 +148,7 @@ protected:
     const bool _recoveredFromDisk;
     const boost::optional<mongo::ForwardableOperationMetadata> _forwardableOpMetadata;
     const boost::optional<mongo::DatabaseVersion> _databaseVersion;
+    boost::optional<NamespaceString> _bucketNss;
 
     bool _firstExecution{
         true};  // True only when executing the coordinator for the first time (meaning it's not a
@@ -172,6 +173,11 @@ private:
 
     ExecutorFuture<bool> _removeDocumentUntillSuccessOrStepdown(
         std::shared_ptr<executor::TaskExecutor> executor);
+
+    ExecutorFuture<void> _acquireAllLocksAsync(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& token);
 
     ExecutorFuture<void> _acquireLockAsync(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                            const CancellationToken& token,
@@ -228,7 +234,7 @@ protected:
 
         // Append static info
         bob.append("type", "op");
-        bob.append("ns", originalNss().toString());
+        bob.append("ns", NamespaceStringUtil::serialize(originalNss()));
         bob.append("desc", _coordinatorName);
         bob.append("op", "command");
         bob.append("active", true);
@@ -372,6 +378,47 @@ protected:
         }
     }
 
+    /**
+     * Advances and persists the `txnNumber` to ensure causality between requests, then returns the
+     * updated operation session information (OSI).
+     */
+    OperationSessionInfo getNewSession(OperationContext* opCtx) {
+        _updateSession(opCtx);
+        return getCurrentSession();
+    }
+
+    virtual boost::optional<Status> getAbortReason() const override {
+        const auto& status = _doc.getAbortReason();
+        invariant(!status || !status->isOK(), "when persisted, status must be an error");
+        return status;
+    }
+
+    /**
+     * Persists the abort reason and throws it as an exception. This causes the coordinator to fail,
+     * and triggers the cleanup future chain since there is a the persisted reason.
+     */
+    void triggerCleanup(OperationContext* opCtx, const Status& status) {
+        LOGV2_INFO(7418502,
+                   "Coordinator failed, persisting abort reason",
+                   "coordinatorId"_attr = _doc.getId(),
+                   "phase"_attr = serializePhase(_doc.getPhase()),
+                   "reason"_attr = redact(status));
+
+        auto newDoc = [&] {
+            stdx::lock_guard lk{_docMutex};
+            return _doc;
+        }();
+
+        auto coordinatorMetadata = newDoc.getShardingDDLCoordinatorMetadata();
+        coordinatorMetadata.setAbortReason(status);
+        newDoc.setShardingDDLCoordinatorMetadata(std::move(coordinatorMetadata));
+
+        _updateStateDocument(opCtx, std::move(newDoc));
+
+        uassertStatusOK(status);
+    }
+
+private:
     // lazily acquire Logical Session ID and a txn number
     void _updateSession(OperationContext* opCtx) {
         auto newDoc = [&] {
@@ -407,42 +454,6 @@ protected:
         osi.setSessionId(optSession->getLsid());
         osi.setTxnNumber(optSession->getTxnNumber());
         return osi;
-    }
-
-    OperationSessionInfo getNewSession(OperationContext* opCtx) {
-        _updateSession(opCtx);
-        return getCurrentSession();
-    }
-
-    virtual boost::optional<Status> getAbortReason() const override {
-        const auto& status = _doc.getAbortReason();
-        invariant(!status || !status->isOK(), "when persisted, status must be an error");
-        return status;
-    }
-
-    /**
-     * Persists the abort reason and throws it as an exception. This causes the coordinator to fail,
-     * and triggers the cleanup future chain since there is a the persisted reason.
-     */
-    void triggerCleanup(OperationContext* opCtx, const Status& status) {
-        LOGV2_INFO(7418502,
-                   "Coordinator failed, persisting abort reason",
-                   "coordinatorId"_attr = _doc.getId(),
-                   "phase"_attr = serializePhase(_doc.getPhase()),
-                   "reason"_attr = redact(status));
-
-        auto newDoc = [&] {
-            stdx::lock_guard lk{_docMutex};
-            return _doc;
-        }();
-
-        auto coordinatorMetadata = newDoc.getShardingDDLCoordinatorMetadata();
-        coordinatorMetadata.setAbortReason(status);
-        newDoc.setShardingDDLCoordinatorMetadata(std::move(coordinatorMetadata));
-
-        _updateStateDocument(opCtx, std::move(newDoc));
-
-        uassertStatusOK(status);
     }
 };
 

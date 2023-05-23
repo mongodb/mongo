@@ -427,6 +427,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
         '$BUILD_DIR/mongo/db/query/op_metrics',
+        '$BUILD_DIR/mongo/db/query/query_shape',
         '$BUILD_DIR/mongo/db/query/stats/query_stats',
         '$BUILD_DIR/mongo/db/query/stats/stats_histograms',
         '$BUILD_DIR/mongo/db/query_exec',

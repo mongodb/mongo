@@ -100,6 +100,24 @@ bool useUnreplicatedTruncates() {
     return res;
 }
 
+void truncateRange(OperationContext* opCtx,
+                   const CollectionPtr& preImagesColl,
+                   const RecordId& minRecordId,
+                   const RecordId& maxRecordId,
+                   int64_t bytesDeleted,
+                   int64_t docsDeleted) {
+    // The session might be in use from marker initialisation so we must
+    // reset it here in order to allow an untimestamped write.
+    opCtx->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+
+    WriteUnitOfWork wuow(opCtx);
+    auto rs = preImagesColl->getRecordStore();
+    auto status = rs->rangeTruncate(opCtx, minRecordId, maxRecordId, -bytesDeleted, -docsDeleted);
+    invariantStatusOK(status);
+    wuow.commit();
+}
+
 // Performs a ranged truncate over each expired marker in 'truncateMarkersForNss'. Updates the
 // "Output" parameters to communicate the respective docs deleted, bytes deleted, and and maximum
 // wall time of documents deleted to the caller.
@@ -115,19 +133,15 @@ void truncateExpiredMarkersForCollection(
     while (auto marker = truncateMarkersForNss->peekOldestMarkerIfNeeded(opCtx)) {
         writeConflictRetry(
             opCtx, "truncate pre-images collection for UUID", preImagesColl->ns(), [&] {
-                // The session might be in use from marker initialisation so we must
-                // reset it here in order to allow an untimestamped write.
-                opCtx->recoveryUnit()->abandonSnapshot();
-                opCtx->recoveryUnit()->allowOneUntimestampedWrite();
-
-                WriteUnitOfWork wuow(opCtx);
                 auto bytesDeleted = marker->bytes;
                 auto docsDeleted = marker->records;
-                auto rs = preImagesColl->getRecordStore();
-                auto status = rs->rangeTruncate(
-                    opCtx, minRecordIdForNs, marker->lastRecord, -bytesDeleted, -docsDeleted);
-                invariantStatusOK(status);
-                wuow.commit();
+
+                truncateRange(opCtx,
+                              preImagesColl,
+                              minRecordIdForNs,
+                              marker->lastRecord,
+                              bytesDeleted,
+                              docsDeleted);
 
                 if (marker->wallTime > maxWallTimeForNsTruncateOutput) {
                     maxWallTimeForNsTruncateOutput = marker->wallTime;
@@ -385,13 +399,12 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
     Client* client) {
     Timer timer;
 
-    Date_t currentTimeForTimeBasedExpiration =
-        change_stream_pre_image_util::getCurrentTimeForPreImageRemoval();
-
     const auto startTime = Date_t::now();
     ServiceContext::UniqueOperationContext opCtx;
     try {
         opCtx = client->makeOperationContext();
+        Date_t currentTimeForTimeBasedExpiration =
+            change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx.get());
         size_t numberOfRemovals = 0;
 
         if (useUnreplicatedTruncates()) {
@@ -590,8 +603,9 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
     auto snapShottedTruncateMap = preImagesCollectionMap->getUnderlyingSnapshot();
     int64_t numRecordsDeleted = 0;
     for (auto& [nsUUID, truncateMarkersForNss] : *snapShottedTruncateMap) {
-        RecordIdBound minRecordId =
-            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID);
+        RecordId minRecordId =
+            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID)
+                .recordId();
 
         int64_t docsDeletedForNs = 0;
         int64_t bytesDeletedForNs = 0;
@@ -600,7 +614,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
                                             truncateMarkersForNss,
                                             preImagesColl.getCollectionPtr(),
                                             nsUUID,
-                                            minRecordId.recordId(),
+                                            minRecordId,
                                             docsDeletedForNs,
                                             bytesDeletedForNs,
                                             maxWallTimeForNsTruncate);
@@ -612,7 +626,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
                                             truncateMarkersForNss,
                                             preImagesColl.getCollectionPtr(),
                                             nsUUID,
-                                            minRecordId.recordId(),
+                                            minRecordId,
                                             docsDeletedForNs,
                                             bytesDeletedForNs,
                                             maxWallTimeForNsTruncate);
@@ -623,6 +637,23 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
         _purgingJobStats.docsDeleted.fetchAndAddRelaxed(docsDeletedForNs);
         _purgingJobStats.bytesDeleted.fetchAndAddRelaxed(bytesDeletedForNs);
         _purgingJobStats.scannedInternalCollections.fetchAndAddRelaxed(1);
+
+        // If the source collection doesn't exist and there's no more data to erase we can safely
+        // remove the markers. Perform a final truncate to remove all elements just in case.
+        if (CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, nsUUID) == nullptr &&
+            truncateMarkersForNss->isEmpty()) {
+
+            RecordId maxRecordId =
+                change_stream_pre_image_util::getAbsoluteMaxPreImageRecordIdBoundForNs(nsUUID)
+                    .recordId();
+
+            writeConflictRetry(opCtx, "final truncate", preImagesColl.nss(), [&] {
+                truncateRange(
+                    opCtx, preImagesColl.getCollectionPtr(), minRecordId, maxRecordId, 0, 0);
+            });
+
+            preImagesCollectionMap->erase(nsUUID);
+        }
     }
 
     _purgingJobStats.scannedCollections.fetchAndAddRelaxed(1);

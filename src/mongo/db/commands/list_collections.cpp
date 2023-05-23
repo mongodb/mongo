@@ -304,7 +304,7 @@ public:
             auto dbName = request().getDbName();
             auto cmdObj = request().toBSON({});
             uassertStatusOK(authzSession->checkAuthorizedToListCollections(
-                dbName.toStringWithTenantId(), cmdObj));
+                DatabaseNameUtil::serializeForAuth(dbName), cmdObj));
         }
 
         NamespaceString ns() const final {
@@ -565,7 +565,7 @@ public:
                  cmdObj,
                  uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
                                      ->checkAuthorizedToListCollections(
-                                         dbName.toStringWithTenantId(), cmdObj))});
+                                         DatabaseNameUtil::serializeForAuth(dbName), cmdObj))});
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(firstBatch.size());
 

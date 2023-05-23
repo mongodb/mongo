@@ -47,9 +47,9 @@ namespace mongo {
 
 class DeleteRequest;
 class OpDebug;
-class ParsedUpdate;
 class PlanExecutor;
 class UpdateRequest;
+class CanonicalQuery;
 
 namespace write_ops_exec {
 
@@ -178,9 +178,9 @@ void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDe
 
 /**
  * Returns true if an update failure due to a given DuplicateKey error is eligible for retry.
- * Requires that parsedUpdate.hasParsedQuery() is true.
  */
-bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
+bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
+                                      const CanonicalQuery& cq,
                                       const DuplicateKeyErrorInfo& errorInfo);
 
 /**
