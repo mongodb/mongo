@@ -41,12 +41,15 @@ def exists(env):
     return True
 
 
+ninja_fake_testlist = None
+
+
 def build_pretty_printer_test(env, target, **kwargs):
+
     if not isinstance(target, list):
         target = [target]
 
     if env.GetOption('ninja') != 'disabled':
-        print_warning("Can't build pretty printer tests with ninja enabled.")
         return []
 
     gdb_bin = None
@@ -202,7 +205,15 @@ def build_pretty_printer_test(env, target, **kwargs):
 
 
 def generate(env):
-    env.TestList("$PRETTY_PRINTER_TEST_LIST", source=[])
+    global ninja_fake_testlist
+    if env.GetOption('ninja') != 'disabled' and ninja_fake_testlist is None:
+        print_warning("Can't run pretty printer tests with ninja.")
+        ninja_fake_testlist = env.Command(
+            '$PRETTY_PRINTER_TEST_LIST', __file__,
+            "type nul >>$TARGET" if sys.platform == 'win32' else "touch $TARGET")
+    else:
+        env.TestList("$PRETTY_PRINTER_TEST_LIST", source=[])
+
     env.AddMethod(build_pretty_printer_test, "PrettyPrinterTest")
     alias = env.Alias("$PRETTY_PRINTER_TEST_ALIAS", "$PRETTY_PRINTER_TEST_LIST")
     env.Alias('+pretty-printer-tests', alias)
