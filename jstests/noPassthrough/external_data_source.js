@@ -160,6 +160,17 @@ assert.throwsWithCode(() => {
     });
 })();
 
+(function testCollectionlessAgg() {
+    const docs = [{a: 1}, {a: 2}, {a: 3}];
+    assert.sameMembers(docs, db.aggregate([{$documents: docs}]).toArray());
+})();
+
+(function testCollectionlessAggWithExternalDataSources() {
+    assert.throwsWithCode(() => {
+        db.aggregate([{$documents: [{a: 1}]}], {$_externalDataSources: []});
+    }, 7604400);
+})();
+
 //
 // Named Pipes success test cases follow.
 //
