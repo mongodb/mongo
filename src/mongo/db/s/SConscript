@@ -41,29 +41,6 @@ env.Library(
 )
 
 env.Library(
-    target='move_primary_test_fixtures',
-    source=[
-        'move_primary/move_primary_cloner_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        # Required for service context test fixture
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/repl/cloner_test_fixtures',
-        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        'move_primary_shared_data',
-    ],
-)
-
-env.Library(
     target='balancer_stats_registry',
     source=[
         'balancer_stats_registry.cpp',
@@ -759,10 +736,6 @@ env.CppUnitTest(
         'migration_destination_manager_test.cpp',
         'migration_session_id_test.cpp',
         'migration_util_test.cpp',
-        'move_primary/move_primary_collection_cloner_test.cpp',
-        'move_primary/move_primary_database_cloner_test.cpp',
-        'move_primary/move_primary_donor_service_test.cpp',
-        'move_primary/move_primary_recipient_service_test.cpp',
         'namespace_metadata_change_notifications_test.cpp',
         'op_observer_sharding_test.cpp',
         'operation_sharding_state_test.cpp',
@@ -851,7 +824,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'move_primary_cloners',
-        'move_primary_test_fixtures',
         'query_analysis_writer',
         'shard_server_test_fixture',
         'sharding_catalog',

@@ -2,7 +2,6 @@
  * Test that movePrimary sets valid block timestamp if a failover occurs before persisting it.
  *
  *  @tags: [
- *    requires_fcv_70,
  *    featureFlagOnlineMovePrimaryLifecycle
  * ]
  */
@@ -12,6 +11,12 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
+
+if (!FeatureFlagUtil.isEnabled(st.s.getDB(jsTestName()), "OnlineMovePrimaryLifecycle")) {
+    jsTestLog('Skipping test because the featureFlagOnlineMovePrimaryLifecycle is disabled.');
+    st.stop();
+    return;
+}
 
 const mongos = st.s0;
 const shard0 = st.shard0;
