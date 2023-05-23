@@ -157,6 +157,43 @@ BSONObj customSerialization(const BSONObj& obj, SerializationOptions opts) {
                     }
                     tassert(7539800, "always expect coordinates", geometryObj["coordinates"]);
                     opts.appendLiteral(&nestedSubObj, geometryObj["coordinates"]);
+                    // 'crs' can be present if users want to use STRICT_SPHERE coordinate system.
+                    if (auto crsElt = geometryObj["crs"]) {
+                        // 'crs' is always an object.
+                        tassert(7559700,
+                                "Expected 'crs' to be an object",
+                                geometryObj["crs"].type() == BSONType::Object);
+                        // 'crs' is required to have a 'type' field with the value 'name'.
+                        // Additionally, it is required to have an object properties field with a
+                        // single 'name' field.
+                        auto crsObjOrig = geometryObj["crs"];
+                        tassert(
+                            7559701,
+                            str::stream() << "Expected 'crs' to contain a string 'type' field, got "
+                                          << crsObjOrig,
+                            crsObjOrig["type"] && crsObjOrig["type"].type() == BSONType::String);
+                        tassert(7559702,
+                                str::stream()
+                                    << "Expected 'crs' to contain a 'properties' object, got , "
+                                    << crsObjOrig,
+                                crsObjOrig["properties"] &&
+                                    crsObjOrig["properties"].type() == BSONType::Object);
+                        tassert(7559703,
+                                str::stream() << "Expected 'crs.properties' to contain a 'name' "
+                                                 "string field, got "
+                                              << crsObjOrig["properties"],
+                                crsObjOrig["properties"].Obj()["name"] &&
+                                    crsObjOrig["properties"].Obj()["name"].type() ==
+                                        BSONType::String);
+                        BSONObjBuilder crsObjBuilder;
+                        opts.appendLiteral(&crsObjBuilder, "type", crsObjOrig["type"].String());
+                        BSONObjBuilder crsPropBuilder;
+                        opts.appendLiteral(&crsPropBuilder,
+                                           "name",
+                                           crsObjOrig["properties"].Obj()["name"].String());
+                        crsObjBuilder.append("properties", crsPropBuilder.obj());
+                        nestedSubObj.append("crs", crsObjBuilder.obj());
+                    }
                     nestedSubObj.doneFast();
                 }
             }
