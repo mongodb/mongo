@@ -195,7 +195,7 @@ public:
             auto collName = coll->ns();
             ResourceId rid(RESOURCE_COLLECTION, collName);
 
-            ASSERT_NE(ResourceCatalog::get(getServiceContext()).name(rid), boost::none);
+            ASSERT_NE(ResourceCatalog::get().name(rid), boost::none);
             numEntries++;
         }
         ASSERT_EQ(5, numEntries);
@@ -237,20 +237,20 @@ TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
 
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    ASSERT_EQ(boost::none, ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT_EQ(boost::none, ResourceCatalog::get().name(rid));
 
     for (int i = 0; i < 5; i++) {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(
             "resourceDb", "coll" + std::to_string(i));
         rid = ResourceId(RESOURCE_COLLECTION, nss);
-        ASSERT_EQ(boost::none, ResourceCatalog::get(getServiceContext()).name(rid));
+        ASSERT_EQ(boost::none, ResourceCatalog::get().name(rid));
     }
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
+    auto ridStr = ResourceCatalog::get().name(rid);
 
     ASSERT(ridStr);
     ASSERT(ridStr->find(dbName.toStringWithTenantId_forTest()) != std::string::npos);
@@ -259,14 +259,14 @@ TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
 TEST_F(CollectionCatalogResourceTest, LookupMissingDatabaseResource) {
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "missingDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT(!ResourceCatalog::get().name(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupCollectionResource) {
     const NamespaceString collNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "resourceDb.coll1");
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
-    auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
+    auto ridStr = ResourceCatalog::get().name(rid);
 
     ASSERT(ridStr);
     ASSERT(ridStr->find(collNs.toStringWithTenantId_forTest()) != std::string::npos);
@@ -276,7 +276,7 @@ TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "resourceDb.coll5");
     auto rid = ResourceId(RESOURCE_COLLECTION, nss);
-    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT(!ResourceCatalog::get().name(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
@@ -285,7 +285,7 @@ TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
     auto coll = catalog.lookupCollectionByNamespace(opCtx.get(), NamespaceString(collNs));
     catalog.deregisterCollection(opCtx.get(), coll->uuid(), /*isDropPending=*/false, boost::none);
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
-    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT(!ResourceCatalog::get().name(rid));
 }
 
 // Create an iterator over the CollectionCatalog and assert that all collections are present.

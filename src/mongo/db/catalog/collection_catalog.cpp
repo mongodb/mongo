@@ -227,22 +227,21 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
-                    writeJobs.push_back([opCtx,
-                                         &from = entry.nss,
-                                         &to = entry.renameTo,
-                                         commitTime](CollectionCatalog& catalog) {
-                        // We just need to do modifications on 'from' here. 'to' is taken care
-                        // of by a separate kWritableCollection entry.
-                        catalog._collections = catalog._collections.erase(from);
-                        catalog._pendingCommitNamespaces =
-                            catalog._pendingCommitNamespaces.erase(from);
+                    writeJobs.push_back(
+                        [opCtx, &from = entry.nss, &to = entry.renameTo, commitTime](
+                            CollectionCatalog& catalog) {
+                            // We just need to do modifications on 'from' here. 'to' is taken care
+                            // of by a separate kWritableCollection entry.
+                            catalog._collections = catalog._collections.erase(from);
+                            catalog._pendingCommitNamespaces =
+                                catalog._pendingCommitNamespaces.erase(from);
 
-                        auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
-                        resourceCatalog.remove({RESOURCE_COLLECTION, from}, from);
-                        resourceCatalog.add({RESOURCE_COLLECTION, to}, to);
+                            auto& resourceCatalog = ResourceCatalog::get();
+                            resourceCatalog.remove({RESOURCE_COLLECTION, from}, from);
+                            resourceCatalog.add({RESOURCE_COLLECTION, to}, to);
 
-                        catalog._catalogIdTracker.rename(from, to, commitTime);
-                    });
+                            catalog._catalogIdTracker.rename(from, to, commitTime);
+                        });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
@@ -304,16 +303,14 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
                     writeJobs.push_back([opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
-                        ResourceCatalog::get(opCtx->getServiceContext())
-                            .add({RESOURCE_COLLECTION, viewName}, viewName);
+                        ResourceCatalog::get().add({RESOURCE_COLLECTION, viewName}, viewName);
                         catalog.deregisterUncommittedView(viewName);
                     });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
                     writeJobs.push_back([opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
-                        ResourceCatalog::get(opCtx->getServiceContext())
-                            .remove({RESOURCE_COLLECTION, viewName}, viewName);
+                        ResourceCatalog::get().remove({RESOURCE_COLLECTION, viewName}, viewName);
                     });
                     break;
                 }
@@ -1297,7 +1294,7 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx,
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_DATABASE, dbName}, dbName);
+    ResourceCatalog::get().remove({RESOURCE_DATABASE, dbName}, dbName);
     _viewsForDatabase = _viewsForDatabase.erase(dbName);
 }
 
@@ -1952,7 +1949,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
 
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
-    auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
+    auto& resourceCatalog = ResourceCatalog::get();
     resourceCatalog.add({RESOURCE_DATABASE, nss.dbName()}, nss.dbName());
     resourceCatalog.add({RESOURCE_COLLECTION, nss}, nss);
 
@@ -2027,7 +2024,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
     coll->onDeregisterFromCatalog(opCtx);
 
-    ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_COLLECTION, ns}, ns);
+    ResourceCatalog::get().remove({RESOURCE_COLLECTION, ns}, ns);
 
     if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
         _viewsForDatabase = _viewsForDatabase.erase(coll->ns().dbName());
@@ -2106,7 +2103,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _dropPendingIndex = {};
     _stats = {};
 
-    ResourceCatalog::get(svcCtx).clear();
+    ResourceCatalog::get().clear();
 }
 
 void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& dbName) const {
