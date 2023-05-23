@@ -473,7 +473,7 @@ bool DBClientBase::createCollection(const NamespaceString& nss,
                                     int max,
                                     BSONObj* info,
                                     boost::optional<BSONObj> writeConcernObj) {
-    verify(!capped || size);
+    MONGO_verify(!capped || size);
     BSONObj o;
     if (info == nullptr)
         info = &o;

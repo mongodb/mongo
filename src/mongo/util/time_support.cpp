@@ -716,8 +716,8 @@ std::string Date_t::toString() const {
 
 time_t Date_t::toTimeT() const {
     const auto secs = millis / 1000;
-    verify(secs >= std::numeric_limits<time_t>::min());
-    verify(secs <= std::numeric_limits<time_t>::max());
+    MONGO_verify(secs >= std::numeric_limits<time_t>::min());
+    MONGO_verify(secs <= std::numeric_limits<time_t>::max());
     return secs;
 }
 

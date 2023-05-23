@@ -77,7 +77,7 @@ std::vector<GeoHash> ExpressionMapping::get2dCovering(const R2Region& region,
                                                       const BSONObj& indexInfoObj,
                                                       int maxCoveringCells) {
     auto result = GeoHashConverter::createFromDoc(indexInfoObj);
-    verify(result.isOK());  // We validated the parameters when creating the index.
+    MONGO_verify(result.isOK());  // We validated the parameters when creating the index.
 
     const auto bits = result.getValue()->getBits();
     R2RegionCoverer coverer(std::move(result.getValue()));

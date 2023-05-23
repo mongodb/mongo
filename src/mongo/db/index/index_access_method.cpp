@@ -221,7 +221,7 @@ struct BtreeExternalSortComparison {
 SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
                                                          std::unique_ptr<SortedDataInterface> btree)
     : _newInterface(std::move(btree)) {
-    verify(IndexDescriptor::isIndexVersionSupported(btreeState->descriptor()->version()));
+    MONGO_verify(IndexDescriptor::isIndexVersionSupported(btreeState->descriptor()->version()));
 }
 
 Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,

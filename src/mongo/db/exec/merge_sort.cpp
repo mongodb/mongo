@@ -140,7 +140,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
     }
 
     // If we're here, for each non-EOF child, we have a valid WSID.
-    verify(!_merging.empty());
+    MONGO_verify(!_merging.empty());
 
     // Get the 'min' WSID.  _merging is a priority queue so its top is the smallest.
     MergingRef top = _merging.top();
@@ -173,13 +173,13 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
         string fn = patternElt.fieldName();
 
         BSONElement lhsElt;
-        verify(lhsMember->getFieldDotted(fn, &lhsElt));
+        MONGO_verify(lhsMember->getFieldDotted(fn, &lhsElt));
 
         // Determine if the left-hand side sort key part comes from an index key.
         auto lhsIsFromIndexKey = !lhsMember->hasObj();
 
         BSONElement rhsElt;
-        verify(rhsMember->getFieldDotted(fn, &rhsElt));
+        MONGO_verify(rhsMember->getFieldDotted(fn, &rhsElt));
 
         // Determine if the right-hand side sort key part comes from an index key.
         auto rhsIsFromIndexKey = !rhsMember->hasObj();

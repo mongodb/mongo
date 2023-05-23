@@ -197,7 +197,7 @@ std::uint32_t deinterleaveZeros(std::uint64_t input) {
 }  // namespace
 
 GeoHash::GeoHash(unsigned x, unsigned y, unsigned bits) {
-    verify(bits <= 32);
+    MONGO_verify(bits <= 32);
     _bits = bits;
     auto interleavedX = interleaveWithZeros(x);
     auto interleavedY = interleaveWithZeros(y);
@@ -234,7 +234,7 @@ GeoHash GeoHash::up() const {
 }
 
 bool GeoHash::hasPrefix(const GeoHash& other) const {
-    verify(other._bits <= _bits);
+    MONGO_verify(other._bits <= _bits);
     if (other._bits == 0)
         return true;
 
@@ -259,7 +259,7 @@ string GeoHash::toStringHex1() const {
 }
 
 void GeoHash::setBit(unsigned pos, bool value) {
-    verify(pos < _bits * 2);
+    MONGO_verify(pos < _bits * 2);
     const long long mask = mask64For(pos);
     if (value)
         _hash |= mask;
@@ -272,12 +272,12 @@ bool GeoHash::getBit(unsigned pos) const {
 }
 
 bool GeoHash::getBitX(unsigned pos) const {
-    verify(pos < 32);
+    MONGO_verify(pos < 32);
     return getBit(pos * 2);
 }
 
 bool GeoHash::getBitY(unsigned pos) const {
-    verify(pos < 32);
+    MONGO_verify(pos < 32);
     return getBit((pos * 2) + 1);
 }
 
@@ -287,7 +287,7 @@ BSONObj GeoHash::wrap(const char* name) const {
     appendHashMin(&b, name);
     BSONObj o = b.obj();
     if ('\0' == name[0])
-        verify(o.objsize() == 20);
+        MONGO_verify(o.objsize() == 20);
     return o;
 }
 
@@ -332,7 +332,7 @@ bool GeoHash::atMaxY() const {
 
 // TODO(hk): comment better
 void GeoHash::move(int x, int y) {
-    verify(_bits);
+    MONGO_verify(_bits);
     _move(0, x);
     _move(1, y);
 }
@@ -341,7 +341,7 @@ void GeoHash::move(int x, int y) {
 void GeoHash::_move(unsigned offset, int d) {
     if (d == 0)
         return;
-    verify(d <= 1 && d >= -1);  // TEMP
+    MONGO_verify(d <= 1 && d >= -1);  // TEMP
 
     bool from, to;
     if (d > 0) {
@@ -373,7 +373,7 @@ void GeoHash::_move(unsigned offset, int d) {
         pos -= 2;
     }
 
-    verify(0);
+    MONGO_verify(0);
 }
 
 GeoHash& GeoHash::operator=(const GeoHash& h) {
@@ -403,7 +403,7 @@ bool GeoHash::operator<(const GeoHash& h) const {
 GeoHash& GeoHash::operator+=(const char* s) {
     unsigned pos = _bits * 2;
     _bits += strlen(s) / 2;
-    verify(_bits <= 32);
+    MONGO_verify(_bits <= 32);
     while ('\0' != s[0]) {
         if (s[0] == '1')
             setBit(pos, 1);
@@ -536,7 +536,7 @@ GeoHash GeoHash::parent(unsigned int level) const {
 }
 
 GeoHash GeoHash::parent() const {
-    verify(_bits > 0);
+    MONGO_verify(_bits > 0);
     return GeoHash(_hash, _bits - 1);
 }
 
@@ -865,7 +865,7 @@ double GeoHashConverter::convertFromHashScale(unsigned in) const {
 
 // Convert from a double that is [min, max] to a double in [0, (max-min)*scaling]
 double GeoHashConverter::convertToDoubleHashScale(double in) const {
-    verify(in <= _params.max && in >= _params.min);
+    MONGO_verify(in <= _params.max && in >= _params.min);
 
     if (in == _params.max) {
         // prevent aliasing with _min by moving inside the "box"
@@ -874,7 +874,7 @@ double GeoHashConverter::convertToDoubleHashScale(double in) const {
     }
 
     in -= _params.min;
-    verify(in >= 0);
+    MONGO_verify(in >= 0);
     return in * _params.scaling;
 }
 

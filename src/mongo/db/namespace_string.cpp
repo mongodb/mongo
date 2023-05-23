@@ -278,7 +278,7 @@ NamespaceString NamespaceString::makeDummyNamespace(const boost::optional<Tenant
 }
 
 std::string NamespaceString::getSisterNS(StringData local) const {
-    verify(local.size() && local[0] != '.');
+    MONGO_verify(local.size() && local[0] != '.');
     return db().toString() + "." + local.toString();
 }
 

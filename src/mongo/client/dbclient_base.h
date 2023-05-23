@@ -496,7 +496,7 @@ public:
      * Used by QueryOption_Exhaust. To use that your subclass must implement this.
      */
     virtual Status recv(Message& m, int lastRequestId) {
-        verify(false);
+        MONGO_verify(false);
         return {ErrorCodes::NotImplemented, "recv() not implemented"};
     }
 

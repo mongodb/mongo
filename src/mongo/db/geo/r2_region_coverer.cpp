@@ -97,7 +97,7 @@ void R2RegionCoverer::getCovering(const R2Region& region, vector<GeoHash>* cover
     // children they have (fewest children first), and then by the number of
     // fully contained children (fewest children first).
 
-    verify(_minLevel <= _maxLevel);
+    MONGO_verify(_minLevel <= _maxLevel);
     dassert(_candidateQueue->empty());
     dassert(_results->empty());
     _region = &region;
@@ -171,7 +171,7 @@ void R2RegionCoverer::addCandidate(Candidate* candidate) {
         return;
     }
 
-    verify(candidate->numChildren == 0);
+    MONGO_verify(candidate->numChildren == 0);
 
     // Expand children
     int numTerminals = expandChildren(candidate);

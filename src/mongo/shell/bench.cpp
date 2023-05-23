@@ -113,7 +113,7 @@ BSONObj fixQuery(const BSONObj& obj, BsonTemplateEvaluator& btl) {
         return obj;
 
     BSONObjBuilder b(obj.objsize() + 128);
-    verify(BsonTemplateEvaluator::StatusSuccess == btl.evaluate(obj, b));
+    MONGO_verify(BsonTemplateEvaluator::StatusSuccess == btl.evaluate(obj, b));
     return b.obj();
 }
 
@@ -840,7 +840,7 @@ void BenchRunState::tellWorkersToCollectStats() {
 
 void BenchRunState::assertFinished() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    verify(0 == _numUnstartedWorkers + _numActiveWorkers);
+    MONGO_verify(0 == _numUnstartedWorkers + _numActiveWorkers);
 }
 
 bool BenchRunState::shouldWorkerFinish() const {
@@ -853,7 +853,7 @@ bool BenchRunState::shouldWorkerCollectStats() const {
 
 void BenchRunState::onWorkerStarted() {
     stdx::lock_guard<Latch> lk(_mutex);
-    verify(_numUnstartedWorkers > 0);
+    MONGO_verify(_numUnstartedWorkers > 0);
     --_numUnstartedWorkers;
     ++_numActiveWorkers;
     if (_numUnstartedWorkers == 0) {
@@ -863,7 +863,7 @@ void BenchRunState::onWorkerStarted() {
 
 void BenchRunState::onWorkerFinished() {
     stdx::lock_guard<Latch> lk(_mutex);
-    verify(_numActiveWorkers > 0);
+    MONGO_verify(_numActiveWorkers > 0);
     --_numActiveWorkers;
     if (_numActiveWorkers + _numUnstartedWorkers == 0) {
         _stateChangeCondition.notify_all();
@@ -907,7 +907,7 @@ bool BenchRunWorker::shouldCollectStats() const {
  * Executes the workload on a worker thread. This is the main routine for benchRunXXX() benchmarks.
  */
 void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
-    verify(conn);
+    MONGO_verify(conn);
     long long count = 0;
     Timer timer;
 
@@ -1084,7 +1084,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                            "namespace"_attr = this->ns,
                            "expected"_attr = this->expectedDoc,
                            "got"_attr = result);
-                verify(false);
+                MONGO_verify(false);
             }
         } break;
         case OpType::COMMAND: {
@@ -1198,7 +1198,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                            "namespace"_attr = this->ns,
                            "expected"_attr = this->expected,
                            "got"_attr = count);
-                verify(false);
+                MONGO_verify(false);
             }
             LOGV2_DEBUG(22798, 5, "Result from benchRun thread [query]", "count"_attr = count);
         } break;
@@ -1578,7 +1578,7 @@ BSONObj BenchRunner::benchRunSync(const BSONObj& argsFake, void* data) {
  * give each worker all the entries to be executed round-robin until the 'seconds' timer expires.
  */
 BSONObj BenchRunner::benchRunOnce(const BSONObj& argsFake, void* data) {
-    verify(argsFake.firstElement().isABSONObj());
+    MONGO_verify(argsFake.firstElement().isABSONObj());
     BSONObj args = argsFake.firstElement().Obj();
 
     // Add a config field to indicate this variant.
@@ -1594,7 +1594,7 @@ BSONObj BenchRunner::benchRunOnce(const BSONObj& argsFake, void* data) {
  * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
  */
 BSONObj BenchRunner::benchStart(const BSONObj& argsFake, void* data) {
-    verify(argsFake.firstElement().isABSONObj());
+    MONGO_verify(argsFake.firstElement().isABSONObj());
     BSONObj args = argsFake.firstElement().Obj();
 
     // Get new BenchRunner object

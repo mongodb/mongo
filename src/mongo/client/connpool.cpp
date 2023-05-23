@@ -197,7 +197,7 @@ DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
             continue;
         }
 
-        verify(sc.conn->getSoTimeout() == socketTimeout);
+        MONGO_verify(sc.conn->getSoTimeout() == socketTimeout);
 #ifdef MONGO_CONFIG_SSL
         invariant(!sc.conn->isUsingTransientSSLParams());
 #endif
@@ -654,7 +654,7 @@ bool DBConnectionPool::serverNameCompare::operator()(const string& a, const stri
         ++ap;
         ++bp;
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 bool DBConnectionPool::poolKeyCompare::operator()(const PoolKey& a, const PoolKey& b) const {

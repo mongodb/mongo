@@ -281,8 +281,8 @@ HostAndPort someHostAndPortForMe() {
     // We are listening externally, but we don't have a definite hostname.
     // Ask the OS.
     std::string h = getHostName();
-    verify(!h.empty());
-    verify(h != "localhost");
+    MONGO_verify(!h.empty());
+    MONGO_verify(h != "localhost");
     return HostAndPort(h, serverGlobalParams.port);
 }
 

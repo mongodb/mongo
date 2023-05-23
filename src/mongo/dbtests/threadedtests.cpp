@@ -264,7 +264,7 @@ private:
         void checkIn() {
             stdx::lock_guard<Latch> lk(_frontDesk);
             _checkedIn++;
-            verify(_checkedIn <= _nRooms);
+            MONGO_verify(_checkedIn <= _nRooms);
             if (_checkedIn > _maxRooms)
                 _maxRooms = _checkedIn;
         }
@@ -272,7 +272,7 @@ private:
         void checkOut() {
             stdx::lock_guard<Latch> lk(_frontDesk);
             _checkedIn--;
-            verify(_checkedIn >= 0);
+            MONGO_verify(_checkedIn >= 0);
         }
 
         Mutex _frontDesk = MONGO_MAKE_LATCH("Hotel::_frontDesk");
@@ -313,7 +313,7 @@ private:
     virtual void validate() {
         // This should always be true, assuming that it takes < 1 sec for the hardware to process a
         // check-out/check-in Time for test is then ~ #threads / _nRooms * 2 seconds
-        verify(_hotel._maxRooms == _hotel._nRooms);
+        MONGO_verify(_hotel._maxRooms == _hotel._nRooms);
     }
 
 protected:

@@ -93,7 +93,7 @@ Labeler BSONObjBuilderValueStream::operator<<(const Labeler::Label& l) {
 
 void BSONObjBuilderValueStream::endField(StringData nextFieldName) {
     if (haveSubobj()) {
-        verify(_fieldName.rawData());
+        MONGO_verify(_fieldName.rawData());
         _builder->append(_fieldName, subobj()->done());
         _subobj.reset();
     }

@@ -677,7 +677,7 @@ public:
     iterator end() const;
 
     void appendSelfToBufBuilder(BufBuilder& b) const {
-        verify(objsize());
+        MONGO_verify(objsize());
         b.appendBuf(objdata(), objsize());
     }
 
@@ -881,7 +881,7 @@ public:
     }
 
     BSONElement next() {
-        verify(_pos <= _theend);
+        MONGO_verify(_pos <= _theend);
         BSONElement e(_pos);
         _pos += e.size();
         return e;
@@ -905,7 +905,7 @@ public:
     }
 
     BSONElement operator*() {
-        verify(_pos <= _theend);
+        MONGO_verify(_pos <= _theend);
         return BSONElement(_pos);
     }
 
@@ -932,7 +932,7 @@ class BSONIteratorSorted {
 
 public:
     ~BSONIteratorSorted() {
-        verify(_fields);
+        MONGO_verify(_fields);
     }
 
     bool more() {
@@ -940,7 +940,7 @@ public:
     }
 
     BSONElement next() {
-        verify(_fields);
+        MONGO_verify(_fields);
         if (_cur < _nfields) {
             const auto& element = _fields[_cur++];
             return BSONElement(element.fieldName.rawData() - 1,  // Include type byte

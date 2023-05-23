@@ -135,7 +135,7 @@ size_t getSupportedMax() {
         return serverGlobalParams.maxConns;
 #else
         struct rlimit limit;
-        verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
+        MONGO_verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
 
         size_t max = (size_t)(limit.rlim_cur * .8);
 

@@ -205,7 +205,7 @@ public:
         BSONObj filterObj = BSON("foo" << 6);
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
-        verify(statusWithMatcher.isOK());
+        MONGO_verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Matcher requires that foo==6 but we only have data with foo==5.

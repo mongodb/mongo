@@ -165,7 +165,7 @@ static Point toLngLatPoint(const S2Point& s2Point) {
 
 static void lineR2Bounds(const S2Polyline& flatLine, Box* flatBounds) {
     int numVertices = flatLine.num_vertices();
-    verify(flatLine.num_vertices() > 0);
+    MONGO_verify(flatLine.num_vertices() > 0);
 
     flatBounds->init(toLngLatPoint(flatLine.vertex(0)), toLngLatPoint(flatLine.vertex(0)));
 
@@ -180,7 +180,7 @@ static void circleR2Bounds(const Circle& circle, Box* flatBounds) {
 }
 
 static void multiPointR2Bounds(const vector<S2Point>& points, Box* flatBounds) {
-    verify(!points.empty());
+    MONGO_verify(!points.empty());
 
     flatBounds->init(toLngLatPoint(points.front()), toLngLatPoint(points.front()));
 
@@ -217,15 +217,15 @@ Box GeometryContainer::R2BoxRegion::buildBounds(const GeometryContainer& geometr
     } else if (geometry._multiPoint && FLAT == geometry._multiPoint->crs) {
         multiPointR2Bounds(geometry._multiPoint->points, &bounds);
     } else if (geometry._multiLine && FLAT == geometry._multiLine->crs) {
-        verify(false);
+        MONGO_verify(false);
     } else if (geometry._multiPolygon && FLAT == geometry._multiPolygon->crs) {
-        verify(false);
+        MONGO_verify(false);
     } else if (geometry._geometryCollection) {
-        verify(false);
+        MONGO_verify(false);
     } else if (geometry.hasS2Region()) {
         // For now, just support spherical cap for $centerSphere and GeoJSON points
-        verify((geometry._cap && FLAT != geometry._cap->crs) ||
-               (geometry._point && FLAT != geometry._point->crs));
+        MONGO_verify((geometry._cap && FLAT != geometry._cap->crs) ||
+                     (geometry._point && FLAT != geometry._point->crs));
         s2RegionR2Bounds(geometry.getS2Region(), &bounds);
     }
 
@@ -291,7 +291,7 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
     }
 
     if (nullptr != _box) {
-        verify(FLAT == _box->crs);
+        MONGO_verify(FLAT == _box->crs);
         if (nullptr == otherContainer._point) {
             return false;
         }

@@ -182,7 +182,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         matchDetails.requestElemMatchKey();
 
         dassert(cq);
-        verify(cq->root()->matchesBSON(oldObjValue, &matchDetails));
+        MONGO_verify(cq->root()->matchesBSON(oldObjValue, &matchDetails));
 
         std::string matchedField;
         if (matchDetails.hasElemMatchKey())

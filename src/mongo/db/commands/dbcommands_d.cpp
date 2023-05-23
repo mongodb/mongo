@@ -322,7 +322,7 @@ public:
                 BSONObj obj;
                 while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
                     BSONElement ne = obj["n"];
-                    verify(ne.isNumber());
+                    MONGO_verify(ne.isNumber());
                     int myn = ne.numberInt();
                     if (n != myn) {
                         if (partialOk) {

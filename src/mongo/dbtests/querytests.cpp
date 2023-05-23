@@ -1283,7 +1283,7 @@ public:
         std::unique_ptr<DBClientCursor> cursor = _client.find(std::move(findRequest));
         while (cursor->more()) {
             BSONObj o = cursor->next();
-            verify(validateBSON(o).isOK());
+            MONGO_verify(validateBSON(o).isOK());
         }
     }
     void run() {

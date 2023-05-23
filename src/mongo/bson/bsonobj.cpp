@@ -875,7 +875,7 @@ BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& 
         auto elem = i.next();
         _fields[x++] = {elem.fieldNameStringData(), elem.size()};
     }
-    verify(x == _nfields);
+    MONGO_verify(x == _nfields);
     std::sort(_fields.get(), _fields.get() + _nfields, cmp);
     _cur = 0;
 }

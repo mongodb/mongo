@@ -245,7 +245,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     invariant(ranking);
     _bestPlanIdx = ranking->candidateOrder[0];
 
-    verify(_bestPlanIdx >= 0 && _bestPlanIdx < static_cast<int>(_candidates.size()));
+    MONGO_verify(_bestPlanIdx >= 0 && _bestPlanIdx < static_cast<int>(_candidates.size()));
 
     auto& bestCandidate = _candidates[_bestPlanIdx];
     const auto& alreadyProduced = bestCandidate.results;

@@ -140,7 +140,7 @@ public:
     }
 
     ConnectionString::ConnectionType type() const {
-        verify(_created);
+        MONGO_verify(_created);
         return _type;
     }
 

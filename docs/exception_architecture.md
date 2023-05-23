@@ -19,7 +19,7 @@ __Note__: Calling C function `assert` is not allowed. Use one of the above inste
 
 The following types of assertions are deprecated:
 
--   `verify`
+-   `MONGO_verify`
     -   Checks per-operation invariants. A synonym for massert but doesn't require an error code.
         Process fatal in debug mode. Do not use for new code; use invariant or fassert instead.
 -   `dassert`
@@ -39,7 +39,7 @@ Some assertions will increment an assertion counter. The `serverStatus` command 
 "asserts" section including these counters:
 
 -   `regular`
-    -   Incremented by `verify`.
+    -   Incremented by `MONGO_verify`.
 -   `warning`
     -   Always 0. Nothing increments this anymore.
 -   `msg`
@@ -55,7 +55,7 @@ Some assertions will increment an assertion counter. The `serverStatus` command 
 ## Considerations
 
 When per-operation invariant checks fail, the current operation fails, but the process and
-connection persist. This means that `massert`, `uassert`, `iassert` and `verify` only
+connection persist. This means that `massert`, `uassert`, `iassert` and `MONGO_verify` only
 terminate the current operation, not the whole process. Be careful not to corrupt process state by
 mistakenly using these assertions midway through mutating process state.
 

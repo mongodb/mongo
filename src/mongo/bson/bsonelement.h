@@ -619,7 +619,7 @@ public:
      */
     const char* binData(int& len) const {
         // BinData: <int len> <byte subtype> <byte[len] data>
-        verify(type() == BinData);
+        MONGO_verify(type() == BinData);
         len = valuestrsize();
         return value() + 5;
     }
@@ -639,14 +639,14 @@ public:
 
     static BinDataType binDataType(const char* raw, size_t length) {
         // BinData: <int len> <byte subtype> <byte[len] data>
-        verify(length >= 5);
+        MONGO_verify(length >= 5);
         unsigned char c = raw[4];
         return static_cast<BinDataType>(c);
     }
 
     BinDataType binDataType() const {
         // BinData: <int len> <byte subtype> <byte[len] data>
-        verify(type() == BinData);
+        MONGO_verify(type() == BinData);
         unsigned char c = (value() + 4)[0];
         return static_cast<BinDataType>(c);
     }
@@ -663,7 +663,7 @@ public:
      * Retrieve the regex std::string for a Regex element
      */
     const char* regex() const {
-        verify(type() == RegEx);
+        MONGO_verify(type() == RegEx);
         return value();
     }
 

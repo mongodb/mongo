@@ -836,7 +836,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
 
     // We're tagging the tree here, so it shouldn't have
     // any tags hanging off yet.
-    verify(nullptr == filter->getTag());
+    MONGO_verify(nullptr == filter->getTag());
 
     if (filter->numChildren() != indexTree->children.size()) {
         str::stream ss;

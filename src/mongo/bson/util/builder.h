@@ -737,8 +737,8 @@ public:
         const int maxSize = 32;
         char* start = _buf.grow(maxSize);
         int z = snprintf(start, maxSize, "%.16g", x);
-        verify(z >= 0);
-        verify(z < maxSize);
+        MONGO_verify(z >= 0);
+        MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
         if (strchr(start, '.') == nullptr && strchr(start, 'E') == nullptr &&
             strchr(start, 'N') == nullptr) {
@@ -805,8 +805,8 @@ private:
     StringBuilderImpl& SBNUM(T val, int maxSize, const char* macro) {
         int prev = _buf.len();
         int z = snprintf(_buf.grow(maxSize), maxSize, macro, (val));
-        verify(z >= 0);
-        verify(z < maxSize);
+        MONGO_verify(z >= 0);
+        MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
         return *this;
     }

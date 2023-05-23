@@ -599,19 +599,19 @@ bool IndexBoundsChecker::isValidKey(const BSONObj& key) {
 }
 
 IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, IndexSeekPoint* out) {
-    verify(_curInterval.size() > 0);
+    MONGO_verify(_curInterval.size() > 0);
     out->keySuffix.resize(_curInterval.size());
 
     // It's useful later to go from a field number to the value for that field.  Store these.
     size_t i = 0;
     BSONObjIterator keyIt(key);
     while (keyIt.more()) {
-        verify(i < _curInterval.size());
+        MONGO_verify(i < _curInterval.size());
 
         _keyValues[i] = keyIt.next();
         i++;
     }
-    verify(i == _curInterval.size());
+    MONGO_verify(i == _curInterval.size());
 
     size_t firstNonContainedField;
     Location orientation;
@@ -655,7 +655,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
         return MUST_ADVANCE;
     }
 
-    verify(AHEAD == orientation);
+    MONGO_verify(AHEAD == orientation);
 
     // Field number 'firstNonContainedField' of the index key is after interval we think it's
     // in.  Fields 0 through 'firstNonContained-1' are within their current intervals and we can
@@ -699,7 +699,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
 
             return MUST_ADVANCE;
         } else {
-            verify(AHEAD == where);
+            MONGO_verify(AHEAD == where);
             // Field number 'firstNonContainedField' cannot possibly be placed into an interval,
             // as it is already past its last possible interval.  The caller must move forward
             // to a key with a greater value for the previous field.
@@ -724,7 +724,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
         }
     }
 
-    verify(firstNonContainedField == _curInterval.size());
+    MONGO_verify(firstNonContainedField == _curInterval.size());
     return VALID;
 }
 

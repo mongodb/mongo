@@ -46,7 +46,7 @@ ServerStatusSectionRegistry* ServerStatusSectionRegistry::get() {
 void ServerStatusSectionRegistry::addSection(ServerStatusSection* section) {
     // Disallow adding a section named "timing" as it is reserved for the server status command.
     dassert(section->getSectionName() != kTimingSection);
-    verify(!_runCalled.load());
+    MONGO_verify(!_runCalled.load());
     _sections[section->getSectionName()] = section;
 }
 

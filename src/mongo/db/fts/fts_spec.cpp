@@ -118,23 +118,23 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
         BSONObjIterator i(indexInfo["weights"].Obj());
         while (i.more()) {
             BSONElement e = i.next();
-            verify(e.isNumber());
+            MONGO_verify(e.isNumber());
 
             if (WILDCARD == e.fieldName()) {
                 _wildcard = true;
             } else {
                 double num = e.number();
                 _weights[e.fieldName()] = num;
-                verify(num > 0 && num < MAX_WORD_WEIGHT);
+                MONGO_verify(num > 0 && num < MAX_WORD_WEIGHT);
             }
         }
-        verify(_wildcard || _weights.size());
+        MONGO_verify(_wildcard || _weights.size());
     }
 
     // extra information
     {
         BSONObj keyPattern = indexInfo["key"].Obj();
-        verify(keyPattern.nFields() >= 2);
+        MONGO_verify(keyPattern.nFields() >= 2);
         BSONObjIterator i(keyPattern);
 
         bool passedFTS = false;
@@ -228,7 +228,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
 
         double& score = (*docScores)[term];
         score += (weight * data.freq * coeff * adjustment);
-        verify(score <= MAX_WEIGHT);
+        MONGO_verify(score <= MAX_WEIGHT);
     }
 }
 
@@ -316,7 +316,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
                     b.append(e);
                 }
             }
-            verify(addedFtsStuff);
+            MONGO_verify(addedFtsStuff);
         }
         keyPattern = b.obj();
 
@@ -324,7 +324,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
         // fields, then extraAfter fields.
         {
             BSONObjIterator i(spec["key"].Obj());
-            verify(i.more());
+            MONGO_verify(i.more());
             BSONElement e = i.next();
 
             // extraBefore fields

@@ -246,7 +246,7 @@ public:
                 std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
                 // exprs is what will wind up deleting this.
                 matcher = me.get();
-                verify(nullptr != matcher);
+                MONGO_verify(nullptr != matcher);
                 exprs->push_back(std::move(me));
             } else if (argsTag == e.fieldName()) {
                 nodeArgs = argObj;

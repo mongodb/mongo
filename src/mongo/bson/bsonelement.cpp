@@ -451,7 +451,7 @@ std::vector<BSONElement> BSONElement::Array() const {
         unsigned u;
         Status status = NumberParser{}(f, &u);
         if (status.isOK()) {
-            verify(u < 1000000);
+            MONGO_verify(u < 1000000);
             if (u >= v.size())
                 v.resize(u + 1);
             v[u] = e;
@@ -607,12 +607,12 @@ BSONObj BSONElement::embeddedObjectUserCheck() const {
 }
 
 BSONObj BSONElement::embeddedObject() const {
-    verify(isABSONObj());
+    MONGO_verify(isABSONObj());
     return BSONObj(value(), BSONObj::LargeSizeTrait{});
 }
 
 BSONObj BSONElement::codeWScopeObject() const {
-    verify(type() == CodeWScope);
+    MONGO_verify(type() == CodeWScope);
     int strSizeWNull = ConstDataView(value() + 4).read<LittleEndian<int>>();
     return BSONObj(value() + 4 + 4 + strSizeWNull);
 }

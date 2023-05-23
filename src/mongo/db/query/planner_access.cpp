@@ -635,10 +635,10 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         BSONObjIterator it(index.keyPattern);
         BSONElement keyElt = it.next();
         for (size_t i = 0; i < pos; ++i) {
-            verify(it.more());
+            MONGO_verify(it.more());
             keyElt = it.next();
         }
-        verify(!keyElt.eoo());
+        MONGO_verify(!keyElt.eoo());
 
         IndexBoundsBuilder::translate(
             expr, keyElt, index, &isn->bounds.fields[pos], tightnessOut, ietBuilder);
@@ -785,7 +785,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
         GeoNear2DSphereNode* gn = static_cast<GeoNear2DSphereNode*>(node);
         boundsToFillOut = &gn->baseBounds;
     } else {
-        verify(type == STAGE_IXSCAN);
+        MONGO_verify(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
 
         // See STAGE_GEO_NEAR_2D above - 2D indexes can only accumulate scan bounds over the first
@@ -808,13 +808,13 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     BSONObjIterator it(index.keyPattern);
     BSONElement keyElt = it.next();
     for (size_t i = 0; i < pos; ++i) {
-        verify(it.more());
+        MONGO_verify(it.more());
         keyElt = it.next();
     }
-    verify(!keyElt.eoo());
+    MONGO_verify(!keyElt.eoo());
     scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
 
-    verify(boundsToFillOut->fields.size() > pos);
+    MONGO_verify(boundsToFillOut->fields.size() > pos);
 
     OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
 
@@ -826,7 +826,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
             IndexBoundsBuilder::translateAndIntersect(
                 expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
         } else {
-            verify(MatchExpression::OR == mergeType);
+            MONGO_verify(MatchExpression::OR == mergeType);
             IndexBoundsBuilder::translateAndUnion(
                 expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
         }
@@ -1072,7 +1072,7 @@ void QueryPlannerAccess::finishLeafNode(
         bounds = &gnode->baseBounds;
         nodeIndex = &gnode->index;
     } else {
-        verify(type == STAGE_IXSCAN);
+        MONGO_verify(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
         nodeIndex = &scan->index;
         bounds = &scan->bounds;
@@ -1088,7 +1088,7 @@ void QueryPlannerAccess::finishLeafNode(
     size_t firstEmptyField = 0;
     for (firstEmptyField = 0; firstEmptyField < bounds->fields.size(); ++firstEmptyField) {
         if (bounds->fields[firstEmptyField].name.empty()) {
-            verify(bounds->fields[firstEmptyField].intervals.empty());
+            MONGO_verify(bounds->fields[firstEmptyField].intervals.empty());
             break;
         }
     }
@@ -1098,7 +1098,7 @@ void QueryPlannerAccess::finishLeafNode(
         // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
         BSONObjIterator it(nodeIndex->keyPattern);
         for (size_t i = 0; i < firstEmptyField; ++i) {
-            verify(it.more());
+            MONGO_verify(it.more());
             it.next();
         }
 
@@ -1108,14 +1108,14 @@ void QueryPlannerAccess::finishLeafNode(
             // There may be filled-in fields to the right of the firstEmptyField; for instance, the
             // index {loc:"2dsphere", x:1} with a predicate over x and a near search over loc.
             if (bounds->fields[firstEmptyField].name.empty()) {
-                verify(bounds->fields[firstEmptyField].intervals.empty());
+                MONGO_verify(bounds->fields[firstEmptyField].intervals.empty());
                 IndexBoundsBuilder::allValuesForField(kpElt, &bounds->fields[firstEmptyField]);
             }
             ++firstEmptyField;
         }
 
         // Make sure that the length of the key is the length of the bounds we started.
-        verify(firstEmptyField == bounds->fields.size());
+        MONGO_verify(firstEmptyField == bounds->fields.size());
     }
 
     // Build Interval Evaluation Trees used to restore index bounds from cached SBE Plans.
@@ -1288,7 +1288,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
 
         scanState.ixtag = checked_cast<IndexTag*>(child->getTag());
         // If there's a tag it must be valid.
-        verify(IndexTag::kNoIndex != scanState.ixtag->index);
+        MONGO_verify(IndexTag::kNoIndex != scanState.ixtag->index);
 
         // If the child can't use an index on its own field (and the child is not a negation
         // of a bounds-generating expression), then it's indexed by virtue of one of
@@ -1338,7 +1338,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
         if (shouldMergeWithLeaf(child, scanState)) {
             // The child uses the same index we're currently building a scan for.  Merge
             // the bounds and filters.
-            verify(scanState.currentIndexNumber == scanState.ixtag->index);
+            MONGO_verify(scanState.currentIndexNumber == scanState.ixtag->index);
             scanState.tightness = IndexBoundsBuilder::INEXACT_FETCH;
             mergeWithLeafNode(child, &scanState);
             refineTightnessForMaybeCoveredQuery(query, scanState.tightness);
@@ -1348,7 +1348,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                 // Output the current scan before starting to construct a new out.
                 finishAndOutputLeaf(&scanState, out);
             } else {
-                verify(IndexTag::kNoIndex == scanState.currentIndexNumber);
+                MONGO_verify(IndexTag::kNoIndex == scanState.currentIndexNumber);
             }
 
             // Reset state before producing a new leaf.
@@ -1483,7 +1483,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
         if (shouldMergeWithLeaf(emChild, *scanState)) {
             // The child uses the same index we're currently building a scan for.  Merge
             // the bounds and filters.
-            verify(scanState->currentIndexNumber == scanState->ixtag->index);
+            MONGO_verify(scanState->currentIndexNumber == scanState->ixtag->index);
 
             scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
             mergeWithLeafNode(emChild, scanState);
@@ -1491,7 +1491,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
             if (nullptr != scanState->currentScan.get()) {
                 finishAndOutputLeaf(scanState, out);
             } else {
-                verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
+                MONGO_verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
             }
 
             // Reset state before producing a new leaf.
@@ -1579,7 +1579,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
 
     // We must use an index for at least one child of the AND.  We shouldn't be here if this
     // isn't the case.
-    verify(ixscanNodes.size() >= 1);
+    MONGO_verify(ixscanNodes.size() >= 1);
 
     // Short-circuit: an AND of one child is just the child.
     if (ixscanNodes.size() == 1) {
@@ -1671,7 +1671,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     // index, so we put a fetch with filter.
     if (root->numChildren() > 0) {
         auto fetch = std::make_unique<FetchNode>();
-        verify(ownedRoot);
+        MONGO_verify(ownedRoot);
         if (ownedRoot->numChildren() == 1) {
             // An $and of one thing is that thing.
             fetch->filter = std::move((*ownedRoot->getChildVector())[0]);
@@ -1827,7 +1827,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             }
 
             auto soln = makeLeafNode(query, index, tag->pos, root, &tightness, ietBuilder);
-            verify(nullptr != soln);
+            MONGO_verify(nullptr != soln);
             finishLeafNode(soln.get(), index, std::move(ietBuilders));
 
             if (!ownedRoot) {
@@ -1853,7 +1853,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
                 return soln;
             } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                        !indices[tag->index].multikey) {
-                verify(nullptr == soln->filter.get());
+                MONGO_verify(nullptr == soln->filter.get());
                 soln->filter = std::move(ownedRoot);
                 return soln;
             } else {
@@ -1947,7 +1947,7 @@ void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
         if (MatchExpression::AND == type) {
             listFilter = std::make_unique<AndMatchExpression>();
         } else {
-            verify(MatchExpression::OR == type);
+            MONGO_verify(MatchExpression::OR == type);
             listFilter = std::make_unique<OrMatchExpression>();
         }
         unique_ptr<MatchExpression> oldFilter = node->filter->clone();

@@ -64,7 +64,7 @@ RemoveSaver::RemoveSaver(const string& a,
         _root /= a;
     if (b.size())
         _root /= b;
-    verify(a.size() || b.size());
+    MONGO_verify(a.size() || b.size());
 
     _file = _root;
 
