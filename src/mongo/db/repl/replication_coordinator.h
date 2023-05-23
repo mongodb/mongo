@@ -388,9 +388,12 @@ public:
      * "oplog holes" from oplog entries with earlier timestamps which commit after this one)
      * this method does not notify oplog waiters.  Callers which know the new lastApplied is at
      * a no-holes point should call signalOplogWaiters after calling this method.
+     *
+     * If advanceGlobalTimestamp is false, we will not advance the global OpTime. The caller takes
+     * responsibility for doing this instead.
      */
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime) = 0;
+        const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp = true) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime durable to this node, but only

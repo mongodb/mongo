@@ -209,7 +209,7 @@ void ReplicationCoordinatorEmbedded::setMyHeartbeatMessage(const std::string&) {
 }
 
 void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeAndWallTimeForward(
-    const OpTimeAndWallTime&) {
+    const OpTimeAndWallTime&, bool) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

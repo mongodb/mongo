@@ -462,8 +462,14 @@ void logOplogRecords(OperationContext* opCtx,
                 hangBeforeLogOpAdvancesLastApplied.pauseWhileSet(opCtx);
             }
 
+            // As an optimization, we skip advancing the global timestamp. In this path on the
+            // primary, the caller will have already advanced the clock to at least this value when
+            // allocating the timestamp.
+            const bool advanceGlobalTimestamp = false;
+
             // Optimes on the primary should always represent consistent database states.
-            replCoord->setMyLastAppliedOpTimeAndWallTimeForward({finalOpTime, wallTime});
+            replCoord->setMyLastAppliedOpTimeAndWallTimeForward({finalOpTime, wallTime},
+                                                                advanceGlobalTimestamp);
 
             // We set the last op on the client to 'finalOpTime', because that contains the
             // timestamp of the operation that the client actually performed.

@@ -131,7 +131,7 @@ protected:
         if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
-        getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime});
+        getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime}, true);
     }
 
     void replCoordSetMyLastDurableOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {

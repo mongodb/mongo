@@ -1389,11 +1389,16 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
 }
 
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
-    const OpTimeAndWallTime& opTimeAndWallTime) {
+    const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp) {
     // Update the global timestamp before setting the last applied opTime forward so the last
     // applied optime is never greater than the latest cluster time in the logical clock.
     const auto opTime = opTimeAndWallTime.opTime;
-    _externalState->setGlobalTimestamp(getServiceContext(), opTime.getTimestamp());
+
+    // The caller may have already advanced the global timestamp, so they may request that we skip
+    // this step.
+    if (advanceGlobalTimestamp) {
+        _externalState->setGlobalTimestamp(getServiceContext(), opTime.getTimestamp());
+    }
 
     stdx::unique_lock<Latch> lock(_mutex);
     auto myLastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
