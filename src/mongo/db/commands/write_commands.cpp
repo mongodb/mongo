@@ -555,9 +555,6 @@ public:
             updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             updateRequest.setExplain(verbosity);
 
-            const ExtensionsCallbackReal extensionsCallback(opCtx,
-                                                            &updateRequest.getNamespaceString());
-
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
             const auto collection =
@@ -585,7 +582,6 @@ public:
 
             ParsedUpdate parsedUpdate(opCtx,
                                       &updateRequest,
-                                      extensionsCallback,
                                       collection.getCollectionPtr(),
                                       false /* forgoOpCounterIncrements */,
                                       isRequestToTimeseries);

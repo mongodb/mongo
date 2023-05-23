@@ -89,6 +89,10 @@ public:
         return _nsString;
     }
 
+    const NamespaceString& getNsString() const {
+        return _nsString;
+    }
+
     void setQuery(const BSONObj& query) {
         _updateOp.setQ(query);
     }
@@ -153,6 +157,10 @@ public:
         return _letParameters;
     }
 
+    const boost::optional<BSONObj>& getLet() const {
+        return _letParameters;
+    }
+
     void setArrayFilters(const std::vector<BSONObj>& arrayFilters) {
         _updateOp.setArrayFilters(arrayFilters);
     }
@@ -192,6 +200,10 @@ public:
         _updateOp.setMulti(value);
     }
 
+    bool getMulti() const {
+        return _updateOp.getMulti();
+    }
+
     bool isMulti() const {
         return _updateOp.getMulti();
     }
@@ -218,6 +230,10 @@ public:
 
     boost::optional<ExplainOptions::Verbosity> explain() const {
         return _explain;
+    }
+
+    bool getIsExplain() const {
+        return static_cast<bool>(_explain);
     }
 
     void setReturnDocs(ReturnDocOption value) {

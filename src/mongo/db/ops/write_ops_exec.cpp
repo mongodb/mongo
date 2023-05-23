@@ -745,10 +745,7 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
             !inTransaction);
     }
 
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
-
-    ParsedUpdate parsedUpdate(
-        opCtx, updateRequest, extensionsCallback, collection.getCollectionPtr());
+    ParsedUpdate parsedUpdate(opCtx, updateRequest, collection.getCollectionPtr());
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const auto exec = uassertStatusOK(
@@ -1179,11 +1176,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
 
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
-
     ParsedUpdate parsedUpdate(opCtx,
                               updateRequest,
-                              extensionsCallback,
                               collection.getCollectionPtr(),
                               forgoOpCounterIncrements,
                               updateRequest->source() == OperationSource::kTimeseriesUpdate);
@@ -1313,9 +1307,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
             return ret;
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-            const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-            auto cq = uassertStatusOK(ParsedUpdate::parseQueryToCQ(
-                opCtx, nullptr /* expCtx */, extensionsCallback, request, request.getQuery()));
+            auto cq = uassertStatusOK(parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, request));
 
             if (!write_ops_exec::shouldRetryDuplicateKeyException(
                     request, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {

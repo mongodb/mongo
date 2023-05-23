@@ -641,15 +641,8 @@ bool handleUpdateOp(OperationContext* opCtx,
                     responses.addUpdateReply(currentOpIdx, result, docFound, boost::none);
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-                    const ExtensionsCallbackReal extensionsCallback(
-                        opCtx, &updateRequest.getNamespaceString());
-
-                    auto cq =
-                        uassertStatusOK(ParsedUpdate::parseQueryToCQ(opCtx,
-                                                                     nullptr /* expCtx */,
-                                                                     extensionsCallback,
-                                                                     updateRequest,
-                                                                     updateRequest.getQuery()));
+                    auto cq = uassertStatusOK(
+                        parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, updateRequest));
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
                             updateRequest, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
                         throw;

@@ -1492,6 +1492,7 @@ execEnv.Library(
         'exec/upsert_stage.cpp',
         'ops/delete_request.idl',
         'ops/parsed_delete.cpp',
+        'ops/parsed_update.cpp',
         'ops/update_result.cpp',
         'pipeline/document_source_cursor.cpp',
         'pipeline/document_source_geo_near_cursor.cpp',

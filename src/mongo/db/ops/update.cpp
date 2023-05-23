@@ -91,8 +91,7 @@ UpdateResult update(OperationContext* opCtx,
     invariant(coll.exists() || !request.isUpsert());
 
     // Parse the update, get an executor for it, run the executor, get stats out.
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-    ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback, coll.getCollectionPtr());
+    ParsedUpdate parsedUpdate(opCtx, &request, coll.getCollectionPtr());
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;

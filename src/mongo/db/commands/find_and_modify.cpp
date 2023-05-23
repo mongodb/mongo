@@ -402,9 +402,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
-        ParsedUpdate parsedUpdate(
-            opCtx, &updateRequest, extensionsCallback, collection.getCollectionPtr());
+        ParsedUpdate parsedUpdate(opCtx, &updateRequest, collection.getCollectionPtr());
         uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -548,15 +546,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-                    const ExtensionsCallbackReal extensionsCallback(
-                        opCtx, &updateRequest.getNamespaceString());
-
-                    auto cq =
-                        uassertStatusOK(ParsedUpdate::parseQueryToCQ(opCtx,
-                                                                     nullptr /* expCtx */,
-                                                                     extensionsCallback,
-                                                                     updateRequest,
-                                                                     updateRequest.getQuery()));
+                    auto cq = uassertStatusOK(
+                        parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, updateRequest));
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
                             updateRequest, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
                         throw;

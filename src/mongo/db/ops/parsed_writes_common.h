@@ -30,20 +30,18 @@
 #pragma once
 
 #include <memory>
-#include <utility>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
+class DeleteRequest;
+class UpdateRequest;
+
 /**
  * Query for timeseries arbitrary writes should be split into two parts: bucket expression and
  * residual expression. The bucket expression is used to find the buckets and the residual
@@ -69,5 +67,85 @@ inline std::unique_ptr<TimeseriesWritesQueryExprs> createTimeseriesWritesQueryEx
     } else {
         return nullptr;
     }
+}
+
+template <typename T>
+concept IsDeleteOrUpdateRequest =
+    std::is_same_v<T, UpdateRequest> || std::is_same_v<T, DeleteRequest>;
+
+namespace impl {
+    /**
+     * Parses the filter of 'request'or the given filter (if given) to a CanonicalQuery. This does a
+     * direct transformation and doesn't do any special handling, e.g. for timeseries.
+     */
+    template <typename T>
+    requires IsDeleteOrUpdateRequest<T> StatusWith<std::unique_ptr<CanonicalQuery>>
+    parseWriteQueryToCQ(OperationContext * opCtx,
+                        ExpressionContext * expCtx,
+                        const ExtensionsCallback& extensionsCallback,
+                        const T& request,
+                        const MatchExpression* rewrittenFilter = nullptr) {
+        // The projection needs to be applied after the delete/update operation, so we do not
+        // specify a projection during canonicalization.
+        auto findCommand = std::make_unique<FindCommandRequest>(request.getNsString());
+
+        if (rewrittenFilter) {
+            findCommand->setFilter(rewrittenFilter->serialize());
+        } else {
+            findCommand->setFilter(request.getQuery());
+        }
+        findCommand->setSort(request.getSort());
+        findCommand->setHint(request.getHint());
+        findCommand->setCollation(request.getCollation().getOwned());
+
+        // Limit should only used for the findAndModify command when a sort is specified. If a sort
+        // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
+        // limit through. Generally, a update stage expects to be able to skip documents that were
+        // deleted/modified under it, but a limit could inhibit that and give an EOF when the
+        // delete/update has not actually delete/updated a document. This behavior is fine for
+        // findAndModify, but should not apply to delete/update in general.
+        if (!request.getMulti() && !request.getSort().isEmpty()) {
+            findCommand->setLimit(1);
+        }
+
+        MatchExpressionParser::AllowedFeatureSet allowedMatcherFeatures =
+            MatchExpressionParser::kAllowAllSpecialFeatures;
+        if constexpr (std::is_same_v<T, UpdateRequest>) {
+            // $expr is not allowed in the query for an upsert, since it is not clear what the
+            // equality extraction behavior for $expr should be.
+            if (request.isUpsert()) {
+                allowedMatcherFeatures &= ~MatchExpressionParser::AllowedFeatures::kExpr;
+            }
+        }
+
+        // If the delete/update request has runtime constants or let parameters attached to it, pass
+        // them to the FindCommandRequest.
+        if (auto& runtimeConstants = request.getLegacyRuntimeConstants()) {
+            findCommand->setLegacyRuntimeConstants(*runtimeConstants);
+        }
+        if (auto& letParams = request.getLet()) {
+            findCommand->setLet(*letParams);
+        }
+
+        return CanonicalQuery::canonicalize(opCtx,
+                                            std::move(findCommand),
+                                            request.getIsExplain(),
+                                            expCtx,
+                                            extensionsCallback,
+                                            allowedMatcherFeatures);
+    }
+}  // namespace impl
+
+template <typename T>
+requires IsDeleteOrUpdateRequest<T> StatusWith<std::unique_ptr<CanonicalQuery>> parseWriteQueryToCQ(
+    OperationContext* opCtx,
+    ExpressionContext* expCtx,
+    const T& request,
+    const MatchExpression* rewrittenFilter = nullptr) {
+    return impl::parseWriteQueryToCQ<T>(opCtx,
+                                        expCtx,
+                                        ExtensionsCallbackReal(opCtx, &request.getNsString()),
+                                        request,
+                                        rewrittenFilter);
 }
 }  // namespace mongo

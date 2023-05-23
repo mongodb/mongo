@@ -993,9 +993,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
         // CanonicalQuery whose ownership will be transferred to the plan executor in
         // getExecutorUpdate().
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(
-            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
+        ParsedUpdate parsedUpdate(opCtx, &request, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;
@@ -1068,9 +1066,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 
         // ParsedUpdate needs to be inside the write conflict retry loop because it contains
         // the UpdateDriver whose state may be modified while we are applying the update.
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(
-            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
+        ParsedUpdate parsedUpdate(opCtx, &request, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;
