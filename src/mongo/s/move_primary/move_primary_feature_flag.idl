@@ -38,5 +38,4 @@ feature_flags:
     featureFlagOnlineMovePrimaryLifecycle:
         description: When enabled, uses improved machinery for movePrimary operation.
         cpp_varname: gFeatureFlagOnlineMovePrimaryLifecycle
-        default: true
-        version: 7.0
+        default: false
