@@ -727,8 +727,7 @@ void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
 
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    ShardingWriteRouter shardingWriteRouter(
-        opCtx(), collection()->ns(), Grid::get(opCtx())->catalogCache());
+    ShardingWriteRouter shardingWriteRouter(opCtx(), collection()->ns());
     checkUpdateChangesExistingShardKey(newObj, oldObj);
     checkUpdateChangesReshardingKey(shardingWriteRouter, newObj, oldObj);
 }

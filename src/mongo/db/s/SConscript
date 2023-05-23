@@ -955,6 +955,7 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
         'sharding_runtime_d',
     ],

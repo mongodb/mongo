@@ -274,12 +274,14 @@ void ShardingMongodTestFixture::setUp() {
 void ShardingMongodTestFixture::tearDown() {
     ReplicaSetMonitor::cleanup();
 
-    if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
-        Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
-    }
+    if (Grid::get(operationContext())->isInitialized()) {
+        if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
+            Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
+        }
 
-    if (Grid::get(operationContext())->shardRegistry()) {
-        Grid::get(operationContext())->shardRegistry()->shutdown();
+        if (Grid::get(operationContext())->shardRegistry()) {
+            Grid::get(operationContext())->shardRegistry()->shutdown();
+        }
     }
 
     CollectionShardingStateFactory::clear(getServiceContext());

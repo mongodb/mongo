@@ -96,6 +96,11 @@ public:
     void setShardingInitialized();
 
     /**
+     * Returns true if init() has successfully completed.
+     */
+    bool isInitialized() const;
+
+    /**
      * If the instance as which this sharding component is running (config/shard/mongos) uses
      * additional connection pools other than the default, this function will be present and can be
      * used to obtain statistics about them. Otherwise, the value will be unset.
@@ -103,31 +108,41 @@ public:
     CustomConnectionPoolStatsFn getCustomConnectionPoolStatsFn() const;
     void setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn);
 
+    /**
+     * These getter methods are safe to run only when Grid::init has been called.
+     */
     ShardingCatalogClient* catalogClient() const {
+        dassert(_isGridInitialized.load());
         return _catalogClient.get();
     }
 
     CatalogCache* catalogCache() const {
+        dassert(_isGridInitialized.load());
         return _catalogCache.get();
     }
 
     ShardRegistry* shardRegistry() const {
+        dassert(_isGridInitialized.load());
         return _shardRegistry.get();
     }
 
     ClusterCursorManager* getCursorManager() const {
+        dassert(_isGridInitialized.load());
         return _cursorManager.get();
     }
 
     executor::TaskExecutorPool* getExecutorPool() const {
+        dassert(_isGridInitialized.load());
         return _executorPool.get();
     }
 
     executor::NetworkInterface* getNetwork() {
+        dassert(_isGridInitialized.load());
         return _network;
     }
 
     BalancerConfiguration* getBalancerConfiguration() const {
+        dassert(_isGridInitialized.load());
         return _balancerConfig.get();
     }
 
@@ -158,6 +173,7 @@ private:
     executor::NetworkInterface* _network{nullptr};
 
     AtomicWord<bool> _shardingInitialized{false};
+    AtomicWord<bool> _isGridInitialized{false};
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Grid::_mutex");
 

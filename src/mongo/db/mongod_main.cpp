@@ -1557,7 +1557,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2_OPTIONS(4784918, {LogComponent::kNetwork}, "Shutting down the ReplicaSetMonitor");
     ReplicaSetMonitor::shutdown();
 
-    if (auto sr = Grid::get(serviceContext)->shardRegistry()) {
+    auto sr = Grid::get(serviceContext)->isInitialized()
+        ? Grid::get(serviceContext)->shardRegistry()
+        : nullptr;
+    if (sr) {
         LOGV2_OPTIONS(4784919, {LogComponent::kSharding}, "Shutting down the shard registry");
         sr->shutdown();
     }
@@ -1574,7 +1577,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         validator->shutDown();
     }
 
-    if (auto pool = Grid::get(serviceContext)->getExecutorPool()) {
+    auto pool = Grid::get(serviceContext)->isInitialized()
+        ? Grid::get(serviceContext)->getExecutorPool()
+        : nullptr;
+    if (pool) {
         LOGV2_OPTIONS(6773200, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
         pool->shutdownAndJoin();
     }

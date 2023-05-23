@@ -43,11 +43,18 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/random.h"
+#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/catalog_cache_mock.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -133,39 +140,56 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
     return std::make_pair(chunks, cm);
 }
 
-std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx) {
-    const size_t nShards = 1;
-    const uint32_t nChunks = 60;
-    const auto clusterId = OID::gen();
-    const auto shards = std::vector<ShardId>{ShardId("shard0")};
-    const auto originatorShard = shards[0];
-
-    const auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
-
-    ShardingState::get(opCtx->getServiceContext())->setInitialized(originatorShard, clusterId);
-
-    CollectionShardingStateFactory::set(
-        opCtx->getServiceContext(),
-        std::make_unique<CollectionShardingStateFactoryShard>(opCtx->getServiceContext()));
-
-    OperationShardingState::setShardRole(
-        opCtx,
-        kNss,
-        ShardVersionFactory::make(
-            chunkManager,
-            originatorShard,
-            boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */);
-
-    // Configuring the filtering metadata such that calls to getCollectionDescription return what we
-    // want. Specifically the reshardingFields are what we use. Its specified by the chunkManager.
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, kNss)
-        ->setFilteringMetadata(opCtx, CollectionMetadata(chunkManager, originatorShard));
-
+void setupCatalogCacheMock(OperationContext* opCtx, bool withShardedCollection) {
     auto catalogCache = CatalogCacheMock::make();
-    catalogCache->setChunkManagerReturnValue(chunkManager);
 
-    return catalogCache;
+    if (withShardedCollection) {
+        const size_t nShards = 1;
+        const uint32_t nChunks = 60;
+        const auto clusterId = OID::gen();
+        const auto shards = std::vector<ShardId>{ShardId("shard0")};
+        const auto originatorShard = shards[0];
+
+        const auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
+
+        ShardingState::get(opCtx->getServiceContext())->setInitialized(originatorShard, clusterId);
+
+        CollectionShardingStateFactory::set(
+            opCtx->getServiceContext(),
+            std::make_unique<CollectionShardingStateFactoryShard>(opCtx->getServiceContext()));
+
+        OperationShardingState::setShardRole(
+            opCtx,
+            kNss,
+            ShardVersionFactory::make(
+                chunkManager,
+                originatorShard,
+                boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+            boost::none /* databaseVersion */);
+
+        // Configuring the filtering metadata such that calls to getCollectionDescription return
+        // what we want. Specifically the reshardingFields are what we use. Its specified by the
+        // chunkManager.
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, kNss)
+            ->setFilteringMetadata(opCtx, CollectionMetadata(chunkManager, originatorShard));
+
+        catalogCache->setChunkManagerReturnValue(chunkManager);
+    }
+
+    auto mockNetwork = std::make_unique<executor::NetworkInterfaceMock>();
+
+    auto const grid = Grid::get(opCtx);
+    grid->init(
+        std::make_unique<ShardingCatalogClientImpl>(nullptr),
+        std::move(catalogCache),
+        std::make_unique<ShardRegistry>(opCtx->getServiceContext(), nullptr, boost::none),
+        std::make_unique<ClusterCursorManager>(opCtx->getServiceContext()->getPreciseClockSource()),
+        std::make_unique<BalancerConfiguration>(),
+        std::make_unique<executor::TaskExecutorPool>(),
+        mockNetwork.get());
+
+    // Note: mockNetwork in Grid will become a dangling pointer after this function, this
+    // is fine since the test shouldn't be using it.
 }
 
 void BM_InsertGetDestinedRecipient(benchmark::State& state) {
@@ -177,9 +201,8 @@ void BM_InsertGetDestinedRecipient(benchmark::State& state) {
     serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
-    const auto catalogCache = createCatalogCacheMock(opCtx.get());
-
-    ShardingWriteRouter writeRouter(opCtx.get(), kNss, catalogCache.get());
+    setupCatalogCacheMock(opCtx.get(), true /* withShardedColl */);
+    ShardingWriteRouter writeRouter(opCtx.get(), kNss);
 
     for (auto keepRunning : state) {
         benchmark::ClobberMemory();
@@ -197,11 +220,11 @@ void BM_UpdateGetDestinedRecipient(benchmark::State& state) {
     serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
-    const auto catalogCache = createCatalogCacheMock(opCtx.get());
+    setupCatalogCacheMock(opCtx.get(), true /* withShardedColl */);
 
     for (auto keepRunning : state) {
         benchmark::ClobberMemory();
-        ShardingWriteRouter writeRouter(opCtx.get(), kNss, catalogCache.get());
+        ShardingWriteRouter writeRouter(opCtx.get(), kNss);
         auto shardId = writeRouter.getReshardingDestinedRecipient(BSON("_id" << 0));
         ASSERT(shardId != boost::none);
     }
@@ -219,11 +242,11 @@ void BM_UnshardedDestinedRecipient(benchmark::State& state) {
         opCtx->getServiceContext(),
         std::make_unique<CollectionShardingStateFactoryStandalone>(opCtx->getServiceContext()));
 
-    const auto catalogCache = CatalogCacheMock::make();
+    setupCatalogCacheMock(opCtx.get(), false /* withShardedColl */);
 
     for (auto keepRunning : state) {
         benchmark::ClobberMemory();
-        ShardingWriteRouter writeRouter(opCtx.get(), kNss, catalogCache.get());
+        ShardingWriteRouter writeRouter(opCtx.get(), kNss);
         auto shardId = writeRouter.getReshardingDestinedRecipient(BSON("_id" << 0));
         ASSERT(shardId == boost::none);
     }

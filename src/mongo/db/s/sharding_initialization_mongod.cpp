@@ -438,7 +438,6 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     const auto& configSvrConnStr = shardIdentity.getConfigsvrConnectionString();
 
     auto const shardingState = ShardingState::get(opCtx);
-    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     hangDuringShardingInitialization.pauseWhileSet();
 
@@ -454,6 +453,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
 
         // If run on a config server, we may not know our connection string yet.
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
             auto prevConfigsvrConnStr = shardRegistry->getConfigServerConnectionString();
             uassert(
                 40373,

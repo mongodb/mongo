@@ -3464,8 +3464,7 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
         invariant(wouldChangeOwningShardInfo->getUuid());
         operation.setNss(*wouldChangeOwningShardInfo->getNs());
         operation.setUuid(*wouldChangeOwningShardInfo->getUuid());
-        ShardingWriteRouter shardingWriteRouter(
-            opCtx, *wouldChangeOwningShardInfo->getNs(), Grid::get(opCtx)->catalogCache());
+        ShardingWriteRouter shardingWriteRouter(opCtx, *wouldChangeOwningShardInfo->getNs());
         operation.setDestinedRecipient(shardingWriteRouter.getReshardingDestinedRecipient(
             wouldChangeOwningShardInfo->getPreImage()));
 

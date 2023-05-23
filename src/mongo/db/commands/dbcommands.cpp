@@ -555,13 +555,14 @@ public:
             !cmd->getNamespace().isTimeseriesBucketsCollection());
 
         // Updating granularity on sharded time-series collections is not allowed.
-        if (Grid::get(opCtx)->catalogClient() && cmd->getTimeseries() &&
-            cmd->getTimeseries()->getGranularity()) {
+        auto catalogClient =
+            Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogClient() : nullptr;
+        if (catalogClient && cmd->getTimeseries() && cmd->getTimeseries()->getGranularity()) {
             auto& nss = cmd->getNamespace();
             auto bucketNss =
                 nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
             try {
-                auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, bucketNss);
+                auto coll = catalogClient->getCollection(opCtx, bucketNss);
                 uassert(ErrorCodes::NotImplemented,
                         str::stream()
                             << "Cannot update granularity of a sharded time-series collection.",

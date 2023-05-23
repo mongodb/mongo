@@ -713,7 +713,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     std::vector<repl::OpTime> opTimeList;
     repl::OpTime lastOpTime;
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
+    ShardingWriteRouter shardingWriteRouter(opCtx, nss);
 
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
@@ -878,8 +878,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
-    ShardingWriteRouter shardingWriteRouter(
-        opCtx, args.coll->ns(), Grid::get(opCtx)->catalogCache());
+    ShardingWriteRouter shardingWriteRouter(opCtx, args.coll->ns());
 
     OpTimeBundle opTime;
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
@@ -1042,7 +1041,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    OpStateAccumulator* opAccumulator) {
     repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, coll, doc));
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns(), Grid::get(opCtx)->catalogCache());
+    ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns());
 
     repl::DurableReplOperation op;
     op.setDestinedRecipient(shardingWriteRouter.getReshardingDestinedRecipient(doc));
@@ -1172,7 +1171,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!args.fromMigrate) {
-            ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
+            ShardingWriteRouter shardingWriteRouter(opCtx, nss);
             shardObserveDeleteOp(opCtx,
                                  nss,
                                  documentKey.getShardKeyAndId(),

@@ -97,13 +97,15 @@ public:
         // Sharding connections, if we have any
         {
             auto const grid = Grid::get(opCtx);
-            if (grid->getExecutorPool()) {
-                grid->getExecutorPool()->appendConnectionStats(&stats);
-            }
+            if (grid->isInitialized()) {
+                if (grid->getExecutorPool()) {
+                    grid->getExecutorPool()->appendConnectionStats(&stats);
+                }
 
-            auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
-            if (customConnPoolStatsFn) {
-                customConnPoolStatsFn(&stats);
+                auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
+                if (customConnPoolStatsFn) {
+                    customConnPoolStatsFn(&stats);
+                }
             }
         }
 
