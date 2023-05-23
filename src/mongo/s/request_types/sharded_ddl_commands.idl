@@ -236,6 +236,10 @@ structs:
                 type: array<ShardKeyRange>
                 description: "The key ranges for the new shard key. This should be continuous and complete."
                 optional: true
+            forceRedistribution:
+                type: bool
+                description: "Whether initiate reshardCollection if the shardKey doesn't change."
+                optional: true
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"

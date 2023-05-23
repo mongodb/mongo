@@ -28,7 +28,9 @@ const testShardDistribution = (mongos) => {
         return;
     }
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    /**
+     * Failure cases.
+     */
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
     jsTest.log("reshardCollection cmd should fail when shardDistribution has duplicate shardId.");
@@ -111,7 +113,11 @@ const testShardDistribution = (mongos) => {
         ]
     }),
                                  ErrorCodes.ShardNotFound);
+    mongos.getDB(kDbName)[collName].drop();
 
+    /**
+     * Success cases go below.
+     */
     jsTest.log("reshardCollection cmd should succeed with shardDistribution parameter.");
     reshardCmdTest.assertReshardCollOk({
         reshardCollection: ns,
@@ -136,6 +142,27 @@ const testShardDistribution = (mongos) => {
         ]);
 };
 
+const testForceRedistribution = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
+    jsTest.log(
+        "When forceRedistribution is not set to true, same-key resharding should have no effect");
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2}, 1);
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2, forceRedistribution: false},
+        1);
+
+    jsTest.log("When forceRedistribution is true, same-key resharding should take effect");
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2, forceRedistribution: true},
+        2);
+};
+
 testShardDistribution(mongos);
+testForceRedistribution(mongos);
 st.stop();
 })();

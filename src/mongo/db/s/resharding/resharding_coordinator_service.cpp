@@ -1647,6 +1647,12 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
         .onCompletion([this, self = shared_from_this(), executor](
                           StatusWith<bool> shardKeyMatchesSW) -> ExecutorFuture<void> {
             if (shardKeyMatchesSW.isOK() && shardKeyMatchesSW.getValue()) {
+                // If forceRedistribution is true, still do resharding.
+                if (_coordinatorDoc.getForceRedistribution() &&
+                    *_coordinatorDoc.getForceRedistribution()) {
+                    return _runReshardingOp(executor);
+                }
+
                 this->_coordinatorService->releaseInstance(this->_id,
                                                            shardKeyMatchesSW.getStatus());
                 _coordinatorDocWrittenPromise.emplaceValue();
@@ -1661,6 +1667,9 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
                 _reshardingCoordinatorObserver->interrupt(shardKeyMatchesSW.getStatus());
                 return ExecutorFuture<void>(**executor, shardKeyMatchesSW.getStatus());
             }
+            // If this is not forced same-key resharding, set forceRedistribution to false so we can
+            // identify forced same-key resharding by this field later.
+            _coordinatorDoc.setForceRedistribution(false);
             return _runReshardingOp(executor);
         })
         .semi();
