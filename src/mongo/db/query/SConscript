@@ -135,6 +135,39 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='index_hint',
+    source=[
+        'index_hint.idl',
+        'index_hint.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
+    target='query_shape_hash',
+    source=[
+        'query_shape_hash.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/crypto/sha256_block',
+    ],
+)
+
+env.Library(
+    target='query_settings',
+    source=[
+        'query_settings.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
+        'index_hint',
+        'query_shape_hash',
+    ],
+)
+
 # Shared mongod/mongos query code.
 env.Library(
     target="query_common",
@@ -435,6 +468,7 @@ env.CppUnitTest(
         "index_bounds_builder_type_test.cpp",
         "index_bounds_test.cpp",
         "index_entry_test.cpp",
+        "index_hint_test.cpp",
         "interval_evaluation_tree_test.cpp",
         "interval_test.cpp",
         "killcursors_request_test.cpp",
@@ -506,6 +540,7 @@ env.CppUnitTest(
         "collation/collator_interface_mock",
         "common_query_enums_and_helpers",
         "hint_parser",
+        "index_hint",
         "map_reduce_output_format",
         "query_common",
         "query_planner",
