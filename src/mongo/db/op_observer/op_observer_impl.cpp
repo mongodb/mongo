@@ -425,7 +425,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
 
     auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
 
-    if (opCtx->writesAreReplicated()) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         if (opTime.isNull()) {
             LOGV2(7360100,
                   "Added oplog entry for createIndexes to transaction",
@@ -1233,7 +1233,7 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         oplogEntry.setOpTime(createOpTime);
     }
     auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
-    if (opCtx->writesAreReplicated()) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
         if (opTime.isNull()) {
             LOGV2(7360102,
                   "Added oplog entry for create to transaction",
