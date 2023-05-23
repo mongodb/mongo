@@ -297,7 +297,8 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
 
 void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                                                    const CollectionPtr& coll,
-                                                   BSONObj const& doc) {
+                                                   BSONObj const& doc,
+                                                   OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(doc);

@@ -79,7 +79,8 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx,
 
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
                                    const CollectionPtr& coll,
-                                   BSONObj const& doc) {
+                                   BSONObj const& doc,
+                                   OpStateAccumulator* opAccumulator) {
     audit::logRemoveOperation(opCtx->getClient(), coll->ns(), doc);
 
     // Extract the _id field from the document. If it does not have an _id, use the

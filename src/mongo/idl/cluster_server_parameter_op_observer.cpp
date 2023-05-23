@@ -90,7 +90,8 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
                                                      const CollectionPtr& coll,
-                                                     const BSONObj& doc) {
+                                                     const BSONObj& doc,
+                                                     OpStateAccumulator* opAccumulator) {
     std::string docBeingDeleted;
 
     if (isConfigNamespace(coll->ns())) {

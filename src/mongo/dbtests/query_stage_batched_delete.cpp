@@ -66,7 +66,8 @@ class ClockAdvancingOpObserver : public OpObserverNoop {
 public:
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) override {
+                       const BSONObj& doc,
+                       OpStateAccumulator* opAccumulator = nullptr) override {
 
         if (docDurationMap.find(doc) != docDurationMap.end()) {
             tickSource->advance(docDurationMap.find(doc)->second);

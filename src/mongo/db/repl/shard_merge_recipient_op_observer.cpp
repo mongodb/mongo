@@ -414,7 +414,8 @@ void ShardMergeRecipientOpObserver::onUpdate(OperationContext* opCtx,
 
 void ShardMergeRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
                                                   const CollectionPtr& coll,
-                                                  BSONObj const& doc) {
+                                                  BSONObj const& doc,
+                                                  OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;

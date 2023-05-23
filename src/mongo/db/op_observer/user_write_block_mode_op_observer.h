@@ -159,7 +159,8 @@ public:
     // Note aboutToDelete is unchecked, but defined.
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) final;
+                       const BSONObj& doc,
+                       OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 

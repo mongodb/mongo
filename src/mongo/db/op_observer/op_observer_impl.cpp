@@ -1038,7 +1038,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    const CollectionPtr& coll,
-                                   BSONObj const& doc) {
+                                   BSONObj const& doc,
+                                   OpStateAccumulator* opAccumulator) {
     repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, coll, doc));
 
     ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns(), Grid::get(opCtx)->catalogCache());
