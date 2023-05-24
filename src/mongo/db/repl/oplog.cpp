@@ -948,6 +948,22 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // complete.
           const bool allowRenameOutOfTheWay = (mode != repl::OplogApplication::Mode::kSecondary);
 
+          // Check whether there is an open but empty database where the name conflicts with the new
+          // collection's database name. It is possible for a secondary's in-memory database state
+          // to diverge from the primary's, if the primary rolls back the dropDatabase oplog entry
+          // after closing its own in-memory database state. In this case, the primary may accept
+          // creating a new database with a conflicting name to what the secondary still has open.
+          // It is okay to simply close the empty database on the secondary in this case.
+          auto duplicates = DatabaseHolder::get(opCtx)->getNamesWithConflictingCasing(nss.dbName());
+          if (duplicates.size() == 1) {
+              auto dupDatabaseIt = duplicates.begin();
+              if (CollectionCatalog::get(opCtx)
+                      ->getAllCollectionUUIDsFromDb(*dupDatabaseIt)
+                      .size() == 0) {
+                  fassert(7727801, dropDatabaseForApplyOps(opCtx, *dupDatabaseIt).isOK());
+              }
+          }
+
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
