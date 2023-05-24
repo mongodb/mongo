@@ -19,6 +19,7 @@
 //   cqf_incompatible,
 //   # Uses mapReduce command.
 //   requires_scripting,
+//   references_foreign_collection,
 // ]
 
 (function() {

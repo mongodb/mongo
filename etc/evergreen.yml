@@ -751,7 +751,8 @@ buildvariants:
   - name: .sharding .txns
   - name: sharding_auth_audit_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: unittest_shell_hang_analyzer_gen
 
 - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
@@ -1321,7 +1322,8 @@ buildvariants:
   - name: .shard_split
   - name: .shard_merge
   - name: streams
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
@@ -1942,7 +1944,8 @@ buildvariants:
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .updatefuzzer
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
 
 ###########################################
 #     Experimental buildvariants          #
@@ -2150,7 +2153,8 @@ buildvariants:
   - name: .serverless
   - name: .shard_split
   - name: .shard_merge
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: .updatefuzzer
   - name: .watchdog
 

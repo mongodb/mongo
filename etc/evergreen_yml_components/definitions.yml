@@ -5825,7 +5825,14 @@ tasks:
       use_large_distro: "true"
 
 - <<: *task_template
-  name: telemetry_passthrough
+  name: query_stats_passthrough
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: query_stats_passthrough_writeonly
   tags: []
   commands:
   - func: "do setup"

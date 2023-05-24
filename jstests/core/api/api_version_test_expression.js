@@ -8,6 +8,7 @@
  *   assumes_unsharded_collection,
  *   uses_api_parameters,
  *   no_selinux,
+ *   references_foreign_collection,
  * ]
  */
 

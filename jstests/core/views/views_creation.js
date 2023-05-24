@@ -5,6 +5,7 @@
  *   assumes_superuser_permissions,
  *   # TODO SERVER-73967: Remove this tag.
  *   does_not_support_stepdowns,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

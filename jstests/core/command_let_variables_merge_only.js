@@ -6,6 +6,7 @@
  *   does_not_support_stepdowns,
  *   does_not_support_causal_consistency,
  *   uses_$out,
+ *   references_foreign_collection,
  * ]
  */
 (function() {
