@@ -640,4 +640,36 @@ assert.eq(res.cursor.firstBatch[0].errmsg,
 assert(!res.cursor.firstBatch[1]);
 
 coll.drop();
+
+var maxWriteBatchSize = db.hello().maxWriteBatchSize;
+var insertOp = {insert: 0, document: {_id: 1, skey: "MongoDB"}};
+
+// Make sure bulkWrite at maxWriteBatchSize is okay
+let ops = [];
+for (var i = 0; i < maxWriteBatchSize; ++i) {
+    ops.push(insertOp);
+}
+
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: ops,
+    nsInfo: [{ns: "test.coll"}],
+});
+
+assert.commandWorked(res);
+coll.drop();
+
+// Make sure bulkWrite above maxWriteBatchSize fails
+ops = [];
+for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
+    ops.push(insertOp);
+}
+
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: ops,
+    nsInfo: [{ns: "test.coll"}],
+});
+
+assert.commandFailedWithCode(res, [ErrorCodes.InvalidLength]);
 })();

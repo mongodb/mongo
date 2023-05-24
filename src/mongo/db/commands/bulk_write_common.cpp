@@ -30,6 +30,7 @@
 #include "mongo/db/commands/bulk_write_common.h"
 
 #include "mongo/db/commands/bulk_write_crud_op.h"
+#include "mongo/db/ops/write_ops.h"
 
 namespace mongo {
 namespace bulk_write_common {
@@ -37,6 +38,12 @@ namespace bulk_write_common {
 void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) {
     const auto& ops = req.getOps();
     const auto& nsInfos = req.getNsInfo();
+
+    uassert(ErrorCodes::InvalidLength,
+            str::stream() << "Write batch sizes must be between 1 and "
+                          << write_ops::kMaxWriteBatchSize << ". Got " << ops.size()
+                          << " operations.",
+            ops.size() != 0 && ops.size() <= write_ops::kMaxWriteBatchSize);
 
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "May not specify both stmtId and stmtIds in bulkWrite command. Got "
