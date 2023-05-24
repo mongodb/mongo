@@ -508,6 +508,9 @@ config_rename(WT_SESSION *session, char **urip, const char *name)
         util_free(buf);
         return (util_err(session, ret, NULL));
     }
+
+    /* Replace the uri. */
+    util_free(*urip);
     *urip = buf;
 
     return (0);
