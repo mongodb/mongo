@@ -120,6 +120,47 @@ void appendSysInfo(BSONObjBuilder* obj) {
 #endif
 }
 
+StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& params) {
+    repl::ReplSettings replSettings;
+
+    if (params.count("replication.serverless")) {
+        if (params.count("replication.replSet") || params.count("replication.replSetName")) {
+            return Status(ErrorCodes::BadValue,
+                          "serverless cannot be used with replSet or replSetName options");
+        }
+        // Starting a node in "serverless" mode implies it uses a replSet.
+        replSettings.setServerlessMode();
+    } else if (params.count("replication.replSet")) {
+        /* seed list of hosts for the repl set */
+        replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
+    } else if (params.count("replication.replSetName")) {
+        // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
+        // set by the user. Therefore, we only need to check for it if "replSet" in not found.
+        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
+    }
+
+    if (params.count("replication.oplogSizeMB")) {
+        long long x = params["replication.oplogSizeMB"].as<int>();
+        if (x <= 0) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "bad --oplogSize, arg must be greater than 0,"
+                                           "found: "
+                                        << x);
+        }
+        // note a small size such as x==1 is ok for an arbiter.
+        if (x > 1000 && sizeof(void*) == 4) {
+            StringBuilder sb;
+            sb << "--oplogSize of " << x
+               << "MB is too big for 32 bit version. Use 64 bit build instead.";
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+        replSettings.setOplogSizeBytes(x * 1024 * 1024);
+        invariant(replSettings.getOplogSizeBytes() > 0);
+    }
+
+    return replSettings;
+}
+
 }  // namespace
 
 bool handlePreValidationMongodOptions(const moe::Environment& params,
@@ -492,25 +533,22 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.magicRestore = 1;
     }
 
-    repl::ReplSettings replSettings;
-    if (params.count("replication.serverless")) {
-        if (params.count("replication.replSet") || params.count("replication.replSetName")) {
+    const auto replSettingsWithStatus = populateReplSettings(params);
+    if (!replSettingsWithStatus.isOK())
+        return replSettingsWithStatus.getStatus();
+    const repl::ReplSettings& replSettings(replSettingsWithStatus.getValue());
+
+    if (replSettings.usingReplSets()) {
+        if ((params.count("security.authorization") &&
+             params["security.authorization"].as<std::string>() == "enabled") &&
+            !serverGlobalParams.startupClusterAuthMode.x509Only() &&
+            serverGlobalParams.keyFile.empty()) {
             return Status(ErrorCodes::BadValue,
-                          "serverless cannot be used with replSet or replSetName options");
+                          str::stream() << "security.keyFile is required when authorization is "
+                                           "enabled with replica sets");
         }
-        // Starting a node in "serverless" mode implies it uses a replSet.
-        replSettings.setServerlessMode();
-    }
-    if (params.count("replication.replSet")) {
-        /* seed list of hosts for the repl set */
-        replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
-    } else if (params.count("replication.replSetName")) {
-        // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
-        // set by the user. Therefore, we only need to check for it if "replSet" in not found.
-        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
     } else {
-        // If neither "replication.replSet" nor "replication.replSetName" is set, then we are in
-        // standalone mode.
+        // If we are not using a replica set, then we are in standalone mode.
         //
         // A standalone node does not use the oplog collection, so special truncation handling for
         // the capped collection is unnecessary.
@@ -524,17 +562,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         // WT. Non-WT storage engines will continue to perform regular capped collection handling
         // for the oplog collection, regardless of this parameter setting.
         storageGlobalParams.allowOplogTruncation = false;
-    }
-
-    if (replSettings.usingReplSets() &&
-        (params.count("security.authorization") &&
-         params["security.authorization"].as<std::string>() == "enabled") &&
-        !serverGlobalParams.startupClusterAuthMode.x509Only() &&
-        serverGlobalParams.keyFile.empty()) {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream()
-                << "security.keyFile is required when authorization is enabled with replica sets");
     }
 
     serverGlobalParams.enableMajorityReadConcern = true;
@@ -555,25 +582,6 @@ Status storeMongodOptions(const moe::Environment& params) {
                           "enableMajorityReadConcern=false: disabling lock-free reads.");
             storageGlobalParams.disableLockFreeReads = true;
         }
-    }
-
-    if (params.count("replication.oplogSizeMB")) {
-        long long x = params["replication.oplogSizeMB"].as<int>();
-        if (x <= 0) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "bad --oplogSize, arg must be greater than 0,"
-                                           "found: "
-                                        << x);
-        }
-        // note a small size such as x==1 is ok for an arbiter.
-        if (x > 1000 && sizeof(void*) == 4) {
-            StringBuilder sb;
-            sb << "--oplogSize of " << x
-               << "MB is too big for 32 bit version. Use 64 bit build instead.";
-            return Status(ErrorCodes::BadValue, sb.str());
-        }
-        replSettings.setOplogSizeBytes(x * 1024 * 1024);
-        invariant(replSettings.getOplogSizeBytes() > 0);
     }
 
     if (params.count("storage.oplogMinRetentionHours")) {
@@ -614,12 +622,10 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
-        const bool replicationEnabled = params.count("replication.replSet") ||
-            params.count("replication.replSetName") || params.count("replication.serverless");
         // Force to set up the node as a replica set, unless we're a shard and we're using queryable
         // backup mode.
         if ((clusterRoleParam == "configsvr" || !params.count("storage.queryableBackupMode")) &&
-            !replicationEnabled) {
+            !replSettings.usingReplSets()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Cannot start a " << clusterRoleParam
                                         << " as a standalone server. Please use the option "
