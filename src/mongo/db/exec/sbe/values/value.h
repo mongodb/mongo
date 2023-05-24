@@ -316,6 +316,7 @@ std::ostream& operator<<(std::ostream& os, TypeTags tag);
 str::stream& operator<<(str::stream& str, TypeTags tag);
 std::ostream& operator<<(std::ostream& os, const std::pair<TypeTags, Value>& value);
 str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& value);
+std::string print(const std::pair<TypeTags, Value>& value);
 
 /**
  * Three ways value comparison (aka spaceship operator).

@@ -284,9 +284,18 @@ class ConstantPrinter(object):
         """Display hint."""
         return None
 
+    @staticmethod
+    def print_sbe_value(tag, value):
+        value_print_fn = "sbe::value::print"
+        (print_fn_symbol, _) = gdb.lookup_symbol(value_print_fn)
+        if print_fn_symbol is None:
+            raise gdb.GdbError("Could not find pretty print function: " + value_print_fn)
+        print_fn = print_fn_symbol.value()
+        return print_fn(tag, value)
+
     def to_string(self):
-        return "Constant[tag={},val={}]".format(
-            str(self.val["_tag"]).split("::")[-1], self.val["_val"])
+        return "Constant[{}]".format(
+            ConstantPrinter.print_sbe_value(self.val["_tag"], self.val["_val"]))
 
 
 class VariablePrinter(object):

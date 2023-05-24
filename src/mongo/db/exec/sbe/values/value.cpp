@@ -415,6 +415,11 @@ str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& valu
     ValuePrinters::make(str, PrintOptions()).writeValueToStream(value.first, value.second);
     return str;
 }
+std::string print(const std::pair<TypeTags, Value>& value) {
+    auto stream = str::stream();
+    stream << value;
+    return stream;
+}
 
 BSONType tagToType(TypeTags tag) noexcept {
     switch (tag) {
