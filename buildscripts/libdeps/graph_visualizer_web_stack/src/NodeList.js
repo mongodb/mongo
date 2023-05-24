@@ -17,6 +17,8 @@ import { setLoading } from "./redux/loading";
 import { setListSearchTerm } from "./redux/listSearchTerm";
 import { Button, Autocomplete, Grid } from "@material-ui/core";
 
+const {REACT_APP_API_URL} = process.env;
+
 const columns = [
   { dataKey: "check", label: "Selected", width: 70 },
   { dataKey: "name", label: "Name", width: 200 },
@@ -29,7 +31,7 @@ const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, s
   React.useEffect(() => {
     let gitHash = selectedGraph;
     if (gitHash) {
-      fetch('/api/graphs/' + gitHash + '/nodes')
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/nodes')
         .then(response => response.json())
         .then(data => {
           setNodes(data.nodes.map((node, index) => {
@@ -55,7 +57,7 @@ const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, s
           "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node),
           "transitive_edges": showTransitive
       };
-      fetch('/api/graphs/' + gitHash + '/d3', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/d3', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -68,7 +70,7 @@ const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, s
           setLinks(data.graphData.links);
           setLinksTrans(data.graphData.links_trans);
         });
-      fetch('/api/graphs/' + gitHash + '/nodes/details', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/nodes/details', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -14,6 +14,8 @@ import { getGraphData } from "./redux/store";
 import { setLinks } from "./redux/links";
 import { setLinksTrans } from "./redux/linksTrans";
 
+const {REACT_APP_API_URL} = process.env;
+
 const OverflowTip = (props) => {
   const textElementRef = useRef(null);
   const [hoverStatus, setHover] = useState(false);
@@ -33,7 +35,7 @@ const OverflowTip = (props) => {
           "selected_nodes": props.nodes.filter(node => node.selected == true).map(node => node.node),
           "transitive_edges": props.showTransitive
       };
-      fetch('/api/graphs/' + gitHash + '/d3', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/d3', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -46,7 +48,7 @@ const OverflowTip = (props) => {
           props.setLinks(data.graphData.links);
           props.setLinksTrans(data.graphData.links_trans);
         });
-      fetch('/api/graphs/' + gitHash + '/nodes/details', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/nodes/details', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -22,6 +22,8 @@ import { setLinksTrans } from "./redux/linksTrans";
 
 import OverflowTooltip from "./OverflowTooltip";
 
+const {REACT_APP_API_URL} = process.env;
+
 const rowHeight = 25;
 
 const Accordion = withStyles({
@@ -131,7 +133,7 @@ const GraphPaths = ({
         "fromNode": fromNode,
         "toNode": toNode
       };
-      fetch('/api/graphs/' + gitHash + '/paths', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/paths', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -146,7 +148,7 @@ const GraphPaths = ({
             "extra_nodes": data.extraNodes,
             "transitive_edges": showTransitive
           };
-          fetch('/api/graphs/' + gitHash + '/d3', {
+          fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/d3', {
               method: 'POST',
               headers: {
               'Content-Type': 'application/json'

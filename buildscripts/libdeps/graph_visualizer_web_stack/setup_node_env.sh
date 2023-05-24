@@ -19,7 +19,7 @@ else
     \. "$NVM_DIR/nvm.sh"
 fi
 
-nvm install 12
+nvm install 14
 
 if [ "$1" = "install" ]
 then
