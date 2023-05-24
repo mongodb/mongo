@@ -54,6 +54,6 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
     if ((ret = session->rename(session, uri, newuri, NULL)) != 0)
         (void)util_err(session, ret, "session.rename: %s, %s", uri, newuri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

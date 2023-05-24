@@ -53,6 +53,6 @@ util_compact(WT_SESSION *session, int argc, char *argv[])
     if ((ret = session->compact(session, uri, NULL)) != 0)
         (void)util_err(session, ret, "session.compact: %s", uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

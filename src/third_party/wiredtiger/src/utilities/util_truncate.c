@@ -54,6 +54,6 @@ util_truncate(WT_SESSION *session, int argc, char *argv[])
     if ((ret = session->truncate(session, uri, NULL, NULL, NULL)) != 0)
         (void)util_err(session, ret, "session.truncate: %s", uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

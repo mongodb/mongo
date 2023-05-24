@@ -67,6 +67,6 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
             printf("\n");
     }
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

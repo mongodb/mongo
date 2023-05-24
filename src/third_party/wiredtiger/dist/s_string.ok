@@ -1103,6 +1103,7 @@ readlock
 readonly
 readunlock
 realloc
+reallocations
 recency
 recno
 recnos

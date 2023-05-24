@@ -176,8 +176,8 @@ err:
         ret = util_flush(session, uri);
 
     for (tlist = list; *tlist != NULL; ++tlist)
-        free(*tlist);
-    free(list);
+        util_free(*tlist);
+    util_free(list);
 
     return (ret == 0 ? 0 : 1);
 }
@@ -205,8 +205,8 @@ int
 config_list_add(WT_SESSION *session, CONFIG_LIST *clp, char *val)
 {
     if (clp->entry + 1 >= clp->max_entry)
-        if ((clp->list = realloc(clp->list, (size_t)(clp->max_entry += 100) * sizeof(char *))) ==
-          NULL)
+        if ((clp->list =
+                util_realloc(clp->list, (size_t)(clp->max_entry += 100) * sizeof(char *))) == NULL)
             /* List already freed by realloc. */
             return (util_err(session, errno, NULL));
 
@@ -226,8 +226,8 @@ config_list_free(CONFIG_LIST *clp)
 
     if (clp->list != NULL)
         for (entry = &clp->list[0]; *entry != NULL; entry++)
-            free(*entry);
-    free(clp->list);
+            util_free(*entry);
+    util_free(clp->list);
     clp->list = NULL;
     clp->entry = 0;
     clp->max_entry = 0;
@@ -291,7 +291,7 @@ config_read(WT_SESSION *session, char ***listp, bool *hexp)
          * termination.
          */
         if (entry + 1 >= max_entry) {
-            if ((tlist = realloc(list, (size_t)(max_entry += 100) * sizeof(char *))) == NULL) {
+            if ((tlist = util_realloc(list, (size_t)(max_entry += 100) * sizeof(char *))) == NULL) {
                 ret = util_err(session, errno, NULL);
 
                 /*
@@ -302,7 +302,7 @@ config_read(WT_SESSION *session, char ***listp, bool *hexp)
             }
             list = tlist;
         }
-        if ((list[entry] = strdup(l.mem)) == NULL) {
+        if ((list[entry] = util_strdup(l.mem)) == NULL) {
             ret = util_err(session, errno, NULL);
             goto err;
         }
@@ -316,16 +316,16 @@ config_read(WT_SESSION *session, char ***listp, bool *hexp)
     }
     *listp = list;
 
-    free(l.mem);
+    util_free(l.mem);
     return (0);
 
 err:
     if (list != NULL) {
         for (tlist = list; *tlist != NULL; ++tlist)
-            free(*tlist);
-        free(list);
+            util_free(*tlist);
+        util_free(list);
     }
-    free(l.mem);
+    util_free(l.mem);
     return (ret);
 }
 
@@ -447,7 +447,7 @@ config_update(WT_SESSION *session, char **list)
      */
     for (cnt = 0, configp = cmdconfig; cmdconfig != NULL && *configp != NULL; configp += 2)
         ++cnt;
-    if ((cfg = calloc(cnt + 10, sizeof(cfg[0]))) == NULL)
+    if ((cfg = util_calloc(cnt + 10, sizeof(cfg[0]))) == NULL)
         return (util_err(session, errno, NULL));
 
     /*
@@ -472,10 +472,10 @@ config_update(WT_SESSION *session, char **list)
                &p)) != 0)
             break;
 
-        free(listp[1]);
+        util_free(listp[1]);
         listp[1] = (char *)p;
     }
-    free(cfg);
+    util_free(cfg);
     return (ret);
 }
 
@@ -492,20 +492,20 @@ config_rename(WT_SESSION *session, char **urip, const char *name)
 
     /* Allocate room. */
     len = strlen(*urip) + strlen(name) + 10;
-    if ((buf = malloc(len)) == NULL)
+    if ((buf = util_malloc(len)) == NULL)
         return (util_err(session, errno, NULL));
 
     /*
      * Find the separating colon characters, but note the trailing one may not be there.
      */
     if ((p = strchr(*urip, ':')) == NULL) {
-        free(buf);
+        util_free(buf);
         return (format(session));
     }
     *p = '\0';
     p = strchr(p + 1, ':');
     if ((ret = __wt_snprintf(buf, len, "%s:%s%s", *urip, name, p == NULL ? "" : p)) != 0) {
-        free(buf);
+        util_free(buf);
         return (util_err(session, ret, NULL));
     }
     *urip = buf;
@@ -575,8 +575,8 @@ insert(WT_CURSOR *cursor, const char *name)
         printf("\r\t%s: %" PRIu64 "\n", name, insert_count);
 
 err:
-    free(key.mem);
-    free(value.mem);
+    util_free(key.mem);
+    util_free(value.mem);
 
     return (ret);
 }

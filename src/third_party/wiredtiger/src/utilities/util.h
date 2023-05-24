@@ -55,3 +55,8 @@ char *util_uri(WT_SESSION *, const char *, const char *);
 void util_usage(const char *, const char *, const char *[]);
 int util_verify(WT_SESSION *, int, char *[]);
 int util_write(WT_SESSION *, int, char *[]);
+void *util_malloc(size_t);
+void *util_realloc(void *, size_t);
+void *util_calloc(size_t, size_t);
+void util_free(void *);
+char *util_strdup(const char *);

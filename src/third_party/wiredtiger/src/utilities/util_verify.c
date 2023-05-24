@@ -119,7 +119,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
           strlen("dump_pages,") + strlen("dump_offsets[],") +
           (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + strlen("history_store") +
           +strlen("read_corrupt,") + strlen("stable_timestamp,") + 20;
-        if ((config = malloc(size)) == NULL) {
+        if ((config = util_malloc(size)) == NULL) {
             ret = util_err(session, errno, NULL);
             goto err;
         }
@@ -177,7 +177,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     }
 
 err:
-    free(config);
-    free(uri);
+    util_free(config);
+    util_free(uri);
     return (ret);
 }
