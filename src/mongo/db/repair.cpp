@@ -148,7 +148,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
 
     LOGV2(21029, "repairDatabase", logAttrs(dbName));
 
-
     opCtx->checkForInterrupt();
 
     // Close the db and invalidate all current users and caches.
@@ -168,13 +167,11 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
     }
 
     try {
-        // Ensure that we don't trigger an exception when attempting to take locks.
-        // TODO (SERVER-71610): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-
         // Restore oplog Collection pointer cache.
         repl::acquireOplogCollectionForLogging(opCtx);
     } catch (...) {
+        // The only expected exception is an interrupt.
+        opCtx->checkForInterrupt();
         LOGV2_FATAL_CONTINUE(
             21031,
             "Unexpected exception encountered while reacquiring oplog collection after repair.");

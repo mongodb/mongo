@@ -1114,7 +1114,8 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                           const CollectionPtr& collection,
                                           bool isResumable) {
     invariant(!_buildIsCleanedUp);
-    // TODO (SERVER-71610): Fix to be interruptible or document exception.
+    // Aborting without cleanup is done during shutdown. At this point the operation context is
+    // killed, but acquiring locks must succeed.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
     // underneath us.

@@ -206,7 +206,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // yielded.
                 ScopeGuard dropPendingGuardWhileUnlocked(
                     [dbName, opCtx, &dropPendingGuard, tenantLockMode] {
-                        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+                        // This scope guard must succeed in acquiring locks and reverting the drop
+                        // pending state even when the failure is due to an interruption.
                         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                         AutoGetDb autoDB(
                             opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
@@ -380,7 +381,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // any errors while we await the replication of any collection drops and then reacquire the
     // locks (which can throw) needed to finish the drop database.
     ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
-        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+        // This scope guard must succeed in acquiring locks and reverting the drop pending state
+        // even when the failure is due to an interruption.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
         AutoGetDb autoDB(opCtx, dbName, MODE_IX);

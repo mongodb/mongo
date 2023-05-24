@@ -166,22 +166,23 @@ void shutdown(ServiceContext* srvContext) {
         // We should always be able to acquire the global lock at shutdown.
         // Close all open databases, shutdown storage engine and run all deinitializers.
         auto shutdownOpCtx = serviceContext->makeOperationContext(client);
-        {
-            // TODO (SERVER-71610): Fix to be interruptible or document exception.
-            UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());  // NOLINT.
-            Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
-            auto databaseHolder = DatabaseHolder::get(shutdownOpCtx.get());
-            databaseHolder->closeAll(shutdownOpCtx.get());
+        // Service context is in shutdown mode, even new operation contexts are considered killed.
+        // Marking the opCtx as executing shutdown prevents this, and makes the opCtx ignore all
+        // interrupts.
+        shutdownOpCtx->setIsExecutingShutdown();
 
-            LogicalSessionCache::set(serviceContext, nullptr);
+        Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
+        auto databaseHolder = DatabaseHolder::get(shutdownOpCtx.get());
+        databaseHolder->closeAll(shutdownOpCtx.get());
 
-            repl::ReplicationCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
-            IndexBuildsCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
+        LogicalSessionCache::set(serviceContext, nullptr);
 
-            // Global storage engine may not be started in all cases before we exit
-            if (serviceContext->getStorageEngine()) {
-                shutdownGlobalStorageEngineCleanly(serviceContext);
-            }
+        repl::ReplicationCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
+        IndexBuildsCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
+
+        // Global storage engine may not be started in all cases before we exit
+        if (serviceContext->getStorageEngine()) {
+            shutdownGlobalStorageEngineCleanly(serviceContext);
         }
     }
     setGlobalServiceContext(nullptr);
