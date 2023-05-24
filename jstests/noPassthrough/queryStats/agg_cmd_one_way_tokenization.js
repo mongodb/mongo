@@ -69,7 +69,7 @@ function runTest(conn) {
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryStatsSamplingRate: -1,
+        internalQueryStatsRateLimit: -1,
         featureFlagQueryStats: true,
     }
 });
@@ -84,7 +84,7 @@ MongoRunner.stopMongod(conn);
 //     rs: {nodes: 1},
 //     mongosOptions: {
 //         setParameter: {
-//             internalQueryStatsSamplingRate: -1,
+//             internalQueryStatsRateLimit: -1,
 //             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
 //         }
 //     },

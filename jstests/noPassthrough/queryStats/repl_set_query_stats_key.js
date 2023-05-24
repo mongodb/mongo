@@ -11,7 +11,7 @@ load("jstests/libs/telemetry_utils.js");
 const replTest = new ReplSetTest({name: 'reindexTest', nodes: 2});
 
 // Turn on the collecting of telemetry metrics.
-replTest.startSet({setParameter: {internalQueryStatsSamplingRate: -1}});
+replTest.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
 replTest.initiate();
 
 const primary = replTest.getPrimary();

@@ -10,7 +10,7 @@ load("jstests/libs/feature_flag_util.js");
 
 // Set sampling rate to -1.
 let options = {
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 };
 const conn = MongoRunner.runMongod(options);
 const testdb = conn.getDB('test');

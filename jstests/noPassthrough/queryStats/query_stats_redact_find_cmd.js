@@ -44,7 +44,7 @@ function runTest(conn) {
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryStatsSamplingRate: -1,
+        internalQueryStatsRateLimit: -1,
         featureFlagQueryStats: true,
     }
 });
@@ -58,7 +58,7 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     mongosOptions: {
         setParameter: {
-            internalQueryStatsSamplingRate: -1,
+            internalQueryStatsRateLimit: -1,
             featureFlagQueryStats: true,
             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
         }

@@ -17,7 +17,7 @@ const setup = () => {
         rs: {nodes: 1},
         mongosOptions: {
             setParameter: {
-                internalQueryStatsSamplingRate: -1,
+                internalQueryStatsRateLimit: -1,
                 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
             }
         },

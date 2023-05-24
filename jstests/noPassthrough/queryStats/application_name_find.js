@@ -12,7 +12,7 @@ const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 };
 
 const conn = MongoRunner.runMongod(options);

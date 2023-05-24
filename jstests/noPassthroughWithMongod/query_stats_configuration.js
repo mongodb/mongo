@@ -22,12 +22,12 @@ if (FeatureFlagUtil.isEnabled(db, "QueryStats")) {
         }
     }
     testTelemetrySetting("internalQueryStatsCacheSize", "2MB");
-    testTelemetrySetting("internalQueryStatsSamplingRate", 2147483647);
+    testTelemetrySetting("internalQueryStatsRateLimit", 2147483647);
 } else {
     // The feature flag is disabled - make sure the telemetry store *cannot* be configured.
     assert.commandFailedWithCode(
         db.adminCommand({setParameter: 1, internalQueryStatsCacheSize: '2MB'}), 7373500);
     assert.commandFailedWithCode(
-        db.adminCommand({setParameter: 1, internalQueryStatsSamplingRate: 2147483647}), 7506200);
+        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}), 7506200);
 }
 }());

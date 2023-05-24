@@ -106,7 +106,7 @@ size_t capQueryStatsStoreSize(size_t requestedSize) {
  * Get the queryStats store size based on the query job's value.
  */
 size_t getQueryStatsStoreSize() {
-    auto status = memory_util::MemorySize::parse(queryQueryStatsStoreSize.get());
+    auto status = memory_util::MemorySize::parse(internalQueryStatsCacheSize.get());
     uassertStatusOK(status);
     size_t requestedSize = memory_util::convertToSizeInBytes(status.getValue());
     return capQueryStatsStoreSize(requestedSize);
@@ -211,7 +211,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         }
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
-        auto configuredSamplingRate = queryQueryStatsSamplingRate.load();
+        auto configuredSamplingRate = internalQueryStatsRateLimit.load();
         queryStatsRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
             configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate);
     }};
