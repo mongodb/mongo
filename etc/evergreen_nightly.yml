@@ -5,7 +5,7 @@ include:
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/atlas.yml
 - filename: etc/evergreen_yml_components/variants/misc_release.yml
-### Comment out when using this file for a LTS or Rapid release branch. ###
+### Comment out when using this file for a Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/ibm.yml
 ### Uncomment when using this file for a LTS release branch. ###
 # - filename: etc/evergreen_yml_components/variants/in_memory.yml
