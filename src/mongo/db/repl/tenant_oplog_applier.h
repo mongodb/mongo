@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
+#include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -127,6 +128,19 @@ private:
     void _applyOplogBatch(TenantOplogBatch* batch);
     Status _applyOplogBatchPerWorker(std::vector<ApplierOperation>* ops);
     void _checkNsAndUuidsBelongToTenant(OperationContext* opCtx, const TenantOplogBatch& batch);
+    void _writeTransactionEntryNoOp(OperationContext* opCtx,
+                                    MutableOplogEntry& noopEntry,
+                                    const OplogEntry& entry);
+    void _writeRetryableWriteEntryNoOp(OperationContext* opCtx,
+                                       MutableOplogEntry& noopEntry,
+                                       const OplogEntry& entry,
+                                       const boost::optional<MutableOplogEntry>& prePostImageEntry,
+                                       const OpTime& originalPrePostImageOpTime);
+    void _writeSessionNoOp(OperationContext* opCtx,
+                           MutableOplogEntry& noopEntry,
+                           boost::optional<SessionTxnRecord> sessionTxnRecord = boost::none,
+                           std::vector<StmtId> stmtIds = {},
+                           boost::optional<MutableOplogEntry> prePostImageEntry = boost::none);
     OpTimePair _writeNoOpEntries(OperationContext* opCtx, const TenantOplogBatch& batch);
 
     using TenantNoOpEntry = std::pair<ApplierOperation, std::vector<OplogSlot>::iterator>;
