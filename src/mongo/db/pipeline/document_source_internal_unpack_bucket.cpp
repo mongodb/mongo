@@ -763,6 +763,15 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
 std::pair<bool, Pipeline::SourceContainer::iterator>
 DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContainer::iterator itr,
                                                          Pipeline::SourceContainer* container) {
+    // The computed min/max for each bucket uses the default collation. If the collation of the
+    // query doesn't match the default we cannot rely on the computed values as they might differ
+    // (e.g. numeric and lexicographic collations compare "5" and "10" in opposite order).
+    // NB: Unfortuntealy, this means we have to forgo the optimization even if the source field is
+    // numeric and not affected by the collation as we cannot know the data type until runtime.
+    if (pExpCtx->collationMatchesDefault == ExpressionContext::CollationMatchesDefault::kNo) {
+        return {};
+    }
+
     const auto* groupPtr = dynamic_cast<DocumentSourceGroup*>(std::next(itr)->get());
     if (groupPtr == nullptr) {
         return {};
