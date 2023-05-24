@@ -136,11 +136,11 @@ class test_hs21(wttest.WiredTigerTestCase):
             # Load data at timestamp 2.
             self.large_updates(ds.uri, value1, ds, self.nrows // 2 , 2)
 
-        # We want to create a long running read transaction in a seperate session which we will persist over the closing and
+        # We want to create a long running read transaction in a separate session which we will persist over the closing and
         # re-opening of handles. We want to ensure the correct data gets read throughout this time period.
         session_read = self.conn.open_session()
         session_read.begin_transaction('read_timestamp=' + self.timestamp_str(2))
-        # Check our inital set of updates are seen at the read timestamp.
+        # Check our initial set of updates are seen at the read timestamp.
         for (_, ds) in active_files:
             # Check that all updates at timestamp 2 are seen.
             self.check(session_read, value1, ds.uri, self.nrows // 2)

@@ -100,7 +100,7 @@ class test_import03(test_import_base):
         self.printVerbose(3, '\nFile configuration:\n' + original_db_file_config)
         self.printVerbose(3, '\nTable configuration:\n' + original_db_table_config)
 
-        # Contruct the config string.
+        # Construct the config string.
         import_config = '{},import=(enabled,repair=false,file_metadata=({}))'.format(
             original_db_table_config, original_db_file_config)
 

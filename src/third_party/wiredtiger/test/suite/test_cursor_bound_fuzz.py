@@ -433,7 +433,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
                     # We returned a key within the range, validate that key is the one that
                     # should've been returned.
                     if (key_found == search_key):
-                        # We've already deteremined the key matches. We can return.
+                        # We've already determined the key matches. We can return.
                         pass
                     if (key_found > search_key):
                         # Walk left and validate that all isn't visible to the search key.

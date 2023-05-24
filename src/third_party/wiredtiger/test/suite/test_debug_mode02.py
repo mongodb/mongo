@@ -82,7 +82,7 @@ class test_debug_mode02(wttest.WiredTigerTestCase, suite_subprocess):
         for i in range(1, self.retain):
             cur_set = self.log_set()
             self.advance_log_checkpoint()
-            # We don't accomodate slow machines here because we don't expect
+            # We don't accommodate slow machines here because we don't expect
             # the files the change and there is no way to know if log removal ran
             # otherwise.
             time.sleep(1.0)

@@ -185,7 +185,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     # on each incremental directory as a starting base.
     # Optional arguments:
     # backup_cur: A backup cursor that can be given into the function, but function caller
-    #    holds reponsibility of closing the cursor.
+    #    holds responsibility of closing the cursor.
     #
     def take_full_backup(self, backup_dir, backup_cur=None):
         self.pr('Full backup to ' + backup_dir + ': ')

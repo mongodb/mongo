@@ -139,7 +139,7 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
             #
             #  But, immediately after the corruption, if we run
             #  wiredtiger_open with salvage, it will fail.
-            # This anomoly should be fixed or explained.
+            # This anomaly should be fixed or explained.
             if self.filename == 'WiredTiger.turtle':
                 continue
 

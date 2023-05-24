@@ -161,7 +161,7 @@ class test_import01(test_import_base):
         # Copy over the datafiles for the object we want to import.
         self.copy_file(self.original_db_file, '.', newdir)
 
-        # Contruct the config string.
+        # Construct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             original_db_file_config + '))'
 
@@ -224,7 +224,7 @@ class test_import01(test_import_base):
         # Now copy it back to our database directory.
         self.copy_file(self.original_db_file, backup_dir, '.')
 
-        # Contruct the config string.
+        # Construct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             original_db_file_config + '))'
 

@@ -536,7 +536,7 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
             #
             #  But, immediately after the corruption, if we run
             #  wiredtiger_open with salvage, it will fail.
-            # This anomoly should be fixed or explained.
+            # This anomaly should be fixed or explained.
             if self.kind == 'removal' and self.filename == 'WiredTiger.turtle':
                 continue
 

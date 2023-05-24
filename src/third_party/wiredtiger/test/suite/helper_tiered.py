@@ -173,7 +173,7 @@ def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False
             bucket_prefix2 = generate_prefix(random_prefix, test_name),
             num_ops=100,
             ss_name = 'azure_store')),
-        # This must be the last item as we seperate the non-tiered from the tiered items later on.
+        # This must be the last item as we separate the non-tiered from the tiered items later on.
         ('non_tiered', dict(is_tiered = False)),
     ]
 

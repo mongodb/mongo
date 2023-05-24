@@ -95,7 +95,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # a greater timestamp already existing.
         self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), "3")
 
-        # Senario 3: Commit with a commit timestamp of 5 and then begin a
+        # Scenario 3: Commit with a commit timestamp of 5 and then begin a
         # transaction intending to commit at 4, the all_durable timestamp
         # should move back to 3. Until the transaction at 4 completes.
         session1.begin_transaction()

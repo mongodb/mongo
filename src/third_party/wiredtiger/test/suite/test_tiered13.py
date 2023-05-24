@@ -96,7 +96,7 @@ class test_tiered13(test_import_base, TieredConfigMixin):
                 table_config = cursor[k]
         cursor.close()
         self.close_conn()
-        # Contruct the config strings.
+        # Construct the config strings.
         import_enabled = 'import=(enabled,repair=true)'
         import_meta = 'import=(enabled,repair=false,file_metadata=(' + \
             fileobj_config + '))'

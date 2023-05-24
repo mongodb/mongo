@@ -59,7 +59,7 @@ class test_import07(test_import_base):
                 break
         cursor.close()
 
-        # Contruct the config string.
+        # Construct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             example_db_file_config + '))'
 
