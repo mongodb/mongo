@@ -1279,6 +1279,11 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("writeConcern", writeConcern->toBSON());
     }
 
+    if (waitForWriteConcernDurationMillis > Milliseconds::zero()) {
+        b.append("waitForWriteConcernDuration",
+                 durationCount<Milliseconds>(waitForWriteConcernDurationMillis));
+    }
+
     if (storageStats) {
         b.append("storage", storageStats->toBSON());
     }
