@@ -147,13 +147,13 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
         try:
             ckpt.start()
             
-            # Wait for checkpoint to start before committing.
-            ckpt_started = 0
-            while not ckpt_started:
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
-                stat_cursor.close()
+            # Wait for checkpoint to start and acquire its snapshot before committing.
+            ckpt_snapshot = 0
+            while not ckpt_snapshot:
                 time.sleep(1)
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_snapshot = stat_cursor[stat.conn.txn_checkpoint_snapshot_acquired][2]
+                stat_cursor.close()
 
             session1.commit_transaction()
             self.evict(self.uri, ds, self.nrows)
