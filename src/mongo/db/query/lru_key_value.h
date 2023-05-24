@@ -278,7 +278,6 @@ private:
     mutable KVList _kvList;
 
     // Maps from a key to the corresponding std::list entry.
-    // TODO: SERVER-73659 LRUKeyValue should track and include the size of _kvMap in overall budget.
     mutable KVMap _kvMap;
 };
 
