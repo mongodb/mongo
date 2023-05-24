@@ -113,7 +113,8 @@ feature_flags:
     featureFlagSearchBatchSizeLimit:
       description: "Feature flag to enable the search batchsize and limit optimization."
       cpp_varname: gFeatureFlagSearchBatchSizeLimit
-      default: false
+      default: true
+      version: 7.1
       shouldBeFCVGated: true
 
     featureFlagAggOutTimeseries:
