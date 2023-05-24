@@ -536,8 +536,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *first_upd
          */
         if (*first_txn_updp == NULL)
             *first_txn_updp = upd;
-        if (WT_TXNID_LT(max_txn, txnid))
-            max_txn = txnid;
 
         /*
          * Special handling for application threads evicting their own updates.
@@ -596,8 +594,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *first_upd
             if (F_ISSET(r, WT_REC_CHECKPOINT)) {
                 *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
                 *has_newer_updatesp = true;
-                if (upd->start_ts > max_ts)
-                    max_ts = upd->start_ts;
                 seen_prepare = true;
                 continue;
             } else {
@@ -617,13 +613,16 @@ __rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *first_upd
             }
         }
 
-        /* Track the first update with non-zero timestamp. */
-        if (upd->start_ts > max_ts)
-            max_ts = upd->start_ts;
-
         /* Always select the newest committed update to write to disk */
         if (upd_select->upd == NULL)
             upd_select->upd = upd;
+
+        /* Track the selected update transaction id and timestamp. */
+        if (WT_TXNID_LT(max_txn, txnid))
+            max_txn = txnid;
+
+        if (upd->start_ts > max_ts)
+            max_ts = upd->start_ts;
 
         /*
          * We only need to walk the whole update chain if we are evicting metadata as it is written
