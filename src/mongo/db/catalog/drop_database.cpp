@@ -99,16 +99,18 @@ void _finishDropDatabase(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
     }
 
+    // Testing depends on this failpoint stopping execution before the dropDatabase oplog entry is
+    // written, as well as before the in-memory state is cleared.
+    if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
+        LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
+        dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet();
+    }
+
     writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
         WriteUnitOfWork wunit(opCtx);
         opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
         wunit.commit();
     });
-
-    if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
-        LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
-        dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet();
-    }
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->dropDb(opCtx, db);
