@@ -576,6 +576,39 @@ public:
     // are ineligible will still not be cached.
     bool forcePlanCache = false;
 
+    // This is state that is to be shared between the DocumentInternalSearchMongotRemote and
+    // DocumentInternalSearchIdLookup stages (these stages are the result of desugaring $search)
+    // during runtime.
+    class SharedSearchState {
+    public:
+        SharedSearchState() {}
+
+        long long getDocsReturnedByIdLookup() const {
+            return _docsReturnedByIdLookup;
+        }
+
+        /**
+         * Sets the value of _docsReturnedByIdLookup to 0.
+         */
+        void resetDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup = 0;
+        }
+
+        /**
+         * Increments the value of _docsReturnedByIdLookup by 1.
+         */
+        void incrementDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup++;
+        }
+
+    private:
+        // When there is an extractable limit in the query, DocumentInternalSearchMongotRemote sends
+        // a getMore to mongot that specifies how many more documents it needs to fulfill that
+        // limit, and it incorporates the amount of documents returned by the
+        // DocumentInternalSearchIdLookup stage into that value.
+        long long _docsReturnedByIdLookup = 0;
+    } sharedSearchState;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
