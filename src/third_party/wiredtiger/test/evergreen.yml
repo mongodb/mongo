@@ -549,8 +549,15 @@ functions:
       script: |
         set -o errexit
         set -o verbose
+        # Fail, show the configuration file.
+        fail() {
+          echo "======= FAILURE =========="
+          [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG
+          exit 1
+        }
+
         for i in $(seq ${times|1}); do
-          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${extra_args|} || ( [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG ) 2>&1
+          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${extra_args|} || fail
         done
   "format test predictable":
     command: shell.exec
