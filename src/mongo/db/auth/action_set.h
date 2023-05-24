@@ -49,6 +49,11 @@ public:
     ActionSet() = default;
     ActionSet(std::initializer_list<ActionType> actions);
 
+    // Parse a human-readable set of ActionTypes into a bitset of actions.
+    // unrecognizedActions will be populated with a copy of any unexpected action, if present.
+    static ActionSet parseFromStringVector(const std::vector<StringData>& actions,
+                                           std::vector<std::string>* unrecognizedActions = nullptr);
+
     void addAction(ActionType action);
     void addAllActionsFromSet(const ActionSet& actionSet);
     void addAllActions();
@@ -80,15 +85,9 @@ public:
     std::string toString() const;
 
     // Returns a vector of strings representing the actions in the ActionSet.
-    std::vector<std::string> getActionsAsStrings() const;
-
-    // Takes a vector of action type std::string representations and writes into *result an
-    // ActionSet of all valid actions encountered.
-    // If it encounters any actions that it doesn't recognize, will put those into
-    // *unrecognizedActions, while still returning the valid actions in *result, and returning OK.
-    static Status parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,
-                                                 ActionSet* result,
-                                                 std::vector<std::string>* unrecognizedActions);
+    // The storage for these StringDatas comes from IDL constexpr definitions for
+    // ActionTypes and is therefore guaranteed for the life of the process.
+    std::vector<StringData> getActionsAsStringDatas() const;
 
     friend bool operator==(const ActionSet& lhs, const ActionSet& rhs) {
         return lhs.equals(rhs);

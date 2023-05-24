@@ -102,25 +102,17 @@ MONGO_INITIALIZER(ServerlessPrivilegePermittedMap)(InitializerContext*) try {
         auto matchTypeName = MatchType_serializer(matchType);
         auto dataObj = MatchType_get_extra_data(matchType);
         auto data = MatchTypeExtraData::parse(IDLParserContext{matchTypeName}, dataObj);
-        auto actionTypes = data.getServerlessActionTypes();
 
-        std::vector<std::string> actionsToParse;
-        std::transform(actionTypes.cbegin(),
-                       actionTypes.cend(),
-                       std::back_inserter(actionsToParse),
-                       [](const auto& at) { return at.toString(); });
-
-        ActionSet actions;
         std::vector<std::string> unknownActions;
-        auto status =
-            ActionSet::parseActionSetFromStringVector(actionsToParse, &actions, &unknownActions);
-        if (!status.isOK()) {
+        auto actions =
+            ActionSet::parseFromStringVector(data.getServerlessActionTypes(), &unknownActions);
+        if (!unknownActions.empty()) {
             StringBuilder sb;
             sb << "Unknown actions listed for match type '" << matchTypeName << "':";
             for (const auto& unknownAction : unknownActions) {
                 sb << " '" << unknownAction << "'";
             }
-            uassertStatusOK(status.withContext(sb.str()));
+            uasserted(ErrorCodes::FailedToParse, sb.str());
         }
 
         ret[matchType] = std::move(actions);

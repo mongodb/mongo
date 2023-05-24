@@ -37,7 +37,6 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
@@ -70,18 +69,15 @@ void addRoleNameObjectsToArrayElement(mutablebson::Element array, RoleNameIterat
 void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privilegesElement,
                                                  mutablebson::Element warningsElement,
                                                  const PrivilegeVector& privileges) {
-    std::string errmsg;
-    for (size_t i = 0; i < privileges.size(); ++i) {
-        ParsedPrivilege pp;
-        if (ParsedPrivilege::privilegeToParsedPrivilege(privileges[i], &pp, &errmsg)) {
-            fassert(17178, privilegesElement.appendObject("", pp.toBSON()));
-        } else {
+    for (const auto& privilege : privileges) {
+        try {
+            fassert(17178, privilegesElement.appendObject("", privilege.toBSON()));
+        } catch (const DBException& ex) {
             fassert(17179,
                     warningsElement.appendString(
                         "",
-                        std::string(str::stream() << "Skipped privileges on resource "
-                                                  << privileges[i].getResourcePattern().toString()
-                                                  << ". Reason: " << errmsg)));
+                        "Skipped privileges on resource {}. Reason: {}"_format(
+                            privilege.getResourcePattern().toString(), ex.what())));
         }
     }
 }

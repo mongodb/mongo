@@ -36,7 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege_parser.h"
+#include "mongo/db/auth/parsed_privilege_gen.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -413,7 +413,7 @@ Status V2UserDocumentParser::initializeUserIndirectRolesFromUserDocument(const B
 }
 
 Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSONObj& doc,
-                                                                      User* user) const {
+                                                                      User* user) const try {
     BSONElement privilegesElement = doc[PRIVILEGES_FIELD_NAME];
     if (privilegesElement.eoo())
         return Status::OK();
@@ -422,34 +422,20 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
                       "User document 'inheritedPrivileges' element must be Array if present.");
     }
     PrivilegeVector privileges;
-    std::string errmsg;
-    for (BSONObjIterator it(privilegesElement.Obj()); it.more(); it.next()) {
-        if ((*it).type() != Object) {
+
+    for (const auto& element : privilegesElement.Obj()) {
+        if (element.type() != Object) {
             LOGV2_WARNING(23743,
                           "Wrong type of element in inheritedPrivileges array",
                           "user"_attr = user->getName(),
-                          "element"_attr = *it);
+                          "element"_attr = element);
             continue;
         }
-        Privilege privilege;
-        ParsedPrivilege pp;
-        if (!pp.parseBSON((*it).Obj(), &errmsg)) {
-            LOGV2_WARNING(23744,
-                          "Could not parse privilege element in user document",
-                          "user"_attr = user->getName(),
-                          "error"_attr = errmsg);
-            continue;
-        }
+
+        auto pp = auth::ParsedPrivilege::parse(IDLParserContext("userPrivilegeDoc"), element.Obj());
         std::vector<std::string> unrecognizedActions;
-        Status status =
-            ParsedPrivilege::parsedPrivilegeToPrivilege(pp, &privilege, &unrecognizedActions);
-        if (!status.isOK()) {
-            LOGV2_WARNING(23745,
-                          "Could not parse privilege element in user document",
-                          "user"_attr = user->getName(),
-                          "error"_attr = causedBy(status));
-            continue;
-        }
+        auto privilege = Privilege::resolvePrivilegeWithTenant(
+            user->getName().getTenant(), pp, &unrecognizedActions);
         if (unrecognizedActions.size()) {
             std::string unrecognizedActionsString;
             str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
@@ -464,6 +450,8 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
     }
     user->setPrivileges(privileges);
     return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 Status V2UserDocumentParser::initializeUserFromUserDocument(const BSONObj& privDoc,

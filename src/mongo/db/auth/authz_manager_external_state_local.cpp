@@ -37,7 +37,7 @@
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/auth_types_gen.h"
-#include "mongo/db/auth/privilege_parser.h"
+#include "mongo/db/auth/parsed_privilege_gen.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
@@ -461,6 +461,7 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
     const bool processPrivs = option & ResolveRoleOption::kPrivileges;
     const bool processRests = option & ResolveRoleOption::kRestrictions;
     const bool walkIndirect = (option & ResolveRoleOption::kDirectOnly) == 0;
+    IDLParserContext idlctx("resolveRoles");
 
     RoleNameSet inheritedRoles;
     PrivilegeVector inheritedPrivileges;
@@ -520,8 +521,15 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
                                 << "Invalid 'privileges' field in role document '" << role << "'"};
                 }
                 for (const auto& privElem : elem.Obj()) {
-                    auto priv = Privilege::fromBSON(privElem);
-                    Privilege::addPrivilegeToPrivilegeVector(&inheritedPrivileges, priv);
+                    if (privElem.type() != Object) {
+                        return {ErrorCodes::UnsupportedFormat,
+                                "Expected privilege document as object, got {}"_format(
+                                    typeName(privElem.type()))};
+                    }
+                    auto pp = auth::ParsedPrivilege::parse(idlctx, privElem.Obj());
+                    Privilege::addPrivilegeToPrivilegeVector(
+                        &inheritedPrivileges,
+                        Privilege::resolvePrivilegeWithTenant(role.getTenant(), pp));
                 }
             }
 

@@ -1430,6 +1430,9 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     const auto kFooCollRsrc = ResourcePattern::forExactNamespace(kFooCollNss);
     assertSecurityToken(kFooCollRsrc, ActionType::insert);
 
+    // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
+    // Add additional tests for cross-tenancy authorizations.
+
     // Assert that another user can't be authorized while the security token is auth'd.
     ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, boost::none));
 

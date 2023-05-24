@@ -260,8 +260,8 @@ env.Library(
         'action_type.cpp',
         'action_type.idl',
         'authorization_contract.cpp',
+        'parsed_privilege.idl',
         'privilege.cpp',
-        'privilege_parser.cpp',
         'resource_pattern.cpp',
     ],
     LIBDEPS_PRIVATE=[

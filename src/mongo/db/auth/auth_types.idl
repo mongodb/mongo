@@ -59,13 +59,6 @@ types:
     deserializer: "mongo::RoleNameOrString::parseFromBSON"
     serializer: "mongo::RoleNameOrString::serializeToBSON"
 
-  Privilege:
-    bson_serialization_type: object
-    description: "A struct representing a privilege grant"
-    cpp_type: "Privilege"
-    deserializer: "mongo::Privilege::fromBSON"
-    serializer: "mongo::Privilege::toBSON"
-
 structs:
   authLocalGetUserFailPoint:
     description: Data for authLocalGetUser failpoint

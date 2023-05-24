@@ -102,9 +102,11 @@ Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
 }
 
 Status checkAuthorizedToGrantPrivileges(AuthorizationSession* authzSession,
-                                        const PrivilegeVector& privileges) {
-    for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
-        Status status = checkAuthorizedToGrantPrivilege(authzSession, *it);
+                                        const boost::optional<TenantId>& tenantId,
+                                        const std::vector<auth::ParsedPrivilege>& privileges) {
+    for (const auto& pp : privileges) {
+        auto privilege = Privilege::resolvePrivilegeWithTenant(tenantId, pp);
+        auto status = checkAuthorizedToGrantPrivilege(authzSession, privilege);
         if (!status.isOK()) {
             return status;
         }
@@ -147,9 +149,11 @@ Status checkAuthorizedToRevokePrivilege(AuthorizationSession* authzSession,
 }
 
 Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
-                                         const PrivilegeVector& privileges) {
-    for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
-        Status status = checkAuthorizedToRevokePrivilege(authzSession, *it);
+                                         const boost::optional<TenantId>& tenantId,
+                                         const std::vector<auth::ParsedPrivilege>& privileges) {
+    for (const auto& pp : privileges) {
+        auto privilege = Privilege::resolvePrivilegeWithTenant(tenantId, pp);
+        auto status = checkAuthorizedToRevokePrivilege(authzSession, privilege);
         if (!status.isOK()) {
             return status;
         }
@@ -255,7 +259,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const CreateRoleCommand& 
             as->isAuthorizedToCreateRole(roleName));
 
     uassertStatusOK(checkAuthorizedToGrantRoles(as, resolveRoleNames(request.getRoles(), dbname)));
-    uassertStatusOK(checkAuthorizedToGrantPrivileges(as, request.getPrivileges()));
+    uassertStatusOK(
+        checkAuthorizedToGrantPrivileges(as, dbname.tenantId(), request.getPrivileges()));
     uassertStatusOK(checkAuthorizedToSetRestrictions(
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
@@ -276,7 +281,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateRoleCommand& 
         uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));
     }
     if (auto privs = request.getPrivileges()) {
-        uassertStatusOK(checkAuthorizedToGrantPrivileges(as, privs.value()));
+        uassertStatusOK(checkAuthorizedToGrantPrivileges(as, dbname.tenantId(), privs.value()));
     }
     uassertStatusOK(checkAuthorizedToSetRestrictions(
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
@@ -291,7 +296,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const GrantRolesToRoleCom
 void checkAuthForTypedCommand(OperationContext* opCtx,
                               const GrantPrivilegesToRoleCommand& request) {
     auto* as = AuthorizationSession::get(opCtx->getClient());
-    uassertStatusOK(checkAuthorizedToGrantPrivileges(as, request.getPrivileges()));
+    uassertStatusOK(checkAuthorizedToGrantPrivileges(
+        as, request.getDbName().tenantId(), request.getPrivileges()));
 }
 
 void checkAuthForTypedCommand(OperationContext* opCtx, const DropUserCommand& request) {
@@ -387,7 +393,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
 void checkAuthForTypedCommand(OperationContext* opCtx,
                               const RevokePrivilegesFromRoleCommand& request) {
     auto* as = AuthorizationSession::get(opCtx->getClient());
-    uassertStatusOK(checkAuthorizedToRevokePrivileges(as, request.getPrivileges()));
+    uassertStatusOK(checkAuthorizedToRevokePrivileges(
+        as, request.getDbName().tenantId(), request.getPrivileges()));
 }
 
 void checkAuthForTypedCommand(OperationContext* opCtx,

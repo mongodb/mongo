@@ -30,6 +30,7 @@ global:
 
 imports:
     - "mongo/db/auth/auth_types.idl"
+    - "mongo/db/auth/parsed_privilege.idl"
     - "mongo/db/basic_types.idl"
 
 structs:
@@ -44,7 +45,7 @@ structs:
                 type: array<RoleName>
             authenticatedUserPrivileges:
                 description: 'Currently authorized privileges across granted roles'
-                type: array<Privilege>
+                type: array<ParsedPrivilege>
                 optional: true
 
     ConnectionStatusReply:
