@@ -178,6 +178,7 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
     }
     storage_source = tiered->bstorage->storage_source;
     bucket_fs = tiered->bstorage->file_system;
+    WT_ASSERT(session, bucket_fs != NULL);
 
     local_name = local_uri;
     WT_PREFIX_SKIP_REQUIRED(session, local_name, "file:");
@@ -209,15 +210,7 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
          */
         if (ret == ENOENT)
             ret = 0;
-        else {
-            /*
-             * Continue with the error ignored if we've been told to do that.
-             */
-            if (ret != 0 &&
-              FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE))
-                ret = 0;
-            WT_ERR(ret);
-
+        else if (ret == 0) {
             /*
              * After successful flushing, push a work unit to perform whatever post-processing the
              * shared storage wants to do for this object. Note that this work unit is unrelated to
@@ -230,6 +223,13 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
              * The object will be removed locally after the local retention period expires.
              */
             WT_ERR(__wt_tiered_put_remove_local(session, tiered, id));
+        } else {
+            /*
+             * Continue with the error ignored if we've been told to do that.
+             */
+            if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE))
+                ret = 0;
+            WT_ERR(ret);
         }
     }
 
