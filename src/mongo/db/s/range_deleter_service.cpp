@@ -503,13 +503,6 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
             .share();
     }
 
-    LOGV2_DEBUG(7536600,
-                2,
-                "Registering range deletion task",
-                "collectionUUID"_attr = rdt.getCollectionUuid(),
-                "range"_attr = redact(rdt.getRange().toString()),
-                "pending"_attr = pending);
-
     auto scheduleRangeDeletionChain = [&](SharedSemiFuture<void> pendingFuture) {
         (void)pendingFuture.thenRunOn(_executor)
             .then([this,
@@ -555,6 +548,13 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
 
     auto lock =
         fromResubmitOnStepUp ? _acquireMutexUnconditionally() : _acquireMutexFailIfServiceNotUp();
+
+    LOGV2_DEBUG(7536600,
+                2,
+                "Registering range deletion task",
+                "collectionUUID"_attr = rdt.getCollectionUuid(),
+                "range"_attr = redact(rdt.getRange().toString()),
+                "pending"_attr = pending);
 
     auto [registeredTask, firstRegistration] =
         _rangeDeletionTasks[rdt.getCollectionUuid()].insert(std::make_shared<RangeDeletion>(rdt));
