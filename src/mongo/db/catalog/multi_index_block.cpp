@@ -386,7 +386,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             index.bulk = index.real->initiateBulk(indexCatalogEntry,
                                                   eachIndexBuildMaxMemoryUsageBytes,
                                                   stateInfo,
-                                                  collection->ns().db());
+                                                  collection->ns().dbName());
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -558,7 +558,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                 index.real->initiateBulk(indexCatalogEntry,
                                          getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()),
                                          /*stateInfo=*/boost::none,
-                                         collection->ns().db());
+                                         collection->ns().dbName());
         }
     };
 

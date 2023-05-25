@@ -122,7 +122,7 @@ public:
         const IndexCatalogEntry* entry,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
-        StringData dbName) final;
+        const DatabaseName& dbName) final;
 
     std::shared_ptr<Ident> getSharedIdent() const final;
 
