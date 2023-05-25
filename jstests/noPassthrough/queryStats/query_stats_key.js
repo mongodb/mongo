@@ -113,5 +113,10 @@ let telemetry = getTelemetry(conn);
 assert.eq(1, telemetry.length);
 confirmAllFieldsPresent(telemetry);
 
+// $hint can only be string(index name) or object (index spec).
+assert.throwsWithCode(() => {
+    coll.find({v: {$eq: 2}}).hint({'v': 60, $hint: -128}).itcount();
+}, ErrorCodes.FailedToParse);
+
 MongoRunner.stopMongod(conn);
 }());

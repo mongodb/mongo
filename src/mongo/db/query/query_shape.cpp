@@ -148,10 +148,13 @@ BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool red
     BSONObjBuilder bob;
     for (BSONElement elem : obj) {
         if (hintSpecialField.compare(elem.fieldName()) == 0) {
-            tassert(7421703,
-                    "Hinted field must be a string with $hint operator",
-                    elem.type() == BSONType::String);
-            bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            if (elem.type() == BSONType::String) {
+                bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            } else if (elem.type() == BSONType::Object) {
+                opts.appendLiteral(&bob, hintSpecialField, elem.Obj());
+            } else {
+                uasserted(ErrorCodes::FailedToParse, "$hint must be a string or an object");
+            }
             continue;
         }
 
