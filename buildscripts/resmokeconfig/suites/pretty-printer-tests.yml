@@ -1,7 +1,7 @@
 test_kind: pretty_printer_test
 
 selector:
-  root: build/install/dist-test/pretty_printer_tests.txt
+  root: build/pretty_printer_tests.txt
 
 executor:
   config: {}

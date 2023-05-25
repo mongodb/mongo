@@ -1643,7 +1643,7 @@ envDict = dict(
     # changes to MCI.
     UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
     PRETTY_PRINTER_TEST_ALIAS='install-pretty-printer-tests',
-    PRETTY_PRINTER_TEST_LIST='$BUILD_DIR/pretty_printer_tests.txt',
+    PRETTY_PRINTER_TEST_LIST='$BUILD_ROOT/pretty_printer_tests.txt',
     LIBFUZZER_TEST_ALIAS='install-fuzzertests',
     LIBFUZZER_TEST_LIST='$BUILD_ROOT/libfuzzer_tests.txt',
     INTEGRATION_TEST_ALIAS='install-integration-tests',

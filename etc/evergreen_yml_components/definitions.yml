@@ -540,6 +540,7 @@ functions:
       - "--tarball=mongo-binaries.tgz"
       - "--extraction-command=${decompress}"
       - "--change-dir=${extraction_change_dir}"
+      - "${move_outputs}"
 
   "get version expansions": &get_version_expansions
     command: s3.get
@@ -3018,6 +3019,7 @@ tasks:
       - "--tarball=mongo-debugsymbols.tgz"
       - "--extraction-command=${decompress}"
       - "--change-dir=build/install/"
+      - "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
     optional: true
   - func: "run tests"
     vars:
@@ -7072,9 +7074,13 @@ tasks:
 - <<: *task_template
   name: resmoke_validation_tests
   tags: []
-  depends_on: []
+  depends_on:
+  - name: archive_dist_test
   commands:
-  - func: "do non-compile setup"
+  - func: "do setup"
+    vars:
+      extraction_change_dir: build/install/
+      move_outputs: "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
   - func: "run tests"
 
 - name: test_packages
