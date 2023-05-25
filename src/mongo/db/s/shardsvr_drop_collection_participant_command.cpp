@@ -38,6 +38,7 @@
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -85,6 +86,9 @@ public:
                     txnParticipant);
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+            // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
+            VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
             bool fromMigrate = request().getFromMigrate().value_or(false);
             DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
