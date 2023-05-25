@@ -140,7 +140,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
                     << "key2" << true);
 
     // Check that an order for deletion from an unsharded collection extracts just the "_id" field
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(*autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
     ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
@@ -167,7 +167,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
                     << "key2" << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(*autoColl, doc).getShardKeyAndId(),
                       BSON("key" << 100 << "key3"
                                  << "abc"
                                  << "_id"
@@ -196,7 +196,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
                            << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(*autoColl, doc).getShardKeyAndId(),
                       BSON("key" << 100 << "_id"
                                  << "hello"
                                  << "key2" << true));
@@ -222,7 +222,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
                            << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(*autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
     ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));

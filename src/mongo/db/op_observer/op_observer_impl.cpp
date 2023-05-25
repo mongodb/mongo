@@ -635,8 +635,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
         if (insertStatementOplogSlot.isNull()) {
             insertStatementOplogSlot = oplogWriter->getNextOpTimes(opCtx, 1U)[0];
         }
-        const auto docKey =
-            repl::getDocumentKey(opCtx, collectionPtr, begin[i].doc).getShardKeyAndId();
+        const auto docKey = repl::getDocumentKey(collectionPtr, begin[i].doc).getShardKeyAndId();
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
@@ -722,7 +721,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         invariant(!defaultFromMigrate);
 
         for (auto iter = first; iter != last; iter++) {
-            const auto docKey = repl::getDocumentKey(opCtx, coll, iter->doc).getShardKeyAndId();
+            const auto docKey = repl::getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             operation.setDestinedRecipient(
                 shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
@@ -746,7 +745,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
         for (auto iter = first; iter != last; iter++) {
-            const auto docKey = repl::getDocumentKey(opCtx, coll, iter->doc).getShardKeyAndId();
+            const auto docKey = repl::getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             if (inRetryableInternalTransaction) {
                 operation.setInitializedStatementIds(iter->stmtIds);
@@ -1039,7 +1038,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    const CollectionPtr& coll,
                                    BSONObj const& doc,
                                    OpStateAccumulator* opAccumulator) {
-    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, coll, doc));
+    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(coll, doc));
 
     {
         ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns());

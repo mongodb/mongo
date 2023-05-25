@@ -63,7 +63,7 @@ private:
  * Returns a DocumentKey constructed from the shard key fields, if the collection is sharded,
  * and the _id field, of the given document.
  */
-DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, BSONObj const& doc);
+DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc);
 
 /**
  * Provides access to the DocumentKey attached to this OperationContext.

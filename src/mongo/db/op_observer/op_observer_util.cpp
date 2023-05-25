@@ -100,7 +100,7 @@ BSONObj DocumentKey::getShardKeyAndId() const {
     return getId();
 }
 
-DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, BSONObj const& doc) {
+DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc) {
     auto idField = doc["_id"];
     BSONObj id = idField ? idField.wrap() : doc;
     boost::optional<BSONObj> shardKey;
