@@ -751,13 +751,13 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
     // This acquires the critical section required by resharding donor machine when it is in
     // kBlockingWrites.
     ShardingRecoveryService::get(opCtx.get())
-        ->acquireRecoverableCriticalSectionBlockWrites(opCtx.get(),
-                                                       doc.getSourceNss(),
-                                                       BSON("command"
-                                                            << "resharding_donor"
-                                                            << "collection"
-                                                            << doc.getSourceNss().toString()),
-                                                       ShardingCatalogClient::kLocalWriteConcern);
+        ->acquireRecoverableCriticalSectionBlockWrites(
+            opCtx.get(),
+            doc.getSourceNss(),
+            BSON("command"
+                 << "resharding_donor"
+                 << "collection" << doc.getSourceNss().toString_forTest()),
+            ShardingCatalogClient::kLocalWriteConcern);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     notifyReshardingCommitting(opCtx.get(), *donor, doc);

@@ -789,8 +789,8 @@ TEST_F(MovePrimaryRecipientServiceTest, DropsTemporaryCollectionsMatchingPrefix)
     auto opCtx = operationContext();
     auto doc = createRecipientDoc();
 
-    const auto& prefix =
-        NamespaceString::makeMovePrimaryTempCollectionsPrefix(doc.getMigrationId()).toString();
+    const auto& prefix = NamespaceString::makeMovePrimaryTempCollectionsPrefix(doc.getMigrationId())
+                             .toString_forTest();
     const auto& fooNs = NamespaceString(prefix + "foo");
     const auto& barNs = NamespaceString(prefix + "bar");
 

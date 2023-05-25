@@ -133,7 +133,8 @@ public:
         ASSERT_EQ(report.getStringField("type"), "op");
         ASSERT_EQ(report.getStringField("op"), "command");
         auto originalCommand = report.getObjectField("originatingCommand");
-        ASSERT_EQ(originalCommand.getStringField("reshardCollection"), kTestNamespace.toString());
+        ASSERT_EQ(originalCommand.getStringField("reshardCollection"),
+                  kTestNamespace.toString_forTest());
         ASSERT_EQ(originalCommand.getObjectField("key").woCompare(kShardKey), 0);
         ASSERT_EQ(originalCommand.getStringField("unique"), "false");
         ASSERT_EQ(originalCommand.getObjectField("collation")

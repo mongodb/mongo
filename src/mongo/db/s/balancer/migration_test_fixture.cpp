@@ -79,7 +79,7 @@ void MigrationTestFixture::setUpZones(const NamespaceString& collName,
     for (auto const& zoneChunkRange : zoneChunkRanges) {
         BSONObjBuilder zoneDocBuilder;
         zoneDocBuilder.append("_id",
-                              BSON(TagsType::ns(collName.toString())
+                              BSON(TagsType::ns(collName.toString_forTest())
                                    << TagsType::min(zoneChunkRange.second.getMin())));
         zoneDocBuilder.append(TagsType::ns(), collName.ns_forTest());
         zoneDocBuilder.append(TagsType::min(), zoneChunkRange.second.getMin());

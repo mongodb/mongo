@@ -675,7 +675,7 @@ TEST_F(ViewCatalogFixture, Iterate) {
     Lock::DBLock dbLock(operationContext(), view1.dbName(), MODE_IX);
     getCatalog()->iterateViews(
         operationContext(), view1.dbName(), [&viewNames](const ViewDefinition& view) {
-            std::string name = view.name().toString();
+            std::string name = view.name().toString_forTest();
             ASSERT(viewNames.end() != viewNames.find(name));
             viewNames.erase(name);
             return true;

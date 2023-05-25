@@ -1408,7 +1408,7 @@ TEST_F(RollbackImplTest, CountChangesCancelOut) {
     // Test that we read the collection count from drop entries.
     ASSERT_OK(_insertOplogEntry(makeCommandOp(Timestamp(5, 5),
                                               uuid,
-                                              nss.getCommandNS().toString(),
+                                              nss.getCommandNS().toString_forTest(),
                                               BSON("drop" << nss.coll()),
                                               5,
                                               BSON("numRecords" << 1))
@@ -2011,7 +2011,7 @@ TEST_F(RollbackImplObserverInfoTest,
     auto nss = NamespaceString("test", "coll");
     auto cmdOp = makeCommandOp(Timestamp(2, 2),
                                UUID::gen(),
-                               nss.getCommandNS().toString(),
+                               nss.getCommandNS().toString_forTest(),
                                BSON("create" << nss.coll()),
                                2);
     std::set<NamespaceString> expectedNamespaces = {nss};
@@ -2022,8 +2022,11 @@ TEST_F(RollbackImplObserverInfoTest,
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropCollectionOplogEntry) {
     auto nss = NamespaceString("test", "coll");
-    auto cmdOp = makeCommandOp(
-        Timestamp(2, 2), UUID::gen(), nss.getCommandNS().toString(), BSON("drop" << nss.coll()), 2);
+    auto cmdOp = makeCommandOp(Timestamp(2, 2),
+                               UUID::gen(),
+                               nss.getCommandNS().toString_forTest(),
+                               BSON("drop" << nss.coll()),
+                               2);
 
     std::set<NamespaceString> expectedNamespaces = {nss};
     auto namespaces =
@@ -2039,8 +2042,8 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfCreateIn
                              << "x"
                              << "name"
                              << "x_1");
-    auto cmdOp =
-        makeCommandOp(Timestamp(2, 2), UUID::gen(), nss.getCommandNS().toString(), indexObj, 2);
+    auto cmdOp = makeCommandOp(
+        Timestamp(2, 2), UUID::gen(), nss.getCommandNS().toString_forTest(), indexObj, 2);
 
     std::set<NamespaceString> expectedNamespaces = {nss};
     auto namespaces =
@@ -2052,7 +2055,7 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropInde
     auto nss = NamespaceString("test", "coll");
     auto cmdOp = makeCommandOp(Timestamp(2, 2),
                                UUID::gen(),
-                               nss.getCommandNS().toString(),
+                               nss.getCommandNS().toString_forTest(),
                                BSON("dropIndexes" << nss.coll() << "index"
                                                   << "x_1"),
                                2);
@@ -2163,7 +2166,7 @@ DEATH_TEST_F(RollbackImplObserverInfoTest,
     auto createNss = NamespaceString("test", "createColl");
     auto createOp = makeCommandOp(Timestamp(2, 2),
                                   UUID::gen(),
-                                  createNss.getCommandNS().toString(),
+                                  createNss.getCommandNS().toString_forTest(),
                                   BSON("create" << createNss.coll()),
                                   2);
 
@@ -2184,13 +2187,15 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesOfApplyOpsOplogEnt
 
     // Add a few different sub-ops from different namespaces to make sure they all get recorded.
     auto createNss = NamespaceString("test", "createColl");
-    auto createOp = makeCommandOpForApplyOps(
-        UUID::gen(), createNss.getCommandNS().toString(), BSON("create" << createNss.coll()), 2);
+    auto createOp = makeCommandOpForApplyOps(UUID::gen(),
+                                             createNss.getCommandNS().toString_forTest(),
+                                             BSON("create" << createNss.coll()),
+                                             2);
 
     auto dropNss = NamespaceString("test", "dropColl");
     auto dropUuid = UUID::gen();
     auto dropOp = makeCommandOpForApplyOps(
-        dropUuid, dropNss.getCommandNS().toString(), BSON("drop" << dropNss.coll()), 2);
+        dropUuid, dropNss.getCommandNS().toString_forTest(), BSON("drop" << dropNss.coll()), 2);
     _initializeCollection(_opCtx.get(), dropUuid, dropNss);
 
     auto collModNss = NamespaceString("test", "collModColl");
