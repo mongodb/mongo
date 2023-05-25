@@ -94,8 +94,15 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
     // We should always be EOF at this point.
     tassert(7655101, "must be at EOF if we performed an upsert", isEOF());
 
-    // If we don't need to return the inserted document, we're done.
-    return PlanStage::IS_EOF;
+    if (!_params.returnNew) {
+        // If we don't need to return the inserted document, we're done.
+        return PlanStage::IS_EOF;
+    }
+
+    // If we want to return the document we just inserted, create it as a WorkingSetMember.
+    _measurementToReturn = _specificStats.objInserted;
+    _prepareToReturnMeasurement(*out);
+    return PlanStage::ADVANCED;
 }
 
 void TimeseriesUpsertStage::_performInsert(BSONObj newDocument) {

@@ -636,7 +636,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                            false,
                                                                            updateRequest.isUpsert(),
                                                                            docFound,
-                                                                           &updateRequest);
+                                                                           updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
                     responses.addUpdateReply(currentOpIdx, result, docFound, boost::none);
                     return true;
@@ -748,7 +748,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         return writeConflictRetry(opCtx, "bulkWriteDelete", nsString, [&] {
             boost::optional<BSONObj> docFound;
             auto nDeleted = write_ops_exec::writeConflictRetryRemove(
-                opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);
+                opCtx, nsString, deleteRequest, curOp, opDebug, inTransaction, docFound);
             lastOpFixer.finishedOpSuccessfully();
             responses.addDeleteReply(currentOpIdx, nDeleted, docFound, boost::none);
             return true;

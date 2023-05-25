@@ -81,21 +81,21 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
 
 // Type requirement 1 for isTimeseries()
 template <typename T>
-constexpr bool isRequestableWithTimeseriesBucketNamespace = requires(const T& t) {
+concept IsRequestableWithTimeseriesBucketNamespace = requires(const T& t) {
     t.getNamespace();
     t.getIsTimeseriesNamespace();
 };
 
 // Type requirement 2 for isTimeseries()
 template <typename T>
-constexpr bool isRequestableOnUserTimeseriesNamespace = requires(const T& t) {
+concept IsRequestableOnUserTimeseriesNamespace = requires(const T& t) {
     t.getNsString();
 };
 
 // Disjuction of type requirements for isTimeseries()
 template <typename T>
-constexpr bool isRequestableOnTimeseries =
-    isRequestableWithTimeseriesBucketNamespace<T> || isRequestableOnUserTimeseriesNamespace<T>;
+concept IsRequestableOnTimeseries =
+    IsRequestableWithTimeseriesBucketNamespace<T> || IsRequestableOnUserTimeseriesNamespace<T>;
 
 /**
  * Returns a pair of (whether 'request' is made on a timeseries collection and the timeseries
@@ -105,10 +105,10 @@ constexpr bool isRequestableOnTimeseries =
  * as the namespace of the 'request'.
  */
 template <typename T>
-requires isRequestableOnTimeseries<T> std::pair<bool, NamespaceString> isTimeseries(
+requires IsRequestableOnTimeseries<T> std::pair<bool, NamespaceString> isTimeseries(
     OperationContext* opCtx, const T& request) {
     const auto [nss, bucketNss] = [&] {
-        if constexpr (isRequestableWithTimeseriesBucketNamespace<T>) {
+        if constexpr (IsRequestableWithTimeseriesBucketNamespace<T>) {
             auto nss = request.getNamespace();
             uassert(5916400,
                     "'isTimeseriesNamespace' parameter can only be set when the request is sent on "

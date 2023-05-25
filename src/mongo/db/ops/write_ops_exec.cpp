@@ -696,27 +696,34 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 }
 
 UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
-                                      const NamespaceString& nsString,
+                                      const NamespaceString& nss,
                                       CurOp* curOp,
                                       OpDebug* opDebug,
                                       bool inTransaction,
                                       bool remove,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
-                                      const UpdateRequest* updateRequest) {
+                                      const UpdateRequest& updateRequest) {
+    auto [isTimeseriesUpdate, nsString] = timeseries::isTimeseries(opCtx, updateRequest);
+    // TODO SERVER-76583: Remove this check.
+    uassert(7314600,
+            "Retryable findAndModify on a timeseries is not supported",
+            !isTimeseriesUpdate || !opCtx->isRetryableWrite());
+
     auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
         MODE_IX);
+    auto dbName = nsString.dbName();
     Database* db = [&]() {
-        AutoGetDb autoDb(opCtx, nsString.dbName(), MODE_IX);
+        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
         return autoDb.ensureDbExists(opCtx);
     }();
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
     }
 
     assertCanWrite_inlock(opCtx, nsString);
@@ -745,7 +752,11 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
             !inTransaction);
     }
 
-    ParsedUpdate parsedUpdate(opCtx, updateRequest, collection.getCollectionPtr());
+    ParsedUpdate parsedUpdate(opCtx,
+                              &updateRequest,
+                              collection.getCollectionPtr(),
+                              false /*forgoOpCounterIncrements*/,
+                              isTimeseriesUpdate);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const auto exec = uassertStatusOK(
@@ -795,25 +806,16 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
 
 long long writeConflictRetryRemove(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   DeleteRequest* deleteRequest,
+                                   const DeleteRequest& deleteRequest,
                                    CurOp* curOp,
                                    OpDebug* opDebug,
                                    bool inTransaction,
                                    boost::optional<BSONObj>& docFound) {
-
-    invariant(deleteRequest);
-
-    auto [isTimeseriesDelete, nsString] = timeseries::isTimeseries(opCtx, *deleteRequest);
-    if (isTimeseriesDelete) {
-        // TODO SERVER-76583: Remove this check.
-        uassert(7308305,
-                "Retryable findAndModify on a timeseries is not supported",
-                !opCtx->isRetryableWrite());
-
-        if (nss != nsString) {
-            deleteRequest->setNsString(nsString);
-        }
-    }
+    auto [isTimeseriesDelete, nsString] = timeseries::isTimeseries(opCtx, deleteRequest);
+    // TODO SERVER-76583: Remove this check.
+    uassert(7308305,
+            "Retryable findAndModify on a timeseries is not supported",
+            !isTimeseriesDelete || !opCtx->isRetryableWrite());
 
     const auto collection = acquireCollection(
         opCtx,
@@ -821,7 +823,7 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
         MODE_IX);
     const auto& collectionPtr = collection.getCollectionPtr();
 
-    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesDelete);
+    ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
     {

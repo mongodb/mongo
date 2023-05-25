@@ -408,7 +408,11 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
-        ParsedUpdate parsedUpdate(opCtx, &updateRequest, collection.getCollectionPtr());
+        ParsedUpdate parsedUpdate(opCtx,
+                                  &updateRequest,
+                                  collection.getCollectionPtr(),
+                                  false /*forgoOpCounterIncrements*/,
+                                  isTimeseries);
         uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -514,7 +518,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
             }
             boost::optional<BSONObj> docFound;
             write_ops_exec::writeConflictRetryRemove(
-                opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);
+                opCtx, nsString, deleteRequest, curOp, opDebug, inTransaction, docFound);
             recordStatsForTopCommand(opCtx);
             return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
@@ -553,7 +557,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                                  req.getRemove().value_or(false),
                                                                  req.getUpsert().value_or(false),
                                                                  docFound,
-                                                                 &updateRequest);
+                                                                 updateRequest);
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 

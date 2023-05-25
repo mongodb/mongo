@@ -18,50 +18,6 @@
 
 load("jstests/core/timeseries/libs/timeseries_writes_util.js");
 
-const testDB = getTestDB();
-
-/**
- * Ensure the updateOne command operates correctly by examining documents after the update.
- */
-function testUpdateOne({
-    initialDocList,
-    updateQuery,
-    updateObj,
-    resultDocList,
-    nMatched,
-    nModified = nMatched,
-    upsert = false,
-    failCode
-}) {
-    const collName = getCallerName();
-    jsTestLog(`Running ${collName}(${tojson(arguments[0])})`);
-
-    const coll = testDB.getCollection(collName);
-    prepareCollection({collName, initialDocList});
-
-    const updateCommand = {
-        update: coll.getName(),
-        updates: [{q: updateQuery, u: updateObj, multi: false, upsert: upsert}]
-    };
-    const res = failCode ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
-                         : assert.commandWorked(testDB.runCommand(updateCommand));
-    if (!failCode) {
-        if (upsert) {
-            assert.eq(1, res.n, tojson(res));
-            assert.eq(0, res.nModified, tojson(res));
-        } else {
-            assert.eq(nMatched, res.n, tojson(res));
-            assert.eq(nModified, res.nModified, tojson(res));
-        }
-    }
-
-    if (resultDocList) {
-        assert.sameMembers(resultDocList,
-                           coll.find().toArray(),
-                           "Collection contents did not match expected after update");
-    }
-}
-
 /**
  * Tests op-style updates.
  */
@@ -385,6 +341,7 @@ function testUpdateOne({
  * bytes).
  */
 (function testUpdateExceedsBucketSizeLimit() {
+    const testDB = getTestDB();
     const collName = "testUpdateExceedsBucketSizeLimit";
     const coll = testDB.getCollection(collName);
     prepareCollection({collName, initialDocList: []});

@@ -44,7 +44,7 @@ struct TimeseriesModifyParams {
           isMulti(deleteParams->isMulti),
           fromMigrate(deleteParams->fromMigrate),
           isExplain(deleteParams->isExplain),
-          returnDeleted(deleteParams->returnDeleted),
+          returnOld(deleteParams->returnDeleted),
           stmtId(deleteParams->stmtId),
           canonicalQuery(deleteParams->canonicalQuery) {}
 
@@ -53,6 +53,8 @@ struct TimeseriesModifyParams {
           isMulti(updateParams->request->isMulti()),
           fromMigrate(updateParams->request->source() == OperationSource::kFromMigrate),
           isExplain(updateParams->request->explain()),
+          returnOld(updateParams->request->shouldReturnOldDocs()),
+          returnNew(updateParams->request->shouldReturnNewDocs()),
           canonicalQuery(updateParams->canonicalQuery),
           isFromOplogApplication(updateParams->request->isFromOplogApplication()),
           updateDriver(updateParams->driver) {
@@ -75,8 +77,11 @@ struct TimeseriesModifyParams {
     // Are we explaining a command rather than actually executing it?
     bool isExplain;
 
-    // Should we return the deleted document?
-    bool returnDeleted = false;
+    // Should we return the old measurement?
+    bool returnOld;
+
+    // Should we return the new measurement?
+    bool returnNew = false;
 
     // The stmtId for this particular command.
     StmtId stmtId = kUninitializedStmtId;
@@ -136,6 +141,11 @@ protected:
 
     void doRestoreStateRequiresCollection() final;
 
+    /**
+     * Prepares returning the old or new measurement when requested so.
+     */
+    void _prepareToReturnMeasurement(WorkingSetID& out);
+
     // A user-initiated write is one which is not caused by oplog application and is not part of a
     // chunk migration.
     bool _isUserInitiatedUpdate;
@@ -143,6 +153,10 @@ protected:
     TimeseriesModifyParams _params;
 
     TimeseriesModifyStats _specificStats{};
+
+    // Stores the old measurement that is modified or the new measurement after update/upsert when
+    // requested to return it for the deleteOne or updateOne.
+    boost::optional<BSONObj> _measurementToReturn = boost::none;
 
     // Original, untranslated and complete predicate.
     std::unique_ptr<MatchExpression> _originalPredicate;
@@ -173,7 +187,7 @@ private:
         ScopeGuard<F>& bucketFreer,
         WorkingSetID bucketWsmId,
         std::vector<BSONObj>&& unchangedMeasurements,
-        const std::vector<BSONObj>& modifiedMeasurements,
+        std::vector<BSONObj>&& matchedMeasurements,
         bool bucketFromMigrate);
 
     /**
@@ -190,11 +204,6 @@ private:
      * Gets the next bucket to process.
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
-
-    /**
-     * Prepares returning a deleted measurement.
-     */
-    void _prepareToReturnDeletedMeasurement(WorkingSetID& out, BSONObj measurement);
 
     WorkingSet* _ws;
 
@@ -222,9 +231,5 @@ private:
     // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
     // established. This can be set when a write fails or when a fetch fails.
     WorkingSetID _retryBucketId = WorkingSet::INVALID_ID;
-
-    // Stores the deleted document when a deleteOne with returnDeleted: true is requested and we
-    // need to yield.
-    boost::optional<BSONObj> _deletedMeasurementToReturn = boost::none;
 };
 }  //  namespace mongo
