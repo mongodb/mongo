@@ -92,7 +92,9 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
 
     auto indexCatalog = _coll->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
-    tassert(4938500,
+    // uassert here, not tassert, because it is not a programming bug if the index got dropped just
+    // before we looked for it.
+    uassert(4938500,
             str::stream() << "could not find index named '" << _indexName << "' in collection '"
                           << _collName->toStringForErrorMsg() << "'",
             indexDesc);
