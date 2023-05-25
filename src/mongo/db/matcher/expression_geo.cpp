@@ -155,8 +155,9 @@ BSONObj customSerialization(const BSONObj& obj, SerializationOptions opts) {
                     if (auto typeElt = geometryObj["type"]) {
                         nestedSubObj.append(typeElt);
                     }
-                    tassert(7539800, "always expect coordinates", geometryObj["coordinates"]);
-                    opts.appendLiteral(&nestedSubObj, geometryObj["coordinates"]);
+                    if (auto coordinatesElem = geometryObj["coordinates"]) {
+                        opts.appendLiteral(&nestedSubObj, coordinatesElem);
+                    }
                     // 'crs' can be present if users want to use STRICT_SPHERE coordinate system.
                     if (auto crsElt = geometryObj["crs"]) {
                         // 'crs' is always an object.

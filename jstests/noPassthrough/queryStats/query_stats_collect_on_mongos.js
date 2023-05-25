@@ -8,7 +8,6 @@ load('jstests/libs/telemetry_utils.js');
 (function() {
 "use strict";
 
-// Redacted literal replacement string. This may change in the future, so it's factored out.
 const setup = () => {
     const st = new ShardingTest({
         mongos: 1,
