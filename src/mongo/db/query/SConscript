@@ -9,6 +9,7 @@ env = env.Clone()
 
 env.SConscript(
     dirs=[
+        'boolean_simplification',
         'ce',
         'collation',
         'cost_model',

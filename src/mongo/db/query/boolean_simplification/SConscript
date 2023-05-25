@@ -1,0 +1,24 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target="boolean_simplification",
+    source=[
+        "petrick.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/mongohasher",
+    ],
+)
+
+env.CppUnitTest(
+    target="boolean_simplification_test",
+    source=[
+        "petrick_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query_expressions",
+        "boolean_simplification",
+    ],
+)
