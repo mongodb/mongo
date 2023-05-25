@@ -96,13 +96,13 @@ boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              const NamespaceString& ns,
-                                              std::vector<BSONObj>&& objs,
-                                              const WriteConcernOptions& wc,
-                                              boost::optional<OID> targetEpoch) {
-    auto writeResults = write_ops_exec::performInserts(
-        expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+Status NonShardServerProcessInterface::insert(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+    auto writeResults = write_ops_exec::performInserts(expCtx->opCtx, *insertCommand);
 
     // Need to check each result in the batch since the writes are unordered.
     for (const auto& result : writeResults.results) {
@@ -116,13 +116,12 @@ Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<Express
 StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    BatchedObjects&& batch,
+    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
     const WriteConcernOptions& wc,
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto writeResults = write_ops_exec::performUpdates(
-        expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
+    auto writeResults = write_ops_exec::performUpdates(expCtx->opCtx, *updateCommand);
 
     // Need to check each result in the batch since the writes are unordered.
     UpdateResult updateResult;

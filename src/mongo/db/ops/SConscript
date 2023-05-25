@@ -86,6 +86,7 @@ env.Library(
 env.CppUnitTest(
     target='db_ops_test',
     source=[
+        'write_ops_exec_test.cpp',
         'write_ops_parsers_test.cpp',
         'write_ops_retryability_test.cpp',
     ],

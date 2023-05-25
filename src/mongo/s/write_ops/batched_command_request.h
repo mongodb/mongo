@@ -52,15 +52,25 @@ public:
         : _batchType(BatchType_Insert),
           _insertReq(std::make_unique<write_ops::InsertCommandRequest>(std::move(insertOp))) {}
 
+    BatchedCommandRequest(std::unique_ptr<write_ops::InsertCommandRequest> insertOp)
+        : _batchType(BatchType_Insert), _insertReq(std::move(insertOp)) {}
+
     BatchedCommandRequest(write_ops::UpdateCommandRequest updateOp)
         : _batchType(BatchType_Update),
           _updateReq(std::make_unique<write_ops::UpdateCommandRequest>(std::move(updateOp))) {}
+
+    BatchedCommandRequest(std::unique_ptr<write_ops::UpdateCommandRequest> updateOp)
+        : _batchType(BatchType_Update), _updateReq(std::move(updateOp)) {}
 
     BatchedCommandRequest(write_ops::DeleteCommandRequest deleteOp)
         : _batchType(BatchType_Delete),
           _deleteReq(std::make_unique<write_ops::DeleteCommandRequest>(std::move(deleteOp))) {}
 
+    BatchedCommandRequest(std::unique_ptr<write_ops::DeleteCommandRequest> deleteOp)
+        : _batchType(BatchType_Delete), _deleteReq(std::move(deleteOp)) {}
+
     BatchedCommandRequest(BatchedCommandRequest&&) = default;
+    BatchedCommandRequest& operator=(BatchedCommandRequest&&) = default;
 
     static BatchedCommandRequest parseInsert(const OpMsgRequest& request);
     static BatchedCommandRequest parseUpdate(const OpMsgRequest& request);
@@ -89,6 +99,18 @@ public:
     const auto& getDeleteRequest() const {
         invariant(_deleteReq);
         return *_deleteReq;
+    }
+
+    std::unique_ptr<write_ops::InsertCommandRequest> extractInsertRequest() {
+        return std::move(_insertReq);
+    }
+
+    std::unique_ptr<write_ops::UpdateCommandRequest> extractUpdateRequest() {
+        return std::move(_updateReq);
+    }
+
+    std::unique_ptr<write_ops::DeleteCommandRequest> extractDeleteRequest() {
+        return std::move(_deleteReq);
     }
 
     std::size_t sizeWriteOps() const;

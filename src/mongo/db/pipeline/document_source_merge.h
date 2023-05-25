@@ -48,8 +48,9 @@ public:
 
     // A descriptor for a merge strategy. Holds a merge strategy function and a set of actions the
     // client should be authorized to perform in order to be able to execute a merge operation using
-    // this merge strategy. If a 'BatchTransform' function is provided, it will be called when
-    // constructing a batch object to transform updates.
+    // this merge strategy. Additionally holds a 'BatchedCommandGenerator' that will initialize a
+    // BatchedWriteRequest for executing the batch write. If a 'BatchTransform' function is
+    // provided, it will be called when constructing a batch object to transform updates.
     struct MergeStrategyDescriptor {
         using WhenMatched = MergeWhenMatchedModeEnum;
         using WhenNotMatched = MergeWhenNotMatchedModeEnum;
@@ -62,13 +63,19 @@ public:
                                                  const WriteConcernOptions&,
                                                  boost::optional<OID>,
                                                  BatchedObjects&&,
+                                                 BatchedCommandRequest&&,
                                                  UpsertType upsert)>;
+
+        // A function object that will be invoked to generate a BatchedCommandRequest.
+        using BatchedCommandGenerator = std::function<BatchedCommandRequest(
+            const boost::intrusive_ptr<ExpressionContext>&, const NamespaceString&)>;
 
         MergeMode mode;
         ActionSet actions;
         MergeStrategy strategy;
         BatchTransform transform;
         UpsertType upsertType;
+        BatchedCommandGenerator batchedCommandGenerator;
     };
 
     /**
@@ -211,7 +218,9 @@ private:
         return bob.obj();
     }
 
-    void spill(BatchedObjects&& batch) override;
+    void spill(BatchedCommandRequest&& bcr, BatchedObjects&& batch) override;
+
+    BatchedCommandRequest initializeBatchedWriteRequest() const override;
 
     void waitWhileFailPointEnabled() override;
 
