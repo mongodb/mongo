@@ -119,7 +119,6 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleTask)(benchmark::State&
         runOnExec(&*runner, [](Status) {});
     }
 }
-BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, kMaxThreads);
 
 /** A simplified ChainedSchedule with only one task. */
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::State& state) {
@@ -130,7 +129,6 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::Sta
         done.get();
     }
 }
-BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, kMaxThreads);
 
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::State& state) {
     int chainDepth = state.range(0);
@@ -170,9 +168,14 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
         loopState.done.get();
     }
 }
+
+#if !__has_feature(address_sanitizer) && !__has_feature(thread_sanitizer)
+BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, kMaxThreads);
+BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ChainedSchedule)
     ->Range(1, kMaxChainSize)
     ->ThreadRange(1, kMaxThreads);
+#endif
 
 }  // namespace
 }  // namespace mongo::transport
