@@ -1230,14 +1230,17 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
             ast_struct.fields.append(ast_field)
 
 
-def _bind_globals(parsed_spec):
-    # type: (syntax.IDLSpec) -> ast.Global
+def _bind_globals(ctxt, parsed_spec):
+    # type: (errors.ParserContext, syntax.IDLSpec) -> ast.Global
     """Bind the globals object from the idl.syntax tree into the idl.ast tree by doing a deep copy."""
     if parsed_spec.globals:
         ast_global = ast.Global(parsed_spec.globals.file_name, parsed_spec.globals.line,
                                 parsed_spec.globals.column)
         ast_global.cpp_namespace = parsed_spec.globals.cpp_namespace
         ast_global.cpp_includes = parsed_spec.globals.cpp_includes
+
+        if not ast_global.cpp_namespace.startswith("mongo"):
+            ctxt.add_bad_cpp_namespace(ast_global, ast_global.cpp_namespace)
 
         configs = parsed_spec.globals.configs
         if configs:
@@ -1639,7 +1642,7 @@ def bind(parsed_spec):
 
     bound_spec = ast.IDLAST()
 
-    bound_spec.globals = _bind_globals(parsed_spec)
+    bound_spec.globals = _bind_globals(ctxt, parsed_spec)
 
     _validate_types(ctxt, parsed_spec)
 
