@@ -109,6 +109,16 @@ Status ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
     // counters because we do not want to count the internal match expression.
     _expCtx->stopExpressionCounters();
 
+    // We also need a copy of the original match expression to use for upserts and positional
+    // updates.
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+        MatchExpressionParser::kAllowAllSpecialFeatures;
+    if (_request->isUpsert()) {
+        allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kExpr;
+    }
+    _originalExpr = uassertStatusOK(MatchExpressionParser::parse(
+        _request->getQuery(), _expCtx, ExtensionsCallbackNoop(), allowedFeatures));
+
     if (_request->isMulti() && !_timeseriesUpdateQueryExprs->_residualExpr) {
         // If we don't have a residual predicate and this is not a single update, we might be able
         // to perform this update directly on the buckets collection. Attempt to translate the

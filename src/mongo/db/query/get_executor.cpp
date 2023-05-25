@@ -2134,6 +2134,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 coll,
                 BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
                 parsedUpdate->releaseResidualExpr(),
+                parsedUpdate->releaseOriginalExpr(),
                 *request);
         } else {
             root = std::make_unique<TimeseriesModifyStage>(
@@ -2143,7 +2144,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 std::move(root),
                 coll,
                 BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-                parsedUpdate->releaseResidualExpr());
+                parsedUpdate->releaseResidualExpr(),
+                parsedUpdate->releaseOriginalExpr());
         }
     } else if (isUpsert) {
         root = std::make_unique<UpsertStage>(

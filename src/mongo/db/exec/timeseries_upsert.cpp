@@ -42,6 +42,7 @@ TimeseriesUpsertStage::TimeseriesUpsertStage(ExpressionContext* expCtx,
                                              const ScopedCollectionAcquisition& coll,
                                              BucketUnpacker bucketUnpacker,
                                              std::unique_ptr<MatchExpression> residualPredicate,
+                                             std::unique_ptr<MatchExpression> originalPredicate,
                                              const UpdateRequest& request)
     : TimeseriesModifyStage(expCtx,
                             std::move(params),
@@ -49,7 +50,8 @@ TimeseriesUpsertStage::TimeseriesUpsertStage(ExpressionContext* expCtx,
                             std::move(child),
                             coll,
                             std::move(bucketUnpacker),
-                            std::move(residualPredicate)),
+                            std::move(residualPredicate),
+                            std::move(originalPredicate)),
       _request(request) {
     // We should never create this stage for a non-upsert request.
     tassert(7655100, "request must be an upsert", _params.isUpdate && _request.isUpsert());
@@ -120,17 +122,8 @@ BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
     if (_request.shouldUpsertSuppliedDocument()) {
         update::generateNewDocumentFromSuppliedDoc(opCtx(), immutablePaths, &_request, doc);
     } else {
-        // Generate the match expression with which to fill in the new document. We use the original
-        // query on the request rather than our parsed canonical query because we want the complete,
-        // un-translated query for this.
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kAllowAllSpecialFeatures &
-            ~MatchExpressionParser::AllowedFeatures::kExpr;
-        auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(
-            _request.getQuery(), expCtx(), ExtensionsCallbackNoop(), allowedFeatures));
-
-        uassertStatusOK(
-            _params.updateDriver->populateDocumentWithQueryFields(*matchExpr, immutablePaths, doc));
+        uassertStatusOK(_params.updateDriver->populateDocumentWithQueryFields(
+            *_originalPredicate, immutablePaths, doc));
 
         update::generateNewDocumentFromUpdateOp(opCtx(), immutablePaths, _params.updateDriver, doc);
     }

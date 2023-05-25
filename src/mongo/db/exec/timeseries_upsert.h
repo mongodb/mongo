@@ -49,6 +49,7 @@ public:
                           const ScopedCollectionAcquisition& coll,
                           BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate,
+                          std::unique_ptr<MatchExpression> originalPredicate,
                           const UpdateRequest& request);
 
     bool isEOF() final;

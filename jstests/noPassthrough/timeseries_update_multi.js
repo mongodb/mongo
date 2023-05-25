@@ -125,7 +125,8 @@ const doc_id_7_no_meta_int_metric = {
 const doc_id_8_array_meta = {
     _id: 8,
     [timeFieldName]: dateTime,
-    [metaFieldName]: [1, 2, 3, 4]
+    [metaFieldName]: [1, 2, 3, 4],
+    f: [4, 3, 2, 1],
 };
 
 /**
@@ -454,6 +455,7 @@ const doc_id_8_array_meta = {
     });
 })();
 
+// Update a metric field with a positional operator.
 (function testArrayModifier() {
     testUpdate({
         initialDocList:
@@ -482,19 +484,65 @@ const doc_id_8_array_meta = {
     });
 })();
 
+// Update the meta field with a positional operator.
 (function testMetaFieldArrayModifier() {
     testUpdate({
         initialDocList: [doc_id_8_array_meta, doc_id_2_a_b_array_metric],
         updateList: [{
             q: {[metaFieldName]: {$gt: 2}},
-            u: {$set: {[metaFieldName + '.$']: 20}},
+            u: {$set: {[metaFieldName + '.$']: 20, f: 10}},
             multi: true,
         }],
         resultDocList: [
-            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [1, 2, 20, 4]},
+            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [1, 2, 20, 4], f: 10},
             doc_id_2_a_b_array_metric
         ],
         nMatched: 1,
+    });
+})();
+
+// Update the meta field with a positional operator.
+(function testMetaAndMetricFieldArrayModifier() {
+    testUpdate({
+        initialDocList: [doc_id_8_array_meta, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {$gt: 2}, f: {$gt: 2}},
+            u: {$set: {[metaFieldName + '.$']: 20, 'f.$': 10}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [20, 2, 3, 4], f: [10, 3, 2, 1]},
+            doc_id_2_a_b_array_metric
+        ],
+        nMatched: 1,
+    });
+})();
+
+// Empty query and update a metric field using a positional operator.
+(function testArrayModifierNoFilter() {
+    testUpdate({
+        initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        updateList: [{
+            q: {},
+            u: {$set: {'f.$': 20}},
+            multi: true,
+        }],
+        resultDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        failCode: ErrorCodes.BadValue,
+    });
+})();
+
+// Query on the meta field and update a metric field using a positional operator.
+(function testArrayModifierMetaFilter() {
+    testUpdate({
+        initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", c: "C"}},
+            u: {$set: {'f.$': 20}},
+            multi: true,
+        }],
+        resultDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        failCode: ErrorCodes.BadValue,
     });
 })();
 

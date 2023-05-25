@@ -46,9 +46,11 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
                                              std::unique_ptr<PlanStage> child,
                                              const ScopedCollectionAcquisition& coll,
                                              BucketUnpacker bucketUnpacker,
-                                             std::unique_ptr<MatchExpression> residualPredicate)
+                                             std::unique_ptr<MatchExpression> residualPredicate,
+                                             std::unique_ptr<MatchExpression> originalPredicate)
     : RequiresWritableCollectionStage(kStageType, expCtx, coll),
       _params(std::move(params)),
+      _originalPredicate(std::move(originalPredicate)),
       _ws(ws),
       _bucketUnpacker{std::move(bucketUnpacker)},
       _residualPredicate(std::move(residualPredicate)),
@@ -59,6 +61,9 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
     tassert(7308300,
             "Can return the deleted measurement only if deleting one",
             !_params.returnDeleted || (_isSingletonWrite() && !_params.isUpdate));
+    tassert(7743100,
+            "Updates must provide original predicate",
+            !_params.isUpdate || _originalPredicate);
     _children.emplace_back(std::move(child));
 
     // These three properties are only used for the queryPlanner explain and will not change while
@@ -139,7 +144,7 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
             // We have to re-apply the filter to get the matched element.
             tassert(7662500,
                     "measurement must pass filter",
-                    _residualPredicate->matchesBSON(measurement, &matchDetails));
+                    _originalPredicate->matchesBSON(measurement, &matchDetails));
 
             uassertStatusOK(_params.updateDriver->update(
                 opCtx(),

@@ -139,6 +139,13 @@ public:
     }
 
     /**
+     * Releases the ownership of the original MatchExpression.
+     */
+    std::unique_ptr<MatchExpression> releaseOriginalExpr() {
+        return std::move(_originalExpr);
+    }
+
+    /**
      * Returns true when we are performing multi updates using a residual predicate on a time-series
      * collection or when performing singleton updates on a time-series collection.
      */
@@ -194,6 +201,9 @@ private:
     // Contains the residual expression and the bucket-level expression that should be pushed down
     // to the bucket collection.
     std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesUpdateQueryExprs;
+
+    // The original, complete and untranslated write query expression.
+    std::unique_ptr<MatchExpression> _originalExpr = nullptr;
 
     const bool _isRequestToTimeseries;
 };

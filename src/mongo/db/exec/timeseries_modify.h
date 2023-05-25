@@ -108,7 +108,8 @@ public:
                           std::unique_ptr<PlanStage> child,
                           const ScopedCollectionAcquisition& coll,
                           BucketUnpacker bucketUnpacker,
-                          std::unique_ptr<MatchExpression> residualPredicate);
+                          std::unique_ptr<MatchExpression> residualPredicate,
+                          std::unique_ptr<MatchExpression> originalPredicate = nullptr);
 
     StageType stageType() const {
         return STAGE_TIMESERIES_MODIFY;
@@ -142,6 +143,9 @@ protected:
     TimeseriesModifyParams _params;
 
     TimeseriesModifyStats _specificStats{};
+
+    // Original, untranslated and complete predicate.
+    std::unique_ptr<MatchExpression> _originalPredicate;
 
 private:
     bool _isMultiWrite() const {
