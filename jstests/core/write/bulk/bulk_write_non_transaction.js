@@ -31,6 +31,44 @@ const cursorEntryValidator = function(entry, expectedEntry) {
     assert.eq(entry.code, expectedEntry.code);
 };
 
+var maxWriteBatchSize = db.hello().maxWriteBatchSize;
+var insertOp = {insert: 0, document: {_id: 1, skey: "MongoDB"}};
+
+// Make sure bulkWrite at maxWriteBatchSize is okay
+let ops = [];
+for (var i = 0; i < maxWriteBatchSize; ++i) {
+    ops.push(insertOp);
+}
+
+var res = db.adminCommand({
+    bulkWrite: 1,
+    ops: ops,
+    nsInfo: [{ns: "test.coll"}],
+});
+
+// It is also possible to see interruption here due to very large batch size.
+if (!ErrorCodes.isInterruption(res.code)) {
+    assert.commandWorked(res);
+}
+coll.drop();
+
+// Make sure bulkWrite above maxWriteBatchSize fails
+ops = [];
+for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
+    ops.push(insertOp);
+}
+
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: ops,
+    nsInfo: [{ns: "test.coll"}],
+});
+
+// It is also possible to see interruption here due to very large batch size.
+if (!ErrorCodes.isInterruption(res.code)) {
+    assert.commandFailedWithCode(res, [ErrorCodes.InvalidLength]);
+}
+
 // Make sure invalid fields are not accepted
 assert.commandFailedWithCode(db.adminCommand({
     bulkWrite: 1,
@@ -113,7 +151,7 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 // Make sure update multi:true + return fails the op.
-var res = db.adminCommand({
+res = db.adminCommand({
     bulkWrite: 1,
     ops: [
         {
@@ -640,36 +678,4 @@ assert.eq(res.cursor.firstBatch[0].errmsg,
 assert(!res.cursor.firstBatch[1]);
 
 coll.drop();
-
-var maxWriteBatchSize = db.hello().maxWriteBatchSize;
-var insertOp = {insert: 0, document: {_id: 1, skey: "MongoDB"}};
-
-// Make sure bulkWrite at maxWriteBatchSize is okay
-let ops = [];
-for (var i = 0; i < maxWriteBatchSize; ++i) {
-    ops.push(insertOp);
-}
-
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: ops,
-    nsInfo: [{ns: "test.coll"}],
-});
-
-assert.commandWorked(res);
-coll.drop();
-
-// Make sure bulkWrite above maxWriteBatchSize fails
-ops = [];
-for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
-    ops.push(insertOp);
-}
-
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: ops,
-    nsInfo: [{ns: "test.coll"}],
-});
-
-assert.commandFailedWithCode(res, [ErrorCodes.InvalidLength]);
 })();
