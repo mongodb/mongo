@@ -248,7 +248,7 @@ try {
            'unique index info does not contain replicationState: ' + tojson(uniqueIndexBuildInfo));
     const replicationState = uniqueIndexBuildInfo.replicationState;
     assert.eq(replicationState.state,
-              'Aborted',
+              'External abort',
               'Unexpected replication state: ' + tojson(uniqueIndexBuildInfo));
     assert(replicationState.hasOwnProperty('timestamp'),
            'replication state should contain abort timestamp: ' + tojson(uniqueIndexBuildInfo));

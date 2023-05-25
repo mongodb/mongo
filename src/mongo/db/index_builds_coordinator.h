@@ -602,11 +602,7 @@ protected:
      * exception of the RSTL. The RSTL will be acquired last, with a timeout. On timeout, all locks
      * are released. If 'retry' is true, keeps until successful RSTL acquisition, and the returned
      * StatusWith will always be OK and contain the locks. If false, it returns with the error after
-     * a single try. If 'collLockTimeout' is set to true, collection lock acquisition is done with
-     * a timeout. The function returns LockTimeout immediately upon collection lock acquisition
-     * timeout.
-     *
-     * TODO (SERVER-76935): Remove collection timeout.
+     * a single try.
      *
      * This is intended to avoid a three-way deadlock between prepared transactions, stepdown, and
      * index build threads when trying to acquire an exclusive collection lock.
@@ -618,9 +614,7 @@ protected:
                           repl::ReplicationStateTransitionLockGuard>>
     _acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
                                        ReplIndexBuildState* replState,
-                                       bool retry = true,
-                                       bool collLockTimeout = false);
-
+                                       bool retry = true);
 
     /**
      * Sets up the in-memory state of the index build. Validates index specs and filters out
@@ -717,8 +711,7 @@ protected:
     void _cleanUpAfterFailure(OperationContext* opCtx,
                               const CollectionPtr& collection,
                               std::shared_ptr<ReplIndexBuildState> replState,
-                              const IndexBuildOptions& indexBuildOptions,
-                              const Status& status);
+                              const IndexBuildOptions& indexBuildOptions);
 
     /**
      * Cleans up a single-phase index build after a failure, only if non-shutdown related. This
@@ -727,8 +720,7 @@ protected:
     void _cleanUpSinglePhaseAfterNonShutdownFailure(OperationContext* opCtx,
                                                     const CollectionPtr& collection,
                                                     std::shared_ptr<ReplIndexBuildState> replState,
-                                                    const IndexBuildOptions& indexBuildOptions,
-                                                    const Status& status);
+                                                    const IndexBuildOptions& indexBuildOptions);
 
     /**
      * Cleans up a two-phase index build after a failure, only if non-shutdown related. This allows
@@ -737,8 +729,7 @@ protected:
     void _cleanUpTwoPhaseAfterNonShutdownFailure(OperationContext* opCtx,
                                                  const CollectionPtr& collection,
                                                  std::shared_ptr<ReplIndexBuildState> replState,
-                                                 const IndexBuildOptions& indexBuildOptions,
-                                                 const Status& status);
+                                                 const IndexBuildOptions& indexBuildOptions);
 
     /**
      * Performs last steps of aborting an index build.
@@ -746,12 +737,14 @@ protected:
     void _completeAbort(OperationContext* opCtx,
                         std::shared_ptr<ReplIndexBuildState> replState,
                         const CollectionPtr& indexBuildEntryCollection,
-                        IndexBuildAction signalAction,
-                        Status reason);
+                        IndexBuildAction signalAction);
+    void _completeExternalAbort(OperationContext* opCtx,
+                                std::shared_ptr<ReplIndexBuildState> replState,
+                                const CollectionPtr& indexBuildEntryCollection,
+                                IndexBuildAction signalAction);
     void _completeSelfAbort(OperationContext* opCtx,
                             std::shared_ptr<ReplIndexBuildState> replState,
-                            const CollectionPtr& indexBuildEntryCollection,
-                            Status reason);
+                            const CollectionPtr& indexBuildEntryCollection);
     void _completeAbortForShutdown(OperationContext* opCtx,
                                    std::shared_ptr<ReplIndexBuildState> replState,
                                    const CollectionPtr& collection);
@@ -828,8 +821,7 @@ protected:
      * the index build to be externally aborted.
      */
     virtual void _signalPrimaryForAbortAndWaitForExternalAbort(OperationContext* opCtx,
-                                                               ReplIndexBuildState* replState,
-                                                               const Status& abortStatus) = 0;
+                                                               ReplIndexBuildState* replState) = 0;
 
     /**
      * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command
