@@ -204,7 +204,6 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage saveState",
-        collection()->ns().ns(),
         [&] {
             child()->saveState();
             return PlanStage::NEED_TIME /* unused */;
@@ -223,7 +222,6 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         const auto modificationRet = handlePlanStageYield(
             expCtx(),
             "TimeseriesModifyStage modifyBucket",
-            collection()->ns().ns(),
             [&] {
                 timeseries::performAtomicWrites(opCtx(),
                                                 collection(),
@@ -266,7 +264,6 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     auto status = handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage restoreState",
-        collection()->ns().ns(),
         [&] {
             child()->restoreState(&collection());
             return PlanStage::NEED_TIME;
@@ -322,7 +319,6 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
     const auto status = handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage:: ensureStillMatches",
-        collection()->ns().ns(),
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
                 collection(), opCtx(), _ws, id, _params.canonicalQuery);

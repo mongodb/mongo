@@ -153,7 +153,6 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "IndexScan",
-        collection()->ns().ns(),
         [&] {
             switch (_scanState) {
                 case INITIALIZING:

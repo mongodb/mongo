@@ -411,7 +411,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         const auto ensureStillMatchesRet = handlePlanStageYield(
             expCtx(),
             "UpdateStage ensureStillMatches",
-            collection()->ns().ns(),
             [&] {
                 docStillMatches = write_stage_common::ensureStillMatches(
                     collection(), opCtx(), _ws, id, _params.canonicalQuery);
@@ -466,7 +465,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         handlePlanStageYield(
             expCtx(),
             "UpdateStage saveState",
-            collection()->ns().ns(),
             [&] {
                 child()->saveState();
                 return PlanStage::NEED_TIME /* unused */;
@@ -484,7 +482,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             const auto updateRet = handlePlanStageYield(
                 expCtx(),
                 "UpdateStage update",
-                collection()->ns().ns(),
                 [&] {
                     // Do the update, get us the new version of the doc.
                     newObj = transformAndUpdate({oldSnapshot, oldObj}, recordId, writeToOrphan);
@@ -534,7 +531,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         const auto restoreStateRet = handlePlanStageYield(
             expCtx(),
             "UpdateStage restoreState",
-            collection()->ns().ns(),
             [&] {
                 child()->restoreState(&collection());
                 return PlanStage::NEED_TIME;

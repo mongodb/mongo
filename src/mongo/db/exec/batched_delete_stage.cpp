@@ -247,7 +247,6 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     handlePlanStageYield(
         expCtx(),
         "BatchedDeleteStage saveState",
-        collection()->ns().ns(),
         [&] {
             child()->saveState();
             return PlanStage::NEED_TIME /* unused */;
@@ -267,7 +266,6 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         const auto ret = handlePlanStageYield(
             expCtx(),
             "BatchedDeleteStage::_deleteBatch",
-            collection()->ns().ns(),
             [&] {
                 timeInBatch =
                     _commitBatch(out, &recordsToSkip, &docsDeleted, &bytesDeleted, &bufferOffset);
@@ -474,7 +472,6 @@ PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
     return handlePlanStageYield(
         expCtx(),
         "BatchedDeleteStage::_tryRestoreState",
-        collection()->ns().ns(),
         [&] {
             child()->restoreState(&collection());
             return PlanStage::NEED_TIME;

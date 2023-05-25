@@ -182,7 +182,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }
-            logWriteConflictAndBackoff(attempt, "query yield", e.reason(), ""_sd);
+            logWriteConflictAndBackoff(
+                attempt, "query yield", e.reason(), NamespaceStringOrUUID(NamespaceString()));
             // Retry the yielding process.
         } catch (...) {
             // Errors other than write conflicts don't get retried, and should instead result in

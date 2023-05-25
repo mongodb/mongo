@@ -103,7 +103,6 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
             const auto ret = handlePlanStageYield(
                 expCtx(),
                 "FetchStage",
-                collection()->ns().ns(),
                 [&] {
                     const auto& coll = collection();
                     if (!_cursor)

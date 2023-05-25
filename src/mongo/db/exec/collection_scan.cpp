@@ -150,7 +150,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "CollectionScan",
-        collection()->ns().ns(),
         [&] {
             if (needToMakeCursor) {
                 const bool forward = _params.direction == CollectionScanParams::FORWARD;

@@ -59,7 +59,6 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "MultiIteratorStage",
-        collection()->ns().ns(),
         [&] {
             while (!_iterators.empty()) {
                 record = _iterators.back()->next();

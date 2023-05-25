@@ -119,7 +119,6 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "CountScan",
-        collection()->ns().ns(),
         [&] {
             // We don't care about the keys.
             const auto kWantLoc = SortedDataInterface::Cursor::kWantLoc;

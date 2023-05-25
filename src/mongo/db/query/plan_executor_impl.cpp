@@ -479,7 +479,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                     _opCtx,
                     tempUnavailErrorsInARow,
                     "plan executor",
-                    _nss.ns(),
+                    NamespaceStringOrUUID(_nss),
                     TemporarilyUnavailableException(
                         Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")));
             } else {
@@ -493,7 +493,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                 CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
                 writeConflictsInARow++;
                 logWriteConflictAndBackoff(
-                    writeConflictsInARow, "plan execution", ""_sd, _nss.ns());
+                    writeConflictsInARow, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
             }
 
             // Yield next time through the loop.

@@ -84,7 +84,6 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "DistinctScan",
-        collection()->ns().ns(),
         [&] {
             if (!_cursor)
                 _cursor = indexAccessMethod()->newCursor(opCtx(), _scanDirection == 1);
