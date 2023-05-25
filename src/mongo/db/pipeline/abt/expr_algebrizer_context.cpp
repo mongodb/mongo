@@ -54,7 +54,7 @@ void ExpressionAlgebrizerContext::push(ABT node) {
 ABT ExpressionAlgebrizerContext::pop() {
     uassert(6624428, "Arity violation", !_stack.empty());
 
-    ABT node = _stack.top();
+    ABT node = std::move(_stack.top());
     _stack.pop();
     return node;
 }
