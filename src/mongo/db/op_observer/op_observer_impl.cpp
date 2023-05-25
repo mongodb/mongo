@@ -1041,11 +1041,11 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    OpStateAccumulator* opAccumulator) {
     repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, coll, doc));
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns());
-
-    repl::DurableReplOperation op;
-    op.setDestinedRecipient(shardingWriteRouter.getReshardingDestinedRecipient(doc));
-    destinedRecipientDecoration(opCtx) = op.getDestinedRecipient();
+    {
+        ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns());
+        destinedRecipientDecoration(opCtx) =
+            shardingWriteRouter.getReshardingDestinedRecipient(doc);
+    }
 
     shardObserveAboutToDelete(opCtx, coll->ns(), doc);
 }
