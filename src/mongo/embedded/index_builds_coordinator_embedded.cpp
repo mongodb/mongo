@@ -88,7 +88,7 @@ IndexBuildsCoordinatorEmbedded::resumeIndexBuild(OperationContext* opCtx,
 }
 
 void IndexBuildsCoordinatorEmbedded::_signalPrimaryForAbortAndWaitForExternalAbort(
-    OperationContext* opCtx, ReplIndexBuildState* replState, const Status& abortStatus) {}
+    OperationContext* opCtx, ReplIndexBuildState* replState) {}
 
 void IndexBuildsCoordinatorEmbedded::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {}

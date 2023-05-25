@@ -144,31 +144,37 @@ public:
          */
         kApplyCommitOplogEntry,
         /**
-         * Below state indicates that index build was successfully able to commit and is set
-         * immediately before it commits the index build.
+         * Below state indicates that index build was successfully able to commit. For kCommitted,
+         * the state is set immediately before it commits the index build.
          */
         kCommitted,
         /**
-         * Below state indicates that index build was successfully able to abort. In case of self
-         * abort this state is set after the build is cleaned up and the abort oplog entry is
-         * replicated. In case of an external abort, this state is set before interrupting the
-         * builder thread, as a way of indicating that a self abort is not required. Cleanup and
-         * oplog entry replicating in this case is done after setting the state.
+         * Below state indicates that index build was successfully able to abort. For kAborted, this
+         * state is set after the build is cleaned up and the abort oplog entry is replicated.
          */
         kAborted,
+        /**
+         * Indicates that an internal error caused the index build to fail, or that an internal
+         * operation or user killOp forced the index build abort by itself. In this state,
+         * concurrent external aborts are not allowed. The index builder thread is responsible for
+         * handling clean up. If it is determined that voting for abort is allowed, transitions to
+         * kAwaitPrimaryAbort. Otherwise it attemps to cleanup directly.
+         */
+        kFailureCleanUp,
         /**
          * Below state indicates that the index build thread has voted for an abort to the current
          * primary, and is waiting for the index build to actually be aborted either because the
          * command is a loopback to itself (vote issuer is primary itself) or due to
-         * 'abortIndexBuild' oplog entry being replicated by the primary.
+         * 'abortIndexBuild' oplog entry being replicated by the primary. Concurrent external aborts
+         * are allowed again (after being disallowed in kFailureCleanUp), as both loopback and
+         * 'abortIndexBuild' are external aborts.
          */
         kAwaitPrimaryAbort,
         /**
-         * This state indicates that an internal operation, regardless of replication state,
-         * requested that this index build abort. The index builder thread is responsible for
-         * handling and cleaning up.
+         * Indicates that an external abort is ongoing. It is the responsibility of the external
+         * aborter to clean up the resources.
          */
-        kForceSelfAbort,
+        kExternalAbort
     };
 
     /**
@@ -206,8 +212,17 @@ public:
         return _state == kAwaitPrimaryAbort;
     }
 
-    bool isForceSelfAbort() const {
-        return _state == kForceSelfAbort;
+    bool isFailureCleanUp() const {
+        return _state == kFailureCleanUp;
+    }
+
+    bool isExternalAbort() const {
+        return _state == kExternalAbort;
+    }
+
+    bool isAborting() const {
+        return _state == kAwaitPrimaryAbort || _state == kFailureCleanUp ||
+            _state == kExternalAbort;
     }
 
     boost::optional<Timestamp> getTimestamp() const {
@@ -242,8 +257,10 @@ public:
                 return "Aborted";
             case kAwaitPrimaryAbort:
                 return "Await primary abort oplog entry";
-            case kForceSelfAbort:
-                return "Forced self-abort";
+            case kFailureCleanUp:
+                return "Cleaning up";
+            case kExternalAbort:
+                return "External abort";
         }
         MONGO_UNREACHABLE;
     }
@@ -308,6 +325,13 @@ public:
     void setInProgress(OperationContext* opCtx);
 
     /**
+     * Transition the index build to kFailureCleanUp state if the build isn't already in kAborted,
+     * kExternalAbort, or kFailureCleanUp state. In case it already is in an abort state, does
+     * nothing and preserves the previous status.
+     */
+    void setPostFailureState(const Status& status);
+
+    /**
      * Indicate that the index build has attempted to vote for commit readiness. After calling this,
      * the index build cannot vote for abort. Performs an interrupt check, in case the build was
      * concurrently forced to self abort or received a killop, in which case the vote for abort is
@@ -328,13 +352,9 @@ public:
 
     /**
      * Only for two-phase index builds. Requests the primary to abort the build, and transitions
-     * into a waiting state.
-     *
-     * Returns true if the thread has transitioned into the waiting state.
-     * Returns false if the build is already in abort state. This can happen if the build detected
-     * an error while an external operation (e.g. a collection drop) is concurrently aborting it.
+     * into kAwaitPrimaryAbort state.
      */
-    bool requestAbortFromPrimary(const Status& abortStatus);
+    void requestAbortFromPrimary();
 
     /**
      * Returns timestamp for committing this index build.
@@ -352,7 +372,7 @@ public:
     /**
      * This index build has failed while running in the builder thread due to a non-shutdown reason.
      */
-    void abortSelf(OperationContext* opCtx);
+    void completeAbort(OperationContext* opCtx);
 
     /**
      * This index build was interrupted because the server is shutting down.
@@ -392,7 +412,17 @@ public:
     bool isSettingUp() const;
 
     /**
-     * Returns abort reason. Invariants if not in aborted state.
+     * Returns true if this index build is being externally aborted.
+     */
+    bool isExternalAbort() const;
+
+    /**
+     * Returns true if this index build is performing self cleanup.
+     */
+    bool isFailureCleanUp() const;
+
+    /**
+     * Returns abort reason.
      */
     std::string getAbortReason() const;
 

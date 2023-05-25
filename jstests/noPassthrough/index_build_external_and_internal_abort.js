@@ -29,7 +29,6 @@ assert.commandWorked(coll.insert({point: {x: -15.0, y: "abc"}}));
 
 let indexBuilderThreadFP =
     configureFailPoint(testDB, 'hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort');
-let connThreadFP = configureFailPoint(testDB, 'hangInRemoveIndexBuildEntryAfterCommitOrAbort');
 
 // Will fail with error code 13026: "geo values must be 'legacy coordinate pairs' for 2d indexes"
 const waitForIndexBuild =
@@ -45,20 +44,15 @@ const awaitDropCollection =
                            assert.commandWorked(db.runCommand({drop: collName}));
                        }, coll.getName()), primary.port);
 
-// Wait for the 'drop' command to hang while tearing down the index build, just after setting the
-// index build state to kAborted.
-connThreadFP.wait();
+// Check external abort is reattempted multiple times, meaning it is blocked behind the internal
+// abort.
+assert.soon(() => checkLog.checkContainsWithAtLeastCountJson(primary, 4656010, {}, 3));
 
-// Resume the index builder thread, which would now try to abort an index that's already in kAbort
-// state.
+// Resume the index builder thread, which will transition to kAwaitPrimaryAbort and unblock external
+// aborts.
 indexBuilderThreadFP.off();
 
-// Wait for the log to confirm the index builder won't attempt to abort the build, because it's
-// already in aborted state.
-checkLog.containsJson(primary, 7530800);
-
-// Resume the collection drop and wait for its completion.
-connThreadFP.off();
+// Wait for completion.
 awaitDropCollection();
 
 waitForIndexBuild();

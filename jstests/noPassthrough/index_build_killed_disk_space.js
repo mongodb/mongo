@@ -30,7 +30,7 @@ function killBeforeVoteCommitSucceeds(rst) {
 
     jsTestLog("Waiting for index build to start");
     const createIdx = IndexBuildTest.startIndexBuild(
-        primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.Interrupted]);
+        primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.OutOfDiskSpace]);
     IndexBuildTest.waitForIndexBuildToStart(primaryDB, primaryColl.getName(), 'a_1');
 
     // Ensure the index build is in an abortable state before the DiskSpaceMonitor runs.
@@ -85,8 +85,7 @@ function killAfterVoteCommitFails(rst) {
         serverStatus.indexBuilds.killedDueToInsufficientDiskSpace;
 
     jsTestLog("Waiting for index build to start");
-    const createIdx = IndexBuildTest.startIndexBuild(
-        primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.Interrupted]);
+    const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1});
     IndexBuildTest.waitForIndexBuildToStart(primaryDB, primaryColl.getName(), 'a_1');
 
     // Ensure the index build has voted commit before the DiskSpaceMonitor runs.
