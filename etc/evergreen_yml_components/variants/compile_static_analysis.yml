@@ -90,6 +90,8 @@ buildvariants:
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-compile-future-tag-multiversion linux-x86-dynamic-compile-future-tag-multiversion
   display_name: "Linux x86 Shared Library Compile (future git tag multiversion)"
+  modules:
+  - enterprise
   expansions:
     <<: *linux-x86-dynamic-compile-expansions
     bv_future_git_tag: r100.0.0-9999
