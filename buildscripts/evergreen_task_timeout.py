@@ -144,16 +144,6 @@ class TimeoutOverrides(BaseModel):
         return None
 
 
-def _is_required_build_variant(build_variant: str) -> bool:
-    """
-    Determine if the given build variants is a required build variant.
-
-    :param build_variant: Name of build variant to check.
-    :return: True if the given build variant is required.
-    """
-    return build_variant.endswith("-required")
-
-
 def output_timeout(exec_timeout: timedelta, idle_timeout: Optional[timedelta],
                    output_file: Optional[str]) -> None:
     """
@@ -163,9 +153,6 @@ def output_timeout(exec_timeout: timedelta, idle_timeout: Optional[timedelta],
     :param idle_timeout: Idle timeout to output.
     :param output_file: Location of output file to write.
     """
-    # the math library is triggering this error in this function for some
-    # reason
-    # pylint: disable=c-extension-no-member
     output = {
         "exec_timeout_secs": math.ceil(exec_timeout.total_seconds()),
     }
@@ -226,7 +213,7 @@ class TaskTimeoutOrchestrator:
             LOGGER.info("Overriding configured timeout", exec_timeout_secs=override.total_seconds())
             determined_timeout = override
 
-        elif _is_required_build_variant(
+        elif self._is_required_build_variant(
                 variant) and determined_timeout > DEFAULT_REQUIRED_BUILD_TIMEOUT:
             LOGGER.info("Overriding required-builder timeout",
                         exec_timeout_secs=DEFAULT_REQUIRED_BUILD_TIMEOUT.total_seconds())
@@ -313,6 +300,17 @@ class TaskTimeoutOrchestrator:
         """
         bv = self.evg_project_config.get_variant(build_variant)
         return bv.is_asan_build()
+
+    def _is_required_build_variant(self, build_variant: str) -> bool:
+        """
+        Determine if the given build variants is a required build variant.
+
+        :param build_variant: Name of build variant to check.
+        :param evergreen_project_config: Evergreen config to query the variant name.
+        :return: True if the given build variant is required.
+        """
+        bv = self.evg_project_config.get_variant(build_variant)
+        return "!" in bv.display_name
 
     def determine_timeouts(self, cli_idle_timeout: Optional[timedelta],
                            cli_exec_timeout: Optional[timedelta], outfile: Optional[str],

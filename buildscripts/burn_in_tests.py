@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Command line utility for determining what jstests have been added or modified."""
 import copy
+import json
 import logging
 import os.path
 import shlex
@@ -47,6 +48,8 @@ DEFAULT_EVG_PROJECT_FILE = "etc/evergreen.yml"
 # correctly.
 SELECTOR_FILE = "etc/burn_in_tests.yml"
 SUITE_FILES = ["with_server"]
+
+BURN_IN_TEST_MEMBERSHIP_FILE = "burn_in_test_membership_map_file_for_ci.json"
 
 SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
                         "multi_stmt_txn_passthrough", "parallel_fsm_workload_test",
@@ -182,7 +185,13 @@ def create_executor_list(suites, exclude_suites):
     parameter. Returns a dict keyed by suite name / executor, value is tests
     to run under that executor.
     """
-    test_membership = create_test_membership_map(test_kind=SUPPORTED_TEST_KINDS)
+    try:
+        with open(BURN_IN_TEST_MEMBERSHIP_FILE) as file:
+            test_membership = json.load(file)
+        LOGGER.info(f"Using cached test membership file {BURN_IN_TEST_MEMBERSHIP_FILE}.")
+    except FileNotFoundError:
+        LOGGER.info("Getting test membership data.")
+        test_membership = create_test_membership_map(test_kind=SUPPORTED_TEST_KINDS)
 
     memberships = defaultdict(list)
     for suite in suites:
@@ -611,7 +620,12 @@ class BurnInOrchestrator:
         self.burn_in_executor.execute(tests_by_task)
 
 
-@click.command(context_settings=dict(ignore_unknown_options=True))
+@click.group()
+def cli():
+    pass
+
+
+@cli.command(context_settings=dict(ignore_unknown_options=True))
 @click.option("--no-exec", "no_exec", default=False, is_flag=True,
               help="Do not execute the found tests.")
 @click.option("--build-variant", "build_variant", default=DEFAULT_VARIANT, metavar='BUILD_VARIANT',
@@ -635,11 +649,11 @@ class BurnInOrchestrator:
 @click.option("--evg-project-file", "evg_project_file", default=DEFAULT_EVG_PROJECT_FILE,
               help="Evergreen project config file")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
-def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
-         repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
-         repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,
-         origin_rev: Optional[str], install_dir: Optional[str], use_yaml: bool,
-         evg_project_file: Optional[str]) -> None:
+def run(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
+        repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
+        repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,
+        origin_rev: Optional[str], install_dir: Optional[str], use_yaml: bool,
+        evg_project_file: Optional[str]) -> None:
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -695,5 +709,27 @@ def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
     burn_in_orchestrator.burn_in(repos, build_variant)
 
 
+@cli.command()
+def generate_test_membership_map_file_for_ci():
+    """
+    Generate a file to cache test membership data for CI.
+
+    This command should only be used in CI. The task generator runs many iterations of this script
+    for many build variants. The bottleneck is that creating the test membership file takes a long time.
+    Instead, we can cache this data & reuse it in CI for a significant speedup.
+
+    Run this command in CI before running the burn in task generator.
+    """
+    _configure_logging(False)
+    buildscripts.resmokelib.parser.set_run_options()
+
+    LOGGER.info("Generating burn_in test membership mapping file.")
+    test_membership = create_test_membership_map(test_kind=SUPPORTED_TEST_KINDS)
+    with open(BURN_IN_TEST_MEMBERSHIP_FILE, "w") as file:
+        json.dump(test_membership, file)
+    LOGGER.info(
+        f"Finished writing burn_in test membership mapping to {BURN_IN_TEST_MEMBERSHIP_FILE}")
+
+
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    cli()

@@ -637,13 +637,6 @@ buildvariants:
     test_flags: *windows_common_test_excludes
     external_auth_jobs_max: 1
   tasks:
-  - name: burn_in_tests_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *windows_compile_variant_name
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -708,13 +701,6 @@ buildvariants:
   - name: cqf_parallel
   - name: query_golden_classic
   - name: query_golden_cqf
-  - name: burn_in_tests_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *windows_compile_variant_name
   # - name: burn_in_tasks_gen
   #   depends_on:
   #   - name: version_burn_in_gen
@@ -936,6 +922,37 @@ buildvariants:
 #          Redhat buildvariants           #
 ###########################################
 
+- name: run-all-affected-jstests
+  display_name: "! Run All Affected JStests"
+  patch_only: true
+  run_on:
+  - rhel80-medium
+  expansions:
+    large_distro_name: rhel80-large
+    burn_in_tag_include_all_required_and_suggested: true
+    burn_in_tag_exclude_build_variants: >-
+      macos-debug-suggested
+    burn_in_tag_include_build_variants: >-
+      enterprise-rhel-80-64-bit-inmem
+      enterprise-rhel-80-64-bit-multiversion
+    burn_in_tag_compile_task_dependency: archive_dist_test_debug
+    compile_variant: *amazon_linux2_arm64_compile_variant_name
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: *amazon_linux2_arm64_compile_variant_name
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  tasks:
+  - name: burn_in_tags_gen
+
 - &enterprise-rhel-80-64-bit-dynamic-template
   <<: *linux_x86_dynamic_compile_variant_dependency
   name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
@@ -958,10 +975,6 @@ buildvariants:
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: >-
-      enterprise-rhel-80-64-bit-inmem
-      enterprise-rhel-80-64-bit-multiversion
-    burn_in_tag_compile_task_dependency: archive_dist_test_debug
   depends_on:
   - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
@@ -971,13 +984,6 @@ buildvariants:
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
   tasks:
-  - name: burn_in_tests_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *linux_x86_dynamic_compile_variant_name
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: aggregation_repeat_queries
@@ -1210,20 +1216,6 @@ buildvariants:
   - name: query_golden_cqf
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
-  - name: burn_in_tests_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *linux_x86_dynamic_compile_variant_name
-  - name: burn_in_tags_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *linux_x86_dynamic_compile_variant_name
   # - name: burn_in_tasks_gen
   #   depends_on:
   #   - name: version_burn_in_gen
@@ -1344,10 +1336,6 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: >-
-      enterprise-rhel-80-64-bit-inmem
-      enterprise-rhel-80-64-bit-multiversion
-    burn_in_tag_compile_task_dependency: archive_dist_test_debug
   depends_on:
   - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
@@ -1392,13 +1380,6 @@ buildvariants:
   - name: .updatefuzzer
   - name: aggregation_repeat_queries
   - name: audit
-  - name: burn_in_tags_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *linux_x86_dynamic_compile_variant_name
   - name: burn_in_tests_gen
     depends_on:
     - name: version_burn_in_gen
@@ -1831,12 +1812,6 @@ buildvariants:
     max_sub_suites: 5
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
-    # TODO: These should be al2 specific variants however we haven't moved these variants over to al2
-    # For now we are not running burn_in_tag with al2
-    burn_in_tag_buildvariants: >-
-      enterprise-rhel-80-64-bit-inmem
-      enterprise-rhel-80-64-bit-multiversion
-    burn_in_tag_compile_task_dependency: archive_dist_test_debug
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge,requires_external_data_source
@@ -1846,20 +1821,6 @@ buildvariants:
   - name: query_golden_cqf
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
-  - name: burn_in_tests_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *amazon_linux2_arm64_compile_variant_name
-  - name: burn_in_tags_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-      variant: *amazon_linux2_arm64_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
@@ -2208,13 +2169,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
   # - name: compile_integration_and_test_parallel_stream_TG # Not passing
   # - name: test_api_version_compatibility # Not relevant for TSAN
-  # - name: burn_in_tests_gen # No burn in tests needed
-  #   depends_on:
-  #   - name: version_burn_in_gen
-  #     variant: generate-tasks-for-version
-  #     omit_generated_tasks: true
-  #   - name: archive_dist_test_debug
-  #     variant: *enterprise-rhel80-debug-tsan
   - name: check_feature_flag_tags
   - name: .aggfuzzer !.feature_flag_guarded
   # - name: .aggregation !.feature_flag_guarded # Not passing
