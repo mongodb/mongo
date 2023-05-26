@@ -484,6 +484,11 @@ void CleanupStructuredEncryptionDataCoordinator::updateCleanupStats(const ECOCSt
     _doc.setEcocStats(docEcocStats);
 }
 
+std::set<NamespaceString> CleanupStructuredEncryptionDataCoordinator::_getAdditionalLocksToAcquire(
+    OperationContext* opCtx) {
+    return {_doc.getEcocNss(), _doc.getEscNss(), _doc.getEcocRenameNss(), _doc.getEscDeletesNss()};
+}
+
 ExecutorFuture<void> CleanupStructuredEncryptionDataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {

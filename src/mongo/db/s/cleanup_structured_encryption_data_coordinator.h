@@ -73,6 +73,8 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept final;
 
+    std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
+
 private:
     // Updates the cleanup stats in the state doc with the supplied stats by
     // adding onto the current stats in the state doc.
