@@ -1447,10 +1447,12 @@ var ReplSetTest = function(opts) {
         // set. If this is a config server, the FCV will be set as part of ShardingTest.
         // versions are supported with the useRandomBinVersionsWithinReplicaSet option.
         let setLastLTSFCV = (lastLTSBinVersionWasSpecifiedForSomeNode ||
-                             jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
+                             jsTest.options().useRandomBinVersionsWithinReplicaSet == 'last-lts') &&
             !self.isConfigServer;
         let setLastContinuousFCV = !setLastLTSFCV &&
-            lastContinuousBinVersionWasSpecifiedForSomeNode && !self.isConfigServer;
+            (lastContinuousBinVersionWasSpecifiedForSomeNode ||
+             jsTest.options().useRandomBinVersionsWithinReplicaSet == 'last-continuous') &&
+            !self.isConfigServer;
 
         if ((setLastLTSFCV || setLastContinuousFCV) &&
             jsTest.options().replSetFeatureCompatibilityVersion) {
@@ -1465,15 +1467,23 @@ var ReplSetTest = function(opts) {
             // Authenticate before running the command.
             asCluster(self.nodes, function setFCV() {
                 let fcv = setLastLTSFCV ? lastLTSFCV : lastContinuousFCV;
+
                 print("Setting feature compatibility version for replica set to '" + fcv + "'");
-                const res = self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv});
+                // When latest is not equal to last-continuous, the transition to last-continuous is
+                // not allowed. Setting fromConfigServer allows us to bypass this restriction and
+                // test last-continuous.
+                const res = self.getPrimary().adminCommand(
+                    {setFeatureCompatibilityVersion: fcv, fromConfigServer: true});
                 // TODO (SERVER-74398): Remove the retry with 'confirm: true' once 7.0 is last LTS.
                 if (!res.ok && res.code === 7369100) {
                     // We failed due to requiring 'confirm: true' on the command. This will only
                     // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
                     // setFCV command with 'confirm: true'.
-                    assert.commandWorked(self.getPrimary().adminCommand(
-                        {setFeatureCompatibilityVersion: fcv, confirm: true}));
+                    assert.commandWorked(self.getPrimary().adminCommand({
+                        setFeatureCompatibilityVersion: fcv,
+                        confirm: true,
+                        fromConfigServer: true
+                    }));
                 } else {
                     assert.commandWorked(res);
                 }
