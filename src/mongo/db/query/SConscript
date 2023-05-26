@@ -169,6 +169,22 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='query_settings_manager',
+    source=[
+        'query_settings_cluster_parameter.idl',
+        'query_settings_manager.cpp',
+    ],
+    LIBDEPS=[
+        'query_settings',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+    ],
+)
+
 # Shared mongod/mongos query code.
 env.Library(
     target="query_common",
