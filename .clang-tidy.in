@@ -35,6 +35,7 @@ Checks:          '-*,
                   modernize-unary-static-assert,
                   mongo-cctype-check,
                   mongo-config-header-check,
+                  mongo-collection-sharding-runtime-check,
                   mongo-cxx20-banned-includes-check,
                   mongo-header-bracket-check,
                   mongo-std-atomic-check,
@@ -130,6 +131,8 @@ CheckOptions:
     value:           assert
   - key:             mongo-header-bracket-check.mongoSourceDirs
     value:           'src/mongo;@MONGO_BUILD_DIR@'
+  - key:             mongo-collection-sharding-runtime-check.exceptionDirs
+    value:           'src/mongo/db/s'
   - key:             bugprone-assert-side-effect.CheckFunctionCalls
     value:           '0'
   - key:             bugprone-dangling-handle.HandleClasses

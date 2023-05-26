@@ -6378,7 +6378,7 @@ if get_option('ninja') == 'disabled':
     compileCommands = env.CompilationDatabase('compile_commands.json')
     # Initialize generated-sources Alias as a placeholder so that it can be used as a
     # dependency for compileCommands. This Alias will be properly updated in other SConscripts.
-    env.Requires(compileCommands, env.Alias("generated-sources"))
+    env.Depends(compileCommands, env.Alias("generated-sources"))
     compileDb = env.Alias("compiledb", compileCommands)
 
 msvc_version = ""

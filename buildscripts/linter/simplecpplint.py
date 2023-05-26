@@ -54,7 +54,6 @@ _RE_LINT = re.compile("//.*NOLINT")
 _RE_COMMENT_STRIP = re.compile("//.*")
 
 _RE_PATTERN_MONGO_POLYFILL = _make_polyfill_regex()
-_RE_COLLECTION_SHARDING_RUNTIME = re.compile(r'\bCollectionShardingRuntime\b')
 _RE_RAND = re.compile(r'\b(srand\(|rand\(\))')
 
 _RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
@@ -151,7 +150,6 @@ class Linter:
                 continue
 
             self._check_for_mongo_polyfill(linenum)
-            self._check_for_collection_sharding_runtime(linenum)
             self._check_for_rand(linenum)
             self._check_for_c_stdlib_headers(linenum)
 
@@ -239,16 +237,6 @@ class Linter:
                 linenum, 'mongodb/polyfill',
                 'Illegal use of banned name from std::/boost:: for "%s", use mongo::stdx:: variant instead'
                 % (match.group(0)))
-
-    def _check_for_collection_sharding_runtime(self, linenum):
-        line = self.clean_lines[linenum]
-        if _RE_COLLECTION_SHARDING_RUNTIME.search(
-                line
-        ) and "/src/mongo/db/s/" not in self.file_name and "_test.cpp" not in self.file_name:
-            self._error(
-                linenum, 'mongodb/collection_sharding_runtime', 'Illegal use of '
-                'CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState '
-                'instead; see src/mongo/db/s/collection_sharding_state.h for details.')
 
     def _check_for_rand(self, linenum):
         line = self.clean_lines[linenum]

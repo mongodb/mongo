@@ -292,6 +292,23 @@ class MongoTidyTests(unittest.TestCase):
             "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#ifndef MONGO_CONFIG_TEST2",
             "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#if defined(MONGO_CONFIG_TEST1)",
         ]
+        self.run_clang_tidy()
+
+    def test_MongoCollectionShardingRuntimeCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-collection-sharding-runtime-check'
+                WarningsAsErrors: '*'
+                CheckOptions:
+                    - key:             mongo-collection-sharding-runtime-check.exceptionDirs
+                      value:           'src/mongo/db/s'
+                """))
+
+        self.expected_output = [
+            "error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details. [mongo-collection-sharding-runtime-check,-warnings-as-errors]\n    CollectionShardingRuntime csr(5, \"Test\");",
+            "error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details. [mongo-collection-sharding-runtime-check,-warnings-as-errors]\n    int result = CollectionShardingRuntime::functionTest(7, \"Test\");",
+        ]
 
         self.run_clang_tidy()
 
