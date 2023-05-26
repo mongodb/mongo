@@ -400,7 +400,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
         }
         ss << "),";
     }
-    if (kAddressSanitizerEnabled || kThreadSanitizerEnabled) {
+    if constexpr (kAddressSanitizerEnabled || kThreadSanitizerEnabled) {
         // For applications using WT, advancing a cursor invalidates the data/memory that cursor was
         // pointing to. WT performs the optimization of managing its own memory. The unit of memory
         // allocation is a page. Walking a cursor from one key/value to the next often lands on the
@@ -420,6 +420,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
         // alleviates this by copying all returned data to its own buffer before leaving the storage
         // engine.
         ss << "debug_mode=(cursor_copy=true),";
+    }
+    if constexpr (kThreadSanitizerEnabled) {
+        // TSAN builds may take longer for certain operations, increase the relevant timeouts.
+        ss << "cache_stuck_timeout_ms=600000,";
+        ss << "generation_drain_timeout_ms=480000,";
     }
     if (TestingProctor::instance().isEnabled()) {
         // Enable debug write-ahead logging for all tables when testing is enabled.
