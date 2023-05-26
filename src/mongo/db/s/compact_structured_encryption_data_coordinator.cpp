@@ -306,6 +306,11 @@ boost::optional<BSONObj> CompactStructuredEncryptionDataCoordinator::reportForCu
     return bob.obj();
 }
 
+std::set<NamespaceString> CompactStructuredEncryptionDataCoordinator::_getAdditionalLocksToAcquire(
+    OperationContext* opCtx) {
+    return {_doc.getEcocNss(), _doc.getEscNss(), _doc.getEcocRenameNss()};
+}
+
 ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {

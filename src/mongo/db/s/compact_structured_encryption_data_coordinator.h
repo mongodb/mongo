@@ -73,6 +73,8 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept final;
 
+    std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
+
 private:
     // The response to the compact command
     boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
