@@ -402,9 +402,9 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                 // committed + the number of documents deleted in the current unit of work.
 
                 // Assume nDocs is positive.
-                return data.hasField("sleepMs") && data.hasField("ns") &&
-                    data.getStringField("ns") == collection()->ns().toString() &&
-                    data.hasField("nDocs") &&
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                return data.hasField("sleepMs") && !fpNss.isEmpty() &&
+                    collection()->ns() == fpNss && data.hasField("nDocs") &&
                     _specificStats.docsDeleted + *docsDeleted >=
                     static_cast<unsigned int>(data.getIntField("nDocs"));
             });

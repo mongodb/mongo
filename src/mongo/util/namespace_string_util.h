@@ -142,6 +142,8 @@ public:
     static NamespaceString parseNamespaceFromDoc(const DatabaseName& dbName, StringData coll);
 
     static NamespaceString parseNamespaceFromResponse(const DatabaseName& dbName, StringData coll);
+
+    static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
 };
 
 }  // namespace mongo

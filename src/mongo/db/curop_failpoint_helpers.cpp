@@ -78,8 +78,8 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
             updateCurOpFailPointMsg(opCtx, origCurOpFailpointMsg);
         },
         [&](const BSONObj& data) {
-            StringData fpNss = data.getStringField("nss");
-            if (nss && !fpNss.empty() && fpNss != nss.value().toString()) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+            if (nss && !fpNss.isEmpty() && fpNss != nss.value()) {
                 return false;
             }
             return true;

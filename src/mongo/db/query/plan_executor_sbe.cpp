@@ -311,11 +311,9 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
-                        if (data.hasField("namespace") &&
-                            _nss != NamespaceString(data.getStringField("namespace"))) {
-                            return false;
-                        }
-                        return true;
+                        const auto fpNss =
+                            NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+                        return fpNss.isEmpty() || _nss == fpNss;
                     }))) {
                 LOGV2(5567001,
                       "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "

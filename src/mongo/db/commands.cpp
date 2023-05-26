@@ -645,14 +645,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     }
 
     if (data.hasField("namespace")) {
-        if (data.hasField("$tenant")) {
-            const auto tenantId = TenantId::parseFromBSON(data.getField("$tenant"));
-            const auto fpNss =
-                NamespaceStringUtil::deserialize(tenantId, data.getStringField("namespace"));
-            if (nss != fpNss) {
-                return false;
-            }
-        } else if (nss != NamespaceString(data.getStringField("namespace"))) {
+        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+        if (nss != fpNss) {
             return false;
         }
     }

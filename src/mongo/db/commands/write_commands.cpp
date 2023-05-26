@@ -296,8 +296,8 @@ public:
             }
 
             if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
-                    const auto ns = data.getStringField("ns");
-                    return ns == request().getNamespace().toString();
+                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                    return fpNss == request().getNamespace();
                 })) {
                 hangInsertBeforeWrite.pauseWhileSet();
             }

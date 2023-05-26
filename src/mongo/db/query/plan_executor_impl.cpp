@@ -505,11 +505,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             invariant(PlanStage::IS_EOF == code);
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
-                        if (data.hasField("namespace") &&
-                            _nss != NamespaceString(data.getStringField("namespace"))) {
-                            return false;
-                        }
-                        return true;
+                        auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+                        return fpNss.isEmpty() || fpNss == _nss;
                     }))) {
                 LOGV2(20946,
                       "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "

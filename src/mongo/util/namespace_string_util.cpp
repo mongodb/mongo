@@ -272,4 +272,14 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromResponse(const DatabaseNa
     return parseNamespaceFromDoc(dbName, coll);
 }
 
+NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
+                                                        StringData nsFieldName) {
+    const auto ns = data.getStringField(nsFieldName);
+    const auto tenantField = data.getField("$tenant");
+    const auto tenantId = tenantField.eoo()
+        ? boost::none
+        : boost::optional<TenantId>(TenantId::parseFromBSON(tenantField));
+    return NamespaceStringUtil::deserialize(tenantId, ns);
+}
+
 }  // namespace mongo
