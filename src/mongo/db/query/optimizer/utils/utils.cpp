@@ -584,29 +584,28 @@ public:
 
         // Union the single intervals together. If we have PathCompare [EqMember] Const [[1, 2, 3]]
         // we create [1, 1] U [2, 2] U [3, 3].
-        boost::optional<IntervalReqExpr::Node> unionedInterval;
+        // The intervals are added so that they form a DNF from single-predicate conjunctions that
+        // are children of a top-level disjunction. The creation of the interval DNF doesn't reuse
+        // combineIntervalsDNF() because this function would end up adding its first argument to
+        // itself for each new bound, thus creating N*(N+1)/2 duplicates.
 
+        IntervalReqExpr::Builder builder;
+        builder.pushDisj();
         for (size_t i = 0; i < boundArray->size(); i++) {
             auto singleBoundLow =
                 Constant::createFromCopy(boundArray->getAt(i).first, boundArray->getAt(i).second);
             auto singleBoundHigh = singleBoundLow;
-
-            auto singleInterval = IntervalReqExpr::makeSingularDNF(
-                IntervalRequirement{{true /*inclusive*/, std::move(singleBoundLow)},
-                                    {true /*inclusive*/, std::move(singleBoundHigh)}});
-
-            if (unionedInterval) {
-                // Union the singleInterval with the unionedInterval we want to update.
-                combineIntervalsDNF(false /*intersect*/, *unionedInterval, singleInterval);
-            } else {
-                unionedInterval = std::move(singleInterval);
-            }
+            builder.pushConj()
+                .atom({{true /*inclusive*/, std::move(singleBoundLow)},
+                       {true /*inclusive*/, std::move(singleBoundHigh)}})
+                .pop();
         }
+        auto unionedInterval = std::move(*builder.finish());
 
         return {{PartialSchemaRequirements{
             PSRExpr::makeSingularDNF(PartialSchemaKey{make<PathIdentity>()},
                                      PartialSchemaRequirement{boost::none /*boundProjectionName*/,
-                                                              std::move(*unionedInterval),
+                                                              std::move(unionedInterval),
                                                               false /*isPerfOnly*/})}}};
     }
 
