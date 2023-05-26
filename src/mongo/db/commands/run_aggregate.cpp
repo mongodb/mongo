@@ -156,11 +156,13 @@ bool handleCursorCommand(OperationContext* opCtx,
             invariant(cursors[idx]);
 
             BSONObjBuilder cursorResult;
-            appendCursorResponseObject(cursors[idx]->cursorid(),
-                                       nsForCursor,
-                                       BSONArray(),
-                                       cursors[idx]->getExecutor()->getExecutorType(),
-                                       &cursorResult);
+            appendCursorResponseObject(
+                cursors[idx]->cursorid(),
+                nsForCursor,
+                BSONArray(),
+                cursors[idx]->getExecutor()->getExecutorType(),
+                &cursorResult,
+                SerializationContext::stateCommandReply(request.getSerializationContext()));
             cursorResult.appendBool("ok", 1);
 
             cursorsBuilder.append(cursorResult.obj());
@@ -291,7 +293,10 @@ bool handleCursorCommand(OperationContext* opCtx,
     }
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
-    responseBuilder.done(cursorId, nsForCursor);
+    responseBuilder.done(
+        cursorId,
+        nsForCursor,
+        SerializationContext::stateCommandReply(request.getSerializationContext()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
@@ -775,7 +780,10 @@ Status runAggregate(OperationContext* opCtx,
             options.isInitialResponse = true;
             CursorResponseBuilder responseBuilder(result, options);
             responseBuilder.setWasStatementExecuted(true);
-            responseBuilder.done(0LL, origNss);
+            responseBuilder.done(
+                0LL,
+                origNss,
+                SerializationContext::stateCommandReply(request.getSerializationContext()));
             return Status::OK();
         }
     }

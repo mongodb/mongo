@@ -70,7 +70,9 @@ CursorResponseBuilder::CursorResponseBuilder(rpc::ReplyBuilderInterface* replyBu
                                                                            : kBatchField));
 }
 
-void CursorResponseBuilder::done(CursorId cursorId, const NamespaceString& cursorNamespace) {
+void CursorResponseBuilder::done(CursorId cursorId,
+                                 const NamespaceString& cursorNamespace,
+                                 const SerializationContext& serializationContext) {
     invariant(_active);
 
     _batch.reset();
@@ -90,7 +92,8 @@ void CursorResponseBuilder::done(CursorId cursorId, const NamespaceString& curso
     }
 
     _cursorObject->append(kIdField, cursorId);
-    _cursorObject->append(kNsField, NamespaceStringUtil::serialize(cursorNamespace));
+    _cursorObject->append(kNsField,
+                          NamespaceStringUtil::serialize(cursorNamespace, serializationContext));
     if (_options.atClusterTime) {
         _cursorObject->append(kAtClusterTimeField, _options.atClusterTime->asTimestamp());
     }
@@ -114,10 +117,12 @@ void appendCursorResponseObject(long long cursorId,
                                 const NamespaceString& cursorNamespace,
                                 BSONArray firstBatch,
                                 boost::optional<StringData> cursorType,
-                                BSONObjBuilder* builder) {
+                                BSONObjBuilder* builder,
+                                const SerializationContext& serializationContext) {
     BSONObjBuilder cursorObj(builder->subobjStart(kCursorField));
     cursorObj.append(kIdField, cursorId);
-    cursorObj.append(kNsField, NamespaceStringUtil::serialize(cursorNamespace));
+    cursorObj.append(kNsField,
+                     NamespaceStringUtil::serialize(cursorNamespace, serializationContext));
     cursorObj.append(kBatchFieldInitial, firstBatch);
     if (cursorType) {
         cursorObj.append(kTypeField, cursorType.value());

@@ -637,7 +637,12 @@ public:
                 const CursorId cursorId = 0;
                 endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
                 auto bodyBuilder = result->getBodyBuilder();
-                appendCursorResponseObject(cursorId, nss, BSONArray(), boost::none, &bodyBuilder);
+                appendCursorResponseObject(cursorId,
+                                           nss,
+                                           BSONArray(),
+                                           boost::none,
+                                           &bodyBuilder,
+                                           respSerializationContext);
                 return;
             }
 
@@ -759,7 +764,7 @@ public:
             }
 
             // Generate the response object to send to the client.
-            firstBatch.done(cursorId, nss);
+            firstBatch.done(cursorId, nss, respSerializationContext);
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.

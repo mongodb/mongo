@@ -695,7 +695,9 @@ public:
                 curOp->debug().cursorExhausted = true;
             }
 
-            nextBatch.done(respondWithId, nss);
+            nextBatch.done(respondWithId,
+                           nss,
+                           SerializationContext::stateCommandReply(_cmd.getSerializationContext()));
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.
