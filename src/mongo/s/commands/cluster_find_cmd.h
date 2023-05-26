@@ -223,7 +223,7 @@ public:
 
             if (!_didDoFLERewrite) {
                 query_stats::registerRequest(expCtx, expCtx->ns, [&]() {
-                    return std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedFind);
+                    return std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedFind);
                 });
             }
             auto cq = uassertStatusOK(CanonicalQuery::canonicalize(expCtx, std::move(parsedFind)));

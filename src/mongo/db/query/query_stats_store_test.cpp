@@ -60,7 +60,7 @@ public:
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
-        FindRequestShapifier findShapifier(expCtx->opCtx, *parsedFind);
+        FindRequestShapifier findShapifier(expCtx, *parsedFind);
 
         SerializationOptions opts;
         if (literalPolicy != LiteralSerializationPolicy::kUnchanged) {
@@ -708,7 +708,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     auto&& [expCtx, parsedFind] =
         uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
     QueryStatsEntry testMetrics{
-        std::make_unique<query_stats::FindRequestShapifier>(opCtx.get(), *parsedFind),
+        std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedFind),
         parsedFind->findCommandRequest->getNamespaceOrUUID()};
 
     bool applyHmacToIdentifiers = false;

@@ -151,7 +151,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // optimizing the query, each of which would alter the query shape.
     if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
         query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
-            return std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedRequest);
+            return std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedRequest);
         });
     }
 
