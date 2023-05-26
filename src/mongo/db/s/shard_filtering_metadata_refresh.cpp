@@ -376,25 +376,57 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             boost::optional<CollectionMetadata> currentMetadataToInstall;
 
             ON_BLOCK_EXIT([&] {
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                // A view can potentially be created after spawning a thread to recover nss's shard
-                // version. It is then ok to lock views in order to clear filtering metadata.
-                //
-                // DBLock and CollectionLock must be used in order to avoid shard version checks
-                Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
-                Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+                boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
+                {
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // A view can potentially be created after spawning a thread to recover nss's
+                    // shard version. It is then ok to lock views in order to clear filtering
+                    // metadata.
+                    //
+                    // DBLock and CollectionLock must be used in order to avoid shard version
+                    // checks.
+                    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+                    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
-                auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+                    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
-                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-                // cancellationToken needs to be checked under the CSR lock before overwriting the
-                // filtering metadata to serialize with other threads calling
-                // 'clearFilteringMetadata'
-                if (currentMetadataToInstall && !cancellationToken.isCanceled()) {
-                    csr->setFilteringMetadata_withLock(opCtx, *currentMetadataToInstall, csrLock);
+                    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+                    // cancellationToken needs to be checked under the CSR lock before overwriting
+                    // the filtering metadata to serialize with other threads calling
+                    // 'clearFilteringMetadata'.
+                    if (currentMetadataToInstall && !cancellationToken.isCanceled()) {
+                        csr->setFilteringMetadata_withLock(
+                            opCtx, *currentMetadataToInstall, csrLock);
+
+                        if (currentMetadataToInstall->isSharded() &&
+                            !currentMetadataToInstall->allowMigrations()) {
+                            if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+                                waitForMigrationAbort.emplace(msm->abort());
+                            }
+                        }
+                    }
                 }
 
-                csr->resetShardVersionRecoverRefreshFuture(csrLock);
+                // Join any ongoing migration outside of the CSR lock. Considering we're technically
+                // inside a destructor, we can't allow this wait to throw and neither can we return
+                // without having waited. It is acceptable to wait here uninterruptibly because
+                // we are not holding any resources and nothing that holds resources should be
+                // waiting on the refresh thread.
+                if (waitForMigrationAbort) {
+                    waitForMigrationAbort->waitNoThrow().ignore();
+                }
+
+                {
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // Remember to wake all waiting threads for this refresh to finish.
+                    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+                    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+
+                    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+                    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+
+                    csr->resetShardVersionRecoverRefreshFuture(csrLock);
+                }
             });
 
             if (runRecover) {
@@ -407,18 +439,22 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             auto currentMetadata = forceGetCurrentMetadata(opCtx, nss);
 
             if (currentMetadata.isSharded()) {
-                // If migrations are disallowed for the namespace, join any migrations which may be
-                // executing currently
+                // Abort and join any ongoing migration if migrations are disallowed for the
+                // namespace.
                 if (!currentMetadata.allowMigrations()) {
                     boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
                     {
-                        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
-                        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+                        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+                        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
                         auto const& csr = CollectionShardingRuntime::get(opCtx, nss);
                         auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-                        if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
-                            waitForMigrationAbort.emplace(msm->abort());
+                        // There is no need to abort an ongoing migration if the refresh is
+                        // cancelled.
+                        if (!cancellationToken.isCanceled()) {
+                            if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+                                waitForMigrationAbort.emplace(msm->abort());
+                            }
                         }
                     }
 
