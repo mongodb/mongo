@@ -386,7 +386,7 @@ create_database(const char *home, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",mmap_all=1");
 
     if (GV(DISK_DIRECT_IO))
-        CONFIG_APPEND(p, ",direct_io=(data)");
+        CONFIG_APPEND(p, ",direct_io=(checkpoint,data,log)");
 
     if (GV(DISK_DATA_EXTEND))
         CONFIG_APPEND(p, ",file_extend=(data=8MB)");
