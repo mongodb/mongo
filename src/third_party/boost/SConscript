@@ -1,4 +1,5 @@
 # -*- mode: python; -*-
+# These changes are based off of https://github.com/mongodb-forks/boost/tree/boost-1.76.0-mongo-v5.0
 
 Import("env")
 
