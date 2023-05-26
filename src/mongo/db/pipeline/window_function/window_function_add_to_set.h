@@ -76,7 +76,7 @@ public:
             output.push_back(*it);
         }
 
-        return Value(output);
+        return Value(std::move(output));
     }
 
 private:

@@ -80,7 +80,7 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
 
     if (merging) {
         tassert(5787803, "input must be an array when 'merging' is true", input.isArray());
-        auto array = input.getArray();
+        const auto& array = input.getArray();
         for (auto&& val : array) {
             _processValue(val);
         }
@@ -685,17 +685,17 @@ Value AccumulatorTopBottomN<sense, single>::getValueConst(bool toBeMerged) const
     };
 
     if constexpr (!single) {
-        return Value(result);
+        return Value(std::move(result));
     } else {
         if (toBeMerged) {
-            return Value(result);
+            return Value(std::move(result));
         } else {
             if (result.empty()) {
                 // This only occurs in a window function scenario, an accumulator will always have
                 // at least one value processed.
                 return Value(BSONNULL);
             }
-            return Value(result[0]);
+            return Value(std::move(result[0]));
         }
     }
 }

@@ -1231,7 +1231,7 @@ bool projNeedsFetch(const CanonicalQuery& query) {
     // document, or requires metadata, we will still need a FETCH stage.
     if (proj->type() == projection_ast::ProjectType::kInclusion && !proj->requiresMatchDetails() &&
         proj->metadataDeps().none() && !proj->requiresDocument()) {
-        auto projFields = proj->getRequiredFields();
+        const auto& projFields = proj->getRequiredFields();
         // Note that it is not possible to project onto dotted paths of _id here, since they may be
         // null or missing, and the index cannot differentiate between the two cases, so we would
         // still need a FETCH stage.

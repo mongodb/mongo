@@ -453,7 +453,7 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
     // Note that we don't run validation when loading a histogram from the Statistics collection
     // because we already validated this histogram before inserting it.
     const auto scalar = ScalarHistogram::make(stats.getScalarHistogram());
-    const auto typeCounts = mapStatsTypeCountToTypeCounts(stats.getTypeCount());
+    auto typeCounts = mapStatsTypeCountToTypeCounts(stats.getTypeCount());
     const double trueCount = stats.getTrueCount();
     const double falseCount = stats.getFalseCount();
     const double nanCount = stats.getNanCount();

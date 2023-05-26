@@ -307,7 +307,7 @@ public:
                                   const RangeStatement& range)
         : DocumentSource(kStageName, pExpCtx),
           _field(std::move(field)),
-          _partitions(std::move(partitions)),
+          _partitions(partitions),
           _range(std::move(range)),
           _partitionTable(pExpCtx->getValueComparator().makeUnorderedValueMap<DensifyValue>()),
           _memTracker(

@@ -261,7 +261,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     if (!combined.empty()) {
-        result.push_back(DocumentSourceSort::create(expCtx, SortPattern{combined}));
+        result.push_back(DocumentSourceSort::create(expCtx, SortPattern{std::move(combined)}));
     }
 
     // $_internalSetWindowFields

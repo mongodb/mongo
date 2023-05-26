@@ -1259,7 +1259,7 @@ std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInE
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
     const BitTestMatchExpression* expr) {
-    auto bitPositions = expr->getBitPositions();
+    const auto& bitPositions = expr->getBitPositions();
 
     // Build an array set of bit positions for the bitmask, and remove duplicates in the
     // bitPositions vector since duplicates aren't handled in the match expression parser by

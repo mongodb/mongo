@@ -571,7 +571,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
 
     // Resolve the view definition.
     auto pipeline = Pipeline::makePipelineFromViewDefinition(
-        _fromExpCtx, resolvedNamespace, serializedPipeline, opts);
+        _fromExpCtx, resolvedNamespace, std::move(serializedPipeline), opts);
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
     // first input document.
@@ -671,7 +671,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
             // This exception returns the information we need to resolve a sharded view. Update the
             // pipeline with the resolved view definition.
             pipeline = buildPipelineFromViewDefinition(
-                serializedPipeline,
+                std::move(serializedPipeline),
                 ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()});
 
             // The serialized pipeline does not have a cache stage, so we will add it back to the

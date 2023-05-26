@@ -128,7 +128,7 @@ public:
                                                               true /* setTenantId */,
                                                               false /* authorizedDatabases*/);
 
-            Reply reply(items);
+            Reply reply(std::move(items));
             if (!nameOnly) {
                 reply.setTotalSize(totalSize);
                 reply.setTotalSizeMb(totalSize / (1024 * 1024));

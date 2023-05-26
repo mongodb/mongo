@@ -1050,7 +1050,8 @@ bool isOnlyDependentOnImpl(E&& expr,
     pathsDepsCopy.insert(exprDepsTracker.fields.begin(), exprDepsTracker.fields.end());
 
     return pathsDeps ==
-        DepsTracker::simplifyDependencies(pathsDepsCopy, DepsTracker::TruncateToRootLevel::no);
+        DepsTracker::simplifyDependencies(std::move(pathsDepsCopy),
+                                          DepsTracker::TruncateToRootLevel::no);
 }
 
 bool isOnlyDependentOn(MatchExpression& expr,

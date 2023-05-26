@@ -200,7 +200,7 @@ SortPattern getSortPatternForDensify(RangeStatement rangeStatement,
         part.fieldPath = field.fullPath();
         sortParts.push_back(std::move(part));
     }
-    return SortPattern{sortParts};
+    return SortPattern{std::move(sortParts)};
 }
 
 list<intrusive_ptr<DocumentSource>> create(const intrusive_ptr<ExpressionContext>& expCtx,
@@ -647,7 +647,7 @@ Value DocumentSourceInternalDensify::serialize(SerializationOptions opts) const 
                    _partitions.end(),
                    serializedPartitionByFields.begin(),
                    [&](FieldPath field) -> Value { return Value(opts.serializeFieldPath(field)); });
-    spec[kPartitionByFieldsFieldName] = Value(serializedPartitionByFields);
+    spec[kPartitionByFieldsFieldName] = Value(std::move(serializedPartitionByFields));
     spec[kRangeFieldName] = _range.serialize(opts);
     MutableDocument out;
     out[getSourceName()] = Value(spec.freeze());

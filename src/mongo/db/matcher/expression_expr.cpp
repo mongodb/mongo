@@ -148,7 +148,7 @@ std::unique_ptr<MatchExpression> attemptToRewriteEqHash(ExprMatchExpression& exp
     // Where "a" can be any field path and ? can be any number.
     if (auto eq = dynamic_cast<ExpressionCompare*>(childExpr.get());
         eq && eq->getOp() == ExpressionCompare::CmpOp::EQ) {
-        auto children = eq->getChildren();
+        const auto& children = eq->getChildren();
         tassert(7281406, "should have 2 $eq children", children.size() == 2ul);
 
         auto eqFirst = children[0].get();

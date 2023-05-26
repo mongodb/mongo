@@ -788,7 +788,7 @@ Value ExpressionObjectToArray::evaluate(const Document& root, Variables* variabl
         output.push_back(keyvalue.freezeToValue());
     }
 
-    return Value(output);
+    return Value(std::move(output));
 }
 
 REGISTER_STABLE_EXPRESSION(objectToArray, ExpressionObjectToArray::parse);
@@ -1017,7 +1017,7 @@ intrusive_ptr<Expression> ExpressionCompare::parse(ExpressionContext* const expC
     intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(expCtx, op);
     ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
     expr->validateArguments(args);
-    expr->_children = args;
+    expr->_children = std::move(args);
     return expr;
 }
 
@@ -3535,7 +3535,7 @@ Value ExpressionIndexOfArray::evaluate(const Document& root, Variables* variable
                           << typeName(arrayArg.getType()),
             arrayArg.isArray());
 
-    std::vector<Value> array = arrayArg.getArray();
+    const std::vector<Value>& array = arrayArg.getArray();
     auto args = evaluateAndValidateArguments(root, _children, array.size(), variables);
     for (int i = args.startIndex; i < args.endIndex; i++) {
         if (getExpressionContext()->getValueComparator().evaluate(array[i] ==
@@ -3630,7 +3630,7 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
                               << "argument is of type: " << typeName(valueArray.getType()),
                 valueArray.isArray());
 
-        auto arr = valueArray.getArray();
+        const auto& arr = valueArray.getArray();
 
         // To handle the case of duplicate values the values need to map to a vector of indecies.
         auto indexMap =
@@ -4007,7 +4007,7 @@ Value ExpressionInternalFLEBetween::serialize(SerializationOptions options) cons
     }
     return Value(Document{{kInternalFleBetween,
                            Document{{"field", _children[0]->serialize(options)},
-                                    {"server", Value(serverDerivedValues)}}}});
+                                    {"server", Value(std::move(serverDerivedValues))}}}});
 }
 
 Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* variables) const {
@@ -4808,7 +4808,7 @@ Value ExpressionReverseArray::evaluate(const Document& root, Variables* variable
 
     std::vector<Value> array = input.getArray();
     std::reverse(array.begin(), array.end());
-    return Value(array);
+    return Value(std::move(array));
 }
 
 REGISTER_STABLE_EXPRESSION(reverseArray, ExpressionReverseArray::parse);
@@ -4904,7 +4904,7 @@ Value ExpressionSortArray::evaluate(const Document& root, Variables* variables) 
 
     std::vector<Value> array = input.getArray();
     std::sort(array.begin(), array.end(), _sortBy);
-    return Value(array);
+    return Value(std::move(array));
 }
 
 REGISTER_STABLE_EXPRESSION(sortArray, ExpressionSortArray::parse);
@@ -5238,7 +5238,7 @@ Value ExpressionInternalFindAllValuesAtPath::evaluate(const Document& root,
         outputVals.push_back(Value(elt));
     }
 
-    return Value(outputVals);
+    return Value(std::move(outputVals));
 }
 // This expression is not part of the stable API, but can always be used. It is
 // an internal expression used only for distinct.
@@ -5908,11 +5908,12 @@ Value ExpressionSwitch::serialize(SerializationOptions options) const {
 
     if (defaultExpr()) {
         return Value(Document{{"$switch",
-                               Document{{"branches", Value(serializedBranches)},
+                               Document{{"branches", Value(std::move(serializedBranches))},
                                         {"default", defaultExpr()->serialize(options)}}}});
     }
 
-    return Value(Document{{"$switch", Document{{"branches", Value(serializedBranches)}}}});
+    return Value(
+        Document{{"$switch", Document{{"branches", Value(std::move(serializedBranches))}}}});
 }
 
 /* ------------------------- ExpressionToLower ----------------------------- */
@@ -6431,7 +6432,7 @@ Value ExpressionZip::evaluate(const Document& root, Variables* variables) const 
         output.push_back(Value(outputChild));
     }
 
-    return Value(output);
+    return Value(std::move(output));
 }
 
 boost::intrusive_ptr<Expression> ExpressionZip::optimize() {
@@ -7176,7 +7177,7 @@ Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
     MutableDocument match;
     match.addField("match", Value(m[0]));
     match.addField("idx", Value(regexState->startCodePointPos));
-    match.addField("captures", Value(captures));
+    match.addField("captures", Value(std::move(captures)));
     return match.freezeToValue();
 }
 
@@ -7375,7 +7376,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
     std::vector<Value> output;
     auto executionState = buildInitialState(root, variables);
     if (executionState.nullish()) {
-        return Value(output);
+        return Value(std::move(output));
     }
     StringData input = *(executionState.input);
     size_t totalDocSize = 0;
@@ -7417,7 +7418,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
         invariant(executionState.startCodePointPos > 0);
         invariant(executionState.startCodePointPos <= executionState.startBytePos);
     } while (static_cast<size_t>(executionState.startBytePos) < input.size());
-    return Value(output);
+    return Value(std::move(output));
 }
 
 /* -------------------------- ExpressionRegexMatch ------------------------------ */

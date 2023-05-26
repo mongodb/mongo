@@ -111,7 +111,7 @@ public:
         if (_values.empty()) {
             std::vector<Value> nulls;
             nulls.insert(nulls.end(), _ps.size(), Value(BSONNULL));
-            return Value(nulls);
+            return Value(std::move(nulls));
         }
         std::vector<Value> pctls;
         pctls.reserve(_ps.size());
@@ -120,7 +120,7 @@ public:
             pctls.push_back(result);
         }
 
-        return Value(pctls);
+        return Value(std::move(pctls));
     };
 
     void reset() final {

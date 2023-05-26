@@ -570,7 +570,7 @@ bool isMergeSkipOrLimit(const boost::intrusive_ptr<DocumentSource>& stage) {
 }
 
 bool isAllLimitsAndSkips(Pipeline* pipeline) {
-    const auto stages = pipeline->getSources();
+    const auto& stages = pipeline->getSources();
     return std::all_of(
         stages.begin(), stages.end(), [](const auto& stage) { return isMergeSkipOrLimit(stage); });
 }

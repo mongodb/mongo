@@ -130,7 +130,7 @@ public:
             options.dropTarget = true;
             options.stayTemp = false;
             doLocalRenameIfOptionsAndIndexesHaveNotChanged(
-                opCtx, fromNss, toNss, options, std::move(indexList), collectionOptions);
+                opCtx, fromNss, toNss, options, indexList, collectionOptions);
         }
 
         NamespaceString ns() const override {

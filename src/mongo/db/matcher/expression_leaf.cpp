@@ -487,7 +487,7 @@ BSONObj InMatchExpression::serializeToShape(SerializationOptions opts) const {
     if (hasRegex()) {
         firstOfEachType.emplace_back(BSONRegEx());
     }
-    return BSON("$in" << opts.serializeLiteral(firstOfEachType));
+    return BSON("$in" << opts.serializeLiteral(std::move(firstOfEachType)));
 }
 
 BSONObj InMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {

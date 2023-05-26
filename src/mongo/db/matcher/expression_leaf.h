@@ -920,7 +920,8 @@ public:
     BitsAllSetMatchExpression(boost::optional<StringData> path,
                               std::vector<uint32_t> bitPositions,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : BitTestMatchExpression(BITS_ALL_SET, path, bitPositions, std::move(annotation)) {}
+        : BitTestMatchExpression(
+              BITS_ALL_SET, path, std::move(bitPositions), std::move(annotation)) {}
 
     BitsAllSetMatchExpression(boost::optional<StringData> path,
                               uint64_t bitMask,
@@ -964,7 +965,8 @@ public:
     BitsAllClearMatchExpression(boost::optional<StringData> path,
                                 std::vector<uint32_t> bitPositions,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : BitTestMatchExpression(BITS_ALL_CLEAR, path, bitPositions, std::move(annotation)) {}
+        : BitTestMatchExpression(
+              BITS_ALL_CLEAR, path, std::move(bitPositions), std::move(annotation)) {}
 
     BitsAllClearMatchExpression(boost::optional<StringData> path,
                                 uint64_t bitMask,
@@ -1008,7 +1010,8 @@ public:
     BitsAnySetMatchExpression(boost::optional<StringData> path,
                               std::vector<uint32_t> bitPositions,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : BitTestMatchExpression(BITS_ANY_SET, path, bitPositions, std::move(annotation)) {}
+        : BitTestMatchExpression(
+              BITS_ANY_SET, path, std::move(bitPositions), std::move(annotation)) {}
 
     BitsAnySetMatchExpression(boost::optional<StringData> path,
                               uint64_t bitMask,
@@ -1052,7 +1055,8 @@ public:
     BitsAnyClearMatchExpression(boost::optional<StringData> path,
                                 std::vector<uint32_t> bitPositions,
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : BitTestMatchExpression(BITS_ANY_CLEAR, path, bitPositions, std::move(annotation)) {}
+        : BitTestMatchExpression(
+              BITS_ANY_CLEAR, path, std::move(bitPositions), std::move(annotation)) {}
 
     BitsAnyClearMatchExpression(boost::optional<StringData> path,
                                 uint64_t bitMask,

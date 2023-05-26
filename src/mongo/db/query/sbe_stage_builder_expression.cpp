@@ -1138,7 +1138,7 @@ public:
     void visit(const ExpressionDateDiff* expr) final {
         using namespace std::literals;
 
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 5);
 
         auto startDateName = makeLocalVariableName(_context->state.frameId(), 0);
@@ -1284,7 +1284,7 @@ public:
         pushABT(std::move(dateDiffExpression));
     }
     void visit(const ExpressionDateFromString* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 5);
         _context->ensureArity(
             1 + (expr->isFormatSpecified() ? 1 : 0) + (expr->isTimezoneSpecified() ? 1 : 0) +
@@ -1456,7 +1456,7 @@ public:
     void visit(const ExpressionDateFromParts* expr) final {
         // This expression can carry null children depending on the set of fields provided,
         // to compute a date from parts so we only need to pop if a child exists.
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 11);
 
         boost::optional<optimizer::ABT> eTimezone;
@@ -1760,7 +1760,7 @@ public:
     }
 
     void visit(const ExpressionDateToParts* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
         auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
         auto isoflagName = makeLocalVariableName(_context->state.frameId(), 0);
@@ -1830,7 +1830,7 @@ public:
     }
 
     void visit(const ExpressionDateToString* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 4);
         _context->ensureArity(1 + (expr->isFormatSpecified() ? 1 : 0) +
                               (expr->isTimezoneSpecified() ? 1 : 0) +
@@ -1948,7 +1948,7 @@ public:
                         std::move(inputValidationCases), optimizer::Constant::nothing())))));
     }
     void visit(const ExpressionDateTrunc* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 5);
         _context->ensureArity(2 + (expr->isBinSizeSpecified() ? 1 : 0) +
                               (expr->isTimezoneSpecified() ? 1 : 0) +
@@ -3379,7 +3379,7 @@ private:
     }
 
     void generateDateExpressionAcceptingTimeZone(StringData exprName, const Expression* expr) {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 2);
 
         auto timezoneExpression =
@@ -3644,7 +3644,7 @@ private:
     void visitIndexOfFunction(const Expression* expr,
                               ExpressionVisitorContext* _context,
                               const std::string& indexOfFunction) {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         auto operandSize = children.size() <= 3 ? 3 : 4;
         optimizer::ABTVector operands;
         operands.reserve(operandSize);
@@ -4054,7 +4054,7 @@ private:
      */
     void generateDateArithmeticsExpression(const ExpressionDateArithmetics* expr,
                                            const std::string& dateExprName) {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         auto arity = children.size();
         invariant(arity == 4);
         auto timezoneExpr =

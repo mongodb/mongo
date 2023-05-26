@@ -735,27 +735,23 @@ void deleteDocument(OperationContext* opCtx,
         Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
     }
 
-    std::vector<OplogSlot> oplogSlots;
-    auto retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kNone;
-    if (storeDeletedDoc == StoreDeletedDoc::On && retryableWrite == RetryableWrite::kYes) {
-        retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
-        oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+    OplogDeleteEntryArgs deleteArgs{
+        nullptr /* deletedDoc */, fromMigrate, collection->isChangeStreamPreAndPostImagesEnabled()};
+
+    const bool shouldRecordPreImageForRetryableWrite =
+        storeDeletedDoc == StoreDeletedDoc::On && retryableWrite == RetryableWrite::kYes;
+    if (shouldRecordPreImageForRetryableWrite) {
+        deleteArgs.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
+        deleteArgs.oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     }
-    OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
-                                    fromMigrate,
-                                    collection->isChangeStreamPreAndPostImagesEnabled(),
-                                    retryableFindAndModifyLocation,
-                                    oplogSlots};
 
     opCtx->getServiceContext()->getOpObserver()->aboutToDelete(opCtx, collection, doc.value());
 
     boost::optional<BSONObj> deletedDoc;
-    const bool isRecordingPreImageForRetryableWrite =
-        retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone;
     const bool isTimeseriesCollection =
         collection->getTimeseriesOptions() || nss.isTimeseriesBucketsCollection();
 
-    if (isRecordingPreImageForRetryableWrite ||
+    if (shouldRecordPreImageForRetryableWrite ||
         collection->isChangeStreamPreAndPostImagesEnabled() ||
         (isTimeseriesCollection &&
          feature_flags::gTimeseriesScalabilityImprovements.isEnabled(

@@ -448,7 +448,7 @@ public:
         values.reserve(vec.size());
         for_each(
             vec.begin(), vec.end(), ([&](const ImplicitValue& val) { values.push_back(val); }));
-        return Value(values);
+        return Value(std::move(values));
     }
 
     /**

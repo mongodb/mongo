@@ -861,8 +861,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // separately project both a document and its sub-fields (e.g., both 'a' and 'a.b'). Compute the
     // the subset of 'csn->allFields' that only includes a field if no other field in
     // 'csn->allFields' is its prefix.
-    fieldsToProject =
-        DepsTracker::simplifyDependencies(fieldsToProject, DepsTracker::TruncateToRootLevel::no);
+    fieldsToProject = DepsTracker::simplifyDependencies(std::move(fieldsToProject),
+                                                        DepsTracker::TruncateToRootLevel::no);
     for (const std::string& field : fieldsToProject) {
         builder.integrateFieldPath(FieldPath(field),
                                    [](const bool isLastElement, optimizer::FieldMapEntry& entry) {
@@ -2645,9 +2645,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // If the group node references any top level fields, we take all of them and add them to
     // 'childReqs'. Note that this happens regardless of whether we need the whole document because
     // it can be the case that this stage references '$$ROOT' as well as some top level fields.
-    auto topLevelFields = getTopLevelFields(groupNode->requiredFields);
-    if (!topLevelFields.empty()) {
-        childReqs.setFields(topLevelFields);
+    if (auto topLevelFields = getTopLevelFields(groupNode->requiredFields);
+        !topLevelFields.empty()) {
+        childReqs.setFields(std::move(topLevelFields));
     }
 
     if (!groupNode->needWholeDocument) {

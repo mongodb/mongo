@@ -426,7 +426,7 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,
                                         numBuckets,
-                                        accumulationStatements,
+                                        std::move(accumulationStatements),
                                         granularityRounder,
                                         maxMemoryUsageBytes);
 }
@@ -539,8 +539,11 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
             "$bucketAuto requires 'groupBy' and 'buckets' to be specified",
             groupByExpression && numBuckets);
 
-    return DocumentSourceBucketAuto::create(
-        pExpCtx, groupByExpression, numBuckets.value(), accumulationStatements, granularityRounder);
+    return DocumentSourceBucketAuto::create(pExpCtx,
+                                            groupByExpression,
+                                            numBuckets.value(),
+                                            std::move(accumulationStatements),
+                                            granularityRounder);
 }
 
 }  // namespace mongo

@@ -1401,7 +1401,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
         RelevantTag* usedRt = static_cast<RelevantTag*>(assignedPred->getTag());
         set<string> usedPrefixes;
         usedPrefixes.insert(getPathPrefix(usedRt->path));
-        used[nullptr] = usedPrefixes;
+        used[nullptr] = std::move(usedPrefixes);
 
         // If 'assigned' is a predicate inside an $elemMatch, we have to
         // add the prefix not only to the top-level context, but also to the
@@ -1416,7 +1416,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
             // in the top-level context, but here must be different because 'usedRt'
             // is in an $elemMatch context.
             elemMatchUsed.insert(usedRt->pathPrefix);
-            used[usedRt->elemMatchExpr] = elemMatchUsed;
+            used[usedRt->elemMatchExpr] = std::move(elemMatchUsed);
         }
     }
 
@@ -1435,7 +1435,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
                 topLevelUsed.insert(getPathPrefix(rt->path));
                 set<string> usedPrefixes;
                 usedPrefixes.insert(rt->pathPrefix);
-                used[rt->elemMatchExpr] = usedPrefixes;
+                used[rt->elemMatchExpr] = std::move(usedPrefixes);
 
                 // Output the predicate.
                 out->push_back(couldCompound[i]);

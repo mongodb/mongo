@@ -154,6 +154,6 @@ std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
                                                  ListIndexesInclude additionalInclude) {
     auto listStatus = listIndexes(opCtx, nss, additionalInclude);
-    return listStatus.isOK() ? listStatus.getValue() : std::list<BSONObj>();
+    return listStatus.isOK() ? std::move(listStatus.getValue()) : std::list<BSONObj>();
 }
 }  // namespace mongo

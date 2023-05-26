@@ -223,7 +223,7 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     }
 
     return DocumentSourceSort::create(
-        sort.getContext(), SortPattern{updatedPattern}, 0, maxMemoryUsageBytes);
+        sort.getContext(), SortPattern{std::move(updatedPattern)}, 0, maxMemoryUsageBytes);
 }
 
 /**
@@ -243,7 +243,7 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
             expCtx.get(), field.firstElement(), expCtx->variablesParseState));
     };
 
-    return DocumentSourceGroup::create(expCtx, groupByExpr, accumulators);
+    return DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators));
 }
 
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.

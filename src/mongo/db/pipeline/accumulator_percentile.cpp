@@ -83,7 +83,7 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
     auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
-    std::vector<double> ps = spec.getP();
+    const std::vector<double>& ps = spec.getP();
 
     PercentileMethodEnum method = spec.getMethod();
 
