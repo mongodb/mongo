@@ -186,8 +186,6 @@ buildvariants:
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-dynamic-required
-    burn_in_tag_compile_task_dependency: archive_dist_test_debug
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -215,7 +213,6 @@ buildvariants:
   - name: .aggregation
   - name: audit
   - name: .auth
-  - name: burn_in_tags_gen
   - name: buildscripts_test
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen

@@ -56,7 +56,7 @@ def get_evergreen_config() -> EvergreenProjectConfig:
 class TestCreateEvgBuildVariantMap(unittest.TestCase):
     def test_create_evg_buildvariant_map(self):
         expansions_file_data = {
-            "build_variant": "variant1", "burn_in_tag_buildvariants": "variant2 variant3"
+            "build_variant": "variant1", "burn_in_tag_include_build_variants": "variant2 variant3"
         }
         buildvariant_map = under_test._create_evg_build_variant_map(expansions_file_data)
 

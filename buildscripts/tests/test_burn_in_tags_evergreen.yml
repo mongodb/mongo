@@ -64,7 +64,7 @@ buildvariants:
   display_name: "! Enterprise RHEL 8.0"
   expansions:
     multiversion_platform: rhel80
-    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-majority-read-concern-off enterprise-rhel-80-64-bit-inmem
+    burn_in_tag_include_build_variants: enterprise-rhel-80-64-bit-majority-read-concern-off enterprise-rhel-80-64-bit-inmem
   tasks:
   - name: compile_all_run_unittests_TG
     distros:

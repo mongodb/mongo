@@ -92,7 +92,7 @@ def _create_evg_build_variant_map(expansions_file_data):
     :param expansions_file_data: Config data file to use.
     :return: Map of base buildvariants to their generated buildvariants.
     """
-    burn_in_tag_build_variants = expansions_file_data["burn_in_tag_buildvariants"]
+    burn_in_tag_build_variants = expansions_file_data["burn_in_tag_include_build_variants"]
 
     if burn_in_tag_build_variants:
         return {
