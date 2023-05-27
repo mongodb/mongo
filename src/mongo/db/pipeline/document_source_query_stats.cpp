@@ -202,7 +202,7 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
                             "Error encountered when applying hmac to query shape, will not publish "
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
-                            "hash"_attr = key);
+                            "hash"_attr = *key);
                 if (kDebugBuild) {
                     tasserted(7349401,
                               "Was not able to re-parse queryStats key when reading queryStats.");
