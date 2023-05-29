@@ -49,6 +49,7 @@ void scanDocumentChildren(mutablebson::ConstElement elem,
                           std::uint32_t recursionLevel,
                           const bool allowTopLevelDollarPrefixes,
                           const bool shouldValidate,
+                          const bool isEmbeddedInIdField,
                           bool* containsDotsAndDollarsField) {
     if (!elem.hasChildren()) {
         return;
@@ -61,6 +62,7 @@ void scanDocumentChildren(mutablebson::ConstElement elem,
                      recursionLevel + 1,
                      allowTopLevelDollarPrefixes,
                      shouldValidate,
+                     isEmbeddedInIdField,
                      containsDotsAndDollarsField);
         curr = curr.rightSibling();
     }
@@ -161,6 +163,7 @@ void scanDocument(const mutablebson::Document& doc,
                              0 /* recursionLevel - forces _id fields to be treated as top-level. */,
                              false /* Top-level _id fields cannot be $-prefixed. */,
                              shouldValidate,
+                             true /* Indicates the element is embedded inside an _id field. */,
                              containsDotsAndDollarsField);
             } else {
                 uassertStatusOK(storageValidIdField(currElem.getValue()));
@@ -176,6 +179,7 @@ void scanDocument(const mutablebson::Document& doc,
                          recursionLevel,
                          allowTopLevelDollarPrefixes,
                          shouldValidate,
+                         false /* Not embedded inside an _id field. */,
                          containsDotsAndDollarsField);
         }
 
@@ -188,6 +192,7 @@ void scanDocument(mutablebson::ConstElement elem,
                   std::uint32_t recursionLevel,
                   const bool allowTopLevelDollarPrefixes,
                   const bool shouldValidate,
+                  const bool isEmbeddedInIdField,
                   bool* containsDotsAndDollarsField) {
     if (shouldValidate) {
         uassert(ErrorCodes::BadValue, "Invalid elements cannot be stored.", elem.ok());
@@ -204,8 +209,10 @@ void scanDocument(mutablebson::ConstElement elem,
     const bool childOfArray = parent.ok() ? (parent.getType() == BSONType::Array) : false;
 
     // Only check top-level fields if 'allowTopLevelDollarPrefixes' is false, and don't validate any
-    // fields for '$'-prefixes if 'allowTopLevelDollarPrefixes' is true.
-    const bool checkTopLevelFields = !allowTopLevelDollarPrefixes && (recursionLevel == 1);
+    // fields for '$'-prefixes if 'allowTopLevelDollarPrefixes' is true. If 'isEmbeddedInIdField' is
+    // true, check for '$'-prefixes at all the levels.
+    const bool checkTopLevelFields =
+        !allowTopLevelDollarPrefixes && (recursionLevel == 1 || isEmbeddedInIdField);
 
     auto fieldName = elem.getFieldName();
     if (fieldName[0] == '$') {
@@ -229,6 +236,7 @@ void scanDocument(mutablebson::ConstElement elem,
                              recursionLevel,
                              allowTopLevelDollarPrefixes,
                              shouldValidate,
+                             isEmbeddedInIdField,
                              containsDotsAndDollarsField);
     }
 }

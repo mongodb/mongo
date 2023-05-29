@@ -87,6 +87,7 @@ void PopNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                      recursionLevel,
                                      false, /* allowTopLevelDollarPrefixedFields */
                                      false, /* Should validate for storage */
+                                     false, /* isEmbeddedInIdField */
                                      containsDotsAndDollarsField);
 }
 

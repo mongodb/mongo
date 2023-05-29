@@ -77,6 +77,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                          recursionLevelForCheck,
                                          false, /* allowTopLevelDollarPrefixedFields */
                                          validateForStorage,
+                                         false, /* isEmbeddedInIdField */
                                          containsDotsAndDollarsField);
     }
 
@@ -86,6 +87,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                          recursionLevelForCheck,
                                          false, /* allowTopLevelDollarPrefixedFields */
                                          validateForStorage,
+                                         false, /* isEmbeddedInIdField */
                                          containsDotsAndDollarsField);
     }
 }
