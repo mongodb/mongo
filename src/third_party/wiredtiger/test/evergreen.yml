@@ -1197,6 +1197,7 @@ variables:
       - func: "compile wiredtiger"
         vars:
           <<: *configure_flags_with_builtins
+          CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
       - func: "recovery stress test script"
         vars:
           times: 25
@@ -1209,6 +1210,7 @@ variables:
         vars:
           <<: *configure_flags_with_builtins
           NONSTANDALONE: -DWT_STANDALONE_BUILD=0
+          CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
       - func: "recovery stress test script"
         vars:
           times: 25
@@ -4338,6 +4340,7 @@ tasks:
         vars:
           <<: *configure_flags_with_builtins
           NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
+          CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
       - func: "recovery stress test script"
         vars:
           times: 25
@@ -4352,6 +4355,7 @@ tasks:
           <<: *configure_flags_with_builtins
           NONSTANDALONE: -DWT_STANDALONE_BUILD=0
           NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
+          CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
       - func: "recovery stress test script"
         vars:
           times: 25
