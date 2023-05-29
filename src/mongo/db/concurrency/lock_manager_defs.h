@@ -168,6 +168,13 @@ enum ResourceType {
     RESOURCE_METADATA,
 
     /**
+     * Resource DDL types used for multi-granularity locking on DDL operations.
+     * These resources are not related to the storage hierarchy.
+     */
+    RESOURCE_DDL_DATABASE,
+    RESOURCE_DDL_COLLECTION,
+
+    /**
      * Resource type used for locking general resources not related to the storage hierarchy. These
      * can't be created manually, use Lock::ResourceMutex::ResourceMutex() instead.
      */
@@ -193,8 +200,15 @@ enum class ResourceGlobalId : uint8_t {
 /**
  * Maps the resource id to a human-readable string.
  */
-static const char* ResourceTypeNames[] = {
-    "Invalid", "Global", "Tenant", "Database", "Collection", "Metadata", "Mutex"};
+static const char* ResourceTypeNames[] = {"Invalid",
+                                          "Global",
+                                          "Tenant",
+                                          "Database",
+                                          "Collection",
+                                          "Metadata",
+                                          "DDLDatabase",
+                                          "DDLCollection",
+                                          "Mutex"};
 
 /**
  * Maps the global resource id to a human-readable string.
@@ -232,8 +246,8 @@ static const char* resourceGlobalIdName(ResourceGlobalId id) {
  * Uniquely identifies a lockable resource.
  */
 class ResourceId {
-    // We only use 3 bits for the resource type in the ResourceId hash
-    enum { resourceTypeBits = 3 };
+    // We only use 4 bits for the resource type in the ResourceId hash
+    enum { resourceTypeBits = 4 };
     MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
 public:
@@ -290,6 +304,7 @@ public:
 
 private:
     friend class ResourceCatalog;
+    friend class ResourceIdTest;
 
     ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 

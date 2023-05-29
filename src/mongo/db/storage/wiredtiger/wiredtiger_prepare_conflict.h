@@ -118,10 +118,10 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         // secondaries) an IX lock that conflicts with the MODE_S lock held by the user operation.
         // User operations that acquire MODE_X locks and block on prepare conflicts could lead to
         // the same problem. However, user operations on secondaries should never hold MODE_X locks.
-        // Since prepared transactions will not reacquire RESOURCE_MUTEX / RESOURCE_METADATA locks
-        // at commit time, these lock types are safe. Therefore, invariant here that we do not get a
-        // prepare conflict while holding a global, database, or collection MODE_S lock (or MODE_X
-        // lock for completeness).
+        // Since prepared transactions will not reacquire RESOURCE_MUTEX / RESOURCE_METADATA /
+        // RESOURCE_DDL_* locks at commit time, these lock types are safe. Therefore, invariant here
+        // that we do not get a prepare conflict while holding a global, database, or collection
+        // MODE_S lock (or MODE_X lock for completeness).
         if (type == RESOURCE_GLOBAL || type == RESOURCE_DATABASE || type == RESOURCE_COLLECTION)
             invariant(lock.mode != MODE_S && lock.mode != MODE_X,
                       str::stream() << lock.resourceId.toString() << " in " << modeName(lock.mode));

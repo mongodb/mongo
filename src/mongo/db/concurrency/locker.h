@@ -163,7 +163,7 @@ public:
     /**
      * Decrements the reference count on the global lock.  If the reference count on the
      * global lock hits zero, the transaction is over, and unlockGlobal unlocks all other locks
-     * except for RESOURCE_MUTEX locks.
+     * except for RESOURCE_MUTEX and RESOURCE_DDL_* locks.
      *
      * @return true if this is the last endTransaction call (i.e., the global lock was
      *          released); false if there are still references on the global lock. This value
@@ -389,8 +389,8 @@ public:
     virtual bool canSaveLockState() = 0;
 
     /**
-     * Retrieves all locks held by this transaction, other than RESOURCE_MUTEX locks, and what mode
-     * they're held in.
+     * Retrieves all locks held by this transaction, other than RESOURCE_MUTEX and RESOURCE_DDL_*
+     * locks, and what mode they're held in.
      *
      * Unlocks all locks held by this transaction, and stores them in 'stateOut'. This functionality
      * is used for yielding, which is voluntary/cooperative lock release and reacquisition in order
