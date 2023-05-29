@@ -288,6 +288,8 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
     if (!reconfig) {
         WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
         conn->log_file_max = (wt_off_t)cval.val;
+        if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
+            conn->log_file_max = (wt_off_t)WT_ALIGN(conn->log_file_max, conn->buffer_alignment);
         /*
          * With the default log file extend configuration or if the log file extension size is
          * larger than the configured maximum log file size, set the log file extension size to the
