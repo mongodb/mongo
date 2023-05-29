@@ -371,6 +371,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
         // Verify post-image and diff format.
         ASSERT_EQUALS(doc, fromjson("{paddingField: 'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry, fromjson("{$v: 2, diff: {d: {f1: false}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When a path in the diff is same as index path.
@@ -386,6 +387,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
                 "{f1: {a: {paddingField: 'largeValueString'}}, paddingField: 'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {sf1: {sa: {d: {b: false, c: false}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff.
@@ -401,6 +403,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
             doc,
             fromjson("{f1: {a: {b: {paddingField: 'largeValueString'}, c: 1, paddingField: "
                      "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // With common parent, but path diverges.
@@ -416,6 +419,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
             doc,
             fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, paddingField: "
                      "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_FALSE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
 }
 
@@ -438,6 +442,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
         ASSERT_EQUALS(doc, fromjson("{f1: true, paddingField: 'largeValueString', f2: true}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {u: {f1: true}, i: {f2: true}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When a path in the diff is same as index path.
@@ -449,6 +454,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
         // Verify diff format.
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {sf1: {sa: {i: {newField: true}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff.
@@ -465,6 +471,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
             fromjson(
                 "{f1: {a: {b: {c: true, paddingField: 'largeValueString'}, c: 1, paddingField: "
                 "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // With common parent, but path diverges.
@@ -480,6 +487,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
             doc,
             fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, c: 1, paddingField: "
                      "'largeValueString', p: true}}, paddingField: 'largeValueString'}"));
+        ASSERT_FALSE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
 }
 
@@ -509,6 +517,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry,
             fromjson("{$v: 2, diff: {sf1: {a: true, s1: {sa: {sb: {a: true, l: 1}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff and also involves numeric
@@ -530,6 +539,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
             result.oplogEntry,
             fromjson(
                 "{$v: 2, diff: {sf1: {a: true, s1: {sa: {sb: {a: true, s1: {i: {d: 1} }}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When inserting a sub-object into array, and the sub-object diverges from the index path.
@@ -548,6 +558,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
                 "'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {sf1: {a: true, u2: {newField: 1} }}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When a common array path element is updated, but the paths diverge at the last element.
@@ -567,6 +578,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
             fromjson(
                 "{f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: 'largeValueString'}], "
                 "c: 2, paddingField: 'largeValueString'}}], paddingField: 'largeValueString'}"));
+        ASSERT_FALSE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
 }
 
@@ -593,6 +605,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
                      "'largeValueString'}}, paddingField: 'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry, fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, l: 1}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // Add an array element.
@@ -610,6 +623,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry,
             fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, u2: {newField: 1} }}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // Updating a sub-array element.
@@ -627,6 +641,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry,
             fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, u1: 'updatedVal'}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
 }
 

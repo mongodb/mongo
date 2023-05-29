@@ -91,12 +91,10 @@ protected:
         return applyParams;
     }
 
-    bool getIndexAffectedFromLogEntry() {
-        if (!_logBuilder || !_indexData) {
+    bool getIndexAffectedFromLogEntry(BSONObj logEntry) {
+        if (!_indexData) {
             return false;
         }
-        // Keep the object alive, extractDiffFromOplogEntry returns a subdocument of this document.
-        BSONObj logEntry = getOplogEntry();
         auto diff = update_oplog_entry::extractDiffFromOplogEntry(logEntry);
         if (!diff) {
             return false;
@@ -104,6 +102,13 @@ protected:
         return mongo::doc_diff::anyIndexesMightBeAffected(
                    *diff, std::vector<const UpdateIndexData*>{_indexData.get()})
             .any();
+    }
+
+    bool getIndexAffectedFromLogEntry() {
+        if (!_logBuilder) {
+            return false;
+        }
+        return getIndexAffectedFromLogEntry(getOplogEntry());
     }
 
     UpdateNode::UpdateNodeApplyParams getUpdateNodeApplyParams() {
