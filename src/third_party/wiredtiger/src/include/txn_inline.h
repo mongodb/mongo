@@ -1064,6 +1064,7 @@ __wt_txn_read(
     read_onpage = prepare_retry = true;
 
 retry:
+    __wt_timing_stress(session, WT_TIMING_STRESS_TXN_READ, NULL);
     WT_RET(__wt_txn_read_upd_list_internal(session, cbt, upd, &prepare_upd, &restored_upd));
     if (WT_UPDATE_DATA_VALUE(cbt->upd_value) ||
       (cbt->upd_value->type == WT_UPDATE_MODIFY && cbt->upd_value->skip_buf))

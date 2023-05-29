@@ -183,7 +183,8 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
     "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
     "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
-    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\","
+    "\"txn_read\"]",
     NULL, 0},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"block_cache\","
@@ -950,7 +951,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
     "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
     "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
-    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\","
+    "\"txn_read\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1046,7 +1048,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
     "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
     "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
-    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\","
+    "\"txn_read\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1140,7 +1143,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
     "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
     "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
-    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\","
+    "\"txn_read\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1232,7 +1236,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
     "\"prepare_resolution\",\"sleep_before_read_overflow_onpage\","
     "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
-    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\"]",
+    "\"split_6\",\"split_7\",\"split_8\",\"tiered_flush_finish\","
+    "\"txn_read\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},

@@ -197,6 +197,8 @@ configure_timing_stress(char **p, size_t max)
         CONFIG_APPEND(*p, ",split_7");
     if (GV(STRESS_SPLIT_8))
         CONFIG_APPEND(*p, ",split_8");
+    if (GV(STRESS_TXN_READ))
+        CONFIG_APPEND(*p, ",txn_read");
     CONFIG_APPEND(*p, "]");
 }
 

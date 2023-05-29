@@ -323,6 +323,8 @@ CONFIG configuration_list[] = {
 
 {"stress.split_8", "stress splits (#8)", C_BOOL, 2, 0, 0}
 
+{"stress.txn_read", "stress txn read", C_BOOL, 2, 0, 0}
+
 {"tiered_storage.flush_frequency", "calls to checkpoint that are flush_tier, if tiered storage enabled (percentage)", 0x0, 0, 50, 100 }
 
 {"tiered_storage.storage_source", "storage source used (azure_store | dir_store | gcp_store | none | off | s3_store)", C_IGNORE | C_STRING, 0, 0, 0}

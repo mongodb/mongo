@@ -671,6 +671,7 @@ config_backward_compatible(void)
     BC_CHECK("stress.hs_checkpoint_delay", STRESS_HS_CHECKPOINT_DELAY);
     BC_CHECK("stress.hs_search", STRESS_HS_SEARCH);
     BC_CHECK("stress.hs_sweep", STRESS_HS_SWEEP);
+    BC_CHECK("stress.txn_read", STRESS_TXN_READ);
 
     tables_apply(config_backward_compatible_table, NULL);
 }
