@@ -9,7 +9,7 @@ Import("use_vendored_libunwind")
 Import("wiredtiger")
 
 snappySuffix = '-1.1.7'
-zlibSuffix = '-1.2.11'
+zlibSuffix = '-1.2.13'
 pcreSuffix = "-8.42"
 icuSuffix = '-57.1'
 tomcryptSuffix = '-1.18.2'

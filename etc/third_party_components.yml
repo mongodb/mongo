@@ -339,7 +339,7 @@ components:
     homepage_url: https://www.zlib.net/
     open_hub_url: https://www.openhub.net/p/zlib
     release_monitoring_id: 5303
-    local_directory_path: src/third_party/zlib-1.2.11
+    local_directory_path: src/third_party/zlib-1.2.13
     team_owner: "Execution"
 
   zstd:
