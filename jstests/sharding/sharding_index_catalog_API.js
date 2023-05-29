@@ -33,6 +33,16 @@ function unregisterIndex(rs, nss, name, uuid) {
     });
 }
 
+// Assert a secondary contains the number of documents specified by count.
+function assertSecondaryCount(rst, collection, query, count) {
+    let matchCount = false;
+    rst.getSecondaries().forEach(function(secondary) {
+        matchCount =
+            matchCount || secondary.getCollection(collection).countDocuments(query) == count;
+    });
+    assert(matchCount);
+}
+
 const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
 const shard0 = st.shard0.shardName;
@@ -95,14 +105,11 @@ assert.eq(1, st.rs0.getPrimary().getCollection(shardCollectionCatalog).countDocu
     uuid: collectionUUID,
     indexVersion: {$exists: true}
 }));
-assert.eq(1, st.rs0.getSecondary().getCollection(shardIndexCatalog).countDocuments({
-    collectionUUID: collectionUUID,
-    name: index1Name
-}));
-assert.eq(1, st.rs0.getSecondary().getCollection(shardCollectionCatalog).countDocuments({
-    uuid: collectionUUID,
-    indexVersion: {$exists: true}
-}));
+
+assertSecondaryCount(
+    st.rs0, shardIndexCatalog, {collectionUUID: collectionUUID, name: index1Name}, 1);
+assertSecondaryCount(
+    st.rs0, shardCollectionCatalog, {uuid: collectionUUID, indexVersion: {$exists: true}}, 1);
 assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index1Name
@@ -142,10 +149,9 @@ assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID,
     name: index1Name
 }));
-assert.eq(1, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocuments({
-    collectionUUID: collectionUUID,
-    name: index1Name
-}));
+
+assertSecondaryCount(
+    st.rs1, shardIndexCatalog, {collectionUUID: collectionUUID, name: index1Name}, 1);
 
 jsTestLog("AND the index version.");
 const indexVersionRS0 = st.rs0.getPrimary()
@@ -170,22 +176,16 @@ assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID,
     name: index2Name
 }));
-assert.eq(1, st.rs0.getSecondary().getCollection(shardIndexCatalog).countDocuments({
-    collectionUUID: collectionUUID,
-    name: index2Name
-}));
-assert.eq(1, st.rs0.getSecondary().getCollection(shardCollectionCatalog).countDocuments({
-    uuid: collectionUUID,
-    indexVersion: {$exists: true}
-}));
+assertSecondaryCount(
+    st.rs0, shardIndexCatalog, {collectionUUID: collectionUUID, name: index2Name}, 1);
+assertSecondaryCount(
+    st.rs0, shardCollectionCatalog, {uuid: collectionUUID, indexVersion: {$exists: true}}, 1);
 assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index2Name
 }));
-assert.eq(1, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocuments({
-    collectionUUID: collectionUUID,
-    name: index2Name
-}));
+assertSecondaryCount(
+    st.rs1, shardIndexCatalog, {collectionUUID: collectionUUID, name: index2Name}, 1);
 
 jsTestLog("Check we didn't commit in a wrong collection.");
 if (TestData.configShard) {
@@ -224,18 +224,14 @@ assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID,
     name: index2Name
 }));
-assert.eq(0, st.rs0.getSecondary().getCollection(shardIndexCatalog).countDocuments({
-    collectionUUID: collectionUUID,
-    name: index2Name
-}));
+assertSecondaryCount(
+    st.rs0, shardIndexCatalog, {collectionUUID: collectionUUID, name: index2Name}, 0);
 assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index2Name
 }));
-assert.eq(0, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocuments({
-    collectionUUID: collectionUUID,
-    name: index2Name
-}));
+assertSecondaryCount(
+    st.rs1, shardIndexCatalog, {collectionUUID: collectionUUID, name: index2Name}, 0);
 
 jsTestLog(
     "Check global index consolidation. Case 1: 1 leftover index dropped. Initial state: there must be only one index in the shards.");
