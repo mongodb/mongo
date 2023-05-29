@@ -79,7 +79,6 @@ struct ServerGlobalParams {
     AtomicWord<int> slowMS{100};           // --time in ms that is "slow"
     AtomicWord<double> sampleRate{1.0};    // --samplerate rate at which to sample slow queries
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
-    bool moveParanoia = false;             // for move chunk paranoia
 
     bool noUnixSocket = false;    // --nounixsocket
     bool doFork = false;          // --fork

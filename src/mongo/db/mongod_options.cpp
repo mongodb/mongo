@@ -262,31 +262,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
         }
     }
 
-    // "sharding.archiveMovedChunks" comes from the config file, so override it if
-    // "noMoveParanoia" or "moveParanoia" are set since those come from the command line.
-    if (params->count("noMoveParanoia")) {
-        Status ret = params->set("sharding.archiveMovedChunks",
-                                 moe::Value(!(*params)["noMoveParanoia"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("noMoveParanoia");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-    if (params->count("moveParanoia")) {
-        Status ret = params->set("sharding.archiveMovedChunks",
-                                 moe::Value((*params)["moveParanoia"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("moveParanoia");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-
     // "sharding.clusterRole" comes from the config file, so override it if "configsvr" or
     // "shardsvr" are set since those come from the command line.
     if (params->count("configsvr")) {
@@ -645,10 +620,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         } else if (clusterRoleParam == "shardsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         }
-    }
-
-    if (params.count("sharding.archiveMovedChunks")) {
-        serverGlobalParams.moveParanoia = params["sharding.archiveMovedChunks"].as<bool>();
     }
 
     if (params.count("sharding._overrideShardIdentity")) {

@@ -63,24 +63,3 @@ configs:
         source: yaml
         conflicts: configsvr
         requires: 'storage.queryableBackupMode'
-    noMoveParanoia:
-        description: 'Turn off paranoid saving of data for the moveChunk command; default'
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts: moveParanoia
-        hidden: true
-    moveParanoia:
-        description: >-
-            Turn on paranoid saving of data during the moveChunk command
-            (used for internal system diagnostics)
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts: noMoveParanoia
-        hidden: true
-    'sharding.archiveMovedChunks':
-        description: >-
-            Config file option to turn on paranoid saving of data during the
-            moveChunk command (used for internal system diagnostics)
-        arg_vartype: Bool
-        source: yaml
-        hidden: true

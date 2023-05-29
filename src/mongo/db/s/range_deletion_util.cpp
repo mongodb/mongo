@@ -53,7 +53,6 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 
@@ -124,11 +123,6 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     deleteStageParams->fromMigrate = true;
     deleteStageParams->isMulti = true;
     deleteStageParams->returnDeleted = true;
-
-    if (serverGlobalParams.moveParanoia) {
-        deleteStageParams->removeSaver =
-            std::make_unique<RemoveSaver>("moveChunk", nss.ns().toString(), "cleaning");
-    }
 
     auto exec =
         InternalPlanner::deleteWithShardKeyIndexScan(opCtx,

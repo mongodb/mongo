@@ -225,10 +225,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     Snapshotted<Document> memberDoc = member->doc;
     BSONObj bsonObjDoc = memberDoc.value().toBson();
 
-    if (_params->removeSaver) {
-        uassertStatusOK(_params->removeSaver->goingToDelete(bsonObjDoc));
-    }
-
     handlePlanStageYield(
         expCtx(),
         "DeleteStage saveState",

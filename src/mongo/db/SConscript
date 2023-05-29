@@ -1583,7 +1583,6 @@ execEnv.Library(
         'shared_request_handling',
         'stats/latency_server_stats',
         'stats/serveronly_stats',
-        'storage/remove_saver',
         'storage/storage_options',
         'update/update_driver',
     ],

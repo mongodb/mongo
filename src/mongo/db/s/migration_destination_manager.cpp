@@ -71,7 +71,6 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
@@ -1674,11 +1673,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {
-        boost::optional<RemoveSaver> rs;
-        if (serverGlobalParams.moveParanoia) {
-            rs.emplace("moveChunk", _nss.ns().toString(), "removedDuring");
-        }
-
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
             totalDocs++;
@@ -1705,10 +1699,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                     }
                     continue;
                 }
-            }
-
-            if (rs) {
-                uassertStatusOK(rs->goingToDelete(fullObj));
             }
 
             writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {
