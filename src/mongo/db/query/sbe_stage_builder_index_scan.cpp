@@ -501,15 +501,6 @@ bool canGenerateSingleIntervalIndexScan(const std::vector<interval_evaluation_tr
 }
 }  // namespace
 
-/**
- * Constructs the most simple version of an index scan from the single interval index bounds.
- *
- * In case when the 'lowKey' and 'highKey' are not specified, slots will be registered for them in
- * the runtime environment and their slot ids returned as a pair in the third element of the tuple.
- *
- * If 'indexKeySlot' is provided, than the corresponding slot will be filled out with each KeyString
- * in the index.
- */
 std::tuple<std::unique_ptr<sbe::PlanStage>,
            PlanStageSlots,
            boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>>>
@@ -772,20 +763,8 @@ IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                     "Generated interval [lowKey, highKey]",
                     "lowKey"_attr = lowKey,
                     "highKey"_attr = highKey);
-        // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
-        // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
-        // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
-        // end key.
-        result.push_back(
-            {std::make_unique<KeyString::Value>(
-                 IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                     lowKey, version, ordering, forward, lowKeyInclusive)),
-             std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
-                 highKey,
-                 version,
-                 ordering,
-                 forward != highKeyInclusive ? KeyString::Discriminator::kExclusiveBefore
-                                             : KeyString::Discriminator::kExclusiveAfter))});
+        result.push_back(makeKeyStringPair(
+            lowKey, lowKeyInclusive, highKey, highKeyInclusive, version, ordering, forward));
     }
     return result;
 }

@@ -1165,4 +1165,27 @@ inline std::vector<T> appendVectorUnique(std::vector<T> lhs, std::vector<T> rhs)
     return lhs;
 }
 
+inline std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>
+makeKeyStringPair(const BSONObj& lowKey,
+                  bool lowKeyInclusive,
+                  const BSONObj& highKey,
+                  bool highKeyInclusive,
+                  KeyString::Version version,
+                  Ordering ordering,
+                  bool forward) {
+    // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
+    // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
+    // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
+    // end key.
+    return {
+        std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+            lowKey, version, ordering, forward, lowKeyInclusive)),
+        std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
+            highKey,
+            version,
+            ordering,
+            forward != highKeyInclusive ? KeyString::Discriminator::kExclusiveBefore
+                                        : KeyString::Discriminator::kExclusiveAfter))};
+}
+
 }  // namespace mongo::stage_builder
