@@ -229,12 +229,6 @@ feature_flags:
         default: true
         version: 6.3
         shouldBeFCVGated: true
-    featureFlagExtendValidateCommand:
-        description: "Enable checks on more types of inconsistencies for the validate command"
-        cpp_varname: feature_flags::gExtendValidateCommand
-        default: true
-        version: 6.2
-        shouldBeFCVGated: true
     featureFlagInternalWritesAreReplicatedTransactionally:
         description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
         cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally

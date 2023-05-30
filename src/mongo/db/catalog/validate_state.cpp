@@ -97,9 +97,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
                                     << "' does not exist to validate.");
         } else {
             // Uses the bucket collection in place of the time-series collection view.
-            if (!view->timeseries() ||
-                !feature_flags::gExtendValidateCommand.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+            if (!view->timeseries()) {
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
             }
             _nss = _nss.makeTimeseriesBucketsNamespace();
