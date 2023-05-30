@@ -35,7 +35,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
-#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 
 namespace mongo {
 namespace {
@@ -91,12 +90,7 @@ public:
              * - Serialize with sharded DDLs, ensuring no concurrent modifications of the
              * collections.
              * - Check safely if the target collection is sharded or not.
-             * Since we are not using the ShardingDDLCoordinator infrastructure we need to
-             * explicitly wait for all DDL coordinators to be recovered and to have re-acquired
-             * their DDL locks before to proceed.
-             * TODO SERVER-76463 remove call to 'waitForRecoveryCompletion'.
              */
-            ShardingDDLCoordinatorService::getService(opCtx)->waitForRecoveryCompletion(opCtx);
             static constexpr StringData lockReason{"internalRenameCollection"_sd};
             auto ddlLockManager = DDLLockManager::get(opCtx);
             auto fromCollDDLLock = ddlLockManager->lock(

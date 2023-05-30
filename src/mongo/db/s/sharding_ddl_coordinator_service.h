@@ -91,11 +91,15 @@ public:
     void waitForRecoveryCompletion(OperationContext* opCtx) const;
 
 private:
+    friend class ShardingDDLCoordinatorServiceTest;
+
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
 
-    void _afterStepDown() override;
+    void _onServiceTermination() override;
     size_t _countCoordinatorDocs(OperationContext* opCtx);
+
+    void _transitionToRecovered(WithLock lk, OperationContext* opCtx);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_mutex");
 

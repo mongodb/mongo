@@ -722,6 +722,7 @@ env.CppUnitTest(
         'shard_local_test.cpp',
         'shard_metadata_util_test.cpp',
         'shard_server_catalog_cache_loader_test.cpp',
+        'sharding_ddl_coordinator_service_test.cpp',
         'sharding_initialization_mongod_test.cpp',
         'sharding_initialization_op_observer_test.cpp',
         'sharding_logging_test.cpp',

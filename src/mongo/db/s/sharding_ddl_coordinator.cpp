@@ -208,7 +208,8 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                    return DDLLockManager::kDefaultLockTimeout;
                }();
 
-               _scopedLocks.emplace(ddlLockManager->lock(opCtx, resource, coorName, lockTimeOut));
+               _scopedLocks.emplace(ddlLockManager->lock(
+                   opCtx, resource, coorName, lockTimeOut, false /* waitForRecovery */));
            })
         .until([this, resource = resource.toString()](Status status) {
             if (!status.isOK()) {

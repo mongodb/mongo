@@ -37,7 +37,6 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
-#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
@@ -69,7 +68,6 @@ public:
 
     ScopedDDLLock(OperationContext* opCtx, const NamespaceString& nss) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            ShardingDDLCoordinatorService::getService(opCtx)->waitForRecoveryCompletion(opCtx);
             auto ddlLockManager = DDLLockManager::get(opCtx);
             auto dbDDLLock = ddlLockManager->lock(
                 opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);

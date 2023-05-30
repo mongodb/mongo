@@ -91,14 +91,20 @@ public:
      * @timeout Time after which this acquisition attempt will give up in case of lock contention.
      * 			A timeout value of -1 means the acquisition will be retried forever.
      *
-     *
      * Throws ErrorCodes::LockBusy in case the timeout is reached.
      * Throws ErrorCategory::Interruption in case the opeartion context is interrupted.
+     * Throws ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout is
+     * reached (except if the caller is a DDL coordinator)
+     *
+     * Note that `lock` can only be called from a replica set primary node, however, the caller has
+     * the responsibility to release the acquired locks on step-downs
      */
     ScopedLock lock(OperationContext* opCtx,
                     StringData ns,
                     StringData reason,
-                    Milliseconds timeout);
+                    Milliseconds timeout) {
+        return lock(opCtx, ns, reason, timeout, true /*waitForRecovery*/);
+    }
 
 protected:
     struct NSLock {
@@ -112,6 +118,36 @@ protected:
 
     Mutex _mutex = MONGO_MAKE_LATCH("DDLLockManager::_mutex");
     StringMap<std::shared_ptr<NSLock>> _inProgressMap;
+
+    enum class State {
+        /**
+         * When the node become secondary the state is set to kPaused and all the lock acquisitions
+         * will be blocked except if the request comes from a DDLCoordinator.
+         */
+        kPaused,
+
+        /**
+         * After the node became primary and the ShardingDDLCoordinatorService already re-acquired
+         * all the previously acquired DDL locks for ongoing DDL coordinators the state transition
+         * to kPrimaryAndRecovered and the lock acquisitions are unblocked.
+         */
+        kPrimaryAndRecovered,
+    };
+
+    State _state = State::kPaused;
+    mutable stdx::condition_variable _stateCV;
+
+    void setState(const State& state);
+
+    ScopedLock lock(OperationContext* opCtx,
+                    StringData ns,
+                    StringData reason,
+                    Milliseconds timeout,
+                    bool waitForRecovery);
+
+    friend class ShardingDDLCoordinator;
+    friend class ShardingDDLCoordinatorService;
+    friend class ShardingDDLCoordinatorServiceTest;
 };
 
 }  // namespace mongo
