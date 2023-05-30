@@ -33,6 +33,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <optional>
 
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
