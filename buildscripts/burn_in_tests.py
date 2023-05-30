@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Command line utility for determining what jstests have been added or modified."""
+import collections
 import copy
 import json
 import logging
@@ -187,7 +188,7 @@ def create_executor_list(suites, exclude_suites):
     """
     try:
         with open(BURN_IN_TEST_MEMBERSHIP_FILE) as file:
-            test_membership = json.load(file)
+            test_membership = collections.defaultdict(list, json.load(file))
         LOGGER.info(f"Using cached test membership file {BURN_IN_TEST_MEMBERSHIP_FILE}.")
     except FileNotFoundError:
         LOGGER.info("Getting test membership data.")
