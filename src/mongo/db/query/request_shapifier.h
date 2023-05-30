@@ -61,14 +61,11 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
 
 protected:
-    RequestShapifier(OperationContext* opCtx,
-                     const boost::optional<std::string> applicationName = boost::none)
-        : _applicationName(applicationName) {
-        if (!_applicationName) {
-            if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-                _applicationName = metadata->getApplicationName().toString();
-            }
+    RequestShapifier(OperationContext* opCtx) {
+        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+            _clientMetaData = boost::make_optional(metadata->getDocument());
         }
+
         if (const auto& comment = opCtx->getComment()) {
             BSONObjBuilder commentBuilder;
             commentBuilder.append(*comment);
@@ -84,8 +81,8 @@ protected:
         }
     }
 
-    boost::optional<std::string> _applicationName;
     std::unique_ptr<APIParameters> _apiParams;
+    boost::optional<BSONObj> _clientMetaData = boost::none;
     BSONObj _commentObj;
     boost::optional<BSONElement> _comment = boost::none;
     boost::optional<BSONObj> _readPreference = boost::none;

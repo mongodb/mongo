@@ -44,9 +44,8 @@ class AggregateRequestShapifier final : public RequestShapifier {
 public:
     AggregateRequestShapifier(AggregateCommandRequest request,
                               const Pipeline& pipeline,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              const boost::optional<std::string> applicationName = boost::none)
-        : RequestShapifier(expCtx->opCtx, applicationName),
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : RequestShapifier(expCtx->opCtx),
           _request(std::move(request)),
           _initialQueryStatsKey(_makeQueryStatsKeyHelper(
               SerializationOptions::kDefaultQueryShapeSerializeOptions, expCtx, pipeline)) {}

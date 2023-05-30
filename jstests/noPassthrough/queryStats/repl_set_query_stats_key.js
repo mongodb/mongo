@@ -32,7 +32,7 @@ replTest.awaitReplication();
 
 function confirmCommandFieldsPresent(queryStatsKey, commandObj) {
     for (const field in queryStatsKey) {
-        if (field == "queryShape" || field == "applicationName" || field == "command") {
+        if (field == "queryShape" || field == "client" || field == "command") {
             continue;
         }
         assert(commandObj.hasOwnProperty(field), field);

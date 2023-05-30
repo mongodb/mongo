@@ -29,11 +29,11 @@ coll.find({v: 1}).toArray();
 
 let telemetry = getTelemetry(conn);
 assert.eq(1, telemetry.length, telemetry);
-assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
+assert.eq(kApplicationName, telemetry[0].key.client.application.name, telemetry);
 
 telemetry = getQueryStatsFindCmd(conn, true);
 assert.eq(1, telemetry.length, telemetry);
-assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
+assert.eq(kApplicationName, telemetry[0].key.client.application.name, telemetry);
 
 MongoRunner.stopMongod(conn);
 }());

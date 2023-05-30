@@ -6,8 +6,26 @@ load("jstests/libs/telemetry_utils.js");
 (function() {
 "use strict";
 
-function confirmAllFieldsPresent(queryStatsEntries) {
+function confirmAllMetaFieldsPresent(clientSubObj) {
     const kApplicationName = "MongoDB Shell";
+    assert.eq(clientSubObj.application.name, kApplicationName);
+
+    {
+        assert(clientSubObj.hasOwnProperty('driver'), clientSubObj);
+        assert(clientSubObj.driver.hasOwnProperty("name"), clientSubObj);
+        assert(clientSubObj.driver.hasOwnProperty("version"), clientSubObj);
+    }
+
+    {
+        assert(clientSubObj.hasOwnProperty('os'), clientSubObj);
+        assert(clientSubObj.os.hasOwnProperty("type"), clientSubObj);
+        assert(clientSubObj.os.hasOwnProperty("name"), clientSubObj);
+        assert(clientSubObj.os.hasOwnProperty("architecture"), clientSubObj);
+        assert(clientSubObj.os.hasOwnProperty("version"), clientSubObj);
+    }
+}
+
+function confirmAllFieldsPresent(queryStatsEntries) {
     const queryShapeFindFields = [
         "cmdNs",
         "command",
@@ -39,16 +57,16 @@ function confirmAllFieldsPresent(queryStatsEntries) {
         "noCursorTimeout",
         "readConcern",
         "allowPartialResults",
-        "applicationName",
         "apiDeprecationErrors",
         "apiVersion",
-        "apiStrict"
+        "apiStrict",
+        "client"
     ];
 
     for (const entry of queryStatsEntries) {
         let fieldCounter = 0;
         assert.eq(entry.key.queryShape.command, "find");
-        assert.eq(entry.key.applicationName, kApplicationName);
+        confirmAllMetaFieldsPresent(entry.key.client);
 
         for (const field in entry.key.queryShape) {
             assert(queryShapeFindFields.includes(field));

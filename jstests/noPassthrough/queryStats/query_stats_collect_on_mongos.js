@@ -37,7 +37,7 @@ const assertExpectedResults = (results,
                                expectedDocsReturnedMin,
                                expectedDocsReturnedSumOfSq) => {
     const {key, metrics} = results;
-    assert.eq(expectedTelemetryKey, key);
+    confirmAllExpectedFieldsPresent(expectedTelemetryKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
     assert.docEq({
         sum: NumberLong(expectedDocsReturnedSum),
@@ -75,8 +75,8 @@ const assertExpectedResults = (results,
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
         batchSize: "?number",
-        applicationName: "MongoDB Shell",
         readConcern: {level: "local", provenance: "implicitDefault"},
+        client: {application: {name: "MongoDB Shell"}}
     };
 
     const cursor = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
@@ -214,8 +214,8 @@ const assertExpectedResults = (results,
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
         batchSize: "?number",
-        applicationName: "MongoDB Shell",
         readConcern: {level: "local", provenance: "implicitDefault"},
+        client: {application: {name: "MongoDB Shell"}}
     };
 
     const cursor1 = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc

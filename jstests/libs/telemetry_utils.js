@@ -50,7 +50,7 @@ function getTelemetry(conn) {
             {$queryStats: {}},
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
-            {$match: {"key.applicationName": kShellApplicationName}}
+            {$match: {"key.client.application.name": kShellApplicationName}}
         ],
         cursor: {}
     });
@@ -62,16 +62,13 @@ function getTelemetry(conn) {
  * object
  */
 function getTelemetryReplSet(conn, collectionName) {
-    const kApplicationName = "MongoDB Shell";
-    // const result = conn.adminCommand({
-    //     aggregate: 1,
     const pipeline = [
         {$queryStats: {}},
         // Sort on telemetry key so entries are in a deterministic order.
         {$sort: {key: 1}},
         {
             $match: {
-                "key.applicationName": kApplicationName,
+                "key.client.application.name": kShellApplicationName,
                 "key.queryShape.cmdNs.coll": collectionName
             }
         }
@@ -84,7 +81,7 @@ function getQueryStatsFindCmd(
     conn, applyHmacToIdentifiers = false, collName = "", hmacKey = kDefaultQueryStatsHmacKey) {
     let matchExpr = {
         "key.queryShape.command": "find",
-        "key.applicationName": kShellApplicationName
+        "key.client.application.name": kShellApplicationName
     };
     if (collName != "") {
         matchExpr["key.queryShape.cmdNs.coll"] = collName;
@@ -120,7 +117,7 @@ function getQueryStatsAggCmd(
                 $match: {
                     "key.queryShape.command": "aggregate",
                     "key.queryShape.pipeline.0.$queryStats": {$exists: false},
-                    "key.applicationName": kShellApplicationName
+                    "key.client.application.name": kShellApplicationName
                 }
             },
             // Sort on key so entries are in a deterministic order.
@@ -130,4 +127,21 @@ function getQueryStatsAggCmd(
     });
     assert.commandWorked(result);
     return result.cursor.firstBatch;
+}
+
+function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
+    let fieldsCounter = 0;
+    for (const field in resultingKey) {
+        fieldsCounter++;
+        if (field === "client") {
+            // client meta data is environment/machine dependent, so do not
+            // assert on fields or specific fields other than the application name.
+            assert.eq(resultingKey.client.application.name, kShellApplicationName);
+            continue;
+        }
+        assert(expectedKey.hasOwnProperty(field));
+        assert.eq(expectedKey[field], resultingKey[field]);
+    }
+    // Make sure the resulting key isn't missing any fields.
+    assert.eq(fieldsCounter, Object.keys(expectedKey).length, resultingKey);
 }

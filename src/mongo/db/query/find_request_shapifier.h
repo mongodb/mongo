@@ -42,9 +42,8 @@ namespace mongo::query_stats {
 class FindRequestShapifier final : public RequestShapifier {
 public:
     FindRequestShapifier(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const ParsedFindCommand& request,
-                         const boost::optional<std::string> applicationName = boost::none)
-        : RequestShapifier(expCtx->opCtx, applicationName),
+                         const ParsedFindCommand& request)
+        : RequestShapifier(expCtx->opCtx),
           _request(*request.findCommandRequest),
           _initialQueryStatsKey(makeQueryStatsKey(
               expCtx, request, SerializationOptions::kDefaultQueryShapeSerializeOptions)) {}

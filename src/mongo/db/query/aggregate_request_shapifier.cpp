@@ -87,10 +87,8 @@ BSONObj AggregateRequestShapifier::_makeQueryStatsKeyHelper(
         opts.appendLiteral(&bob, "comment", *_comment);
     }
 
-    // TODO SERVER-77190 include the whole client metadata
-    // applicationName
-    if (_applicationName.has_value()) {
-        bob.append("applicationName", _applicationName.value());
+    if (_clientMetaData) {
+        bob.append("client", *_clientMetaData);
     }
 
     return bob.obj();

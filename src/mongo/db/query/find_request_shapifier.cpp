@@ -89,11 +89,6 @@ BSONObj FindRequestShapifier::makeQueryStatsKey(
         opts.appendLiteral(&bob, "comment", *_comment);
     }
 
-    if (_applicationName.has_value()) {
-        bob.append("applicationName", _applicationName.value());
-    }
-
-
     if (const auto& apiVersion = _apiParams->getAPIVersion()) {
         bob.append("apiVersion", apiVersion.value());
     }
@@ -124,6 +119,10 @@ BSONObj FindRequestShapifier::makeQueryStatsKey(
 
     if (_readPreference) {
         bob.append("$readPreference", *_readPreference);
+    }
+
+    if (_clientMetaData) {
+        bob.append("client", *_clientMetaData);
     }
 
     return bob.obj();
