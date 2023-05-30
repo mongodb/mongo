@@ -91,8 +91,9 @@ TEST_F(EmptyDoc, EmptyPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_FALSE(swFound.getValue());
 }
 
 TEST_F(EmptyDoc, NewField) {
@@ -100,8 +101,9 @@ TEST_F(EmptyDoc, NewField) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_FALSE(swFound.getValue());
 
     Element newElem = doc().makeElementInt("a", 1);
     ASSERT_TRUE(newElem.ok());
@@ -116,8 +118,9 @@ TEST_F(EmptyDoc, NewPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_FALSE(swFound.getValue());
 
     Element newElem = doc().makeElementInt("c", 1);
     ASSERT_TRUE(newElem.ok());
@@ -161,8 +164,9 @@ TEST_F(SimpleDoc, EmptyPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_FALSE(swFound.getValue());
 }
 
 TEST_F(SimpleDoc, SimplePath) {
@@ -170,7 +174,9 @@ TEST_F(SimpleDoc, SimplePath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
@@ -181,8 +187,8 @@ TEST_F(SimpleDoc, LongerPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status, ErrorCodes::PathNotViable);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_EQUALS(swFound.getStatus().code(), ErrorCodes::PathNotViable);
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
@@ -193,8 +199,9 @@ TEST_F(SimpleDoc, NotCommonPrefix) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_FALSE(swFound.getValue());
 
     // From this point on, handles the creation of the '.b' part that wasn't found.
     Element newElem = doc().makeElementInt("b", 1);
@@ -272,7 +279,9 @@ TEST_F(NestedDoc, SimplePath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
@@ -283,7 +292,9 @@ TEST_F(NestedDoc, ShorterPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_EQUALS(idxFound, 1U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"], nullptr), 0);
 }
@@ -293,7 +304,9 @@ TEST_F(NestedDoc, ExactPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 2U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"], nullptr), 0);
@@ -305,8 +318,8 @@ TEST_F(NestedDoc, LongerPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_EQUALS(swFound.getStatus().code(), ErrorCodes::PathNotViable);
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 2U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"], nullptr), 0);
@@ -317,7 +330,9 @@ TEST_F(NestedDoc, NewFieldNested) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_EQUALS(idxFound, 1U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"], nullptr), 0);
 
@@ -337,7 +352,9 @@ TEST_F(NestedDoc, NotStartingFromRoot) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root()["a"], &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root()["a"], &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_EQUALS(idxFound, 1U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"], nullptr), 0);
 }
@@ -388,7 +405,9 @@ TEST_F(ArrayDoc, PathOnEmptyArray) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
@@ -399,7 +418,9 @@ TEST_F(ArrayDoc, PathOnPopulatedArray) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 1U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0], nullptr), 0);
@@ -410,7 +431,9 @@ TEST_F(ArrayDoc, MixedArrayAndObjectPath) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 2U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]["c"], nullptr), 0);
@@ -421,7 +444,9 @@ TEST_F(ArrayDoc, ExtendingExistingObject) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 1U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0], nullptr), 0);
@@ -443,7 +468,9 @@ TEST_F(ArrayDoc, NewObjectInsideArray) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
@@ -465,7 +492,9 @@ TEST_F(ArrayDoc, NewNestedObjectInsideArray) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
@@ -487,7 +516,9 @@ TEST_F(ArrayDoc, ArrayPaddingNecessary) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
@@ -512,7 +543,9 @@ TEST_F(ArrayDoc, ExcessivePaddingRequested) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
 
     // From this point on, try to create the padded part that wasn't found.
     Element newElem = doc().makeElementInt("", 1);
@@ -538,7 +571,9 @@ TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_OK(swFound);
+    ASSERT_TRUE(swFound.getValue());
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(countChildren(elemFound), 5u);
 
@@ -563,8 +598,8 @@ TEST_F(ArrayDoc, NonNumericPathInArray) {
 
     FieldIndex idxFound;
     Element elemFound = root();
-    Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
-    ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
+    auto swFound = findLongestPrefix(field(), root(), &idxFound, &elemFound);
+    ASSERT_EQUALS(swFound.getStatus().code(), ErrorCodes::PathNotViable);
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);

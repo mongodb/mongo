@@ -58,6 +58,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> clone() const {
         auto xorCopy = std::make_unique<InternalSchemaXorMatchExpression>(_errorAnnotation);
+        xorCopy->reserve(numChildren());
         for (size_t i = 0; i < numChildren(); ++i) {
             xorCopy->add(getChild(i)->clone());
         }
