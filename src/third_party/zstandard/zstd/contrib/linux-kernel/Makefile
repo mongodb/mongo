@@ -1,5 +1,5 @@
 # ################################################################
-# Copyright (c) Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -26,14 +26,13 @@ libzstd:
 		--rewrite-include '"(\.\./)?zstd_errors.h"=<linux/zstd_errors.h>' \
 		--sed 's,/\*\*\*,/* *,g' \
 		--sed 's,/\*\*,/*,g' \
+		--spdx \
 		-DZSTD_NO_INTRINSICS \
 		-DZSTD_NO_UNUSED_FUNCTIONS \
 		-DZSTD_LEGACY_SUPPORT=0 \
 		-DZSTD_STATIC_LINKING_ONLY \
 		-DFSE_STATIC_LINKING_ONLY \
-		-DHUF_STATIC_LINKING_ONLY \
 		-DXXH_STATIC_LINKING_ONLY \
-		-DMEM_FORCE_MEMORY_ACCESS=0 \
 		-D__GNUC__ \
 		-D__linux__=1 \
 		-DSTATIC_BMI2=0 \
@@ -49,16 +48,19 @@ libzstd:
 		-UZSTD_MULTITHREAD \
 		-U_MSC_VER \
 		-U_WIN32 \
-		-RZSTDLIB_VISIBILITY= \
-		-RZSTDERRORLIB_VISIBILITY= \
+		-RZSTDLIB_VISIBLE= \
+		-RZSTDERRORLIB_VISIBLE= \
 		-RZSTD_FALLTHROUGH=fallthrough \
 		-DZSTD_HAVE_WEAK_SYMBOLS=0 \
 		-DZSTD_TRACE=0 \
 		-DZSTD_NO_TRACE \
+		-DZSTD_DISABLE_ASM \
 		-DZSTD_LINUX_KERNEL
+	rm linux/lib/zstd/decompress/huf_decompress_amd64.S
 	mv linux/lib/zstd/zstd.h linux/include/linux/zstd_lib.h
 	mv linux/lib/zstd/zstd_errors.h linux/include/linux/
 	cp linux_zstd.h linux/include/linux/zstd.h
+	cp zstd_common_module.c linux/lib/zstd
 	cp zstd_compress_module.c linux/lib/zstd
 	cp zstd_decompress_module.c linux/lib/zstd
 	cp decompress_sources.h linux/lib/zstd
@@ -102,4 +104,5 @@ test: libzstd
 
 .PHONY: clean
 clean:
-	$(RM) -rf linux test/test test/static_test
+	$(RM) -rf linux
+	$(MAKE) -C test clean

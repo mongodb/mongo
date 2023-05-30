@@ -164,6 +164,7 @@ Advanced arguments :
 --filelist FILE : read list of files to operate upon from FILE
 --output-dir-flat DIR : processed files are stored into DIR
 --output-dir-mirror DIR : processed files are stored into DIR respecting original directory structure
+--[no-]asyncio : use asynchronous IO (default: enabled)
 --[no-]check : during compression, add XXH64 integrity checksum to frame (default: enabled). If specified with -d, decompressor will ignore/validate checksums in compressed frame (default: validate).
 --      : All arguments after "--" are treated as files
 
@@ -208,7 +209,7 @@ Benchmark arguments :
  -b#    : benchmark file(s), using # compression level (default: 3)
  -e#    : test all compression levels successively from -b# to -e# (default: 1)
  -i#    : minimum evaluation time in seconds (default: 3s)
- -B#    : cut file into independent blocks of size # (default: no block)
+ -B#    : cut file into independent chunks of size # (default: no chunking)
  -S     : output one benchmark result per input file (default: consolidated result)
 --priority=rt : set process priority to real-time
 ```
@@ -275,7 +276,7 @@ compression speed (for lower levels) with minimal change in compression ratio.
 
 The below table illustrates this on the [Silesia compression corpus].
 
-[Silesia compression corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
+[Silesia compression corpus]: https://sun.aei.polsl.pl//~sdeor/index.php?page=silesia
 
 | Method | Compression ratio | Compression speed | Decompression speed  |
 |:-------|------------------:|------------------:|---------------------:|

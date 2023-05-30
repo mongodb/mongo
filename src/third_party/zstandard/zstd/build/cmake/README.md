@@ -1,13 +1,13 @@
 # Cmake contributions
 
 Contributions to the cmake build configurations are welcome. Please
-use case sensitivity that matches modern (ie. cmake version 2.6 and above)
+use case sensitivity that matches modern (i.e. cmake version 2.6 and above)
 conventions of using lower-case for commands, and upper-case for
 variables.
 
 ## How to build
 
-As cmake doesn't support command like `cmake clean`, it's recommended to perform a "out of source build".
+As cmake doesn't support command like `cmake clean`, it's recommended to perform an "out of source build".
 To do this, you can create a new directory and build in it:
 ```sh
 cd build/cmake
@@ -37,7 +37,7 @@ cmake -LH ..
 Bool options can be set to `ON/OFF` with `-D[option]=[ON/OFF]`. You can configure cmake options like this:
 ```sh
 cd build/cmake/builddir
-cmake -DZSTD_BUILD_TESTS=ON -DZSTD_LEGACY_SUPPORT=ON ..
+cmake -DZSTD_BUILD_TESTS=ON -DZSTD_LEGACY_SUPPORT=OFF ..
 make
 ```
 

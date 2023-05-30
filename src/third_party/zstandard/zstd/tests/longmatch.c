@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -36,27 +36,27 @@ compress(ZSTD_CStream *ctx, ZSTD_outBuffer out, const void *data, size_t size)
 int main(int argc, const char** argv)
 {
   ZSTD_CStream* ctx;
-  ZSTD_parameters params;
-  size_t rc;
-  unsigned windowLog;
+  unsigned windowLog = 18;
   (void)argc;
   (void)argv;
   /* Create stream */
-  ctx = ZSTD_createCStream();
+  ctx = ZSTD_createCCtx();
   if (!ctx) { return 1; }
   /* Set parameters */
-  memset(&params, 0, sizeof(params));
-  params.cParams.windowLog = 18;
-  params.cParams.chainLog = 13;
-  params.cParams.hashLog = 14;
-  params.cParams.searchLog = 1;
-  params.cParams.minMatch = 7;
-  params.cParams.targetLength = 16;
-  params.cParams.strategy = ZSTD_fast;
-  windowLog = params.cParams.windowLog;
-  /* Initialize stream */
-  rc = ZSTD_initCStream_advanced(ctx, NULL, 0, params, 0);
-  if (ZSTD_isError(rc)) { return 2; }
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_windowLog, windowLog)))
+    return 2;
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_chainLog, 13)))
+    return 2;
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_hashLog, 14)))
+    return 2;
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_searchLog, 1)))
+    return 2;
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_minMatch, 7)))
+    return 2;
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_targetLength, 16)))
+    return 2;
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_strategy, ZSTD_fast)))
+    return 2;
   {
     U64 compressed = 0;
     const U64 toCompress = ((U64)1) << 33;
@@ -97,5 +97,6 @@ int main(int argc, const char** argv)
     free(srcBuffer);
     free(dstBuffer);
   }
+  ZSTD_freeCCtx(ctx);
   return 0;
 }

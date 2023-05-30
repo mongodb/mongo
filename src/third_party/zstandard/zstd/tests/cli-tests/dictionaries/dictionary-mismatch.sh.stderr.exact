@@ -1,0 +1,7 @@
+zstd files/0 -D dicts/0 -q
+zstd -t files/0.zst -D dicts/0
+files/0.zst         : 1000 bytes 
+zstd -t files/0.zst -D dicts/1 && die "Must fail" ||:
+files/0.zst : Decoding error (36) : Dictionary mismatch 
+zstd -t files/0.zst            && die "Must fail" ||:
+files/0.zst : Decoding error (36) : Dictionary mismatch 

@@ -364,6 +364,10 @@
 				>
 			</File>
 			<File
+                RelativePath="..\..\..\programs\fileio_asyncio.c"
+                >
+            </File>
+			<File
 				RelativePath="..\..\..\lib\compress\fse_compress.c"
 				>
 			</File>

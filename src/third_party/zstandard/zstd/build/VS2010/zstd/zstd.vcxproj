@@ -62,6 +62,7 @@
     <ClCompile Include="..\..\..\programs\datagen.c" />
     <ClCompile Include="..\..\..\programs\dibio.c" />
     <ClCompile Include="..\..\..\programs\fileio.c" />
+    <ClCompile Include="..\..\..\programs\fileio_asyncio.c" />
     <ClCompile Include="..\..\..\programs\zstdcli.c" />
     <ClCompile Include="..\..\..\programs\zstdcli_trace.c" />
   </ItemGroup>
@@ -113,6 +114,7 @@
     <RootNamespace>zstd</RootNamespace>
     <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\obj\$(RootNamespace)_$(Platform)_$(Configuration)\</IntDir>
+    <InstructionSet>NotSet</InstructionSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -186,6 +188,7 @@
       <PreprocessorDefinitions>ZSTD_MULTITHREAD=1;ZSTD_LEGACY_SUPPORT=5;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <EnablePREfast>false</EnablePREfast>
+      <EnableEnhancedInstructionSet>$(InstructionSet)</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -202,6 +205,7 @@
       <PreprocessorDefinitions>ZSTD_MULTITHREAD=1;ZSTD_LEGACY_SUPPORT=5;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <EnablePREfast>false</EnablePREfast>
+      <EnableEnhancedInstructionSet>$(InstructionSet)</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -221,6 +225,7 @@
       <EnablePREfast>false</EnablePREfast>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <EnableEnhancedInstructionSet>$(InstructionSet)</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -243,6 +248,7 @@
       <EnablePREfast>false</EnablePREfast>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/DZSTD_MULTITHREAD %(AdditionalOptions)</AdditionalOptions>
+      <EnableEnhancedInstructionSet>$(InstructionSet)</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

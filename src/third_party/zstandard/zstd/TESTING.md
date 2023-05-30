@@ -22,7 +22,7 @@ They consist of the following tests:
   - `tests/playTests.sh --test-large-data`
   - Fuzzer tests: `tests/fuzzer.c`, `tests/zstreamtest.c`, and `tests/decodecorpus.c`
 - `tests/zstreamtest.c` under Tsan (streaming mode, including multithreaded mode)
-- Valgrind Test (`make -C tests valgrindTest`) (testing CLI and fuzzer under valgrind)
+- Valgrind Test (`make -C tests test-valgrind`) (testing CLI and fuzzer under `valgrind`)
 - Fuzzer tests (see above) on ARM, AArch64, PowerPC, and PowerPC64
 
 Long Tests

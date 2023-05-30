@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -123,7 +123,7 @@ BMK_runTime_t BMK_extract_runTime(BMK_runOutcome_t outcome);
 /* when benchmark failed, it means one invocation of `benchFn` failed.
  * The failure was detected by `errorFn`, operating on return values of `benchFn`.
  * Returns the faulty return value.
- * note : this function will abort() program execution if benchmark did not failed.
+ * note : this function will abort() program execution if benchmark did not fail.
  *        always check if benchmark failed first !
  */
 size_t BMK_extract_errorResult(BMK_runOutcome_t outcome);

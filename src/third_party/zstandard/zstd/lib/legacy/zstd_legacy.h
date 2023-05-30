@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -241,6 +241,13 @@ MEM_STATIC ZSTD_frameSizeInfo ZSTD_findFrameSizeInfoLegacy(const void *src, size
     if (!ZSTD_isError(frameSizeInfo.compressedSize) && frameSizeInfo.compressedSize > srcSize) {
         frameSizeInfo.compressedSize = ERROR(srcSize_wrong);
         frameSizeInfo.decompressedBound = ZSTD_CONTENTSIZE_ERROR;
+    }
+    /* In all cases, decompressedBound == nbBlocks * ZSTD_BLOCKSIZE_MAX.
+     * So we can compute nbBlocks without having to change every function.
+     */
+    if (frameSizeInfo.decompressedBound != ZSTD_CONTENTSIZE_ERROR) {
+        assert((frameSizeInfo.decompressedBound & (ZSTD_BLOCKSIZE_MAX - 1)) == 0);
+        frameSizeInfo.nbBlocks = (size_t)(frameSizeInfo.decompressedBound / ZSTD_BLOCKSIZE_MAX);
     }
     return frameSizeInfo;
 }

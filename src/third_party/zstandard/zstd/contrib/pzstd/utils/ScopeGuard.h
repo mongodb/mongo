@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-present, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -15,7 +15,7 @@ namespace pzstd {
 /**
  * Dismissable scope guard.
  * `Function` must be callable and take no parameters.
- * Unless `dissmiss()` is called, the callable is executed upon destruction of
+ * Unless `dismiss()` is called, the callable is executed upon destruction of
  * `ScopeGuard`.
  *
  * Example:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -26,12 +26,16 @@
  * @param MEM_FORCE_MEMORY_ACCESS:
  *        This flag controls how the zstd library accesses unaligned memory.
  *        It can be undefined, or 0 through 2. If it is undefined, it selects
- *        the method to use based on the compiler. If testing with UBSAN set
- *        MEM_FORCE_MEMORY_ACCESS=0 to use the standard compliant method.
+ *        the method to use based on the compiler.
  * @param FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
  *        This is the canonical flag to enable deterministic builds for fuzzing.
  *        Changes to zstd for fuzzing are gated behind this define.
  *        It is recommended to define this when building zstd for fuzzing.
+ * @param FUZZ_THIRD_PARTY_SEQ_PROD
+ *        This flag allows sequence producer plugin authors to replace the built-in
+ *        default sequence producer with their own code. If you are not a plugin
+ *        author, you should not define this flag. See the docs at
+ *        fuzz_third_party_seq_prod.h for more information.
  */
 
 #ifndef FUZZ_H

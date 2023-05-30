@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>  /* time(), for seed random initialization */
 
 #include "util.h"
 #include "timefn.h"   /* UTIL_clockSpanMicro, SEC_TO_MICRO, UTIL_TIME_INITIALIZER */
@@ -24,21 +25,14 @@
 #include "zdict.h"
 
 /* Direct access to internal compression functions is required */
-#include "zstd_compress.c"
+#include "compress/zstd_compress.c" /* ZSTD_resetSeqStore, ZSTD_storeSeq, *_TO_OFFBASE, HIST_countFast_wksp, HIST_isError */
+#include "decompress/zstd_decompress_block.h" /* ZSTD_decompressBlock_deprecated */
 
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"     /* XXH64 */
 
-#ifndef MIN
-    #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifndef MAX_PATH
-    #ifdef PATH_MAX
-        #define MAX_PATH PATH_MAX
-    #else
-        #define MAX_PATH 256
-    #endif
+#if !(defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */))
+# define inline  /* disable */
 #endif
 
 /*-************************************
@@ -69,6 +63,7 @@ static UTIL_time_t g_displayClock = UTIL_TIME_INITIALIZER;
             exit(1);                                                           \
         }                                                                      \
     } while (0)
+
 
 /*-*******************************************************
 *  Random function
@@ -136,7 +131,7 @@ static void RAND_genDist(U32* seed, BYTE* dist, double weight)
     BYTE step = (BYTE) ((RAND(seed) % 256) | 1); /* force it to be odd so it's relatively prime to 256 */
 
     while (i < DISTSIZE) {
-        size_t states = ((size_t)(weight * statesLeft)) + 1;
+        size_t states = ((size_t)(weight * (double)statesLeft)) + 1;
         size_t j;
         for (j = 0; j < states && i < DISTSIZE; j++, i++) {
             dist[i] = symb;
@@ -165,7 +160,7 @@ static double RAND_exp(U32* seed, double mean)
 /*-*******************************************************
 *  Constants and Structs
 *********************************************************/
-const char *BLOCK_TYPES[] = {"raw", "rle", "compressed"};
+const char* BLOCK_TYPES[] = {"raw", "rle", "compressed"};
 
 #define MAX_DECOMPRESSED_SIZE_LOG 20
 #define MAX_DECOMPRESSED_SIZE (1ULL << MAX_DECOMPRESSED_SIZE_LOG)
@@ -174,6 +169,14 @@ const char *BLOCK_TYPES[] = {"raw", "rle", "compressed"};
 
 #define MIN_SEQ_LEN (3)
 #define MAX_NB_SEQ ((ZSTD_BLOCKSIZE_MAX + MIN_SEQ_LEN - 1) / MIN_SEQ_LEN)
+
+#ifndef MAX_PATH
+    #ifdef PATH_MAX
+        #define MAX_PATH PATH_MAX
+    #else
+        #define MAX_PATH 256
+    #endif
+#endif
 
 BYTE CONTENT_BUFFER[MAX_DECOMPRESSED_SIZE];
 BYTE FRAME_BUFFER[MAX_DECOMPRESSED_SIZE * 2];
@@ -239,6 +242,10 @@ typedef enum {
   gt_frame = 0,  /* generate frames */
   gt_block,      /* generate compressed blocks without block/frame headers */
 } genType_e;
+
+#ifndef MIN
+    #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 /*-*******************************************************
 *  Global variables (set from command line)
@@ -454,7 +461,7 @@ static size_t writeHufHeader(U32* seed, HUF_CElt* hufTable, void* dst, size_t ds
     }
 
     /* Write table description header */
-    {   size_t const hSize = HUF_writeCTable (op, dstSize, hufTable, maxSymbolValue, huffLog);
+    {   size_t const hSize = HUF_writeCTable_wksp (op, dstSize, hufTable, maxSymbolValue, huffLog, WKSP, sizeof(WKSP));
         if (hSize + 12 >= srcSize) return 0;   /* not useful to try compression */
         op += hSize;
     }
@@ -558,10 +565,10 @@ static size_t writeLiteralsBlockCompressed(U32* seed, frame_t* frame, size_t con
                     sizeFormat == 0
                             ? HUF_compress1X_usingCTable(
                                       op, opend - op, LITERAL_BUFFER, litSize,
-                                      frame->stats.hufTable)
+                                      frame->stats.hufTable, /* flags */ 0)
                             : HUF_compress4X_usingCTable(
                                       op, opend - op, LITERAL_BUFFER, litSize,
-                                      frame->stats.hufTable);
+                                      frame->stats.hufTable, /* flags */ 0);
             CHECKERR(compressedSize);
             /* this only occurs when it could not compress or similar */
         } while (compressedSize <= 0);
@@ -662,16 +669,16 @@ generateSequences(U32* seed, frame_t* frame, seqStore_t* seqStore,
          * ensure nice numbers */
         U32 matchLen =
                 MIN_SEQ_LEN +
-                ROUND(RAND_exp(seed, excessMatch / (double)(numSequences - i)));
+                ROUND(RAND_exp(seed, (double)excessMatch / (double)(numSequences - i)));
         U32 literalLen =
                 (RAND(seed) & 7)
                         ? ROUND(RAND_exp(seed,
-                                         literalsSize /
+                                         (double)literalsSize /
                                                  (double)(numSequences - i)))
                         : 0;
         /* actual offset, code to send, and point to copy up to when shifting
          * codes in the repeat offsets history */
-        U32 offset, offsetCode, repIndex;
+        U32 offset, offBase, repIndex;
 
         /* bounds checks */
         matchLen = (U32) MIN(matchLen, excessMatch + MIN_SEQ_LEN);
@@ -707,12 +714,12 @@ generateSequences(U32* seed, frame_t* frame, seqStore_t* seqStore,
                         }
                     }
                 }
-                offsetCode = STORE_OFFSET(offset);
+                offBase = OFFSET_TO_OFFBASE(offset);
                 repIndex = 2;
             } else {
                 /* do a repeat offset */
                 U32 const randomRepIndex = RAND(seed) % 3;
-                offsetCode = STORE_REPCODE(randomRepIndex + 1);  /* expects values between 1 & 3 */
+                offBase = REPCODE_TO_OFFBASE(randomRepIndex + 1);  /* expects values between 1 & 3 */
                 if (literalLen > 0) {
                     offset = frame->stats.rep[randomRepIndex];
                     repIndex = randomRepIndex;
@@ -751,12 +758,12 @@ generateSequences(U32* seed, frame_t* frame, seqStore_t* seqStore,
         DISPLAYLEVEL(7, " srcPos: %8u seqNb: %3u",
                      (unsigned)((BYTE*)srcPtr - (BYTE*)frame->srcStart), (unsigned)i);
         DISPLAYLEVEL(6, "\n");
-        if (STORED_IS_REPCODE(offsetCode)) {  /* expects sumtype numeric representation of ZSTD_storeSeq() */
+        if (OFFBASE_IS_REPCODE(offBase)) {  /* expects sumtype numeric representation of ZSTD_storeSeq() */
             DISPLAYLEVEL(7, "        repeat offset: %d\n", (int)repIndex);
         }
         /* use libzstd sequence handling */
         ZSTD_storeSeq(seqStore, literalLen, literals, literals + literalLen,
-                      offsetCode, matchLen);
+                      offBase, matchLen);
 
         literalsSize -= literalLen;
         excessMatch -= (matchLen - MIN_SEQ_LEN);
@@ -765,8 +772,8 @@ generateSequences(U32* seed, frame_t* frame, seqStore_t* seqStore,
 
     memcpy(srcPtr, literals, literalsSize);
     srcPtr += literalsSize;
-    DISPLAYLEVEL(6, "      excess literals: %5u", (unsigned)literalsSize);
-    DISPLAYLEVEL(7, " srcPos: %8u", (unsigned)((BYTE*)srcPtr - (BYTE*)frame->srcStart));
+    DISPLAYLEVEL(6, "      excess literals: %5u ", (unsigned)literalsSize);
+    DISPLAYLEVEL(7, "srcPos: %8u ", (unsigned)((BYTE*)srcPtr - (BYTE*)frame->srcStart));
     DISPLAYLEVEL(6, "\n");
 
     return numSequences;
@@ -1428,7 +1435,7 @@ static size_t testDecodeWithDict(U32 seed, genType_e genType)
                 ZSTD_freeDCtx(dctx);
                 goto dictTestCleanup;
             }
-            ret = ZSTD_decompressBlock(dctx, DECOMPRESSED_BUFFER, MAX_DECOMPRESSED_SIZE,
+            ret = ZSTD_decompressBlock_deprecated(dctx, DECOMPRESSED_BUFFER, MAX_DECOMPRESSED_SIZE,
                                        fr.dataStart, (BYTE*)fr.data - (BYTE*)fr.dataStart);
         }
         ZSTD_freeDCtx(dctx);
@@ -1455,7 +1462,7 @@ static size_t testDecodeRawBlock(frame_t* fr)
     size_t ret = ZSTD_decompressBegin(dctx);
     if (ZSTD_isError(ret)) return ret;
 
-    ret = ZSTD_decompressBlock(
+    ret = ZSTD_decompressBlock_deprecated(
             dctx,
             DECOMPRESSED_BUFFER, MAX_DECOMPRESSED_SIZE,
             fr->dataStart, (BYTE*)fr->data - (BYTE*)fr->dataStart);

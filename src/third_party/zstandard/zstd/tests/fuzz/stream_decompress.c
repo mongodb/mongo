@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -99,14 +99,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *src, size_t size)
 
     while (size > 0) {
         ZSTD_inBuffer in = makeInBuffer(&src, &size, producer);
-        while (in.pos != in.size) {
+        do {
+            size_t const rc = ZSTD_decompressStream(dstream, &out, &in);
+            if (ZSTD_isError(rc)) goto error;
             if (out.pos == out.size) {
                 if (stableOutBuffer) goto error;
                 out = makeOutBuffer(producer, buf, bufSize);
             }
-            size_t const rc = ZSTD_decompressStream(dstream, &out, &in);
-            if (ZSTD_isError(rc)) goto error;
-        }
+        } while (in.pos != in.size);
     }
 
 error:

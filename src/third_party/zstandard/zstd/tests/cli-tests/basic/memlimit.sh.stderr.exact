@@ -1,0 +1,13 @@
+error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed 
+error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed 
+error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed 
+error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed 
+error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed 
+error: only numeric values with optional suffixes K, KB, KiB, M, MB, MiB are allowed 
+Should allow numeric parameter without suffix
+Should allow numeric parameter with expected suffix
+Should allow numeric parameter with expected suffix
+Should allow numeric parameter with expected suffix
+Should allow numeric parameter with expected suffix
+Should allow numeric parameter with expected suffix
+Should allow numeric parameter with expected suffix

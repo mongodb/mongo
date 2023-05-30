@@ -56,26 +56,26 @@ z_const char hello[] = "hello, hello! I said hello, hello!";
 const char dictionary[] = "hello, hello!";
 uLong dictId; /* Adler32 value of the dictionary */
 
-void test_deflate       OF((Byte *compr, uLong comprLen));
-void test_inflate       OF((Byte *compr, uLong comprLen,
+void test_deflate       _Z_OF((Byte *compr, uLong comprLen));
+void test_inflate       _Z_OF((Byte *compr, uLong comprLen,
                             Byte *uncompr, uLong uncomprLen));
-void test_large_deflate OF((Byte *compr, uLong comprLen,
+void test_large_deflate _Z_OF((Byte *compr, uLong comprLen,
                             Byte *uncompr, uLong uncomprLen));
-void test_large_inflate OF((Byte *compr, uLong comprLen,
+void test_large_inflate _Z_OF((Byte *compr, uLong comprLen,
                             Byte *uncompr, uLong uncomprLen));
-void test_flush         OF((Byte *compr, uLong *comprLen));
-void test_sync          OF((Byte *compr, uLong comprLen,
+void test_flush         _Z_OF((Byte *compr, uLong *comprLen));
+void test_sync          _Z_OF((Byte *compr, uLong comprLen,
                             Byte *uncompr, uLong uncomprLen));
-void test_dict_deflate  OF((Byte *compr, uLong comprLen));
-void test_dict_inflate  OF((Byte *compr, uLong comprLen,
+void test_dict_deflate  _Z_OF((Byte *compr, uLong comprLen));
+void test_dict_inflate  _Z_OF((Byte *compr, uLong comprLen,
                             Byte *uncompr, uLong uncomprLen));
-int  main               OF((int argc, char *argv[]));
+int  main               _Z_OF((int argc, char *argv[]));
 
 
 #ifdef Z_SOLO
 
-void *myalloc OF((void *, unsigned, unsigned));
-void myfree OF((void *, void *));
+void *myalloc _Z_OF((void *, unsigned, unsigned));
+void myfree _Z_OF((void *, void *));
 
 void *myalloc(q, n, m)
     void *q;
@@ -102,9 +102,9 @@ static free_func zfree = myfree;
 static alloc_func zalloc = (alloc_func)0;
 static free_func zfree = (free_func)0;
 
-void test_compress      OF((Byte *compr, uLong comprLen,
+void test_compress      _Z_OF((Byte *compr, uLong comprLen,
                             Byte *uncompr, uLong uncomprLen));
-void test_gzio          OF((const char *fname,
+void test_gzio          _Z_OF((const char *fname,
                             Byte *uncompr, uLong uncomprLen));
 
 /* ===========================================================================

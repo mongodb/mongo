@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -24,7 +24,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "fuzz_helpers.h"
 
 /* Struct used for maintaining the state of the data */
 typedef struct FUZZ_dataProducer_s FUZZ_dataProducer_t;

@@ -46,7 +46,7 @@ The compiled executable will require ZSTD DLL which is available at `dll\libzstd
 Open `example\fullbench-dll.sln` to compile `fullbench-dll` that uses a
 dynamic ZSTD library from the `dll` directory. The solution works with Visual C++
 2010 or newer. When one will open the solution with Visual C++ newer than 2010
-then the solution will upgraded to the current version.
+then the solution will be upgraded to the current version.
 
 ## Using ZSTD DLL with Visual C++
 

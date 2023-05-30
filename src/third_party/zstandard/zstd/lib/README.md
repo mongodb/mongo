@@ -91,7 +91,7 @@ The file structure is designed to make this selection manually achievable for an
         `ZSTD_LIB_COMPRESSION, ZSTD_LIB_DECOMPRESSION`, `ZSTD_LIB_DICTBUILDER`,
         and `ZSTD_LIB_DEPRECATED` as `0` to forgo compilation of the
         corresponding features. This will also disable compilation of all
-        dependencies (eg. `ZSTD_LIB_COMPRESSION=0` will also disable
+        dependencies (e.g. `ZSTD_LIB_COMPRESSION=0` will also disable
         dictBuilder).
 
 - There are a number of options that can help minimize the binary size of
@@ -161,6 +161,13 @@ The file structure is designed to make this selection manually achievable for an
   `ZSTD_DCtx` decompression contexts,
   but might also result in a small decompression speed cost.
 
+- The C compiler macros `ZSTDLIB_VISIBLE`, `ZSTDERRORLIB_VISIBLE` and `ZDICTLIB_VISIBLE`
+  can be overridden to control the visibility of zstd's API. Additionally,
+  `ZSTDLIB_STATIC_API` and `ZDICTLIB_STATIC_API` can be overridden to control the visibility
+  of zstd's static API. Specifically, it can be set to `ZSTDLIB_HIDDEN` to hide the symbols
+  from the shared library. These macros default to `ZSTDLIB_VISIBILITY`,
+  `ZSTDERRORLIB_VSIBILITY`, and `ZDICTLIB_VISIBILITY` if unset, for backwards compatibility
+  with the old macro names.
 
 #### Windows : using MinGW+MSYS to create DLL
 
