@@ -735,6 +735,8 @@ void deleteDocument(OperationContext* opCtx,
         Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
     }
 
+    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(opCtx, collection, doc.value());
+
     OplogDeleteEntryArgs deleteArgs{
         nullptr /* deletedDoc */, fromMigrate, collection->isChangeStreamPreAndPostImagesEnabled()};
 
@@ -744,8 +746,6 @@ void deleteDocument(OperationContext* opCtx,
         deleteArgs.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
         deleteArgs.oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     }
-
-    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(opCtx, collection, doc.value());
 
     boost::optional<BSONObj> deletedDoc;
     const bool isTimeseriesCollection =
