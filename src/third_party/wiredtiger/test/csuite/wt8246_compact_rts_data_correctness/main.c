@@ -30,6 +30,7 @@
 #include <signal.h>
 
 #define TIMEOUT 1
+#define MAX_RETRIES 5
 
 #define NUM_RECORDS (800 * WT_THOUSAND)
 
@@ -325,9 +326,10 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
     WT_DECL_RET;
     WT_RAND_STATE rnd;
     uint64_t val;
-    int i;
+    int i, retry_attempts;
     char tscfg[64];
 
+    retry_attempts = 0;
     __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
@@ -337,12 +339,17 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
         cursor->set_key(cursor, i + 1);
         val = (uint64_t)__wt_random(&rnd);
         cursor->set_value(cursor, val, val, val, value);
-        if ((ret = cursor->insert(cursor)) == WT_ROLLBACK)
+        while (((ret = cursor->insert(cursor)) == WT_ROLLBACK) && retry_attempts < MAX_RETRIES) {
             testutil_check(session->rollback_transaction(session, NULL));
-        else {
-            testutil_check(ret);
-            testutil_check(session->commit_transaction(session, tscfg));
+            testutil_check(session->begin_transaction(session, NULL));
+            ++retry_attempts;
         }
+
+        if (retry_attempts == MAX_RETRIES)
+            testutil_die(ret, "Cursor insert returned WT_ROLLBACK for %d times", MAX_RETRIES);
+
+        testutil_check(ret);
+        testutil_check(session->commit_transaction(session, tscfg));
     }
 
     testutil_check(cursor->close(cursor));
