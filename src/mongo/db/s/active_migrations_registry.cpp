@@ -282,7 +282,7 @@ Status ActiveMigrationsRegistry::ActiveMoveChunkState::constructErrorStatus() co
         "'{}{}' for namespace {} to shard {}",
         (args.getMin() ? "min: " + args.getMin()->toString() + " - " : ""),
         (args.getMax() ? "max: " + args.getMax()->toString() : ""),
-        args.getCommandParameter().ns(),
+        args.getCommandParameter().toStringForErrorMsg(),
         args.getToShard().toString());
     return {ErrorCodes::ConflictingOperationInProgress, std::move(errMsg)};
 }

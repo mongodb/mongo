@@ -261,7 +261,7 @@ bool opReplicatedEnough(OperationContext* opCtx,
  */
 BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_migrateClone", nss.ns());
+    builder.append("_migrateClone", NamespaceStringUtil::serialize(nss));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -273,7 +273,7 @@ BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSes
  */
 BSONObj createTransferModsRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_transferMods", nss.ns());
+    builder.append("_transferMods", NamespaceStringUtil::serialize(nss));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -435,7 +435,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
         b.append("sessionId", _sessionId->toString());
     }
 
-    b.append("ns", _nss.ns());
+    b.append("ns", NamespaceStringUtil::serialize(_nss));
     b.append("from", _fromShardConnString.toString());
     b.append("fromShardId", _fromShard.toString());
     b.append("min", _min);
@@ -1180,8 +1180,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     boost::optional<Timer> timeInCriticalSection;
 
     if (!skipToCritSecTaken) {
-        timing.emplace(
-            outerOpCtx, "to", _nss.ns(), _min, _max, 8 /* steps */, &_errmsg, _toShard, _fromShard);
+        timing.emplace(outerOpCtx,
+                       "to",
+                       NamespaceStringUtil::serialize(_nss),
+                       _min,
+                       _max,
+                       8 /* steps */,
+                       &_errmsg,
+                       _toShard,
+                       _fromShard);
 
         LOGV2(
             22000,

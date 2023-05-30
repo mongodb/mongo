@@ -761,7 +761,7 @@ std::string SplitInfo::toString() const {
     }
 
     return "Splitting chunk in {} [ {}, {} ), residing on {} at [ {} ] with version {} and collection placement version {}"_format(
-        nss.ns(),
+        toStringForLogging(nss),
         minKey.toString(),
         maxKey.toString(),
         shardId.toString(),

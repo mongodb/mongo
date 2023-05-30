@@ -134,7 +134,7 @@ std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx
                                                          const UUID& uuid) {
     // Use the content of config.chunks to obtain the placement of the collection being renamed.
     // The request is equivalent to 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'.
-    auto query = BSON(NamespacePlacementType::kNssFieldName << nss.ns());
+    auto query = BSON(NamespacePlacementType::kNssFieldName << NamespaceStringUtil::serialize(nss));
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
@@ -174,8 +174,9 @@ SemiFuture<BatchedCommandResponse> deleteShardedCollectionStatement(
     int stmtId) {
 
     if (uuid) {
-        const auto deleteCollectionQuery = BSON(
-            CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << *uuid);
+        const auto deleteCollectionQuery =
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)
+                                               << CollectionType::kUuidFieldName << *uuid);
 
         write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
         deleteOp.setDeletes({[&]() {
@@ -203,7 +204,7 @@ SemiFuture<BatchedCommandResponse> renameShardedCollectionStatement(
     newCollectionType.setEpoch(OID::gen());
 
     // Implemented as an upsert to be idempotent
-    auto query = BSON(CollectionType::kNssFieldName << newNss.ns());
+    auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(newNss));
     write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
     updateOp.setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
@@ -248,8 +249,8 @@ SemiFuture<BatchedCommandResponse> updateZonesStatement(const txn_api::Transacti
                                                         const NamespaceString& oldNss,
                                                         const NamespaceString& newNss) {
 
-    const auto query = BSON(TagsType::ns(oldNss.ns().toString()));
-    const auto update = BSON("$set" << BSON(TagsType::ns(newNss.ns().toString())));
+    const auto query = BSON(TagsType::ns(NamespaceStringUtil::serialize(oldNss)));
+    const auto update = BSON("$set" << BSON(TagsType::ns(NamespaceStringUtil::serialize(newNss))));
 
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
@@ -269,7 +270,7 @@ SemiFuture<BatchedCommandResponse> updateZonesStatement(const txn_api::Transacti
 SemiFuture<BatchedCommandResponse> deleteZonesStatement(const txn_api::TransactionClient& txnClient,
                                                         const NamespaceString& nss) {
 
-    const auto query = BSON(TagsType::ns(nss.ns().toString()));
+    const auto query = BSON(TagsType::ns(NamespaceStringUtil::serialize(nss)));
     const auto hint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
 
     BatchedCommandRequest request([&] {
@@ -648,7 +649,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "renameCollection.start",
-                    fromNss.ns(),
+                    NamespaceStringUtil::serialize(fromNss),
                     BSON("source" << NamespaceStringUtil::serialize(fromNss) << "destination"
                                   << NamespaceStringUtil::serialize(toNss)),
                     ShardingCatalogClient::kMajorityWriteConcern);
@@ -802,7 +803,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             ShardingLogging::get(opCtx)->logChange(
                 opCtx,
                 "renameCollection.end",
-                nss().ns(),
+                NamespaceStringUtil::serialize(nss()),
                 BSON("source" << NamespaceStringUtil::serialize(nss()) << "destination"
                               << NamespaceStringUtil::serialize(_request.getTo())),
                 ShardingCatalogClient::kMajorityWriteConcern);

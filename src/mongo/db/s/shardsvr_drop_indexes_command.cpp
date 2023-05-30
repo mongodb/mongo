@@ -175,7 +175,8 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         resolvedNs = ns().makeTimeseriesBucketsNamespace();
     }
 
-    auto collDDLLock = ddlLockManager->lock(opCtx, resolvedNs.ns(), lockReason, lockTimeout);
+    auto collDDLLock = ddlLockManager->lock(
+        opCtx, NamespaceStringUtil::serialize(resolvedNs), lockReason, lockTimeout);
 
     StaleConfigRetryState retryState;
     return shardVersionRetry(

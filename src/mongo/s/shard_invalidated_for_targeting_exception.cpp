@@ -33,6 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace {
@@ -44,7 +45,7 @@ constexpr StringData kNss = "nss"_sd;
 }  // namespace
 
 void ShardInvalidatedForTargetingInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append(kNss, _nss.ns());
+    bob->append(kNss, NamespaceStringUtil::serialize(_nss));
 }
 
 std::shared_ptr<const ErrorExtraInfo> ShardInvalidatedForTargetingInfo::parse(const BSONObj& obj) {

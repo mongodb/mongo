@@ -190,7 +190,7 @@ bool isDbAlreadyDropped(OperationContext* opCtx,
 BSONObj getReasonForDropCollection(const NamespaceString& nss) {
     return BSON("command"
                 << "dropCollection fromDropDatabase"
-                << "nss" << nss.ns());
+                << "nss" << NamespaceStringUtil::serialize(nss));
 }
 
 }  // namespace
@@ -205,7 +205,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     // moveChunk and to prevent new ones from happening.
     const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
     auto collDDLLock = DDLLockManager::get(opCtx)->lock(
-        opCtx, nss.ns(), coorName, DDLLockManager::kDefaultLockTimeout);
+        opCtx, NamespaceStringUtil::serialize(nss), coorName, DDLLockManager::kDefaultLockTimeout);
 
     if (!_isPre70Compatible()) {
         ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);

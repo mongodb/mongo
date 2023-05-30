@@ -336,7 +336,7 @@ BSONObjBuilder _makeMigrationStatusDocumentCommon(const NamespaceString& nss,
     builder.append(kDestinationShard, toShard.toString());
     builder.append(kIsDonorShard, isDonorShard);
     builder.append(kChunk, BSON(ChunkType::min(min) << ChunkType::max(max)));
-    builder.append(kCollection, nss.ns());
+    builder.append(kCollection, NamespaceStringUtil::serialize(nss));
     return builder;
 }
 
@@ -966,7 +966,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
 
         BSONObjBuilder builder;
-        builder.append("_recvChunkReleaseCritSec", nss.ns());
+        builder.append("_recvChunkReleaseCritSec", NamespaceStringUtil::serialize(nss));
         sessionId.append(&builder);
         const auto commandObj = CommandHelpers::appendMajorityWriteConcern(builder.obj());
 

@@ -164,7 +164,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         Lock::GlobalLock lk(opCtx, MODE_IX);
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_S);
         } else {
             // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
@@ -276,7 +276,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
             // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
@@ -405,7 +405,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
             // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
@@ -537,7 +537,7 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
     store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
         const auto& nss = doc.getNss();
         {
-            if (nsIsDbOnly(nss.ns())) {
+            if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
                 AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
                 auto scopedDss =
                     DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());

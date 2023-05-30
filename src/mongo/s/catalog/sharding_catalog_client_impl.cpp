@@ -512,7 +512,8 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                 kConfigReadSelector,
                                                 readConcernLevel,
                                                 CollectionType::ConfigNS,
-                                                BSON(CollectionType::kNssFieldName << nss.ns()),
+                                                BSON(CollectionType::kNssFieldName
+                                                     << NamespaceStringUtil::serialize(nss)),
                                                 BSONObj(),
                                                 1))
             .value;
@@ -812,13 +813,14 @@ ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
 
 StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollection(
     OperationContext* opCtx, const NamespaceString& nss) {
-    auto findStatus = _exhaustiveFindOnConfig(opCtx,
-                                              kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
-                                              TagsType::ConfigNS,
-                                              BSON(TagsType::ns(nss.ns().toString())),
-                                              BSON(TagsType::min() << 1),
-                                              boost::none);  // no limit
+    auto findStatus =
+        _exhaustiveFindOnConfig(opCtx,
+                                kConfigReadSelector,
+                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                TagsType::ConfigNS,
+                                BSON(TagsType::ns(NamespaceStringUtil::serialize(nss))),
+                                BSON(TagsType::min() << 1),
+                                boost::none);  // no limit
     if (!findStatus.isOK()) {
         return findStatus.getStatus().withContext("Failed to load tags");
     }
@@ -1433,8 +1435,8 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     // Build the pipeline for the exact placement data.
     // 1. Get all the history entries prior to the requested time concerning either the collection
     // or the parent database.
-    const auto& kMarkerNss =
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns();
+    const auto& kMarkerNss = NamespaceStringUtil::serialize(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
     auto matchStage = [&]() {
         bool isClusterSearch = !nss.has_value();
         if (isClusterSearch)

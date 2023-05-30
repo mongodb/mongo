@@ -59,7 +59,7 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
         << "Refine shard key for collection " << collNss << " with " << shardKey.toString();
 
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("refineCollectionShardKey", collNss.ns());
+    cmdBuilder.append("refineCollectionShardKey", NamespaceStringUtil::serialize(collNss));
     cmdBuilder.append("shardKey", shardKey.toBSON());
     cmdBuilder.append("oldShardKey", oldShardKey.toBSON());
 

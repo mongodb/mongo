@@ -107,7 +107,7 @@ BSONObj createRequestWithSessionId(StringData commandName,
                                    const MigrationSessionId& sessionId,
                                    bool waitForSteadyOrDone = false) {
     BSONObjBuilder builder;
-    builder.append(commandName, nss.ns());
+    builder.append(commandName, NamespaceStringUtil::serialize(nss));
     builder.append("waitForSteadyOrDone", waitForSteadyOrDone);
     sessionId.append(&builder);
     return builder.obj();
@@ -448,7 +448,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
 
     auto responseStatus = _callRecipient(opCtx, [&] {
         BSONObjBuilder builder;
-        builder.append(kRecvChunkCommit, nss().ns());
+        builder.append(kRecvChunkCommit, NamespaceStringUtil::serialize(nss()));
         // For backward compatibility with v6.0 recipients.
         // TODO (SERVER-67844): Remove it once 7.0 becomes LTS.
         builder.append("acquireCSOnRecipient", true);
@@ -1297,7 +1297,7 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                                   << migrationSessionIdStatus.getStatus().toString()};
         }
 
-        if (res["ns"].str() != nss().ns() ||
+        if (res["ns"].str() != NamespaceStringUtil::serialize(nss()) ||
             (res.hasField("fromShardId")
                  ? (res["fromShardId"].str() != _args.getFromShard().toString())
                  : (res["from"].str() != _donorConnStr.toString())) ||

@@ -536,7 +536,8 @@ ChunkVersion RoutingTableHistory::getVersionForLogging(const ShardId& shardName)
 
 std::string RoutingTableHistory::toString() const {
     StringBuilder sb;
-    sb << "RoutingTableHistory: " << _nss.ns() << " key: " << _shardKeyPattern.toString() << '\n';
+    sb << "RoutingTableHistory: " << toStringForLogging(_nss)
+       << " key: " << _shardKeyPattern.toString() << '\n';
 
     sb << "Chunks:\n";
     _chunkMap.forEach([&sb](const auto& chunk) {

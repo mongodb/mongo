@@ -87,11 +87,11 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
 
             // This is a best-effort attempt to refresh the shard 'shardEntry'. Fire and forget an
             // asynchronous '_flushRoutingTableCacheUpdates' request.
-            shard->runFireAndForgetCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin.toString(),
-                BSON("_flushRoutingTableCacheUpdates" << coll.getNss().ns()));
+            shard->runFireAndForgetCommand(opCtx,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           DatabaseName::kAdmin.toString(),
+                                           BSON("_flushRoutingTableCacheUpdates"
+                                                << NamespaceStringUtil::serialize(coll.getNss())));
         }
     }
 }
@@ -234,7 +234,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "refineCollectionShardKey.start",
-        nss.ns(),
+        NamespaceStringUtil::serialize(nss),
         BSON("oldKey" << oldShardKeyPattern.toBSON() << "newKey" << newShardKeyPattern.toBSON()
                       << "oldEpoch" << collType.getEpoch() << "newEpoch" << newEpoch),
         ShardingCatalogClient::kLocalWriteConcern,
@@ -258,12 +258,12 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         auto [chunkUpdates, tagUpdates] = makeChunkAndTagUpdatesForRefine(newFields);
 
         // Update the config.collections entry for the given namespace.
-        auto catalogUpdateRequest =
-            BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
-                                                 BSON(CollectionType::kNssFieldName << nss.ns()),
-                                                 collType.toBSON(),
-                                                 false /* upsert */,
-                                                 false /* multi */);
+        auto catalogUpdateRequest = BatchedCommandRequest::buildUpdateOp(
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+            collType.toBSON(),
+            false /* upsert */,
+            false /* multi */);
         return txnClient.runCRUDOp(catalogUpdateRequest, {})
             .thenRunOn(txnExec)
             .then([&txnClient, timers, collType, nss, chunkUpdates = std::move(chunkUpdates)](
@@ -316,12 +316,12 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                     // Update all config.tags entries for the given namespace by setting their
                     // bounds for each new field in the refined key to MinKey (except for the global
                     // max tag where the max bounds are set to MaxKey).
-                    auto tagUpdateRequest =
-                        BatchedCommandRequest::buildPipelineUpdateOp(TagsType::ConfigNS,
-                                                                     BSON("ns" << nss.ns()),
-                                                                     tagUpdates,
-                                                                     false /* upsert */,
-                                                                     true /* useMultiUpdate */);
+                    auto tagUpdateRequest = BatchedCommandRequest::buildPipelineUpdateOp(
+                        TagsType::ConfigNS,
+                        BSON("ns" << NamespaceStringUtil::serialize(nss)),
+                        tagUpdates,
+                        false /* upsert */,
+                        true /* useMultiUpdate */);
                     return txnClient.runCRUDOp(tagUpdateRequest, {});
                 })
             .thenRunOn(txnExec)
@@ -358,7 +358,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "refineCollectionShardKey.end",
-                                           nss.ns(),
+                                           NamespaceStringUtil::serialize(nss),
                                            BSONObj(),
                                            ShardingCatalogClient::kLocalWriteConcern,
                                            _localConfigShard,
@@ -407,7 +407,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
 
         ShardingLogging::get(opCtx)->logChange(opCtx,
                                                "configureCollectionBalancing",
-                                               nss.ns(),
+                                               NamespaceStringUtil::serialize(nss),
                                                logChangeDetail.obj(),
                                                ShardingCatalogClient::kMajorityWriteConcern,
                                                _localConfigShard,
@@ -473,7 +473,8 @@ void ShardingCatalogManager::configureCollectionBalancing(
         withTransaction(opCtx,
                         CollectionType::ConfigNS,
                         [this, &nss, &update](OperationContext* opCtx, TxnNumber txnNumber) {
-                            const auto query = BSON(CollectionType::kNssFieldName << nss.ns());
+                            const auto query = BSON(CollectionType::kNssFieldName
+                                                    << NamespaceStringUtil::serialize(nss));
                             const auto res = writeToConfigDocumentInTxn(
                                 opCtx,
                                 CollectionType::ConfigNS,
@@ -571,57 +572,57 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
 
-    withTransaction(opCtx,
-                    CollectionType::ConfigNS,
-                    [this, &nss, &timeseriesParameters, &shardIds](OperationContext* opCtx,
-                                                                   TxnNumber txnNumber) {
-                        auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName +
-                            "." + TypeCollectionTimeseriesFields::kGranularityFieldName;
-                        auto bucketSpanFieldName = CollectionType::kTimeseriesFieldsFieldName +
-                            "." + TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName;
-                        auto bucketRoundingFieldName = CollectionType::kTimeseriesFieldsFieldName +
-                            "." + TypeCollectionTimeseriesFields::kBucketRoundingSecondsFieldName;
+    withTransaction(
+        opCtx,
+        CollectionType::ConfigNS,
+        [this, &nss, &timeseriesParameters, &shardIds](OperationContext* opCtx,
+                                                       TxnNumber txnNumber) {
+            auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
+                TypeCollectionTimeseriesFields::kGranularityFieldName;
+            auto bucketSpanFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
+                TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName;
+            auto bucketRoundingFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
+                TypeCollectionTimeseriesFields::kBucketRoundingSecondsFieldName;
 
-                        BSONObjBuilder updateCmd;
-                        BSONObj bucketUp;
-                        if (timeseriesParameters.getGranularity().has_value()) {
-                            auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
-                                timeseriesParameters.getGranularity().get());
-                            updateCmd.append("$unset", BSON(bucketRoundingFieldName << ""));
-                            bucketUp = BSON(granularityFieldName
-                                            << BucketGranularity_serializer(
-                                                   timeseriesParameters.getGranularity().get())
-                                            << bucketSpanFieldName << bucketSpan);
-                        } else {
-                            invariant(timeseriesParameters.getBucketMaxSpanSeconds().has_value() &&
-                                      timeseriesParameters.getBucketRoundingSeconds().has_value());
-                            updateCmd.append("$unset", BSON(granularityFieldName << ""));
-                            bucketUp =
-                                BSON(bucketSpanFieldName
-                                     << timeseriesParameters.getBucketMaxSpanSeconds().get()
-                                     << bucketRoundingFieldName
-                                     << timeseriesParameters.getBucketRoundingSeconds().get());
-                        }
-                        updateCmd.append("$set", bucketUp);
+            BSONObjBuilder updateCmd;
+            BSONObj bucketUp;
+            if (timeseriesParameters.getGranularity().has_value()) {
+                auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
+                    timeseriesParameters.getGranularity().get());
+                updateCmd.append("$unset", BSON(bucketRoundingFieldName << ""));
+                bucketUp = BSON(
+                    granularityFieldName
+                    << BucketGranularity_serializer(timeseriesParameters.getGranularity().get())
+                    << bucketSpanFieldName << bucketSpan);
+            } else {
+                invariant(timeseriesParameters.getBucketMaxSpanSeconds().has_value() &&
+                          timeseriesParameters.getBucketRoundingSeconds().has_value());
+                updateCmd.append("$unset", BSON(granularityFieldName << ""));
+                bucketUp = BSON(bucketSpanFieldName
+                                << timeseriesParameters.getBucketMaxSpanSeconds().get()
+                                << bucketRoundingFieldName
+                                << timeseriesParameters.getBucketRoundingSeconds().get());
+            }
+            updateCmd.append("$set", bucketUp);
 
-                        writeToConfigDocumentInTxn(
-                            opCtx,
-                            CollectionType::ConfigNS,
-                            BatchedCommandRequest::buildUpdateOp(
-                                CollectionType::ConfigNS,
-                                BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
-                                updateCmd.obj() /* update */,
-                                false /* upsert */,
-                                false /* multi */),
-                            txnNumber);
+            writeToConfigDocumentInTxn(opCtx,
+                                       CollectionType::ConfigNS,
+                                       BatchedCommandRequest::buildUpdateOp(
+                                           CollectionType::ConfigNS,
+                                           BSON(CollectionType::kNssFieldName
+                                                << NamespaceStringUtil::serialize(nss)) /* query */,
+                                           updateCmd.obj() /* update */,
+                                           false /* upsert */,
+                                           false /* multi */),
+                                       txnNumber);
 
-                        // Bump the chunk version for shards.
-                        bumpMajorVersionOneChunkPerShard(opCtx,
-                                                         nss,
-                                                         txnNumber,
-                                                         {std::make_move_iterator(shardIds.begin()),
-                                                          std::make_move_iterator(shardIds.end())});
-                    });
+            // Bump the chunk version for shards.
+            bumpMajorVersionOneChunkPerShard(opCtx,
+                                             nss,
+                                             txnNumber,
+                                             {std::make_move_iterator(shardIds.begin()),
+                                              std::make_move_iterator(shardIds.end())});
+        });
 }
 
 }  // namespace mongo

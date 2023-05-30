@@ -109,8 +109,8 @@ ReshardingCollectionCloner::makeRawPipeline(
 
     // Assume that the config.cache.chunks collection isn't a view either.
     auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-    auto tempCacheChunksNss =
-        NamespaceString::makeGlobalConfigCollection("cache.chunks." + tempNss.ns());
+    auto tempCacheChunksNss = NamespaceString::makeGlobalConfigCollection(
+        "cache.chunks." + NamespaceStringUtil::serialize(tempNss));
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
 
     // Pipeline::makePipeline() ignores the collation set on the AggregationRequest (or lack

@@ -208,7 +208,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             opCtx->recoveryUnit()->onCommit(
                 [insertedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                     OperationContext* opCtx, boost::optional<Timestamp>) {
-                    if (nsIsDbOnly(insertedNss.ns())) {
+                    if (nsIsDbOnly(NamespaceStringUtil::serialize(insertedNss))) {
                         boost::optional<AutoGetDb> lockDbIfNotPrimary;
                         if (!isStandaloneOrPrimary(opCtx)) {
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
@@ -351,7 +351,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         opCtx->recoveryUnit()->onCommit(
             [updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
-                if (nsIsDbOnly(updatedNss.ns())) {
+                if (nsIsDbOnly(NamespaceStringUtil::serialize(updatedNss))) {
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
                         lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
@@ -583,7 +583,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         opCtx->recoveryUnit()->onCommit(
             [deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
-                if (nsIsDbOnly(deletedNss.ns())) {
+                if (nsIsDbOnly(NamespaceStringUtil::serialize(deletedNss))) {
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
                         lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);

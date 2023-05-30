@@ -240,7 +240,7 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
     std::vector<RangeDeletionTask> tasks;
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto query = BSON(RangeDeletionTask::kNssFieldName << nss.ns());
+    auto query = BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(nss));
 
     store.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
         tasks.push_back(std::move(deletionTask));
@@ -364,7 +364,8 @@ void snapshotRangeDeletionsForRename(OperationContext* opCtx,
     // Clear out eventual snapshots associated with the target collection: always restart from a
     // clean state in case of stepdown or primary killed.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionForRenameNamespace);
-    store.remove(opCtx, BSON(RangeDeletionTask::kNssFieldName << toNss.ns()));
+    store.remove(opCtx,
+                 BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(toNss)));
 
     auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
     for (auto& task : rangeDeletionTasks) {
@@ -382,7 +383,8 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsStore(
         NamespaceString::kRangeDeletionNamespace);
 
-    const auto query = BSON(RangeDeletionTask::kNssFieldName << nss.ns());
+    const auto query =
+        BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(nss));
 
     rangeDeletionsForRenameStore.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
         try {
@@ -400,8 +402,8 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
     // Delete already restored snapshots associated to the target collection
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsForRenameStore(
         NamespaceString::kRangeDeletionForRenameNamespace);
-    rangeDeletionsForRenameStore.remove(opCtx,
-                                        BSON(RangeDeletionTask::kNssFieldName << toNss.ns()));
+    rangeDeletionsForRenameStore.remove(
+        opCtx, BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(toNss)));
 }
 
 

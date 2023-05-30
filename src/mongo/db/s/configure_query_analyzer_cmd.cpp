@@ -74,8 +74,10 @@ public:
             // Check under the db lock if this is still the primary shard for the database.
             DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
 
-            _collDDLLock.emplace(ddlLockManager->lock(
-                opCtx, nss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout));
+            _collDDLLock.emplace(ddlLockManager->lock(opCtx,
+                                                      NamespaceStringUtil::serialize(nss),
+                                                      lockReason,
+                                                      DDLLockManager::kDefaultLockTimeout));
         } else {
             _autoColl.emplace(opCtx, nss, MODE_IX);
         }

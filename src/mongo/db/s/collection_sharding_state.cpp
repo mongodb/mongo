@@ -66,11 +66,11 @@ public:
 
     CSSAndLock* getOrCreate(const NamespaceString& nss) noexcept {
         stdx::lock_guard<Latch> lg(_mutex);
-
-        auto it = _collections.find(nss.ns());
+        const auto nssStr = NamespaceStringUtil::serialize(nss);
+        auto it = _collections.find(nssStr);
         if (it == _collections.end()) {
-            auto inserted = _collections.try_emplace(
-                nss.ns(), std::make_unique<CSSAndLock>(_factory->make(nss)));
+            auto inserted =
+                _collections.try_emplace(nssStr, std::make_unique<CSSAndLock>(_factory->make(nss)));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
