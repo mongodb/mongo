@@ -45,10 +45,6 @@ namespace mongo {
 OpObserverShardingImpl::OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter)
     : OpObserverImpl(std::move(oplogWriter)) {}
 
-void OpObserverShardingImpl::shardObserveAboutToDelete(OperationContext* opCtx,
-                                                       NamespaceString const& nss,
-                                                       BSONObj const& docToDelete) {}
-
 void OpObserverShardingImpl::shardObserveInsertsOp(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -132,12 +128,5 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
         cloner->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime);
     }
 }
-
-void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  const BSONObj& documentKey,
-                                                  const repl::OpTime& opTime,
-                                                  const ShardingWriteRouter& shardingWriteRouter,
-                                                  const bool inMultiDocumentTransaction) {}
 
 }  // namespace mongo

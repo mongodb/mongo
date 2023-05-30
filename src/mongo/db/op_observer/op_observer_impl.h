@@ -238,9 +238,6 @@ public:
                                      const repl::OpTime& newCommitPoint) final {}
 
 private:
-    virtual void shardObserveAboutToDelete(OperationContext* opCtx,
-                                           NamespaceString const& nss,
-                                           BSONObj const& doc) {}
     virtual void shardObserveInsertsOp(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        std::vector<InsertStatement>::const_iterator first,
@@ -253,12 +250,6 @@ private:
                                       const NamespaceString& nss,
                                       boost::optional<BSONObj> preImageDoc,
                                       const BSONObj& postImageDoc,
-                                      const repl::OpTime& opTime,
-                                      const ShardingWriteRouter& shardingWriteRouter,
-                                      const bool inMultiDocumentTransaction) {}
-    virtual void shardObserveDeleteOp(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const BSONObj& documentKey,
                                       const repl::OpTime& opTime,
                                       const ShardingWriteRouter& shardingWriteRouter,
                                       const bool inMultiDocumentTransaction) {}

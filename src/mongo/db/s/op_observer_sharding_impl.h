@@ -38,9 +38,6 @@ public:
     OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter);
 
 protected:
-    void shardObserveAboutToDelete(OperationContext* opCtx,
-                                   NamespaceString const& nss,
-                                   BSONObj const& docToDelete) override;
     void shardObserveInsertsOp(OperationContext* opCtx,
                                const NamespaceString& nss,
                                std::vector<InsertStatement>::const_iterator first,
@@ -53,12 +50,6 @@ protected:
                               const NamespaceString& nss,
                               boost::optional<BSONObj> preImageDoc,
                               const BSONObj& updatedDoc,
-                              const repl::OpTime& opTime,
-                              const ShardingWriteRouter& shardingWriteRouter,
-                              bool inMultiDocumentTransaction) override;
-    void shardObserveDeleteOp(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const BSONObj& documentKey,
                               const repl::OpTime& opTime,
                               const ShardingWriteRouter& shardingWriteRouter,
                               bool inMultiDocumentTransaction) override;

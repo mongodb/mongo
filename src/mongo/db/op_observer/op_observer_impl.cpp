@@ -1044,8 +1044,6 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
         destinedRecipientDecoration(opCtx) =
             shardingWriteRouter.getReshardingDestinedRecipient(doc);
     }
-
-    shardObserveAboutToDelete(opCtx, coll->ns(), doc);
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
@@ -1166,8 +1164,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
         onWriteOpCompleted(opCtx, std::vector<StmtId>{stmtId}, sessionTxnRecord);
     }
-
-    // shardObserveDeleteOp() is a no-op.
 }
 
 void OpObserverImpl::onInternalOpMessage(
