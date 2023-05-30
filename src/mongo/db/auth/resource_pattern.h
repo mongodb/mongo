@@ -63,7 +63,6 @@ public:
     // forAnySystemBuckets() - Remove boost::none default.
     // forAnySystemBucketsInDatabase() - Remove `StringData` variant.
     // forAnySystemBucketsInAnyDatabase() - Remove variant without tenantId arg.
-    // forExactSystemBucketsCollection() - Remove variant with discrete db/coll args.
     // databaseToMatch() - Remove in favor of dbNameToMatch.
 
     /**
@@ -174,12 +173,6 @@ public:
     static ResourcePattern forExactSystemBucketsCollection(const NamespaceString& nss) {
         invariant(!nss.coll().startsWith("system.buckets."));
         return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource, nss);
-    }
-
-    static ResourcePattern forExactSystemBucketsCollection(StringData dbName,
-                                                           StringData collectionName) {
-        return forExactSystemBucketsCollection(
-            NamespaceString::createNamespaceStringForAuth(boost::none, dbName, collectionName));
     }
 
     /**

@@ -1495,11 +1495,14 @@ const ResourcePattern SystemBucketsTest::otherDbSystemBucketResource(
         NamespaceString::createNamespaceString_forTest("sb_db_other.system.buckets.sb_coll_test")));
 
 const ResourcePattern SystemBucketsTest::testBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_test", "sb_coll_test"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceStringForAuth(
+        boost::none /* tenantId */, "sb_db_test"_sd, "sb_coll_test"_sd)));
 const ResourcePattern SystemBucketsTest::otherBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_test", "sb_coll_other"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceStringForAuth(
+        boost::none /* tenantId */, "sb_db_test"_sd, "sb_coll_other"_sd)));
 const ResourcePattern SystemBucketsTest::otherDbBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_other", "sb_coll_test"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceStringForAuth(
+        boost::none /* tenantId */, "sb_db_other"_sd, "sb_coll_test"_sd)));
 
 TEST_F(SystemBucketsTest, CheckExactSystemBucketsCollection) {
     // If we have a system_buckets exact priv
