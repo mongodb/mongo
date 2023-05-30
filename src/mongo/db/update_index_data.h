@@ -29,10 +29,9 @@
 
 #pragma once
 
-#include <set>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
+#include <absl/container/btree_set.h>
 
 namespace mongo {
 
@@ -89,8 +88,8 @@ private:
      */
     bool _startsWith(const FieldRef& a, const FieldRef& b) const;
 
-    std::set<FieldRef> _canonicalPaths;
-    std::set<std::string> _pathComponents;
+    absl::btree_set<FieldRef> _canonicalPaths;
+    absl::btree_set<std::string> _pathComponents;
 
     bool _allPathsIndexed;
 };
