@@ -8959,7 +8959,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .stitch
-  - name: .publish
 
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
@@ -9055,7 +9054,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
-  - name: .publish
 
 - name: ubuntu1604
   display_name: Ubuntu 16.04
@@ -9241,7 +9239,6 @@ buildvariants:
   - name: .sharding .txns
   - name: sharding_jscore_passthrough
   - name: .stitch
-  - name: .publish
 
 - name: ubuntu1804-arm64
   display_name: Ubuntu 18.04 arm64
@@ -9296,7 +9293,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: .publish
 
 - name: ubuntu2004
   display_name: Ubuntu 20.04
