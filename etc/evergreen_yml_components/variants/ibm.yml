@@ -31,14 +31,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel81-power8-large
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel81-power8-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel81-power8-large
   - name: .jscore .common !.auth
   - name: .read_write_concern
   - name: replica_sets_gen
@@ -83,14 +83,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel71-power8-large
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel71-power8-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel71-power8-large
   - name: .jscore .common !.auth
   - name: .read_write_concern
   - name: replica_sets_gen
@@ -137,14 +137,14 @@ buildvariants:
   - name: small_compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel72-zseries-build
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel72-zseries-build
   - name: .jscore .common !.auth
   - name: .read_write_concern
   - name: replica_sets_gen
@@ -191,14 +191,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel83-zseries-large
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel83-zseries-large
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel83-zseries-large
   - name: .jscore .common !.auth
   - name: .read_write_concern
   - name: replica_sets_gen

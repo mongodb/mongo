@@ -183,6 +183,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-build
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - amazon2-build
   - name: .aggfuzzer .common
   - name: aggregation
   - name: audit
@@ -285,6 +288,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - amazon2-arm64-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer
   - name: .aggregation
@@ -313,9 +319,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - amazon2-arm64-large
   - name: jsCore
     distros:
     - amazon2-arm64-large
@@ -733,6 +736,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit
@@ -750,9 +756,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_txns_large_txns_format
