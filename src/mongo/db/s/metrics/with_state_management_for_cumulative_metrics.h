@@ -49,6 +49,10 @@ public:
     template <typename... Args>
     WithStateManagementForCumulativeMetrics(Args&&... args) : Base{std::forward<Args>(args)...} {}
 
+    WithStateManagementForCumulativeMetrics(
+        const WithStateManagementForCumulativeMetrics<Base, SizeHelper, StateEnums...>& other) =
+        default;
+
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
         getHolderFor<T>().onStateTransition(before, after);
