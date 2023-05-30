@@ -155,6 +155,11 @@ StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx
                                                          const UUID& migrationUUID) {
     // Read the most up to date data.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    // ReadConcern must also be fixed for the new scope. It will get restored when exiting this.
+    auto originalReadConcern =
+        std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+    ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
+
     AutoGetCollectionForRead collection(opCtx,
                                         NamespaceString::kTenantMigrationRecipientsNamespace);
 

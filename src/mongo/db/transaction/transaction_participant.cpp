@@ -170,6 +170,10 @@ void validateTransactionHistoryApplyOpsOplogEntry(const repl::OplogEntry& oplogE
 template <typename Callable>
 auto performReadWithNoTimestampDBDirectClient(OperationContext* opCtx, Callable&& callable) {
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    // ReadConcern must also be fixed for the new scope. It will get restored when exiting this.
+    auto originalReadConcern =
+        std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+    ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
     DBDirectClient client(opCtx);
     return callable(&client);
@@ -208,6 +212,9 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
     result.lastTxnRecord = [&]() -> boost::optional<SessionTxnRecord> {
         ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+        auto originalReadConcern =
+            std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+        ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
         AutoGetCollectionForRead autoRead(opCtx,
                                           NamespaceString::kSessionTransactionsTableNamespace);
@@ -273,6 +280,9 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     // Restore the current timestamp read source after fetching transaction history, which may
     // change our ReadSource.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    auto originalReadConcern =
+        std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+    ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
     while (it.hasNext()) {

@@ -1693,9 +1693,9 @@ void ExecCommandDatabase::_initiateCommand() {
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
-    // If the parent operation runs in a transaction, we don't override the read concern.
-    auto skipReadConcern =
-        opCtx->getClient()->isInDirectClient() && opCtx->inMultiDocumentTransaction();
+    // If the operation is being executed as part of DBDirectClient this means we must use the
+    // original read concern.
+    auto skipReadConcern = opCtx->getClient()->isInDirectClient();
     bool startTransaction = static_cast<bool>(_sessionOptions.getStartTransaction());
     if (!skipReadConcern) {
         auto newReadConcernArgs = uassertStatusOK(_extractReadConcern(
