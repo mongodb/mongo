@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/field_ref.h"
 
 #include <algorithm>
@@ -53,6 +54,9 @@ void FieldRef::parse(StringData path) {
     // keep a copy in a local sting.
 
     _dotted = path.toString();
+    tassert(1589700,
+            "the size of the path is larger than accepted",
+            _dotted.size() <= BSONObjMaxInternalSize);
 
     // Separate the field parts using '.' as a delimiter.
     std::string::iterator beg = _dotted.begin();
