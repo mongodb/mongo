@@ -52,6 +52,23 @@ StringData safeFirstPart(const FieldRef* fieldRef) {
         return fieldRef->getPart(0);
     }
 }
+
+
+/**
+ * Helper function to check if path conflicts are all prefixes.
+ */
+Status checkPathIsPrefixOf(const FieldRef& path, const FieldRef& conflictingPath) {
+    // Conflicts are always prefixes (or equal to) the path, or vice versa
+    if (path.numParts() > conflictingPath.numParts()) {
+        string errMsg = str::stream()
+            << "field at '" << conflictingPath.dottedField()
+            << "' must be exactly specified, field at sub-path '" << path.dottedField() << "'found";
+        return Status(ErrorCodes::NotExactValueField, errMsg);
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 bool FieldRefSet::FieldRefPtrLessThan::operator()(const FieldRef* l, const FieldRef* r) const {
@@ -72,7 +89,7 @@ FieldRefSet::FieldRefSet(const vector<FieldRef*>& paths) {
     fillFrom(paths);
 }
 
-bool FieldRefSet::findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const {
+StatusWith<bool> FieldRefSet::checkForConflictsAndPrefix(const FieldRef* toCheck) const {
     bool foundConflict = false;
 
     // If the set is empty, there is no work to do.
@@ -88,10 +105,9 @@ bool FieldRefSet::findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts)
     while (it != _fieldSet.end() && safeFirstPart(*it) == prefixStr) {
         size_t common = (*it)->commonPrefixSize(*toCheck);
         if ((*it)->numParts() == common || toCheck->numParts() == common) {
-            if (!conflicts)
-                return true;
-
-            conflicts->_fieldSet.insert(*it);
+            if (auto status = checkPathIsPrefixOf(*toCheck, **it); !status.isOK()) {
+                return status;
+            }
             foundConflict = true;
         }
         ++it;

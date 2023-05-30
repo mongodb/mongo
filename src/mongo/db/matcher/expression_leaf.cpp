@@ -51,10 +51,11 @@
 
 namespace mongo {
 
+template <typename T>
 ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     MatchType type,
     boost::optional<StringData> path,
-    Value rhs,
+    T&& rhs,
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
     clonable_ptr<ErrorAnnotation> annotation,
@@ -65,6 +66,24 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     setData(_backingBSON.firstElement());
     invariant(_rhs.type() != BSONType::EOO);
 }
+
+// Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.
+template ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
+    MatchType,
+    boost::optional<StringData>,
+    Value&&,
+    ElementPath::LeafArrayBehavior,
+    ElementPath::NonLeafArrayBehavior,
+    clonable_ptr<ErrorAnnotation>,
+    const CollatorInterface*);
+template ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
+    MatchType,
+    boost::optional<StringData>,
+    const BSONElement&,
+    ElementPath::LeafArrayBehavior,
+    ElementPath::NonLeafArrayBehavior,
+    clonable_ptr<ErrorAnnotation>,
+    const CollatorInterface*);
 
 bool ComparisonMatchExpressionBase::equivalent(const MatchExpression* other) const {
     if (other->matchType() != matchType())
@@ -95,14 +114,15 @@ BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide(SerializationO
     }
 }
 
+template <typename T>
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
                                                      boost::optional<StringData> path,
-                                                     Value rhs,
+                                                     T&& rhs,
                                                      clonable_ptr<ErrorAnnotation> annotation,
                                                      const CollatorInterface* collator)
     : ComparisonMatchExpressionBase(type,
                                     path,
-                                    std::move(rhs),
+                                    std::forward<T>(rhs),
                                     ElementPath::LeafArrayBehavior::kTraverse,
                                     ElementPath::NonLeafArrayBehavior::kTraverse,
                                     std::move(annotation),
@@ -121,6 +141,18 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
             uasserted(ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression");
     }
 }
+
+// Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.
+template ComparisonMatchExpression::ComparisonMatchExpression(MatchType,
+                                                              boost::optional<StringData>,
+                                                              Value&&,
+                                                              clonable_ptr<ErrorAnnotation>,
+                                                              const CollatorInterface*);
+template ComparisonMatchExpression::ComparisonMatchExpression(MatchType,
+                                                              boost::optional<StringData>,
+                                                              const BSONElement&,
+                                                              clonable_ptr<ErrorAnnotation>,
+                                                              const CollatorInterface*);
 
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
                                                      MatchDetails* details) const {

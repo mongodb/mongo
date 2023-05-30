@@ -149,9 +149,10 @@ public:
         }
     }
 
+    template <typename T>
     ComparisonMatchExpressionBase(MatchType type,
                                   boost::optional<StringData> path,
-                                  Value rhs,
+                                  T&& rhs,
                                   ElementPath::LeafArrayBehavior,
                                   ElementPath::NonLeafArrayBehavior,
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr,
@@ -248,9 +249,10 @@ public:
         return isComparisonMatchExpression(expr->matchType());
     }
 
+    template <typename T>
     ComparisonMatchExpression(MatchType type,
                               boost::optional<StringData> path,
-                              Value rhs,
+                              T&& rhs,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr,
                               const CollatorInterface* collator = nullptr);
 
@@ -272,7 +274,9 @@ public:
                             const BSONElement& rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
                             const CollatorInterface* collator = nullptr)
-        : ComparisonMatchExpression(EQ, path, Value(rhs), std::move(annotation), collator) {}
+        : ComparisonMatchExpression(EQ, path, rhs, std::move(annotation), collator) {
+        invariant(!rhs.eoo());
+    }
 
     StringData name() const final {
         return kName;
@@ -280,7 +284,7 @@ public:
 
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<EqualityMatchExpression>(path(), Value(getData()), _errorAnnotation);
+            std::make_unique<EqualityMatchExpression>(path(), getData(), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -311,7 +315,9 @@ public:
     LTEMatchExpression(boost::optional<StringData> path,
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(LTE, path, Value(rhs), std::move(annotation)) {}
+        : ComparisonMatchExpression(LTE, path, rhs, std::move(annotation)) {
+        invariant(!rhs.eoo());
+    }
 
     StringData name() const final {
         return kName;
@@ -350,7 +356,9 @@ public:
     LTMatchExpression(boost::optional<StringData> path,
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(LT, path, Value(rhs), std::move(annotation)) {}
+        : ComparisonMatchExpression(LT, path, rhs, std::move(annotation)) {
+        invariant(!rhs.eoo());
+    }
 
     StringData name() const final {
         return kName;
@@ -394,7 +402,9 @@ public:
     GTMatchExpression(boost::optional<StringData> path,
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(GT, path, Value(rhs), std::move(annotation)) {}
+        : ComparisonMatchExpression(GT, path, rhs, std::move(annotation)) {
+        invariant(!rhs.eoo());
+    }
 
     StringData name() const final {
         return kName;
@@ -437,7 +447,9 @@ public:
     GTEMatchExpression(boost::optional<StringData> path,
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(GTE, path, Value(rhs), std::move(annotation)) {}
+        : ComparisonMatchExpression(GTE, path, rhs, std::move(annotation)) {
+        invariant(!rhs.eoo());
+    }
 
     StringData name() const final {
         return kName;

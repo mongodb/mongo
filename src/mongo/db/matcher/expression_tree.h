@@ -52,6 +52,10 @@ public:
         _expressions.push_back(std::move(e));
     }
 
+    void reserve(size_t n) {
+        _expressions.reserve(n);
+    }
+
     void clear() {
         _expressions.clear();
     }
@@ -127,6 +131,7 @@ public:
     virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<AndMatchExpression> self =
             std::make_unique<AndMatchExpression>(_errorAnnotation);
+        self->reserve(numChildren());
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->clone());
         }
@@ -171,6 +176,7 @@ public:
     virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<OrMatchExpression> self =
             std::make_unique<OrMatchExpression>(_errorAnnotation);
+        self->reserve(numChildren());
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->clone());
         }
@@ -215,6 +221,7 @@ public:
     virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<NorMatchExpression> self =
             std::make_unique<NorMatchExpression>(_errorAnnotation);
+        self->reserve(numChildren());
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->clone());
         }
