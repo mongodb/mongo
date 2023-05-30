@@ -2018,6 +2018,16 @@ tasks:
 
     - func: "upload debugsymbols"
 
+- name: compile_integration_test
+  tags: []
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-integration-tests
+      compiling_for_test: true
+
 - name: compile_ninja
   commands:
   - func: "scons compile"
@@ -4191,97 +4201,76 @@ tasks:
 - <<: *task_template
   name: integration_tests_standalone
   tags: ["integration", "standalone"]
+  depends_on:
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - *git_get_project
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
   - func: "run tests"
     vars:
+      install_dir: build/install/bin
       resmoke_args: --suites=integration_tests_standalone --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_standalone_audit
   tags: ["integration", "audit"]
+  depends_on:
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - *git_get_project
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
   - func: "run tests"
     vars:
+      install_dir: build/install/bin
       resmoke_args: --suites=integration_tests_standalone_audit --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_replset
   tags: ["integration"]
+  depends_on:
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - *git_get_project
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
   - func: "run tests"
     vars:
+      install_dir: build/install/bin
       resmoke_args: --suites=integration_tests_replset --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_replset_ssl_auth
   tags: ["integration"]
+  depends_on:
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - *git_get_project
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
   - func: "run tests"
     vars:
+      install_dir: build/install/bin
       resmoke_args: --suites=integration_tests_replset_ssl_auth --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_sharded
   tags: ["integration", "sharded"]
+  depends_on:
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - *git_get_project
   - *f_expansions_write
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
   - func: "run tests"
     vars:
+      install_dir: build/install/bin
       resmoke_args: --suites=integration_tests_sharded --storageEngine=wiredTiger
 
 - <<: *task_template
@@ -7118,6 +7107,26 @@ task_groups:
   - run_dbtest
   - archive_dbtest
 
+- <<: *compile_task_group_template
+  name: compile_integration_and_test_parallel_stream_TG
+  tasks:
+  - compile_integration_test
+  - integration_tests_standalone
+  - integration_tests_standalone_audit
+  - integration_tests_replset
+  - integration_tests_replset_ssl_auth
+  - integration_tests_sharded
+
+- <<: *compile_task_group_template
+  name: compile_integration_and_test_no_audit_parallel_stream_TG
+  tasks:
+  - compile_integration_test
+  - integration_tests_standalone
+  - integration_tests_replset
+  - integration_tests_replset_ssl_auth
+  - integration_tests_sharded
+
+
 - name: clang_tidy_TG
   setup_group_can_fail_task: true
   setup_group:
@@ -7236,8 +7245,10 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-large
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: build_variant_gen
-  - name: .integration !.audit
     distros:
     - rhel80-medium
   - name: jsCore
@@ -7276,6 +7287,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel80-xlarge
   - name: build_variant_gen
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.gle !.multiversion
@@ -7285,7 +7299,6 @@ buildvariants:
   - name: .misc_js
   - name: disk_wiredtiger
   - name: free_monitoring
-  - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
@@ -8248,6 +8261,9 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - windows-vsCurrent-xlarge
   - name: build_variant_gen
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
@@ -8263,9 +8279,6 @@ buildvariants:
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.audit
-    distros:
-    - windows-vsCurrent-large
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
@@ -8849,6 +8862,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation
@@ -8866,9 +8882,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
@@ -8959,6 +8972,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-xlarge
   - name: build_variant_gen
   - name: lint_pylinters
   - name: lint_clang_format
@@ -8991,9 +9007,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -9386,6 +9399,7 @@ buildvariants:
     use_scons_cache: false
   tasks:
     - name: compile_test_and_package_serial_TG
+    - name: compile_integration_and_test_no_audit_parallel_stream_TG
     - name: build_variant_gen
     - name: .aggregation !.unwind
     - name: audit
@@ -9397,7 +9411,6 @@ buildvariants:
     - name: disk_wiredtiger
     - name: .encrypt
     - name: initial_sync_fuzzer_gen
-    - name: .integration !.audit
     - name: .jscore .common
     - name: jsCore_txns_large_txns_format
     - name: jsCore_minimum_batch_size
@@ -10004,15 +10017,15 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel71-power8-large
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel71-power8-large
   - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel71-power8-large
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
@@ -10055,15 +10068,15 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel81-power8-large
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel81-power8-large
   - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel81-power8-large
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
@@ -10138,15 +10151,15 @@ buildvariants:
   - name: small_compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel72-zseries-build
   - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel72-zseries-build
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
@@ -10189,15 +10202,15 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel83-zseries-large
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel83-zseries-large
   - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
   - name: .misc_js
   - name: .encrypt
-  - name: .integration !.audit
-    distros:
-    - rhel83-zseries-large
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
@@ -10728,6 +10741,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel80-xlarge
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: .aggregation !.unwind !.encrypt
@@ -10740,9 +10756,6 @@ buildvariants:
     distros:
     - rhel80-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.audit
-    distros:
-    - rhel80-medium
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
@@ -10793,6 +10806,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
     # TODO (SERVER-58125): Re-enable the timeseries fuzzer for EFT
   - name: build_variant_gen
   - name: .aggfuzzer .common !.timeseries
@@ -10806,7 +10820,6 @@ buildvariants:
   # - name: concurrency_replication_causal_consistency_gen
   # - name: concurrency_simultaneous_gen
   # - name: concurrency_simultaneous_replication
-  - name: .integration !.audit
   - name: .jscore .common !.txns !.decimal
   - name: jsCore_op_query
   # SERVER-50295: Investigate jstestfuzz time outs.
@@ -10839,14 +10852,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel72-zseries-build
   - name: build_variant_gen
   - name: .aggregation .common
   - name: .auth !.multiversion
   - name: audit
   - name: .misc_js
-  - name: .integration !.audit
-    distros:
-    - rhel72-zseries-build
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
   - name: .read_write_concern !.durable_history
@@ -10888,6 +10901,7 @@ buildvariants:
     exec_timeout_secs: 14400 # 3 hour timeout
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
   - name: compile_benchmarks
   - name: build_variant_gen
   - name: .aggregation
@@ -10903,7 +10917,6 @@ buildvariants:
   - name: external_auth
   - name: external_auth_aws
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.standalone !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
@@ -10982,6 +10995,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
   - name: compile_benchmarks
   - name: build_variant_gen
   - name: .aggregation
@@ -10996,7 +11010,6 @@ buildvariants:
   - name: .encrypt
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
@@ -11166,12 +11179,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - ubuntu1804-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
@@ -11200,12 +11215,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - ubuntu1804-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11230,12 +11247,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - ubuntu1804-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11261,12 +11280,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - ubuntu1804-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11292,12 +11313,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - ubuntu1804-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11323,12 +11346,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - ubuntu1804-build
   - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
