@@ -256,6 +256,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/keys_collection_client_direct',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer_util',
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',

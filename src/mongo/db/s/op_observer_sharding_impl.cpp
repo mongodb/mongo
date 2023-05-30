@@ -41,20 +41,13 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-namespace {
-
-const auto getIsMigrating = OperationContext::declareDecoration<bool>();
-
-}  // namespace
 
 OpObserverShardingImpl::OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter)
     : OpObserverImpl(std::move(oplogWriter)) {}
 
 void OpObserverShardingImpl::shardObserveAboutToDelete(OperationContext* opCtx,
                                                        NamespaceString const& nss,
-                                                       BSONObj const& docToDelete) {
-    getIsMigrating(opCtx) = MigrationSourceManager::isMigrating(opCtx, nss, docToDelete);
-}
+                                                       BSONObj const& docToDelete) {}
 
 void OpObserverShardingImpl::shardObserveInsertsOp(
     OperationContext* opCtx,
@@ -145,35 +138,6 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const BSONObj& documentKey,
                                                   const repl::OpTime& opTime,
                                                   const ShardingWriteRouter& shardingWriteRouter,
-                                                  const bool inMultiDocumentTransaction) {
-    auto* const css = shardingWriteRouter.getCss();
-    css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
-
-    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
-    auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded()) {
-        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
-        return;
-    }
-
-    if (inMultiDocumentTransaction) {
-        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-
-        if (atClusterTime) {
-            const auto shardKey =
-                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(documentKey);
-            MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
-                opCtx, *metadata, shardKey, *atClusterTime);
-        }
-
-        return;
-    }
-
-    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner && getIsMigrating(opCtx)) {
-        cloner->onDeleteOp(opCtx, documentKey, opTime);
-    }
-}
+                                                  const bool inMultiDocumentTransaction) {}
 
 }  // namespace mongo

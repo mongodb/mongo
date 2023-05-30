@@ -66,6 +66,17 @@ public:
      */
     static void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss);
 
+    void aboutToDelete(OperationContext* opCtx,
+                       const CollectionPtr& coll,
+                       const BSONObj& docToDelete,
+                       OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onDelete(OperationContext* opCtx,
+                  const CollectionPtr& coll,
+                  StmtId stmtId,
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator) final;
+
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        const TransactionOperations& transactionOperations,
                                        OpStateAccumulator* opAccumulator = nullptr) final;

@@ -74,7 +74,6 @@
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -1168,17 +1167,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         onWriteOpCompleted(opCtx, std::vector<StmtId>{stmtId}, sessionTxnRecord);
     }
 
-    if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
-        if (!args.fromMigrate) {
-            ShardingWriteRouter shardingWriteRouter(opCtx, nss);
-            shardObserveDeleteOp(opCtx,
-                                 nss,
-                                 documentKey.getShardKeyAndId(),
-                                 opTime.writeOpTime,
-                                 shardingWriteRouter,
-                                 inMultiDocumentTransaction);
-        }
-    }
+    // shardObserveDeleteOp() is a no-op.
 }
 
 void OpObserverImpl::onInternalOpMessage(

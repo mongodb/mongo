@@ -29,14 +29,24 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
+#include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+namespace {
+
+// Used to coordinate delete operations between aboutToDelete() and onDelete().
+const auto getIsMigrating = OperationContext::declareDecoration<bool>();
+
+}  // namespace
 
 // static
 void MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
@@ -104,6 +114,66 @@ void MigrationChunkClonerSourceOpObserver::onUnpreparedTransactionCommit(
     opCtx->recoveryUnit()->registerChange(
         std::make_unique<LogTransactionOperationsForShardingHandler>(
             *opCtx->getLogicalSessionId(), statements, commitOpTime));
+}
+
+void MigrationChunkClonerSourceOpObserver::aboutToDelete(OperationContext* opCtx,
+                                                         const CollectionPtr& coll,
+                                                         const BSONObj& docToDelete,
+                                                         OpStateAccumulator* opAccumulator) {
+    const auto& nss = coll->ns();
+    getIsMigrating(opCtx) = MigrationSourceManager::isMigrating(opCtx, nss, docToDelete);
+}
+
+void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
+                                                    const CollectionPtr& coll,
+                                                    StmtId stmtId,
+                                                    const OplogDeleteEntryArgs& args,
+                                                    OpStateAccumulator* opAccumulator) {
+    if (args.fromMigrate) {
+        return;
+    }
+
+    const auto& nss = coll->ns();
+    if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+        return;
+    }
+
+    ShardingWriteRouter shardingWriteRouter(opCtx, nss);
+    auto* const css = shardingWriteRouter.getCss();
+    css->checkShardVersionOrThrow(opCtx);
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
+
+    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded()) {
+        assertNoMovePrimaryInProgress(opCtx, nss);
+        return;
+    }
+
+    auto optDocKey = repl::documentKeyDecoration(opCtx);
+    invariant(optDocKey, nss.toStringForErrorMsg());
+    auto documentKey = optDocKey.value().getShardKeyAndId();
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+    if (inMultiDocumentTransaction) {
+        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+        if (atClusterTime) {
+            const auto shardKey =
+                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(documentKey);
+            assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
+        }
+
+        return;
+    }
+
+    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
+    if (cloner && getIsMigrating(opCtx)) {
+        const auto& opTime = opAccumulator->opTime.writeOpTime;
+        cloner->onDeleteOp(opCtx, documentKey, opTime);
+    }
 }
 
 void MigrationChunkClonerSourceOpObserver::onTransactionPrepare(
