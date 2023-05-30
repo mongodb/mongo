@@ -76,6 +76,7 @@ public:
         }
         // This stage doesn't modify documents.
         setVariableConstraints.preservesOrderAndMetadata = true;
+        setVariableConstraints.canSwapWithSkippingOrLimitingStage = true;
         return setVariableConstraints;
     }
 
