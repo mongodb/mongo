@@ -7440,7 +7440,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .stitch
-  - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu1804-64
@@ -7560,7 +7559,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: tla-plus
@@ -7664,7 +7662,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .stitch
-  - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804-arm64
@@ -7722,7 +7719,6 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004
