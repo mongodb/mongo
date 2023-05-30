@@ -126,6 +126,8 @@ structs:
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding size
+    # estimation functions in 'write_ops.cpp'. 
     WriteCommandRequestBase:
         description: "Contains basic information included by all write commands"
         strict: false
@@ -264,7 +266,8 @@ structs:
                               true. Otherwise, the document before the write."
 
 commands:
-
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding insert
+    # size estimation functions in 'write_ops.cpp'.
     insert:
         description: "Parser for the 'insert' command."
         command_name: insert
@@ -286,6 +289,8 @@ commands:
                 type: array<object>
                 supports_doc_sequence: true
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding update
+    # size estimation functions in 'write_ops.cpp'. 
     update:
         description: "Parser for the 'update' command."
         command_name: update
@@ -318,6 +323,8 @@ commands:
                 type: LegacyRuntimeConstants
                 optional: true
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding delete
+    # size estimation functions in 'write_ops.cpp'. 
     delete:
         description: "Parser for the 'delete' command."
         command_name: delete

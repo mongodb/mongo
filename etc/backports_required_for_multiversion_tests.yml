@@ -118,6 +118,8 @@ last-continuous:
     ticket: SERVER-76948
   - test_file: jstests/sharding/shard_key_index_must_exist.js
     ticket: SERVER-6491
+  - test_file: jstests/sharding/merge_let_params_size_estimation.js
+    ticket: SERVER-74806
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -127,6 +129,7 @@ last-continuous:
     replica_sets_multiversion: null
     sharded_collections_jscore_multiversion_passthrough: null
     sharding_jscore_multiversion_passthrough: null
+
 last-lts:
   all:
   - test_file: jstests/core/null_query_semantics.js
@@ -329,6 +332,8 @@ last-lts:
     ticket: SERVER-76948
   - test_file: jstests/sharding/shard_key_index_must_exist.js
     ticket: SERVER-6491
+  - test_file: jstests/sharding/merge_let_params_size_estimation.js
+    ticket: SERVER-74806
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

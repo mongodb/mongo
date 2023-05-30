@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 
 namespace mongo {
@@ -47,10 +48,22 @@ public:
 
     /**
      * Estimates the size of writes that will be executed on the current node. Note that this
-     * does not account for the full size of an update statement.
+     * does not account for the full size of an update statement because in the case of local
+     * writes, we will not have to serialize to BSON and are therefore not subject to the 16MB
+     * BSONObj size limit.
      */
     class LocalWriteSizeEstimator final : public WriteSizeEstimator {
     public:
+        int estimateInsertHeaderSize(
+            const write_ops::InsertCommandRequest& insertReq) const override {
+            return 0;
+        }
+
+        int estimateUpdateHeaderSize(
+            const write_ops::UpdateCommandRequest& insertReq) const override {
+            return 0;
+        }
+
         int estimateInsertSizeBytes(const BSONObj& insert) const override {
             return insert.objsize();
         }
@@ -70,6 +83,16 @@ public:
      */
     class TargetPrimaryWriteSizeEstimator final : public WriteSizeEstimator {
     public:
+        int estimateInsertHeaderSize(
+            const write_ops::InsertCommandRequest& insertReq) const override {
+            return write_ops::getInsertHeaderSizeEstimate(insertReq);
+        }
+
+        int estimateUpdateHeaderSize(
+            const write_ops::UpdateCommandRequest& updateReq) const override {
+            return write_ops::getUpdateHeaderSizeEstimate(updateReq);
+        }
+
         int estimateInsertSizeBytes(const BSONObj& insert) const override {
             return insert.objsize() + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
         }
@@ -106,8 +129,6 @@ public:
     virtual std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const override;
 
-    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
-        OperationContext* opCtx, const NamespaceString& ns) const override;
 
     virtual void updateClientOperationTime(OperationContext* opCtx) const final;
 
