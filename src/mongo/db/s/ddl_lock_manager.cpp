@@ -60,8 +60,31 @@ DDLLockManager* DDLLockManager::get(OperationContext* opCtx) {
 DDLLockManager::ScopedLock DDLLockManager::lock(OperationContext* opCtx,
                                                 StringData ns,
                                                 StringData reason,
-                                                Milliseconds timeout) {
+                                                Milliseconds timeout,
+                                                bool waitForRecovery) {
     stdx::unique_lock<Latch> lock(_mutex);
+
+    // Wait for primary and DDL recovered state
+    Timer waitingRecoveryTimer;
+    if (!opCtx->waitForConditionOrInterruptFor(_stateCV, lock, timeout, [&] {
+            return _state == State::kPrimaryAndRecovered || !waitForRecovery;
+        })) {
+        using namespace fmt::literals;
+        uasserted(
+            ErrorCodes::LockTimeout,
+            "Failed to acquire DDL lock for namespace '{}' after {} with reason '{}' while "
+            "waiting recovery of DDLCoordinatorService"_format(ns, timeout.toString(), reason));
+    }
+
+    // Subtracting from timeout the time invested on waiting for recovery
+    timeout = [&] {
+        const auto waitingRecoveryTime = Milliseconds(waitingRecoveryTimer.millis());
+        if (timeout.compare(waitingRecoveryTime) < 0) {
+            return Milliseconds::zero();
+        }
+        return timeout - waitingRecoveryTime;
+    }();
+
     auto iter = _inProgressMap.find(ns);
 
     if (iter == _inProgressMap.end()) {
@@ -114,6 +137,12 @@ DDLLockManager::ScopedLock::~ScopedLock() {
         }
         LOGV2(6855302, "Released DDL lock", "resource"_attr = _ns, "reason"_attr = _reason);
     }
+}
+
+void DDLLockManager::setState(const State& state) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    _state = state;
+    _stateCV.notify_all();
 }
 
 }  // namespace mongo

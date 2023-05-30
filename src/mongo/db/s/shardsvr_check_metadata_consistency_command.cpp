@@ -35,7 +35,6 @@
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -109,12 +108,6 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-            // This commands uses DDL locks to serialize with concurrent DDL operations.
-            // Since we are not using the ShardingDDLCoordinator infrastructure we need to
-            // explicitely wait for all DDL coordinators to be recovered and to have re-acquired
-            // their DDL locks before to proceed.
-            ShardingDDLCoordinatorService::getService(opCtx)->waitForRecoveryCompletion(opCtx);
 
             const auto nss = ns();
             switch (metadata_consistency_util::getCommandLevel(nss)) {
