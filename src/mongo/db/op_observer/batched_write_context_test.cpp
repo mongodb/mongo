@@ -30,19 +30,18 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
 namespace {
 
 // This test fixture provides access to a properly initialized global service context to test the
 // BatchedWriteContext class and its interaction with WriteUnitOfWork. For batched write
 // interactions with the oplog, see BatchedWriteOutputsTest.
-class BatchedWriteContextTest : public ServiceContextTest {};
+class BatchedWriteContextTest : public ServiceContextMongoDTest {};
 
 TEST_F(BatchedWriteContextTest, TestBatchingCondition) {
     auto opCtxRaii = makeOperationContext();

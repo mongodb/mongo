@@ -264,7 +264,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/rs_local_client',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
         '$BUILD_DIR/mongo/db/transaction/transaction_operations',

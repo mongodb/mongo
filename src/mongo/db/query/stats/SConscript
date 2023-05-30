@@ -106,7 +106,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="stats_test_utils",
+    target='stats_test_utils',
     source=[
         'collection_statistics_mock.cpp',
         'rand_utils.cpp',
@@ -116,7 +116,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
-        "$BUILD_DIR/mongo/unittest/unittest",
         'stats_gen',
         'stats_histograms',
     ],

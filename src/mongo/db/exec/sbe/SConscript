@@ -260,13 +260,15 @@ env.Library(
         'abt/sbe_abt_test_util.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/pipeline/abt_translation",
-        "$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils",
+        '$BUILD_DIR/mongo/db/pipeline/abt_translation',
+        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'query_sbe_abt',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
     ],
 )
 
@@ -277,7 +279,6 @@ env.CppUnitTest(
         'abt/sbe_abt_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
         'sbe_abt_test_util',
     ],
 )

@@ -155,6 +155,7 @@ wtEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/clock_source_mock',
