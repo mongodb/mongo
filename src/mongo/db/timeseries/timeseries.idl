@@ -93,6 +93,8 @@ structs:
                               datetime type (0x9)"
                 type: string
                 unstable: false
+                validator:
+                    callback: "validateTimeAndMetaField"
             metaField:
                 description: "The name of the top-level field describing the series. This field is
                               used to group related data and may be of any BSON type. This may not 
@@ -100,6 +102,8 @@ structs:
                 type: string
                 optional: true
                 unstable: false
+                validator:
+                    callback: "validateTimeAndMetaField"
             granularity:
                 description: "Describes the expected interval between subsequent measurements"
                 type: BucketGranularity
