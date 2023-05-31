@@ -410,6 +410,8 @@ last-continuous:
     ticket: SERVER-67529
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
+  - test_file: jstests/core/timeseries/timeseries_create_collection.js
+    ticket: SERVER-77382
   suites: null
 
 last-lts:
@@ -902,4 +904,6 @@ last-lts:
     ticket: SERVER-67529
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
+  - test_file: jstests/core/timeseries/timeseries_create_collection.js
+    ticket: SERVER-77382
   suites: null
