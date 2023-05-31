@@ -82,8 +82,21 @@ Pipeline::SourceContainer::iterator eraseAndStich(Pipeline::SourceContainer::ite
 
 }  // namespace
 
-boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) {
+/**
+ * If there are any $limit stages that could be logically swapped forward to the position of the
+ * pipeline pointed to by 'itr' without changing the meaning of the query, removes these $limit
+ * stages from the Pipeline and returns the resulting limit. A single limit value is computed by
+ * taking the minimum after swapping each individual $limit stage forward.
+ *
+ * This method also implements the ability to swap a $limit before a $skip, by adding the value of
+ * the $skip to the value of the $limit.
+ *
+ * If shouldModifyPipeline is false, this method does not swap any stages but rather just returns
+ * the single limit value described above.
+ */
+boost::optional<long long> extractLimitForPushdownHelper(Pipeline::SourceContainer::iterator itr,
+                                                         Pipeline::SourceContainer* container,
+                                                         bool shouldModifyPipeline) {
     int64_t skipSum = 0;
     boost::optional<long long> minLimit;
     while (itr != container->end()) {
@@ -104,7 +117,11 @@ boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::it
                 minLimit = std::min(static_cast<long long>(safeSum), *minLimit);
             }
 
-            itr = eraseAndStich(itr, container);
+            if (shouldModifyPipeline) {
+                itr = eraseAndStich(itr, container);
+            } else {
+                ++itr;
+            }
         } else if (!nextStage->constraints().canSwapWithSkippingOrLimitingStage) {
             break;
         } else {
@@ -113,6 +130,16 @@ boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::it
     }
 
     return minLimit;
+}
+
+boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) {
+    return extractLimitForPushdownHelper(itr, container, true /* shouldModifyPipeline */);
+}
+
+boost::optional<long long> getUserLimit(Pipeline::SourceContainer::iterator itr,
+                                        Pipeline::SourceContainer* container) {
+    return extractLimitForPushdownHelper(itr, container, false /* shouldModifyPipeline */);
 }
 
 boost::optional<long long> extractSkipForPushdown(Pipeline::SourceContainer::iterator itr,
