@@ -682,8 +682,9 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                               collectionAccessMode);
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
-                                        << "Unable to proceed with " << opStr << "."};
+                          str::stream()
+                              << "Collection [" << nsOrUUID.toStringForErrorMsg() << "] not found. "
+                              << "Unable to proceed with " << opStr << "."};
         }
 
         auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
@@ -1048,8 +1049,9 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
                               MODE_IX);
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
-                                        << "Unable to update document."};
+                          str::stream()
+                              << "Collection [" << nsOrUUID.toStringForErrorMsg() << "] not found. "
+                              << "Unable to update document."};
         }
 
         // We can create an UpdateRequest now that the collection's namespace has been resolved, in

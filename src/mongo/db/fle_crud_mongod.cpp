@@ -531,14 +531,15 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
                 opCtx, kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
             if (!indexDescriptor) {
                 uasserted(ErrorCodes::IndexNotFound,
-                          str::stream() << "Index not found, ns:" << nsOrUUID.toString()
+                          str::stream() << "Index not found, ns:" << toStringForLogging(nsOrUUID)
                                         << ", index: " << kIdIndexName);
             }
 
             if (indexDescriptor->isPartial()) {
                 uasserted(ErrorCodes::IndexOptionsConflict,
-                          str::stream() << "Partial index is not allowed for this operation, ns:"
-                                        << nsOrUUID.toString() << ", index: " << kIdIndexName);
+                          str::stream()
+                              << "Partial index is not allowed for this operation, ns:"
+                              << toStringForLogging(nsOrUUID) << ", index: " << kIdIndexName);
             }
 
             auto indexCatalogEntry = indexDescriptor->getEntry()->shared_from_this();

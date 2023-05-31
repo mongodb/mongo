@@ -1020,8 +1020,6 @@ public:
      */
     Status isNssValid() const;
 
-    std::string toString() const;
-
     /**
      * This function should only be used when logging a NamespaceStringOrUUID in an error message.
      */
@@ -1033,14 +1031,6 @@ public:
     friend std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID);
 
     void serialize(BSONObjBuilder* builder, StringData fieldName) const;
-
-    friend std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& o) {
-        return stream << o.toString();
-    }
-
-    friend StringBuilder& operator<<(StringBuilder& builder, const NamespaceStringOrUUID& o) {
-        return builder << o.toString();
-    }
 
 private:
     using UUIDWithDbName = std::tuple<DatabaseName, UUID>;

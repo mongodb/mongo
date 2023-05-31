@@ -477,14 +477,6 @@ Status NamespaceStringOrUUID::isNssValid() const {
     return Status::OK();
 }
 
-std::string NamespaceStringOrUUID::toString() const {
-    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
-        return nss->toString();
-    }
-
-    return get<1>(get<UUIDWithDbName>(_nssOrUUID)).toString();
-}
-
 std::string NamespaceStringOrUUID::toStringForErrorMsg() const {
     if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
         return nss->toStringForErrorMsg();

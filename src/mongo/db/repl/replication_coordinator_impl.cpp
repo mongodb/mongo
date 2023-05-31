@@ -3050,7 +3050,7 @@ bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& ns
         return ns->isSystemDotProfile();
     } else {
         auto uuid = nsOrUUID.uuid();
-        invariant(uuid, nsOrUUID.toString());
+        invariant(uuid, toStringForLogging(nsOrUUID));
         if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid)) {
             return ns->isSystemDotProfile();
         }
@@ -3072,7 +3072,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
         return true;
     }
 
-    invariant(opCtx->lockState()->isRSTLLocked(), nsOrUUID.toString());
+    invariant(opCtx->lockState()->isRSTLLocked(), toStringForLogging(nsOrUUID));
     return canAcceptWritesFor_UNSAFE(opCtx, nsOrUUID);
 }
 
@@ -3099,7 +3099,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
         }
     } else if (const auto& oplogCollection = LocalOplogInfo::get(opCtx)->getCollection()) {
         auto uuid = nsOrUUID.uuid();
-        invariant(uuid, nsOrUUID.toString());
+        invariant(uuid, toStringForLogging(nsOrUUID));
         if (oplogCollection->uuid() != *uuid) {
             return true;
         }
