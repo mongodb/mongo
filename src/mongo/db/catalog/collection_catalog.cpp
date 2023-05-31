@@ -1052,13 +1052,15 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
 
     // If neither `latestCollection` or `pendingCollection` match the metadata we fully instantiate
     // a new collection instance from durable storage that is guaranteed to match. This can happen
-    // when multikey is not consistent with the storage snapshot.
+    // when multikey is not consistent with the storage snapshot. We use 'pendingCollection' as the
+    // base when available as it might contain an index that is about to be added. Dropped indexes
+    // can be found through other means in the drop pending state.
     invariant(latestCollection || pendingCollection);
     auto durableCatalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
     invariant(durableCatalogEntry);
     auto compatibleCollection =
         _createCompatibleCollection(opCtx,
-                                    latestCollection ? latestCollection : pendingCollection,
+                                    pendingCollection ? pendingCollection : latestCollection,
                                     /*readTimestamp=*/boost::none,
                                     durableCatalogEntry.get());
 
