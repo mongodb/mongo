@@ -146,6 +146,8 @@ BatchedDeleteStage::BatchedDeleteStage(
     tassert(6303800,
             "batched deletions only support multi-document deletions (multi: true)",
             _params->isMulti);
+    // TODO SERVER-66279 remove the following tassert once the range-deleter will be using batched
+    // deletions since it's the only component expected to delete with `fromMigrate=true`
     tassert(6303801,
             "batched deletions do not support the 'fromMigrate' parameter",
             !_params->fromMigrate);
@@ -346,16 +348,19 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
 
         WorkingSetMember* member = _ws->get(workingSetMemberID);
 
-        // Determine whether the document being deleted is owned by this shard, and the action
-        // to undertake if it isn't.
-        bool writeToOrphan = false;
-        auto action = _preWriteFilter.computeActionAndLogSpecialCases(
-            member->doc.value(), "batched delete"_sd, collection()->ns());
-        if (!docStillMatches || action == write_stage_common::PreWriteFilter::Action::kSkip) {
-            recordsToSkip->insert(workingSetMemberID);
-            continue;
-        }
-        writeToOrphan = action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate;
+        bool writeToOrphan = _params->fromMigrate;
+        if (!_params->fromMigrate) {
+            // Determine whether the document being deleted is owned by this shard, and the action
+            // to undertake if it isn't.
+            auto action = _preWriteFilter.computeActionAndLogSpecialCases(
+                member->doc.value(), "batched delete"_sd, collection()->ns());
+            if (!docStillMatches || action == write_stage_common::PreWriteFilter::Action::kSkip) {
+                recordsToSkip->insert(workingSetMemberID);
+                continue;
+            }
+            writeToOrphan =
+                action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate;
+        };
 
         auto retryableWrite = write_stage_common::isRetryableWrite(opCtx());
         Snapshotted<Document> memberDoc = member->doc;
@@ -381,7 +386,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
             _params->stmtId,
             member->recordId,
             _params->opDebug,
-            _params->fromMigrate || writeToOrphan,
+            writeToOrphan,
             false,
             _params->returnDeleted ? collection_internal::StoreDeletedDoc::On
                                    : collection_internal::StoreDeletedDoc::Off,
