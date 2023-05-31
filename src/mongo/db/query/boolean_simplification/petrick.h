@@ -34,6 +34,17 @@
 
 namespace mongo::boolean_simplification {
 /**
+ * List of indices of original minterms covered by the derived minterm (prime implicants).
+ */
+using PrimeImplicantIndices = std::vector<uint32_t>;
+
+/**
+ * Prime implicant indices that cover the original minterms.
+ */
+using CoveredOriginalMinterms = std::vector<uint32_t>;
+
+
+/**
  * An implementation of Petrick's Method: https://en.wikipedia.org/wiki/Petrick%27s_method. This is
  * an algorithm for finding a minimum sum-of-products expression given as input a list of prime
  * implicants found by the Quine-McCluskey algorithm. The outer list has an element for each minterm
@@ -50,5 +61,5 @@ namespace mongo::boolean_simplification {
  * possible that we can get more than one coverage as output. For the given input: [[0, 1, 2], [2,
  * 3], [0, 3]] two coverages are possible: [[0, 1], [0, 2]].
  */
-std::vector<std::vector<uint32_t>> petricksMethod(const std::vector<std::vector<uint32_t>>& data);
+std::vector<CoveredOriginalMinterms> petricksMethod(const std::vector<PrimeImplicantIndices>& data);
 }  // namespace mongo::boolean_simplification
