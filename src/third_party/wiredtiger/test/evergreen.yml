@@ -3355,10 +3355,6 @@ tasks:
           HAVE_UNITTEST: -DHAVE_UNITTEST=1
           <<: *configure_flags_with_builtins
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
-      - func: "unit test"
-        vars:
-          unit_test_args: -v 2
-          check_coverage: true
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
