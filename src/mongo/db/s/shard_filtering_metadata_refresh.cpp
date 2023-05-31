@@ -377,8 +377,8 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 
             ON_BLOCK_EXIT([&] {
                 boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                 {
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                     // A view can potentially be created after spawning a thread to recover nss's
                     // shard version. It is then ok to lock views in order to clear filtering
                     // metadata.
@@ -412,6 +412,7 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 }
 
                 {
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                     // Remember to wake all waiting threads for this refresh to finish.
                     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
                     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
@@ -438,8 +439,8 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 if (!currentMetadata.allowMigrations()) {
                     boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
                     {
-                        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-                        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
+                        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+                        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
                         auto const& csr = CollectionShardingRuntime::get(opCtx, nss);
                         auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
