@@ -69,19 +69,15 @@ StatusWith<OplogInterface::Iterator::Value> OplogIteratorRemote::next() {
 
 OplogInterfaceRemote::OplogInterfaceRemote(HostAndPort hostAndPort,
                                            GetConnectionFn getConnection,
-                                           StringData collectionName,
                                            int batchSize)
-    : _hostAndPort(hostAndPort),
-      _getConnection(getConnection),
-      _collectionName(collectionName),
-      _batchSize(batchSize) {}
+    : _hostAndPort(hostAndPort), _getConnection(getConnection), _batchSize(batchSize) {}
 
 std::string OplogInterfaceRemote::toString() const {
     return _getConnection()->toString();
 }
 
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() const {
-    FindCommandRequest findRequest{NamespaceString{_collectionName}};
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
     findRequest.setProjection(BSON("ts" << 1 << "t" << 1LL));
     findRequest.setSort(BSON("$natural" << -1));
     findRequest.setBatchSize(_batchSize);
