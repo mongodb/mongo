@@ -68,7 +68,8 @@ std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData
  */
 BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          const TimeseriesOptions& tsOptions);
+                                          const TimeseriesOptions& tsOptions,
+                                          bool allowArbitraryWrites);
 
 /**
  * Returns the match expressions for the bucket and residual filters for a timeseries write

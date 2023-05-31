@@ -429,17 +429,18 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                     << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
                 !isUpsert);
 
-        // Since this is a timeseries query, we may need to rename the metaField.
-        if (auto metaField = _cri.cm.getTimeseriesFields().value().getMetaField()) {
-            query = timeseries::translateQuery(query, *metaField);
-        } else {
-            // We want to avoid targeting the query incorrectly if no metaField is defined on the
-            // timeseries collection, since we only allow queries on the metaField for timeseries
-            // updates. Note: any non-empty query should fail to update once it reaches the shards
-            // because there is no metaField for it to query for, but we don't want to validate this
-            // during routing.
-            query = BSONObj();
-        }
+        // Translate the update query on a timeseries collection into the bucket-level predicate
+        // so that we can target the request to the correct shard or broadcast the request if
+        // the bucket-level predicate is empty.
+        //
+        // Note: The query returned would match a super set of the documents matched by the
+        // original query.
+        query = timeseries::getBucketLevelPredicateForRouting(
+            query,
+            expCtx,
+            _cri.cm.getTimeseriesFields()->getTimeseriesOptions(),
+            feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                serverGlobalParams.featureCompatibility));
     }
 
     validateUpdateDoc(updateOp);
@@ -564,7 +565,11 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             // Note: The query returned would match a super set of the documents matched by the
             // original query.
             deleteQuery = timeseries::getBucketLevelPredicateForRouting(
-                deleteQuery, expCtx, tsFields->getTimeseriesOptions());
+                deleteQuery,
+                expCtx,
+                tsFields->getTimeseriesOptions(),
+                feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility));
         }
 
         // Sharded collections have the following further requirements for targeting:

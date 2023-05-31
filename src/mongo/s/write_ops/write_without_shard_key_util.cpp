@@ -169,12 +169,18 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                                                                let,
                                                                legacyRuntimeConstants);
 
+    bool arbitraryTimeseriesWritesEnabled = feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                                                serverGlobalParams.featureCompatibility) ||
+        feature_flags::gTimeseriesUpdatesSupport.isEnabled(serverGlobalParams.featureCompatibility);
     auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
         expCtx,
         cri.cm.getShardKeyPattern(),
-        !isTimeseries ? query
-                      : timeseries::getBucketLevelPredicateForRouting(
-                            query, expCtx, tsFields->getTimeseriesOptions())));
+        !isTimeseries
+            ? query
+            : timeseries::getBucketLevelPredicateForRouting(query,
+                                                            expCtx,
+                                                            tsFields->getTimeseriesOptions(),
+                                                            arbitraryTimeseriesWritesEnabled)));
 
     // 'shardKey' will only be populated only if a full equality shard key is extracted.
     if (shardKey.isEmpty()) {
