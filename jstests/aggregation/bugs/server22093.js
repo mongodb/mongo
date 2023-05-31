@@ -32,10 +32,20 @@ var simpleGroup = coll.aggregate([{$group: {_id: null, count: {$sum: 1}}}]).toAr
 assert.eq(simpleGroup.length, 1);
 assert.eq(simpleGroup[0]["count"], 15);
 
+// Retrieve the query plain from explain, whose shape varies depending on the query and the
+// engines used (classic/sbe).
+const getQueryPlan = function(explain) {
+    if (explain.stages) {
+        explain = explain.stages[0].$cursor;
+    }
+    let winningPlan = explain.queryPlanner.winningPlan;
+    return winningPlan.queryPlan ? winningPlan.queryPlan : winningPlan;
+};
+
 var explained =
     coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
 
-assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+assert(planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 
 explained = coll.explain().aggregate([
     {$match: {foo: {$gt: 0}}},
@@ -43,15 +53,15 @@ explained = coll.explain().aggregate([
     {$group: {_id: null, count: {$sum: 1}}}
 ]);
 
-assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+assert(planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 
 // Make sure a $count stage can use the COUNT_SCAN optimization.
 explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$count: "count"}]);
-assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+assert(planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 
 // A $match that is not a single range cannot use the COUNT_SCAN optimization.
 explained = coll.explain().aggregate([{$match: {foo: {$in: [0, 1]}}}, {$count: "count"}]);
-assert(!planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+assert(!planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 
 // Test that COUNT_SCAN can be used when there is a $sort.
 explained = coll.explain().aggregate([{$sort: {foo: 1}}, {$count: "count"}]);
@@ -67,8 +77,8 @@ assert.eq(true, countScan.indexBounds.startKeyInclusive, explained);
 assert.eq({foo: MaxKey}, countScan.indexBounds.endKey, explained);
 assert.eq(true, countScan.indexBounds.endKeyInclusive, explained);
 
-// Test that the inclusivity/exclusivity of the index bounds for COUNT_SCAN are correct when there
-// is a $sort in the opposite direction of the index.
+// Test that the inclusivity/exclusivity of the index bounds for COUNT_SCAN are correct when
+// there is a $sort in the opposite direction of the index.
 explained = coll.explain().aggregate(
     [{$match: {foo: {$gte: 0, $lt: 10}}}, {$sort: {foo: -1}}, {$count: "count"}]);
 countScan = getAggPlanStage(explained, "COUNT_SCAN");

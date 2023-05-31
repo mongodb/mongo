@@ -74,8 +74,9 @@ void updatePlanCache(OperationContext* opCtx,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
                      stage_builder::PlanStageData& stageData) {
+    // TODO: SERVER-76815 enable caching the COUNT_SCAN queries for SBE.
     const CollectionPtr& collection = collections.getMainCollection();
-    if (collection && shouldCacheQuery(query)) {
+    if (collection && shouldCacheQuery(query) && !solution.hasNode(STAGE_COUNT_SCAN)) {
         // Clustered collection scans need to cache 'ccCollator' for bounds computation.
         if (stageData.doSbeClusteredCollectionScan) {
             const CollatorInterface* ccCollator = collection->getDefaultCollator();
