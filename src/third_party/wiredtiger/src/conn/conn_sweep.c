@@ -173,6 +173,12 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
         if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) || !F_ISSET(dhandle, WT_DHANDLE_DEAD))
             continue;
 
+        /*
+         * The sweep server should not close dropped dhandles, they will be closed elsewhere.
+         */
+        if (F_ISSET(dhandle, WT_DHANDLE_DROPPED))
+            continue;
+
         /* If the handle is marked dead, flush it from cache. */
         WT_WITH_DHANDLE(session, dhandle, ret = __wt_conn_dhandle_close(session, false, false));
 
