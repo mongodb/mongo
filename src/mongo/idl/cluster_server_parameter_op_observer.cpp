@@ -91,6 +91,7 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
                                                      const CollectionPtr& coll,
                                                      const BSONObj& doc,
+                                                     OplogDeleteEntryArgs* args,
                                                      OpStateAccumulator* opAccumulator) {
     std::string docBeingDeleted;
 

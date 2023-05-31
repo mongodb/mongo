@@ -119,6 +119,7 @@ void MigrationChunkClonerSourceOpObserver::onUnpreparedTransactionCommit(
 void MigrationChunkClonerSourceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                          const CollectionPtr& coll,
                                                          const BSONObj& docToDelete,
+                                                         OplogDeleteEntryArgs* args,
                                                          OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     getIsMigrating(opCtx) = MigrationSourceManager::isMigrating(opCtx, nss, docToDelete);

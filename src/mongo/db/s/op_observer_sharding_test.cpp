@@ -269,8 +269,9 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
         opObserver.onUpdate(opCtx, update);
     };
     auto onDelete = [&]() {
-        opObserver.aboutToDelete(opCtx, *autoColl, BSON("_id" << 0));
-        opObserver.onDelete(opCtx, *autoColl, kUninitializedStmtId, {});
+        OplogDeleteEntryArgs args;
+        opObserver.aboutToDelete(opCtx, *autoColl, BSON("_id" << 0), &args);
+        opObserver.onDelete(opCtx, *autoColl, kUninitializedStmtId, args);
     };
 
     // Using the latest dbVersion works

@@ -116,6 +116,7 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx,
 void QueryAnalysisOpObserver::aboutToDelete(OperationContext* opCtx,
                                             const CollectionPtr& coll,
                                             BSONObj const& doc,
+                                            OplogDeleteEntryArgs* args,
                                             OpStateAccumulator* opAccumulator) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace ||

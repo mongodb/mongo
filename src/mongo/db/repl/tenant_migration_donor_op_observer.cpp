@@ -298,6 +298,7 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
 void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                                                    const CollectionPtr& coll,
                                                    BSONObj const& doc,
+                                                   OplogDeleteEntryArgs* args,
                                                    OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {

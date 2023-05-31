@@ -80,6 +80,7 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx,
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
                                    const CollectionPtr& coll,
                                    BSONObj const& doc,
+                                   OplogDeleteEntryArgs* args,
                                    OpStateAccumulator* opAccumulator) {
     audit::logRemoveOperation(opCtx->getClient(), coll->ns(), doc);
 

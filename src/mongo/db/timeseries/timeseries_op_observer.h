@@ -60,6 +60,7 @@ public:
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
                        OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;

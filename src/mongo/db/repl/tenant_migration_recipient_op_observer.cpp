@@ -196,6 +196,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
 void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
                                                        const CollectionPtr& coll,
                                                        BSONObj const& doc,
+                                                       OplogDeleteEntryArgs* args,
                                                        OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {

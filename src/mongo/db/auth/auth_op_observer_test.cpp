@@ -143,10 +143,11 @@ TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     WriteUnitOfWork wunit(opCtx.get());
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1), &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1), &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
@@ -154,16 +155,18 @@ DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") 
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 DEATH_TEST_F(AuthOpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
     AutoGetCollection autoColl(opCtx.get(), _nss, MODE_IX);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, {});
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, {}, &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 }  // namespace

@@ -135,6 +135,7 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
 void UserWriteBlockModeOpObserver::aboutToDelete(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
                                                  BSONObj const& doc,
+                                                 OplogDeleteEntryArgs* args,
                                                  OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kUserWritesCriticalSectionsNamespace) {
         documentIdDecoration(opCtx) = doc;

@@ -735,10 +735,14 @@ void deleteDocument(OperationContext* opCtx,
         Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
     }
 
-    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(opCtx, collection, doc.value());
+    OplogDeleteEntryArgs deleteArgs;
+    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(
+        opCtx, collection, doc.value(), &deleteArgs);
 
-    OplogDeleteEntryArgs deleteArgs{
-        nullptr /* deletedDoc */, fromMigrate, collection->isChangeStreamPreAndPostImagesEnabled()};
+    deleteArgs.deletedDoc = nullptr;
+    deleteArgs.fromMigrate = fromMigrate;
+    deleteArgs.changeStreamPreAndPostImagesEnabledForCollection =
+        collection->isChangeStreamPreAndPostImagesEnabled();
 
     const bool shouldRecordPreImageForRetryableWrite =
         storeDeletedDoc == StoreDeletedDoc::On && retryableWrite == RetryableWrite::kYes;

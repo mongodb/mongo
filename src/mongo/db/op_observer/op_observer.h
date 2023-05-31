@@ -37,6 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/rollback.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
@@ -90,7 +91,15 @@ struct OplogUpdateEntryArgs {
         : updateArgs(updateArgs), coll(coll) {}
 };
 
-struct OplogDeleteEntryArgs {
+/**
+ * Holds supplementary information required for OpObserver::onDelete() to write out an
+ * oplog entry for deleting a single document from a collection.
+ *
+ * This struct is also passed to OpObserver::aboutToDelete() so that OpObserver
+ * implementations may include additional information (via decorations) to be shared with
+ * the onDelete() method within the same implementation.
+ */
+struct OplogDeleteEntryArgs : Decorable<OplogDeleteEntryArgs> {
     const BSONObj* deletedDoc = nullptr;
 
     // "fromMigrate" indicates whether the delete was induced by a chunk migration, and so
@@ -230,6 +239,7 @@ public:
     virtual void aboutToDelete(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                const BSONObj& doc,
+                               OplogDeleteEntryArgs* args,
                                OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     /**

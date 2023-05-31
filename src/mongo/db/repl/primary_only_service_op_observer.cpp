@@ -52,6 +52,7 @@ PrimaryOnlyServiceOpObserver::~PrimaryOnlyServiceOpObserver() = default;
 void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
                                                  BSONObj const& doc,
+                                                 OplogDeleteEntryArgs* args,
                                                  OpStateAccumulator* opAccumulator) {
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.

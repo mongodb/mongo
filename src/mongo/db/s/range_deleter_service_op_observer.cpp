@@ -132,6 +132,7 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
 void RangeDeleterServiceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                   const CollectionPtr& coll,
                                                   BSONObj const& doc,
+                                                  OplogDeleteEntryArgs* args,
                                                   OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         deletedDocumentDecoration(opCtx) = doc;

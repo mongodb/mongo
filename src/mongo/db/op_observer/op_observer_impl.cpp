@@ -1036,6 +1036,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    const CollectionPtr& coll,
                                    BSONObj const& doc,
+                                   OplogDeleteEntryArgs* args,
                                    OpStateAccumulator* opAccumulator) {
     repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(coll, doc));
 
