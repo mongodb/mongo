@@ -56,4 +56,12 @@ std::string ShardVersion::toString() const {
     return (_indexVersion ? _indexVersion->toString() : "") + "||" + placementVersion().toString();
 }
 
+BSONObj ShardVersion::toBSON() const {
+    BSONObjBuilder builder;
+    if (_indexVersion) {
+        builder.append("indexVersion", *_indexVersion);
+    }
+    builder.append("placementVersion", placementVersion().toBSON());
+    return builder.obj();
+}
 }  // namespace mongo

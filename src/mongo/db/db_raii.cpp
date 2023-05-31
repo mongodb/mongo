@@ -69,8 +69,7 @@ const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
  */
 bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are not supported in multi-document transactions.
-    // Lock-free reads are not supported under an exclusive lock (nested reads under exclusive lock
-    // holding operations).
+    // Lock-free reads are not supported when performing a write.
     // Lock-free reads are not supported if a storage txn is already open w/o the lock-free reads
     // operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&

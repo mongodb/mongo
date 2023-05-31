@@ -79,15 +79,14 @@ struct CollectionOrViewAcquisitionRequest {
           viewMode(viewMode) {}
 
     /**
-     * Infers the placement and read concerns from the OperationShardingState and ReadConcern values
-     * on the OperationContext.
+     * Overload, which acquires a collection or view by NSS or DB/UUID and infers the placement and
+     * read concerns from the OperationShardingState and ReadConcern values on the OperationContext.
      */
     static CollectionOrViewAcquisitionRequest fromOpCtx(
         OperationContext* opCtx,
-        NamespaceString nss,
+        NamespaceStringOrUUID nssOrUUID,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView,
-        boost::optional<UUID> expectedUUID = boost::none);
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
 
     boost::optional<NamespaceString> nss;
 
@@ -257,6 +256,10 @@ std::vector<ScopedCollectionAcquisition> acquireCollections(
 ScopedCollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);
 
+// TODO SERVER-77405 Rename and make it delegate to locked version when lock-free is not possible.
+ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
+
 std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
     OperationContext* opCtx,
     std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
@@ -333,15 +336,37 @@ public:
 };
 
 /**
- * Yields the TransactionResources from the opCtx.
- * Returns boost::none if the lock manager global lock has been recursively locked, meaning that
- * yielding is not allowed. In this case, the opCtx's TransactionResources are left intact.
+ * Yields the TransactionResources from the opCtx. It's the callers responsibility to verify a yield
+ * can be performed by calling Locker::canSaveLockState().
  */
-boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperationContext(
-    OperationContext* opCtx);
+YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);
 
 void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                                                    YieldedTransactionResources&& yieldedResources);
+
+/**
+ * TODO SERVER-77405 remove, make internal only.
+ *
+ * Performs some checks to determine whether the operation is compatible with a lock-free read.
+ * Multi-doc transactions are not supported, nor are operations performing a write.
+ */
+bool supportsLockFreeRead(OperationContext* opCtx);
+
+/**
+ * TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
+ * RAII type for letting secondary reads to block behind the PBW lock.
+ * Note: Do not add additional usage. This is only temporary for ease of backport.
+ */
+struct BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE {
+public:
+    BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx);
+    ~BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE();
+
+private:
+    OperationContext* _opCtx{nullptr};
+    boost::optional<bool> _originalSettings;
+};
+
 
 namespace shard_role_details {
 class SnapshotAttempt {
@@ -354,6 +379,8 @@ public:
 
     void snapshotInitialState();
 
+    void changeReadSourceForSecondaryReads();
+
     void openStorageSnapshot();
 
     [[nodiscard]] std::shared_ptr<const CollectionCatalog> getConsistentCatalog();
@@ -365,6 +392,7 @@ private:
     bool _successful = false;
     boost::optional<long long> _replTermBeforeSnapshot;
     boost::optional<std::shared_ptr<const CollectionCatalog>> _catalogBeforeSnapshot;
+    boost::optional<bool> _shouldReadAtLastApplied;
 };
 }  // namespace shard_role_details
 }  // namespace mongo

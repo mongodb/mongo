@@ -890,12 +890,25 @@ class LockFreeReadsBlock {
     LockFreeReadsBlock& operator=(const LockFreeReadsBlock&) = delete;
 
 public:
+    // Allow move operators.
+    LockFreeReadsBlock(LockFreeReadsBlock&& rhs) : _opCtx(rhs._opCtx) {
+        rhs._opCtx = nullptr;
+    };
+    LockFreeReadsBlock& operator=(LockFreeReadsBlock&& rhs) {
+        _opCtx = rhs._opCtx;
+        rhs._opCtx = nullptr;
+
+        return *this;
+    };
+
     LockFreeReadsBlock(OperationContext* opCtx) : _opCtx(opCtx) {
         _opCtx->incrementLockFreeReadOpCount();
     }
 
     ~LockFreeReadsBlock() {
-        _opCtx->decrementLockFreeReadOpCount();
+        if (_opCtx) {
+            _opCtx->decrementLockFreeReadOpCount();
+        }
     }
 
 private:

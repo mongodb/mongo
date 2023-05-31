@@ -91,9 +91,11 @@ assertMetrics(primary, (metrics) => {
     assert.gte(metrics[dbName2].totalUnitsWritten, 2);
 });
 
-// Clear metrics and wait for a TTL pass to delete the documents.
+// Clear metrics and wait for two TTL passes to make sure we both observe the inserts and delete the
+// documents.
 clearMetrics(primary);
 pauseTtl.off();
+TTLUtil.waitForPass(primaryDB1);
 TTLUtil.waitForPass(primaryDB1);
 
 // Ensure that the TTL monitor deleted 2 documents on the primary and recorded read and write

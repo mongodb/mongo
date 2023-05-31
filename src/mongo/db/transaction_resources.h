@@ -102,22 +102,42 @@ struct AcquiredCollection {
     AcquiredCollection(AcquisitionPrerequisites prerequisites,
                        std::shared_ptr<Lock::DBLock> dbLock,
                        boost::optional<Lock::CollectionLock> collectionLock,
+                       boost::optional<LockFreeReadsBlock> lockFreeReadsBlock,
+                       boost::optional<Lock::GlobalLock> globalLock,
                        boost::optional<ScopedCollectionDescription> collectionDescription,
                        boost::optional<ScopedCollectionFilter> ownershipFilter,
                        CollectionPtr collectionPtr)
         : prerequisites(std::move(prerequisites)),
           dbLock(std::move(dbLock)),
           collectionLock(std::move(collectionLock)),
+          lockFreeReadsBlock(std::move(lockFreeReadsBlock)),
+          globalLock(std::move(globalLock)),
           collectionDescription(std::move(collectionDescription)),
           ownershipFilter(std::move(ownershipFilter)),
           collectionPtr(std::move(collectionPtr)),
           invalidated(false),
           sharedImpl(std::make_shared<SharedImpl>()) {}
 
+    AcquiredCollection(AcquisitionPrerequisites prerequisites,
+                       std::shared_ptr<Lock::DBLock> dbLock,
+                       boost::optional<Lock::CollectionLock> collectionLock,
+                       CollectionPtr collectionPtr)
+        : AcquiredCollection(std::move(prerequisites),
+                             std::move(dbLock),
+                             std::move(collectionLock),
+                             boost::none,
+                             boost::none,
+                             boost::none,
+                             boost::none,
+                             std::move(collectionPtr)){};
+
     AcquisitionPrerequisites prerequisites;
 
     std::shared_ptr<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collectionLock;
+
+    boost::optional<LockFreeReadsBlock> lockFreeReadsBlock;
+    boost::optional<Lock::GlobalLock> globalLock;
 
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;

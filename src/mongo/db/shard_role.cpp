@@ -29,6 +29,7 @@
 
 #include "mongo/db/shard_role.h"
 
+#include "storage/snapshot_helper.h"
 #include <boost/utility/in_place_factory.hpp>
 #include <map>
 
@@ -49,6 +50,11 @@
 namespace mongo {
 namespace {
 
+// TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
+// If set to false, secondary reads should wait behind the PBW lock.
+const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
+    OperationContext::declareDecoration<boost::optional<bool>>();
+
 auto getTransactionResources = OperationContext::declareDecoration<
     std::unique_ptr<shard_role_details::TransactionResources>>();
 
@@ -62,20 +68,48 @@ shard_role_details::TransactionResources& getOrMakeTransactionResources(Operatio
 }
 
 struct ResolvedNamespaceOrViewAcquisitionRequest {
-    // Populated in the first phase of collection(s) acquisition
+    // Populated in the first phase of collection(s) acquisition.
     AcquisitionPrerequisites prerequisites;
 
-    // Populated optionally in the second phase of collection(s) acquisition
+    // Populated only for locked acquisitions in the second phase of collection(s) acquisition.
     std::shared_ptr<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collLock;
+
+    // Resources for lock free reads.
+    struct LockFreeReadsResources {
+        // If this field is set, the reader will not take the ParallelBatchWriterMode lock and
+        // conflict with secondary batch application.
+        std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
+        std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
+        std::shared_ptr<Lock::GlobalLock> globalLock;
+    } lockFreeReadsResources;
 };
 
 using ResolvedNamespaceOrViewAcquisitionRequestsMap =
     std::map<ResourceId, ResolvedNamespaceOrViewAcquisitionRequest>;
 
+void validateResolvedCollectionByUUID(OperationContext* opCtx,
+                                      CollectionOrViewAcquisitionRequest ar,
+                                      const Collection* coll) {
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Namespace " << (*ar.dbname).toStringForErrorMsg() << ":" << *ar.uuid
+                          << " not found",
+            coll);
+    auto shardVersion = OperationShardingState::get(opCtx).getShardVersion(coll->ns());
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Collection " << (*ar.dbname).toStringForErrorMsg() << ":" << *ar.uuid
+                          << " acquired by UUID has a ShardVersion attached.",
+            !shardVersion || shardVersion == ShardVersion::UNSHARDED());
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Database name mismatch for " << (*ar.dbname).toStringForErrorMsg()
+                          << ":" << *ar.uuid << ". Expected: " << (*ar.dbname).toStringForErrorMsg()
+                          << " Actual: " << coll->ns().dbName().toStringForErrorMsg(),
+            coll->ns().dbName() == *ar.dbname);
+}
+
 /**
- * Takes the input acquisitions, populates the NSS and UUID parts and returns a list, sorted by NSS,
- * suitable for a defined lock acquisition order.
+ * Takes the input acquisitions, populates the NSS and returns a map sorted by NSS, suitable for
+ * locking them in NSS order.
  */
 ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionRequests(
     OperationContext* opCtx,
@@ -86,10 +120,6 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
 
     for (const auto& ar : acquisitionRequests) {
         if (ar.nss) {
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Namespace " << ar.nss->toStringForErrorMsg()
-                                  << "is not a valid collection name",
-                    ar.nss->isValid());
             auto coll = catalog.lookupCollectionByNamespace(opCtx, *ar.nss);
             checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, ar.uuid);
 
@@ -105,26 +135,9 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, *ar.nss),
                                               std::move(resolvedAcquisitionRequest));
         } else if (ar.dbname) {
-            invariant(ar.uuid);
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid db name " << ar.dbname->toStringForErrorMsg(),
-                    NamespaceString::validDBName(*ar.dbname,
-                                                 NamespaceString::DollarInDbNameBehavior::Allow));
             auto coll = catalog.lookupCollectionByUUID(opCtx, *ar.uuid);
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Namespace " << (*ar.dbname).toStringForErrorMsg() << ":"
-                                  << *ar.uuid << " not found",
-                    coll);
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Database name mismatch for "
-                                  << (*ar.dbname).toStringForErrorMsg() << ":" << *ar.uuid
-                                  << ". Expected: " << (*ar.dbname).toStringForErrorMsg()
-                                  << " Actual: " << coll->ns().dbName().toStringForErrorMsg(),
-                    coll->ns().dbName() == *ar.dbname);
 
-            if (ar.nss) {
-                checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, *ar.uuid);
-            }
+            validateResolvedCollectionByUUID(opCtx, ar, coll);
 
             AcquisitionPrerequisites prerequisites(coll->ns(),
                                                    coll->uuid(),
@@ -205,15 +218,22 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
     const CollectionCatalog& catalog,
     const AcquisitionPrerequisites& prerequisites) {
     const auto& nss = prerequisites.nss;
-    // TODO SERVER-76415 fix secondary reads if shouldReadAtLastApplied
 
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-    auto coll = CollectionPtr(catalog.establishConsistentCollection(
-        opCtx, NamespaceStringOrUUID(prerequisites.nss), readTimestamp));
+    auto coll = CollectionPtr(
+        catalog.establishConsistentCollection(opCtx, NamespaceStringOrUUID(nss), readTimestamp));
     checkCollectionUUIDMismatch(opCtx, nss, coll, prerequisites.uuid);
 
     if (coll) {
         verifyDbAndCollection(opCtx, nss, coll, prerequisites.operationType);
+
+        // Ban snapshot reads on capped collections.
+        const auto readConcernLevel = prerequisites.readConcern.getLevel();
+        uassert(ErrorCodes::SnapshotUnavailable,
+                "Reading from capped collections with readConcern snapshot is not supported",
+                !coll->isCapped() ||
+                    readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+
         return coll;
     } else if (auto view = catalog.lookupView(opCtx, nss)) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -286,16 +306,40 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
                     acquisitionRequest.second.collLock);
 
         auto& prerequisites = acquisitionRequest.second.prerequisites;
+        auto& txnResources = getOrMakeTransactionResources(opCtx);
         auto snapshotedServices = acquireServicesSnapshot(opCtx, catalog, prerequisites);
         const bool isCollection =
             std::holds_alternative<CollectionPtr>(snapshotedServices.collectionPtrOrView);
 
         if (isCollection) {
+            const auto& collectionPtr =
+                std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView);
+            invariant(!prerequisites.uuid || prerequisites.uuid == collectionPtr->uuid());
+            if (!prerequisites.uuid && collectionPtr) {
+                // If the uuid wasn't originally set on the AcquisitionRequest, set it now on the
+                // prerequisites so that on restore from yield we can check we are restoring the
+                // same instance of the ns.
+                prerequisites.uuid = collectionPtr->uuid();
+            }
+
+            boost::optional<LockFreeReadsBlock> lockFreeReadsBlock;
+            if (acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock) {
+                lockFreeReadsBlock.emplace(std::move(
+                    *acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock));
+            }
+            boost::optional<Lock::GlobalLock> globalLock;
+            if (acquisitionRequest.second.lockFreeReadsResources.globalLock) {
+                globalLock.emplace(
+                    std::move(*acquisitionRequest.second.lockFreeReadsResources.globalLock));
+            }
+
             shard_role_details::AcquiredCollection& acquiredCollection =
-                getOrMakeTransactionResources(opCtx).addAcquiredCollection(
+                txnResources.addAcquiredCollection(
                     {prerequisites,
                      std::move(acquisitionRequest.second.dbLock),
                      std::move(acquisitionRequest.second.collLock),
+                     std::move(lockFreeReadsBlock),
+                     std::move(globalLock),
                      std::move(snapshotedServices.collectionDescription),
                      std::move(snapshotedServices.ownershipFilter),
                      std::move(std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
@@ -345,6 +389,7 @@ std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(
     while (true) {
         shard_role_details::SnapshotAttempt snapshotAttempt(opCtx, acquisitionRequests);
         snapshotAttempt.snapshotInitialState();
+        snapshotAttempt.changeReadSourceForSecondaryReads();
         snapshotAttempt.openStorageSnapshot();
         if (auto catalog = snapshotAttempt.getConsistentCatalog()) {
             return catalog;
@@ -375,6 +420,25 @@ std::vector<NamespaceStringOrUUID> toNamespaceStringOrUUIDs(
     return requests;
 }
 
+void validateRequests(const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+    for (const auto& ar : acquisitionRequests) {
+        if (ar.nss) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Namespace " << ar.nss->toStringForErrorMsg()
+                                  << "is not a valid collection name",
+                    ar.nss->isValid());
+        } else if (ar.dbname) {
+            invariant(ar.uuid);
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid db name " << ar.dbname->toStringForErrorMsg(),
+                    NamespaceString::validDBName(*ar.dbname,
+                                                 NamespaceString::DollarInDbNameBehavior::Allow));
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
+}
+
 void checkShardingPlacement(
     OperationContext* opCtx,
     const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
@@ -385,6 +449,31 @@ void checkShardingPlacement(
             checkPlacementVersion(opCtx, *ar.nss, ar.placementConcern);
         }
     }
+}
+
+const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
+    Lock::GlobalLockSkipOptions options;
+    options.skipRSTLLock = true;
+    return options;
+}()};
+
+ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock(
+    OperationContext* opCtx,
+    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+    std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
+    if (!opCtx->isLockFreeReadsOp() &&
+        allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
+        opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
+        skipPBWMLock = std::make_shared<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
+            opCtx->lockState());
+    }
+    auto lockFreeReadsBlock = std::make_shared<LockFreeReadsBlock>(opCtx);
+    auto globalLock = std::make_shared<Lock::GlobalLock>(opCtx,
+                                                         MODE_IS,
+                                                         Date_t::max(),
+                                                         Lock::InterruptBehavior::kThrow,
+                                                         kLockFreeReadsGlobalLockOptions);
+    return {skipPBWMLock, lockFreeReadsBlock, globalLock};
 }
 
 std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
@@ -399,22 +488,36 @@ std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
 
 }  // namespace
 
+BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE::
+    BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx);
+    allowSecondaryReads->swap(_originalSettings);
+    *allowSecondaryReads = false;
+}
+
+BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE::
+    ~BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE() {
+    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(_opCtx);
+    allowSecondaryReads->swap(_originalSettings);
+}
+
 CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
     OperationContext* opCtx,
-    NamespaceString nss,
+    NamespaceStringOrUUID nssOrUUID,
     AcquisitionPrerequisites::OperationType operationType,
-    AcquisitionPrerequisites::ViewMode viewMode,
-    boost::optional<UUID> expectedUUID) {
+    AcquisitionPrerequisites::ViewMode viewMode) {
     auto& oss = OperationShardingState::get(opCtx);
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
 
+    // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
+    PlacementConcern placementConcern = nssOrUUID.nss()
+        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()),
+                           oss.getShardVersion(*nssOrUUID.nss())}
+        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()), {}};
+
     return CollectionOrViewAcquisitionRequest(
-        nss,
-        expectedUUID,
-        {oss.getDbVersion(nss.db()), oss.getShardVersion(nss)},
-        readConcern,
-        operationType,
-        viewMode);
+        nssOrUUID, placementConcern, readConcern, operationType, viewMode);
 }
 
 CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
@@ -547,6 +650,14 @@ ScopedCollectionOrViewAcquisition acquireCollectionOrView(
     invariant(acquisition.size() == 1);
     return std::move(acquisition.front());
 }
+
+ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest) {
+    auto acquisition =
+        acquireCollectionsOrViewsWithoutTakingLocks(opCtx, {std::move(acquisitionRequest)});
+    invariant(acquisition.size() == 1);
+    return std::move(acquisition.front());
+}
 namespace shard_role_details {
 
 void SnapshotAttempt::snapshotInitialState() {
@@ -557,25 +668,64 @@ void SnapshotAttempt::snapshotInitialState() {
     _catalogBeforeSnapshot = CollectionCatalog::get(_opCtx);
 }
 
-void SnapshotAttempt::openStorageSnapshot() {
-    invariant(_catalogBeforeSnapshot && _replTermBeforeSnapshot);
-    if (_opCtx->recoveryUnit()->isActive()) {
-        // We already have an open storage snapshot, nothing to do.
-        return;
-    }
+void SnapshotAttempt::changeReadSourceForSecondaryReads() {
+    invariant(_replTermBeforeSnapshot && _catalogBeforeSnapshot);
+    auto catalog = *_catalogBeforeSnapshot;
 
+    for (auto& nsOrUUID : _acquisitionRequests) {
+        NamespaceString nss;
+        try {
+            nss = catalog->resolveNamespaceStringOrUUID(_opCtx, nsOrUUID);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            invariant(nsOrUUID.uuid());
+
+            const auto readSource = _opCtx->recoveryUnit()->getTimestampReadSource();
+            if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
+                readSource == RecoveryUnit::ReadSource::kLastApplied) {
+                throw;
+            }
+        }
+        _shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(_opCtx, nss);
+        if (*_shouldReadAtLastApplied)
+            return;
+    }
+}
+
+void SnapshotAttempt::openStorageSnapshot() {
+    invariant(_shouldReadAtLastApplied);
+
+    // If the collection requires capped snapshots (i.e. it is unreplicated, capped, not the
+    // oplog, and not clustered), establish a capped snapshot. This must happen before opening
+    // the storage snapshot to ensure a reader using tailable cursors would not miss any writes.
+    //
+    // It is safe to establish the capped snapshot here, on the Collection object in the latest
+    // version of the catalog, even if establishConsistentCollection is eventually called to
+    // construct a Collection object from the durable catalog because the only way that can be
+    // required for a collection that uses capped snapshots (i.e. a collection that is unreplicated
+    // and capped) is:
+    //  * The present read operation is reading without a timestamp (since unreplicated collections
+    //    don't support timestamped reads), and
+    //  * When opening the storage snapshot (and thus when establishing the capped snapshot), there
+    //    was a DDL operation pending on the namespace or UUID requested for this read (because this
+    //    is the only time we need to construct a Collection object from the durable catalog for an
+    //    untimestamped read).
+    //
+    // Because DDL operations require a collection X lock, there cannot have been any ongoing
+    // concurrent writes to the collection while establishing the capped snapshot. This means that
+    // if there was a capped snapshot, it should not have contained any uncommitted writes, and so
+    // the _lowestUncommittedRecord must be null.
     for (auto& nssOrUUID : _acquisitionRequests) {
         establishCappedSnapshotIfNeeded(_opCtx, *_catalogBeforeSnapshot, nssOrUUID);
     }
 
-    // TODO SERVER-76415 call preallocateSnapshotForOplogRead() when reading from the oplog.
-    _opCtx->recoveryUnit()->preallocateSnapshot();
-    _openedSnapshot = true;
+    // TODO SERVER-77381 call preallocateSnapshotForOplogRead() when reading from the oplog.
+    if (!_opCtx->recoveryUnit()->isActive()) {
+        _opCtx->recoveryUnit()->preallocateSnapshot();
+        _openedSnapshot = true;
+    }
 }
 
 std::shared_ptr<const CollectionCatalog> SnapshotAttempt::getConsistentCatalog() {
-    invariant(_catalogBeforeSnapshot && _replTermBeforeSnapshot &&
-              _opCtx->recoveryUnit()->isActive());
     auto catalogAfterSnapshot = CollectionCatalog::get(_opCtx);
     const auto replTermAfterSnapshot = repl::ReplicationCoordinator::get(_opCtx)->getTerm();
 
@@ -595,7 +745,6 @@ SnapshotAttempt::~SnapshotAttempt() {
         return;
     }
 
-    // We can't abandon the snapshot if we are in a WUOW.
     if (_openedSnapshot && !_opCtx->lockState()->inAWriteUnitOfWork()) {
         _opCtx->recoveryUnit()->abandonSnapshot();
     }
@@ -605,7 +754,8 @@ SnapshotAttempt::~SnapshotAttempt() {
 ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
-    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
+    const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests,
+    ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources&& lockFreeReadsResources) {
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests;
 
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
@@ -614,27 +764,11 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
     for (const auto& ar : acquisitionRequests) {
         NamespaceStringOrUUID nssOrUUID =
             ar.nss ? NamespaceStringOrUUID(*ar.nss) : NamespaceStringOrUUID(*ar.dbname, *ar.uuid);
-        uassertStatusOK(nssOrUUID.isNssValid());
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid db name " << ar.dbname->toStringForErrorMsg(),
-                NamespaceString::validDBName(nssOrUUID.dbName(),
-                                             NamespaceString::DollarInDbNameBehavior::Allow));
 
-        auto coll =
-            CollectionPtr(catalog.establishConsistentCollection(opCtx, nssOrUUID, readTimestamp));
+        auto coll = catalog.establishConsistentCollection(opCtx, nssOrUUID, readTimestamp);
 
-        // If we are acquiring by UUID and no collection matches, raise NamespaceNotFound.
         if (!ar.nss) {
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Namespace " << (*ar.dbname).toStringForErrorMsg() << ":"
-                                  << *ar.uuid << " not found",
-                    coll);
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Database name mismatch for "
-                                  << (*ar.dbname).toStringForErrorMsg() << ":" << *ar.uuid
-                                  << ". Expected: " << (*ar.dbname).toStringForErrorMsg()
-                                  << " Actual: " << coll->ns().dbName().toStringForErrorMsg(),
-                    coll->ns().dbName() == *ar.dbname);
+            validateResolvedCollectionByUUID(opCtx, ar, coll);
         }
 
         const auto& nss = ar.nss ? *ar.nss : coll->ns();
@@ -642,7 +776,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
             nss, ar.uuid, ar.readConcern, ar.placementConcern, ar.operationType, ar.viewMode);
 
         ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-            prerequisites, nullptr, boost::none};
+            prerequisites, nullptr, boost::none, lockFreeReadsResources};
         // We don't care about ordering in this case, use a mock ResourceId as the key.
         sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, counter++),
                                           std::move(resolvedAcquisitionRequest));
@@ -658,6 +792,8 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
     if (acquisitionRequests.size() == 0) {
         return {};
     }
+
+    validateRequests(acquisitionRequests);
 
     // We shouldn't have an open snapshot unless we are in a multi document transaction or a
     // previous acquisition opened and stashed it already.
@@ -751,10 +887,19 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
 
         checkShardingPlacement(opCtx, acquisitionRequests);
 
-        // TODO SERVER-76901 open consistent storage snapshot.
-        auto catalog = CollectionCatalog::get(opCtx);
-        return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
-            opCtx, *catalog, std::move(sortedAcquisitionRequests));
+        // Open a consistent catalog snapshot if needed.
+        bool openSnapshot = !opCtx->recoveryUnit()->isActive();
+        auto catalog = openSnapshot ? stashConsistentCatalog(opCtx, acquisitionRequests)
+                                    : CollectionCatalog::get(opCtx);
+
+        try {
+            return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
+                opCtx, *catalog, std::move(sortedAcquisitionRequests));
+        } catch (...) {
+            if (openSnapshot)
+                opCtx->recoveryUnit()->abandonSnapshot();
+            throw;
+        }
     }
 }
 
@@ -764,15 +909,22 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutT
         return {};
     }
 
-    // We shouldn't have an open snapshot unless a previous lock-free acquisition opened and stashed
-    // it already.
+    validateRequests(acquisitionRequests);
+
+    // We shouldn't have an open snapshot unless a previous lock-free acquisition opened and
+    // stashed it already.
     invariant(!opCtx->recoveryUnit()->isActive() || opCtx->isLockFreeReadsOp());
 
-    // TODO SERVER-76415 take global lock.
+    auto lockFreeReadsResources = takeGlobalLock(opCtx, acquisitionRequests);
+
+    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
+    catalog_helper::setAutoGetCollectionWaitFailpointExecute(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
 
     // Make sure the sharding placement is correct before opening the storage snapshot, we will
-    // check it again after opening it to make sure it is consistent. This is specially important in
-    // secondaries since they can be lagging and might not be aware of the latests routing changes.
+    // check it again after opening it to make sure it is consistent. This is specially
+    // important in secondaries since they can be lagging and might not be aware of the latests
+    // routing changes.
     checkShardingPlacement(opCtx, acquisitionRequests);
 
     // Open a consistent catalog snapshot if needed.
@@ -785,7 +937,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutT
         checkShardingPlacement(opCtx, acquisitionRequests);
 
         auto sortedAcquisitionRequests = shard_role_details::generateSortedAcquisitionRequests(
-            opCtx, *catalog, acquisitionRequests);
+            opCtx, *catalog, acquisitionRequests, std::move(lockFreeReadsResources));
         return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
             opCtx, *catalog, std::move(sortedAcquisitionRequests));
     } catch (...) {
@@ -822,13 +974,8 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
     if (coll)
         prerequisites.uuid = boost::optional<UUID>(coll->uuid());
 
-    shard_role_details::AcquiredCollection& acquiredCollection =
-        txnResources.addAcquiredCollection({prerequisites,
-                                            std::move(dbLock),
-                                            std::move(collLock),
-                                            boost::none,
-                                            boost::none,
-                                            std::move(coll)});
+    shard_role_details::AcquiredCollection& acquiredCollection = txnResources.addAcquiredCollection(
+        {prerequisites, std::move(dbLock), std::move(collLock), std::move(coll)});
 
     return ScopedCollectionAcquisition(opCtx, acquiredCollection);
 }
@@ -836,8 +983,8 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
 ScopedLocalCatalogWriteFence::ScopedLocalCatalogWriteFence(OperationContext* opCtx,
                                                            ScopedCollectionAcquisition* acquisition)
     : _opCtx(opCtx), _acquiredCollection(&acquisition->_acquiredCollection) {
-    // Clear the collectionPtr from the acquisition to indicate that it should not be used until the
-    // caller is done with the DDL modifications
+    // Clear the collectionPtr from the acquisition to indicate that it should not be used until
+    // the caller is done with the DDL modifications
     _acquiredCollection->collectionPtr = CollectionPtr();
 
     // OnCommit, there is nothing to do because the caller is not allowed to use the collection in
@@ -868,6 +1015,12 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
         auto collection =
             catalog->lookupCollectionByNamespace(opCtx, acquiredCollection->prerequisites.nss);
         checkCollectionUUIDMismatch(opCtx, nss, collection, acquiredCollection->prerequisites.uuid);
+        if (!acquiredCollection->collectionPtr && collection) {
+            // If the uuid wasn't originally set on the prerequisites, because the collection didn't
+            // exist, set it now so that on restore from yield we can check we are restoring the
+            // same instance of the ns.
+            acquiredCollection->prerequisites.uuid = collection->uuid();
+        }
         acquiredCollection->collectionPtr = CollectionPtr(collection);
     } catch (const DBException& ex) {
         LOGV2_DEBUG(7653800,
@@ -893,8 +1046,7 @@ void YieldedTransactionResources::dispose() {
     }
 }
 
-boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperationContext(
-    OperationContext* opCtx) {
+YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx) {
     auto& transactionResources = getTransactionResources(opCtx);
     if (!transactionResources) {
         return YieldedTransactionResources();
@@ -910,12 +1062,6 @@ boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperat
                 acquisition.prerequisites.placementConcern),
             str::stream() << "Collection " << acquisition.prerequisites.nss.toStringForErrorMsg()
                           << " acquired with special placement concern and cannot be yielded");
-
-        // If the uuid wasn't originally set on the prerequisites, set it now so that on restore
-        // from yield we can check we are restoring the same instance of the ns.
-        if (!acquisition.prerequisites.uuid && acquisition.collectionPtr) {
-            acquisition.prerequisites.uuid = acquisition.collectionPtr->uuid();
-        }
     }
 
     // Yielding view acquisitions is not supported.
@@ -964,11 +1110,11 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
             const auto& prerequisites = acquiredCollection.prerequisites;
 
             auto uassertCollectionAppearedAfterRestore = [&] {
-                uasserted(
-                    743870,
-                    str::stream()
-                        << "Collection " << prerequisites.nss.toStringForErrorMsg()
-                        << " appeared after a restore, which violates the semantics of restore");
+                uasserted(743870,
+                          str::stream()
+                              << "Collection " << prerequisites.nss.toStringForErrorMsg()
+                              << " appeared after a restore, which violates the semantics of "
+                                 "restore");
             };
 
             if (prerequisites.operationType == AcquisitionPrerequisites::OperationType::kRead) {
@@ -977,10 +1123,10 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                 // RangePreserver.
                 auto collOrView = acquireLocalCollectionOrView(opCtx, *catalog, prerequisites);
 
-                // We do not support yielding view acquisitions. Therefore it is not possible that
-                // upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it would not
-                // have met the prerequisite that the collection instance is still the same as the
-                // one before yielding.
+                // We do not support yielding view acquisitions. Therefore it is not possible
+                // that upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it
+                // would not have met the prerequisite that the collection instance is still the
+                // same as the one before yielding.
                 invariant(std::holds_alternative<CollectionPtr>(collOrView));
                 if (!acquiredCollection.collectionPtr != !std::get<CollectionPtr>(collOrView)) {
                     uassertCollectionAppearedAfterRestore();
@@ -992,10 +1138,10 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                 auto reacquiredServicesSnapshot =
                     acquireServicesSnapshot(opCtx, *catalog, prerequisites);
 
-                // We do not support yielding view acquisitions. Therefore it is not possible that
-                // upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it would not
-                // have met the prerequisite that the collection instance is still the same as the
-                // one before yielding.
+                // We do not support yielding view acquisitions. Therefore it is not possible
+                // that upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it
+                // would not have met the prerequisite that the collection instance is still the
+                // same as the one before yielding.
                 invariant(std::holds_alternative<CollectionPtr>(
                     reacquiredServicesSnapshot.collectionPtrOrView));
                 if (!acquiredCollection.collectionPtr !=
@@ -1057,6 +1203,17 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
         CollectionCatalog::stash(opCtx, catalog);
     }
     scopeGuard.dismiss();
+}
+
+// TODO SERVER-77067 simplify conditions
+bool supportsLockFreeRead(OperationContext* opCtx) {
+    // Lock-free reads are not supported:
+    //   * in multi-document transactions.
+    //   * under an IX lock (nested reads under IX lock holding operations).
+    //   * if a storage txn is already open w/o the lock-free reads operation flag set.
+    return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
+        !opCtx->lockState()->isWriteLocked() &&
+        !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
 }  // namespace mongo
