@@ -252,11 +252,8 @@ __wt_rts_btree_walk_btree_apply(
 
     if (modified || max_durable_ts > rollback_timestamp || prepared_updates ||
       has_txn_updates_gt_than_ckpt_snap) {
-        /*
-         * Open a handle; we're potentially opening a lot of handles and there's no reason to cache
-         * all of them for future unknown use, discard on close.
-         */
-        ret = __wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_DISCARD);
+        /* Open a handle for processing. */
+        ret = __wt_session_get_dhandle(session, uri, NULL, NULL, 0);
         if (ret != 0)
             WT_ERR_MSG(session, ret, "%s: unable to open handle%s", uri,
               ret == EBUSY ? ", error indicates handle is unavailable due to concurrent use" : "");
