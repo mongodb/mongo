@@ -254,16 +254,34 @@ void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorRespons
     _batch = response.releaseBatch();
     _batchIter = _batch.begin();
 
-    // If we got a cursor id back, pre-fetch the next batch
-    if (_cursorId) {
-        GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
-        getMoreRequest.setBatchSize(_options.batchSize);
-        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+    // If the previous response contained a cursorId and pre-fetching is enabled, schedule the
+    // getMore.
+    if ((_cursorId != kClosedCursorId) && _options.preFetchNextBatch) {
+        _scheduleGetMore(opCtx);
     }
 }
 
+void TaskExecutorCursor::_scheduleGetMore(OperationContext* opCtx) {
+    // The previous response must have returned an open cursor ID.
+    invariant(_cursorId >= kMinLegalCursorId);
+    // There cannot be an existing in-flight request.
+    invariant(!_cmdState);
+    GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
+    getMoreRequest.setBatchSize(_options.batchSize);
+    _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+}
+
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
-    invariant(_cmdState, "_getNextBatch() requires an async request to have already been sent.");
+    // If we don't have an in-flight request, schedule one. This will occur when the
+    // 'preFetchNextBatch' option is false.
+    if (!_cmdState) {
+        invariant(!_options.preFetchNextBatch);
+        _scheduleGetMore(opCtx);
+    }
+
+    // There should be an in-flight request at this point, either sent asyncronously when we
+    // processed the previous response or just scheduled.
+    invariant(_cmdState);
     invariant(_cursorId != kClosedCursorId);
 
     auto clock = opCtx->getServiceContext()->getPreciseClockSource();
@@ -291,12 +309,15 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     tassert(6253100, "Expected at least one response for cursor", cursorResponses.size() > 0);
     CursorResponse cr = uassertStatusOK(std::move(cursorResponses[0]));
     _processResponse(opCtx, std::move(cr));
+
     // If we have more responses, build them into cursors then hold them until a caller accesses
     // them. Skip the first response, we used it to populate this cursor.
     // Ensure we update the RCR we give to each 'child cursor' with the current opCtx.
     auto freshRcr = _createRequest(opCtx, _rcr.cmdObj);
     auto copyOptions = [&] {
         TaskExecutorCursor::Options options;
+        // In the case that pinConnection is true, we need to ensure that additional cursors also
+        // pin their connection to the same socket as the original cursor.
         options.pinConnection = _options.pinConnection;
         return options;
     };

@@ -492,6 +492,56 @@ public:
         th.join();
     }
 
+    /**
+     * Test that if 'preFetchNextBatch' is false, the TaskExecutorCursor does not request GetMores
+     * until the current batch is exhausted and 'getNext()' is invoked.
+     */
+    void NoPrefetchGetMore() {
+        CursorId cursorId = 1;
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 "test",
+                                 BSON("search"
+                                      << "foo"),
+                                 opCtx.get());
+
+        // Construction of the TaskExecutorCursor enqueues a request in the NetworkInterfaceMock.
+        TaskExecutorCursor tec = makeTec(rcr, [] {
+            TaskExecutorCursor::Options opts;
+            opts.batchSize = 2;
+            opts.preFetchNextBatch = false;
+            return opts;
+        }());
+
+        // Mock the response for the first batch.
+        scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
+
+        // Exhaust the first batch.
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+
+        // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
+        // 'preFetchNextBatch' works as expected.
+        ASSERT_FALSE(hasReadyRequests());
+
+        // As soon as 'getNext()' is invoked, the TaskExecutorCursor will try to send a GetMore and
+        // that will block this thread in the NetworkInterfaceMock until there is a scheduled
+        // response. However, we cannot schedule the cursor response on the main thread before we
+        // call 'getNext()' as that will cause the NetworkInterfaceMock to block until there is
+        // request enqueued ('getNext()' is the function which will enqueue such as request).
+        // To avoid this deadlock, we start a new thread which will schedule a response on the
+        // NetworkInterfaceMock.
+        stdx::thread t(
+            [this, cursorId] { scheduleSuccessfulCursorResponse("nextBatch", 3, 4, 0); });
+        t.detach();
+
+        // Schedules the GetMore request and exhausts the cursor.
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
+
+        // Assert no GetMore is requested.
+        ASSERT_FALSE(hasReadyRequests());
+    }
+
     ServiceContext::UniqueServiceContext serviceCtx = ServiceContext::make();
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
@@ -505,10 +555,10 @@ public:
         launchExecutorThread();
     }
 
-    BSONObj scheduleSuccessfulCursorResponse(StringData fieldName,
-                                             size_t start,
-                                             size_t end,
-                                             size_t cursorId) {
+    virtual BSONObj scheduleSuccessfulCursorResponse(StringData fieldName,
+                                                     size_t start,
+                                                     size_t end,
+                                                     size_t cursorId) {
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
 
 
@@ -653,7 +703,48 @@ public:
     }
 };
 
+class NoPrefetchTaskExecutorCursorTestFixture : public NonPinningTaskExecutorCursorTestFixture {
+public:
+    TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
+                               TaskExecutorCursor::Options&& options = {}) {
+        options.preFetchNextBatch = false;
+        return TaskExecutorCursor(getExecutorPtr(), rcr, std::move(options));
+    }
+
+    BSONObj scheduleSuccessfulCursorResponse(StringData fieldName,
+                                             size_t start,
+                                             size_t end,
+                                             size_t cursorId) {
+        NetworkInterfaceMock::InNetworkGuard ing(getNet());
+        // Don't assert that the network has requests like we do in other classes. This is to enable
+        // the test in 'NoPrefetchGetMore'.
+        auto rcr =
+            ing->scheduleSuccessfulResponse(buildCursorResponse(fieldName, start, end, cursorId));
+        ing->runReadyNetworkOperations();
+        return rcr.cmdObj.getOwned();
+    }
+};
+
+class NoPrefetchPinnedTaskExecutorCursorTestFixture
+    : public PinnedConnTaskExecutorCursorTestFixture {
+public:
+    TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
+                               TaskExecutorCursor::Options&& options = {}) {
+        options.preFetchNextBatch = false;
+        options.pinConnection = true;
+        return TaskExecutorCursor(getExecutorPtr(), rcr, std::move(options));
+    }
+};
+
 TEST_F(NonPinningTaskExecutorCursorTestFixture, SingleBatchWorks) {
+    SingleBatchWorksTest();
+}
+
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, SingleBatchWorks) {
+    SingleBatchWorksTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, SingleBatchWorks) {
     SingleBatchWorksTest();
 }
 
@@ -662,6 +753,14 @@ TEST_F(PinnedConnTaskExecutorCursorTestFixture, SingleBatchWorks) {
 }
 
 TEST_F(NonPinningTaskExecutorCursorTestFixture, MultipleCursorsSingleBatchSucceeds) {
+    MultipleCursorsSingleBatchSucceedsTest();
+}
+
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, MultipleCursorsSingleBatchSucceeds) {
+    MultipleCursorsSingleBatchSucceedsTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, MultipleCursorsSingleBatchSucceeds) {
     MultipleCursorsSingleBatchSucceedsTest();
 }
 
@@ -674,11 +773,30 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture,
     ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructedTest();
 }
 
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture,
+       ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructed) {
+    ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructedTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture,
+       ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructed) {
+    ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructedTest();
+}
+
 TEST_F(PinnedConnTaskExecutorCursorTestFixture,
        ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructed) {
     ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructedTest();
 }
+
 TEST_F(NonPinningTaskExecutorCursorTestFixture, MultipleCursorsGetMoreWorks) {
+    MultipleCursorsGetMoreWorksTest();
+}
+
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, MultipleCursorsGetMoreWorks) {
+    MultipleCursorsGetMoreWorksTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, MultipleCursorsGetMoreWorks) {
     MultipleCursorsGetMoreWorksTest();
 }
 
@@ -690,13 +808,21 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, FailureInFind) {
     FailureInFindTest();
 }
 
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, FailureInFind) {
+    FailureInFindTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, FailureInFind) {
+    FailureInFindTest();
+}
+
 TEST_F(PinnedConnTaskExecutorCursorTestFixture, FailureInFind) {
     FailureInFindTest();
 }
 
 /**
  * Ensure early termination of the cursor calls killCursor (if we know about the cursor id)
- * Only applicapble to the unpinned case - if the connection is pinned, and a getMore is
+ * Only applicable to the unpinned case - if the connection is pinned, and a getMore is
  * in progress and/or fails, the most we can do is kill the connection. We can't re-use
  * the connection to send killCursors.
  */
@@ -730,6 +856,14 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, MultipleBatchesWorks) {
     MultipleBatchesWorksTest();
 }
 
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, MultipleBatchesWorks) {
+    MultipleBatchesWorksTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, MultipleBatchesWorks) {
+    MultipleBatchesWorksTest();
+}
+
 TEST_F(PinnedConnTaskExecutorCursorTestFixture, MultipleBatchesWorks) {
     MultipleBatchesWorksTest();
 }
@@ -738,11 +872,27 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, EmptyFirstBatch) {
     EmptyFirstBatchTest();
 }
 
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, EmptyFirstBatch) {
+    EmptyFirstBatchTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, EmptyFirstBatch) {
+    EmptyFirstBatchTest();
+}
+
 TEST_F(PinnedConnTaskExecutorCursorTestFixture, EmptyFirstBatch) {
     EmptyFirstBatchTest();
 }
 
 TEST_F(NonPinningTaskExecutorCursorTestFixture, EmptyNonInitialBatch) {
+    EmptyNonInitialBatchTest();
+}
+
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, EmptyNonInitialBatch) {
+    EmptyNonInitialBatchTest();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, EmptyNonInitialBatch) {
     EmptyNonInitialBatchTest();
 }
 
@@ -795,6 +945,14 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, LsidIsPassed) {
                       scheduleSuccessfulKillCursorResponse(1));
 
     ASSERT_FALSE(hasReadyRequests());
+}
+
+TEST_F(NoPrefetchTaskExecutorCursorTestFixture, NoPrefetchGetMore) {
+    NoPrefetchGetMore();
+}
+
+TEST_F(NoPrefetchPinnedTaskExecutorCursorTestFixture, NoPrefetchWithPinning) {
+    NoPrefetchGetMore();
 }
 
 }  // namespace
