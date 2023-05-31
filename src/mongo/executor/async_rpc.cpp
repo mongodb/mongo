@@ -48,13 +48,15 @@ public:
      *
      * Do not call directly - this is not part of the public API.
      */
-    ExecutorFuture<AsyncRPCInternalResponse> _sendCommand(StringData dbName,
-                                                          BSONObj cmdBSON,
-                                                          Targeter* targeter,
-                                                          OperationContext* opCtx,
-                                                          std::shared_ptr<TaskExecutor> exec,
-                                                          CancellationToken token,
-                                                          BatonHandle baton) final {
+    ExecutorFuture<AsyncRPCInternalResponse> _sendCommand(
+        StringData dbName,
+        BSONObj cmdBSON,
+        Targeter* targeter,
+        OperationContext* opCtx,
+        std::shared_ptr<TaskExecutor> exec,
+        CancellationToken token,
+        BatonHandle baton,
+        boost::optional<UUID> clientOperationKey) final {
         auto proxyExec = std::make_shared<ProxyingExecutor>(baton, exec);
         auto targetsUsed = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
@@ -65,12 +67,20 @@ public:
                    exec = std::move(exec),
                    token,
                    baton = std::move(baton),
-                   targetsUsed](std::vector<HostAndPort> targets) {
+                   targetsUsed,
+                   clientOperationKey](std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
                 *targetsUsed = targets;
                 executor::RemoteCommandRequestOnAny executorRequest(
-                    targets, dbName, cmdBSON, rpc::makeEmptyMetadata(), opCtx);
+                    targets,
+                    dbName,
+                    cmdBSON,
+                    rpc::makeEmptyMetadata(),
+                    opCtx,
+                    executor::RemoteCommandRequest::kNoTimeout,
+                    {},
+                    clientOperationKey);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token, std::move(baton));
             })
             .onError([targetsUsed](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {

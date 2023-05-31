@@ -1204,6 +1204,61 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
     ASSERT_EQ(target, targetHeardFrom);
 }
 
+auto extractUUID(const BSONElement& element) {
+    return UUID::fromCDR(element.uuid());
+}
+
+auto getOpKeyFromCommand(const BSONObj& cmdObj) {
+    return extractUUID(cmdObj["clientOperationKey"]);
+}
+
+TEST_F(AsyncRPCTestFixture, OperationKeyIsSetByDefault) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+    ASSERT_DOES_NOT_THROW([&] {
+        onCommand([&](const auto& request) {
+            (void)getOpKeyFromCommand(request.cmdObj);
+            return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    }());
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
+
+    future.get();
+}
+
+TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
+    const auto opKey = UUID::gen();
+
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    // Set OperationKey via AsyncRPCOptions.
+    options->genericArgs.stable.setClientOperationKey(opKey);
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+    onCommand([&](const auto& request) {
+        ASSERT_EQ(getOpKeyFromCommand(request.cmdObj), opKey);
+        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+    future.get();
+}
+
 /**
  * Checks that if cancellation occurs after TaskExecutor receives a network response, the
  * cancellation fails and the network response fulfills the final response.

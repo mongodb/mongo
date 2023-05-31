@@ -756,6 +756,44 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
     ASSERT_FALSE(swResult.isOK());
 }
 
+TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
+    const auto opKey = UUID::gen();
+    assertCommandOK("admin",
+                    BSON("configureFailPoint"
+                         << "failIfOperationKeyMismatch"
+                         << "mode"
+                         << "alwaysOn"
+                         << "data" << BSON("clientOperationKey" << opKey)),
+                    kNoTimeout);
+
+    ON_BLOCK_EXIT([&] {
+        assertCommandOK("admin",
+                        BSON("configureFailPoint"
+                             << "failIfOperationKeyMismatch"
+                             << "mode"
+                             << "off"),
+                        kNoTimeout);
+    });
+
+    RemoteCommandRequest::Options rcrOptions;
+    rcrOptions.hedgeOptions.isHedgeEnabled = true;
+    rcrOptions.hedgeOptions.hedgeCount = fixture().getServers().size();
+    RemoteCommandRequestOnAny rcr(fixture().getServers(),
+                                  "admin",
+                                  makeEchoCmdObj(),
+                                  BSONObj(),
+                                  nullptr,
+                                  kNoTimeout,
+                                  std::move(rcrOptions),
+                                  opKey);
+    // Only internal clients can run hedged operations.
+    resetIsInternalClient(true);
+    ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
+    auto cbh = makeCallbackHandle();
+    auto fut = runCommand(cbh, std::move(rcr));
+    fut.get();
+}
+
 class HedgeCancellationTest : public NetworkInterfaceTest {
 public:
     enum class CancellationMode { kAfterCompletion, kAfterScheduling };
