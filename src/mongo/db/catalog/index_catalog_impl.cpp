@@ -2073,16 +2073,14 @@ void IndexCatalogImpl::prepareInsertDeleteOptions(OperationContext* opCtx,
 void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
                                          Collection* coll,
                                          IndexCatalogEntry* index) {
+    // This function can be called inside of a WriteUnitOfWork, which can still encounter a write
+    // conflict. We don't need to reset any in-memory state as a new writable collection is fetched
+    // when retrying.
     auto releasedEntry = _buildingIndexes.release(index->descriptor());
     invariant(releasedEntry.get() == index);
     _readyIndexes.add(std::move(releasedEntry));
 
-    // Wait to unset the interceptor until the index actually commits. If a write conflict is
-    // encountered and the index commit process is restated, the multikey information from the
-    // interceptor may still be needed.
-    opCtx->recoveryUnit()->onCommit([index](OperationContext*, boost::optional<Timestamp>) {
-        index->setIndexBuildInterceptor(nullptr);
-    });
+    index->setIndexBuildInterceptor(nullptr);
     index->setIsReady(true);
 }
 
