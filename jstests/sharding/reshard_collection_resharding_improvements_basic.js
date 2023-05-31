@@ -160,6 +160,72 @@ const testForceRedistribution = (mongos) => {
     reshardCmdTest.assertReshardCollOk(
         {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2, forceRedistribution: true},
         2);
+
+    // Create a sharded collection with 2 zones, then force same-key resharding without specifying
+    // zones and the resharding should use existing 2 zones
+    jsTest.log("When zones is not provided, use existing zones on the collection");
+    const additionalSetup = function(test) {
+        const st = test._st;
+        const ns = test._ns;
+        const zoneName1 = 'z1';
+        const zoneName2 = 'z2';
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName1}));
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName2}));
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName2}));
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
+        assert.commandWorked(st.s.adminCommand(
+            {updateZoneKeyRange: ns, min: {oldKey: MinKey}, max: {oldKey: 0}, zone: zoneName1}));
+        assert.commandWorked(st.s.adminCommand(
+            {updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: MaxKey}, zone: zoneName2}));
+    };
+
+    reshardCmdTest.assertReshardCollOk(
+        {
+            reshardCollection: ns,
+            key: {oldKey: 1},
+            forceRedistribution: true,
+            shardDistribution: [
+                {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+                {shard: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
+                {shard: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+            ]
+        },
+        4,
+        [
+            {recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+            {recipientShardId: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 0}},
+            {recipientShardId: st.shard0.shardName, min: {oldKey: 0}, max: {oldKey: 1}},
+            {recipientShardId: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+        ],
+        [
+            {zone: "z1", min: {oldKey: MinKey}, max: {oldKey: 0}},
+            {zone: "z2", min: {oldKey: 0}, max: {oldKey: MaxKey}}
+        ],
+        additionalSetup);
+    jsTest.log("When empty zones is provided, should discard the existing zones.");
+    reshardCmdTest.assertReshardCollOk(
+        {
+            reshardCollection: ns,
+            key: {oldKey: 1},
+            forceRedistribution: true,
+            zones: [],
+            shardDistribution: [
+                {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+                {shard: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
+                {shard: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+            ]
+        },
+        3,
+        [
+            {recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+            {recipientShardId: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
+            {recipientShardId: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+        ],
+        [],
+        additionalSetup);
 };
 
 testShardDistribution(mongos);

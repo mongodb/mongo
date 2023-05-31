@@ -104,7 +104,8 @@ class ReshardCollectionCmdTest {
         assert.eq(doesExist, expectedToExist);
     }
 
-    _verifyTemporaryReshardingCollectionExistsWithCorrectOptions(expectedRecipientShards) {
+    _verifyTemporaryReshardingCollectionExistsWithCorrectOptions(shardKey,
+                                                                 expectedRecipientShards) {
         const originalCollInfo =
             this._mongos.getDB(this._dbName).getCollectionInfos({name: this._collName})[0];
         assert.neq(originalCollInfo, undefined);
@@ -118,7 +119,7 @@ class ReshardCollectionCmdTest {
             this._verifyCollectionExistenceForConn(this._collName, true, rsPrimary);
             this._verifyCollectionExistenceForConn(tempReshardingCollName, false, rsPrimary);
             ShardedIndexUtil.assertIndexExistsOnShard(
-                this._shardIdToShardMap[shardId], this._dbName, this._collName, {newKey: 1});
+                this._shardIdToShardMap[shardId], this._dbName, this._collName, shardKey);
         });
     }
 
@@ -149,11 +150,21 @@ class ReshardCollectionCmdTest {
                       .itcount());
     }
 
-    _verifyTagsDocumentsAfterOperationCompletes(ns, shardKeyPattern) {
+    _verifyTagsDocumentsAfterOperationCompletes(ns, shardKeyPattern, expectedZones) {
         const tagsArr = this._mongos.getCollection('config.tags').find({ns: ns}).toArray();
+        if (expectedZones !== undefined) {
+            assert.eq(tagsArr.length, expectedZones.length);
+            tagsArr.sort((a, b) => a["tag"].localeCompare(b["tag"]));
+            expectedZones.sort((a, b) => a["zone"].localeCompare(b["zone"]));
+        }
         for (let i = 0; i < tagsArr.length; ++i) {
             assert.eq(Object.keys(tagsArr[i]["min"]), shardKeyPattern);
             assert.eq(Object.keys(tagsArr[i]["max"]), shardKeyPattern);
+            if (expectedZones !== undefined) {
+                assert.eq(tagsArr[i]["min"], expectedZones[i]["min"]);
+                assert.eq(tagsArr[i]["max"], expectedZones[i]["max"]);
+                assert.eq(tagsArr[i]["tag"], expectedZones[i]["zone"]);
+            }
         }
     }
 
@@ -176,7 +187,7 @@ class ReshardCollectionCmdTest {
         assert.commandWorked(this._mongos.adminCommand(commandObj));
 
         this._verifyTemporaryReshardingCollectionExistsWithCorrectOptions(
-            this._getAllShardIdsFromExpectedChunks(presetReshardedChunks));
+            commandObj.key, this._getAllShardIdsFromExpectedChunks(presetReshardedChunks));
 
         this._verifyTagsDocumentsAfterOperationCompletes(this._ns, Object.keys(commandObj.key));
 
@@ -191,8 +202,11 @@ class ReshardCollectionCmdTest {
      * @param {Object} commandObj The reshardCollection cmd to execute.
      * @param {Number} expectedChunkNum Number of chunks to have after reshardCollection.
      * @param {Object[]} expectedChunks Expected chunk distribution after reshardCollection.
+     * @param {Object[]} expectedZones Expected zones for the collection after reshardCollection.
+     * @param {Function} additionalSetup Additional setup needed, taking the class object as input.
      */
-    assertReshardCollOk(commandObj, expectedChunkNum, expectedChunks) {
+    assertReshardCollOk(
+        commandObj, expectedChunkNum, expectedChunks, expectedZones, additionalSetup) {
         assert.commandWorked(
             this._mongos.adminCommand({shardCollection: this._ns, key: {oldKey: 1}}));
 
@@ -203,6 +217,9 @@ class ReshardCollectionCmdTest {
             bulk.insert({oldKey: x, newKey: this._numInitialDocs - x});
         }
         assert.commandWorked(bulk.execute());
+        if (additionalSetup) {
+            additionalSetup(this);
+        }
 
         const tempReshardingCollName =
             this._constructTemporaryReshardingCollName(this._dbName, this._collName);
@@ -211,10 +228,11 @@ class ReshardCollectionCmdTest {
 
         if (expectedChunks) {
             this._verifyTemporaryReshardingCollectionExistsWithCorrectOptions(
-                this._getAllShardIdsFromExpectedChunks(expectedChunks));
+                commandObj.key, this._getAllShardIdsFromExpectedChunks(expectedChunks));
         }
 
-        this._verifyTagsDocumentsAfterOperationCompletes(this._ns, Object.keys(commandObj.key));
+        this._verifyTagsDocumentsAfterOperationCompletes(
+            this._ns, Object.keys(commandObj.key), expectedZones);
 
         this._verifyChunksMatchExpected(expectedChunkNum, expectedChunks);
 

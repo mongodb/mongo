@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -243,6 +244,20 @@ std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
     return tags;
 }
 
+std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext* opCtx,
+                                                               const NamespaceString& sourceNss) {
+    std::vector<ReshardingZoneType> zones;
+    const auto collectionZones = uassertStatusOK(
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getTagsForCollection(opCtx,
+                                                                                       sourceNss));
+
+    for (const auto& zone : collectionZones) {
+        ReshardingZoneType newZone(zone.getTag(), zone.getMinKey(), zone.getMaxKey());
+        zones.push_back(newZone);
+    }
+    return zones;
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
@@ -423,9 +438,11 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
         uassert(ErrorCodes::InvalidOptions,
                 "ShardKeyRange max should follow shard key's keyPattern",
                 (!shard.getMax().has_value()) || keyPattern.isShardKey(*shard.getMax()));
-        uassert(ErrorCodes::InvalidOptions,
-                "ShardDistribution should have unique shardIds",
-                shardIds.find(shard.getShard()) == shardIds.end());
+        if (hasMinMax && !(*hasMinMax)) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Non-explicit shardDistribution should have unique shardIds",
+                    shardIds.find(shard.getShard()) == shardIds.end());
+        }
 
         // Check all shardKeyRanges have min/max or none of them has min/max.
         if (hasMinMax.has_value()) {

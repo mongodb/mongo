@@ -107,7 +107,7 @@ public:
 
             const auto& authoritativeTags =
                 uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
-            if (!authoritativeTags.empty()) {
+            if (!authoritativeTags.empty() && !request().getForceRedistribution()) {
                 uassert(ErrorCodes::BadValue,
                         "Must specify value for zones field",
                         request().getZones());

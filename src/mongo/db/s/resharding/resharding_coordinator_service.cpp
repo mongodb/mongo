@@ -1961,6 +1961,15 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
 
+    // If zones is not provided by the user, we should use the existing zones for
+    // this resharding operation.
+    if (updatedCoordinatorDoc.getForceRedistribution() &&
+        *updatedCoordinatorDoc.getForceRedistribution() && !updatedCoordinatorDoc.getZones()) {
+        auto zones = resharding::getZonesFromExistingCollection(
+            opCtx.get(), updatedCoordinatorDoc.getSourceNss());
+        updatedCoordinatorDoc.setZones(std::move(zones));
+    }
+
     auto shardsAndChunks = _reshardingCoordinatorExternalState->calculateParticipantShardsAndChunks(
         opCtx.get(), updatedCoordinatorDoc);
 
