@@ -94,12 +94,10 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
 bool isQueryPlanSbeCompatible(const QuerySolution* root) {
     tassert(7061701, "Expected QuerySolution pointer to not be nullptr", root);
 
-    // (Ignore FCV check): This is intentional because we always want to use this feature once the
-    // feature flag is enabled.
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
+    // TODO SERVER-52958: Add support in the SBE stage builders for the COUNT_SCAN stage.
     const bool isNotCountScan = !root->hasNode(StageType::STAGE_COUNT_SCAN);
 
-    return isNotCountScan || sbeFull;
+    return isNotCountScan;
 }
 
 }  // namespace mongo

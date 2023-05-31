@@ -627,68 +627,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    // COUNT_SCAN node doesn't expected to return index info.
-    tassert(8423394, "buildCountScan() does not support kReturnKey", !reqs.has(kReturnKey));
-    tassert(8423393, "buildCountScan() does not support kSnapshotId", !reqs.has(kSnapshotId));
-    tassert(8423392, "buildCountScan() does not support kIndexIdent", !reqs.has(kIndexIdent));
-    tassert(8423391, "buildCountScan() does not support kIndexKey", !reqs.has(kIndexKey));
-    tassert(
-        8423390, "buildCountScan() does not support kIndexKeyPattern", !reqs.has(kIndexKeyPattern));
-    tassert(8423389, "buildCountScan() does not support kSortKey", !reqs.hasSortKeys());
-
-    auto csn = static_cast<const CountScanNode*>(root);
-
-    const auto& collection = getCurrentCollection(reqs);
-    auto indexName = csn->index.identifier.catalogName;
-    auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(_state.opCtx, indexName);
-    auto indexAccessMethod =
-        collection->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
-    auto [lowKey, highKey] =
-        makeKeyStringPair(csn->startKey,
-                          csn->startKeyInclusive,
-                          csn->endKey,
-                          csn->endKeyInclusive,
-                          indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
-                          indexAccessMethod->getSortedDataInterface()->getOrdering(),
-                          true /* forward */);
-
-    auto [stage, planStageSlots, _] = generateSingleIntervalIndexScan(_state,
-                                                                      collection,
-                                                                      indexName,
-                                                                      indexDescriptor->keyPattern(),
-                                                                      true /* forward */,
-                                                                      std::move(lowKey),
-                                                                      std::move(highKey),
-                                                                      {} /* indexKeysToInclude */,
-                                                                      {} /* indexKeySlots */,
-                                                                      reqs,
-                                                                      _yieldPolicy,
-                                                                      csn->nodeId(),
-                                                                      false /* lowPriority */);
-
-    if (csn->index.multikey ||
-        (indexDescriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
-         indexDescriptor->keyPattern().nFields() > 1)) {
-        stage =
-            sbe::makeS<sbe::UniqueStage>(std::move(stage),
-                                         sbe::makeSV(planStageSlots.get(PlanStageSlots::kRecordId)),
-                                         csn->nodeId());
-    }
-
-    if (reqs.has(kResult)) {
-        // COUNT_SCAN stage doesn't produce any output, make an empty obj for kResult.
-        auto resultSlot = _slotIdGenerator.generate();
-        planStageSlots.set(kResult, resultSlot);
-        stage = sbe::makeProjectStage(
-            std::move(stage), csn->nodeId(), resultSlot, makeFunction("newObj"));
-    }
-
-    planStageSlots.clearNonRequiredSlots(reqs);
-    return {std::move(stage), std::move(planStageSlots)};
-}
-
 namespace {
 std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& state,
                                                              const MatchExpression* me,
@@ -3301,7 +3239,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             SlotBasedStageBuilder&, const QuerySolutionNode* root, const PlanStageReqs& reqs)>>
         kStageBuilders = {
             {STAGE_COLLSCAN, &SlotBasedStageBuilder::buildCollScan},
-            {STAGE_COUNT_SCAN, &SlotBasedStageBuilder::buildCountScan},
             {STAGE_VIRTUAL_SCAN, &SlotBasedStageBuilder::buildVirtualScan},
             {STAGE_IXSCAN, &SlotBasedStageBuilder::buildIndexScan},
             {STAGE_COLUMN_SCAN, &SlotBasedStageBuilder::buildColumnScan},
