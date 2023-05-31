@@ -393,6 +393,8 @@ last-continuous:
     ticket: SERVER-76988
   - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
     ticket: SERVER-77247
+  - test_file: jstests/core/timeseries/timeseries_create_collection.js
+    ticket: SERVER-77382
   suites: null
 last-lts:
   all:
@@ -870,4 +872,6 @@ last-lts:
     ticket: SERVER-76988
   - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
     ticket: SERVER-77247
+  - test_file: jstests/core/timeseries/timeseries_create_collection.js
+    ticket: SERVER-77382
   suites: null
