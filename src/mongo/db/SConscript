@@ -2150,20 +2150,6 @@ env.Library(
 )
 
 env.Library(
-    target='service_context_devnull_test_fixture',
-    source=[
-        'service_context_devnull_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        'service_context_d_test_fixture',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull',
-    ],
-)
-
-env.Library(
     target='log_process_details',
     source=[
         'log_process_details.cpp',
@@ -2733,7 +2719,6 @@ if wiredtiger:
             'server_base',
             'server_options_servers',
             'service_context_d_test_fixture',
-            'service_context_devnull_test_fixture',
             'service_liaison_mock',
             'session/logical_session_cache_impl',
             'session/logical_session_id_helpers',
