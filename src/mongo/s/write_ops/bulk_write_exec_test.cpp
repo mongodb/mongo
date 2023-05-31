@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -1106,69 +1107,116 @@ public:
     BulkWriteExecTest() = default;
     ~BulkWriteExecTest() = default;
 
+    const ShardId kShardIdA = ShardId("shardA");
+    const ShardId kShardIdB = ShardId("shardB");
+
     void setUp() override {
         ShardingTestFixture::setUp();
+        configTargeter()->setFindHostReturnValue(HostAndPort("FakeConfigHost", 12345));
+
+        std::vector<std::tuple<ShardId, HostAndPort>> remoteShards{
+            {kShardIdA, HostAndPort(str::stream() << kShardIdA << ":123")},
+            {kShardIdB, HostAndPort(str::stream() << kShardIdB << ":123")},
+        };
+
+        std::vector<ShardType> shards;
+
+        for (size_t i = 0; i < remoteShards.size(); i++) {
+            ShardType shardType;
+            shardType.setName(std::get<0>(remoteShards[i]).toString());
+            shardType.setHost(std::get<1>(remoteShards[i]).toString());
+
+            shards.push_back(shardType);
+
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                std::make_unique<RemoteCommandTargeterMock>());
+            targeter->setConnectionStringReturnValue(
+                ConnectionString(std::get<1>(remoteShards[i])));
+            targeter->setFindHostReturnValue(std::get<1>(remoteShards[i]));
+
+            targeterFactory()->addTargeterToReturn(ConnectionString(std::get<1>(remoteShards[i])),
+                                                   std::move(targeter));
+        }
+
+        setupShards(shards);
     }
 };
 
-// TODO (SERVER-76953): Uncomment after mongos can handle targeting errors in unordered ops.
-// TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
-//     ShardId shardIdA("shardA");
-//     ShardId shardIdB("shardB");
-//     NamespaceString nss0("foo.bar");
-//     NamespaceString nss1("bar.foo");
-//     ShardEndpoint endpoint0(
-//         shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
-//     ShardEndpoint endpoint1(
-//         shardIdB,
-//         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
-//                                   boost::optional<CollectionIndexes>(boost::none)),
-//         boost::none);
+TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
+    NamespaceString nss0("foo.bar");
+    NamespaceString nss1("bar.foo");
+    ShardEndpoint endpoint0(
+        kShardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpoint1(
+        kShardIdB,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
 
-//     std::vector<std::unique_ptr<NSTargeter>> targeters;
-//     // Initialize the targeter so that x >= 0 values are untargetable so target call will
-//     encounter
-//     // an error.
-//     targeters.push_back(initTargeterHalfRange(nss0, endpoint0));
-//     targeters.push_back(initTargeterFullRange(nss1, endpoint1));
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    // Initialize the targeter so that x >= 0 values are untargetable so target call will encounter
+    // an error.
+    targeters.push_back(initTargeterHalfRange(nss0, endpoint0));
+    targeters.push_back(initTargeterFullRange(nss1, endpoint1));
 
-//     auto targeter0 = static_cast<BulkWriteMockNSTargeter*>(targeters[0].get());
-//     auto targeter1 = static_cast<BulkWriteMockNSTargeter*>(targeters[1].get());
+    auto targeter0 = static_cast<BulkWriteMockNSTargeter*>(targeters[0].get());
+    auto targeter1 = static_cast<BulkWriteMockNSTargeter*>(targeters[1].get());
 
-//     // Only the first op would get a target error.
-//     BulkWriteCommandRequest request(
-//         {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
-//         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    // Only the first op would get a target error.
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
 
-//     // Test unordered operations. Since only the first op is untargetable, the second op will
-//     // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and
-//     try
-//     // to refresh the targeters upon targeting errors.
-//     request.setOrdered(false);
-//     auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
-//     ASSERT_EQUALS(replyItems.size(), 2u);
-//     ASSERT_NOT_OK(replyItems[0].getStatus());
-//     ASSERT_OK(replyItems[1].getStatus());
-//     ASSERT_EQUALS(targeter0->getNumRefreshes(), 1);
-//     ASSERT_EQUALS(targeter1->getNumRefreshes(), 1);
+    LOGV2(7695300, "Sending an unordered request with untargetable first op and valid second op.");
+    auto future = launchAsync([&] {
+        // Test unordered operations. Since only the first op is untargetable, the second op will
+        // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and
+        // try to refresh the targeters upon targeting errors.
+        request.setOrdered(false);
+        auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
+        ASSERT_EQUALS(replyItems.size(), 2u);
+        ASSERT_NOT_OK(replyItems[0].getStatus());
+        ASSERT_OK(replyItems[1].getStatus());
+        ASSERT_EQUALS(targeter0->getNumRefreshes(), 1);
+        ASSERT_EQUALS(targeter1->getNumRefreshes(), 1);
+    });
 
-//     // Test ordered operations. This is mostly the same as the test case above except that we
-//     should
-//     // only return the first error for ordered operations.
-//     request.setOrdered(true);
-//     replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
-//     ASSERT_EQUALS(replyItems.size(), 1u);
-//     ASSERT_NOT_OK(replyItems[0].getStatus());
-//     // We should have another refresh attempt.
-//     ASSERT_EQUALS(targeter0->getNumRefreshes(), 2);
-//     ASSERT_EQUALS(targeter1->getNumRefreshes(), 2);
-// }
+    // Mock a bulkWrite response to respond to the second op, which is valid.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        LOGV2(7695301,
+              "Shard received a request, sending mock response.",
+              "request"_attr = request.toString());
+        BulkWriteCommandReply reply;
+        reply.setCursor(BulkWriteCommandResponseCursor(
+            0,  // cursorId
+            std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)}));
+        reply.setNumErrors(0);
+        return reply.toBSON();
+    });
+    future.default_timed_get();
+
+    LOGV2(7695302, "Sending an ordered request with untargetable first op and valid second op.");
+    // This time there is no need to mock a response because when the first op's targeting fails,
+    // the entire operation is halted and so nothing is sent to the shards.
+    future = launchAsync([&] {
+        // Test ordered operations. This is mostly the same as the test case above except that we
+        // should only return the first error for ordered operations.
+        request.setOrdered(true);
+        auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
+        ASSERT_EQUALS(replyItems.size(), 1u);
+        ASSERT_NOT_OK(replyItems[0].getStatus());
+        // We should have another refresh attempt.
+        ASSERT_EQUALS(targeter0->getNumRefreshes(), 2);
+        ASSERT_EQUALS(targeter1->getNumRefreshes(), 2);
+    });
+
+    future.default_timed_get();
+}
 
 TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
-    ShardId shardId("shardA");
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(
-        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+        kShardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
 
     // Mock targeter that throws StaleEpoch on refresh to mimic the collection being dropped.
     class StaleEpochMockNSTargeter : public MockNSTargeter {
