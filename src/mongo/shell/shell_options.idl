@@ -29,6 +29,7 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
+  - "mongo/client/sasl_oidc_client_params.h"
   - "mongo/shell/shell_options.h"
   - "mongo/shell/shell_utils.h"
   configs:
@@ -202,6 +203,15 @@ configs:
     section: "Authentication Options"
     description: "Remote host name to use for purpose of GSSAPI/Kerberos authentication"
     arg_vartype: String
+
+  oidcAccessToken:
+    description: >-
+      If set, the shell will pass this token to the server for any user that tries
+      authenticating with the MONGODB-OIDC mechanism. This will bypass the device authorization
+      grant flow.
+    source: cli
+    arg_vartype: String
+    cpp_varname: oidcClientGlobalParams.oidcAccessToken
 
   "idleSessionTimeout":
     description: "Terminate the Shell session if it's been idle for this many seconds"
