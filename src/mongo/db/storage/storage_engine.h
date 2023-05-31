@@ -445,7 +445,7 @@ public:
      * Clears list of drop-pending idents in the storage engine.
      * Used primarily by rollback after recovering to a stable timestamp.
      */
-    virtual void clearDropPendingState() = 0;
+    virtual void clearDropPendingState(OperationContext* opCtx) = 0;
 
     /**
      * Adds 'ident' to a list of indexes/collections whose data will be dropped when:

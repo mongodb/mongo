@@ -239,7 +239,9 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     }
 }
 
-void KVDropPendingIdentReaper::clearDropPendingState() {
+void KVDropPendingIdentReaper::clearDropPendingState(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
+
     stdx::lock_guard<Latch> lock(_mutex);
     _dropPendingIdents.clear();
     _identToTimestamp.clear();

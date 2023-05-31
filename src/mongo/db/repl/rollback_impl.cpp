@@ -1352,6 +1352,13 @@ Timestamp RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
     // Recover to the stable timestamp while holding the global exclusive lock. This may throw,
     // which the caller must handle.
     Lock::GlobalWrite globalWrite(opCtx);
+
+    // Reset the drop pending reaper state prior to recovering to the stable timestamp, which
+    // re-opens the catalog and can add drop pending idents. This prevents collisions with idents
+    // already registered with the reaper.
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    storageEngine->clearDropPendingState(opCtx);
+
     return _storageInterface->recoverToStableTimestamp(opCtx);
 }
 
@@ -1396,11 +1403,7 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
     // replication subsystem or the storage engine.
     DropPendingCollectionReaper::get(opCtx)->clearDropPendingState();
 
-    // After recovering to a timestamp, the list of drop-pending idents maintained by the storage
-    // engine is no longer accurate and needs to be cleared.
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    storageEngine->clearDropPendingState();
-
     std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
     for (const auto& dbName : dbNames) {
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);

@@ -125,7 +125,7 @@ public:
     bool supportsPendingDrops() const final {
         return false;
     }
-    void clearDropPendingState() final {}
+    void clearDropPendingState(OperationContext* opCtx) final {}
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
         fassertFailed(40547);
     }

@@ -160,7 +160,7 @@ public:
 
     bool supportsPendingDrops() const final;
 
-    void clearDropPendingState() final;
+    void clearDropPendingState(OperationContext* opCtx) final;
 
     SnapshotManager* getSnapshotManager() const final;
 
