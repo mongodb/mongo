@@ -1154,8 +1154,8 @@ bool StorageEngineImpl::supportsPendingDrops() const {
     return supportsReadConcernMajority();
 }
 
-void StorageEngineImpl::clearDropPendingState() {
-    _dropPendingIdentReaper.clearDropPendingState();
+void StorageEngineImpl::clearDropPendingState(OperationContext* opCtx) {
+    _dropPendingIdentReaper.clearDropPendingState(opCtx);
 }
 
 Timestamp StorageEngineImpl::getAllDurableTimestamp() const {

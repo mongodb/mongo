@@ -118,9 +118,13 @@ public:
 
     /**
      * Clears maps of drop pending idents but does not drop idents in storage engine.
-     * Used by rollback after recovering to a stable timestamp.
+     * Used by rollback before recovering to a stable timestamp.
+     *
+     * This function is called under the same critical section as rollback-to-stable, which happens
+     * under the global exclusive lock, and has to be called prior to re-opening the catalog, which
+     * can add drop pending idents.
      */
-    void clearDropPendingState();
+    void clearDropPendingState(OperationContext* opCtx);
 
 private:
     // Contains information identifying what collection/index data to drop as well as determining
