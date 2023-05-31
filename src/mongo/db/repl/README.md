@@ -1332,7 +1332,7 @@ There are a number of ways that a node will run for election:
   longer than `catchUpTakeoverDelayMillis` (default 30 seconds), it will run for election. This
   behvarior is known as a **catchup takeover**. If primary catchup is taking too long, catchup
   takeover can help allow the replica set to accept writes sooner, since a more up-to-date node will
-  not spend as much time (or any time) in catchup. See the "Transitioning to `PRIMARY`" section for
+  not spend as much time (or any time) in catchup. See the [Transitioning to `PRIMARY` section](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#transitioning-to-primary) section for
   further details on primary catchup.
 * The `replSetStepUp` command can be run on an eligible node to cause it to run for election
   immediately. We don't expect users to call this command, but it is run internally for election
@@ -1345,14 +1345,26 @@ There are a number of ways that a node will run for election:
   `enableElectionHandoff` is false, then nodes in the replica set will wait until the election
   timeout triggers to run for election.
 
+### Code references
+* [election timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L345) ([defaults](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_config.idl#L101))
+* [priority takeover](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L449)
+* [priority takeover: priority check](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1568-L1578)
+* [priority takeover: wait time calculation](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_config.cpp#L705-L709)
+* [newly elected primary catchup](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4714)
+* [primary catchup completion](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4799-L4813)
+* [primary start accepting writes](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1361)
+* [catchup takeover](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L466)
+* [catchup takeover: takeover check](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L466)
+* [election handoff](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2924)
+* [election handoff: skip wait](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2917-L2921)
 
 ### Candidate Perspective
 
 A candidate node first runs a dry-run election. In a **dry-run election**, a node starts a
-[`VoteRequester`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/vote_requester.h),
+[`VoteRequester`](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/vote_requester.h),
 which uses a
-[`ScatterGatherRunner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/scatter_gather_runner.h)
-to send a `replSetRequestVotes` command to every node asking if that node would vote for it. The
+[`ScatterGatherRunner`](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/scatter_gather_runner.h)
+to send a [`replSetRequestVotes` command](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_request_votes.cpp#L47) to every node asking if that node would vote for it. The
 candidate node does not increase its term during a dry-run because if a primary ever sees a higher
 term than its own, it steps down. By first conducting a dry-run election, we make it unlikely that
 nodes will increase their own term when they would not win and prevent needless primary stepdowns.
@@ -1370,6 +1382,13 @@ members in order to get elected.
 
 If the candidate received votes from a majority of nodes, including itself, the candidate wins the
 election.
+
+#### Code references
+* [dry-run election](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L203)
+* [skipping dry-run](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L185)
+* [real election](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L277)
+* [candidate process vote response](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/vote_requester.cpp#L114)
+* [candidate checks election result](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L416)
 
 ### Voter Perspective
 
@@ -1391,6 +1410,10 @@ Whenever a node votes for itself, or another node, it records that "LastVote" in
 the `local.replset.election` collection. This information is read into memory at startup and used in
 future elections. This ensures that even if a node restarts, it does not vote for two nodes in the
 same term.
+
+#### Code references
+* [node processing vote request](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L3429)
+* [recording LastVote durably](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5739)
 
 ### Transitioning to `PRIMARY`
 
@@ -1431,6 +1454,16 @@ Finally, the node drops all temporary collections, restores all locks for
 and logs “transition to primary complete”. At this point, new writes will be accepted by the
 primary.
 
+#### Code references
+* [clearing the sync source, notify nodes of election, prepare catch up](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4697-L4707)
+* [catchup to latest optime known via heartbeats](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4800)
+* [catchup-timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4746)
+* [always allow chaining for catchup](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5231)
+* [enter drain mode after catchup attempt](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4783)
+* [exit drain mode](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1205)
+* [term bump](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1300)
+* [drop temporary collections](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L532)
+
 ## Step Down
 
 ### Conditional
@@ -1459,9 +1492,16 @@ conditions and steps down immediately after it reaches the `secondaryCatchUpPeri
 Upon a successful stepdown, it yields locks held by
 [prepared transactions](#stepdown-with-a-prepared-transaction) because we are now a secondary.
 Finally, we log stepdown metrics and update our member state to `SECONDARY`.
-* User-facing documentation is
-available [here](https://www.mongodb.com/docs/manual/reference/command/replSetStepDown/#command-fields).
-* [Code spelunking point](https://github.com/mongodb/mongo/blob/843762120897ed2dbfe8bbc69dbbf99b641c009c/src/mongo/db/repl/replication_coordinator_impl.cpp#L2737).
+
+#### Code references
+* [User-facing documentation](https://www.mongodb.com/docs/manual/reference/command/replSetStepDown/#command-fields).
+* [Replication coordinator stepDown method](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2729)
+* [ReplSetStepDown command class](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L527)
+* [The node loops trying to step down](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2836)
+* [A majority of nodes need to have reached the last applied optime](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2733)
+* [At least one caught up node needs to be electable](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2738)
+* [Set the LeaderMode to kSteppingDown](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1721)
+* [Upon a successful stepdown, it yields locks held by prepared transactions](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2899)
 
 ### Unconditional
 
@@ -1480,6 +1520,14 @@ schedule a replica set config change.
 During unconditional stepdown, we do not check preconditions before attempting to step down. Similar
 to conditional stepdowns, we must kill any conflicting user/system operations before acquiring the
 RSTL and yield locks of prepared transactions following a successful stepdown.
+
+#### Code references
+* [Stepping down on learning of a higher term](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L6066)
+* [Liveness timeout checks](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1236-L1249)
+* [Stepping down on liveness timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L424)
+* [ReplSetReconfig command class](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L431)
+* [Stepping on reconfig](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4010)
+* [Stepping down on heartbeat](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L980)
 
 ### Concurrent Stepdown Attempts
 
