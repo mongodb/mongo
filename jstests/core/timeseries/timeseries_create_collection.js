@@ -19,6 +19,15 @@ assert.commandWorked(testDB.dropDatabase());
 const timeFieldName = 'time';
 const coll = testDB.t;
 
+// Fails to create a time-series collection with null-embedded timeField or metaField.
+assert.commandFailedWithCode(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: '\0time'}}),
+    ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    testDB.createCollection(coll.getName(),
+                            {timeseries: {timeField: timeFieldName, metaField: 't\0ag'}}),
+    ErrorCodes.BadValue);
+
 // Create a timeseries collection, listCollection should show view and bucket collection
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
