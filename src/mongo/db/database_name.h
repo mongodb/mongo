@@ -87,13 +87,6 @@ public:
             return _get().toString();
         }
 
-        friend std::ostream& operator<<(std::ostream& stream, const ConstantProxy& dbName) {
-            return stream << dbName.toString();
-        }
-        friend StringBuilder& operator<<(StringBuilder& builder, const ConstantProxy& dbName) {
-            return builder << dbName.toString();
-        }
-
     private:
         const DatabaseName& _get() const {
             return _sharedState->get();
