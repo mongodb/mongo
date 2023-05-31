@@ -35,7 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/client/sasl_oidc_client_params_gen.h"
+#include "mongo/client/sasl_oidc_client_types_gen.h"
 #include "mongo/db/auth/oauth_discovery_factory.h"
 #include "mongo/db/auth/oidc_protocol_gen.h"
 #include "mongo/rpc/object_check.h"
