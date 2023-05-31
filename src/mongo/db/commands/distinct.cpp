@@ -167,6 +167,9 @@ public:
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
 
+        SerializationContext sc(SerializationContext::stateCommandRequest());
+        sc.setTenantIdSource(request.getValidatedTenantId() != boost::none);
+
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
@@ -180,16 +183,13 @@ public:
                 OpMsgRequestBuilder::createWithValidatedTenancyScope(
                     nss.dbName(), request.validatedTenancyScope, viewAggregation.getValue())
                     .body;
-            // TODO SERVER-75930: expose serializatonContext from when ParseDistinct calls
-            // ParseDistinctRequest, and pass it onto parseFromBSON to override
-            // parse(IDLParseContext&, BSONObj&) call
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
                 viewAggCmd,
                 verbosity,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false),
-                SerializationContext::stateCommandRequest());
+                sc);
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.
@@ -203,13 +203,11 @@ public:
             getExecutorDistinct(&collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
-        // TODO SERVER-75930: expose serializatonContext from when ParseDistinct calls
-        // ParseDistinctRequest, and pass it onto explainStages
         Explain::explainStages(executor.get(),
                                collection,
                                verbosity,
                                BSONObj(),
-                               SerializationContext::stateCommandReply(),
+                               SerializationContext::stateCommandReply(sc),
                                cmdObj,
                                &bodyBuilder);
         return Status::OK();

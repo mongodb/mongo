@@ -67,6 +67,7 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
     const findAndModPrefixed =
         primary.getDB(kTenant + '_myDb0')
             .runCommand({findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}});
+    // TOOD SERVER-74284: unwrap and keep only the (!featureFlagRequireTenantId) case
     if (!featureFlagRequireTenantId) {
         // Check that we do find the doc when the tenantId was passed as a prefix, only if the
         // feature flag is not enabled. In this case, the server still accepts prefixed names,

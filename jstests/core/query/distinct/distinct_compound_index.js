@@ -55,7 +55,10 @@ assertStagesForExplainOfCommand({
 
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: 1, b: 1, text: "text"}));
-assertStagesForExplainOfCommand({
+// TODO SERVER-76084: build a test similar to this to check that the distinct output contains the
+// prefix according to expectPrefix value/presence ie.
+// if (!expectPrefix) assert.eq(result["queryPlanner"]["namespace"], "test.distinct_multikey_index")
+let result = assertStagesForExplainOfCommand({
     coll: coll,
     cmdObj: cmdObj,
     expectedStages: ["COLLSCAN"],
