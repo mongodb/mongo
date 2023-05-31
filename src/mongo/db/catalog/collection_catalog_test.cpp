@@ -1033,13 +1033,17 @@ public:
         Timestamp timestamp,
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
-        int expectedNumIndexes) {
+        int expectedNumIndexes,
+        std::function<void(OperationContext*)> extraOpHook = {}) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
             timestamp,
-            [this, &nss, &indexSpec](OperationContext* opCtx) {
+            [this, &nss, &indexSpec, extraOpHook](OperationContext* opCtx) {
                 _createIndex(opCtx, nss, indexSpec);
+                if (extraOpHook) {
+                    extraOpHook(opCtx);
+                }
             },
             openSnapshotBeforeCommit,
             expectedExistence,
@@ -1054,13 +1058,17 @@ public:
         Timestamp timestamp,
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
-        int expectedNumIndexes) {
+        int expectedNumIndexes,
+        std::function<void(OperationContext*)> extraOpHook = {}) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
             timestamp,
-            [this, &nss, &indexName](OperationContext* opCtx) {
+            [this, &nss, &indexName, extraOpHook](OperationContext* opCtx) {
                 _dropIndex(opCtx, nss, indexName);
+                if (extraOpHook) {
+                    extraOpHook(opCtx);
+                }
             },
             openSnapshotBeforeCommit,
             expectedExistence,
@@ -2718,6 +2726,41 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBef
                                                           1);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right before the second index create is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          nss,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          true,
+                                                          true,
+                                                          1,
+                                                          makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2744,6 +2787,41 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionAft
                                                           false,
                                                           true,
                                                           2);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right after the second index create is committed to the durable
+    // catalog, the collection instance should have both indexes.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          nss,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          2,
+                                                          makeIndexMultikey);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDBeforeCommit) {
@@ -2777,6 +2855,45 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByU
                                                           1);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionByUUIDBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the second index create is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          uuidWithDbName,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          true,
+                                                          true,
+                                                          1,
+                                                          makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2808,6 +2925,45 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByU
                                                           2);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionByUUIDAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right after the second index create is committed to the durable
+    // catalog, the collection instance should have both indexes.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          uuidWithDbName,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          2,
+                                                          makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionBeforeCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2834,6 +2990,38 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionBefor
         opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right before the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2, makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2858,6 +3046,38 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfter
     // catalog, the collection instance should not have the second index.
     concurrentDropIndexAndEstablishConsistentCollection(
         opCtx.get(), nss, nss, "y_1", dropIndexTs, false, true, 1);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right after the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, "y_1", dropIndexTs, false, true, 1, makeIndexMultikey);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUIDBeforeCommit) {
@@ -2889,6 +3109,42 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUI
         opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, true, true, 2);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionByUUIDBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, true, true, 2, makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUIDAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2916,6 +3172,42 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUI
     // catalog, the collection instance should not have the second index.
     concurrentDropIndexAndEstablishConsistentCollection(
         opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, false, true, 1);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionByUUIDAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right after the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, false, true, 1, makeIndexMultikey);
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgressAndReady) {
