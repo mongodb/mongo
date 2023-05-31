@@ -233,11 +233,12 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
         tassert(7032369,
-                fmt::format("Insert did not add any doc to collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            nss.toStringForErrorMsg(),
-                            reason.toString(),
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString()),
+                fmt::format(
+                    "Insert did not add any doc to collection '{}' for namespace '{}' "
+                    "and reason '{}'",
+                    nss.toStringForErrorMsg(),
+                    reason.toString(),
+                    NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg()),
                 batchedResponse.getN() > 0);
     }
 
@@ -360,13 +361,14 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        tassert(7032363,
-                fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toStringForErrorMsg(),
-                            reason.toString()),
-                batchedResponse.getNModified() > 0);
+        tassert(
+            7032363,
+            fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
+                        "and reason '{}'",
+                        NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg(),
+                        nss.toStringForErrorMsg(),
+                        reason.toString()),
+            batchedResponse.getNModified() > 0);
     }
 
     WriteConcernResult ignoreResult;
@@ -490,13 +492,14 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        tassert(7032367,
-                fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toStringForErrorMsg(),
-                            reason.toString()),
-                batchedResponse.getN() > 0);
+        tassert(
+            7032367,
+            fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
+                        "and reason '{}'",
+                        NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg(),
+                        nss.toStringForErrorMsg(),
+                        reason.toString()),
+            batchedResponse.getN() > 0);
     }
 
     WriteConcernResult ignoreResult;

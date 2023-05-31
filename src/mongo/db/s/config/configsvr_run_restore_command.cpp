@@ -88,9 +88,10 @@ ShouldRestoreDocument shouldRestoreDocument(OperationContext* opCtx,
                 (void)UUID::parse(doc);
             } catch (const AssertionException&) {
                 uasserted(ErrorCodes::BadValue,
-                          str::stream() << "The uuid field of '" << doc.toString() << "' in '"
-                                        << NamespaceString::kConfigsvrRestoreNamespace.toString()
-                                        << "' needs to be of type UUID");
+                          str::stream()
+                              << "The uuid field of '" << doc.toString() << "' in '"
+                              << NamespaceString::kConfigsvrRestoreNamespace.toStringForErrorMsg()
+                              << "' needs to be of type UUID");
             }
         }
     }

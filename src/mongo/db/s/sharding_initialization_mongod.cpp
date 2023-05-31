@@ -361,7 +361,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
                              "queryableBackupMode. If not in queryableBackupMode, you can edit "
                              "the shardIdentity document by starting the server *without* "
                              "--shardsvr, manually updating the shardIdentity document in the "
-                          << NamespaceString::kServerConfigurationNamespace.toString()
+                          << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
                           << " collection, and restarting the server with --shardsvr.",
             serverGlobalParams.overrideShardIdentity.isEmpty());
 

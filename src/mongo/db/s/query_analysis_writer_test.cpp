@@ -529,7 +529,7 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesIndexExists) {
         FailPoint::alwaysOn,
         0,
         BSON("failCommands" << BSON_ARRAY("createIndexes") << "namespace"
-                            << NamespaceString::kConfigSampledQueriesNamespace.toString()
+                            << NamespaceString::kConfigSampledQueriesNamespace.toStringForErrorMsg()
                             << "errorCode" << ErrorCodes::IndexAlreadyExists
                             << "failInternalCommands" << true << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
@@ -543,13 +543,14 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesIndexExists) {
 
 TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesDiffIndexExists) {
     auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
-    failCreateIndexes->setMode(
-        FailPoint::alwaysOn,
-        0,
-        BSON("failCommands" << BSON_ARRAY("createIndexes") << "namespace"
-                            << NamespaceString::kConfigSampledQueriesDiffNamespace.toString()
-                            << "errorCode" << ErrorCodes::IndexAlreadyExists
-                            << "failInternalCommands" << true << "failLocalClients" << true));
+    failCreateIndexes
+        ->setMode(FailPoint::alwaysOn,
+                  0,
+                  BSON("failCommands"
+                       << BSON_ARRAY("createIndexes") << "namespace"
+                       << NamespaceString::kConfigSampledQueriesDiffNamespace.toStringForErrorMsg()
+                       << "errorCode" << ErrorCodes::IndexAlreadyExists << "failInternalCommands"
+                       << true << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto future = writer.createTTLIndexes(operationContext());
     future.get();
@@ -564,11 +565,11 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenAnalyzeShardKeySplitPointsIn
     failCreateIndexes->setMode(
         FailPoint::alwaysOn,
         0,
-        BSON(
-            "failCommands" << BSON_ARRAY("createIndexes") << "namespace"
-                           << NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace.toString()
-                           << "errorCode" << ErrorCodes::IndexAlreadyExists
-                           << "failInternalCommands" << true << "failLocalClients" << true));
+        BSON("failCommands"
+             << BSON_ARRAY("createIndexes") << "namespace"
+             << NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace.toStringForErrorMsg()
+             << "errorCode" << ErrorCodes::IndexAlreadyExists << "failInternalCommands" << true
+             << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto future = writer.createTTLIndexes(operationContext());
     future.get();

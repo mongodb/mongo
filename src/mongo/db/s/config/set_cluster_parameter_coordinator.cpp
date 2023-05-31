@@ -205,7 +205,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "setClusterParameter.start",
-                    NamespaceString::kClusterParametersNamespace.toString(),
+                    toStringForLogging(NamespaceString::kClusterParametersNamespace),
                     _doc.getParameter(),
                     kMajorityWriteConcern,
                     catalogManager->localConfigShard(),
@@ -236,7 +236,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "setClusterParameter.end",
-                    NamespaceString::kClusterParametersNamespace.toString(),
+                    toStringForLogging(NamespaceString::kClusterParametersNamespace),
                     _doc.getParameter(),
                     kMajorityWriteConcern,
                     catalogManager->localConfigShard(),

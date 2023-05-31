@@ -107,18 +107,8 @@ public:
         decltype(auto) dbName() const {
             return _get().dbName();
         }
-        decltype(auto) toString() const {
-            return _get().toString();
-        }
         decltype(auto) toStringForErrorMsg() const {
             return _get().toStringForErrorMsg();
-        }
-
-        friend std::ostream& operator<<(std::ostream& stream, const ConstantProxy& nss) {
-            return stream << nss.toString();
-        }
-        friend StringBuilder& operator<<(StringBuilder& builder, const ConstantProxy& nss) {
-            return builder << nss.toString();
         }
 
     private:
