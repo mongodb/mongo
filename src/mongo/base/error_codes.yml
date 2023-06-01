@@ -533,6 +533,8 @@ error_codes:
 
     - {code: 401, name: ResumeTenantChangeStream}
 
+    - {code: 402, name: RetryableInternalTransactionNotSupported}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
