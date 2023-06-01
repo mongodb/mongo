@@ -525,7 +525,8 @@ void ShardingCatalogManager::renameShardedMetadata(
     Lock::ExclusiveLock chunkLk(opCtx, _kChunkOpLock);
     Lock::ExclusiveLock zoneLk(opCtx, _kZoneOpLock);
 
-    std::string logMsg = str::stream() << from << " to " << to;
+    std::string logMsg = str::stream()
+        << toStringForLogging(from) << " to " << toStringForLogging(to);
     if (optFromCollType) {
         // Rename CSRS metadata in case the source collection is sharded
         auto collType = *optFromCollType;

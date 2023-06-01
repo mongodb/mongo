@@ -1637,7 +1637,7 @@ WriteResult performDeletes(OperationContext* opCtx,
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     str::stream() << "Cannot perform a multi delete inside of a multi-document "
                                      "transaction on a time-series collection: "
-                                  << ns,
+                                  << ns.toStringForErrorMsg(),
                     !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti());
         }
 

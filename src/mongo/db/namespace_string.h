@@ -770,14 +770,6 @@ public:
      */
     static bool validCollectionName(StringData coll);
 
-    friend std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
-        return stream << nss.toString();
-    }
-
-    friend StringBuilder& operator<<(StringBuilder& builder, const NamespaceString& nss) {
-        return builder << nss.toString();
-    }
-
     int compare(const NamespaceString& other) const {
         if (_hasTenantId() && !other._hasTenantId()) {
             return 1;

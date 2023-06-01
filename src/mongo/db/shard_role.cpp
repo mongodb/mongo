@@ -876,7 +876,8 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
             if (changedUUID(writeInMultiDocumentTransaction ? latestCatalog : currentCatalog)) {
                 if (writeInMultiDocumentTransaction) {
                     throwWriteConflictException(
-                        str::stream() << "Unable to write to collection '" << prerequisites.nss
+                        str::stream() << "Unable to write to collection '"
+                                      << prerequisites.nss.toStringForErrorMsg()
                                       << "' due to catalog changes; please retry the operation");
                 } else {
                     // Retry optimistic resolution.

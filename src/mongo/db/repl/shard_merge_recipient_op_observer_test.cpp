@@ -84,8 +84,10 @@ protected:
         AutoGetCollection collection(
             opCtx(), NamespaceString::kShardMergeRecipientsNamespace, MODE_IX);
         if (!collection)
-            FAIL(str::stream() << "Collection " << NamespaceString::kShardMergeRecipientsNamespace
-                               << " doesn't exist");
+            FAIL(str::stream()
+                 << "Collection "
+                 << NamespaceString::kShardMergeRecipientsNamespace.toStringForErrorMsg()
+                 << " doesn't exist");
 
         CollectionUpdateArgs updateArgs{preImageDoc};
         updateArgs.updatedDoc = UpdatedDoc;

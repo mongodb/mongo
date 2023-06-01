@@ -654,7 +654,7 @@ FLECompactESCDeleteSet readRandomESCNonAnchorIds(OperationContext* opCtx,
 
     uassert(7293607,
             str::stream() << "Got an invalid cursor while reading the Queryable Encryption ESC "
-                          << escNss,
+                          << escNss.toStringForErrorMsg(),
             cursor);
 
     while (cursor->more()) {
@@ -754,7 +754,7 @@ void cleanupESCAnchors(OperationContext* opCtx,
 
     uassert(7618812,
             str::stream() << "Got an invalid cursor while reading the Queryable Encryption ESC "
-                          << escDeletesNss,
+                          << escDeletesNss.toStringForErrorMsg(),
             cursor);
 
     std::vector<PrfBlock> deleteSet;

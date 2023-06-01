@@ -230,7 +230,7 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
         description,
         [&](OperationContext* outerOpCtx, const CollectionRoutingInfo& outerCri) {
             tassert(7647923,
-                    str::stream() << "Namespace " << escDeletesNss
+                    str::stream() << "Namespace " << escDeletesNss.toStringForErrorMsg()
                                   << " is expected to be unsharded, but is sharded",
                     !outerCri.cm.isSharded());
 
@@ -244,7 +244,7 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
                 description,
                 [&](OperationContext* innerOpCtx, const CollectionRoutingInfo& innerCri) {
                     tassert(7647924,
-                            str::stream() << "Namespace " << escNss
+                            str::stream() << "Namespace " << escNss.toStringForErrorMsg()
                                           << " is expected to be unsharded, but is sharded",
                             !innerCri.cm.isSharded());
 

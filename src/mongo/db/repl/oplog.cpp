@@ -2069,7 +2069,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         !collection ? str::stream()
                                 << "(NamespaceNotFound): Failed to apply operation due "
                                    "to missing collection ("
-                                << requestNss << ")"
+                                << requestNss.toStringForErrorMsg() << ")"
                                     : "Applied a delete which did not delete anything."s);
                 }
                 // It is legal for a delete operation on the pre-images collection to delete zero

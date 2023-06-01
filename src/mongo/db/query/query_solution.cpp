@@ -1702,7 +1702,7 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "EQ_LOOKUP\n";
     addIndent(ss, indent + 1);
-    *ss << "from = " << foreignCollection << "\n";
+    *ss << "from = " << toStringForLogging(foreignCollection) << "\n";
     addIndent(ss, indent + 1);
     *ss << "as = " << joinField.fullPath() << "\n";
     addIndent(ss, indent + 1);

@@ -64,8 +64,8 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) 
     // Validate the namespaces in nsInfo.
     for (const auto& nsInfo : nsInfos) {
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified for bulkWrite: '" << nsInfo.getNs()
-                              << "'",
+                str::stream() << "Invalid namespace specified for bulkWrite: '"
+                              << nsInfo.getNs().toStringForErrorMsg() << "'",
                 nsInfo.getNs().isValid());
     }
 
