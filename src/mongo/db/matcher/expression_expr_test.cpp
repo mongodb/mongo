@@ -813,8 +813,8 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
 
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierHmacPolicy = applyHmacForTest;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
+    opts.transformIdentifiers = true;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$expr":{"$sum":["$HASH<a>","$HASH<b>"]}})",

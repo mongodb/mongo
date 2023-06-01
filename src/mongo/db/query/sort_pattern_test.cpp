@@ -50,8 +50,8 @@ TEST(SerializeSortPatternTest, SerializeAndRedactFieldName) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
     SerializationOptions opts = {};
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
 
     // Most basic sort pattern, confirm that field name gets redacted.
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
@@ -87,7 +87,7 @@ TEST(SerializeSortPatternTest, SerializeNoRedaction) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
     SerializationOptions opts = {};
-    opts.applyHmacToIdentifiers = false;
+    opts.transformIdentifiers = false;
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"val":1})",
         sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));

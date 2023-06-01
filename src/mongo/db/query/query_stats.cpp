@@ -268,16 +268,22 @@ std::size_t hash(const BSONObj& obj) {
 }  // namespace
 
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              bool applyHmacToIdentifiers,
+                                              TransformAlgorithm algorithm,
                                               std::string hmacKey) const {
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
-    if (applyHmacToIdentifiers) {
-        options.applyHmacToIdentifiers = true;
-        options.identifierHmacPolicy = [&](StringData sd) {
-            return sha256HmacStringDataHasher(hmacKey, sd);
-        };
+    switch (algorithm) {
+        case TransformAlgorithm::kHmacSha256:
+            options.transformIdentifiers = true;
+            options.transformIdentifiersCallback = [&](StringData sd) {
+                return sha256HmacStringDataHasher(hmacKey, sd);
+            };
+            break;
+        case TransformAlgorithm::kNone:
+            break;
+        default:
+            MONGO_UNREACHABLE;
     }
     return requestShapifier->makeQueryStatsKey(options, opCtx);
 }

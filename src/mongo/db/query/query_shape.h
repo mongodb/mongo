@@ -56,9 +56,10 @@ BSONObj debugPredicateShape(const MatchExpression* predicate);
 BSONObj representativePredicateShape(const MatchExpression* predicate);
 
 BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> identifierHmacPolicy);
-BSONObj representativePredicateShape(const MatchExpression* predicate,
-                                     std::function<std::string(StringData)> identifierHmacPolicy);
+                            std::function<std::string(StringData)> transformIdentifiersCallback);
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> transformIdentifiersCallback);
 
 BSONObj extractSortShape(const BSONObj& sortSpec,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,

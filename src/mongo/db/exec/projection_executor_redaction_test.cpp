@@ -66,9 +66,9 @@ TEST(Redaction, ProjectionTest) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
+    options.transformIdentifiers = true;
 
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiersCallback = applyHmacForTest;
     auto redactProj = [&](std::string obj) {
         return compileProjection(fromjson(obj))->serializeTransformation(boost::none, options);
     };

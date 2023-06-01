@@ -35,4 +35,5 @@ class RunQueryStats(BGHook):
                     assert "asOf" in operation
 
         verify_results({})
-        verify_results({"applyHmacToIdentifiers": True, "hmacKey": self.hmac_key})
+        verify_results(
+            {"transformIdentifiers": {"algorithm": "hmac-sha-256", "hmacKey": self.hmac_key}})

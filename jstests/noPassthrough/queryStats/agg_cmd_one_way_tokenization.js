@@ -28,7 +28,7 @@ function runTest(conn) {
         .toArray();
 
     let stats = getTelemetry(admin);
-    stats = getQueryStatsAggCmd(admin, /*applyHmacToIdentifiers*/ true);
+    stats = getQueryStatsAggCmd(admin, /*transformIdentifiers*/ true);
 
     assert.eq(1, stats.length);
     assert.eq({"db": `${kHashedDbName}`, "coll": `${kHashedCollName}`},
@@ -50,7 +50,7 @@ function runTest(conn) {
         stats[0].key.queryShape.pipeline);
 
     db.test.aggregate([{$match: {a: {$regex: "foo(.*)"}, b: {$gt: 0}}}]).toArray();
-    stats = getQueryStatsAggCmd(admin, /*applyHmacToIdentifiers*/ true);
+    stats = getQueryStatsAggCmd(admin, /*transformIdentifiers*/ true);
 
     assert.eq(2, stats.length);
     assert.eq({"db": `${kHashedDbName}`, "coll": `${kHashedCollName}`},

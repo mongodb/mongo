@@ -69,8 +69,8 @@ public:
             opts.literalPolicy = literalPolicy;
         }
         if (applyHmac) {
-            opts.applyHmacToIdentifiers = true;
-            opts.identifierHmacPolicy = applyHmacForTest;
+            opts.transformIdentifiers = true;
+            opts.transformIdentifiersCallback = applyHmacForTest;
         }
         return findShapifier.makeQueryStatsKey(opts, expCtx);
     }
@@ -90,8 +90,8 @@ public:
             opts.literalPolicy = literalPolicy;
         }
         if (applyHmac) {
-            opts.applyHmacToIdentifiers = true;
-            opts.identifierHmacPolicy = applyHmacForTest;
+            opts.transformIdentifiers = true;
+            opts.transformIdentifiersCallback = applyHmacForTest;
         }
         return aggShapifier.makeQueryStatsKey(opts, expCtx);
     }
@@ -711,9 +711,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
         std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedFind),
         parsedFind->findCommandRequest->getNamespaceOrUUID()};
 
-    bool applyHmacToIdentifiers = false;
     auto hmacApplied =
-        testMetrics.computeQueryStatsKey(opCtx.get(), applyHmacToIdentifiers, std::string{});
+        testMetrics.computeQueryStatsKey(opCtx.get(), TransformAlgorithm::kNone, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -745,9 +744,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
 
     // Now be sure hmac is applied to variable names. We don't currently expose a different way to
     // do the hashing, so we'll just stick with the big long strings here for now.
-    applyHmacToIdentifiers = true;
-    hmacApplied =
-        testMetrics.computeQueryStatsKey(opCtx.get(), applyHmacToIdentifiers, std::string{});
+    hmacApplied = testMetrics.computeQueryStatsKey(
+        opCtx.get(), TransformAlgorithm::kHmacSha256, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {

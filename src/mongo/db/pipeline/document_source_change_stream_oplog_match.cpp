@@ -215,7 +215,7 @@ Value DocumentSourceChangeStreamOplogMatch::serialize(SerializationOptions opts)
         sub.done();
     } else {
         BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (opts.replacementForLiteralArgs || opts.applyHmacToIdentifiers) {
+        if (opts.replacementForLiteralArgs || opts.transformIdentifiers) {
             sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,
                        getMatchExpression()->serialize(opts));
         } else {

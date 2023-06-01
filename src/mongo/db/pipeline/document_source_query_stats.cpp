@@ -48,18 +48,34 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
                                            feature_flags::gFeatureFlagQueryStats);
 
 namespace {
+
+TransformAlgorithm algFromString(std::string str) {
+    if (str == "hmac-sha-256") {
+        return kHmacSha256;
+    } else {
+        return kNone;
+    }
+}
+
 /**
- * Try to parse the applyHmacToIdentifiers property from the element.
+ * Try to parse the algorithm property from the element.
  */
-boost::optional<bool> parseApplyHmacToIdentifiers(const BSONElement& el) {
-    if (el.fieldNameStringData() == "applyHmacToIdentifiers"_sd) {
+boost::optional<TransformAlgorithm> parseAlgorithm(const BSONElement& el) {
+    if (el.fieldNameStringData() == "algorithm"_sd) {
         auto type = el.type();
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << DocumentSourceQueryStats::kStageName
-                              << " applyHmacToIdentifiers parameter must be boolean. Found type: "
+                              << " algorithm parameter must be a string. Found type: "
                               << typeName(type),
-                type == BSONType::Bool);
-        return el.trueValue();
+                type == BSONType::String);
+        std::string algorithmStr = el.str();
+        TransformAlgorithm algorithm = algFromString(algorithmStr);
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << DocumentSourceQueryStats::kStageName
+                              << " algorithm currently supported is only 'hmac-sha-256'. Found: "
+                              << algorithmStr,
+                algorithm != TransformAlgorithm::kNone);
+        return algorithm;
     }
     return boost::none;
 }
@@ -89,8 +105,8 @@ boost::optional<std::string> parseHmacKey(const BSONElement& el) {
 }
 
 /**
- * Parse the spec object calling the `ctor` with the bool applyHmacToIdentifiers and std::string
- * hmacKey arguments.
+ * Parse the spec object calling the `ctor` with the TransformAlgorithm enum algorithm and
+ * std::string hmacKey arguments.
  */
 template <typename Ctor>
 auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
@@ -98,35 +114,52 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
             str::stream() << DocumentSourceQueryStats::kStageName
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
+    BSONObj obj = spec.embeddedObject();
 
-    bool applyHmacToIdentifiers = false;
+    TransformAlgorithm algorithm = TransformAlgorithm::kNone;
     std::string hmacKey;
-    for (auto&& el : spec.embeddedObject()) {
-        if (auto maybeApplyHmacToIdentifiers = parseApplyHmacToIdentifiers(el);
-            maybeApplyHmacToIdentifiers) {
-            applyHmacToIdentifiers = *maybeApplyHmacToIdentifiers;
-        } else if (auto maybeHmacKey = parseHmacKey(el); maybeHmacKey) {
-            hmacKey = *maybeHmacKey;
+    for (auto&& subObj : obj) {
+        auto field = subObj.fieldNameStringData();
+        if (field == "transformIdentifiers"_sd) {
+            auto transformIdentifiersObj = obj.getObjectField("transformIdentifiers"_sd);
+            for (auto&& el : transformIdentifiersObj) {
+                if (auto maybeAlgorithm = parseAlgorithm(el); maybeAlgorithm) {
+                    algorithm = *maybeAlgorithm;
+                } else if (auto maybeHmacKey = parseHmacKey(el); maybeHmacKey) {
+                    hmacKey = *maybeHmacKey;
+                } else {
+                    uasserted(ErrorCodes::FailedToParse,
+                              str::stream() << DocumentSourceQueryStats::kStageName
+                                            << " parameters to 'transformIdentifiers' may only "
+                                               "contain 'algorithm' or "
+                                               "'hmacKey' options. Found: "
+                                            << el.fieldName());
+                }
+            }
+            // If transformIdentifiers is present, we must have the algorithm field.
+            uassert(
+                ErrorCodes::FailedToParse,
+                str::stream()
+                    << DocumentSourceQueryStats::kStageName
+                    << " missing value for algorithm, which is required for 'transformIdentifiers'",
+                algorithm != TransformAlgorithm::kNone);
         } else {
             uasserted(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << DocumentSourceQueryStats::kStageName
-                          << " parameters object may only contain 'applyHmacToIdentifiers' or "
-                             "'hmacKey' options. Found: "
-                          << el.fieldName());
+                      str::stream() << "$queryStats parameters object may only contain "
+                                       "'transformIdentifiers'. Found: "
+                                    << field.toString());
         }
     }
-
-    return ctor(applyHmacToIdentifiers, hmacKey);
+    return ctor(algorithm, hmacKey);
 }
 
 }  // namespace
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
+    return parseSpec(spec, [&](TransformAlgorithm algorithm, std::string hmacKey) {
         return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
-            spec.fieldName(), applyHmacToIdentifiers, hmacKey);
+            spec.fieldName(), algorithm, hmacKey);
     });
 }
 
@@ -138,8 +171,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
             "$queryStats must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
-    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
-        return new DocumentSourceQueryStats(pExpCtx, applyHmacToIdentifiers, hmacKey);
+    return parseSpec(spec, [&](TransformAlgorithm algorithm, std::string hmacKey) {
+        return new DocumentSourceQueryStats(pExpCtx, algorithm, hmacKey);
     });
 }
 
@@ -190,8 +223,8 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
             try {
-                auto queryStatsKey = metrics->computeQueryStatsKey(
-                    pExpCtx->opCtx, _applyHmacToIdentifiers, _hmacKey);
+                auto queryStatsKey =
+                    metrics->computeQueryStatsKey(pExpCtx->opCtx, _algorithm, _hmacKey);
                 _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics->toBSON()},
                                                   {"asOf", partitionReadTime}});

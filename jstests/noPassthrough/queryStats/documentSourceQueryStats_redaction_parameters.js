@@ -28,7 +28,7 @@ function runTest(conn) {
 
     // Turning on hmac should apply hmac to all field names on all entries, even previously cached
     // ones.
-    const telemetryKey = getQueryStatsFindCmd(conn, /*applyHmacToIdentifiers*/ true)[0]["key"];
+    const telemetryKey = getQueryStatsFindCmd(conn, /*transformIdentifiers*/ true)[0]["key"];
     assert.eq(telemetryKey.queryShape.filter,
               {"fNWkKfogMv6MJ77LpBcuPrO7Nq+R+7TqtD+Lgu3Umc4=": {"$lte": "?number"}});
     assert.eq(telemetryKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
@@ -39,9 +39,9 @@ function runTest(conn) {
     const telemetry = getTelemetry(conn)[1]["key"];
     assertTelemetryKeyWithoutHmac(telemetry.queryShape);
 
-    // Explicitly set applyHmacToIdentifiers to false.
+    // Explicitly set transformIdentifiers to false.
     assertTelemetryKeyWithoutHmac(
-        getQueryStatsFindCmd(conn, /*applyHmacToIdentifiers*/ false)[0]["key"].queryShape);
+        getQueryStatsFindCmd(conn, /*transformIdentifiers*/ false)[0]["key"].queryShape);
 
     // Wrong parameter name throws error.
     let pipeline = [{$queryStats: {redactFields: true}}];
@@ -49,30 +49,55 @@ function runTest(conn) {
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: redactFields");
+        "$queryStats parameters object may only contain 'transformIdentifiers'. Found: redactFields");
 
-    // Wrong parameter type throws error.
-    pipeline = [{$queryStats: {applyHmacToIdentifiers: 1}}];
+    // Wrong parameter name throws error.
+    pipeline = [{$queryStats: {algorithm: "hmac-sha-256"}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "$queryStats applyHmacToIdentifiers parameter must be boolean. Found type: double");
+        "$queryStats parameters object may only contain 'transformIdentifiers'. Found: algorithm");
 
-    pipeline = [{$queryStats: {hmacKey: 1}}];
+    // Wrong parameter type throws error.
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: 1}}}];
+    assertAdminDBErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.FailedToParse,
+        "$queryStats algorithm parameter must be a string. Found type: double");
+
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey: 1}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
         "$queryStats hmacKey parameter must be bindata of length 32 or greater. Found type: double");
 
-    // Parameter object with unrecognized key throws error.
-    pipeline = [{$queryStats: {applyHmacToIdentifiers: true, hmacStrategy: "on"}}];
+    // Unsupported algorithm throws error.
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-1"}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: hmacStrategy");
+        "$queryStats algorithm currently supported is only 'hmac-sha-256'. Found: hmac-sha-1");
+
+    // TransformIdentifiers with missing algorithm throws error.
+    pipeline = [{$queryStats: {transformIdentifiers: {}}}];
+    assertAdminDBErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.FailedToParse,
+        "$queryStats missing value for algorithm, which is required for 'transformIdentifiers'");
+
+    // Parameter object with unrecognized key throws error.
+    pipeline =
+        [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacStrategy: "on"}}}];
+    assertAdminDBErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.FailedToParse,
+        "$queryStats parameters to 'transformIdentifiers' may only contain 'algorithm' or 'hmacKey' options. Found: hmacStrategy");
 }
 
 const conn = MongoRunner.runMongod({

@@ -781,8 +781,8 @@ TEST_F(ProjectionASTTest, TestASTRedaction) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
 
 
     auto proj = fromjson("{'a.b': 1}");

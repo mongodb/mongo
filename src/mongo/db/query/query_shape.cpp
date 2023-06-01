@@ -49,20 +49,21 @@ BSONObj representativePredicateShape(const MatchExpression* predicate) {
 }
 
 BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> identifierHmacPolicy) {
+                            std::function<std::string(StringData)> transformIdentifiersCallback) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierHmacPolicy = identifierHmacPolicy;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = transformIdentifiersCallback;
+    opts.transformIdentifiers = true;
     return predicate->serialize(opts);
 }
 
-BSONObj representativePredicateShape(const MatchExpression* predicate,
-                                     std::function<std::string(StringData)> identifierHmacPolicy) {
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> transformIdentifiersCallback) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
-    opts.identifierHmacPolicy = identifierHmacPolicy;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = transformIdentifiersCallback;
+    opts.transformIdentifiers = true;
     return predicate->serialize(opts);
 }
 

@@ -78,7 +78,7 @@ function getTelemetryReplSet(conn, collectionName) {
 
 // TODO SERVER-77279 refactor to pass options as object
 function getQueryStatsFindCmd(
-    conn, applyHmacToIdentifiers = false, collName = "", hmacKey = kDefaultQueryStatsHmacKey) {
+    conn, transformIdentifiers = false, collName = "", hmacKey = kDefaultQueryStatsHmacKey) {
     let matchExpr = {
         "key.queryShape.command": "find",
         "key.client.application.name": kShellApplicationName
@@ -87,16 +87,23 @@ function getQueryStatsFindCmd(
         matchExpr["key.queryShape.cmdNs.coll"] = collName;
     }
     // Filter out agg queries, including $queryStats.
-    const result = conn.adminCommand({
-        aggregate: 1,
-        pipeline: [
-            {$queryStats: {applyHmacToIdentifiers, hmacKey}},
+    var pipeline;
+    if (transformIdentifiers) {
+        pipeline = [
+            {$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey}}},
             {$match: matchExpr},
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
-        ],
-        cursor: {}
-    });
+        ];
+    } else {
+        pipeline = [
+            {$queryStats: {}},
+            {$match: matchExpr},
+            // Sort on telemetry key so entries are in a deterministic order.
+            {$sort: {key: 1}},
+        ];
+    }
+    const result = conn.adminCommand({aggregate: 1, pipeline: pipeline, cursor: {}});
     assert.commandWorked(result);
     return result.cursor.firstBatch;
 }
@@ -107,11 +114,11 @@ function getQueryStatsFindCmd(
  */
 // TODO SERVER-77279 refactor to pass options as object
 function getQueryStatsAggCmd(
-    conn, applyHmacToIdentifiers = false, hmacKey = kDefaultQueryStatsHmacKey) {
-    const result = conn.adminCommand({
-        aggregate: 1,
-        pipeline: [
-            {$queryStats: {applyHmacToIdentifiers, hmacKey}},
+    conn, transformIdentifiers = false, hmacKey = kDefaultQueryStatsHmacKey) {
+    var pipeline;
+    if (transformIdentifiers) {
+        pipeline = [
+            {$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey}}},
             // Filter out find queries and $queryStats aggregations.
             {
                 $match: {
@@ -122,9 +129,23 @@ function getQueryStatsAggCmd(
             },
             // Sort on key so entries are in a deterministic order.
             {$sort: {key: 1}},
-        ],
-        cursor: {}
-    });
+        ];
+    } else {
+        pipeline = [
+            {$queryStats: {}},
+            // Filter out find queries and $queryStats aggregations.
+            {
+                $match: {
+                    "key.queryShape.command": "aggregate",
+                    "key.queryShape.pipeline.0.$queryStats": {$exists: false},
+                    "key.client.application.name": kShellApplicationName
+                }
+            },
+            // Sort on key so entries are in a deterministic order.
+            {$sort: {key: 1}},
+        ];
+    }
+    const result = conn.adminCommand({aggregate: 1, pipeline: pipeline, cursor: {}});
     assert.commandWorked(result);
     return result.cursor.firstBatch;
 }

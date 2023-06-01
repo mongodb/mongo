@@ -53,6 +53,9 @@ using BSONNumeric = long long;
 
 namespace query_stats {
 
+/** The type of algorithm to be used for transformIdentifiers */
+enum TransformAlgorithm { kHmacSha256, kNone };
+
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
  * with the reduction in required storage.
@@ -123,11 +126,12 @@ public:
     }
 
     /**
-     * Generate the queryStats key for this entry's request. If applyHmacToIdentifiers is true, any
-     * identifying information (field names, namespace) will be anonymized.
+     * Generate the queryStats key for this entry's request. If algorithm is not
+     * TransformAlgorithm::kNone, any identifying information (field names, namespace) will be
+     * anonymized.
      */
     BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 bool applyHmacToIdentifiers,
+                                 TransformAlgorithm algorithm,
                                  std::string hmacKey) const;
 
     /**

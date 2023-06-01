@@ -41,7 +41,7 @@ BSONObj AggregateRequestShapifier::makeQueryStatsKey(const SerializationOptions&
 
 BSONObj AggregateRequestShapifier::makeQueryStatsKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    if (_initialQueryStatsKey && !opts.applyHmacToIdentifiers &&
+    if (_initialQueryStatsKey && !opts.transformIdentifiers &&
         opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
         auto tmp = std::move(*_initialQueryStatsKey);
         _initialQueryStatsKey = boost::none;

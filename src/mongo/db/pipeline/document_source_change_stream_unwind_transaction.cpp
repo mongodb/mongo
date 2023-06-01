@@ -141,7 +141,7 @@ Value DocumentSourceChangeStreamUnwindTransaction::serialize(SerializationOption
     }
 
     Value spec;
-    if (opts.replacementForLiteralArgs || opts.applyHmacToIdentifiers) {
+    if (opts.replacementForLiteralArgs || opts.transformIdentifiers) {
         spec = Value(DOC(DocumentSourceChangeStreamUnwindTransactionSpec::kFilterFieldName
                          << _expression->serialize(opts)));
     } else {
