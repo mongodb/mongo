@@ -82,13 +82,6 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
-    featureFlagBitwiseAggOperators:
-      description: "Feature flag for enabling support for bitwise operators in the aggregation language."
-      cpp_varname: gFeatureFlagBitwise
-      default: true
-      version: 6.3
-      shouldBeFCVGated: true
-
     featureFlagCompoundWildcardIndexes:
       description: "Feature flag to enable compound wildcard indexes."
       cpp_varname: gFeatureFlagCompoundWildcardIndexes
