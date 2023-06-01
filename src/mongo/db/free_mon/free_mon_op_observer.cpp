@@ -47,7 +47,7 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
          repl::MemberState::RS_PRIMARY);
 }
 
-const auto getFreeMonDeleteState = OperationContext::declareDecoration<bool>();
+const auto getFreeMonDeleteState = OplogDeleteEntryArgs::declareDecoration<bool>();
 
 }  // namespace
 
@@ -133,7 +133,7 @@ void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
 
     // Set a flag that indicates whether the document to be delete is the free monitoring state
     // document
-    getFreeMonDeleteState(opCtx) = isFreeMonDoc;
+    getFreeMonDeleteState(args) = isFreeMonDoc;
 }
 
 void FreeMonOpObserver::onDelete(OperationContext* opCtx,
@@ -149,7 +149,7 @@ void FreeMonOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    if (getFreeMonDeleteState(opCtx) == true) {
+    if (getFreeMonDeleteState(args) == true) {
         auto controller = FreeMonController::get(opCtx->getServiceContext());
 
         if (controller != nullptr) {

@@ -42,7 +42,7 @@ namespace mongo {
 
 namespace {
 
-const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
 }  // namespace
 
@@ -86,7 +86,7 @@ void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
 
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.
-    documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
+    documentIdDecoration(args) = doc["_id"] ? doc["_id"].wrap() : doc;
 }
 
 void AuthOpObserver::onDelete(OperationContext* opCtx,
@@ -94,7 +94,7 @@ void AuthOpObserver::onDelete(OperationContext* opCtx,
                               StmtId stmtId,
                               const OplogDeleteEntryArgs& args,
                               OpStateAccumulator* opAccumulator) {
-    auto& documentId = documentIdDecoration(opCtx);
+    auto& documentId = documentIdDecoration(args);
     invariant(!documentId.isEmpty());
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "d", coll->ns(), documentId, nullptr);

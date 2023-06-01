@@ -87,8 +87,8 @@ using repl::DurableOplogEntry;
 using repl::MutableOplogEntry;
 using ChangeStreamPreImageRecordingMode = repl::ReplOperation::ChangeStreamPreImageRecordingMode;
 
-const OperationContext::Decoration<boost::optional<ShardId>> destinedRecipientDecoration =
-    OperationContext::declareDecoration<boost::optional<ShardId>>();
+const auto destinedRecipientDecoration =
+    OplogDeleteEntryArgs::declareDecoration<boost::optional<ShardId>>();
 
 namespace {
 
@@ -251,18 +251,20 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            const boost::optional<UUID>& uuid,
                            StmtId stmtId,
                            bool fromMigrate,
+                           const repl::DocumentKey& documentKey,
+                           const boost::optional<ShardId>& destinedRecipient,
                            OplogWriter* oplogWriter) {
     oplogEntry->setTid(nss.tenantId());
     oplogEntry->setNss(nss);
     oplogEntry->setUuid(uuid);
-    oplogEntry->setDestinedRecipient(destinedRecipientDecoration(opCtx));
+    oplogEntry->setDestinedRecipient(destinedRecipient);
 
     repl::OplogLink oplogLink;
     oplogWriter->appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, {stmtId});
 
     OpTimeBundle opTimes;
     oplogEntry->setOpType(repl::OpTypeEnum::kDelete);
-    oplogEntry->setObject(repl::documentKeyDecoration(opCtx).value().getShardKeyAndId());
+    oplogEntry->setObject(documentKey.getShardKeyAndId());
     oplogEntry->setFromMigrateIfTrue(fromMigrate);
     opTimes.writeOpTime =
         logOperation(opCtx, oplogEntry, true /*assignWallClockTime*/, oplogWriter);
@@ -1038,12 +1040,11 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    BSONObj const& doc,
                                    OplogDeleteEntryArgs* args,
                                    OpStateAccumulator* opAccumulator) {
-    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(coll, doc));
+    repl::documentKeyDecoration(args).emplace(repl::getDocumentKey(coll, doc));
 
     {
         ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns());
-        destinedRecipientDecoration(opCtx) =
-            shardingWriteRouter.getReshardingDestinedRecipient(doc);
+        destinedRecipientDecoration(args) = shardingWriteRouter.getReshardingDestinedRecipient(doc);
     }
 }
 
@@ -1054,7 +1055,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     const auto uuid = coll->uuid();
-    auto optDocKey = repl::documentKeyDecoration(opCtx);
+    auto optDocKey = repl::documentKeyDecoration(args);
     invariant(optDocKey, nss.toStringForErrorMsg());
     auto& documentKey = optDocKey.value();
 
@@ -1069,7 +1070,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (inBatchedWrite) {
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
-        operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));
+        operation.setDestinedRecipient(destinedRecipientDecoration(args));
         operation.setFromMigrateIfTrue(args.fromMigrate);
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
@@ -1106,7 +1107,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
 
-        operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));
+        operation.setDestinedRecipient(destinedRecipientDecoration(args));
         operation.setFromMigrateIfTrue(args.fromMigrate);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
@@ -1124,8 +1125,15 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             }
         }
 
-        opTime = replLogDelete(
-            opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, _oplogWriter.get());
+        opTime = replLogDelete(opCtx,
+                               nss,
+                               &oplogEntry,
+                               uuid,
+                               stmtId,
+                               args.fromMigrate,
+                               documentKey,
+                               destinedRecipientDecoration(args),
+                               _oplogWriter.get());
         if (opAccumulator) {
             opAccumulator->opTime.writeOpTime = opTime.writeOpTime;
             opAccumulator->opTime.wallClockTime = opTime.wallClockTime;

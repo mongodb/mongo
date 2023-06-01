@@ -44,7 +44,7 @@ namespace mongo {
 namespace {
 
 // Used to coordinate delete operations between aboutToDelete() and onDelete().
-const auto getIsMigrating = OperationContext::declareDecoration<bool>();
+const auto getIsMigrating = OplogDeleteEntryArgs::declareDecoration<bool>();
 
 }  // namespace
 
@@ -122,7 +122,7 @@ void MigrationChunkClonerSourceOpObserver::aboutToDelete(OperationContext* opCtx
                                                          OplogDeleteEntryArgs* args,
                                                          OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    getIsMigrating(opCtx) = MigrationSourceManager::isMigrating(opCtx, nss, docToDelete);
+    getIsMigrating(args) = MigrationSourceManager::isMigrating(opCtx, nss, docToDelete);
 }
 
 void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
@@ -151,7 +151,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    auto optDocKey = repl::documentKeyDecoration(opCtx);
+    auto optDocKey = repl::documentKeyDecoration(args);
     invariant(optDocKey, nss.toStringForErrorMsg());
     auto documentKey = optDocKey.value().getShardKeyAndId();
 
@@ -171,7 +171,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
     }
 
     auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner && getIsMigrating(opCtx)) {
+    if (cloner && getIsMigrating(args)) {
         const auto& opTime = opAccumulator->opTime.writeOpTime;
         cloner->onDeleteOp(opCtx, documentKey, opTime);
     }

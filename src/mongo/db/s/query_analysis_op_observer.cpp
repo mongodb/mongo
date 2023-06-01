@@ -42,7 +42,7 @@ namespace analyze_shard_key {
 
 namespace {
 
-const auto docToDeleteDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto docToDeleteDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
 }  // namespace
 
@@ -121,7 +121,7 @@ void QueryAnalysisOpObserver::aboutToDelete(OperationContext* opCtx,
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace ||
             coll->ns() == MongosType::ConfigNS) {
-            docToDeleteDecoration(opCtx) = doc;
+            docToDeleteDecoration(args) = doc;
         }
     }
 }
@@ -133,7 +133,7 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
                                        OpStateAccumulator* opAccumulator) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
-            auto& doc = docToDeleteDecoration(opCtx);
+            auto& doc = docToDeleteDecoration(args);
             invariant(!doc.isEmpty());
             const auto parsedDoc = QueryAnalyzerDocument::parse(
                 IDLParserContext("QueryAnalysisOpObserver::onDelete"), doc);
@@ -144,7 +144,7 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
                 });
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                    coll->ns() == MongosType::ConfigNS) {
-            auto& doc = docToDeleteDecoration(opCtx);
+            auto& doc = docToDeleteDecoration(args);
             invariant(!doc.isEmpty());
             const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(doc));
             opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,

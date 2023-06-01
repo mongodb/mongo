@@ -146,7 +146,7 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
     const auto& nss = coll->ns();
     const bool inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
 
-    auto optDocKey = repl::documentKeyDecoration(opCtx);
+    auto optDocKey = repl::documentKeyDecoration(args);
     invariant(optDocKey, nss.toStringForErrorMsg());
     auto& documentKey = optDocKey.value();
 

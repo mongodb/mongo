@@ -68,6 +68,7 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc);
 /**
  * Provides access to the DocumentKey attached to this OperationContext.
  */
-extern const OperationContext::Decoration<boost::optional<repl::DocumentKey>> documentKeyDecoration;
+extern const OplogDeleteEntryArgs::Decoration<boost::optional<repl::DocumentKey>>
+    documentKeyDecoration;
 
 }  // namespace mongo::repl

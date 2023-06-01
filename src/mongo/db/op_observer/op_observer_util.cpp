@@ -36,8 +36,8 @@
 
 namespace mongo::repl {
 
-const OperationContext::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
-    OperationContext::declareDecoration<boost::optional<DocumentKey>>();
+const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
+    OplogDeleteEntryArgs::declareDecoration<boost::optional<DocumentKey>>();
 
 MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);

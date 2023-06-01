@@ -998,7 +998,7 @@ TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
     // of setting of `documentKey` on the delete for sharding purposes.
     // `OpObserverImpl::onDelete` asserts its existence.
     OplogDeleteEntryArgs deleteEntryArgs;
-    repl::documentKeyDecoration(opCtx.get()).emplace(BSON("_id" << 0), boost::none);
+    repl::documentKeyDecoration(deleteEntryArgs).emplace(BSON("_id" << 0), boost::none);
     opObserver.onDelete(opCtx.get(), *locks, kUninitializedStmtId, deleteEntryArgs);
     wuow.commit();
 
@@ -2850,8 +2850,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
             // side-effect of setting of `documentKey` on the delete for sharding purposes.
             // `OpObserverImpl::onDelete` asserts its existence.
             OplogDeleteEntryArgs args;
-            repl::documentKeyDecoration(opCtx).emplace(docsToDelete[doc]["_id"].wrap(),
-                                                       boost::none);
+            repl::documentKeyDecoration(args).emplace(docsToDelete[doc]["_id"].wrap(), boost::none);
             opCtx->getServiceContext()->getOpObserver()->onDelete(
                 opCtx, *autoColl, kUninitializedStmtId, args);
         }
@@ -2918,7 +2917,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     // (1) Delete
     {
         OplogDeleteEntryArgs args;
-        repl::documentKeyDecoration(opCtx).emplace(BSON("_id" << 1), boost::none);
+        repl::documentKeyDecoration(args).emplace(BSON("_id" << 1), boost::none);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
             opCtx, *autoColl, kUninitializedStmtId, args);
     }
@@ -3012,7 +3011,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     // (1) Delete
     {
         OplogDeleteEntryArgs args;
-        repl::documentKeyDecoration(opCtx).emplace(BSON("_id" << 1), boost::none);
+        repl::documentKeyDecoration(args).emplace(BSON("_id" << 1), boost::none);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
             opCtx, *autoColl, kUninitializedStmtId, args);
     }
@@ -3118,7 +3117,7 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
         // of setting of `documentKey` on the delete for sharding purposes.
         // `OpObserverImpl::onDelete` asserts its existence.
         OplogDeleteEntryArgs args;
-        repl::documentKeyDecoration(opCtx).emplace(BSON("_id" << docId), boost::none);
+        repl::documentKeyDecoration(args).emplace(BSON("_id" << docId), boost::none);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
             opCtx, *autoColl, kUninitializedStmtId, args);
     }
@@ -3171,7 +3170,7 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
         // of setting of `documentKey` on the delete for sharding purposes.
         // `OpObserverImpl::onDelete` asserts its existence.
         OplogDeleteEntryArgs args;
-        repl::documentKeyDecoration(opCtx).emplace(BSON("_id" << docId), boost::none);
+        repl::documentKeyDecoration(args).emplace(BSON("_id" << docId), boost::none);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
             opCtx, *autoColl, kUninitializedStmtId, args);
     }
@@ -3318,7 +3317,8 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
         // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
         // of setting of `documentKey` on the delete for sharding purposes.
         // `OpObserverImpl::onDelete` asserts its existence.
-        repl::documentKeyDecoration(opCtx).emplace(_deletedDoc["_id"].wrap(), boost::none);
+        repl::documentKeyDecoration(deleteEntryArgs)
+            .emplace(_deletedDoc["_id"].wrap(), boost::none);
         opObserver.onDelete(
             opCtx, *locks, testCase.isRetryable() ? 1 : kUninitializedStmtId, deleteEntryArgs);
         wuow.commit();
@@ -3368,7 +3368,8 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
         // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
         // of setting of `documentKey` on the delete for sharding purposes.
         // `OpObserverImpl::onDelete` asserts its existence.
-        repl::documentKeyDecoration(opCtx).emplace(_deletedDoc["_id"].wrap(), boost::none);
+        repl::documentKeyDecoration(deleteEntryArgs)
+            .emplace(_deletedDoc["_id"].wrap(), boost::none);
         opObserver.onDelete(opCtx, *locks, stmtId, deleteEntryArgs);
         commitUnpreparedTransaction<OpObserverRegistry>(opCtx, opObserver);
         wuow.commit();
