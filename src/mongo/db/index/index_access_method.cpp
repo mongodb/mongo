@@ -805,7 +805,9 @@ const IndexCatalogEntry* IndexAccessMethod::BulkBuilder::yield(OperationContext*
                 LOGV2(5180600, "Hanging index build during bulk load yield");
                 fp->pauseWhileSet();
             },
-            [opCtx, &ns](auto&& config) { return config.getStringField("namespace") == ns.ns(); });
+            [opCtx, &ns](auto&& config) {
+                return NamespaceStringUtil::parseFailPointData(config, "namespace") == ns;
+            });
     };
     failPointHang(&hangDuringIndexBuildBulkLoadYield);
     failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);

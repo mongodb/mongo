@@ -863,8 +863,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         },
         [&](const BSONObj& data) {
             // If the failpoint specifies no collection or matches the existing one, fail.
-            auto collElem = data["collectionNS"];
-            return !collElem || args.coll->ns().ns() == collElem.String();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
+            return fpNss.isEmpty() || args.coll->ns() == fpNss;
         });
 
     // Do not log a no-op operation; see SERVER-21738

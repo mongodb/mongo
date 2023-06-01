@@ -332,8 +332,8 @@ void insertDocumentsAtomically(OperationContext* opCtx,
         },
         [&](const BSONObj& data) {
             // Check if the failpoint specifies no collection or matches the existing one.
-            const auto collElem = data["collectionNS"];
-            return !collElem || collection.nss().ns() == collElem.str();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
+            return fpNss.isEmpty() || collection.nss() == fpNss;
         });
 
     uassertStatusOK(collection_internal::insertDocuments(opCtx,

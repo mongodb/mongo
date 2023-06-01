@@ -485,7 +485,7 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
             }
         },
         [&](const BSONObj& data) {
-            return data["namespace"].String() == _sourceNss.ns() &&
+            return NamespaceStringUtil::parseFailPointData(data, "namespace") == _sourceNss &&
                 static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt();
         });
 }

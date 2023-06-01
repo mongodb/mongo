@@ -1224,7 +1224,6 @@ void RunCommandImpl::_epilogue() {
                 &waitAfterCommandFinishesExecution, opCtx, "waitAfterCommandFinishesExecution");
         },
         [&](const BSONObj& data) {
-            auto ns = data["ns"].valueStringDataSafe();
             auto commands =
                 data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
             bool requestMatchesComment = data.hasField("comment")
@@ -1233,7 +1232,8 @@ void RunCommandImpl::_epilogue() {
 
             // If 'ns', 'commands', or 'comment' is not set, block for all the namespaces, commands,
             // or comments respectively.
-            return (ns.empty() || _ecd->getInvocation()->ns().ns() == ns) &&
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+            return (fpNss.isEmpty() || _ecd->getInvocation()->ns() == fpNss) &&
                 (commands.empty() ||
                  std::any_of(commands.begin(),
                              commands.end(),
