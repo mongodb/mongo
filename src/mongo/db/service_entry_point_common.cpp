@@ -2454,7 +2454,7 @@ BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* comman
 }
 
 void logHandleRequestFailure(const Status& status) {
-    LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(status));
+    LOGV2_INFO(4879802, "Failed to handle request", "error"_attr = redact(status));
 }
 
 void onHandleRequestException(const HandleRequest& hr, const Status& status) {
