@@ -858,9 +858,13 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             "renaming system.js collection or renaming to system.js is not allowed",
             !source.isSystemDotJavascript() && !target.isSystemDotJavascript());
 
-    uassert(ErrorCodes::IllegalOperation,
-            "Renaming system.buckets collections is not allowed",
-            source.isOutTmpBucketsCollection() || !source.isTimeseriesBucketsCollection());
+    if (!source.isOutTmpBucketsCollection() && source.isTimeseriesBucketsCollection() &&
+        !AuthorizationSession::get(opCtx->getClient())
+             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                ActionType::setUserWriteBlockMode)) {
+        uasserted(ErrorCodes::IllegalOperation,
+                  "Renaming system.buckets collections is not allowed");
+    }
 }
 
 void validateAndRunRenameCollection(OperationContext* opCtx,
