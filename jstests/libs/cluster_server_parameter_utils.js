@@ -539,6 +539,13 @@ function testInvalidClusterParameterCommands(conn, tenantId) {
             // Assert that invalid uses of getClusterParameter fail on secondaries.
             testInvalidGetClusterParameter(secondary, tenantId);
         });
+
+        // Assert that invalid direct writes to <tenantId>_config.clusterParameters fail.
+        assert.commandFailed(conn.getPrimary().getDB("config").clusterParameters.insert({
+            _id: 'testIntClusterParameter',
+            foo: 'bar',
+            clusterParameterTime: {"$timestamp": {t: 0, i: 0}}
+        }));
     } else if (conn instanceof ShardingTest) {
         const adminDB = conn.s0.getDB('admin');
 
@@ -594,6 +601,19 @@ function testInvalidClusterParameterCommands(conn, tenantId) {
             // Assert that invalid forms of getClusterParameter fail on configsvr secondaries.
             testInvalidGetClusterParameter(secondary, tenantId);
         });
+        // Assert that invalid direct writes to <tenantId>_config.clusterParameters fail.
+        assert.commandFailed(configRS.getPrimary().getDB("config").clusterParameters.insert({
+            _id: 'testIntClusterParameter',
+            foo: 'bar',
+            clusterParameterTime: {"$timestamp": {t: 0, i: 0}}
+        }));
+        shards.forEach(function(shard) {
+            assert.commandFailed(shard.getPrimary().getDB("config").clusterParameters.insert({
+                _id: 'testIntClusterParameter',
+                foo: 'bar',
+                clusterParameterTime: {"$timestamp": {t: 0, i: 0}}
+            }));
+        });
     } else {  // Standalone
         const adminDB = conn.getDB('admin');
 
@@ -607,5 +627,12 @@ function testInvalidClusterParameterCommands(conn, tenantId) {
         // Assert that running setClusterParameter with a scalar value fails.
         assert.commandFailed(adminDB.runCommand(
             tenantCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId)));
+
+        // Assert that invalid direct writes to <tenantId>_config.clusterParameters fail.
+        assert.commandFailed(conn.getDB("config").clusterParameters.insert({
+            _id: 'testIntClusterParameter',
+            foo: 'bar',
+            clusterParameterTime: {"$timestamp": {t: 0, i: 0}}
+        }));
     }
 }

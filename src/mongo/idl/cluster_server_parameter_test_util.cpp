@@ -97,9 +97,12 @@ void remove(const boost::optional<TenantId>& tenantId) {
     uassertStatusOK(response.toStatus());
 }
 
-BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, StringData strValue) {
+BSONObj makeClusterParametersDoc(const LogicalTime& cpTime,
+                                 int intValue,
+                                 StringData strValue,
+                                 StringData parameterName) {
     ClusterServerParameter csp;
-    csp.set_id(kCSPTest);
+    csp.set_id(parameterName);
     csp.setClusterParameterTime(cpTime);
 
     ClusterServerParameterTest cspt;
