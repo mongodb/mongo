@@ -666,7 +666,7 @@ macro(source_python3_package python_libs python_version python_executable)
     if("${CMAKE_VERSION}" VERSION_LESS "3.12.0")
         # This method of finding python libs has been deprecated since version 3.12.
         # If we are running with a greater CMake version, opt to use the Python3 package.
-        set(Python_ADDITIONAL_VERSIONS 3.9 3.8 3.7 3.6 3.5)
+        set(Python_ADDITIONAL_VERSIONS 3.11 3.9 3.8 3.7 3.6 3.5)
         find_package(PythonInterp ${required_version} REQUIRED)
         find_package(PythonLibs ${required_version} REQUIRED)
         include_directories(${PYTHON_INCLUDE_DIRS})
