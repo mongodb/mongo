@@ -466,6 +466,12 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         }
         // Group oplog entries from the same session for noop writes.
         if (auto sessionId = op.entry.getOperationSessionInfo().getSessionId()) {
+            uassert(ErrorCodes::RetryableInternalTransactionNotSupported,
+                    str::stream() << "Tenant migration doesn't support retryable retryable "
+                                     "internal transaction. SessionId:: "
+                                  << sessionId->toBSON(),
+                    _protocol == MigrationProtocolEnum::kShardMerge ||
+                        !isInternalSessionForRetryableWrite(*sessionId));
             sessionOps[*sessionId].emplace_back(&op.entry, slotIter);
         } else {
             nonSessionOps.emplace_back(&op.entry, slotIter);

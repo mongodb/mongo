@@ -558,4 +558,4 @@ error_codes:
     - {code: 50768,name: NotARetryableWriteCommand}
     - {code: 50915,name: BackupCursorOpenConflictWithCheckpoint, categories: [RetriableError]}
     - {code: 56846,name: ConfigServerUnreachable}
-
+    - {code: 57986,name: RetryableInternalTransactionNotSupported}

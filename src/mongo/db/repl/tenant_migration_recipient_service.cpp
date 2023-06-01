@@ -1339,6 +1339,12 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     const BSONObj& entry) {
     auto sessionTxnRecord = SessionTxnRecord::parse(IDLParserContext("SessionTxnRecord"), entry);
     auto sessionId = sessionTxnRecord.getSessionId();
+    uassert(ErrorCodes::RetryableInternalTransactionNotSupported,
+            str::stream()
+                << "Tenant migration doesn't support retryable internal transaction. SessionId:: "
+                << sessionId.toBSON(),
+            !isInternalSessionForRetryableWrite(sessionId));
+
     auto txnNumber = sessionTxnRecord.getTxnNum();
     auto optTxnRetryCounter = sessionTxnRecord.getTxnRetryCounter();
     uassert(ErrorCodes::InvalidOptions,
