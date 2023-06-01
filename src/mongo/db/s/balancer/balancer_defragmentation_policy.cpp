@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
+#include "mongo/db/s/balancer/balancer_defragmentation_policy.h"
+
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
@@ -1200,7 +1201,7 @@ private:
 
 }  // namespace
 
-void BalancerDefragmentationPolicyImpl::startCollectionDefragmentations(OperationContext* opCtx) {
+void BalancerDefragmentationPolicy::startCollectionDefragmentations(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_stateMutex);
 
     // Fetch all collections with `defragmentCollection` flag enabled
@@ -1226,8 +1227,8 @@ void BalancerDefragmentationPolicyImpl::startCollectionDefragmentations(Operatio
     _onStateUpdated();
 }
 
-void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(OperationContext* opCtx,
-                                                                       const NamespaceString& nss) {
+void BalancerDefragmentationPolicy::abortCollectionDefragmentation(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
     stdx::lock_guard<Latch> lk(_stateMutex);
     auto coll =
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, nss, {});
@@ -1241,17 +1242,17 @@ void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(Operation
     }
 }
 
-void BalancerDefragmentationPolicyImpl::interruptAllDefragmentations() {
+void BalancerDefragmentationPolicy::interruptAllDefragmentations() {
     stdx::lock_guard<Latch> lk(_stateMutex);
     _defragmentationStates.clear();
 }
 
-bool BalancerDefragmentationPolicyImpl::isDefragmentingCollection(const UUID& uuid) {
+bool BalancerDefragmentationPolicy::isDefragmentingCollection(const UUID& uuid) {
     stdx::lock_guard<Latch> lk(_stateMutex);
     return _defragmentationStates.contains(uuid);
 }
 
-BSONObj BalancerDefragmentationPolicyImpl::reportProgressOn(const UUID& uuid) {
+BSONObj BalancerDefragmentationPolicy::reportProgressOn(const UUID& uuid) {
     stdx::lock_guard<Latch> lk(_stateMutex);
     auto match = _defragmentationStates.find(uuid);
     if (match == _defragmentationStates.end() || !match->second) {
@@ -1263,7 +1264,7 @@ BSONObj BalancerDefragmentationPolicyImpl::reportProgressOn(const UUID& uuid) {
                       << kProgress << collDefragmentationPhase->reportProgress());
 }
 
-MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
+MigrateInfoVector BalancerDefragmentationPolicy::selectChunksToMove(
     OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) {
 
     MigrateInfoVector chunksToMove;
@@ -1342,11 +1343,11 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
     return chunksToMove;
 }
 
-StringData BalancerDefragmentationPolicyImpl::getName() const {
+StringData BalancerDefragmentationPolicy::getName() const {
     return StringData(kPolicyName);
 }
 
-boost::optional<BalancerStreamAction> BalancerDefragmentationPolicyImpl::getNextStreamingAction(
+boost::optional<BalancerStreamAction> BalancerDefragmentationPolicy::getNextStreamingAction(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_stateMutex);
     // Visit the defrag state in round robin fashion starting from a random one
@@ -1392,8 +1393,8 @@ boost::optional<BalancerStreamAction> BalancerDefragmentationPolicyImpl::getNext
     return boost::none;
 }
 
-bool BalancerDefragmentationPolicyImpl::_advanceToNextActionablePhase(OperationContext* opCtx,
-                                                                      const UUID& collUuid) {
+bool BalancerDefragmentationPolicy::_advanceToNextActionablePhase(OperationContext* opCtx,
+                                                                  const UUID& collUuid) {
     auto& currentPhase = _defragmentationStates.at(collUuid);
     auto phaseTransitionNeeded = [&currentPhase] {
         return currentPhase && currentPhase->isComplete() &&
@@ -1412,7 +1413,7 @@ bool BalancerDefragmentationPolicyImpl::_advanceToNextActionablePhase(OperationC
     return advanced;
 }
 
-void BalancerDefragmentationPolicyImpl::applyActionResult(
+void BalancerDefragmentationPolicy::applyActionResult(
     OperationContext* opCtx,
     const BalancerStreamAction& action,
     const BalancerStreamActionResponse& response) {
@@ -1447,7 +1448,7 @@ void BalancerDefragmentationPolicyImpl::applyActionResult(
     _onStateUpdated();
 }
 
-std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transitionPhases(
+std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicy::_transitionPhases(
     OperationContext* opCtx,
     const CollectionType& coll,
     DefragmentationPhaseEnum nextPhase,
@@ -1495,9 +1496,9 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
     return nextPhaseObject;
 }
 
-void BalancerDefragmentationPolicyImpl::_initializeCollectionState(WithLock,
-                                                                   OperationContext* opCtx,
-                                                                   const CollectionType& coll) {
+void BalancerDefragmentationPolicy::_initializeCollectionState(WithLock,
+                                                               OperationContext* opCtx,
+                                                               const CollectionType& coll) {
     if (MONGO_unlikely(skipDefragmentationPhaseTransition.shouldFail())) {
         return;
     }
@@ -1517,9 +1518,9 @@ void BalancerDefragmentationPolicyImpl::_initializeCollectionState(WithLock,
     }
 }
 
-void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* opCtx,
-                                                            DefragmentationPhaseEnum phase,
-                                                            const UUID& uuid) {
+void BalancerDefragmentationPolicy::_persistPhaseUpdate(OperationContext* opCtx,
+                                                        DefragmentationPhaseEnum phase,
+                                                        const UUID& uuid) {
     DBDirectClient dbClient(opCtx);
     write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
     updateOp.setUpdates({[&] {
@@ -1540,8 +1541,8 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* op
         opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernShardingTimeout, &ignoreResult));
 }
 
-void BalancerDefragmentationPolicyImpl::_clearDefragmentationState(OperationContext* opCtx,
-                                                                   const UUID& uuid) {
+void BalancerDefragmentationPolicy::_clearDefragmentationState(OperationContext* opCtx,
+                                                               const UUID& uuid) {
     DBDirectClient dbClient(opCtx);
 
     // Clear datasize estimates from chunks
