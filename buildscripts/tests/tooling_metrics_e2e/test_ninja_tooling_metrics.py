@@ -5,8 +5,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 from mock import MagicMock
-from mongo_tooling_metrics import client
-from mongo_tooling_metrics.base_metrics import TopLevelMetrics
+from mongo_tooling_metrics.lib.top_level_metrics import NinjaToolingMetrics
 import ninja as under_test
 
 BUILD_DIR = os.path.join(os.getcwd(), 'build')
@@ -34,9 +33,8 @@ subprocess.run([
     "fast.ninja",
     "install-platform",
 ])
-@patch.object(TopLevelMetrics, 'should_collect_metrics', MagicMock(return_value=True))
 class TestNinjaAtExitMetricsCollection(unittest.TestCase):
-    @patch.object(client, 'should_collect_internal_metrics', MagicMock(return_value=True))
+    @patch.object(NinjaToolingMetrics, 'should_collect_metrics', MagicMock(return_value=True))
     @patch.object(atexit, "register", MagicMock())
     def test_at_exit_metrics_collection(self):
         with self.assertRaises(SystemExit) as _:
@@ -44,11 +42,10 @@ class TestNinjaAtExitMetricsCollection(unittest.TestCase):
 
         atexit_functions = [
             call for call in atexit.register.call_args_list
-            if call[0][0].__name__ == '_verbosity_enforced_save_metrics'
+            if call[0][0].__name__ == '_safe_save_metrics'
         ]
-        generate_metrics = atexit_functions[0][0][1].generate_metrics
         kwargs = atexit_functions[0][1]
-        metrics = generate_metrics(**kwargs)
+        metrics = NinjaToolingMetrics.generate_metrics(**kwargs)
 
         assert not metrics.is_malformed()
         assert len(metrics.build_info.build_artifacts) > 0
@@ -64,10 +61,10 @@ class TestNinjaAtExitMetricsCollection(unittest.TestCase):
         assert metrics.command_info.options['f'] == "fast.ninja"
         assert metrics.command_info.options['j'] == "400"
 
-    @patch.object(client, 'should_collect_internal_metrics', MagicMock(return_value=False))
+    @patch.object(NinjaToolingMetrics, 'should_collect_metrics', MagicMock(return_value=False))
     @patch.object(atexit, "register", MagicMock())
     def test_no_at_exit_metrics_collection(self):
         with self.assertRaises(SystemExit) as _:
             under_test.ninja()
         atexit_functions = [call[0][0].__name__ for call in atexit.register.call_args_list]
-        assert "_verbosity_enforced_save_metrics" not in atexit_functions
+        assert "_safe_save_metrics" not in atexit_functions

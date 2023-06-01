@@ -23,8 +23,6 @@ from pkg_resources import parse_version
 
 import SCons
 import SCons.Script
-from mongo_tooling_metrics.client import get_mongo_metrics_client
-from mongo_tooling_metrics.errors import ExternalHostException
 from mongo_tooling_metrics.lib.top_level_metrics import SConsToolingMetrics
 from site_scons.mongo import build_profiles
 
@@ -1659,22 +1657,13 @@ env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption
 
 # The placement of this is intentional. Here we setup an atexit method to store tooling metrics.
 # We should only register this function after env, env_vars and the parser have been properly initialized.
-try:
-    metrics_client = get_mongo_metrics_client()
-    metrics_client.register_metrics(
-        SConsToolingMetrics,
-        utc_starttime=datetime.utcnow(),
-        artifact_dir=env.Dir('$BUILD_DIR').get_abspath(),
-        env_vars=env_vars,
-        env=env,
-        parser=_parser,
-    )
-except ExternalHostException as _:
-    pass
-except Exception as _:
-    print(
-        "This MongoDB Virtual Workstation could not connect to the internal cluster\nThis is a non-issue, but if this message persists feel free to reach out in #server-dev-platform"
-    )
+SConsToolingMetrics.register_metrics(
+    utc_starttime=datetime.utcnow(),
+    artifact_dir=env.Dir('$BUILD_DIR').get_abspath(),
+    env_vars=env_vars,
+    env=env,
+    parser=_parser,
+)
 
 if get_option('build-metrics'):
     env['BUILD_METRICS_ARTIFACTS_DIR'] = '$BUILD_ROOT/$VARIANT_DIR'
