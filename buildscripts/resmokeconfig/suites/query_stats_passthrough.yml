@@ -16,6 +16,8 @@ selector:
   - jstests/core/txns/**/*.js
   exclude_with_any_tags:
   - references_foreign_collection  # TODO: SERVER-76220 remove tag from tests.
+  # Running $queryStats will increment these counters which can screw up some test assertions.
+  - inspects_command_opcounters
 
 executor:
   archive:
