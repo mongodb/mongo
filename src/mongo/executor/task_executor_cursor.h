@@ -74,6 +74,11 @@ public:
         // If false, we will fetch the next batch when the current batch is exhausted and
         // 'getNext()' is invoked.
         bool preFetchNextBatch{true};
+
+        // This function, if specified, may modify a getMore request to include additional
+        // information.
+        std::function<void(BSONObjBuilder& bob)> getMoreAugmentationWriter;
+
         Options() {}
     };
 
@@ -175,7 +180,7 @@ private:
     void _runRemoteCommand(const RemoteCommandRequest& rcr);
 
     /**
-     * Gets the next batch with interruptibility via the opCtx
+     * Gets the next batch with interruptibility via the opCtx.
      */
     void _getNextBatch(OperationContext* opCtx);
 

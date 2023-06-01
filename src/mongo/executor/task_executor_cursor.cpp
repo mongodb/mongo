@@ -268,7 +268,17 @@ void TaskExecutorCursor::_scheduleGetMore(OperationContext* opCtx) {
     invariant(!_cmdState);
     GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
     getMoreRequest.setBatchSize(_options.batchSize);
-    _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+
+    if (_options.getMoreAugmentationWriter) {
+        // Prefetching must be disabled to use the augmenting functionality.
+        invariant(!_options.preFetchNextBatch);
+        BSONObjBuilder getMoreBob;
+        getMoreRequest.serialize({}, &getMoreBob);
+        _options.getMoreAugmentationWriter(getMoreBob);
+        _runRemoteCommand(_createRequest(opCtx, getMoreBob.obj()));
+    } else {
+        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+    }
 }
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
