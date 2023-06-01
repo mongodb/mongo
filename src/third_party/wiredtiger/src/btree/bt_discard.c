@@ -280,6 +280,7 @@ __wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
     }
 
     if (home == NULL || __wt_off_page(home, ref_addr)) {
+        ((WT_ADDR *)ref_addr)->size = 0;
         __wt_free(session, ((WT_ADDR *)ref_addr)->addr);
         __wt_free(session, ref_addr);
     }
