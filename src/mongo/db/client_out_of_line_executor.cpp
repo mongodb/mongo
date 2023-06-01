@@ -38,6 +38,7 @@
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -50,7 +51,7 @@ public:
     /** Returns Info(), then suppresses to `Debug(2)` for a second. */
     logv2::SeveritySuppressor bumpedSeverity{
         Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
-    ClockSource::StopWatch stopWatch;
+    Timer timer;
 };
 
 ClientOutOfLineExecutor::ClientOutOfLineExecutor() noexcept
@@ -96,14 +97,14 @@ void ClientOutOfLineExecutor::consumeAllTasks() noexcept {
     // approximation of the acceptable overhead in the context of normal client operations.
     static constexpr auto kTimeLimit = Microseconds(30);
 
-    _impl->stopWatch.restart();
+    _impl->timer.reset();
 
     while (auto maybeTask = _taskQueue->tryPop()) {
         auto task = std::move(*maybeTask);
         task(Status::OK());
     }
 
-    auto elapsed = _impl->stopWatch.elapsed();
+    auto elapsed = _impl->timer.elapsed();
 
     if (MONGO_unlikely(elapsed > kTimeLimit)) {
         LOGV2_DEBUG(4651401,
