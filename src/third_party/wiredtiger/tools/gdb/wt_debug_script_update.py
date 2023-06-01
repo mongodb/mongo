@@ -3,10 +3,14 @@ import bson
 from pprint import pprint
 
 # Usage examples:
-# coll_dh = get_data_handle(conn, 'file:collection-5550--7194480883124807592.wt')
+# To dump data from the original file handle.
+# coll_dh = get_data_handle(conn, 'file:collection-5550--7194480883124807592.wt', NULL)
 # dump_handle(coll_dh)
-# index_dh = get_data_handle(conn, 'file:index-5558--7194480883124807592.wt')
-# dump_handle(index_dh)
+#
+# To dump data from the checkpoint of file handle.
+# coll_dh = get_data_handle(conn, 'file:collection-5550--7194480883124807592.wt', 'WiredTigerCheckpoint.5')
+# dump_handle(coll_dh)
+
 
 def dbg(ident, var):
     print('----------')
@@ -42,14 +46,20 @@ def walk_wt_list(lst):
 
     return ret
 
-def get_data_handle(conn, handle_name):
+def get_data_handle(conn, handle_name, checkpoint_name=None):
     #dbg('datahandles', conn['dhqh'])
     ret = None
     for handle in walk_wt_list(conn['dhqh']):
         #print("Handle: " + str(handle['name']))
+        #print("Handle checkpoint: " + str(handle['checkpoint']))
         if handle['name'].string() == handle_name:
-            ret = handle
-
+            if checkpoint_name and handle['checkpoint'] and handle['checkpoint'].string() == checkpoint_name:
+                ret = handle
+            elif not checkpoint_name:
+                ret = handle
+    if ret:
+        print("Found Handle: " + str(ret['name']))
+        print("Found Handle checkpoint: " + str(ret['checkpoint']))
     return ret
 
 def get_btree_handle(dhandle):
