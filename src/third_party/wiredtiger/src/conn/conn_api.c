@@ -2344,6 +2344,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
      * Fail points are also defined in this list and will occur randomly when enabled.
      */
     static const WT_NAME_FLAG stress_types[] = {
+      {"aggressive_stash_free", WT_TIMING_STRESS_AGGRESSIVE_STASH_FREE},
       {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
       {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
       {"checkpoint_evict_page", WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE},

@@ -157,6 +157,8 @@ static void
 configure_timing_stress(char **p, size_t max)
 {
     CONFIG_APPEND(*p, ",timing_stress_for_test=[");
+    if (GV(STRESS_AGGRESSIVE_STASH_FREE))
+        CONFIG_APPEND(*p, ",aggressive_stash_free");
     if (GV(STRESS_AGGRESSIVE_SWEEP))
         CONFIG_APPEND(*p, ",aggressive_sweep");
     if (GV(STRESS_CHECKPOINT))

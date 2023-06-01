@@ -283,6 +283,8 @@ CONFIG configuration_list[] = {
 
 {"statistics_log.sources", "statistics_log sources (file: | off)", C_IGNORE | C_STRING, 0, 0, 0}
 
+{"stress.aggressive_stash_free", "stress freeing stashed memory aggressively", C_BOOL, 2, 0, 0}
+
 {"stress.aggressive_sweep", "stress aggressive sweep", C_BOOL, 2, 0, 0}
 
 {"stress.checkpoint", "stress checkpoints", C_BOOL, 2, 0, 0}

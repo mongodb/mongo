@@ -163,6 +163,8 @@ static const char *list[] = {
   "runs.threads",
   "timer=",
   "runs.timer",
+  "timing_stress_aggressive_stash_free=",
+  "stress.aggressive_stash_free",
   "timing_stress_aggressive_sweep=",
   "stress.aggressive_sweep",
   "timing_stress_checkpoint=",
