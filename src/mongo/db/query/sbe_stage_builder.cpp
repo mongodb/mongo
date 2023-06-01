@@ -2463,18 +2463,36 @@ sbe::value::SlotVector generateAccumulator(
                             makeFunction("sortKeyComponentVectorToArray", std::move(key)));
 
             // Build the value expression for the accumulator.
-            auto expObj = dynamic_cast<ExpressionObject*>(accStmt.expr.argument.get());
-            tassert(5807015,
-                    str::stream() << accStmt.expr.name
-                                  << " accumulator must have an object argument",
-                    expObj);
-            for (auto& [key, value] : expObj->getChildExpressions()) {
-                if (key == AccumulatorN::kFieldNameOutput) {
-                    auto outputExpr = generateExpression(state, value.get(), rootSlot, &outputs);
-                    accArgs.emplace(AccArgs::kTopBottomNValue,
-                                    makeFillEmptyNull(outputExpr.extractExpr(state)));
-                    break;
+            if (auto expObj = dynamic_cast<ExpressionObject*>(accStmt.expr.argument.get())) {
+                for (auto& [key, value] : expObj->getChildExpressions()) {
+                    if (key == AccumulatorN::kFieldNameOutput) {
+                        auto outputExpr =
+                            generateExpression(state, value.get(), rootSlot, &outputs);
+                        accArgs.emplace(AccArgs::kTopBottomNValue,
+                                        makeFillEmptyNull(outputExpr.extractExpr(state)));
+                        break;
+                    }
                 }
+            } else if (auto expConst =
+                           dynamic_cast<ExpressionConstant*>(accStmt.expr.argument.get())) {
+                auto objConst = expConst->getValue();
+                tassert(7767100,
+                        str::stream()
+                            << accStmt.expr.name << " accumulator must have an object argument",
+                        objConst.isObject());
+                auto outputField =
+                    objConst.getDocument().toBson().getField(AccumulatorN::kFieldNameOutput);
+                if (outputField.ok()) {
+                    auto [outputTag, outputVal] =
+                        sbe::bson::convertFrom<false /* View */>(outputField);
+                    auto outputExpr = makeConstant(outputTag, outputVal);
+                    accArgs.emplace(AccArgs::kTopBottomNValue,
+                                    makeFillEmptyNull(std::move(outputExpr)));
+                }
+            } else {
+                tasserted(5807015,
+                          str::stream()
+                              << accStmt.expr.name << " accumulator must have an object argument");
             }
             tassert(5807016,
                     str::stream() << accStmt.expr.name
