@@ -60,11 +60,11 @@ int64_t getAvailableDiskSpaceBytes(const std::string& path) {
     return static_cast<int64_t>(spaceInfo.available);
 }
 
-int64_t getAvailableDiskSpaceBytesInDbPath() {
+int64_t getAvailableDiskSpaceBytesInDbPath(const std::string& dbpath) {
     if (auto fp = simulateAvailableDiskSpace.scoped(); fp.isActive()) {
         return static_cast<int64_t>(fp.getData()["bytes"].numberLong());
     }
-    return getAvailableDiskSpaceBytes(storageGlobalParams.dbpath);
+    return getAvailableDiskSpaceBytes(dbpath);
 }
 
 }  // namespace mongo
