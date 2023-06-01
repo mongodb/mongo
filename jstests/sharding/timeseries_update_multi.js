@@ -162,18 +162,6 @@ const requestConfigurations = {
         reachesPrimary: true,
         reachesOther: false,
     },
-    // TODO (SERVER-77178): test that updates modifying shard key fail.
-    // This time field filter has the request targeted to the shard0 and updates the time field.
-    timeFilterOneShardAndUpdateTime: {
-        updateList: [{
-            q: {[timeField]: generateTimeValue(0), f: 0},
-            u: {$set: {[timeField]: generateTimeValue(4)}},
-            multi: true,
-        }],
-        expectedUpdates: {findQuery: {[timeField]: generateTimeValue(4)}, expectedMatchingIds: []},
-        reachesPrimary: true,
-        reachesOther: false,
-    },
     // This time field filter has the request targeted to both shards.
     timeFilterTwoShards: {
         updateList: [
@@ -266,10 +254,10 @@ const requestConfigurations = {
     metaTimeFilterOneShard: {
         updateList: [{
             q: {[metaField]: 2, [timeField]: generateTimeValue(2), f: 2},
-            u: {$set: {[metaField]: "newType"}},
+            u: {$set: {f: 1000}},
             multi: true,
         }],
-        expectedUpdates: {findQuery: {[metaField]: "newType"}, expectedMatchingIds: [2]},
+        expectedUpdates: {findQuery: {f: 1000}, expectedMatchingIds: [2]},
         reachesPrimary: false,
         reachesOther: true,
     },
@@ -304,10 +292,10 @@ const requestConfigurations = {
     metaObjectTimeFilterOneShard: {
         updateList: [{
             q: {[metaField]: {a: 2}, [timeField]: generateTimeValue(2), f: 2},
-            u: {$set: {[metaField]: {a: 20}}},
+            u: {$set: {f: 2000}},
             multi: true,
         }],
-        expectedUpdates: {findQuery: {[metaField]: {a: 20}}, expectedMatchingIds: [2]},
+        expectedUpdates: {findQuery: {f: 2000}, expectedMatchingIds: [2]},
         reachesPrimary: false,
         reachesOther: true,
     },
@@ -332,7 +320,6 @@ const requestConfigurations = {
         updateList: [{
             q: {[metaField + '.a']: 2, f: 2},
             u: [
-                {$set: {[metaField + '.a']: 101}},
                 {$set: {"newField": 101}},
             ],
             multi: true,
@@ -529,8 +516,6 @@ runOneTestCase("metaSubFieldShardKey", "metaSubFieldFilterTwoShards");
 
 runOneTestCase("timeShardKey", "nonShardKeyFilter");
 runOneTestCase("timeShardKey", "timeFilterOneShard");
-// TODO (SERVER-77178): test that updates modifying shard key fail with 'InvalidOptions'.
-// runOneTestCase("timeShardKey", "timeFilterOneShardAndUpdateTime");
 runOneTestCase("timeShardKey", "timeFilterTwoShards");
 
 runOneTestCase("metaTimeShardKey", "emptyFilter");

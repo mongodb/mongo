@@ -55,6 +55,8 @@ struct TimeseriesModifyParams {
           isExplain(updateParams->request->explain()),
           returnOld(updateParams->request->shouldReturnOldDocs()),
           returnNew(updateParams->request->shouldReturnNewDocs()),
+          allowShardKeyUpdatesWithoutFullShardKeyInQuery(
+              updateParams->request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()),
           canonicalQuery(updateParams->canonicalQuery),
           isFromOplogApplication(updateParams->request->isFromOplogApplication()),
           updateDriver(updateParams->driver) {
@@ -82,6 +84,9 @@ struct TimeseriesModifyParams {
 
     // Should we return the new measurement?
     bool returnNew = false;
+
+    // Should we allow shard key updates without the full shard key in the query?
+    OptionalBool allowShardKeyUpdatesWithoutFullShardKeyInQuery;
 
     // The stmtId for this particular command.
     StmtId stmtId = kUninitializedStmtId;
@@ -204,6 +209,22 @@ private:
      * Gets the next bucket to process.
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
+
+    void _checkRestrictionsOnUpdatingShardKeyAreNotViolated(
+        const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths);
+
+    void _checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
+                                             const BSONObj& oldBucket,
+                                             const BSONObj& oldMeasurement);
+
+    void _checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
+                                          const BSONObj& newBucket,
+                                          const BSONObj& oldBucke,
+                                          const BSONObj& oldMeasurementt);
+
+    void _checkUpdateChangesShardKeyFields(const BSONObj& newBucket,
+                                           const BSONObj& oldBucke,
+                                           const BSONObj& oldMeasurementt);
 
     WorkingSet* _ws;
 

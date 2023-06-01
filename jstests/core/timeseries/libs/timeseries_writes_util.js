@@ -191,8 +191,8 @@ function makeFindOneAndUpdateCommand(
  * This is useful for generating unique collection names. If the return function name is not unique
  * and the caller needs to generate a unique collection name, the caller can append a unique suffix.
  */
-function getCallerName() {
-    return `${new Error().stack.split('\n')[2].split('@')[0]}`;
+function getCallerName(callDepth = 2) {
+    return `${new Error().stack.split('\n')[callDepth].split('@')[0]}`;
 }
 
 function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {

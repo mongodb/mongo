@@ -29,11 +29,15 @@
 
 #include "mongo/db/exec/timeseries_modify.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -176,6 +180,186 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
         std::move(modifiedMeasurements), std::move(insertOps));
 }
 
+void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
+    const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths) {
+    // We do not allow modifying either the current shard key value or new shard key value (if
+    // resharding) without specifying the full current shard key in the query.
+    // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
+    // But if we are here, we already know that the shard key is not _id, since we have an assertion
+    // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
+    // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
+    // shard key fields.
+    const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
+    pathsupport::EqualityMatches equalities;
+
+    // We do not allow updates to the shard key when 'multi' is true.
+    uassert(ErrorCodes::InvalidOptions,
+            "Multi-update operations are not allowed when updating the shard key field.",
+            _params.isUpdate && _isSingletonWrite());
+
+    // With the introduction of PM-1632, we allow updating a document shard key without
+    // providing a full shard key if the update is executed in a retryable write or transaction.
+    // PM-1632 uses an internal transaction to execute these updates, so to make sure that we can
+    // only update the document shard key in a retryable write or transaction, mongos only sets
+    // $_allowShardKeyUpdatesWithoutFullShardKeyInQuery to true if the client executed write was a
+    // retryable write or in a transaction.
+    if (_params.allowShardKeyUpdatesWithoutFullShardKeyInQuery &&
+        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bool isInternalClient =
+            !cc().session() || (cc().session()->getTags() & transport::Session::kInternalClient);
+        uassert(ErrorCodes::InvalidOptions,
+                "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
+                isInternalClient);
+
+        // If this node is a replica set primary node, an attempted update to the shard key value
+        // must either be a retryable write or inside a transaction. An update without a transaction
+        // number is legal if gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled
+        // because mongos will be able to start an internal transaction to handle the
+        // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
+        // we can skip validation.
+        if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Must run update to shard key field in a multi-statement transaction or with "
+                    "retryWrites: true.",
+                    _params.allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+        }
+    } else {
+        uassert(7717803,
+                "Shard key update is not allowed without specifying the full shard key in the "
+                "query",
+                (_params.canonicalQuery &&
+                 pathsupport::extractFullEqualityMatches(
+                     *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                     .isOK() &&
+                 equalities.size() == shardKeyPathsVector.size()));
+
+        // If this node is a replica set primary node, an attempted update to the shard key value
+        // must either be a retryable write or inside a transaction. An update without a transaction
+        // number is legal if gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled
+        // because mongos will be able to start an internal transaction to handle the
+        // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
+        // we can skip validation.
+        if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Must run update to shard key field in a multi-statement transaction or with "
+                    "retryWrites: true.",
+                    opCtx()->getTxnNumber());
+        }
+    }
+}
+
+void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
+                                                                const BSONObj& oldBucket,
+                                                                const BSONObj& oldMeasurement) {
+    using namespace fmt::literals;
+    const auto& collDesc = collectionAcquisition().getShardingDescription();
+    const auto& shardKeyPattern = collDesc.getShardKeyPattern();
+
+    auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldBucket);
+    auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newBucket);
+
+    // If the shard key fields remain unchanged by this update we can skip the rest of the checks.
+    // Using BSONObj::binaryEqual() still allows a missing shard key field to be filled in with an
+    // explicit null value.
+    if (newShardKey.binaryEqual(oldShardKey)) {
+        return;
+    }
+
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
+
+    // Assert that the updated doc has no arrays or array descendants for the shard key fields.
+    update::assertPathsNotArray(mutablebson::Document{oldBucket}, shardKeyPaths);
+
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
+
+    // At this point we already asserted that the complete shardKey have been specified in the
+    // query, this implies that mongos is not doing a broadcast update and that it attached a
+    // shardVersion to the command. Thus it is safe to call getOwnershipFilter
+    const auto& collFilter = collectionAcquisition().getShardingFilter();
+    invariant(collFilter);
+
+    // If the shard key of an orphan document is allowed to change, and the document is allowed to
+    // become owned by the shard, the global uniqueness assumption for _id values would be violated.
+    invariant(collFilter->keyBelongsToMe(oldShardKey));
+
+    if (!collFilter->keyBelongsToMe(newShardKey)) {
+        uasserted(
+            7717801,
+            "This update would cause the doc to change owning shards, old = {}, new = {}"_format(
+                oldBucket.toString(), newBucket.toString()));
+        // TODO SERVER-76871 or SERVER-77607 would allow us to throw the following error instead.
+        /*
+        // We would need 'oldMeasurement' to be able to delete it using timeseries deleteOne instead
+        // of the old bucket document.
+        uasserted(WouldChangeOwningShardInfo(
+                      oldMeasurement, newObj, false, collection()->ns(), collection()->uuid()),
+                  "This update would cause the doc to change owning shards");
+        */
+    }
+}
+
+void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(
+    const ShardingWriteRouter& shardingWriteRouter,
+    const BSONObj& newBucket,
+    const BSONObj& oldBucket,
+    const BSONObj& oldMeasurement) {
+    using namespace fmt::literals;
+    const auto& collDesc = collectionAcquisition().getShardingDescription();
+
+    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
+    if (!reshardingKeyPattern)
+        return;
+
+    auto oldShardKey = reshardingKeyPattern->extractShardKeyFromDoc(oldBucket);
+    auto newShardKey = reshardingKeyPattern->extractShardKeyFromDoc(newBucket);
+
+    if (newShardKey.binaryEqual(oldShardKey))
+        return;
+
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
+
+    auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldBucket);
+    auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newBucket);
+
+    if (oldRecipShard != newRecipShard) {
+        uasserted(
+            7717802,
+            "This update would cause the doc to change owning shards from {} to {}, old = {}, new = {}"_format(
+                oldRecipShard.toString(),
+                newRecipShard.toString(),
+                oldBucket.toString(),
+                newBucket.toString()));
+        // TODO SERVER-76871 or SERVER-77607 would allow us to throw the following error instead.
+        /*
+        // We would need 'oldMeasurement' to be able to delete it using timeseries deleteOne instead
+        // of the old bucket document.
+        uasserted(
+            WouldChangeOwningShardInfo(
+                oldMeasurement, newObj, false, collection()->ns(), collection()->uuid()),
+            "This update would cause the doc to change owning shards under the new shard key");
+        */
+    }
+}
+
+void TimeseriesModifyStage::_checkUpdateChangesShardKeyFields(const BSONObj& newBucket,
+                                                              const BSONObj& oldBucket,
+                                                              const BSONObj& oldMeasurement) {
+    const auto isSharded = collectionAcquisition().getShardingDescription().isSharded();
+    if (!isSharded) {
+        return;
+    }
+
+    // It is possible that both the existing and new shard keys are being updated, so we do not want
+    // to short-circuit checking whether either is being modified.
+    _checkUpdateChangesExistingShardKey(newBucket, oldBucket, oldMeasurement);
+    ShardingWriteRouter shardingWriteRouter(opCtx(), collection()->ns());
+    _checkUpdateChangesReshardingKey(shardingWriteRouter, newBucket, oldBucket, oldMeasurement);
+}
+
 template <typename F>
 std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseriesBuckets(
     ScopeGuard<F>& bucketFreer,
@@ -194,6 +378,14 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     if (_params.isUpdate) {
         std::tie(updatedMeasurements, insertOps) =
             _buildInsertOps(matchedMeasurements, unchangedMeasurements);
+
+        if (_isUserInitiatedUpdate && !updatedMeasurements.empty()) {
+            tassert(7717800,
+                    "Must have insert ops for updated measurement(s) at this point",
+                    !insertOps.empty() && !insertOps[0].getDocuments().empty());
+            _checkUpdateChangesShardKeyFields(
+                insertOps[0].getDocuments()[0], _bucketUnpacker.bucket(), matchedMeasurements[0]);
+        }
     }
 
     // If this is a delete, we will be deleting all matched measurements. If this is an update, we
