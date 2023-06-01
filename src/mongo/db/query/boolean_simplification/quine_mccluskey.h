@@ -51,7 +51,7 @@ namespace mongo::boolean_simplification {
  * input minterms with indexes 3 and 4 which are ~AB~CD, ~ABCD.
  * Indeed ~AB~CD | ~ABCD == ~ABD & (~C | C) == ~ABD.
  */
-std::pair<Maxterm, std::vector<PrimeImplicantIndices>> findPrimeImplicants(Maxterm maxterm);
+std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Maxterm maxterm);
 
 /**
  * The Quine–McCluskey algorithm is a method used for minimizing boolean expressions. It works by

@@ -37,7 +37,7 @@ namespace mongo::boolean_simplification {
 namespace {
 
 struct MintermData {
-    MintermData(Minterm minterm, PrimeImplicantIndices coveredMinterms)
+    MintermData(Minterm minterm, CoveredOriginalMinterms coveredMinterms)
         : minterm(std::move(minterm)),
           coveredMinterms(std::move(coveredMinterms)),
           combined(false) {}
@@ -47,7 +47,7 @@ struct MintermData {
     // List of indices of original input minterms which are "covered" by the current derived
     // minterm. The original minterm is covered by all minterms which are produced
     // by combinations of the original minterm.
-    PrimeImplicantIndices coveredMinterms;
+    CoveredOriginalMinterms coveredMinterms;
 
     // Set to true for minterms which are combination of at least two other minterms.
     bool combined;
@@ -119,7 +119,7 @@ QmcTable combine(QmcTable& qmc) {
                     lhs.combined = true;
                     rhs.combined = true;
 
-                    PrimeImplicantIndices coveredMinterms{};
+                    CoveredOriginalMinterms coveredMinterms{};
                     coveredMinterms.reserve(lhs.coveredMinterms.size() +
                                             rhs.coveredMinterms.size());
                     std::merge(begin(lhs.coveredMinterms),
@@ -162,9 +162,9 @@ const std::vector<uint32_t>& findOptimalCoverage(
 }
 }  // namespace
 
-std::pair<Maxterm, std::vector<PrimeImplicantIndices>> findPrimeImplicants(Maxterm maxterm) {
-    std::pair<Maxterm, std::vector<PrimeImplicantIndices>> result{Maxterm{maxterm.numberOfBits()},
-                                                                  {}};
+std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Maxterm maxterm) {
+    std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> result{Maxterm{maxterm.numberOfBits()},
+                                                                    {}};
     QmcTable qmc{std::move(maxterm.minterms)};
     stdx::unordered_set<Minterm> seenMinterms{};
 

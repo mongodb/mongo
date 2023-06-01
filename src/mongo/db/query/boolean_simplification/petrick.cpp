@@ -205,8 +205,8 @@ private:
 };
 }  // namespace
 
-std::vector<CoveredOriginalMinterms> petricksMethod(
-    const std::vector<PrimeImplicantIndices>& data) {
+std::vector<PrimeImplicantIndices> petricksMethod(
+    const std::vector<CoveredOriginalMinterms>& data) {
     if (data.empty()) {
         return {};
     }

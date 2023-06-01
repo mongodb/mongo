@@ -34,14 +34,14 @@
 
 namespace mongo::boolean_simplification {
 /**
- * List of indices of original minterms covered by the derived minterm (prime implicants).
- */
-using PrimeImplicantIndices = std::vector<uint32_t>;
-
-/**
- * Prime implicant indices that cover the original minterms.
+ * The list of original minterms covered by a derived minterm (a.k.a. prime implicant).
  */
 using CoveredOriginalMinterms = std::vector<uint32_t>;
+
+/**
+ * Represents a list of prime implicants, identified by their indices.
+ */
+using PrimeImplicantIndices = std::vector<uint32_t>;
 
 
 /**
@@ -61,5 +61,5 @@ using CoveredOriginalMinterms = std::vector<uint32_t>;
  * possible that we can get more than one coverage as output. For the given input: [[0, 1, 2], [2,
  * 3], [0, 3]] two coverages are possible: [[0, 1], [0, 2]].
  */
-std::vector<CoveredOriginalMinterms> petricksMethod(const std::vector<PrimeImplicantIndices>& data);
+std::vector<PrimeImplicantIndices> petricksMethod(const std::vector<CoveredOriginalMinterms>& data);
 }  // namespace mongo::boolean_simplification
