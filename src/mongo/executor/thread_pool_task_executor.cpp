@@ -90,8 +90,9 @@ public:
     }
 
     // All fields except for "canceled" are guarded by the owning task executor's _mutex. The
-    // "canceled" field may be observed without holding _mutex, but may only be set while holding
-    // _mutex.
+    // "canceled" field may be observed without holding _mutex only if we are checking if the value
+    // is true. This is because once "canceled" stores true, we never set it back to false. The
+    // "canceled" field may only be set while holding _mutex.
 
     CallbackFn callback;
     AtomicWord<unsigned> canceled{0U};
@@ -828,19 +829,19 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
                       std::move(cbHandle),
                       cbState->canceled.load() ? kCallbackCanceledErrorStatus : Status::OK());
 
-    if (!cbState->isFinished.load()) {
+    if (auto lk = stdx::unique_lock(_mutex); !cbState->isFinished.load()) {
         TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {
         };
         {
-            auto lk = stdx::lock_guard(_mutex);
             std::swap(cbState->callback, callback);
+            lk.unlock();
         }
         callback(std::move(args));
 
+        lk.lock();
         // Leave the empty callback function if the request has been marked canceled or finished
         // while running the callback to avoid leaking resources.
         if (!cbState->canceled.load() && !cbState->isFinished.load()) {
-            auto lk = stdx::lock_guard(_mutex);
             std::swap(callback, cbState->callback);
         }
     }
