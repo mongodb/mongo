@@ -1,5 +1,5 @@
 /**
- * Test that mongos is collecting telemetry metrics.
+ * Test that mongos is collecting query stats metrics.
  * @tags: [featureFlagQueryStats]
  */
 
@@ -30,14 +30,14 @@ const setup = () => {
 };
 
 const assertExpectedResults = (results,
-                               expectedTelemetryKey,
+                               expectedQueryStatsKey,
                                expectedExecCount,
                                expectedDocsReturnedSum,
                                expectedDocsReturnedMax,
                                expectedDocsReturnedMin,
                                expectedDocsReturnedSumOfSq) => {
     const {key, metrics} = results;
-    confirmAllExpectedFieldsPresent(expectedTelemetryKey, key);
+    confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
     assert.docEq({
         sum: NumberLong(expectedDocsReturnedSum),
@@ -60,7 +60,7 @@ const assertExpectedResults = (results,
     }
 };
 
-// Assert that, for find queries, no telemetry results are written until a cursor has reached
+// Assert that, for find queries, no query stats results are written until a cursor has reached
 // exhaustion; ensure accurate results once they're written.
 {
     const st = setup();
@@ -68,7 +68,7 @@ const assertExpectedResults = (results,
     const collName = "coll";
     const coll = db[collName];
 
-    const telemetryKey = {
+    const queryStatsKey = {
         queryShape: {
             cmdNs: {db: "test", coll: "coll"},
             command: "find",
@@ -81,37 +81,37 @@ const assertExpectedResults = (results,
 
     const cursor = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
 
-    // Since the cursor hasn't been exhausted yet, ensure no telemetry results have been written
+    // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
     // yet.
-    let telemetry = getTelemetry(db);
-    assert.eq(0, telemetry.length, telemetry);
+    let queryStats = getTelemetry(db);
+    assert.eq(0, queryStats.length, queryStats);
 
-    // Run a getMore to exhaust the cursor, then ensure telemetry results have been written
+    // Run a getMore to exhaust the cursor, then ensure query stats results have been written
     // accurately. batchSize must be 2 so the cursor recognizes exhaustion.
     assert.commandWorked(db.runCommand({
         getMore: cursor.getId(),
         collection: coll.getName(),
         batchSize: 2
     }));  // returns 1 doc, exhausts the cursor
-    telemetry = getQueryStatsFindCmd(db);
-    assert.eq(1, telemetry.length, telemetry);
-    assertExpectedResults(telemetry[0],
-                          telemetryKey,
+    queryStats = getQueryStatsFindCmd(db);
+    assert.eq(1, queryStats.length, queryStats);
+    assertExpectedResults(queryStats[0],
+                          queryStatsKey,
                           /* expectedExecCount */ 1,
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 2,
                           /* expectedDocsReturnedSumOfSq */ 4);
 
-    // Run more queries (to exhaustion) with the same query shape, and ensure telemetry results are
-    // accurate.
+    // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
+    // are accurate.
     coll.find({v: {$gt: 2, $lt: 3}}).batchSize(10).toArray();  // returns 0 docs
     coll.find({v: {$gt: 0, $lt: 1}}).batchSize(10).toArray();  // returns 0 docs
     coll.find({v: {$gt: 0, $lt: 2}}).batchSize(10).toArray();  // return 1 doc
-    telemetry = getQueryStatsFindCmd(db);
-    assert.eq(1, telemetry.length, telemetry);
-    assertExpectedResults(telemetry[0],
-                          telemetryKey,
+    queryStats = getQueryStatsFindCmd(db);
+    assert.eq(1, queryStats.length, queryStats);
+    assertExpectedResults(queryStats[0],
+                          queryStatsKey,
                           /* expectedExecCount */ 4,
                           /* expectedDocsReturnedSum */ 3,
                           /* expectedDocsReturnedMax */ 2,
@@ -121,93 +121,92 @@ const assertExpectedResults = (results,
     st.stop();
 }
 
-// Assert that, for agg queries, no telemetry results are written until a cursor has reached
+// Assert that, for agg queries, no query stats results are written until a cursor has reached
 // exhaustion; ensure accurate results once they're written.
-// TODO SERVER-77325 reenable these tests
-// {
-//     const st = setup();
-//     const db = st.s.getDB("test");
-//     const coll = db.coll;
+{
+    const st = setup();
+    const db = st.s.getDB("test");
+    const coll = db.coll;
 
-//     const telemetryKey = {
-//         queryShape: {
-//             cmdNs: {db: "test", coll: "coll"},
-//             command: "aggregate",
-//             pipeline: [
-//                 {$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}},
-//                 {$project: {_id: true, hello: true}}
-//             ]
+    const queryStatsKey = {
+        queryShape: {
+            cmdNs: {db: "test", coll: "coll"},
+            command: "aggregate",
+            pipeline: [
+                {$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}},
+                {$project: {_id: true, hello: true}}
+            ]
 
-//         },
-//         cursor: {batchSize: "?number"},
-//         applicationName: "MongoDB Shell"
-//     };
+        },
+        cursor: {batchSize: "?number"},
+        applicationName: "MongoDB Shell"
+    };
 
-//     const cursor = coll.aggregate(
-//         [
-//             {$match: {v: {$gt: 0, $lt: 5}}},
-//             {$project: {hello: true}},
-//         ],
-//         {cursor: {batchSize: 1}});  // returns 1 doc
+    const cursor = coll.aggregate(
+        [
+            {$match: {v: {$gt: 0, $lt: 5}}},
+            {$project: {hello: true}},
+        ],
+        {cursor: {batchSize: 1}});  // returns 1 doc
 
-//     // Since the cursor hasn't been exhausted yet, ensure no telemetry results have been written
-//     // yet.
-//     let telemetry = getTelemetry(db);
-//     assert.eq(0, telemetry.length, telemetry);
+    // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
+    // yet.
+    let queryStats = getTelemetry(db);
+    assert.eq(0, queryStats.length, queryStats);
 
-//     // Run a getMore to exhaust the cursor, then ensure telemetry results have been written
-//     // accurately. batchSize must be 2 so the cursor recognizes exhaustion.
-//     assert.commandWorked(db.runCommand({
-//         getMore: cursor.getId(),
-//         collection: coll.getName(),
-//         batchSize: 2
-//     }));  // returns 1 doc, exhausts the cursor
-//     telemetry = getQueryStatsAggCmd(db);
-//     assert.eq(1, telemetry.length, telemetry);
-//     assertExpectedResults(telemetry[0],
-//                           telemetryKey,
-//                           /* expectedExecCount */ 1,
-//                           /* expectedDocsReturnedSum */ 2,
-//                           /* expectedDocsReturnedMax */ 2,
-//                           /* expectedDocsReturnedMin */ 2,
-//                           /* expectedDocsReturnedSumOfSq */ 4);
+    // Run a getMore to exhaust the cursor, then ensure query stats results have been written
+    // accurately. batchSize must be 2 so the cursor recognizes exhaustion.
+    assert.commandWorked(db.runCommand({
+        getMore: cursor.getId(),
+        collection: coll.getName(),
+        batchSize: 2
+    }));  // returns 1 doc, exhausts the cursor
+    queryStats = getQueryStatsAggCmd(db);
+    assert.eq(1, queryStats.length, queryStats);
+    assertExpectedResults(queryStats[0],
+                          queryStatsKey,
+                          /* expectedExecCount */ 1,
+                          /* expectedDocsReturnedSum */ 2,
+                          /* expectedDocsReturnedMax */ 2,
+                          /* expectedDocsReturnedMin */ 2,
+                          /* expectedDocsReturnedSumOfSq */ 4);
 
-//     // Run more queries (to exhaustion) with the same query shape, and ensure telemetry results
-//     // are accurate.
-//     coll.aggregate([
-//         {$match: {v: {$gt: 0, $lt: 5}}},
-//         {$project: {hello: true}},
-//     ]);  // returns 2 docs
-//     coll.aggregate([
-//         {$match: {v: {$gt: 2, $lt: 3}}},
-//         {$project: {hello: true}},
-//     ]);  // returns 0 docs
-//     coll.aggregate([
-//         {$match: {v: {$gt: 0, $lt: 2}}},
-//         {$project: {hello: true}},
-//     ]);  // returns 1 doc
-//     telemetry = getQueryStatsAggCmd(db);
-//     assert.eq(1, telemetry.length, telemetry);
-//     assertExpectedResults(telemetry[0],
-//                           telemetryKey,
-//                           /* expectedExecCount */ 4,
-//                           /* expectedDocsReturnedSum */ 5,
-//                           /* expectedDocsReturnedMax */ 2,
-//                           /* expectedDocsReturnedMin */ 0,
-//                           /* expectedDocsReturnedSumOfSq */ 9);
+    // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
+    // are accurate.
+    coll.aggregate([
+        {$match: {v: {$gt: 0, $lt: 5}}},
+        {$project: {hello: true}},
+    ]);  // returns 2 docs
+    coll.aggregate([
+        {$match: {v: {$gt: 2, $lt: 3}}},
+        {$project: {hello: true}},
+    ]);  // returns 0 docs
+    coll.aggregate([
+        {$match: {v: {$gt: 0, $lt: 2}}},
+        {$project: {hello: true}},
+    ]);  // returns 1 doc
+    queryStats = getQueryStatsAggCmd(db);
+    assert.eq(1, queryStats.length, queryStats);
+    assertExpectedResults(queryStats[0],
+                          queryStatsKey,
+                          /* expectedExecCount */ 4,
+                          /* expectedDocsReturnedSum */ 5,
+                          /* expectedDocsReturnedMax */ 2,
+                          /* expectedDocsReturnedMin */ 0,
+                          /* expectedDocsReturnedSumOfSq */ 9);
 
-//     st.stop();
-// }
+    st.stop();
+}
 
 // Assert on batchSize-limited find queries that killCursors will write metrics with partial results
-// to the telemetry store.
+// to the query stats store.
 {
     const st = setup();
     const db = st.s.getDB("test");
     const collName = "coll";
     const coll = db[collName];
 
-    const telemetryKey = {
+    const queryStatsKey = {
         queryShape: {
             cmdNs: {db: "test", coll: "coll"},
             command: "find",
@@ -224,10 +223,10 @@ const assertExpectedResults = (results,
     assert.commandWorked(
         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
 
-    const telemetry = getTelemetry(db);
-    assert.eq(1, telemetry.length);
-    assertExpectedResults(telemetry[0],
-                          telemetryKey,
+    const queryStats = getTelemetry(db);
+    assert.eq(1, queryStats.length);
+    assertExpectedResults(queryStats[0],
+                          queryStatsKey,
                           /* expectedExecCount */ 2,
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 1,
@@ -237,47 +236,45 @@ const assertExpectedResults = (results,
 }
 
 // Assert on batchSize-limited agg queries that killCursors will write metrics with partial results
-// to the telemetry store.
-// TODO SERVER-77325 reenable these tests
-// {
-//     const st = setup();
-//     const db = st.s.getDB("test");
-//     const coll = db.coll;
+// to the query stats store.
+{
+    const st = setup();
+    const db = st.s.getDB("test");
+    const coll = db.coll;
 
-//     const telemetryKey = {
-//         queryShape: {
-//             cmdNs: {db: "test", coll: "coll"},
-//             command: "aggregate",
-//             pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]
-//         },
-//         cursor: {batchSize: "?number"},
-//         applicationName: "MongoDB Shell"
-//     };
+    const queryStatsKey = {
+        queryShape: {
+            cmdNs: {db: "test", coll: "coll"},
+            command: "aggregate",
+            pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]
+        },
+        cursor: {batchSize: "?number"},
+        applicationName: "MongoDB Shell"
+    };
 
-//     const cursor1 = coll.aggregate(
-//         [
-//             {$match: {v: {$gt: 0, $lt: 5}}},
-//         ],
-//         {cursor: {batchSize: 1}});  // returns 1 doc
-//     const cursor2 = coll.aggregate(
-//         [
-//             {$match: {v: {$gt: 0, $lt: 2}}},
-//         ],
-//         {cursor: {batchSize: 1}});  // returns 1 doc
+    const cursor1 = coll.aggregate(
+        [
+            {$match: {v: {$gt: 0, $lt: 5}}},
+        ],
+        {cursor: {batchSize: 1}});  // returns 1 doc
+    const cursor2 = coll.aggregate(
+        [
+            {$match: {v: {$gt: 0, $lt: 2}}},
+        ],
+        {cursor: {batchSize: 1}});  // returns 1 doc
 
-//     assert.commandWorked(
-//         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(),
-//         cursor2.getId()]}));
+    assert.commandWorked(
+        db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
 
-//     const telemetry = getTelemetry(db);
-//     assert.eq(1, telemetry.length);
-//     assertExpectedResults(telemetry[0],
-//                           telemetryKey,
-//                           /* expectedExecCount */ 2,
-//                           /* expectedDocsReturnedSum */ 2,
-//                           /* expectedDocsReturnedMax */ 1,
-//                           /* expectedDocsReturnedMin */ 1,
-//                           /* expectedDocsReturnedSumOfSq */ 2);
-//     st.stop();
-// }
+    const queryStats = getTelemetry(db);
+    assert.eq(1, queryStats.length);
+    assertExpectedResults(queryStats[0],
+                          queryStatsKey,
+                          /* expectedExecCount */ 2,
+                          /* expectedDocsReturnedSum */ 2,
+                          /* expectedDocsReturnedMax */ 1,
+                          /* expectedDocsReturnedMin */ 1,
+                          /* expectedDocsReturnedSumOfSq */ 2);
+    st.stop();
+}
 }());

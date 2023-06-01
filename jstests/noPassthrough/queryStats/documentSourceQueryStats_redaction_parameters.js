@@ -109,20 +109,18 @@ const conn = MongoRunner.runMongod({
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
-// TODO SERVER-77325 reenable these tests
-// const st = new ShardingTest({
-//     mongos: 1,
-//     shards: 1,
-//     config: 1,
-//     rs: {nodes: 1},
-//     mongosOptions: {
-//         setParameter: {
-//             internalQueryStatsRateLimit: -1,
-//             featureFlagQueryStats: true,
-//             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-//         }
-//     },
-// });
-// runTest(st.s);
-// st.stop();
+const st = new ShardingTest({
+    mongos: 1,
+    shards: 1,
+    config: 1,
+    rs: {nodes: 1},
+    mongosOptions: {
+        setParameter: {
+            internalQueryStatsRateLimit: -1,
+            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
+        }
+    },
+});
+runTest(st.s);
+st.stop();
 }());
