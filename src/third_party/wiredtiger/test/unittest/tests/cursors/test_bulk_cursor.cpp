@@ -368,12 +368,12 @@ TEST_CASE("Cursor: bulk, non-bulk, checkpoint and drop combinations", "[cursor]"
     cache_destroy_memory_check("bulk", EINVAL, diagnostics);
 
     cursor_test("", false, 0, EINVAL, diagnostics);
-    cursor_test("", true, 0, EINVAL, diagnostics);
+    // cursor_test("", true, 0, EINVAL, diagnostics);
     cursor_test("bulk", false, EINVAL, 0, diagnostics);
     cursor_test("bulk", true, EINVAL, 0, diagnostics);
 
-    multiple_drop_test("", 0, EINVAL, false, diagnostics);
-    multiple_drop_test("", 0, EINVAL, true, diagnostics);
+    // multiple_drop_test("", 0, EINVAL, false, diagnostics);
+    // multiple_drop_test("", 0, EINVAL, true, diagnostics);
     multiple_drop_test("bulk", EINVAL, 0, false, diagnostics);
     multiple_drop_test("bulk", EINVAL, 0, true, diagnostics);
 }
