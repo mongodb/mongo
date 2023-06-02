@@ -27,12 +27,8 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/json.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
@@ -49,7 +45,6 @@
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace repl {
@@ -212,9 +207,9 @@ TEST_F(ReplCoordHBV1Test,
     performSyncToFinishReconfigHeartbeat();
 
     assertMemberState(MemberState::RS_STARTUP2);
-    OperationContextNoop opCtx;
+    auto opCtx{makeOperationContext()};
     auto storedConfig = ReplSetConfig::parse(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(opCtx.get())));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -257,9 +252,9 @@ TEST_F(ReplCoordHBV1Test,
     performSyncToFinishReconfigHeartbeat();
 
     assertMemberState(MemberState::RS_STARTUP2);
-    OperationContextNoop opCtx;
+    auto opCtx{makeOperationContext()};
     auto storedConfig = ReplSetConfig::parse(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(opCtx.get())));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -436,9 +431,9 @@ TEST_F(ReplCoordHBV1Test, UninitializedDonorNodeAcceptsSplitConfigOnFirstHeartbe
     performSyncToFinishReconfigHeartbeat();
 
     assertMemberState(MemberState::RS_STARTUP2);
-    OperationContextNoop opCtx;
+    auto opCtx{makeOperationContext()};
     auto storedConfig = ReplSetConfig::parse(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(opCtx.get())));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -1471,9 +1466,9 @@ TEST_F(ReplCoordHBV1Test,
     performSyncToFinishReconfigHeartbeat();
 
     assertMemberState(MemberState::RS_ARBITER);
-    OperationContextNoop opCtx;
+    auto opCtx{makeOperationContext()};
     auto storedConfig = ReplSetConfig::parse(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(opCtx.get())));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -1526,9 +1521,8 @@ TEST_F(ReplCoordHBV1Test,
     performSyncToFinishReconfigHeartbeat();
 
     assertMemberState(MemberState::RS_STARTUP, "2");
-    OperationContextNoop opCtx;
-
-    StatusWith<BSONObj> loadedConfig(getExternalState()->loadLocalConfigDocument(&opCtx));
+    auto opCtx{makeOperationContext()};
+    StatusWith<BSONObj> loadedConfig(getExternalState()->loadLocalConfigDocument(opCtx.get()));
     ASSERT_NOT_OK(loadedConfig.getStatus()) << loadedConfig.getValue();
     exitNetwork();
 }

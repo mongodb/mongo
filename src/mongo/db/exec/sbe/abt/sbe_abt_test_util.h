@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/utils/utils.h"

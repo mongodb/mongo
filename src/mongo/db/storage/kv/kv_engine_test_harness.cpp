@@ -30,9 +30,10 @@
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"

@@ -1638,7 +1638,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
             dps::extractElementAtPath(*storageEngineOptions, _canonicalName + ".configString")
                 .str();
     }
-    // Some unittests use a OperationContextNoop that can't support such lookups.
+
     StatusWith<std::string> result =
         WiredTigerIndex::generateCreateString(_canonicalName,
                                               _indexOptions,

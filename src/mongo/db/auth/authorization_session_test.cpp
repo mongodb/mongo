@@ -96,7 +96,7 @@ public:
         _opCtx = _client->makeOperationContext();
         auto localManagerState = std::make_unique<FailureCapableAuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
-        managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
         auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
             getServiceContext(), std::move(localManagerState));
         authzManager = uniqueAuthzManager.get();

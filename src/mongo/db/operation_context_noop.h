@@ -28,16 +28,12 @@
  */
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 
 namespace mongo {
-
-class Client;
 
 class OperationContextNoop : public OperationContext {
 public:

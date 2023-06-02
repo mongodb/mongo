@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 
-#include <memory>
 #include <string>
 
 #include "mongo/base/shim.h"
@@ -44,12 +41,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-
 namespace {
 
 std::unique_ptr<AuthzManagerExternalState> authzManagerExternalStateCreateImpl() {
@@ -99,10 +94,9 @@ void AuthzManagerExternalStateMock::setAuthorizationManager(AuthorizationManager
     _authzManager = authzManager;
 }
 
-void AuthzManagerExternalStateMock::setAuthzVersion(int version) {
-    OperationContextNoop opCtx;
+void AuthzManagerExternalStateMock::setAuthzVersion(OperationContext* opCtx, int version) {
     uassertStatusOK(
-        updateOne(&opCtx,
+        updateOne(opCtx,
                   NamespaceString::kServerConfigurationNamespace,
                   AuthorizationManager::versionDocumentQuery,
                   BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << version)),

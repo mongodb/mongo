@@ -202,15 +202,11 @@ private:
     // In cases when there is a ServiceContext, if there already exists a TimeZoneDatabase
     // associated with the ServiceContext, adopt it. Otherwise, create a new one.
     void _setTimeZoneDatabase() {
-        // In some cases, e.g. the user uses an OperationContextNoop which does _not_ provide a
-        // ServiceContext to create this ExpressionContextForTest, then it shouldn't resolve any
-        // timeZoneDatabase.
-        if (auto* serviceContext = getServiceContext()) {
-            if (!TimeZoneDatabase::get(serviceContext)) {
-                TimeZoneDatabase::set(serviceContext, std::make_unique<TimeZoneDatabase>());
-            }
-            timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
+        auto* serviceContext = getServiceContext();
+        if (!TimeZoneDatabase::get(serviceContext)) {
+            TimeZoneDatabase::set(serviceContext, std::make_unique<TimeZoneDatabase>());
         }
+        timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
     }
 
     stdx::variant<ServiceContext*, std::unique_ptr<QueryTestServiceContext>> _serviceContext;

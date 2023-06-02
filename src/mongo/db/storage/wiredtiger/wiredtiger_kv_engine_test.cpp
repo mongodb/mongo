@@ -27,24 +27,20 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
-
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
-#include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/checkpointer.h"
+#include "mongo/db/storage/kv/kv_engine_test_harness.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -56,7 +52,6 @@
 #include "mongo/util/clock_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {

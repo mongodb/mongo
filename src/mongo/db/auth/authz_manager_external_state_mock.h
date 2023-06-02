@@ -56,7 +56,7 @@ public:
     virtual ~AuthzManagerExternalStateMock();
 
     void setAuthorizationManager(AuthorizationManager* authzManager);
-    void setAuthzVersion(int version);
+    void setAuthzVersion(OperationContext* opCtx, int version);
 
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) override;
