@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
@@ -214,6 +215,44 @@ const expectToReopenArchivedBuckets = function() {
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting expectToReopenArchivedBuckets.");
+}();
+
+const expectToReopenCompressedBuckets = function() {
+    if (!FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+        return;
+    }
+
+    jsTestLog("Entering expectToReopenCompressedBuckets...");
+    resetCollection();
+
+    let initialMeasurements = [];
+    for (let i = 0; i < 5; ++i) {
+        initialMeasurements.push({
+            [timeField]: ISODate("2022-08-26T19:19:00Z"),
+            [metaField]: "ReopenedBucket1",
+        });
+    }
+    const forward = {
+        [timeField]: ISODate("2022-08-27T19:19:00Z"),
+        [metaField]: "ReopenedBucket1",
+    };
+    const backward = {
+        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [metaField]: "ReopenedBucket1",
+    };
+
+    for (let i = 0; i < initialMeasurements.length; ++i) {
+        checkIfBucketReopened(
+            initialMeasurements[i], /* willCreateBucket */ i == 0, /* willReopenBucket */ false);
+    }
+    // Time forwards will open a new bucket, and close and compress the old one.
+    checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    assert.eq(1, bucketsColl.find({"control.version": 2}).toArray().length);
+
+    // We expect to reopen the compressed bucket with time backwards.
+    checkIfBucketReopened(backward, /* willCreateBucket */ false, /* willReopenBucket */ true);
+
+    jsTestLog("Exiting expectToReopenCompressedBuckets.");
 }();
 
 const failToReopenNonSuitableBuckets = function() {

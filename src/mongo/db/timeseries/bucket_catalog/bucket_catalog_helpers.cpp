@@ -132,7 +132,7 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
  * Generates a match filter used to identify suitable buckets for reopening, represented by:
  *
  * {$and:
- *       [{"control.version":1},
+ *       [{"control.version":1}, // Only when gTimeseriesAlwaysUseCompressedBuckets is disabled.
  *       {$or: [{"control.closed":{$exists:false}},
  *              {"control.closed":false}]
  *       },
@@ -148,8 +148,12 @@ BSONObj generateReopeningMatchFilter(const Date_t& time,
                                      const std::string& controlMinTimePath,
                                      const std::string& maxDataTimeFieldPath,
                                      int64_t bucketMaxSpanSeconds) {
-    // The bucket must be uncompressed.
-    auto versionFilter = BSON(kControlVersionPath << kTimeseriesControlUncompressedVersion);
+    boost::optional<BSONObj> versionFilter;
+    if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // The bucket must be uncompressed.
+        versionFilter = BSON(kControlVersionPath << kTimeseriesControlUncompressedVersion);
+    }
 
     // The bucket cannot be closed (aka open for new measurements).
     auto closedFlagFilter =
@@ -177,8 +181,14 @@ BSONObj generateReopeningMatchFilter(const Date_t& time,
     // full and we do not want to insert future measurements into it.
     auto measurementSizeFilter = BSON(maxDataTimeFieldPath << BSON("$exists" << false));
 
-    return BSON("$and" << BSON_ARRAY(versionFilter << closedFlagFilter << timeRangeFilter
-                                                   << metaFieldFilter << measurementSizeFilter));
+    if (versionFilter) {
+        return BSON("$and" << BSON_ARRAY(*versionFilter << closedFlagFilter << timeRangeFilter
+                                                        << metaFieldFilter
+                                                        << measurementSizeFilter));
+    } else {
+        return BSON("$and" << BSON_ARRAY(closedFlagFilter << timeRangeFilter << metaFieldFilter
+                                                          << measurementSizeFilter));
+    }
 }
 
 }  // namespace
