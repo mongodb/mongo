@@ -2012,6 +2012,7 @@ if env.get('ENABLE_OOM_RETRY'):
                 ': fatal error: Killed signal terminated program cc1',
                 # TODO: SERVER-77322 remove this non memory related ICE.
                 r'during IPA pass: cp.+g\+\+: internal compiler error',
+                'ld terminated with signal 9',
             ]
         elif env.ToolchainIs('msvc'):
             env['OOM_RETRY_MESSAGES'] = [
