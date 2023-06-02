@@ -407,7 +407,10 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 }
 
                 // Join any ongoing migration outside of the CSR lock. Considering we're technically
-                // inside a destructor, we can't allow this wait to throw.
+                // inside a destructor, we can't allow this wait to throw and neither can we return
+                // without having waited. It is acceptable to wait here uninterruptibly because
+                // we are not holding any resources and nothing that holds resources should be
+                // waiting on the refresh thread.
                 if (waitForMigrationAbort) {
                     waitForMigrationAbort->waitNoThrow().ignore();
                 }
