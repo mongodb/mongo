@@ -134,7 +134,8 @@ def generate_mongod_parameters(rng, mode):
     ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
     ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
-    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = "fixedConcurrentTransactions"
+    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choice(
+        ["throughputProbing", "fixedConcurrentTransactions"], p=[0.9, 0.1])
     if rng.choice(3 * [True] + [False]):
         # The old retryable writes format is used by other variants. Weight towards turning on the
         # new retryable writes format on in this one.
