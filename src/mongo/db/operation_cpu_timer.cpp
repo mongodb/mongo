@@ -73,7 +73,7 @@ MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadDetach);
 
 class PosixTimer final : public OperationCPUTimer {
 public:
-    PosixTimer(const std::shared_ptr<OperationCPUTimers>& timers) : OperationCPUTimer(timers) {}
+    PosixTimer() = default;
     ~PosixTimer() = default;
 
     Nanoseconds getElapsed() const override;
@@ -161,8 +161,7 @@ Nanoseconds PosixTimer::_getThreadTime() const try {
 }
 
 // Set of timers created by this OperationContext.
-static auto getCPUTimers =
-    OperationContext::declareDecoration<std::shared_ptr<OperationCPUTimers>>();
+static auto getCPUTimers = OperationContext::declareDecoration<OperationCPUTimers>();
 
 }  // namespace
 
@@ -187,15 +186,13 @@ OperationCPUTimers* OperationCPUTimers::get(OperationContext* opCtx) {
     if (!isTimeSupported)
         return nullptr;
 
-    auto& timers = getCPUTimers(opCtx);
-    if (!timers) {
-        timers = std::make_shared<OperationCPUTimers>();
-    }
-    return timers.get();
+    return &getCPUTimers(opCtx);
 }
 
-std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
-    return std::make_unique<PosixTimer>(shared_from_this());
+std::shared_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
+    auto timer = std::make_shared<PosixTimer>();
+    _timers.push_back(timer);
+    return timer;
 }
 
 #else  // not defined(__linux__)
@@ -204,46 +201,27 @@ OperationCPUTimers* OperationCPUTimers::get(OperationContext*) {
     return nullptr;
 }
 
-std::unique_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
+std::shared_ptr<OperationCPUTimer> OperationCPUTimers::makeTimer() {
     MONGO_UNREACHABLE;
 }
 
 #endif  // defined(__linux__)
-
-OperationCPUTimer::OperationCPUTimer(const std::shared_ptr<OperationCPUTimers>& timers)
-    : _timers(timers) {
-    _it = timers->_add(this);
-}
-
-OperationCPUTimer::~OperationCPUTimer() {
-    // It is possible for an OperationCPUTimer to outlive the OperationCPUTimers container that is
-    // decorated on the OperationContext. For example, a Timer can be owned by an OperationContext
-    // decoration, and may be destructed after the Timers container, an order which we cannot
-    // control. Therefore we must ensure the weak_ptr we hold is still valid.
-    if (auto timers = _timers.lock()) {
-        timers->_remove(_it);
-    }
-}
-
-OperationCPUTimers::Iterator OperationCPUTimers::_add(OperationCPUTimer* timer) {
-    return _timers.insert(_timers.end(), timer);
-}
-
-void OperationCPUTimers::_remove(OperationCPUTimers::Iterator it) {
-    _timers.erase(it);
-}
 
 size_t OperationCPUTimers::count() const {
     return _timers.size();
 }
 
 void OperationCPUTimers::onThreadAttach() {
+    // We assume that attach and detach events are very rare, so we do not mind starting and
+    // stopping timers with no observers.
     for (auto& timer : _timers) {
         timer->onThreadAttach();
     }
 }
 
 void OperationCPUTimers::onThreadDetach() {
+    // We assume that attach and detach events are very rare, so we do not mind starting and
+    // stopping timers with no observers.
     for (auto& timer : _timers) {
         timer->onThreadDetach();
     }

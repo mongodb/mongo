@@ -1000,7 +1000,7 @@ private:
 
     // This CPU timer tracks the CPU time spent for this operation. Will be nullptr on unsupported
     // platforms.
-    std::unique_ptr<OperationCPUTimer> _cpuTimer;
+    std::shared_ptr<OperationCPUTimer> _cpuTimer;
 
     // The time at which this CurOp instance had its timer paused, or 0 if the timer is not
     // currently paused.
