@@ -89,6 +89,13 @@ feature_flags:
       version: 7.0
       shouldBeFCVGated: true
 
+    featureFlagShardedSearchCustomSort:
+      description: "Feature flag to enable user specified sort for sharded $search queries."
+      cpp_varname: gFeatureFlagShardedSearchCustomSort
+      default: true
+      version: 7.0
+      shouldBeFCVGated: true
+
     featureFlagApproxPercentiles:
       description: "Feature flag to enable approximate $percentile accumulator/expression."
       cpp_varname: gFeatureFlagApproxPercentiles

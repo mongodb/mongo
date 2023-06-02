@@ -384,10 +384,10 @@ Value DocumentSourceBucketAuto::serialize(SerializationOptions opts) const {
     MutableDocument insides;
 
     insides["groupBy"] = _groupByExpression->serialize(opts);
-    insides["buckets"] = opts.serializeLiteralValue(_nBuckets);
+    insides["buckets"] = opts.serializeLiteral(_nBuckets);
 
     if (_granularityRounder) {
-        insides["granularity"] = opts.serializeLiteralValue(_granularityRounder->getName());
+        insides["granularity"] = opts.serializeLiteral(_granularityRounder->getName());
     }
 
     MutableDocument outputSpec(_accumulatedFields.size());

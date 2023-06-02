@@ -323,10 +323,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -373,10 +373,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -387,8 +387,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "maxTimeMS": "?number",
             "batchSize": "?number"
-            }
-        )",
+        })",
         key);
 
     // Add the fields that shouldn't be hmacApplied.
@@ -429,10 +428,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -483,10 +482,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -560,10 +559,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "c": 1
                 },
                 "max": {
-                    "z": "?"
+                    "z": "?number"
                 },
                 "min": {
-                    "z": "?"
+                    "z": "?number"
                 }
             }
         })",
@@ -592,10 +591,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "$hint": "z"
                 },
                 "max": {
-                    "z": "?"
+                    "z": "?number"
                 },
                 "min": {
-                    "z": "?"
+                    "z": "?number"
                 }
             }
         })",
@@ -650,10 +649,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 }
             }
         })",
@@ -680,10 +679,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "$natural": -1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 }
             }
         })",
@@ -898,7 +897,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {
@@ -961,7 +960,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {
@@ -1032,7 +1031,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {
@@ -1110,7 +1109,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {

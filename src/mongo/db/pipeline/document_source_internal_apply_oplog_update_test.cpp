@@ -254,7 +254,7 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, RedactsCorrectly) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalApplyOplogUpdate": {
-                "oplogUpdate": "?"
+                "oplogUpdate":"?object"
             }
         })",
         redact(*docSource));

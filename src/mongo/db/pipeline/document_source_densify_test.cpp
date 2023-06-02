@@ -1299,6 +1299,7 @@ TEST_F(DensifyRedactionTest, RedactionDateBounds) {
             }
         }
     })");
+
     auto docSource =
         DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1307,9 +1308,12 @@ TEST_F(DensifyRedactionTest, RedactionDateBounds) {
                 "field": "HASH<a>",
                 "partitionByFields": [],
                 "range": {
-                    "step": "?",
-                    "bounds": ["?", "?"],
-                    "unit": "?"
+                    "step": "?number",
+                    "bounds": [
+                        "?date",
+                        "?date"
+                    ],
+                    "unit": "?string"
                 }
             }
         })",
@@ -1339,7 +1343,7 @@ TEST_F(DensifyRedactionTest, RedactionFullBoundsWithPartitionFields) {
                     "HASH<c>.HASH<d>"
                 ],
                 "range": {
-                    "step": "?",
+                    "step": "?number",
                     "bounds": "full"
                 }
             }
@@ -1369,9 +1373,9 @@ TEST_F(DensifyRedactionTest, RedactionPartitionBounds) {
                     "HASH<foo>"
                 ],
                 "range": {
-                    "step": "?",
+                    "step": "?number",
                     "bounds": "partition",
-                    "unit": "?"
+                    "unit": "?string"
                 }
             }
         })",

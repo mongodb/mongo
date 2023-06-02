@@ -239,7 +239,7 @@ struct SerializationOptions {
      * - If it is 'kToRepresentativeValue', it Returns an arbitrary value of the same type as the
      *   one given. For any number, this will be the number 1. For any boolean this will be true.
      *
-     *   TODO SERVER-XYZ If you need a different value to make sure it will parse, you should not
+     *   TODO SERVER-76330 If you need a different value to make sure it will parse, you should not
      *   use this API - but use serializeConstrainedLiteral() instead.
      */
     Value serializeLiteral(const BSONElement& e) const;
@@ -254,7 +254,7 @@ struct SerializationOptions {
     // expressions in {$and: [{a: {$gt: 3}}, {b: {$gt: 4}}]}. There the only literals are 3 and
     // 4, so the serialization expected would be {$and: [{a: {$gt: '?'}}, {b: {$lt: '?'}}]}.
     //
-    // TODO SERVER-XXX remove this option in favor of 'literalPolicy' below.
+    // TODO SERVER-75400 remove this option in favor of 'literalPolicy' below.
     boost::optional<StringData> replacementForLiteralArgs = boost::none;
 
     // 'literalPolicy' is an independent option to serialize in a general format with the aim of

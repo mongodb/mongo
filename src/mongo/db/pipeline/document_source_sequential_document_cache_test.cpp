@@ -85,17 +85,17 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, Redaction) {
     std::vector<Value> vals;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kBuilding"}})",
+        R"({"$sequentialCache":{"maxSizeBytes":"?number","status":"kBuilding"}})",
         redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
 
     cache.freeze();
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kServing"}})",
+        R"({"$sequentialCache":{"maxSizeBytes":"?number","status":"kServing"}})",
         redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
 
     cache.abandon();
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kAbandoned"}})",
+        R"({"$sequentialCache":{"maxSizeBytes":"?number","status":"kAbandoned"}})",
         redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
 }
 }  // namespace

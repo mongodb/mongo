@@ -70,7 +70,7 @@ Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
     auto nearValue = [&]() -> Value {
         if (auto constGeometry = dynamic_cast<ExpressionConstant*>(_nearGeometry.get());
             constGeometry) {
-            return opts.serializeLiteralValue(constGeometry->getValue());
+            return opts.serializeLiteral(constGeometry->getValue());
         } else {
             return _nearGeometry->serialize(opts);
         }
@@ -79,22 +79,22 @@ Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
     result.setField("distanceField", Value(opts.serializeFieldPath(*distanceField)));
 
     if (maxDistance) {
-        result.setField("maxDistance", opts.serializeLiteralValue(*maxDistance));
+        result.setField("maxDistance", opts.serializeLiteral(*maxDistance));
     }
 
     if (minDistance) {
-        result.setField("minDistance", opts.serializeLiteralValue(*minDistance));
+        result.setField("minDistance", opts.serializeLiteral(*minDistance));
     }
 
-    if (opts.transformIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.transformIdentifiers || opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
         auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, pExpCtx));
         result.setField("query", Value(matchExpr->serialize(opts)));
     } else {
         result.setField("query", Value(query));
     }
-    result.setField("spherical", opts.serializeLiteralValue(spherical));
+    result.setField("spherical", opts.serializeLiteral(spherical));
     if (distanceMultiplier) {
-        result.setField("distanceMultiplier", opts.serializeLiteralValue(*distanceMultiplier));
+        result.setField("distanceMultiplier", opts.serializeLiteral(*distanceMultiplier));
     }
 
     if (includeLocs)

@@ -114,7 +114,7 @@ Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
     }
 
     if (_doingMerge) {
-        insides["$doingMerge"] = opts.serializeLiteralValue(true);
+        insides["$doingMerge"] = opts.serializeLiteral(true);
     }
 
     serializeAdditionalFields(insides, opts);
@@ -127,21 +127,21 @@ Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
 
         for (size_t i = 0; i < _accumulatedFields.size(); i++) {
             md[opts.serializeFieldPathFromString(_accumulatedFields[i].fieldName)] =
-                opts.serializeLiteralValue(static_cast<long long>(
+                opts.serializeLiteral(static_cast<long long>(
                     _memoryTracker[_accumulatedFields[i].fieldName].maxMemoryBytes()));
         }
 
         out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
         out["totalOutputDataSizeBytes"] =
-            opts.serializeLiteralValue(static_cast<long long>(_stats.totalOutputDataSizeBytes));
-        out["usedDisk"] = opts.serializeLiteralValue(_stats.spills > 0);
-        out["spills"] = opts.serializeLiteralValue(static_cast<long long>(_stats.spills));
+            opts.serializeLiteral(static_cast<long long>(_stats.totalOutputDataSizeBytes));
+        out["usedDisk"] = opts.serializeLiteral(_stats.spills > 0);
+        out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spills));
         out["spilledDataStorageSize"] =
-            opts.serializeLiteralValue(static_cast<long long>(_stats.spilledDataStorageSize));
+            opts.serializeLiteral(static_cast<long long>(_stats.spilledDataStorageSize));
         out["numBytesSpilledEstimate"] =
-            opts.serializeLiteralValue(static_cast<long long>(_stats.numBytesSpilledEstimate));
+            opts.serializeLiteral(static_cast<long long>(_stats.numBytesSpilledEstimate));
         out["spilledRecords"] =
-            opts.serializeLiteralValue(static_cast<long long>(_stats.spilledRecords));
+            opts.serializeLiteral(static_cast<long long>(_stats.spilledRecords));
     }
 
     return out.freezeToValue();

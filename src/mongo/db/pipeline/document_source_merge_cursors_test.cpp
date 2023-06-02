@@ -549,17 +549,17 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, QueryShape) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$mergeCursors": {
-                "compareWholeSortKey": "?",
+                "compareWholeSortKey": "?bool",
                 "remotes": [
                     {
                         "shardId": "HASH<FakeShard1>",
                         "hostAndPort": "HASH<FakeShard1Host:12345>",
-                        "cursorResponse": "?"
+                        "cursorResponse": "?object"
                     },
                     {
                         "shardId": "HASH<FakeShard2>",
                         "hostAndPort": "HASH<FakeShard2Host:12345>",
-                        "cursorResponse": "?"
+                        "cursorResponse": "?object"
                     }
                 ],
                 "nss": "HASH<test.mergeCursors>",

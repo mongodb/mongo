@@ -107,7 +107,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
 TEST_F(DocumentSourceSkipTest, Redaction) {
     auto stage = DocumentSourceSkip::create(getExpCtx(), 1337);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$skip":"?"})",
+        R"({"$skip":"?number"})",
         redact(*stage));
 }
 }  // namespace

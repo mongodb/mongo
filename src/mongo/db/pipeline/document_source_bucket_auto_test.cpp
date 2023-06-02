@@ -868,8 +868,8 @@ TEST_F(BucketAutoTests, RedactionWithoutOutputField) {
         R"({
             "$bucketAuto": {
                 "groupBy": "$HASH<_id>",
-                "buckets": "?",
-                "granularity": "?",
+                "buckets": "?number",
+                "granularity": "?string",
                 "output": {
                     "HASH<count>": {
                         "$sum": "?number"
@@ -896,7 +896,7 @@ TEST_F(BucketAutoTests, RedactionWithOutputField) {
         R"({
             "$bucketAuto": {
                 "groupBy": "$HASH<year>",
-                "buckets": "?",
+                "buckets": "?number",
                 "output": {
                     "HASH<count>": {
                         "$sum": "?number"

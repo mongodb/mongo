@@ -45,7 +45,7 @@ function runTest(conn) {
                     ]
                 }
             },
-            {"$skip": "?"}
+            {"$skip": "?number"}
         ],
         stats[0].key.queryShape.pipeline);
 

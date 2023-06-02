@@ -766,10 +766,10 @@ TEST_F(DocumentSourceExchangeTest, QueryShape) {
         R"({
             "$_internalExchange": {
                 "policy": "roundrobin",
-                "consumers": "?",
+                "consumers": "?number",
                 "orderPreserving": false,
-                "bufferSize": "?",
-                "key": "?"
+                "bufferSize": "?number",
+                "key": "?object"
             }
         })",
         redact(*stage));
