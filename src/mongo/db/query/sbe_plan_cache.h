@@ -147,6 +147,11 @@ public:
         return _info.toString();
     }
 
+    uint64_t estimatedKeySizeBytes() const {
+        return sizeof(*this) + _info.keySizeInBytes() +
+            container_size_helper::estimateObjectSizeInBytes(_secondaryCollectionStates);
+    }
+
 private:
     // Contains the actual encoding of the query shape as well as the index discriminators.
     const PlanCacheKeyInfo _info;
@@ -205,9 +210,7 @@ struct BudgetEstimator {
      */
     size_t operator()(const sbe::PlanCacheKey& key,
                       const std::shared_ptr<const PlanCacheEntry>& entry) {
-        // TODO: SERVER-73649 include size of underlying query shape and size of int_32 key hash in
-        // total size estimation.
-        return entry->estimatedEntrySizeBytes;
+        return entry->estimatedEntrySizeBytes + key.estimatedKeySizeBytes();
     }
 };
 
