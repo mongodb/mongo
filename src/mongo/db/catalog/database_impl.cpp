@@ -792,6 +792,12 @@ Collection* DatabaseImpl::_createCollection(
     // Create Collection object
     auto ownedCollection = [&]() -> std::shared_ptr<Collection> {
         if (!vopts) {
+            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+                throwWriteConflictException(str::stream()
+                                            << "Namespace '" << nss.toStringForErrorMsg()
+                                            << "' is already in use.");
+            }
+
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
                 uassertStatusOK(storageEngine->getCatalog()->createCollection(

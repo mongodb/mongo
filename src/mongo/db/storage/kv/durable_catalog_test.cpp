@@ -114,7 +114,7 @@ public:
             operationContext(),
             nss,
             catalogId,
-            getCatalog()->getMetaData(operationContext(), catalogId),
+            getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata,
             std::move(coll.second));
 
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
@@ -229,7 +229,7 @@ protected:
         imd.spec = descriptor.infoObj();
         imd.ready = true;
 
-        md = getCatalog()->getMetaData(operationContext(), catalogId);
+        md = getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata;
         md->insertIndex(std::move(imd));
         getCatalog()->putMetaData(operationContext(), catalogId, *md);
 
@@ -255,6 +255,11 @@ protected:
                                                                   const BSONObj& storageMetadata) {
         Lock::DBLock dbLock(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), nss, MODE_X);
+
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "Collection already exists. NS: " << nss.toStringForErrorMsg(),
+                !CollectionCatalog::get(operationContext())
+                     ->lookupCollectionByNamespace(operationContext(), nss));
 
         WriteUnitOfWork wuow(operationContext());
         auto res = getCatalog()->importCollection(
@@ -658,7 +663,9 @@ public:
 
         // Verify that the durable catalog has 'expected' as multikey paths for this index
         Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-        auto md = getCatalog()->getMetaData(operationContext(), collection->getCatalogId());
+        auto md = getCatalog()
+                      ->getParsedCatalogEntry(operationContext(), collection->getCatalogId())
+                      ->metadata;
 
         auto indexOffset = md->findIndexOffset(indexEntry->descriptor()->indexName());
         assertMultikeyPathsAreEqual(md->indexes[indexOffset].multikeyPaths, expected);
@@ -854,8 +861,8 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
                               ->lookupCollectionByNamespace(operationContext(), regularNss);
         RecordId catalogId = collection->getCatalogId();
         ASSERT(!getCatalog()
-                    ->getMetaData(operationContext(), catalogId)
-                    ->timeseriesBucketsMayHaveMixedSchemaData);
+                    ->getParsedCatalogEntry(operationContext(), catalogId)
+                    ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
     }
 
     {
@@ -870,11 +877,11 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
                               ->lookupCollectionByNamespace(operationContext(), bucketsNss);
         RecordId catalogId = collection->getCatalogId();
         ASSERT(getCatalog()
-                   ->getMetaData(operationContext(), catalogId)
-                   ->timeseriesBucketsMayHaveMixedSchemaData);
+                   ->getParsedCatalogEntry(operationContext(), catalogId)
+                   ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
         ASSERT_FALSE(*getCatalog()
-                          ->getMetaData(operationContext(), catalogId)
-                          ->timeseriesBucketsMayHaveMixedSchemaData);
+                          ->getParsedCatalogEntry(operationContext(), catalogId)
+                          ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
     }
 }
 
@@ -893,9 +900,12 @@ TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace
     ASSERT_EQ(getCatalog()->getEntry(catalogId).nss, nss);
 
     Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogId)->nss.tenantId(),
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogId)
+                  ->metadata->nss.tenantId(),
               nss.tenantId());
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogId)->nss, nss);
+    ASSERT_EQ(getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata->nss,
+              nss);
 
     auto catalogEntry = getCatalog()->scanForCatalogEntryByNss(operationContext(), nss);
 
@@ -936,7 +946,9 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     ASSERT(catalogEntryThird != boost::none);
     ASSERT_EQ(nssThird, catalogEntryThird->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDThird.uuid, catalogEntryThird->metadata->options.uuid);
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDThird.catalogId)->nss,
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDThird.catalogId)
+                  ->metadata->nss,
               nssThird);
     ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDThird.catalogId).nss, nssThird);
 
@@ -945,7 +957,9 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     ASSERT_EQ(nssSecond, catalogEntrySecond->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDSecond.uuid, catalogEntrySecond->metadata->options.uuid);
     ASSERT(catalogEntrySecond->metadata->options.timeseries);
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDSecond.catalogId)->nss,
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDSecond.catalogId)
+                  ->metadata->nss,
               nssSecond);
     ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDSecond.catalogId).nss, nssSecond);
 
@@ -954,7 +968,9 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     ASSERT_EQ(nssFirst, catalogEntryFirst->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDFirst.uuid, catalogEntryFirst->metadata->options.uuid);
     ASSERT_EQ(nssFirst.tenantId(), catalogEntryFirst->metadata->nss.tenantId());
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDFirst.catalogId)->nss,
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDFirst.catalogId)
+                  ->metadata->nss,
               nssFirst);
     ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
 

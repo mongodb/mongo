@@ -440,7 +440,11 @@ public:
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaDataAtTime(
         DurableCatalog* durableCatalog, RecordId catalogId, const Timestamp& ts) {
         OneOffRead oor(_opCtx, ts);
-        return durableCatalog->getMetaData(_opCtx, catalogId);
+        auto catalogEntry = durableCatalog->getParsedCatalogEntry(_opCtx, catalogId);
+        if (!catalogEntry) {
+            return nullptr;
+        }
+        return catalogEntry->metadata;
     }
 
     StatusWith<BSONObj> doApplyOps(const DatabaseName& dbName,

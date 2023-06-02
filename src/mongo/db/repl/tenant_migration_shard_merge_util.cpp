@@ -255,6 +255,10 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                     Top::get(serviceContext).collectionDropped(nss);
                 });
 
+            uassert(ErrorCodes::NamespaceExists,
+                    str::stream() << "Collection already exists. NS: " << nss.toStringForErrorMsg(),
+                    !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
+
             // Create Collection object.
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             auto durableCatalog = storageEngine->getCatalog();
@@ -269,7 +273,9 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
             auto importResult = uassertStatusOK(DurableCatalog::get(opCtx)->importCollection(
                 opCtx, nss, metadata.catalogObject, storageMetaObj, importOptions));
 
-            const auto md = durableCatalog->getMetaData(opCtx, importResult.catalogId);
+            const auto catalogEntry =
+                durableCatalog->getParsedCatalogEntry(opCtx, importResult.catalogId);
+            const auto md = catalogEntry->metadata;
             for (const auto& index : md->indexes) {
                 uassert(6114301, "Cannot import non-ready indexes", index.ready);
             }

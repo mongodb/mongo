@@ -1301,10 +1301,9 @@ private:
             ASSERT_EQ(coll->getIndexCatalog()->numIndexesTotal(), expectedNumIndexes);
 
             auto catalogEntry =
-                DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, coll->getCatalogId());
-            ASSERT(!catalogEntry.isEmpty());
-            ASSERT(
-                coll->isMetadataEqual(DurableCatalog::getMetadataFromCatalogEntry(catalogEntry)));
+                DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, coll->getCatalogId());
+            ASSERT(catalogEntry);
+            ASSERT(coll->isMetadataEqual(catalogEntry->metadata->toBSON()));
 
             // Lookups from the catalog should return the newly opened collection.
             ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, coll->ns()), coll);

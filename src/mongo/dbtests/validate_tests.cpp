@@ -4115,8 +4115,9 @@ public:
         // of a pre-3.4 index.
         {
             WriteUnitOfWork wunit(&_opCtx);
-            auto collMetadata =
-                DurableCatalog::get(&_opCtx)->getMetaData(&_opCtx, coll()->getCatalogId());
+            auto collMetadata = DurableCatalog::get(&_opCtx)
+                                    ->getParsedCatalogEntry(&_opCtx, coll()->getCatalogId())
+                                    ->metadata;
             int offset = collMetadata->findIndexOffset(indexName);
             ASSERT_GTE(offset, 0);
 

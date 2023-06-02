@@ -862,7 +862,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         return latestCollection->getCatalogId();
     }();
 
-    auto catalogEntry = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, catalogId);
+    auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
 
     const NamespaceString& nss = [&]() {
         if (auto nss = nssOrUUID.nss()) {
@@ -883,7 +883,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
 
     // If the catalog entry is not found in our snapshot then the collection is being dropped and we
     // can observe the drop. Lookups by this namespace or uuid should not find a collection.
-    if (catalogEntry.isEmpty()) {
+    if (!catalogEntry) {
         // If we performed this lookup by UUID we could be in a case where we're looking up
         // concurrently with a rename with dropTarget=true where the UUID that we use is the target
         // that got dropped. If that rename has committed we need to put the correct collection
@@ -903,7 +903,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
 
     // When trying to open the latest collection by namespace and the catalog entry has a different
     // namespace in our snapshot, then there is a rename operation concurrent with this call.
-    NamespaceString nsInDurableCatalog = DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry);
+    NamespaceString nsInDurableCatalog = catalogEntry->metadata->nss;
     if (nssOrUUID.nss() && nss != nsInDurableCatalog) {
         // There are two types of rename depending on the dropTarget flag.
         if (pendingCollection && latestCollection &&
@@ -973,16 +973,16 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         }
     }
 
-    auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
+    auto metadataObj = catalogEntry->metadata->toBSON();
 
-    if (latestCollection && latestCollection->isMetadataEqual(metadata)) {
+    if (latestCollection && latestCollection->isMetadataEqual(metadataObj)) {
         openedCollections.store(latestCollection, nss, uuid);
         return latestCollection.get();
     }
 
     // Use the pendingCollection if there is no latestCollection or if the metadata of the
     // latestCollection doesn't match the durable catalogEntry.
-    if (pendingCollection && pendingCollection->isMetadataEqual(metadata)) {
+    if (pendingCollection && pendingCollection->isMetadataEqual(metadataObj)) {
         // If the latest collection doesn't exist then the pending collection must exist as it's
         // being created in this snapshot. Otherwise, if the latest collection is incompatible
         // with this snapshot, then the change came from an uncommitted update by an operation

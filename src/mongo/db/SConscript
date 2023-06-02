@@ -1206,6 +1206,7 @@ env.Library(
         'catalog/index_builds_manager',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/durable_catalog',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/fail_point',
         'catalog/collection_catalog',

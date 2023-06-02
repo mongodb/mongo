@@ -34,7 +34,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/durable_catalog_impl.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -63,7 +63,7 @@ public:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-class DurableCatalogImplTest : public ServiceContextTest {
+class DurableCatalogTest : public ServiceContextTest {
 protected:
     void setUp() override {
         helper = KVHarnessHelper::create(getServiceContext());
@@ -82,22 +82,20 @@ protected:
     RecordId newCollection(OperationContext* opCtx,
                            const NamespaceString& ns,
                            const CollectionOptions& options,
-                           DurableCatalogImpl* catalog) {
+                           DurableCatalog* catalog) {
         Lock::DBLock dbLk(opCtx, ns.dbName(), MODE_IX);
         auto swEntry = catalog->_addEntry(opCtx, ns, options);
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
     }
 
-    Status dropCollection(OperationContext* opCtx,
-                          RecordId catalogId,
-                          DurableCatalogImpl* catalog) {
+    Status dropCollection(OperationContext* opCtx, RecordId catalogId, DurableCatalog* catalog) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
         return catalog->_removeEntry(opCtx, catalogId);
     }
 
     void putMetaData(OperationContext* opCtx,
-                     DurableCatalogImpl* catalog,
+                     DurableCatalog* catalog,
                      RecordId catalogId,
                      BSONCollectionCatalogEntry::MetaData& md) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
@@ -105,7 +103,7 @@ protected:
     }
 
     std::string getIndexIdent(OperationContext* opCtx,
-                              DurableCatalogImpl* catalog,
+                              DurableCatalog* catalog,
                               RecordId catalogId,
                               StringData idxName) {
         Lock::GlobalLock globalLk(opCtx, MODE_IS);
@@ -1006,11 +1004,11 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, CommitBehindStable, "Fatal assertion.*39
     }
 }
 
-TEST_F(DurableCatalogImplTest, Coll1) {
+TEST_F(DurableCatalogTest, Coll1) {
     KVEngine* engine = helper->getEngine();
 
     std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
+    std::unique_ptr<DurableCatalog> catalog;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1019,7 +1017,7 @@ TEST_F(DurableCatalogImplTest, Coll1) {
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
         rs = engine->getRecordStore(
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), false, false, nullptr);
         uow.commit();
     }
 
@@ -1041,7 +1039,7 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
         WriteUnitOfWork uow(opCtx);
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), false, false, nullptr);
         catalog->init(opCtx);
         uow.commit();
     }
@@ -1060,11 +1058,11 @@ TEST_F(DurableCatalogImplTest, Coll1) {
     ASSERT_NOT_EQUALS(ident, catalog->getEntry(newCatalogId).ident);
 }
 
-TEST_F(DurableCatalogImplTest, Idx1) {
+TEST_F(DurableCatalogTest, Idx1) {
     KVEngine* engine = helper->getEngine();
 
     std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
+    std::unique_ptr<DurableCatalog> catalog;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1073,7 +1071,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
         rs = engine->getRecordStore(
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), false, false, nullptr);
         uow.commit();
     }
 
@@ -1085,7 +1083,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         catalogId =
             newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1120,7 +1118,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         auto opCtx = clientAndCtx.opCtx();
         ASSERT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
         ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
     }
 
     {
@@ -1150,11 +1148,11 @@ TEST_F(DurableCatalogImplTest, Idx1) {
     }
 }
 
-TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
+TEST_F(DurableCatalogTest, DirectoryPerDb1) {
     KVEngine* engine = helper->getEngine();
 
     std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
+    std::unique_ptr<DurableCatalog> catalog;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1163,7 +1161,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
         rs = engine->getRecordStore(
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), true, false, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), true, false, nullptr);
         uow.commit();
     }
 
@@ -1175,7 +1173,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         catalogId =
             newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1197,16 +1195,16 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/");
         ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
 
-TEST_F(DurableCatalogImplTest, Split1) {
+TEST_F(DurableCatalogTest, Split1) {
     KVEngine* engine = helper->getEngine();
 
     std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
+    std::unique_ptr<DurableCatalog> catalog;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1215,7 +1213,7 @@ TEST_F(DurableCatalogImplTest, Split1) {
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
         rs = engine->getRecordStore(
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, true, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), false, true, nullptr);
         uow.commit();
     }
 
@@ -1227,7 +1225,7 @@ TEST_F(DurableCatalogImplTest, Split1) {
         catalogId =
             newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1249,16 +1247,16 @@ TEST_F(DurableCatalogImplTest, Split1) {
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "index/");
         ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
 
-TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
+TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
     KVEngine* engine = helper->getEngine();
 
     std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
+    std::unique_ptr<DurableCatalog> catalog;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1267,7 +1265,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
         rs = engine->getRecordStore(
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), true, true, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), true, true, nullptr);
         uow.commit();
     }
 
@@ -1279,7 +1277,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         catalogId =
             newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1301,12 +1299,12 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/index/");
         ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
 
-TEST_F(DurableCatalogImplTest, BackupImplemented) {
+TEST_F(DurableCatalogTest, BackupImplemented) {
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
@@ -1318,7 +1316,7 @@ TEST_F(DurableCatalogImplTest, BackupImplemented) {
     }
 }
 
-DEATH_TEST_REGEX_F(DurableCatalogImplTest,
+DEATH_TEST_REGEX_F(DurableCatalogTest,
                    TerminateOnNonNumericIndexVersion,
                    "Fatal assertion.*50942") {
     KVEngine* engine = helper->getEngine();
@@ -1364,13 +1362,13 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
     }
 }
 
-TEST_F(DurableCatalogImplTest, EntryIncludesTenantIdInMultitenantEnv) {
+TEST_F(DurableCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {
     gMultitenancySupport = true;
     KVEngine* engine = helper->getEngine();
 
     // Create a DurableCatalog and RecordStore
     std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
+    std::unique_ptr<DurableCatalog> catalog;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1379,7 +1377,7 @@ TEST_F(DurableCatalogImplTest, EntryIncludesTenantIdInMultitenantEnv) {
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
         rs = engine->getRecordStore(
             opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), false, false, nullptr);
         uow.commit();
     }
 
@@ -1407,7 +1405,7 @@ TEST_F(DurableCatalogImplTest, EntryIncludesTenantIdInMultitenantEnv) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
         WriteUnitOfWork uow(opCtx);
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        catalog = std::make_unique<DurableCatalog>(rs.get(), false, false, nullptr);
         catalog->init(opCtx);
         uow.commit();
     }

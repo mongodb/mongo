@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-class DurableCatalogImpl;
+class DurableCatalog;
 class KVEngine;
 
 struct StorageEngineOptions {
@@ -335,7 +335,7 @@ public:
     const DurableCatalog* getCatalog() const override;
 
     /**
-     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
+     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalog.
      */
     void loadCatalog(OperationContext* opCtx,
                      boost::optional<Timestamp> stableTs,
@@ -393,7 +393,7 @@ private:
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
-     * whose entry is present in the DurableCatalogImpl, but missing from the KVEngine. Returns an
+     * whose entry is present in the DurableCatalog, but missing from the KVEngine. Returns an
      * error Status if called outside of a repair context or the implementation of
      * KVEngine::recoverOrphanedIdent returns an error other than DataModifiedByRepair.
      *
@@ -452,7 +452,7 @@ private:
     const bool _supportsCappedCollections;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
-    std::unique_ptr<DurableCatalogImpl> _catalog;
+    std::unique_ptr<DurableCatalog> _catalog;
 
     // Flag variable that states if the storage engine is in backup mode.
     bool _inBackupMode = false;
