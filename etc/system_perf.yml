@@ -2579,7 +2579,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-shard"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks:
+    tasks: &linux_3_shard_tasks
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
@@ -2624,6 +2624,26 @@ buildvariants:
       - name: crud_workloads_majority
       - name: crud_workloads_w1
       - name: mixed_workloads
+
+  - name: linux-3-shard-heuristic-bonsai.2022-11
+    display_name: Linux 3-Shard Cluster 2022-11 (Bonsai with Heuristic CE)
+    cron: *linux-3-shard-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-heuristic-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *linux_3_shard_tasks
 
   - name: linux-shard-lite-audit.2022-11
     display_name: Linux Shard Lite Cluster Audit 2022-11
