@@ -45,10 +45,10 @@ variables:
 #  _skip_compile_rhel70: &_compile_rhel70
 #      - name: schedule_global_auto_tasks
 #        variant: task_generation
-# _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+#  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
 #     - name: schedule_global_auto_tasks
 #       variant: task_generation
-# _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+#  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
 #     - name: schedule_global_auto_tasks
 #       variant: task_generation
 #  _skip_expansions: &_expansion_updates
