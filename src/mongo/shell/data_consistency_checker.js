@@ -136,7 +136,7 @@ var {DataConsistencyChecker} = (function() {
          * @returns a boolean when checkType is true and an integer otherwise.
          */
         static bsonCompareFunction(a, b, checkType = true) {
-            if (TestData.ignoreFieldOrderForDataConsistency) {
+            if (TestData && TestData.ignoreFieldOrderForDataConsistency) {
                 // When the bsonCompareFunction is invoked with checkType, a boolean return value is
                 // expected. For that reason we compare the unordered compare result with 0.
                 if (checkType) {
