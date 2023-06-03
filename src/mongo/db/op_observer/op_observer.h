@@ -57,13 +57,28 @@ struct OpTimeBundle {
  * The generic container for onUpdate/onDelete/onUnpreparedTransactionCommit state-passing between
  * OpObservers. Despite the naming, some OpObserver's don't strictly observe. This struct is written
  * by OpObserverImpl and useful for later observers to inspect state they need.
+ *
+ * These structs are decorable to support the sharing of critical resources between OpObserverImpl
+ * and MigrationChunkClonerSourceOpObserver. No other decorations should be added to these structs.
  */
-struct OpStateAccumulator {
+struct OpStateAccumulator : Decorable<OpStateAccumulator> {
+    OpStateAccumulator() = default;
+
     OpTimeBundle opTime;
+
+private:
+    OpStateAccumulator(const OpStateAccumulator&) = delete;
+    OpStateAccumulator& operator=(const OpStateAccumulator&) = delete;
 };
 
-struct InsertsOpStateAccumulator {
+struct InsertsOpStateAccumulator : Decorable<InsertsOpStateAccumulator> {
+    InsertsOpStateAccumulator() = default;
+
     std::vector<repl::OpTime> opTimes;
+
+private:
+    InsertsOpStateAccumulator(const InsertsOpStateAccumulator&) = delete;
+    InsertsOpStateAccumulator& operator=(const InsertsOpStateAccumulator&) = delete;
 };
 
 enum class RetryableFindAndModifyLocation {
