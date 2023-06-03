@@ -151,9 +151,11 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    auto optDocKey = documentKeyDecoration(args);
-    invariant(optDocKey, nss.toStringForErrorMsg());
-    auto documentKey = optDocKey.value().getShardKeyAndId();
+    auto getShardKeyAndId = [&nss](const OplogDeleteEntryArgs& args) -> BSONObj {
+        auto optDocKey = documentKeyDecoration(args);
+        invariant(optDocKey, nss.toStringForErrorMsg());
+        return optDocKey.value().getShardKeyAndId();
+    };
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
@@ -163,7 +165,8 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
 
         if (atClusterTime) {
             const auto shardKey =
-                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(documentKey);
+                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(
+                    getShardKeyAndId(args));
             assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
         }
 
@@ -173,7 +176,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
     auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
     if (cloner && getIsMigrating(args)) {
         const auto& opTime = opAccumulator->opTime.writeOpTime;
-        cloner->onDeleteOp(opCtx, documentKey, opTime);
+        cloner->onDeleteOp(opCtx, getShardKeyAndId(args), opTime);
     }
 }
 
