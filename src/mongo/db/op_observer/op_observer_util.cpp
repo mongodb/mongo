@@ -34,7 +34,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/util/fail_point.h"
 
-namespace mongo::repl {
+namespace mongo {
 
 const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
     OplogDeleteEntryArgs::declareDecoration<boost::optional<DocumentKey>>();
@@ -114,4 +114,4 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc) {
     return {std::move(id), std::move(shardKey)};
 }
 
-}  // namespace mongo::repl
+}  // namespace mongo

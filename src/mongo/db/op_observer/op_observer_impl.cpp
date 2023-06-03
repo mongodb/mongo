@@ -251,7 +251,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            const boost::optional<UUID>& uuid,
                            StmtId stmtId,
                            bool fromMigrate,
-                           const repl::DocumentKey& documentKey,
+                           const DocumentKey& documentKey,
                            const boost::optional<ShardId>& destinedRecipient,
                            OplogWriter* oplogWriter) {
     oplogEntry->setTid(nss.tenantId());
@@ -638,13 +638,13 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
         if (insertStatementOplogSlot.isNull()) {
             insertStatementOplogSlot = oplogWriter->getNextOpTimes(opCtx, 1U)[0];
         }
-        const auto docKey = repl::getDocumentKey(collectionPtr, begin[i].doc).getShardKeyAndId();
+        const auto docKey = getDocumentKey(collectionPtr, begin[i].doc).getShardKeyAndId();
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(begin[i].doc));
-        repl::addDestinedRecipient.execute([&](const BSONObj& data) {
+        addDestinedRecipient.execute([&](const BSONObj& data) {
             auto recipient = data["destinedRecipient"].String();
             oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
         });
@@ -666,7 +666,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
             RecordId(), RecordData(bsonOplogEntries[i].objdata(), bsonOplogEntries[i].objsize())};
     }
 
-    repl::sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
+    sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
         auto numMillis = data["waitForMillis"].numberInt();
         LOGV2(7456300,
               "Sleeping for {sleepMillis}ms after receiving {numOpTimesReceived} optimes from "
@@ -724,7 +724,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         invariant(!defaultFromMigrate);
 
         for (auto iter = first; iter != last; iter++) {
-            const auto docKey = repl::getDocumentKey(coll, iter->doc).getShardKeyAndId();
+            const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             operation.setDestinedRecipient(
                 shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
@@ -748,7 +748,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
         for (auto iter = first; iter != last; iter++) {
-            const auto docKey = repl::getDocumentKey(coll, iter->doc).getShardKeyAndId();
+            const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             if (inRetryableInternalTransaction) {
                 operation.setInitializedStatementIds(iter->stmtIds);
@@ -1042,7 +1042,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    BSONObj const& doc,
                                    OplogDeleteEntryArgs* args,
                                    OpStateAccumulator* opAccumulator) {
-    repl::documentKeyDecoration(args).emplace(repl::getDocumentKey(coll, doc));
+    documentKeyDecoration(args).emplace(getDocumentKey(coll, doc));
 
     {
         ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns());
@@ -1057,7 +1057,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     const auto uuid = coll->uuid();
-    auto optDocKey = repl::documentKeyDecoration(args);
+    auto optDocKey = documentKeyDecoration(args);
     invariant(optDocKey, nss.toStringForErrorMsg());
     auto& documentKey = optDocKey.value();
 
@@ -1283,7 +1283,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setTid(nss.tenantId());
         oplogEntry.setNss(nss.getCommandNS());
         oplogEntry.setUuid(uuid);
-        oplogEntry.setObject(repl::makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
+        oplogEntry.setObject(makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
         auto opTime =
             logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());

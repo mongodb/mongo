@@ -33,7 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 
-namespace mongo::repl {
+namespace mongo {
 
 // Common fail points for logOp() and logInsertOps().
 extern FailPoint addDestinedRecipient;
@@ -68,7 +68,6 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc);
 /**
  * Provides access to the DocumentKey attached to this OperationContext.
  */
-extern const OplogDeleteEntryArgs::Decoration<boost::optional<repl::DocumentKey>>
-    documentKeyDecoration;
+extern const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> documentKeyDecoration;
 
-}  // namespace mongo::repl
+}  // namespace mongo

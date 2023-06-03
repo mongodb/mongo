@@ -151,7 +151,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    auto optDocKey = repl::documentKeyDecoration(args);
+    auto optDocKey = documentKeyDecoration(args);
     invariant(optDocKey, nss.toStringForErrorMsg());
     auto documentKey = optDocKey.value().getShardKeyAndId();
 

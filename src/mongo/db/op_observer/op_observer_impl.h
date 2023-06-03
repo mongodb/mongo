@@ -32,9 +32,7 @@
 #include <memory>
 
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/op_observer/oplog_writer.h"
-#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 namespace repl {
