@@ -715,7 +715,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     std::vector<repl::OpTime> opTimeList;
     repl::OpTime lastOpTime;
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, nss);
+    auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
 
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
@@ -727,7 +727,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             operation.setDestinedRecipient(
-                shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
+                shardingWriteRouter->getReshardingDestinedRecipient(iter->doc));
 
             operation.setFromMigrateIfTrue(fromMigrate[std::distance(first, iter)]);
 
@@ -754,7 +754,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 operation.setInitializedStatementIds(iter->stmtIds);
             }
             operation.setDestinedRecipient(
-                shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
+                shardingWriteRouter->getReshardingDestinedRecipient(iter->doc));
 
             operation.setFromMigrateIfTrue(fromMigrate[std::distance(first, iter)]);
 
@@ -778,7 +778,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                    first,
                                    last,
                                    std::move(fromMigrate),
-                                   shardingWriteRouter,
+                                   *shardingWriteRouter,
                                    coll,
                                    _oplogWriter.get());
         if (!opTimeList.empty())
@@ -800,18 +800,20 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord);
     }
 
-    if (opAccumulator) {
-        opAccumulator->opTimes = opTimeList;
-    }
-
     shardObserveInsertsOp(opCtx,
                           nss,
                           first,
                           last,
                           opTimeList,
-                          shardingWriteRouter,
+                          *shardingWriteRouter,
                           defaultFromMigrate,
                           inMultiDocumentTransaction);
+
+    if (opAccumulator) {
+        opAccumulator->opTimes = opTimeList;
+        shardingWriteRouterInsertsOpStateAccumulatorDecoration(opAccumulator) =
+            std::move(shardingWriteRouter);
+    }
 }
 
 void OpObserverImpl::onInsertGlobalIndexKey(OperationContext* opCtx,

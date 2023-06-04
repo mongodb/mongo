@@ -53,44 +53,7 @@ void OpObserverShardingImpl::shardObserveInsertsOp(
     const std::vector<repl::OpTime>& opTimeList,
     const ShardingWriteRouter& shardingWriteRouter,
     const bool fromMigrate,
-    const bool inMultiDocumentTransaction) {
-    if (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
-        return;
-
-    auto* const css = shardingWriteRouter.getCss();
-    css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
-
-    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
-    auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded()) {
-        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
-        return;
-    }
-
-    int index = 0;
-    for (auto it = first; it != last; it++, index++) {
-        auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
-
-        if (inMultiDocumentTransaction) {
-            const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-
-            if (atClusterTime) {
-                const auto shardKey =
-                    metadata->getShardKeyPattern().extractShardKeyFromDocThrows(it->doc);
-                MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
-                    opCtx, *metadata, shardKey, *atClusterTime);
-            }
-
-            return;
-        }
-
-        auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-        if (cloner) {
-            cloner->onInsertOp(opCtx, it->doc, opTime);
-        }
-    }
-}
+    const bool inMultiDocumentTransaction) {}
 
 void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const NamespaceString& nss,
