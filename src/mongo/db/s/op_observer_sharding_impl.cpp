@@ -98,35 +98,6 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const BSONObj& postImageDoc,
                                                   const repl::OpTime& opTime,
                                                   const ShardingWriteRouter& shardingWriteRouter,
-                                                  const bool inMultiDocumentTransaction) {
-    auto* const css = shardingWriteRouter.getCss();
-    css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
-
-    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
-    auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded()) {
-        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
-        return;
-    }
-
-    if (inMultiDocumentTransaction) {
-        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-
-        if (atClusterTime) {
-            const auto shardKey =
-                metadata->getShardKeyPattern().extractShardKeyFromDocThrows(postImageDoc);
-            MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
-                opCtx, *metadata, shardKey, *atClusterTime);
-        }
-
-        return;
-    }
-
-    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner) {
-        cloner->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime);
-    }
-}
+                                                  const bool inMultiDocumentTransaction) {}
 
 }  // namespace mongo

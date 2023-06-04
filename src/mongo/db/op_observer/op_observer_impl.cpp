@@ -880,7 +880,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, args.coll->ns());
+    auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, args.coll->ns());
 
     OpTimeBundle opTime;
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
@@ -890,7 +890,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         auto operation = MutableOplogEntry::makeUpdateOperation(
             args.coll->ns(), args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
         operation.setDestinedRecipient(
-            shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
+            shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
@@ -941,7 +941,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
 
-        const auto& scopedCollectionDescription = shardingWriteRouter.getCollDesc();
+        const auto& scopedCollectionDescription = shardingWriteRouter->getCollDesc();
         // ShardingWriteRouter only has boost::none scopedCollectionDescription when not in a
         // sharded cluster.
         if (scopedCollectionDescription && scopedCollectionDescription->isSharded()) {
@@ -951,13 +951,13 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         }
 
         operation.setDestinedRecipient(
-            shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
+            shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
         oplogEntry.setDestinedRecipient(
-            shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
+            shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
 
         if (args.retryableFindAndModifyLocation ==
             RetryableFindAndModifyLocation::kSideCollection) {
@@ -1031,9 +1031,14 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                                  args.updateArgs->preImageDoc,
                                  args.updateArgs->updatedDoc,
                                  opTime.writeOpTime,
-                                 shardingWriteRouter,
+                                 *shardingWriteRouter,
                                  inMultiDocumentTransaction);
         }
+    }
+
+    if (opAccumulator) {
+        shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator) =
+            std::move(shardingWriteRouter);
     }
 }
 
