@@ -237,22 +237,6 @@ public:
                                      const repl::OpTime& newCommitPoint) final {}
 
 private:
-    virtual void shardObserveInsertsOp(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       std::vector<InsertStatement>::const_iterator first,
-                                       std::vector<InsertStatement>::const_iterator last,
-                                       const std::vector<repl::OpTime>& opTimeList,
-                                       const ShardingWriteRouter& shardingWriteRouter,
-                                       bool fromMigrate,
-                                       bool inMultiDocumentTransaction){};
-    virtual void shardObserveUpdateOp(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      boost::optional<BSONObj> preImageDoc,
-                                      const BSONObj& postImageDoc,
-                                      const repl::OpTime& opTime,
-                                      const ShardingWriteRouter& shardingWriteRouter,
-                                      const bool inMultiDocumentTransaction) {}
-
     std::unique_ptr<OplogWriter> _oplogWriter;
 };
 

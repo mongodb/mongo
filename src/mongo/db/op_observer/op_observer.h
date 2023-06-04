@@ -225,7 +225,7 @@ public:
      * and is intended to be forwarded to downstream subsystems that expect a single
      * 'fromMigrate' to describe the entire set of inserts.
      * Examples: ShardServerOpObserver, UserWriteBlockModeOpObserver, and
-     * OpObserverShardingImpl::shardObserveInsertsOp().
+     * MigrationChunkClonerSourceOpObserver::onInserts().
      */
     virtual void onInserts(OperationContext* opCtx,
                            const CollectionPtr& coll,

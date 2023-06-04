@@ -800,15 +800,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord);
     }
 
-    shardObserveInsertsOp(opCtx,
-                          nss,
-                          first,
-                          last,
-                          opTimeList,
-                          *shardingWriteRouter,
-                          defaultFromMigrate,
-                          inMultiDocumentTransaction);
-
     if (opAccumulator) {
         opAccumulator->opTimes = opTimeList;
         shardingWriteRouterInsertsOpStateAccumulatorDecoration(opAccumulator) =
@@ -1024,18 +1015,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
         onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord);
-    }
-
-    if (args.coll->ns() != NamespaceString::kSessionTransactionsTableNamespace) {
-        if (args.updateArgs->source != OperationSource::kFromMigrate) {
-            shardObserveUpdateOp(opCtx,
-                                 args.coll->ns(),
-                                 args.updateArgs->preImageDoc,
-                                 args.updateArgs->updatedDoc,
-                                 opTime.writeOpTime,
-                                 *shardingWriteRouter,
-                                 inMultiDocumentTransaction);
-        }
     }
 
     if (opAccumulator) {

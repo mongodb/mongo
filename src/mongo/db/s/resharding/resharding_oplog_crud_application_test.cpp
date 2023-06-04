@@ -31,6 +31,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/persistent_task_store.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
@@ -91,14 +91,14 @@ public:
             mongoDSessionCatalog->onStepUp(opCtx.get());
             LogicalSessionCache::set(serviceContext, std::make_unique<LogicalSessionCacheNoop>());
 
-            // OpObserverShardingImpl is required for timestamping the writes from
+            // OpObserverImpl is required for timestamping the writes from
             // ReshardingOplogApplicationRules.
             auto opObserverRegistry =
                 dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
             invariant(opObserverRegistry);
 
             opObserverRegistry->addObserver(
-                std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterImpl>()));
+                std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
             opObserverRegistry->addObserver(
                 std::make_unique<MigrationChunkClonerSourceOpObserver>());
         }

@@ -42,11 +42,12 @@ namespace mongo {
  * OpObserver methods.
  *
  * This class replaces OpObserverShardingImpl without deriving directly from OpObserverImpl
- * while implementing the standard OpObserver methods.
+ * while implementing the standard OpObserver methods. OpObserverShardingImpl was removed in
+ * SERVER-76271.
  *
  * See ShardServerOpObserver.
  */
-class MigrationChunkClonerSourceOpObserver : public OpObserverNoop {
+class MigrationChunkClonerSourceOpObserver final : public OpObserverNoop {
 public:
     /**
      * Write operations do shard version checking, but if an update operation runs as part of a
