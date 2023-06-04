@@ -139,7 +139,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(rename_collection::checkAuthForRenameCollectionCommand(
-                opCtx->getClient(), ns().db().toString(), request().toBSON(BSONObj())));
+                opCtx->getClient(), request()));
         }
 
         bool supportsWriteConcern() const override {
