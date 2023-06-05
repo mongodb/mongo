@@ -103,7 +103,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangAfterDroppingCollectionInTransitionToDedicatedConfigServer);
+MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -975,24 +975,37 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                 RemoveShardProgress::PENDING_RANGE_DELETIONS, boost::none, pendingRangeDeletions};
         }
 
-        // Drop the drained collections locally so the config server can transition back to catalog
-        // shard mode in the future without requiring users to manually drop them.
-        LOGV2(7509600, "Locally dropping drained collections", "shardId"_attr = name);
+        // Drop all tracked databases locally now that all user data has been drained so the config
+        // server can transition back to catalog shard mode without requiring users to manually drop
+        // them.
+        LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = name);
 
-        auto shardedCollections = _localCatalogClient->getCollections(opCtx, {});
-        for (auto&& collection : shardedCollections) {
+        auto trackedDBs =
+            _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        for (auto&& db : trackedDBs) {
+            // Assume no multitenancy since we're dropping all user namespaces.
+            const auto dbName = DatabaseNameUtil::deserialize(boost::none, db.getName());
+            tassert(7783700,
+                    "Cannot drop admin or config database from the config server",
+                    dbName != DatabaseName::kConfig && dbName != DatabaseName::kAdmin);
+
             DBDirectClient client(opCtx);
-
             BSONObj result;
-            if (!client.dropCollection(
-                    collection.getNss(), ShardingCatalogClient::kLocalWriteConcern, &result)) {
-                // Note attempting to drop a non-existent collection does not return an error, so
-                // it's safe to assert the status is ok even if an earlier attempt was interrupted
-                // by a failover.
+            if (!client.dropDatabase(dbName, ShardingCatalogClient::kLocalWriteConcern, &result)) {
                 uassertStatusOK(getStatusFromCommandResult(result));
             }
 
-            hangAfterDroppingCollectionInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
+            hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
+        }
+
+        // Also drop the sessions collection, which we assume is the only sharded collection in the
+        // config database.
+        DBDirectClient client(opCtx);
+        BSONObj result;
+        if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
+                                   ShardingCatalogClient::kLocalWriteConcern,
+                                   &result)) {
+            uassertStatusOK(getStatusFromCommandResult(result));
         }
     }
 
