@@ -725,9 +725,9 @@ main(int argc, char *argv[])
     }
     if (!verify_only) {
         /* Make both the home directory and the bucket directory under the home. */
-        testutil_make_work_dir(home);
-        testutil_check(__wt_snprintf(bucket_dir, sizeof(bucket_dir), "%s/%s", working_dir, BUCKET));
-        testutil_make_work_dir(bucket_dir);
+        testutil_recreate_dir(home);
+        testutil_snprintf(bucket_dir, sizeof(bucket_dir), "%s/%s", working_dir, BUCKET);
+        testutil_mkdir(bucket_dir);
 
         __wt_random_init_seed(NULL, &rnd);
         if (rand_time) {
@@ -1002,7 +1002,7 @@ main(int argc, char *argv[])
         /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
         if (chdir("../") != 0)
             testutil_die(errno, "root chdir: %s", home);
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     }
     testutil_cleanup(opts);
     return (EXIT_SUCCESS);

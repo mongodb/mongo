@@ -712,13 +712,13 @@ main(int argc, char *argv[])
     /* Create the database, run the test, and fail. */
     if (!verify_only) {
         /* Create the test's home directory. */
-        testutil_make_work_dir(home);
+        testutil_recreate_dir(home);
 
         /* Set up the test subdirectories. */
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR));
-        testutil_make_work_dir(buf);
+        testutil_mkdir(buf);
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR));
-        testutil_make_work_dir(buf);
+        testutil_mkdir(buf);
 
         /* Set up LazyFS. */
         if (use_lazyfs)
@@ -839,7 +839,7 @@ main(int argc, char *argv[])
 
     /* Delete the work directory. */
     if (ret == EXIT_SUCCESS && !preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
 
     return (ret);
 }

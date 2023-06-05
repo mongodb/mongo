@@ -531,7 +531,7 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
     WT_SESSION *session;
     uint32_t granularity;
     int nfiles, ret;
-    char buf[4096];
+    char buf[4096], copy_from[PATH_MAX], copy_to[PATH_MAX];
     char *filename;
     char granularity_unit;
     const char *cons;
@@ -541,10 +541,7 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
     VERBOSE(2, "BASE BACKUP: %s\n", backup_home);
     active_files_free(active);
     active_files_init(active);
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), "rm -rf %s && mkdir %s", backup_home, backup_home));
-    VERBOSE(3, " => %s\n", buf);
-    testutil_check(system(buf));
+    testutil_recreate_dir(backup_home);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     tinfo->full_backup_number = tinfo->incr_backup_number++;
@@ -572,10 +569,10 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
         nfiles++;
         testutil_check(cursor->get_key(cursor, &filename));
         active_files_add(active, filename);
-        testutil_check(
-          __wt_snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, backup_home, filename));
-        VERBOSE(3, " => %s\n", buf);
-        testutil_check(system(buf));
+        testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s", home, filename);
+        testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", backup_home, filename);
+        VERBOSE(3, " => copy %s %s\n", copy_from, copy_to);
+        testutil_copy(copy_from, copy_to);
     }
     testutil_assert(ret == WT_NOTFOUND);
     testutil_check(cursor->close(cursor));
@@ -617,7 +614,7 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
     ssize_t rdsize;
     uint64_t offset, size, type;
     int rfd, ret, wfd, nfiles, nrange, ncopy;
-    char buf[4096], rbuf[4096], wbuf[4096];
+    char buf[4096], copy_from[PATH_MAX], copy_to[PATH_MAX], rbuf[4096], wbuf[4096];
     char *filename;
 
     VERBOSE(2, "INCREMENTAL BACKUP: %s\n", backup_home);
@@ -645,10 +642,10 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
              * indicated to be changed. This may be useful for debugging problems that occur in
              * backup. This path is typically disabled for the test program.
              */
-            testutil_check(__wt_snprintf(
-              buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, backup_home, filename));
-            VERBOSE(3, " => %s\n", buf);
-            testutil_check(system(buf));
+            testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s", home, filename);
+            testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", backup_home, filename);
+            VERBOSE(3, " => copy %s %s\n", copy_from, copy_to);
+            testutil_copy(copy_from, copy_to);
         } else {
             /*
              * Here is the normal incremental backup. Now that we know what file has changed, we get
@@ -680,10 +677,10 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
                     free(tmp);
                 } else {
                     ncopy++;
-                    testutil_check(__wt_snprintf(
-                      buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, backup_home, filename));
-                    VERBOSE(3, " => %s\n", buf);
-                    testutil_check(system(buf));
+                    testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s", home, filename);
+                    testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", backup_home, filename);
+                    VERBOSE(3, " => copy %s %s\n", copy_from, copy_to);
+                    testutil_copy(copy_from, copy_to);
                 }
             }
             testutil_assert(ret == WT_NOTFOUND);
@@ -793,14 +790,12 @@ check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinf
     WT_CONNECTION *conn;
     WT_SESSION *session;
     uint32_t slot;
-    char buf[4096];
 
     VERBOSE(
       2, "CHECK BACKUP: copy %s to %s, then check %s\n", backup_home, backup_check, backup_check);
 
-    testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "rm -rf %s && cp -r %s %s", backup_check, backup_home, backup_check));
-    testutil_check(system(buf));
+    testutil_remove(backup_check);
+    testutil_copy(backup_home, backup_check);
 
     testutil_check(wiredtiger_open(backup_check, NULL, CONN_CONFIG_COMMON, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -824,13 +819,13 @@ main(int argc, char *argv[])
     ACTIVE_FILES active;
     TABLE_INFO tinfo;
     WT_CONNECTION *conn;
+    WT_FILE_COPY_OPTS copy_opts;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
     uint32_t file_max, iter, max_value_size, next_checkpoint, rough_size, slot;
-    int ch, ncheckpoints, nreopens, status;
+    int ch, ncheckpoints, nreopens;
     const char *backup_verbose, *working_dir;
-    char backup_check[1024], backup_dir[1024], backup_src[1024], command[4096], conf[1024],
-      home[1024];
+    char backup_check[1024], backup_dir[1024], backup_src[1024], conf[1024], home[1024];
     bool preserve;
 
     preserve = false;
@@ -839,6 +834,9 @@ main(int argc, char *argv[])
     custom_die = die; /* Set our own abort handler */
     WT_CLEAR(tinfo);
     active_files_init(&active);
+
+    memset(&copy_opts, 0, sizeof(copy_opts));
+    copy_opts.preserve = true;
 
     working_dir = "WT_TEST.incr_backup";
 
@@ -876,10 +874,8 @@ main(int argc, char *argv[])
     testutil_check(__wt_snprintf(backup_src, sizeof(backup_src), "./%s.BACKUP.SRC", home));
     printf("Seed: %" PRIu64 "\n", seed);
 
-    testutil_check(
-      __wt_snprintf(command, sizeof(command), "rm -rf %s %s; mkdir %s", home, backup_dir, home));
-    if ((status = system(command)) < 0)
-        testutil_die(status, "system: %s", command);
+    testutil_recreate_dir(home);
+    testutil_remove(backup_dir);
 
     backup_verbose = (verbose_level >= 4) ? "verbose=(backup)" : "";
 
@@ -964,10 +960,8 @@ main(int argc, char *argv[])
             VERBOSE(2, "Close and reopen the connection %d\n", nreopens);
             testutil_check(conn->close(conn, NULL));
             /* Check the source bitmap after restart. Copy while closed. */
-            testutil_check(__wt_snprintf(command, sizeof(command),
-              "rm -rf %s; mkdir %s; cp -rp %s/* %s", backup_src, backup_src, home, backup_src));
-            if ((status = system(command)) < 0)
-                testutil_die(status, "system: %s", command);
+            testutil_remove(backup_src);
+            testutil_copy_ext(home, backup_src, &copy_opts);
 
             testutil_check(wiredtiger_open(home, NULL, conf, &conn));
             testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -997,7 +991,7 @@ main(int argc, char *argv[])
     printf("Success.\n");
     if (!preserve) {
         testutil_clean_test_artifacts(home);
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     }
 
     return (EXIT_SUCCESS);

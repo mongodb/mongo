@@ -175,7 +175,7 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler, "create", &opts->conn));
 

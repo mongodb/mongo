@@ -332,7 +332,7 @@ run_check_subtest(
     testutil_assert(narg <= MAX_ARGS);
     if (opts->verbose)
         printf("running a separate process with %" PRIu64 " operations until fail...\n", nops);
-    testutil_clean_work_dir(opts->home);
+    testutil_remove(opts->home);
     run_process(opts, debugger != NULL ? debugger : opts->argv0, subtest_args, &estatus);
     if (opts->verbose)
         printf("process exited %d\n", estatus);
@@ -509,7 +509,7 @@ subtest_main(int argc, char *argv[], bool close_test)
     /* No core files during fault injection tests. */
     testutil_check(setrlimit(RLIMIT_CORE, &rlim));
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     /* Redirect stderr, stdout. */
     testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE));
@@ -702,7 +702,7 @@ main(int argc, char *argv[])
     } else
         run_check_subtest(opts, debugger, opts->nops, opts->nrecords, &nresults);
 
-    testutil_clean_work_dir(opts->home);
+    testutil_remove(opts->home);
     testutil_cleanup(opts);
 
     return (0);

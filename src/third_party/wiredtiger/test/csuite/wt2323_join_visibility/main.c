@@ -102,7 +102,7 @@ main(int argc, char *argv[])
     memset(sharedopts, 0, sizeof(*sharedopts));
 
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);

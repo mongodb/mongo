@@ -308,7 +308,7 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     __wt_random_init_seed(NULL, &rnd);
     if (rand_time) {
@@ -408,7 +408,7 @@ main(int argc, char *argv[])
         /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
         if (chdir("../") != 0)
             testutil_die(errno, "root chdir: %s", home);
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     }
     return (EXIT_SUCCESS);
 }

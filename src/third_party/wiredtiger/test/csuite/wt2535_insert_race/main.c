@@ -102,7 +102,7 @@ main(int argc, char *argv[])
     opts->nrecords = 100 * WT_THOUSAND;
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=2G,eviction=(threads_max=5),statistics=(all),statistics_log=(json,on_"

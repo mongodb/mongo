@@ -1306,13 +1306,10 @@ main(int argc, char *argv[])
     }
     printf("CONFIG:%s\n", args);
     if (!verify_only) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s", home));
-        if ((status = system(buf)) < 0)
-            testutil_die(status, "system: %s", buf);
-        testutil_make_work_dir(home);
+        testutil_recreate_dir(home);
         if (LF_ISSET(TEST_TIERED)) {
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", home));
-            testutil_make_work_dir(buf);
+            testutil_snprintf(buf, sizeof(buf), "%s/bucket", home);
+            testutil_mkdir(buf);
         }
 
         __wt_random_init_seed(NULL, &rnd);
@@ -1383,7 +1380,7 @@ main(int argc, char *argv[])
 
     if (!preserve) {
         testutil_clean_test_artifacts(home);
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     }
 
     return (EXIT_SUCCESS);

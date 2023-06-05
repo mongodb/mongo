@@ -1157,21 +1157,21 @@ main(int argc, char *argv[])
     /* Create the database, run the test, and fail. */
     if (!verify_only) {
         /* Create the test's home directory. */
-        testutil_make_work_dir(home);
+        testutil_recreate_dir(home);
 
         /* Set up the test subdirectories. */
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR));
-        testutil_make_work_dir(buf);
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR));
-        testutil_make_work_dir(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR);
+        testutil_mkdir(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR);
+        testutil_mkdir(buf);
 
         /* Set up LazyFS. */
         if (use_lazyfs)
             testutil_lazyfs_setup(&lazyfs, home);
 
         if (opts->tiered_storage) {
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s/bucket", home, WT_HOME_DIR));
-            testutil_make_work_dir(buf);
+            testutil_snprintf(buf, sizeof(buf), "%s/%s/bucket", home, WT_HOME_DIR);
+            testutil_mkdir(buf);
         }
 
         if (rand_time) {
@@ -1467,7 +1467,7 @@ main(int argc, char *argv[])
 
     /* Delete the work directory. */
     if (ret == EXIT_SUCCESS && !opts->preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
 
     testutil_cleanup(opts);
     return (ret);
