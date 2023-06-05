@@ -35,7 +35,8 @@ const assertExpectedResults = (results,
                                expectedDocsReturnedSum,
                                expectedDocsReturnedMax,
                                expectedDocsReturnedMin,
-                               expectedDocsReturnedSumOfSq) => {
+                               expectedDocsReturnedSumOfSq,
+                               getMores) => {
     const {key, metrics} = results;
     confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
@@ -47,16 +48,39 @@ const assertExpectedResults = (results,
     },
                  metrics.docsReturned);
 
+    const {
+        firstSeenTimestamp,
+        latestSeenTimestamp,
+        lastExecutionMicros,
+        totalExecMicros,
+        firstResponseExecMicros
+    } = metrics;
+
     // This test can't predict exact timings, so just assert these three fields have been set (are
     // non-zero).
-    const {firstSeenTimestamp, lastExecutionMicros, queryExecMicros} = metrics;
-
-    assert.neq(timestampCmp(firstSeenTimestamp, Timestamp(0, 0)), 0);
     assert.neq(lastExecutionMicros, NumberLong(0));
+    assert.neq(firstSeenTimestamp.getTime(), 0);
+    assert.neq(latestSeenTimestamp.getTime(), 0);
 
     const distributionFields = ['sum', 'max', 'min', 'sumOfSquares'];
     for (const field of distributionFields) {
-        assert.neq(queryExecMicros[field], NumberLong(0));
+        assert.neq(totalExecMicros[field], NumberLong(0));
+        assert.neq(firstResponseExecMicros[field], NumberLong(0));
+        if (getMores) {
+            // If there are getMore calls, totalExecMicros fields should be greater than or equal to
+            // firstResponseExecMicros.
+            if (field == 'min' || field == 'max') {
+                // In the case that we've executed multiple queries with the same shape, it is
+                // possible for the min or max to be equal.
+                assert.gte(totalExecMicros[field], firstResponseExecMicros[field]);
+            } else {
+                assert.gt(totalExecMicros[field], firstResponseExecMicros[field]);
+            }
+        } else {
+            // If there are no getMore calls, totalExecMicros fields should be equal to
+            // firstResponseExecMicros.
+            assert.eq(totalExecMicros[field], firstResponseExecMicros[field]);
+        }
     }
 };
 
@@ -101,7 +125,8 @@ const assertExpectedResults = (results,
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 2,
-                          /* expectedDocsReturnedSumOfSq */ 4);
+                          /* expectedDocsReturnedSumOfSq */ 4,
+                          /* getMores */ true);
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
     // are accurate.
@@ -116,7 +141,8 @@ const assertExpectedResults = (results,
                           /* expectedDocsReturnedSum */ 3,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 0,
-                          /* expectedDocsReturnedSumOfSq */ 5);
+                          /* expectedDocsReturnedSumOfSq */ 5,
+                          /* getMores */ true);
 
     st.stop();
 }
@@ -169,7 +195,8 @@ const assertExpectedResults = (results,
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 2,
-                          /* expectedDocsReturnedSumOfSq */ 4);
+                          /* expectedDocsReturnedSumOfSq */ 4,
+                          /* getMores */ true);
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
     // are accurate.
@@ -193,7 +220,8 @@ const assertExpectedResults = (results,
                           /* expectedDocsReturnedSum */ 5,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 0,
-                          /* expectedDocsReturnedSumOfSq */ 9);
+                          /* expectedDocsReturnedSumOfSq */ 9,
+                          /* getMores */ true);
 
     st.stop();
 }
@@ -231,7 +259,8 @@ const assertExpectedResults = (results,
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 1,
                           /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 2);
+                          /* expectedDocsReturnedSumOfSq */ 2,
+                          /* getMores */ false);
     st.stop();
 }
 
@@ -274,7 +303,8 @@ const assertExpectedResults = (results,
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 1,
                           /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 2);
+                          /* expectedDocsReturnedSumOfSq */ 2,
+                          /* getMores */ false);
     st.stop();
 }
 }());

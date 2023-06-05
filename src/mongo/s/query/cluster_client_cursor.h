@@ -234,6 +234,9 @@ public:
 
     void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
         _metrics.add(newMetrics);
+        if (!_firstResponseExecutionTime) {
+            _firstResponseExecutionTime = _metrics.executionTime;
+        }
     }
 
     //
@@ -276,6 +279,9 @@ protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
+
+    // The execution time collected from the initial operation prior to any getMore requests.
+    boost::optional<Microseconds> _firstResponseExecutionTime;
 
 private:
     // Unused maxTime budget for this cursor.

@@ -145,6 +145,7 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
                                      _queryStatsStoreKeyHash,
                                      std::move(_queryStatsRequestShapifier),
                                      _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
                                      _metrics.nreturned.value_or(0));
     }
 

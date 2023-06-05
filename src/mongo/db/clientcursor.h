@@ -209,6 +209,9 @@ public:
 
     void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
         _metrics.add(newMetrics);
+        if (!_firstResponseExecutionTime) {
+            _firstResponseExecutionTime = _metrics.executionTime;
+        }
     }
 
     /**
@@ -464,6 +467,9 @@ private:
 
     // Flag indicating that a client has requested to kill the cursor.
     bool _killPending = false;
+
+    // The execution time collected from the initial operation prior to any getMore requests.
+    boost::optional<Microseconds> _firstResponseExecutionTime;
 };
 
 /**

@@ -325,6 +325,7 @@ void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<RequestShapifier> requestShapifier,
                      const uint64_t queryExecMicros,
+                     const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
     if (!queryStatsKeyHash) {
         return;
@@ -361,9 +362,11 @@ void writeQueryStats(OperationContext* opCtx,
         metrics = newMetrics.getValue()->second;
     }
 
+    metrics->latestSeenTimestamp = Date_t::now();
     metrics->lastExecutionMicros = queryExecMicros;
     metrics->execCount++;
-    metrics->queryExecMicros.aggregate(queryExecMicros);
+    metrics->totalExecMicros.aggregate(queryExecMicros);
+    metrics->firstResponseExecMicros.aggregate(firstResponseExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
 }
 }  // namespace query_stats

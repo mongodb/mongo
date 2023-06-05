@@ -91,6 +91,19 @@ const fooNeBatchSize = 3;
     assert.eq(telemetryResults[1].metrics.docsReturned.sum, fooNeBatchSize);
 
     verifyMetrics(telemetryResults);
+
+    const distributionFields = ['sum', 'max', 'min', 'sumOfSquares'];
+    for (const field of distributionFields) {
+        // If there are getMore calls, queryExecMicros should be greater than or equal to
+        // firstResponseExecMicros.
+        assert.gt(telemetryResults[0].metrics.totalExecMicros[field],
+                  telemetryResults[0].metrics.firstResponseExecMicros[field]);
+
+        // If there is no getMore calls, firstResponseExecMicros and queryExecMicros should be
+        // equal.
+        assert.eq(telemetryResults[1].metrics.totalExecMicros[field],
+                  telemetryResults[1].metrics.firstResponseExecMicros[field]);
+    }
 }
 
 // Assert that options such as limit/sort create different keys, and that repeating a query shape
