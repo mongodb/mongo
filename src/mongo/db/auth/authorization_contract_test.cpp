@@ -165,5 +165,28 @@ TEST(AuthContractTest, InitializerList) {
     ASSERT_TRUE(ac2.contains(ac1));
 }
 
+TEST(AuthContractTest, NonTestModeCheck) {
+    AuthorizationContract ac(/* isTestModeEnabled */ false);
+    ac.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
+    ac.addAccessCheck(AccessCheckEnum::kIsCoAuthorized);
+
+    ActionSet enableShardingActions;
+    enableShardingActions.addAction(ActionType::enableSharding);
+    enableShardingActions.addAction(ActionType::refineCollectionShardKey);
+    enableShardingActions.addAction(ActionType::reshardCollection);
+    ac.addPrivilege(Privilege(ResourcePattern::forAnyNormalResource(), enableShardingActions));
+
+    // Non-test mode will not keep accounting and will not take any mutex guard
+    ASSERT_FALSE(ac.hasAccessCheck(AccessCheckEnum::kIsAuthenticated));
+    ASSERT_FALSE(ac.hasAccessCheck(AccessCheckEnum::kIsCoAuthorized));
+
+    ASSERT_FALSE(ac.hasPrivileges(
+        Privilege(ResourcePattern::forAnyNormalResource(), ActionType::enableSharding)));
+    ASSERT_FALSE(ac.hasPrivileges(
+        Privilege(ResourcePattern::forAnyNormalResource(), ActionType::refineCollectionShardKey)));
+    ASSERT_FALSE(ac.hasPrivileges(
+        Privilege(ResourcePattern::forAnyNormalResource(), ActionType::reshardCollection)));
+}
+
 }  // namespace
 }  // namespace mongo
