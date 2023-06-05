@@ -40,7 +40,7 @@ found = False
 found_primitives = []
 start_regex = "^(\+|-).*"
 for primitive in primitives:
-    if (re.search(start_regex + primitive, diff)):
+    if (re.search(start_regex + primitive, diff, re.MULTILINE)):
         found_primitives.append(primitive)
         found = True
 
