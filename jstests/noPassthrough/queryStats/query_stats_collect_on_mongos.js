@@ -98,8 +98,8 @@ const assertExpectedResults = (results,
             command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
-        batchSize: "?number",
         readConcern: {level: "local", provenance: "implicitDefault"},
+        batchSize: "?number",
         client: {application: {name: "MongoDB Shell"}}
     };
 
@@ -240,8 +240,8 @@ const assertExpectedResults = (results,
             command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
-        batchSize: "?number",
         readConcern: {level: "local", provenance: "implicitDefault"},
+        batchSize: "?number",
         client: {application: {name: "MongoDB Shell"}}
     };
 

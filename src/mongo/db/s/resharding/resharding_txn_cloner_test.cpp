@@ -37,6 +37,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"

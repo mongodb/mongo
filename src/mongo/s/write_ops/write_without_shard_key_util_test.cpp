@@ -29,6 +29,7 @@
 
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"

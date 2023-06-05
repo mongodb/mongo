@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 
 namespace mongo {

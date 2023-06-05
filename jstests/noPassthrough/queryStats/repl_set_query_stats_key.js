@@ -35,7 +35,9 @@ function confirmCommandFieldsPresent(queryStatsKey, commandObj) {
         if (field == "queryShape" || field == "client" || field == "command") {
             continue;
         }
-        assert(commandObj.hasOwnProperty(field), field);
+        assert(commandObj.hasOwnProperty(field),
+               `${field} is present in the query stats key but not present in command obj: ${
+                   tojson(queryStatsKey)}, ${tojson(commandObj)}`);
     }
     assert.eq(Object.keys(queryStatsKey).length, Object.keys(commandObj).length, queryStatsKey);
 }
@@ -75,8 +77,8 @@ delete commandObj["apiVersion"];
 delete commandObj["apiStrict"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
 telemetry = getTelemetryReplSet(replSetConn, collName);
-confirmCommandFieldsPresent(telemetry[2].key, commandObj);
-assert.eq(telemetry[2].key["readConcern"], {level: "local"});
+assert.eq(telemetry[1].key["readConcern"], {level: "local"});
+confirmCommandFieldsPresent(telemetry[1].key, commandObj);
 
 replTest.stopSet();
 })();

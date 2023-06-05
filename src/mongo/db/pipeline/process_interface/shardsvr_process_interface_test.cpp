@@ -28,9 +28,11 @@
  */
 
 #include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 

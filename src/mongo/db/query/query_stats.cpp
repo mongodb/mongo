@@ -270,27 +270,17 @@ std::size_t hash(const BSONObj& obj) {
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
                                               TransformAlgorithm algorithm,
                                               std::string hmacKey) const {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementForLiteralArgs;
-    switch (algorithm) {
-        case TransformAlgorithm::kHmacSha256:
-            options.transformIdentifiers = true;
-            options.transformIdentifiersCallback = [&](StringData sd) {
-                return sha256HmacStringDataHasher(hmacKey, sd);
-            };
-            break;
-        case TransformAlgorithm::kNone:
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-    return requestShapifier->makeQueryStatsKey(options, opCtx);
+    return keyGenerator->generate(
+        opCtx,
+        algorithm == TransformAlgorithm::kHmacSha256
+            ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
+                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
+            : boost::none);
 }
 
 void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<RequestShapifier>(void)> makeShapifier) {
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
     auto opCtx = expCtx->opCtx;
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
@@ -304,13 +294,9 @@ void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementForLiteralArgs;
     auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryStatsRequestShapifier = makeShapifier();
-    opDebug.queryStatsStoreKeyHash =
-        hash(opDebug.queryStatsRequestShapifier->makeQueryStatsKey(options, expCtx));
+    opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
@@ -323,7 +309,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     std::unique_ptr<KeyGenerator> keyGenerator,
                      const uint64_t queryExecMicros,
                      const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
@@ -338,13 +324,12 @@ void writeQueryStats(OperationContext* opCtx,
         metrics = *statusWithMetrics.getValue();
     } else {
         tassert(7315200,
-                "requestShapifier cannot be null when writing a new entry to the telemetry store",
-                requestShapifier != nullptr);
-        size_t numEvicted =
-            queryStatsStore.put(*queryStatsKeyHash,
-                                std::make_shared<QueryStatsEntry>(std::move(requestShapifier),
-                                                                  CurOp::get(opCtx)->getNSS()),
-                                partitionLock);
+                "keyGenerator cannot be null when writing a new entry to the telemetry store",
+                keyGenerator != nullptr);
+        size_t numEvicted = queryStatsStore.put(
+            *queryStatsKeyHash,
+            std::make_shared<QueryStatsEntry>(std::move(keyGenerator), CurOp::get(opCtx)->getNSS()),
+            partitionLock);
         queryStatsEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*queryStatsKeyHash);
         if (!newMetrics.isOK()) {

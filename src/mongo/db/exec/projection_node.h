@@ -32,7 +32,7 @@
 #include <list>
 
 #include "mongo/db/exec/projection_executor.h"
-
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/query/projection_policies.h"
 
 namespace mongo::projection_executor {

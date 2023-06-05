@@ -307,8 +307,10 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
 
 }  // namespace
 
-// TODO SERVER-76329 use the new policy.
-const SerializationOptions SerializationOptions::kDefaultQueryShapeSerializeOptions =
+const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerializeOptions =
+    SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+
+const SerializationOptions SerializationOptions::kDebugQueryShapeSerializeOptions =
     SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
 // Overloads for BSONElem and Value.

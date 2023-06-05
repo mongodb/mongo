@@ -70,9 +70,12 @@ enum class LiteralSerializationPolicy {
  * A struct with options for how you want to serialize a match or aggregation expression.
  */
 struct SerializationOptions {
+    using TokenizeIdentifierFunc = std::function<std::string(StringData)>;
+
     // The default serialization options for a query shape. No need to redact identifiers for the
     // this purpose. We may do that on the $queryStats read path.
-    static const SerializationOptions kDefaultQueryShapeSerializeOptions;
+    static const SerializationOptions kRepresentativeQueryShapeSerializeOptions;
+    static const SerializationOptions kDebugQueryShapeSerializeOptions;
 
     SerializationOptions() {}
 

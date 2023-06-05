@@ -36,6 +36,8 @@
 
 namespace mongo::query_shape {
 
+using QueryShapeHash = SHA256Block;
+
 constexpr StringData kLiteralArgString = "?"_sd;
 
 /**
@@ -72,4 +74,8 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
                           const Pipeline& pipeline,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt);
+
+QueryShapeHash hash(const BSONObj& queryShape);
 }  // namespace mongo::query_shape

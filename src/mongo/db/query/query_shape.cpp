@@ -33,6 +33,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_shape_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 
 namespace mongo::query_shape {
@@ -135,13 +136,11 @@ void addRemainingFindCommandFields(BSONObjBuilder* bob,
                                    const SerializationOptions& opts) {
     for (auto [fieldName, getterFunction] : boolArgMap) {
         auto optBool = getterFunction(findCommand);
-        if (optBool.has_value()) {
-            opts.appendLiteral(bob, fieldName, optBool.value_or(false));
-        }
+        optBool.serializeToBSON(fieldName, bob);
     }
     auto collation = findCommand.getCollation();
     if (!collation.isEmpty()) {
-        opts.appendLiteral(bob, FindCommandRequest::kCollationFieldName, collation);
+        bob->append(FindCommandRequest::kCollationFieldName, collation);
     }
 }
 
@@ -184,9 +183,8 @@ BSONObj extractLetSpecShape(BSONObj letSpec,
 
     BSONObjBuilder bob;
     for (BSONElement elem : letSpec) {
-        auto redactedValue =
-            Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState)
-                ->serialize(opts);
+        auto expr = Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
+        auto redactedValue = expr->serialize(opts);
         // Note that this will throw on deeply nested let variables.
         redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
     }
@@ -216,6 +214,7 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
         } else {
             BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
             cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid()->toString()));
+            cmdNs.append("db", opts.serializeIdentifier(ns.dbname()));
             cmdNs.done();
         }
     }
@@ -321,5 +320,30 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
         bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
     }
     return bob.obj();
+}
+
+NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt) {
+    tassert(7632900, "cmdNs must be an object.", cmdNsElt.type() == BSONType::Object);
+    auto cmdNs = CommandNamespace::parse(IDLParserContext("cmdNs"), cmdNsElt.embeddedObject());
+
+    boost::optional<TenantId> tenantId = cmdNs.getTenantId().map(TenantId::parseFromString);
+
+    if (cmdNs.getColl().has_value()) {
+        tassert(7632903,
+                "Exactly one of 'uuid' and 'coll' can be defined.",
+                !cmdNs.getUuid().has_value());
+        return NamespaceString(cmdNs.getDb(), cmdNs.getColl().value());
+    } else {
+        tassert(7632904,
+                "Exactly one of 'uuid' and 'coll' can be defined.",
+                !cmdNs.getColl().has_value());
+        UUID uuid = uassertStatusOK(UUID::parse(cmdNs.getUuid().value().toString()));
+        return NamespaceStringOrUUID(cmdNs.getDb().toString(), uuid, tenantId);
+    }
+}
+
+QueryShapeHash hash(const BSONObj& queryShape) {
+    return QueryShapeHash::computeHash(reinterpret_cast<const uint8_t*>(queryShape.objdata()),
+                                       queryShape.objsize());
 }
 }  // namespace mongo::query_shape

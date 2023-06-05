@@ -31,7 +31,7 @@
 
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/query/query_stats_key_generator.h"
 
 namespace mongo::query_stats {
 
@@ -40,34 +40,47 @@ namespace mongo::query_stats {
  * avoid parsing the raw pipeline multiple times, but users should be sure to provide a
  * non-optimized pipeline.
  */
-class AggregateRequestShapifier final : public RequestShapifier {
+class AggregateKeyGenerator final : public KeyGenerator {
 public:
-    AggregateRequestShapifier(AggregateCommandRequest request,
-                              const Pipeline& pipeline,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : RequestShapifier(expCtx->opCtx),
+    AggregateKeyGenerator(AggregateCommandRequest request,
+                          const Pipeline& pipeline,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : KeyGenerator(
+              expCtx->opCtx,
+              // TODO: SERVER-76330 Store representative agg query shape in telemetry store.
+              BSONObj()),
           _request(std::move(request)),
           _initialQueryStatsKey(_makeQueryStatsKeyHelper(
-              SerializationOptions::kDefaultQueryShapeSerializeOptions, expCtx, pipeline)) {}
+              SerializationOptions::kDebugQueryShapeSerializeOptions, expCtx, pipeline)) {
+        _queryShapeHash = query_shape::hash(*_initialQueryStatsKey);
+    }
 
-    // Each of these makeQueryStatsKey variations configures the necessary expression context and
-    // parsed Pipeline, but _makeQueryStatsHelper does the core work of generating the key.
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              OperationContext* opCtx) const final;
+    BSONObj generate(OperationContext* opCtx,
+                     boost::optional<SerializationOptions::TokenizeIdentifierFunc>) const final;
 
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+
+    BSONObj makeQueryStatsKeyForTest(const SerializationOptions& opts,
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+        return makeQueryStatsKey(opts, expCtx);
+    }
+
+protected:
+    void appendCommandSpecificComponents(BSONObjBuilder& bob,
+                                         const SerializationOptions& opts) const final override;
 
 private:
     BSONObj _makeQueryStatsKeyHelper(const SerializationOptions& opts,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      const Pipeline& pipeline) const;
 
+    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const;
+
     boost::intrusive_ptr<ExpressionContext> makeDummyExpCtx(OperationContext* opCtx) const {
         // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
         // to mongot.
-        // TODO SERVER-76220 look into if this could be consolidated between request shapifier types
-        // and potentially remove one of the makeQueryStatsKey() overrides
+        // TODO SERVER-76220 look into if this could be consolidated between query stats key
+        // generator types and potentially remove one of the makeQueryStatsKey() overrides
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, _request.getNamespace());
         expCtx->variables.setDefaultRuntimeConstants(opCtx);
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
@@ -79,9 +92,8 @@ private:
         return expCtx;
     }
 
-
     // We make a copy of AggregateCommandRequest since this instance may outlive the
-    // original request once the RequestShapifier is moved to the query stats store.
+    // original request once the KeyGenerator is moved to the query stats store.
     AggregateCommandRequest _request;
 
     // This is computed and cached upon construction until asked for once - at which point this

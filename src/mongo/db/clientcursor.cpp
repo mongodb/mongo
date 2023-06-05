@@ -125,8 +125,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _queryStatsStoreKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsStoreKeyHash),
-      _queryStatsRequestShapifier(
-          std::move(CurOp::get(operationUsingCursor)->debug().queryStatsRequestShapifier)),
+      _queryStatsKeyGenerator(
+          std::move(CurOp::get(operationUsingCursor)->debug().queryStatsKeyGenerator)),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->debug().shouldOmitDiagnosticInformation),
       _opKey(operationUsingCursor->getOperationKey()) {
@@ -163,7 +163,7 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     if (_queryStatsStoreKeyHash && opCtx) {
         query_stats::writeQueryStats(opCtx,
                                      _queryStatsStoreKeyHash,
-                                     std::move(_queryStatsRequestShapifier),
+                                     std::move(_queryStatsKeyGenerator),
                                      _metrics.executionTime.value_or(Microseconds{0}).count(),
                                      _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
                                      _metrics.nreturned.value_or(0));
@@ -401,14 +401,14 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
 }
 
 void collectQueryStatsMongod(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier) {
+                             std::unique_ptr<query_stats::KeyGenerator> keyGenerator) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // query stats directly.
     auto& opDebug = CurOp::get(opCtx)->debug();
     int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
     query_stats::writeQueryStats(opCtx,
                                  opDebug.queryStatsStoreKeyHash,
-                                 std::move(requestShapifier),
+                                 std::move(keyGenerator),
                                  execTime,
                                  execTime,
                                  opDebug.additiveMetrics.nreturned.value_or(0));

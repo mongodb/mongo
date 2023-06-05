@@ -27,39 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/aggregate_request_shapifier.h"
+#include "mongo/db/query/query_stats_aggregate_key_generator.h"
 
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/serialization_options.h"
 
 namespace mongo::query_stats {
 
-BSONObj AggregateRequestShapifier::makeQueryStatsKey(const SerializationOptions& opts,
-                                                     OperationContext* opCtx) const {
-    return makeQueryStatsKey(opts, makeDummyExpCtx(opCtx));
+BSONObj AggregateKeyGenerator::generate(
+    OperationContext* opCtx,
+    boost::optional<SerializationOptions::TokenizeIdentifierFunc> hmacPolicy) const {
+    // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
+    // to mongot.
+    auto expCtx = makeDummyExpCtx(opCtx);
+
+    SerializationOptions opts = hmacPolicy
+        ? SerializationOptions(*hmacPolicy, LiteralSerializationPolicy::kToDebugTypeString)
+        : SerializationOptions(LiteralSerializationPolicy::kToDebugTypeString);
+
+    return makeQueryStatsKey(opts, expCtx);
 }
 
-BSONObj AggregateRequestShapifier::makeQueryStatsKey(
-    const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    if (_initialQueryStatsKey && !opts.transformIdentifiers &&
-        opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
-        auto tmp = std::move(*_initialQueryStatsKey);
-        _initialQueryStatsKey = boost::none;
-        return tmp;
-    }
-
-    auto pipeline = Pipeline::parse(_request.getPipeline(), expCtx);
-    return _makeQueryStatsKeyHelper(opts, expCtx, *pipeline);
-}
-
-BSONObj AggregateRequestShapifier::_makeQueryStatsKeyHelper(
-    const SerializationOptions& opts,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const Pipeline& pipeline) const {
-    BSONObjBuilder bob;
-
-    bob.append("queryShape", query_shape::extractQueryShape(_request, pipeline, opts, expCtx));
-
+void AggregateKeyGenerator::appendCommandSpecificComponents(
+    BSONObjBuilder& bob, const SerializationOptions& opts) const {
     // cursor
     if (auto param = _request.getCursor().getBatchSize()) {
         BSONObjBuilder cursorInfo = bob.subobjStart(AggregateCommandRequest::kCursorFieldName);
@@ -81,16 +72,19 @@ BSONObj AggregateRequestShapifier::_makeQueryStatsKeyHelper(
         opts.appendLiteral(
             &bob, AggregateCommandRequest::kBypassDocumentValidationFieldName, bool(param.get()));
     }
+}
 
-    // comment
-    if (_comment) {
-        opts.appendLiteral(&bob, "comment", *_comment);
-    }
+BSONObj AggregateKeyGenerator::makeQueryStatsKey(
+    const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    auto pipeline = Pipeline::parse(_request.getPipeline(), expCtx);
+    return _makeQueryStatsKeyHelper(opts, expCtx, *pipeline);
+}
 
-    if (_clientMetaData) {
-        bob.append("client", *_clientMetaData);
-    }
-
-    return bob.obj();
+BSONObj AggregateKeyGenerator::_makeQueryStatsKeyHelper(
+    const SerializationOptions& opts,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const Pipeline& pipeline) const {
+    return generateWithQueryShape(query_shape::extractQueryShape(_request, pipeline, opts, expCtx),
+                                  opts);
 }
 }  // namespace mongo::query_stats

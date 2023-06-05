@@ -51,13 +51,13 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
-#include "mongo/db/query/aggregate_request_shapifier.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_aggregate_key_generator.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -309,8 +309,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
         query_stats::registerRequest(expCtx, executionNss, [&]() {
-            return std::make_unique<query_stats::AggregateRequestShapifier>(
-                request, *pipeline, expCtx);
+            return std::make_unique<query_stats::AggregateKeyGenerator>(request, *pipeline, expCtx);
         });
     }
     return pipeline;
@@ -487,7 +486,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // query_stats::registerRequest.
             query_stats::registerRequest(expCtx, namespaces.executionNss, [&]() {
                 auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-                return std::make_unique<query_stats::AggregateRequestShapifier>(
+                return std::make_unique<query_stats::AggregateKeyGenerator>(
                     request, *pipeline, expCtx);
             });
         }

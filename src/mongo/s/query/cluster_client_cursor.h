@@ -270,10 +270,10 @@ public:
     virtual bool shouldOmitDiagnosticInformation() const = 0;
 
     /**
-     * Returns and releases ownership of the RequestShapifier associated with the request this
+     * Returns and releases ownership of the KeyGenerator associated with the request this
      * cursor is handling.
      */
-    virtual std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() = 0;
+    virtual std::unique_ptr<query_stats::KeyGenerator> getKeyGenerator() = 0;
 
 protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.

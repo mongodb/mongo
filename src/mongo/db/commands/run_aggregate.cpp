@@ -63,7 +63,6 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
-#include "mongo/db/query/aggregate_request_shapifier.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
@@ -78,6 +77,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_aggregate_key_generator.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -1012,7 +1012,7 @@ Status runAggregate(OperationContext* opCtx,
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
             query_stats::registerRequest(expCtx, nss, [&]() {
-                return std::make_unique<query_stats::AggregateRequestShapifier>(
+                return std::make_unique<query_stats::AggregateKeyGenerator>(
                     request, *pipeline, expCtx);
             });
         }

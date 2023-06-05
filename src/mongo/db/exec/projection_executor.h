@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_policies.h"
 
 namespace mongo::projection_executor {

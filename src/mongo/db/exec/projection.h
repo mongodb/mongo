@@ -33,6 +33,7 @@
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/record_id.h"
 
