@@ -86,22 +86,22 @@ protected:
     }
 
     /**
-     * addShard validates the host as a shard. It calls "isMaster" on the host to determine what
+     * addShard validates the host as a shard. It calls "hello" on the host to determine what
      * kind of host it is -- mongos, regular mongod, config mongod -- and whether the replica set
-     * details are correct. "isMasterResponse" defines the response of the "isMaster" request and
+     * details are correct. "helloResponse" defines the response of the "hello" request and
      * should be a command response BSONObj, or a failed Status.
      *
      * ShardingTestFixture::expectGetShards() should be called before this function, otherwise
-     * addShard will never reach the isMaster command -- a find query is called first.
+     * addShard will never reach the "hello" command -- a find query is called first.
      */
-    void expectIsMaster(const HostAndPort& target, StatusWith<BSONObj> isMasterResponse) {
-        onCommandForAddShard([&, target, isMasterResponse](const RemoteCommandRequest& request) {
+    void expectHello(const HostAndPort& target, StatusWith<BSONObj> helloResponse) {
+        onCommandForAddShard([&, target, helloResponse](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, "admin");
-            ASSERT_BSONOBJ_EQ(request.cmdObj, BSON("isMaster" << 1));
+            ASSERT_BSONOBJ_EQ(request.cmdObj, BSON("hello" << 1));
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
-            return isMasterResponse;
+            return helloResponse;
         });
     }
 
@@ -482,9 +482,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -569,9 +569,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -673,7 +673,7 @@ TEST_F(AddShardTest, UnreachableHost) {
     });
 
     Status hostUnreachableStatus = Status(ErrorCodes::HostUnreachable, "host unreachable");
-    expectIsMaster(shardTarget, hostUnreachableStatus);
+    expectHello(shardTarget, hostUnreachableStatus);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -698,9 +698,9 @@ TEST_F(AddShardTest, AddMongosAsShard) {
         ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     });
 
-    expectIsMaster(shardTarget,
-                   BSON("msg"
-                        << "isdbgrid"));
+    expectHello(shardTarget,
+                BSON("msg"
+                     << "isdbgrid"));
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -726,10 +726,10 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "use replica set url format");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "myOtherSet"
                                         << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -756,9 +756,9 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "host did not return a set name");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -785,10 +785,10 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "does not match the actual set name");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "myOtherSet"
                                         << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -817,10 +817,10 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
     });
 
     BSONObj commandResponse =
-        BSON("ok" << 1 << "ismaster" << true << "setName"
+        BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                   << "config"
                   << "configsvr" << true << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -850,11 +850,11 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
 
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -885,11 +885,11 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -931,11 +931,11 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget, {BSON("name" << existingDB.getName())});
 
@@ -975,11 +975,11 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
@@ -1047,11 +1047,11 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
@@ -1128,9 +1128,9 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(

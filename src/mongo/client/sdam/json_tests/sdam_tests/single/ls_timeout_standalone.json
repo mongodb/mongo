@@ -8,7 +8,7 @@
           "a:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "logicalSessionTimeoutMinutes": 7,
             "minWireVersion": 0,
             "maxWireVersion": 6

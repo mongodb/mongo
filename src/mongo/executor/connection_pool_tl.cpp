@@ -171,7 +171,7 @@ public:
     explicit TLConnectionSetupHook(executor::NetworkConnectionHook* hookToWrap, bool x509AuthOnly)
         : _wrappedHook(hookToWrap), _x509AuthOnly(x509AuthOnly) {}
 
-    BSONObj augmentIsMasterRequest(const HostAndPort& remoteHost, BSONObj cmdObj) override {
+    BSONObj augmentHelloRequest(const HostAndPort& remoteHost, BSONObj cmdObj) override {
         BSONObjBuilder bob(std::move(cmdObj));
         bob.append("hangUpOnStepDown", false);
         auto systemUser = internalSecurity.getUser();
@@ -189,9 +189,9 @@ public:
     }
 
     Status validateHost(const HostAndPort& remoteHost,
-                        const BSONObj& isMasterRequest,
-                        const RemoteCommandResponse& isMasterReply) override try {
-        const auto& reply = isMasterReply.data;
+                        const BSONObj& helloRequest,
+                        const RemoteCommandResponse& helloReply) override try {
+        const auto& reply = helloReply.data;
 
         // X.509 auth only means we only want to use a single mechanism regards of what hello says
         if (_x509AuthOnly) {
@@ -215,7 +215,7 @@ public:
         if (!_wrappedHook) {
             return Status::OK();
         } else {
-            return _wrappedHook->validateHost(remoteHost, isMasterRequest, isMasterReply);
+            return _wrappedHook->validateHost(remoteHost, helloRequest, helloReply);
         }
     } catch (const DBException& e) {
         return e.toStatus();
@@ -326,7 +326,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
 #endif
 
     // For transient connections, only use X.509 auth.
-    auto isMasterHook = std::make_shared<TLConnectionSetupHook>(_onConnectHook, x509AuthOnly);
+    auto helloHook = std::make_shared<TLConnectionSetupHook>(_onConnectHook, x509AuthOnly);
 
     AsyncDBClient::connect(
         _peer, _sslMode, _serviceContext, _reactor, timeout, _transientSSLContext)
@@ -334,29 +334,29 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
             return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
         })
-        .then([this, isMasterHook, instanceName = std::move(instanceName)](
+        .then([this, helloHook, instanceName = std::move(instanceName)](
                   AsyncDBClient::Handle client) {
             _client = std::move(client);
-            return _client->initWireVersion(instanceName, isMasterHook.get());
+            return _client->initWireVersion(instanceName, helloHook.get());
         })
-        .then([this, isMasterHook]() -> Future<bool> {
+        .then([this, helloHook]() -> Future<bool> {
             if (_skipAuth) {
                 return false;
             }
 
-            return _client->completeSpeculativeAuth(isMasterHook->getSession(),
+            return _client->completeSpeculativeAuth(helloHook->getSession(),
                                                     auth::getInternalAuthDB(),
-                                                    isMasterHook->getSpeculativeAuthenticateReply(),
-                                                    isMasterHook->getSpeculativeAuthType());
+                                                    helloHook->getSpeculativeAuthenticateReply(),
+                                                    helloHook->getSpeculativeAuthType());
         })
-        .then([this, isMasterHook, authParametersProvider](bool authenticatedDuringConnect) {
+        .then([this, helloHook, authParametersProvider](bool authenticatedDuringConnect) {
             if (_skipAuth || authenticatedDuringConnect) {
                 return Future<void>::makeReady();
             }
 
             boost::optional<std::string> mechanism;
-            if (!isMasterHook->saslMechsForInternalAuth().empty())
-                mechanism = isMasterHook->saslMechsForInternalAuth().front();
+            if (!helloHook->saslMechsForInternalAuth().empty())
+                mechanism = helloHook->saslMechsForInternalAuth().front();
             return _client->authenticateInternal(std::move(mechanism), authParametersProvider);
         })
         .then([this] {
@@ -414,8 +414,7 @@ void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     });
 
     _client
-        ->runCommandRequest(
-            {_peer, std::string("admin"), BSON("isMaster" << 1), BSONObj(), nullptr})
+        ->runCommandRequest({_peer, std::string("admin"), BSON("hello" << 1), BSONObj(), nullptr})
         .then([](executor::RemoteCommandResponse response) {
             return Future<void>::makeReady(response.status);
         })

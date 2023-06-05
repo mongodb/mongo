@@ -42,6 +42,6 @@ constexpr StringData kX509AuthMechanism = "MONGODB-X509"_sd;
 void disableX509Auth(ServiceContext* svcCtx);
 bool isX509AuthDisabled(ServiceContext* svcCtx);
 
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj isMaster, BSONObjBuilder* result);
+void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj helloCmd, BSONObjBuilder* result);
 
 }  // namespace mongo

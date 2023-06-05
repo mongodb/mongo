@@ -57,7 +57,7 @@ class ClockSource;
 class MockReplicaSet {
 public:
     /**
-     * Creates a mock replica set and automatically mocks the isMaster and replSetGetStatus commands
+     * Creates a mock replica set and automatically mocks the hello and replSetGetStatus commands
      * based on the default replica set configuration. Either the first node is primary and the
      * others are secondaries, or all are secondaries. By default, hostnames begin with "$", which
      * signals to ReplicaSetMonitor and to ConnectionString::connect that these are mocked hosts.
@@ -87,12 +87,11 @@ public:
     std::vector<std::string> getSecondaries() const;
 
     /**
-     * Sets the configuration for this replica sets. This also has a side effect
-     * of mocking the ismaster and replSetGetStatus command responses based on
-     * the new config.
+     * Sets the configuration for this replica sets. This also has a side effect of mocking the
+     * hello and replSetGetStatus command responses based on the new config.
      *
-     * Note: does not automatically select a new primary. Can be done manually by
-     * calling setPrimary.
+     * Note: does not automatically select a new primary. Can be done manually by calling
+     * setPrimary.
      */
     void setConfig(const repl::ReplSetConfig& newConfig);
 
@@ -138,10 +137,9 @@ private:
     typedef std::map<std::string, MockRemoteDBServer*> ReplNodeMap;
 
     /**
-     * Mocks the ismaster command based on the information on the current
-     * replica set configuration.
+     * Mocks the "hello" command based on the information on the current replica set configuration.
      */
-    void mockIsMasterCmd();
+    void mockHelloCmd();
 
     /**
      * Mock the hello response for the given server.

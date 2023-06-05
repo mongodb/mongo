@@ -48,12 +48,12 @@ namespace mongo {
 Status ShardingNetworkConnectionHook::validateHost(
     const HostAndPort& remoteHost,
     const BSONObj&,
-    const executor::RemoteCommandResponse& isMasterReply) {
-    return validateHostImpl(remoteHost, isMasterReply);
+    const executor::RemoteCommandResponse& helloReply) {
+    return validateHostImpl(remoteHost, helloReply);
 }
 
 Status ShardingNetworkConnectionHook::validateHostImpl(
-    const HostAndPort& remoteHost, const executor::RemoteCommandResponse& isMasterReply) {
+    const HostAndPort& remoteHost, const executor::RemoteCommandResponse& helloReply) {
     auto shard =
         Grid::get(getGlobalServiceContext())->shardRegistry()->getShardForHostNoReload(remoteHost);
     if (!shard) {
@@ -62,11 +62,11 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
     }
 
     long long configServerModeNumber;
-    auto status = bsonExtractIntegerField(isMasterReply.data, "configsvr", &configServerModeNumber);
+    auto status = bsonExtractIntegerField(helloReply.data, "configsvr", &configServerModeNumber);
 
     switch (status.code()) {
         case ErrorCodes::OK: {
-            // The ismaster response indicates remoteHost is a config server.
+            // The hello response indicates remoteHost is a config server.
             if (!shard->isConfig()) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "Surprised to discover that " << remoteHost.toString()
@@ -75,7 +75,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             return Status::OK();
         }
         case ErrorCodes::NoSuchKey: {
-            // The ismaster response indicates that remoteHost is not a config server, or that
+            // The hello response indicates that remoteHost is not a config server, or that
             // the config server is running a version prior to the 3.1 development series.
             if (!shard->isConfig()) {
                 return Status::OK();
@@ -86,7 +86,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
                                   << " does not believe it is a config server"};
         }
         default:
-            // The ismaster response was malformed.
+            // The hello response was malformed.
             return status;
     }
 }

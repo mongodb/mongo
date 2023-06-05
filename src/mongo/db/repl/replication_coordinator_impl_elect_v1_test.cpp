@@ -227,7 +227,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
 
-    // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
+    // Since we're still in drain mode, expect that we report isWritablePrimary:false,
+    // issecondary:true.
     auto helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_FALSE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
@@ -284,7 +285,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
 
-    // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
+    // Since we're still in drain mode, expect that we report isWritablePrimary:false,
+    // issecondary:true.
     auto helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_FALSE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();

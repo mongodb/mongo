@@ -279,7 +279,7 @@ void RecipientAcceptSplitListener::onServerHeartbeatSucceededEvent(const HostAnd
 
     _reportedSetNames[hostAndPort] = reply["setName"].str();
 
-    if (!_hasPrimary && reply["ismaster"].booleanSafe()) {
+    if (!_hasPrimary && reply["isWritablePrimary"].booleanSafe()) {
         _hasPrimary = true;
     }
 

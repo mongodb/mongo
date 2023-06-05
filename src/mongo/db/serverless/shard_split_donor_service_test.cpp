@@ -324,7 +324,7 @@ void processHelloRequest(executor::NetworkInterfaceMock* net, MockReplicaSet* re
     auto noi = net->getNextReadyRequest();
     auto request = noi->getRequest();
 
-    assertRemoteCommandNameEquals("isMaster", request);
+    assertRemoteCommandNameEquals("hello", request);
     auto requestHost = request.target.toString();
     const auto node = replSet->getNode(requestHost);
     if (node->isRunning()) {
@@ -597,7 +597,8 @@ TEST(RecipientAcceptSplitListenerTest, FutureReady) {
     ASSERT_FALSE(listener.getFuture().isReady());
 
     listener.onServerHeartbeatSucceededEvent(
-        donor.getHosts().front(), BSON("setName" << donor.getSetName() << "ismaster" << true));
+        donor.getHosts().front(),
+        BSON("setName" << donor.getSetName() << "isWritablePrimary" << true));
     ASSERT_TRUE(listener.getFuture().isReady());
 }
 
@@ -618,7 +619,8 @@ TEST(RecipientAcceptSplitListenerTest, FutureReadyNameChange) {
         listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << donor.getSetName()));
     }
     listener.onServerHeartbeatSucceededEvent(
-        donor.getHosts().front(), BSON("setName" << donor.getSetName() << "ismaster" << true));
+        donor.getHosts().front(),
+        BSON("setName" << donor.getSetName() << "isWritablePrimary" << true));
 
     ASSERT_TRUE(listener.getFuture().isReady());
 }
@@ -640,7 +642,7 @@ TEST(RecipientAcceptSplitListenerTest, FutureNotReadyMissingNodes) {
     ASSERT_FALSE(listener.getFuture().isReady());
     donor.setPrimary(donor.getHosts()[0].host());
     listener.onServerHeartbeatSucceededEvent(
-        donor.getHosts()[0], BSON("setName" << donor.getSetName() << "ismaster" << true));
+        donor.getHosts()[0], BSON("setName" << donor.getSetName() << "isWritablePrimary" << true));
     ASSERT_TRUE(listener.getFuture().isReady());
 }
 

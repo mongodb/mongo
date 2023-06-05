@@ -200,7 +200,7 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture, MonitoringNonNetworkE
 }
 
 TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture,
-       ApplicationNonNetworkIsMasterOrRecoveringError) {
+       ApplicationNonNetworkHelloOrRecoveringError) {
     testScenario(
         HandshakeStage::kPostHandshake,
         kMonitoringOperation,
