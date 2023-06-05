@@ -64,15 +64,9 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
 
-bool connHealthMetricsEnabled() {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-}
-
-CounterMetric numConnectionNetworkTimeouts("operation.numConnectionNetworkTimeouts",
-                                           connHealthMetricsEnabled);
+CounterMetric numConnectionNetworkTimeouts("operation.numConnectionNetworkTimeouts");
 CounterMetric timeSpentWaitingBeforeConnectionTimeoutMillis(
-    "operation.totalTimeWaitingBeforeConnectionTimeoutMillis", connHealthMetricsEnabled);
+    "operation.totalTimeWaitingBeforeConnectionTimeoutMillis");
 
 Status appendMetadata(RemoteCommandRequestOnAny* request,
                       const std::unique_ptr<rpc::EgressMetadataHook>& hook) {

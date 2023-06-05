@@ -65,11 +65,6 @@ auto makeSeveritySuppressor() {
         Seconds{1}, logv2::LogSeverity::Log(), logv2::LogSeverity::Debug(2));
 }
 
-bool connHealthMetricsEnabled() {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-}
-
 bool connHealthMetricsLoggingEnabled() {
     return gEnableDetailedConnectionHealthMetricLogLines;
 }
@@ -89,7 +84,7 @@ void logSlowConnection(const HostAndPort& peer, const ConnectionMetrics& connMet
 }
 
 CounterMetric totalConnectionEstablishmentTime(
-    "network.totalEgressConnectionEstablishmentTimeMillis", connHealthMetricsEnabled);
+    "network.totalEgressConnectionEstablishmentTimeMillis");
 
 }  // namespace
 
@@ -438,17 +433,14 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             cancelTimeout();
 
             if (status.isOK()) {
-                if (connHealthMetricsEnabled()) {
-                    totalConnectionEstablishmentTime.increment(_connMetrics.total().count());
-                    if (connHealthMetricsLoggingEnabled() &&
-                        _connMetrics.total() >=
-                            Milliseconds(gSlowConnectionThresholdMillis.load())) {
-                        logSlowConnection(_peer, _connMetrics);
-                    }
+                totalConnectionEstablishmentTime.increment(_connMetrics.total().count());
+                if (connHealthMetricsLoggingEnabled() &&
+                    _connMetrics.total() >= Milliseconds(gSlowConnectionThresholdMillis.load())) {
+                    logSlowConnection(_peer, _connMetrics);
                 }
                 handler->promise.emplaceValue();
             } else {
-                if (ErrorCodes::isNetworkTimeoutError(status) && connHealthMetricsEnabled() &&
+                if (ErrorCodes::isNetworkTimeoutError(status) &&
                     connHealthMetricsLoggingEnabled()) {
                     logSlowConnection(_peer, _connMetrics);
                 }

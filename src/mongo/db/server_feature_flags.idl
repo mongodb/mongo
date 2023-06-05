@@ -43,12 +43,6 @@ feature_flags:
         cpp_varname: gFeatureFlagRequireTenantID
         default: false
         shouldBeFCVGated: true
-    featureFlagConnHealthMetrics:
-        description: "Enable newly added cluster connection health metrics"
-        cpp_varname: gFeatureFlagConnHealthMetrics
-        default: true
-        version: 6.3
-        shouldBeFCVGated: true
     featureFlagGlobalIndexes:
         description: "Enable support for global indexes"
         cpp_varname: gFeatureFlagGlobalIndexes

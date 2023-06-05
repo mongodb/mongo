@@ -66,12 +66,8 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeMarkKeepOpen);
 MONGO_FAIL_POINT_DEFINE(alwaysLogConnAcquisitionToWireTime)
 
 namespace {
-bool connHealthMetricsEnabled() {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-}
 CounterMetric totalTimeForEgressConnectionAcquiredToWireMicros(
-    "network.totalTimeForEgressConnectionAcquiredToWireMicros", connHealthMetricsEnabled);
+    "network.totalTimeForEgressConnectionAcquiredToWireMicros");
 }  // namespace
 
 Future<AsyncDBClient::Handle> AsyncDBClient::connect(
