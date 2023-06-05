@@ -25,7 +25,6 @@ cd src
 activate_venv
 $python buildscripts/jepsen_report.py --start_time=$start_time --end_time=$end_time --elapsed=$elapsed_secs --emit_status_files --store ./jepsen-mongodb jepsen-mongodb/jepsen_${task_name}_${execution}.log
 exit_code=$?
-cat report.json
 
 if [ -f "jepsen_system_fail.txt" ]; then
   mv jepsen_system_fail.txt jepsen-mongodb/jepsen_system_failure_${task_name}_${execution}
