@@ -47,6 +47,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
@@ -573,11 +574,12 @@ bool AuthorizationSessionImpl::isAuthorizedToChangeAsUser(const UserName& userNa
 }
 
 StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListCollections(
-    StringData dbname, const BSONObj& cmdObj) {
+    const ListCollections& cmd) {
+    const auto& dbname = cmd.getDbName();
     _contract.addAccessCheck(AccessCheckEnum::kCheckAuthorizedToListCollections);
 
-    if (cmdObj["authorizedCollections"].trueValue() && cmdObj["nameOnly"].trueValue() &&
-        AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
+    if (cmd.getAuthorizedCollections() && cmd.getNameOnly() &&
+        AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname.db())) {
         return PrivilegeVector();
     }
 
@@ -589,7 +591,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListColle
     }
 
     return Status(ErrorCodes::Unauthorized,
-                  str::stream() << "Not authorized to list collections on db: " << dbname);
+                  str::stream() << "Not authorized to list collections on db: " << dbname.db());
 }
 
 bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& roleName) {

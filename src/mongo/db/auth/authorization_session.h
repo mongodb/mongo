@@ -47,6 +47,7 @@ namespace mongo {
 
 class Client;
 class AuthorizationContract;
+class ListCollections;
 
 /**
  * Contains all the authorization logic for a single client connection.  It contains a set of
@@ -199,8 +200,8 @@ public:
     // Checks if the current session is authorized to list the collections in the given
     // database. If it is, return a privilegeVector containing the privileges used to authorize
     // this command.
-    virtual StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
-                                                                         const BSONObj& cmdObj) = 0;
+    virtual StatusWith<PrivilegeVector> checkAuthorizedToListCollections(
+        const ListCollections&) = 0;
 
     // Checks if this connection is using the localhost bypass
     virtual bool isUsingLocalhostBypass() = 0;

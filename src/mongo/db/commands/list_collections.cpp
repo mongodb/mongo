@@ -300,11 +300,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
             AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-
-            auto dbName = request().getDbName();
-            auto cmdObj = request().toBSON({});
-            uassertStatusOK(authzSession->checkAuthorizedToListCollections(
-                DatabaseNameUtil::serializeForAuth(dbName), cmdObj));
+            uassertStatusOK(authzSession->checkAuthorizedToListCollections(request()));
         }
 
         NamespaceString ns() const final {
@@ -564,8 +560,7 @@ public:
                  ReadPreferenceSetting::get(opCtx),
                  cmdObj,
                  uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                     ->checkAuthorizedToListCollections(
-                                         DatabaseNameUtil::serializeForAuth(dbName), cmdObj))});
+                                     ->checkAuthorizedToListCollections(listCollRequest))});
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(firstBatch.size());
 

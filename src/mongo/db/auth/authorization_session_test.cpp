@@ -47,6 +47,7 @@
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -1147,39 +1148,53 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedNobodyWhenAuthIs
     authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
 }
 
+const auto listTestCollectionsPayload = BSON("listCollections"_sd << 1 << "$db"
+                                                                  << "test"_sd);
+const auto listTestCollectionsCmd =
+    ListCollections::parse(IDLParserContext("listTestCollectionsCmd"), listTestCollectionsPayload);
+const auto listOtherCollectionsPayload = BSON("listCollections"_sd << 1 << "$db"
+                                                                   << "other"_sd);
+const auto listOtherCollectionsCmd = ListCollections::parse(
+    IDLParserContext("listOtherCollectionsCmd"), listOtherCollectionsPayload);
+const auto listOwnTestCollectionsPayload =
+    BSON("listCollections"_sd << 1 << "$db"
+                              << "test"_sd
+                              << "nameOnly"_sd << true << "authorizedCollections"_sd << true);
+const auto listOwnTestCollectionsCmd = ListCollections::parse(
+    IDLParserContext("listOwnTestCollectionsCmd"), listOwnTestCollectionsPayload);
+
 TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPrivilege) {
-    BSONObj cmd = BSON("listCollections" << 1);
-    // With no privileges, there is not authorization to list collections
+    // With no privileges, there is no authorization to list collections
     ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections(testFooNss.db(), cmd).getStatus());
+              authzSession->checkAuthorizedToListCollections(listTestCollectionsCmd).getStatus());
     ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections(testBarNss.db(), cmd).getStatus());
-    ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections(testQuxNss.db(), cmd).getStatus());
+              authzSession->checkAuthorizedToListCollections(listOtherCollectionsCmd).getStatus());
 }
 
 TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege) {
-    BSONObj cmd = BSON("listCollections" << 1);
-    // The listCollections privilege authorizes the list collections command.
+    // The listCollections privilege authorizes the list collections command on the named database
+    // only.
     authzSession->assumePrivilegesForDB(Privilege(testDBResource, ActionType::listCollections));
 
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testFooNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testBarNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testQuxNss.db(), cmd).getStatus());
+    // "test" DB is okay.
+    ASSERT_OK(authzSession->checkAuthorizedToListCollections(listTestCollectionsCmd).getStatus());
+
+    // "other" DB is not.
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthorizedToListCollections(listOtherCollectionsCmd).getStatus());
 }
 
 TEST_F(AuthorizationSessionTest, CanListOwnCollectionsWithPrivilege) {
-    BSONObj cmd =
-        BSON("listCollections" << 1 << "nameOnly" << true << "authorizedCollections" << true);
-    // The listCollections privilege authorizes the list collections command.
+    // Any privilege on a DB implies authorization to list one's own collections.
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
 
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testFooNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testBarNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testQuxNss.db(), cmd).getStatus());
+    // Just own collections is okay.
+    ASSERT_OK(
+        authzSession->checkAuthorizedToListCollections(listOwnTestCollectionsCmd).getStatus());
 
+    // All collections is not.
     ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections("other", cmd).getStatus());
+              authzSession->checkAuthorizedToListCollections(listTestCollectionsCmd).getStatus());
 }
 
 TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {

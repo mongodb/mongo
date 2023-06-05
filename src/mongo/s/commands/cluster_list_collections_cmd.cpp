@@ -214,7 +214,10 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const final {
         auto* authzSession = AuthorizationSession::get(opCtx->getClient());
-        return authzSession->checkAuthorizedToListCollections(dbName.db(), cmdObj).getStatus();
+        const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        IDLParserContext ctxt("ListCollection", apiStrict, dbName.tenantId());
+        auto request = ListCollections::parse(ctxt, cmdObj);
+        return authzSession->checkAuthorizedToListCollections(request).getStatus();
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
@@ -252,8 +255,7 @@ public:
             // Use the original command object rather than the rewritten one to preserve whether
             // 'authorizedCollections' field is set.
             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthorizedToListCollections(
-                                    DatabaseNameUtil::serializeForAuth(dbName), cmdObj)));
+                                ->checkAuthorizedToListCollections(requestParser.request())));
     }
 
     void validateResult(const BSONObj& result) final {

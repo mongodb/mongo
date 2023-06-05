@@ -120,8 +120,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData,
-                                                                 const BSONObj&) override {
+    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(const ListCollections&) override {
         return PrivilegeVector();
     }
 
