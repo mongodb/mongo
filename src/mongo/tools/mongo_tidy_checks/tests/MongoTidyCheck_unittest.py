@@ -150,6 +150,17 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoCxx20StdChronoCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-cxx20-std-chrono-check'
+                WarningsAsErrors: '*'
+                """))
+        prohibited_types = ["day", "day", "month", "year", "month_day", "month", "day", "day"]
+        self.expected_output = [
+            f"Illegal use of prohibited type 'std::chrono::{t}'." for t in prohibited_types]
+        self.run_clang_tidy()
+
     def test_MongoStdOptionalCheck(self):
 
         self.write_config(
