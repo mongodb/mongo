@@ -294,8 +294,8 @@ bool processReplSetStepUpRequest(executor::NetworkInterfaceMock* net,
     auto noi = net->getNextReadyRequest();
     auto request = noi->getRequest();
 
-    // The command can also be `isMaster`
-    assertRemoteCommandIn({"replSetStepUp", "isMaster"}, request);
+    // The command can also be `hello`
+    assertRemoteCommandIn({"replSetStepUp", "hello"}, request);
 
     auto&& cmdObj = request.cmdObj;
     auto requestHost = request.target.toString();
@@ -446,11 +446,11 @@ protected:
     void waitForMonitorAndProcessHello() {
         _net->enterNetwork();
         waitForReadyRequest(_net);
-        processIncomingRequest(_net, &_recipientSet, "isMaster");
+        processIncomingRequest(_net, &_recipientSet, "hello");
         waitForReadyRequest(_net);
-        processIncomingRequest(_net, &_recipientSet, "isMaster");
+        processIncomingRequest(_net, &_recipientSet, "hello");
         waitForReadyRequest(_net);
-        processIncomingRequest(_net, &_recipientSet, "isMaster");
+        processIncomingRequest(_net, &_recipientSet, "hello");
         _net->runReadyNetworkOperations();
         _net->exitNetwork();
     }
@@ -490,7 +490,7 @@ void mockCommandReplies(MockReplicaSet* replSet) {
         auto node = replSet->getNode(hostAndPort.toString());
         node->setCommandReply("replSetStepUp", BSON("ok" << 1));
         node->setCommandReply("appendOplogNote", BSON("ok" << 1));
-        node->setCommandReply("isMaster", makeHelloReply(replSet->getSetName()));
+        node->setCommandReply("hello", makeHelloReply(replSet->getSetName()));
     }
 }
 
@@ -695,7 +695,7 @@ TEST_F(ShardSplitDonorServiceTest, SendReplSetStepUpToHighestLastApplied) {
 
     mockCommandReplies(&_recipientSet);
     auto recipientPrimary = _recipientSet.getNode(_recipientSet.getHosts()[1].toString());
-    recipientPrimary->setCommandReply("isMaster", makeHelloReply(_recipientSetName, newerOpTime));
+    recipientPrimary->setCommandReply("hello", makeHelloReply(_recipientSetName, newerOpTime));
 
     for (auto&& recipientNodeHost : _recipientSet.getHosts()) {
         if (recipientNodeHost == recipientPrimary->getServerHostAndPort()) {
@@ -703,7 +703,7 @@ TEST_F(ShardSplitDonorServiceTest, SendReplSetStepUpToHighestLastApplied) {
         }
 
         auto recipientNode = _recipientSet.getNode(recipientNodeHost.toString());
-        recipientNode->setCommandReply("isMaster", makeHelloReply(_recipientSetName, olderOpTime));
+        recipientNode->setCommandReply("hello", makeHelloReply(_recipientSetName, olderOpTime));
     }
 
     _skipAcceptanceFP.reset();

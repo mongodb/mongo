@@ -522,8 +522,8 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // NotPrimary errors always include a topologyVersion, since we increment topologyVersion on
     // stepdown. ShutdownErrors only include a topologyVersion if the server is in quiesce mode,
-    // since we only increment the topologyVersion at shutdown and alert waiting isMaster commands
-    // if the server enters quiesce mode.
+    // since we only increment the topologyVersion at shutdown and alert waiting isMaster/hello
+    // commands if the server enters quiesce mode.
     const auto shouldAppendTopologyVersion =
         (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
          isNotPrimaryError) ||

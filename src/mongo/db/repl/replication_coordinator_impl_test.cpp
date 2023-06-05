@@ -137,7 +137,7 @@ std::shared_ptr<const repl::HelloResponse> awaitHelloWithNewOpCtx(
     return replCoord->awaitHelloResponse(newOpCtx.get(), horizonParams, topologyVersion, deadline);
 }
 
-TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {
+TEST_F(ReplCoordTest, IsWritablePrimaryFalseDuringStepdown) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version" << 1 << "members"
@@ -162,13 +162,13 @@ TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {
     replCoord->updateTerm_forTest(replCoord->getTerm() + 1, &updateTermResult);
     ASSERT(TopologyCoordinator::UpdateTermResult::kTriggerStepDown == updateTermResult);
 
-    // Test that "ismaster" is immediately false, although "secondary" is not yet true.
+    // Test that "isWritablePrimary" is immediately false, although "secondary" is not yet true.
     auto opCtx = makeOperationContext();
     const auto response =
         getReplCoord()->awaitHelloResponse(opCtx.get(), {}, boost::none, boost::none);
     ASSERT_TRUE(response->isConfigSet());
-    BSONObj responseObj = response->toBSON();
-    ASSERT_FALSE(responseObj["ismaster"].Bool());
+    BSONObj responseObj = response->toBSON(false /*useLegacyResponseFields*/);
+    ASSERT_FALSE(responseObj["isWritablePrimary"].Bool());
     ASSERT_FALSE(responseObj["secondary"].Bool());
     ASSERT_FALSE(responseObj.hasField("isreplicaset"));
 
@@ -3602,10 +3602,10 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnStepDown) {
             responseAfterDisablingWrites->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterDisablingWrites->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersionAfterDisablingWrites->getProcessId(), expectedProcessId);
-        // We expect the server to increment the TopologyVersion and respond to waiting hellos
-        // once we disable writes on the node that is stepping down from primary. At this time,
-        // the 'ismaster' response field will be false but the node will have yet to transition to
-        // secondary.
+        // We expect the server to increment the TopologyVersion and respond to waiting hellos once
+        // we disable writes on the node that is stepping down from primary. At this time, the
+        // 'isWritablePrimary' response field will be false but the node will have yet to transition
+        // to secondary.
         ASSERT_FALSE(responseAfterDisablingWrites->isWritablePrimary());
         ASSERT_FALSE(responseAfterDisablingWrites->isSecondary());
         ASSERT_EQUALS(responseAfterDisablingWrites->getPrimary().host(), "node1");
@@ -5121,8 +5121,8 @@ TEST_F(ReplCoordTest, HelloResponseMentionsLackOfReplicaSetConfig) {
     const auto response =
         getReplCoord()->awaitHelloResponse(opCtx.get(), {}, boost::none, boost::none);
     ASSERT_FALSE(response->isConfigSet());
-    BSONObj responseObj = response->toBSON();
-    ASSERT_FALSE(responseObj["ismaster"].Bool());
+    BSONObj responseObj = response->toBSON(false /*useLegacyResponseFields*/);
+    ASSERT_FALSE(responseObj["isWritablePrimary"].Bool());
     ASSERT_FALSE(responseObj["secondary"].Bool());
     ASSERT_TRUE(responseObj["isreplicaset"].Bool());
     ASSERT_EQUALS("Does not have a valid replica set config", responseObj["info"].String());

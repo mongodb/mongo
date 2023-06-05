@@ -210,7 +210,7 @@ void ServerDescription::parseTypeFromHelloReply(const BSONObj helloReply) {
         t = ServerType::kMongos;
     } else if (hasSetName && helloReply.getBoolField("hidden")) {
         t = ServerType::kRSOther;
-    } else if (hasSetName && helloReply.getBoolField("ismaster")) {
+    } else if (hasSetName && helloReply.getBoolField("isWritablePrimary")) {
         t = ServerType::kRSPrimary;
     } else if (hasSetName && helloReply.getBoolField("secondary")) {
         t = ServerType::kRSSecondary;

@@ -532,8 +532,8 @@ reInitiateWithoutThrowingOnAbortedMember = function(replSetTest) {
     try {
         replSetTest.reInitiate();
     } catch (e) {
-        // reInitiate can throw because it tries to run an ismaster command on
-        // all secondaries, including the new one that may have already aborted
+        // reInitiate can throw because it tries to run a "hello" command on all secondaries,
+        // including the new one that may have already aborted
         const errMsg = tojson(e);
         if (isNetworkError(e)) {
             // Ignore these exceptions, which are indicative of an aborted node
@@ -587,7 +587,7 @@ awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
                 // Check that *all* host properties are set correctly
                 var propOk = true;
                 for (var prop in hostOk) {
-                    // Use special comparator for tags because isMaster can return the fields in
+                    // Use special comparator for tags because hello can return the fields in
                     // different order. The fields of the tags should be treated like a set of
                     // strings and 2 tags should be considered the same if the set is equal.
                     if (prop == 'tags') {

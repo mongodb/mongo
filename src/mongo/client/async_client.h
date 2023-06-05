@@ -112,10 +112,8 @@ private:
     Future<Message> _waitForResponse(boost::optional<int32_t> msgId,
                                      const BatonHandle& baton = nullptr);
     Future<void> _call(Message request, int32_t msgId, const BatonHandle& baton = nullptr);
-    BSONObj _buildIsMasterRequest(const std::string& appName,
-                                  executor::NetworkConnectionHook* hook);
-    void _parseIsMasterResponse(BSONObj request,
-                                const std::unique_ptr<rpc::ReplyInterface>& response);
+    BSONObj _buildHelloRequest(const std::string& appName, executor::NetworkConnectionHook* hook);
+    void _parseHelloResponse(BSONObj request, const std::unique_ptr<rpc::ReplyInterface>& response);
     auth::RunCommandHook _makeAuthRunCommandHook();
 
     const HostAndPort _peer;

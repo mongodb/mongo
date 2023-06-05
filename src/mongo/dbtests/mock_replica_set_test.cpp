@@ -71,7 +71,7 @@ TEST(MockReplicaSetTest, GetNode) {
     ASSERT(replSet.getNode("$n3:27017") == nullptr);
 }
 
-TEST(MockReplicaSetTest, IsMasterNode0) {
+TEST(MockReplicaSetTest, HelloNode0) {
     MockReplicaSet replSet("n", 3);
     set<string> expectedHosts;
     expectedHosts.insert("$n0:27017");
@@ -81,10 +81,10 @@ TEST(MockReplicaSetTest, IsMasterNode0) {
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n0:27017");
     bool ok = MockDBClientConnection(node).runCommand(
-        {boost::none, "foo"}, BSON("ismaster" << 1), cmdResponse);
+        {boost::none, "foo"}, BSON("hello" << 1), cmdResponse);
     ASSERT(ok);
 
-    ASSERT(cmdResponse["ismaster"].trueValue());
+    ASSERT(cmdResponse["isWritablePrimary"].trueValue());
     ASSERT(!cmdResponse["secondary"].trueValue());
     ASSERT_EQUALS("$n0:27017", cmdResponse["me"].str());
     ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -99,7 +99,7 @@ TEST(MockReplicaSetTest, IsMasterNode0) {
     ASSERT(expectedHosts == hostList);
 }
 
-TEST(MockReplicaSetTest, IsMasterNode1) {
+TEST(MockReplicaSetTest, HelloNode1) {
     MockReplicaSet replSet("n", 3);
     set<string> expectedHosts;
     expectedHosts.insert("$n0:27017");
@@ -109,10 +109,10 @@ TEST(MockReplicaSetTest, IsMasterNode1) {
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n1:27017");
     bool ok = MockDBClientConnection(node).runCommand(
-        {boost::none, "foo"}, BSON("ismaster" << 1), cmdResponse);
+        {boost::none, "foo"}, BSON("hello" << 1), cmdResponse);
     ASSERT(ok);
 
-    ASSERT(!cmdResponse["ismaster"].trueValue());
+    ASSERT(!cmdResponse["isWritablePrimary"].trueValue());
     ASSERT(cmdResponse["secondary"].trueValue());
     ASSERT_EQUALS("$n1:27017", cmdResponse["me"].str());
     ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -127,7 +127,7 @@ TEST(MockReplicaSetTest, IsMasterNode1) {
     ASSERT(expectedHosts == hostList);
 }
 
-TEST(MockReplicaSetTest, IsMasterNode2) {
+TEST(MockReplicaSetTest, HelloNode2) {
     MockReplicaSet replSet("n", 3);
     set<string> expectedHosts;
     expectedHosts.insert("$n0:27017");
@@ -137,10 +137,10 @@ TEST(MockReplicaSetTest, IsMasterNode2) {
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n2:27017");
     bool ok = MockDBClientConnection(node).runCommand(
-        {boost::none, "foo"}, BSON("ismaster" << 1), cmdResponse);
+        {boost::none, "foo"}, BSON("hello" << 1), cmdResponse);
     ASSERT(ok);
 
-    ASSERT(!cmdResponse["ismaster"].trueValue());
+    ASSERT(!cmdResponse["isWritablePrimary"].trueValue());
     ASSERT(cmdResponse["secondary"].trueValue());
     ASSERT_EQUALS("$n2:27017", cmdResponse["me"].str());
     ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -290,7 +290,7 @@ ReplSetConfig _getConfigWithMemberRemoved(const ReplSetConfig& oldConfig,
 }
 }  // namespace
 
-TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
+TEST(MockReplicaSetTest, HelloReconfigNodeRemoved) {
     MockReplicaSet replSet("n", 3);
 
     ReplSetConfig oldConfig = replSet.getReplConfig();
@@ -299,14 +299,14 @@ TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
     replSet.setConfig(newConfig);
 
     {
-        // Check isMaster for node still in set
+        // Check that node is still a writable primary.
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode("$n0:27017");
         bool ok = MockDBClientConnection(node).runCommand(
-            {boost::none, "foo"}, BSON("ismaster" << 1), cmdResponse);
+            {boost::none, "foo"}, BSON("hello" << 1), cmdResponse);
         ASSERT(ok);
 
-        ASSERT(cmdResponse["ismaster"].trueValue());
+        ASSERT(cmdResponse["isWritablePrimary"].trueValue());
         ASSERT(!cmdResponse["secondary"].trueValue());
         ASSERT_EQUALS("$n0:27017", cmdResponse["me"].str());
         ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -327,14 +327,14 @@ TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
     }
 
     {
-        // Check isMaster for node still not in set anymore
+        // Check node is no longer a writable primary.
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode(hostToRemove);
         bool ok = MockDBClientConnection(node).runCommand(
-            {boost::none, "foo"}, BSON("ismaster" << 1), cmdResponse);
+            {boost::none, "foo"}, BSON("hello" << 1), cmdResponse);
         ASSERT(ok);
 
-        ASSERT(!cmdResponse["ismaster"].trueValue());
+        ASSERT(!cmdResponse["isWritablePrimary"].trueValue());
         ASSERT(!cmdResponse["secondary"].trueValue());
         ASSERT_EQUALS(hostToRemove, cmdResponse["me"].str());
         ASSERT_EQUALS("n", cmdResponse["setName"].str());

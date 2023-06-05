@@ -91,17 +91,17 @@ Future<AsyncDBClient::Handle> AsyncDBClient::connect(
         });
 }
 
-BSONObj AsyncDBClient::_buildIsMasterRequest(const std::string& appName,
-                                             executor::NetworkConnectionHook* hook) {
+BSONObj AsyncDBClient::_buildHelloRequest(const std::string& appName,
+                                          executor::NetworkConnectionHook* hook) {
     BSONObjBuilder bob;
 
-    bob.append("isMaster", 1);
+    bob.append("hello", 1);
 
     const auto versionString = VersionInfoInterface::instance().version();
     ClientMetadata::serialize(appName, versionString, &bob);
 
     if (getTestCommandsEnabled()) {
-        // Only include the host:port of this process in the isMaster command request if test
+        // Only include the host:port of this process in the "hello" command request if test
         // commands are enabled. mongobridge uses this field to identify the process opening a
         // connection to it.
         StringBuilder sb;
@@ -116,16 +116,16 @@ BSONObj AsyncDBClient::_buildIsMasterRequest(const std::string& appName,
     }
 
     if (hook) {
-        return hook->augmentIsMasterRequest(remote(), bob.obj());
+        return hook->augmentHelloRequest(remote(), bob.obj());
     } else {
         return bob.obj();
     }
 }
 
-void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
-                                           const std::unique_ptr<rpc::ReplyInterface>& response) {
+void AsyncDBClient::_parseHelloResponse(BSONObj request,
+                                        const std::unique_ptr<rpc::ReplyInterface>& response) {
     uassert(50786,
-            "Expected OP_MSG response to isMaster",
+            "Expected OP_MSG response to 'hello'",
             response->getProtocol() == rpc::Protocol::kOpMsg);
     auto wireSpec = WireSpec::instance().get();
     auto responseBody = response->getCommandReply();
@@ -224,7 +224,7 @@ Future<bool> AsyncDBClient::completeSpeculativeAuth(std::shared_ptr<SaslClientSe
 
     if (speculativeAuthType == auth::SpeculativeAuthType::kNone) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Received unexpected isMaster."
+                      str::stream() << "Received unexpected hello."
                                     << auth::kSpeculativeAuthenticate << " reply");
     }
 
@@ -250,7 +250,7 @@ Future<bool> AsyncDBClient::completeSpeculativeAuth(std::shared_ptr<SaslClientSe
 
 Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
                                             executor::NetworkConnectionHook* const hook) {
-    auto requestObj = _buildIsMasterRequest(appName, hook);
+    auto requestObj = _buildHelloRequest(appName, hook);
     auto opMsgRequest = OpMsgRequest::fromDBAndBody("admin", requestObj);
 
     auto msgId = nextMessageId();
@@ -258,7 +258,7 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
         .then([msgId, this]() { return _waitForResponse(msgId); })
         .then([this, requestObj, hook, timer = Timer{}](Message response) {
             auto cmdReply = rpc::makeReply(&response);
-            _parseIsMasterResponse(requestObj, cmdReply);
+            _parseHelloResponse(requestObj, cmdReply);
             if (hook) {
                 executor::RemoteCommandResponse cmdResp(*cmdReply, timer.elapsed());
                 uassertStatusOK(hook->validateHost(_peer, requestObj, std::move(cmdResp)));

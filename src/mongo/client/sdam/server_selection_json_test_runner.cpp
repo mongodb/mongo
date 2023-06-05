@@ -132,7 +132,7 @@ public:
                                   HelloOutcome(HostAndPort("dummy"),
                                                BSON("ok" << 1 << "setname"
                                                          << "replSet"
-                                                         << "ismaster" << true),
+                                                         << "isWritablePrimary" << true),
                                                HelloRTT(Milliseconds(_newRtt)))));
         }
 

@@ -58,7 +58,6 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::
         if (!replicaSetMonitor) {
             LOGV2_DEBUG(4333215,
                         kLogLevel,
-                        "Could not find rsm instance {replicaSet} for query processing",
                         "Could not find rsm instance for query processing",
                         "replicaSet"_attr = *setName);
             return;
@@ -66,7 +65,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::
         replicaSetMonitor->_processOutstanding(newDescription);
     }
 
-    // No set name occurs when there is an error monitoring isMaster replies (e.g. HostUnreachable).
+    // No set name occurs when there is an error monitoring "hello" replies (e.g. HostUnreachable).
     // There is nothing to do in that case.
 }
 };  // namespace mongo

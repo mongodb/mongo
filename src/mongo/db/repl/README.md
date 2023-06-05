@@ -378,6 +378,8 @@ If the server does not support `hello`, the `helloOk` flag is ignored. A new dri
 not see "helloOk: true" in the response and continue to send `isMaster` on this connection. Old drivers
 will not specify this flag at all, so the behavior remains the same.
 
+Communication between nodes in the cluster is always done using `hello`, never with `isMaster`.
+
 ## Communication
 
 Each node has a copy of the **`ReplicaSetConfig`** in the `ReplicationCoordinator` that lists all
@@ -525,7 +527,7 @@ assigns itself a priority takeover timeout proportional to its rank. After that 
 node will check if it's eligible to run for election and if so will begin an election. The timeout
 is simply: `(election timeout) * (priority rank + 1)`.
 
-Heartbeat threads belong to the 
+Heartbeat threads belong to the
 [`ReplCoordThreadPool`](https://github.com/mongodb/mongo/blob/674d57fc70d80dedbfd634ce00ca4b967ea89646/src/mongo/db/mongod_main.cpp#L944)
 connection pool started by the
 [`ReplicationCoordinator`](https://github.com/mongodb/mongo/blob/674d57fc70d80dedbfd634ce00ca4b967ea89646/src/mongo/db/mongod_main.cpp#L986).
@@ -845,7 +847,7 @@ node hasn't committed the transaction (and therefore, the WUOW) yet.
 A user can [add additional operations](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/op_observer_impl.cpp#L554) to an existing multi-document transaction by running more
 commands on the same session. These operations are then stored in memory. Once a write completes on
 the primary, [we update the corresponding `sessionTxnRecord`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/op_observer_impl.cpp#L1664-L1673)
-in the transactions table (`config.transactions`) with information about the transaction. 
+in the transactions table (`config.transactions`) with information about the transaction.
 This includes things like the `lsid`, the `txnNumber` currently associated with the session, and the `txnState`.
 
 This table was introduced for retryable writes and is used to keep track of retryable write and
@@ -1684,15 +1686,15 @@ The `initialSyncTransientErrorRetryPeriodSeconds` is also used to control retrie
 fetcher and all network operations in initial sync which take place after the data cloning has
 started.
 
-As of v4.4, initial syncing a node with [two-phase index builds](https://github.com/mongodb/mongo/blob/0a7641e69031fcfdf25a1780a3b62bca5f59d68f/src/mongo/db/catalog/README.md#replica-set-index-builds) 
-will immediately build all ready indexes from the sync source and setup the index builder threads 
-for any unfinished index builds. 
-[See here](https://github.com/mongodb/mongo/blob/85d75907fd12c2360cf16b97f941386f343ca6fc/src/mongo/db/repl/collection_cloner.cpp#L247-L301). 
+As of v4.4, initial syncing a node with [two-phase index builds](https://github.com/mongodb/mongo/blob/0a7641e69031fcfdf25a1780a3b62bca5f59d68f/src/mongo/db/catalog/README.md#replica-set-index-builds)
+will immediately build all ready indexes from the sync source and setup the index builder threads
+for any unfinished index builds.
+[See here](https://github.com/mongodb/mongo/blob/85d75907fd12c2360cf16b97f941386f343ca6fc/src/mongo/db/repl/collection_cloner.cpp#L247-L301).
 
-This is necessary to avoid a scenario where the primary node cannot satisfy the index builds commit 
-quorum if it depends on the initial syncing nodes vote. Prior to this, initial syncing nodes would 
-start the index build when they came across the `commitIndexBuild` oplog entry, which is only 
-observable once the index builds commit quorum has been satisfied. 
+This is necessary to avoid a scenario where the primary node cannot satisfy the index builds commit
+quorum if it depends on the initial syncing nodes vote. Prior to this, initial syncing nodes would
+start the index build when they came across the `commitIndexBuild` oplog entry, which is only
+observable once the index builds commit quorum has been satisfied.
 [See this test for an example](https://github.com/mongodb/mongo/blob/f495bdead326a06a76f8a980e44092deb096a21d/jstests/noPassthrough/commit_quorum_does_not_hang_with_initial_sync.js).
 
 ## Oplog application phase
@@ -2058,11 +2060,11 @@ transaction. For a prepared transaction, we have the following guarantee: `prepa
 
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
 serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this
-is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945). 
+is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945).
 Since it is reset every time we recalculate the stable optime, it will also be up to date.
 
-When `eMRC=false`, this [is set](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4952-L4961) 
-to the minimum of the stable optime and the `lastCommittedOpTime`, even though it is not used to 
+When `eMRC=false`, this [is set](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4952-L4961)
+to the minimum of the stable optime and the `lastCommittedOpTime`, even though it is not used to
 serve majority reads in that case.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
@@ -2117,7 +2119,7 @@ populated internally from the `currentCommittedSnapshot` timestamp inside `Repli
 **`stable_timestamp`**: The newest timestamp at which the storage engine is allowed to take a
 checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
-majority committed so that RTT rollback can use it. In the case when 
+majority committed so that RTT rollback can use it. In the case when
 [`eMRC=false`](#enableMajorityReadConcern-flag), the stable timestamp may not be majority committed,
 which is why we must use the Rollback via Refetch rollback algorithm.
 

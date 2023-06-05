@@ -173,8 +173,8 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
             false,  // auto reconnect
             0,      // socket timeout
             {},     // MongoURI
-            [this, target](const executor::RemoteCommandResponse& isMasterReply) {
-                return _hook->validateHost(target, BSONObj(), isMasterReply);
+            [this, target](const executor::RemoteCommandResponse& helloReply) {
+                return _hook->validateHost(target, BSONObj(), helloReply);
             }));
     } else {
         conn.reset(new DBClientConnection());

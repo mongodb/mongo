@@ -36,7 +36,7 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Handle isMaster: { speculativeAuthenticate: {...} }
+ * Handle hello: { speculativeAuthenticate: {...} }
  */
 void doSpeculativeSaslStart(OperationContext* opCtx,
                             const BSONObj& sourceObj,

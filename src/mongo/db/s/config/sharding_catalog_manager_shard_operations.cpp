@@ -352,7 +352,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     const ConnectionString& connectionString,
     bool isConfigShard) {
     auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), DatabaseName::kAdmin.db(), BSON("isMaster" << 1));
+        opCtx, targeter.get(), DatabaseName::kAdmin.db(), BSON("hello" << 1));
     if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
         return swCommandResponse.getStatus().withReason(
             str::stream() << "Cannot add " << connectionString.toString()
@@ -363,17 +363,16 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     // Check for a command response error
-    auto resIsMasterStatus = std::move(swCommandResponse.getValue().commandStatus);
-    if (!resIsMasterStatus.isOK()) {
-        return resIsMasterStatus.withContext(str::stream()
-                                             << "Error running isMaster against "
-                                             << targeter->connectionString().toString());
+    auto resHelloStatus = std::move(swCommandResponse.getValue().commandStatus);
+    if (!resHelloStatus.isOK()) {
+        return resHelloStatus.withContext(str::stream() << "Error running 'hello' against "
+                                                        << targeter->connectionString().toString());
     }
 
-    auto resIsMaster = std::move(swCommandResponse.getValue().response);
+    auto resHello = std::move(swCommandResponse.getValue().response);
 
     // Fail if the node being added is a mongos.
-    const std::string msg = resIsMaster.getStringField("msg").toString();
+    const std::string msg = resHello.getStringField("msg").toString();
     if (msg == "isdbgrid") {
         return {ErrorCodes::IllegalOperation, "cannot add a mongos as a shard"};
     }
@@ -384,23 +383,23 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     // because of our internal wire version protocol. So we can safely invariant here that the node
     // is compatible.
     long long maxWireVersion;
-    Status status = bsonExtractIntegerField(resIsMaster, "maxWireVersion", &maxWireVersion);
+    Status status = bsonExtractIntegerField(resHello, "maxWireVersion", &maxWireVersion);
     if (!status.isOK()) {
-        return status.withContext(str::stream() << "isMaster returned invalid 'maxWireVersion' "
+        return status.withContext(str::stream() << "hello returned invalid 'maxWireVersion' "
                                                 << "field when attempting to add "
                                                 << connectionString.toString() << " as a shard");
     }
 
-    // Check whether there is a master. If there isn't, the replica set may not have been
-    // initiated. If the connection is a standalone, it will return true for isMaster.
-    bool isMaster;
-    status = bsonExtractBooleanField(resIsMaster, "ismaster", &isMaster);
+    // Check whether the host is a writable primary. If not, the replica set may not have been
+    // initiated. If the connection is a standalone, it will return true for "isWritablePrimary".
+    bool isWritablePrimary;
+    status = bsonExtractBooleanField(resHello, "isWritablePrimary", &isWritablePrimary);
     if (!status.isOK()) {
-        return status.withContext(str::stream() << "isMaster returned invalid 'ismaster' "
+        return status.withContext(str::stream() << "hello returned invalid 'isWritablePrimary' "
                                                 << "field when attempting to add "
                                                 << connectionString.toString() << " as a shard");
     }
-    if (!isMaster) {
+    if (!isWritablePrimary) {
         return {ErrorCodes::NotWritablePrimary,
                 str::stream()
                     << connectionString.toString()
@@ -409,7 +408,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     const std::string providedSetName = connectionString.getSetName();
-    const std::string foundSetName = resIsMaster["setName"].str();
+    const std::string foundSetName = resHello["setName"].str();
 
     // Make sure the specified replica set name (if any) matches the actual shard's replica set
     if (providedSetName.empty() && !foundSetName.empty()) {
@@ -422,7 +421,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     if (!providedSetName.empty() && foundSetName.empty()) {
         return {ErrorCodes::OperationFailed,
                 str::stream() << "host did not return a set name; "
-                              << "is the replica set still initializing? " << resIsMaster};
+                              << "is the replica set still initializing? " << resHello};
     }
 
     // Make sure the set name specified in the connection string matches the one where its hosts
@@ -434,14 +433,14 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     // Is it a config server?
-    if (resIsMaster.hasField("configsvr") && !isConfigShard) {
+    if (resHello.hasField("configsvr") && !isConfigShard) {
         return {ErrorCodes::OperationFailed,
                 str::stream() << "Cannot add " << connectionString.toString()
                               << " as a shard since it is a config server"};
     }
 
-    if (resIsMaster.hasField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
-        !resIsMaster.getBoolField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
+    if (resHello.hasField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
+        !resHello.getBoolField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
         !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
         return {
             ErrorCodes::OperationFailed,
@@ -454,11 +453,11 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                    "using the setDefaultRWConcern command and try again."};
     }
 
-    if (resIsMaster.hasField(HelloCommandReply::kCwwcFieldName)) {
-        auto cwwcOnShard = WriteConcernOptions::parse(
-                               resIsMaster.getObjectField(HelloCommandReply::kCwwcFieldName))
-                               .getValue()
-                               .toBSON();
+    if (resHello.hasField(HelloCommandReply::kCwwcFieldName)) {
+        auto cwwcOnShard =
+            WriteConcernOptions::parse(resHello.getObjectField(HelloCommandReply::kCwwcFieldName))
+                .getValue()
+                .toBSON();
 
         auto cachedCWWC = ReadWriteConcernDefaults::get(opCtx).getCWWC(opCtx);
         if (!cachedCWWC) {
@@ -491,20 +490,20 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     if (!providedSetName.empty()) {
         std::set<std::string> hostSet;
 
-        BSONObjIterator iter(resIsMaster["hosts"].Obj());
+        BSONObjIterator iter(resHello["hosts"].Obj());
         while (iter.more()) {
             hostSet.insert(iter.next().String());  // host:port
         }
 
-        if (resIsMaster["passives"].isABSONObj()) {
-            BSONObjIterator piter(resIsMaster["passives"].Obj());
+        if (resHello["passives"].isABSONObj()) {
+            BSONObjIterator piter(resHello["passives"].Obj());
             while (piter.more()) {
                 hostSet.insert(piter.next().String());  // host:port
             }
         }
 
-        if (resIsMaster["arbiters"].isABSONObj()) {
-            BSONObjIterator piter(resIsMaster["arbiters"].Obj());
+        if (resHello["arbiters"].isABSONObj()) {
+            BSONObjIterator piter(resHello["arbiters"].Obj());
             while (piter.more()) {
                 hostSet.insert(piter.next().String());  // host:port
             }
@@ -516,7 +515,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                 return {ErrorCodes::OperationFailed,
                         str::stream() << "in seed list " << connectionString.toString() << ", host "
                                       << host << " does not belong to replica set " << foundSetName
-                                      << "; found " << resIsMaster.toString()};
+                                      << "; found " << resHello.toString()};
             }
         }
     }

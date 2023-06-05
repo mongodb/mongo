@@ -157,7 +157,6 @@ protected:
 TEST_F(ReplicaSetMonitorFixture, StreamableRSMWireVersion) {
     auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri, nullptr);
 
-    // Schedule isMaster requests and wait for the responses.
     auto primaryFuture =
         rsm->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly),
                               CancellationToken::uncancelable());
