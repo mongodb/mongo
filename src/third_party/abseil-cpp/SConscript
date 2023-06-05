@@ -1,7 +1,11 @@
 # Generated from parse_lib_from_ninja.py
 Import("env")
+Import("has_option")
 env = env.Clone()
 env.InjectThirdParty(libraries=['abseil-cpp'])
+if has_option('gcov') and env.ToolchainIs('clang'):
+    env.Append(CCFLAGS=['-Wno-pass-failed'])
+
 if env.ToolchainIs('msvc'):
     env.Append(
         CPPDEFINES=[
