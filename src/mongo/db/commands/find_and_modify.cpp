@@ -81,41 +81,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failAllFindAndModify);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
 
-/**
- * If the operation succeeded, then returns either a document to return to the client, or
- * boost::none if no matching document to update/remove was found. If the operation failed, throws.
- */
-boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
-                                         const write_ops::FindAndModifyCommandRequest& request,
-                                         PlanExecutor* exec,
-                                         bool isRemove) {
-    BSONObj value;
-    PlanExecutor::ExecState state;
-    try {
-        state = exec->getNext(&value, nullptr);
-    } catch (DBException& exception) {
-        auto&& explainer = exec->getPlanExplainer();
-        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-        LOGV2_WARNING(
-            23802,
-            "Plan executor error during findAndModify: {error}, stats: {stats}, cmd: {cmd}",
-            "Plan executor error during findAndModify",
-            "error"_attr = exception.toStatus(),
-            "stats"_attr = redact(stats),
-            "cmd"_attr = request.toBSON(BSONObj() /* commandPassthroughFields */));
-
-        exception.addContext("Plan executor error during findAndModify");
-        throw;
-    }
-
-    if (PlanExecutor::ADVANCED == state) {
-        return {std::move(value)};
-    }
-
-    invariant(state == PlanExecutor::IS_EOF);
-    return boost::none;
-}
-
 void validate(const write_ops::FindAndModifyCommandRequest& request) {
     uassert(ErrorCodes::FailedToParse,
             "Either an update or remove=true must be specified",

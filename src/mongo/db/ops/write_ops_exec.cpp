@@ -672,11 +672,13 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     PlanExecutor::ExecState state;
     try {
         state = exec->getNext(&value, nullptr);
+    } catch (const WriteConflictException&) {
+        // Propagate the WCE to be retried at a higher-level without logging.
+        throw;
     } catch (DBException& exception) {
         auto&& explainer = exec->getPlanExplainer();
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         LOGV2_WARNING(7267501,
-                      "Plan executor error during findAndModify: {error}, stats: {stats}",
                       "Plan executor error during findAndModify",
                       "error"_attr = exception.toStatus(),
                       "stats"_attr = redact(stats));
