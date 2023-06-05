@@ -61,7 +61,7 @@ bool MockNetwork::_allExpectationsSatisfied() const {
     });
 }
 
-void MockNetwork::runUntilIdle() {
+void MockNetwork::_runUntilIdle() {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     do {
         // The main responsibility of the mock network is to host incoming requests and scheduled
@@ -130,7 +130,7 @@ void MockNetwork::runUntilExpectationsSatisfied() {
     // network is idle, the extra threads may be running and will schedule new requests. As a
     // result, the current best practice is to busy-loop to prepare for that.
     while (!_allExpectationsSatisfied()) {
-        runUntilIdle();
+        _runUntilIdle();
     }
 }
 
@@ -144,7 +144,7 @@ void MockNetwork::runUntil(Date_t target) {
             _net->runUntil(target);
         }
         // Run until idle.
-        runUntilIdle();
+        _runUntilIdle();
     }
     LOGV2_DEBUG(5015403, 1, "mock reached time", "target"_attr = target);
 }
