@@ -30,7 +30,13 @@ var $config = extendWorkload($config, function($config, $super) {
 
         var docs = db[collName].find().toArray();
         docs.forEach(function(doc) {
-            assertWhenOwnColl.eq('number', typeof doc.z);
+            assertWhenOwnColl.eq(
+                'number',
+                typeof doc.z,
+                `The query is ${tojson(query)}, and doc is ${
+                    tojson(doc)}, the number of all docs is ${
+                    docs.length}. The response of update is ${tojson(res)}, and config multi is ${
+                    $config.data.multi.toString()}`);
             assertWhenOwnColl.gt(doc.z, 0);
         });
     };
