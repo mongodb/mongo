@@ -69,7 +69,8 @@ const auto kTestBarBucketRsrc = ResourcePattern::forExactNamespace(kTestBarBucke
 const auto kTestBarSystemBucketsRsrc =
     ResourcePattern::forExactSystemBucketsCollection(kTestBarNSS);
 const auto kTestDBSystemBucketsRsrc = ResourcePattern::forAnySystemBucketsInDatabase(kTestDB);
-const auto kBarCollSystemBucketsRsrc = ResourcePattern::forAnySystemBucketsInAnyDatabase("bar"_sd);
+const auto kBarCollSystemBucketsRsrc =
+    ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "bar"_sd);
 const auto kBucketsBarCollRsrc =
     ResourcePattern::forCollectionName(boost::none, "system.buckets.bar"_sd);
 

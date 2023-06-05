@@ -62,7 +62,6 @@ public:
     // forCollectionName() - Remove variant without tenantId arg.
     // forAnySystemBuckets() - Remove boost::none default.
     // forAnySystemBucketsInDatabase() - Remove `StringData` variant.
-    // forAnySystemBucketsInAnyDatabase() - Remove variant without tenantId arg.
     // databaseToMatch() - Remove in favor of dbNameToMatch.
 
     /**
@@ -160,10 +159,6 @@ public:
         return ResourcePattern(
             MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
             NamespaceString::createNamespaceStringForAuth(boost::none, "", collectionName));
-    }
-
-    static ResourcePattern forAnySystemBucketsInAnyDatabase(StringData collectionName) {
-        return forAnySystemBucketsInAnyDatabase(boost::none, collectionName);
     }
 
     /**

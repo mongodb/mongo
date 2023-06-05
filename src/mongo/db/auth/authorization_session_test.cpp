@@ -1472,6 +1472,8 @@ protected:
     static const ResourcePattern testBucketResource;
     static const ResourcePattern otherBucketResource;
     static const ResourcePattern otherDbBucketResource;
+
+    static const ResourcePattern sbCollTestInAnyDB;
 };
 
 const ResourcePattern SystemBucketsTest::testMissingSystemBucketResource(
@@ -1503,6 +1505,9 @@ const ResourcePattern SystemBucketsTest::otherBucketResource(
 const ResourcePattern SystemBucketsTest::otherDbBucketResource(
     ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceStringForAuth(
         boost::none /* tenantId */, "sb_db_other"_sd, "sb_coll_test"_sd)));
+
+const ResourcePattern SystemBucketsTest::sbCollTestInAnyDB(
+    ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "sb_coll_test"_sd));
 
 TEST_F(SystemBucketsTest, CheckExactSystemBucketsCollection) {
     // If we have a system_buckets exact priv
@@ -1580,8 +1585,7 @@ TEST_F(SystemBucketsTest, CheckAnySystemBucketsInDatabase) {
 
 TEST_F(SystemBucketsTest, CheckforAnySystemBucketsInAnyDatabase) {
     // If we have a system_buckets for a coll in any db priv
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase("sb_coll_test"), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
 
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
@@ -1631,8 +1635,7 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeOnResourceForSystemBuckets) {
 
     // If we have a privilege on any systems buckets in any db, we have actions on all databases and
     // system.buckets.<coll> they contain
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase(sb_coll_test), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forDatabaseName(sb_db_test)));
@@ -1705,8 +1708,7 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeInResourceDBForSystemBuckets)
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase(sb_coll_test), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
