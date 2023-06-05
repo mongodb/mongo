@@ -65,6 +65,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -372,6 +373,9 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
+        if (isTimeseries) {
+            timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+        }
 
         ParsedUpdate parsedUpdate(opCtx,
                                   &updateRequest,

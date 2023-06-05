@@ -71,6 +71,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -564,16 +565,11 @@ public:
                                   MODE_IX);
 
             if (isRequestToTimeseries) {
-                uassert(ErrorCodes::NamespaceNotFound,
-                        "Could not find time-series buckets collection for write explain",
-                        collection.getCollectionPtr());
-                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series buckets collection is missing time-series options",
-                        timeseriesOptions);
+                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 const auto& requestHint = request().getUpdates()[0].getHint();
                 if (timeseries::isHintIndexKey(requestHint)) {
+                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
                     updateRequest.setHint(
                         uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                             *timeseriesOptions, requestHint)));
@@ -754,15 +750,10 @@ public:
                     opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
                 MODE_IX);
             if (isRequestToTimeseries) {
-                uassert(ErrorCodes::NamespaceNotFound,
-                        "Could not find time-series buckets collection for write explain",
-                        collection.exists());
-                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series buckets collection is missing time-series options",
-                        timeseriesOptions);
+                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 if (timeseries::isHintIndexKey(firstDelete.getHint())) {
+                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
                     deleteRequest.setHint(
                         uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                             *timeseriesOptions, firstDelete.getHint())));

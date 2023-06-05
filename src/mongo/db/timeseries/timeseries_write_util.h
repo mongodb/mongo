@@ -36,6 +36,14 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 
 namespace mongo::timeseries {
+
+/**
+ * Asserts the buckets collection exists and has valid time-series options.
+ *
+ * Assumes already holding a lock on the collection.
+ */
+void assertTimeseriesBucketsCollection(const Collection* bucketsColl);
+
 /**
  * Returns the document for writing a new bucket with a write batch.
  */

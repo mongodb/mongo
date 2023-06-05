@@ -268,6 +268,15 @@ void updateTimeseriesDocument(OperationContext* opCtx,
 }
 }  // namespace
 
+void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
+    uassert(ErrorCodes::NamespaceNotFound,
+            "Could not find time-series buckets collection for write",
+            bucketsColl);
+    uassert(ErrorCodes::InvalidOptions,
+            "Time-series buckets collection is missing time-series options",
+            bucketsColl->getTimeseriesOptions());
+}
+
 BSONObj makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
                                 const BSONObj& metadata) {
     StringDataMap<BSONObjBuilder> dataBuilders;

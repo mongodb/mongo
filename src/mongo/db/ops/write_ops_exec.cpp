@@ -754,6 +754,10 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
             !inTransaction);
     }
 
+    if (isTimeseriesUpdate) {
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+    }
+
     ParsedUpdate parsedUpdate(opCtx,
                               &updateRequest,
                               collection.getCollectionPtr(),
@@ -1135,16 +1139,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }();
 
     if (source == OperationSource::kTimeseriesUpdate) {
-        uassert(ErrorCodes::NamespaceNotFound,
-                "Could not find time-series buckets collection for update",
-                collection.getCollectionPtr());
-
-        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-        uassert(ErrorCodes::InvalidOptions,
-                "Time-series buckets collection is missing time-series options",
-                timeseriesOptions);
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
         // Only translate the hint if it is specified with an index key.
+        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
         if (timeseries::isHintIndexKey(updateRequest->getHint())) {
             updateRequest->setHint(
                 uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
@@ -1519,15 +1517,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     if (source == OperationSource::kTimeseriesDelete) {
-        uassert(ErrorCodes::NamespaceNotFound,
-                "Could not find time-series buckets collection for write",
-                collection.getCollectionPtr());
-        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-        uassert(ErrorCodes::InvalidOptions,
-                "Time-series buckets collection is missing time-series options",
-                timeseriesOptions);
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
         // Only translate the hint if it is specified by index key.
+        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
         if (timeseries::isHintIndexKey(request.getHint())) {
             request.setHint(
                 uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
@@ -2389,12 +2382,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
     // invalidated.
     auto catalog = CollectionCatalog::get(opCtx);
     auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Could not find time-series buckets collection for write",
-            bucketsColl);
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series buckets collection is missing time-series options",
-            bucketsColl->getTimeseriesOptions());
+    timeseries::assertTimeseriesBucketsCollection(bucketsColl);
 
     auto timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
 
