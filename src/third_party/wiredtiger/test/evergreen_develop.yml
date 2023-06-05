@@ -129,6 +129,7 @@ buildvariants:
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
   tasks:
     - name: coverage-report
+    - name: coverage-report-catch2
     - name: cyclomatic-complexity
 
 - name: compatibility-tests-less-frequent
