@@ -729,21 +729,6 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     auto swUser = getAuthorizationManager().reacquireUser(opCtx, currentUser);
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
-        // If an LDAP user is no longer in the cache and cannot be acquired from the cache's
-        // backing LDAP host, it should be cleared from _authenticatedUser. This
-        // guarantees that no operations can be performed until the LDAP host comes back up.
-        // TODO SERVER-72678 avoid this edge case hack when rearchitecting user acquisition.
-        if (name.getDB() == DatabaseName::kExternal.db() &&
-            currentUser->getUserRequest().mechanismData.empty()) {
-            clearUser();
-            LOGV2(5914804,
-                  "Removed external user from session cache of user information because of "
-                  "error status",
-                  "user"_attr = name,
-                  "status"_attr = status);
-            return;
-        }
-
         switch (status.code()) {
             case ErrorCodes::UserNotFound: {
                 // User does not exist anymore.
