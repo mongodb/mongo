@@ -686,18 +686,6 @@ struct __wt_page {
     uint32_t prefix_start; /* Best page prefix starting slot */
     uint32_t prefix_stop;  /* Maximum slot to which the best page prefix applies */
 
-#define WT_PAGE_IS_INTERNAL(page) \
-    ((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
-#define WT_PAGE_INVALID 0       /* Invalid page */
-#define WT_PAGE_BLOCK_MANAGER 1 /* Block-manager page */
-#define WT_PAGE_COL_FIX 2       /* Col-store fixed-len leaf */
-#define WT_PAGE_COL_INT 3       /* Col-store internal page */
-#define WT_PAGE_COL_VAR 4       /* Col-store var-length leaf page */
-#define WT_PAGE_OVFL 5          /* Overflow page */
-#define WT_PAGE_ROW_INT 6       /* Row-store internal page */
-#define WT_PAGE_ROW_LEAF 7      /* Row-store leaf page */
-    uint8_t type;               /* Page type */
-
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_PAGE_BUILD_KEYS 0x001u         /* Keys have been built in memory */
 #define WT_PAGE_COMPACTION_WRITE 0x002u   /* Writing the page for compaction */
@@ -712,7 +700,19 @@ struct __wt_page {
                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t flags_atomic;                /* Atomic flags, use F_*_ATOMIC_16 */
 
-    uint8_t unused; /* Unused padding */
+#define WT_PAGE_IS_INTERNAL(page) \
+    ((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
+#define WT_PAGE_INVALID 0       /* Invalid page */
+#define WT_PAGE_BLOCK_MANAGER 1 /* Block-manager page */
+#define WT_PAGE_COL_FIX 2       /* Col-store fixed-len leaf */
+#define WT_PAGE_COL_INT 3       /* Col-store internal page */
+#define WT_PAGE_COL_VAR 4       /* Col-store var-length leaf page */
+#define WT_PAGE_OVFL 5          /* Overflow page */
+#define WT_PAGE_ROW_INT 6       /* Row-store internal page */
+#define WT_PAGE_ROW_LEAF 7      /* Row-store leaf page */
+    uint8_t type;               /* Page type */
+
+    /* 1 byte hole expected. */
 
     size_t memory_footprint; /* Memory attached to the page */
 
