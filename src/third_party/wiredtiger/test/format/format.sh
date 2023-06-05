@@ -367,6 +367,28 @@ report_failure()
 	echo "$name: failure status reported" > $dir/$status
 }
 
+# Wait for a process to die. Handle both child and non-child processes.
+# $1 pid
+# Return <exit code> of process if child or 127 if non-child
+wait_for_process()
+{
+	pid=$1
+	ret=127
+
+	if [ `pstree -p $$ | grep -w $pid | wc -l` -gt "0" ]; then
+		# Can still produce "wait: pid XXXX is not a child of this shell" due to process
+		# ending between the steps, can be safely ignored.
+		wait $pid
+		ret=$?
+	else
+		while [ -d "/proc/$pid/" ]; do
+			sleep 1
+		done
+	fi
+
+	return $ret
+}
+
 # Resolve/cleanup completed jobs.
 resolve()
 {
@@ -399,16 +421,27 @@ resolve()
 			}
 
 			# Kill the process group to catch any child processes.
+			if [ `ps -eo ppid | grep -w $pid | wc -l` -gt "0" ]; then
+				kill -KILL -- -$pid
+			fi
+			# Kill the process.
+			kill -KILL $pid
+			wait_for_process $pid
+
 			msg "job in $dir killed"
-			kill -KILL -- -$pid
-			wait $pid
 
 			# Remove jobs we killed, they count as neither success or failure.
 			rm -rf $dir $log
 			continue
 		}
-		wait $pid
+		wait_for_process $pid
 		eret=$?
+
+		# Check for Sanitizer failures, have to do this prior to success because both can be reported.
+		grep -E -i 'Sanitizer' $log > /dev/null && {
+			report_failure $dir
+			continue
+		}
 
 		# Remove successful jobs.
 		grep 'successful run completed' $log > /dev/null && {
@@ -468,7 +501,7 @@ resolve()
 			continue
 		}
 
-		# Check for the library abort message, or an error from format.
+		# Check for the library abort message or an error from format.
 		grep -E \
 		    'aborting WiredTiger library|format alarm timed out|run FAILED' \
 		    $log > /dev/null && {
