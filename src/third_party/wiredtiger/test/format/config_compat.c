@@ -221,7 +221,7 @@ config_compat(const char **origp)
 
     for (p = list; *p != NULL; p += 2)
         if (strncmp(orig, *p, (size_t)((equalp - orig) + 1)) == 0) {
-            testutil_check(__wt_snprintf(conv, sizeof(conv), "%s%s", *++p, equalp));
+            testutil_snprintf(conv, sizeof(conv), "%s%s", *++p, equalp);
             *origp = conv;
             break;
         }

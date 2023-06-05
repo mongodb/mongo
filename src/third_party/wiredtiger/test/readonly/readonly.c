@@ -215,9 +215,9 @@ main(int argc, char *argv[])
      * Set up all the directory names.
      */
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_check(__wt_snprintf(home_wr, sizeof(home_wr), "%s%s", home, HOME_WR_SUFFIX));
-    testutil_check(__wt_snprintf(home_rd, sizeof(home_rd), "%s%s", home, HOME_RD_SUFFIX));
-    testutil_check(__wt_snprintf(home_rd2, sizeof(home_rd2), "%s%s", home, HOME_RD2_SUFFIX));
+    testutil_snprintf(home_wr, sizeof(home_wr), "%s%s", home, HOME_WR_SUFFIX);
+    testutil_snprintf(home_rd, sizeof(home_rd), "%s%s", home, HOME_RD_SUFFIX);
+    testutil_snprintf(home_rd2, sizeof(home_rd2), "%s%s", home, HOME_RD2_SUFFIX);
     if (!child) {
         testutil_recreate_dir(home);
         testutil_recreate_dir(home_wr);
@@ -320,7 +320,7 @@ main(int argc, char *argv[])
      *
      * The child will exit with success if its test passes.
      */
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir));
+    testutil_snprintf(cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
     if ((status = system(cmd)) < 0)
         testutil_die(status, "system: %s", cmd);
     if (WEXITSTATUS(status) != 0)
@@ -329,7 +329,7 @@ main(int argc, char *argv[])
     /*
      * Scenario 2. Run child with writable config.
      */
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir));
+    testutil_snprintf(cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
     if ((status = system(cmd)) < 0)
         testutil_die(status, "system: %s", cmd);
     if (WEXITSTATUS(status) != 0)
@@ -347,7 +347,7 @@ main(int argc, char *argv[])
     /*
      * Scenario 3. Child read-only.
      */
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir));
+    testutil_snprintf(cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
     if ((status = system(cmd)) < 0)
         testutil_die(status, "system: %s", cmd);
     if (WEXITSTATUS(status) != 0)
@@ -356,7 +356,7 @@ main(int argc, char *argv[])
     /*
      * Scenario 4. Run child with writable config.
      */
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir));
+    testutil_snprintf(cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
     if ((status = system(cmd)) < 0)
         testutil_die(status, "system: %s", cmd);
     if (WEXITSTATUS(status) != 0)
@@ -372,10 +372,10 @@ main(int argc, char *argv[])
     /*
      * We need to chmod the read-only databases back so that they can be removed by scripts.
      */
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), "chmod 0777 %s %s", home_rd, home_rd2));
+    testutil_snprintf(cmd, sizeof(cmd), "chmod 0777 %s %s", home_rd, home_rd2);
     if ((status = system(cmd)) < 0)
         testutil_die(status, "system: %s", cmd);
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), "chmod -R 0666 %s/* %s/*", home_rd, home_rd2));
+    testutil_snprintf(cmd, sizeof(cmd), "chmod -R 0666 %s/* %s/*", home_rd, home_rd2);
     if ((status = system(cmd)) < 0)
         testutil_die(status, "system: %s", cmd);
     printf(" *** Readonly test successful ***\n");

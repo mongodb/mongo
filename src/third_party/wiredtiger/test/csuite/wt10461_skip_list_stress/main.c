@@ -140,7 +140,7 @@ thread_search_insert_run(void *arg)
      * skiplist.
      */
     check_key.data = dmalloc(CHECK_KEY_SIZE);
-    testutil_check(__wt_snprintf((char *)check_key.data, CHECK_KEY_SIZE, "00"));
+    testutil_snprintf((char *)check_key.data, CHECK_KEY_SIZE, "00");
     check_key.size = CHECK_KEY_SIZE;
 
     __wt_atomic_addv32(&active_search_insert_threads, 1);
@@ -207,7 +207,7 @@ run(const char *working_dir)
     testutil_check(session->begin_transaction(session, NULL));
     for (uint32_t i = NUM_KEYS; i > 0; i--) {
         /* All keys use leading zeros. Otherwise "2" is consider larger than "11". */
-        testutil_check(__wt_snprintf(key, KEY_SIZE, "%0*u", KEY_SIZE - 1, i));
+        testutil_snprintf(key, KEY_SIZE, "%0*u", KEY_SIZE - 1, i);
         insert_key(cursor, key);
     }
     testutil_check(session->commit_transaction(session, NULL));

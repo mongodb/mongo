@@ -118,8 +118,8 @@ tiered_storage_read_config(const char *home, char *s3_prefix, size_t s3_prefix_s
     testutil_assert(s3_prefix_size > 0);
     s3_prefix[0] = '\0';
 
-    testutil_check(__wt_snprintf(config_path, sizeof(config_path), "%s/%s",
-      home == NULL ? "." : home, TIERED_STORAGE_CONFIG_FILE));
+    testutil_snprintf(config_path, sizeof(config_path), "%s/%s", home == NULL ? "." : home,
+      TIERED_STORAGE_CONFIG_FILE);
     f = fopen(config_path, "r");
     if (f == NULL) {
         testutil_assert_errno(errno == ENOENT);
@@ -144,7 +144,7 @@ tiered_storage_read_config(const char *home, char *s3_prefix, size_t s3_prefix_s
         *(value++) = '\0';
 
         if (strcmp(str, "prefix") == 0) {
-            testutil_check(__wt_snprintf(s3_prefix, s3_prefix_size, "%s", value));
+            testutil_snprintf(s3_prefix, s3_prefix_size, "%s", value);
             continue;
         }
 
@@ -168,8 +168,8 @@ tiered_storage_write_config(const char *home, const char *s3_prefix)
     FILE *f;
     char config_path[512];
 
-    testutil_check(__wt_snprintf(config_path, sizeof(config_path), "%s/%s",
-      home == NULL ? "." : home, TIERED_STORAGE_CONFIG_FILE));
+    testutil_snprintf(config_path, sizeof(config_path), "%s/%s", home == NULL ? "." : home,
+      TIERED_STORAGE_CONFIG_FILE);
     f = fopen(config_path, "w");
     testutil_assert_errno(f != NULL);
 
@@ -213,8 +213,7 @@ tiered_storage_generate_prefix(char *out, size_t size)
 #endif
     n = strftime(time_str, sizeof(time_str), "%F-%H-%M-%S", &time_parsed);
     testutil_assert(n > 0);
-    testutil_check(
-      __wt_snprintf(out, size, "s3test/test/%s/%" PRIu32 "--", time_str, testutil_random(NULL)));
+    testutil_snprintf(out, size, "s3test/test/%s/%" PRIu32 "--", time_str, testutil_random(NULL));
 }
 
 /*
@@ -242,8 +241,8 @@ testutil_tiered_storage_configuration(TEST_OPTS *opts, const char *home, char *t
 
             if (s3_access_key == NULL || s3_secret_key == NULL)
                 testutil_die(EINVAL, "AWS S3 access key or secret key is not set");
-            testutil_check(
-              __wt_snprintf(auth_token, sizeof(auth_token), "%s;%s", s3_access_key, s3_secret_key));
+            testutil_snprintf(
+              auth_token, sizeof(auth_token), "%s;%s", s3_access_key, s3_secret_key);
 
             /*
              * By default the S3 bucket name is S3_DEFAULT_BUCKET_NAME, but it can be overridden
@@ -265,35 +264,33 @@ testutil_tiered_storage_configuration(TEST_OPTS *opts, const char *home, char *t
                 tiered_storage_write_config(home, s3_prefix);
             }
         }
-        testutil_check(__wt_snprintf(ext_cfg, ext_cfg_size, TESTUTIL_ENV_CONFIG_TIERED_EXT,
-          opts->build_dir, opts->tiered_storage_source, opts->tiered_storage_source, opts->delay_ms,
-          opts->error_ms, opts->force_delay, opts->force_error));
+        testutil_snprintf(ext_cfg, ext_cfg_size, TESTUTIL_ENV_CONFIG_TIERED_EXT, opts->build_dir,
+          opts->tiered_storage_source, opts->tiered_storage_source, opts->delay_ms, opts->error_ms,
+          opts->force_delay, opts->force_error);
 
         if (is_dir_store) {
             if (opts->absolute_bucket_dir) {
                 if (opts->home[0] == '/')
-                    testutil_check(
-                      __wt_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME));
+                    testutil_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME);
                 else {
                     if (getcwd(cwd, sizeof(cwd)) == NULL)
                         testutil_die(ENOENT, "No such directory");
-                    testutil_check(__wt_snprintf(
-                      dir, sizeof(dir), "%s/%s/%s", cwd, opts->home, DIR_STORE_BUCKET_NAME));
+                    testutil_snprintf(
+                      dir, sizeof(dir), "%s/%s/%s", cwd, opts->home, DIR_STORE_BUCKET_NAME);
                 }
             } else
-                testutil_check(__wt_snprintf(dir, sizeof(dir), "%s", DIR_STORE_BUCKET_NAME));
+                testutil_snprintf(dir, sizeof(dir), "%s", DIR_STORE_BUCKET_NAME);
         }
-        testutil_check(__wt_snprintf(tiered_cfg, tiered_cfg_size, TESTUTIL_ENV_CONFIG_TIERED,
+        testutil_snprintf(tiered_cfg, tiered_cfg_size, TESTUTIL_ENV_CONFIG_TIERED,
           is_dir_store ? dir : s3_bucket_name, is_dir_store ? "pfx-" : s3_prefix,
-          opts->local_retention, opts->tiered_storage_source, auth_token));
+          opts->local_retention, opts->tiered_storage_source, auth_token);
         if (is_dir_store && opts->make_bucket_dir) {
-            testutil_check(
-              __wt_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME));
+            testutil_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME);
             testutil_check(mkdir(dir, 0777));
         }
 
     } else {
-        testutil_check(__wt_snprintf(ext_cfg, ext_cfg_size, "\"\""));
+        testutil_snprintf(ext_cfg, ext_cfg_size, "\"\"");
         testutil_assert(tiered_cfg_size > 0);
         tiered_cfg[0] = '\0';
     }

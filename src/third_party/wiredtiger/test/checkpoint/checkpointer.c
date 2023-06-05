@@ -44,10 +44,10 @@ set_stable(uint64_t stable_ts)
     char buf[128];
 
     if (g.race_timestamps)
-        testutil_check(__wt_snprintf(buf, sizeof(buf),
-          "stable_timestamp=%" PRIx64 ",oldest_timestamp=%" PRIx64, stable_ts, stable_ts));
+        testutil_snprintf(buf, sizeof(buf),
+          "stable_timestamp=%" PRIx64 ",oldest_timestamp=%" PRIx64, stable_ts, stable_ts);
     else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "stable_timestamp=%" PRIx64, stable_ts));
+        testutil_snprintf(buf, sizeof(buf), "stable_timestamp=%" PRIx64, stable_ts);
     testutil_check(g.conn->set_timestamp(g.conn, buf));
 }
 
@@ -255,13 +255,13 @@ real_checkpointer(THREAD_DATA *td)
         ts_config = "use_timestamp=true";
 
     if (!WT_PREFIX_MATCH(g.checkpoint_name, "WiredTigerCheckpoint")) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "name=%s,%s", g.checkpoint_name, ts_config));
+        testutil_snprintf(buf, sizeof(buf), "name=%s,%s", g.checkpoint_name, ts_config);
         checkpoint_config = buf;
     } else
         checkpoint_config = ts_config;
 
-    testutil_check(__wt_snprintf(
-      flush_tier_config, sizeof(flush_tier_config), "flush_tier=(enabled,force),%s", ts_config));
+    testutil_snprintf(
+      flush_tier_config, sizeof(flush_tier_config), "flush_tier=(enabled,force),%s", ts_config);
 
     /* Use the extra random generator as the tier delay doesn't affect the actual data content. */
     set_flush_tier_delay(&td->extra_rnd);
@@ -338,8 +338,8 @@ real_checkpointer(THREAD_DATA *td)
 
         /* Advance the oldest timestamp to the most recently set stable timestamp. */
         if (g.use_timestamps && g.ts_oldest != 0) {
-            testutil_check(__wt_snprintf(
-              timestamp_buf, sizeof(timestamp_buf), "oldest_timestamp=%" PRIx64, g.ts_oldest));
+            testutil_snprintf(
+              timestamp_buf, sizeof(timestamp_buf), "oldest_timestamp=%" PRIx64, g.ts_oldest);
             testutil_check(g.conn->set_timestamp(g.conn, timestamp_buf));
         }
 
@@ -457,16 +457,15 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_check
         return (log_print_err("verify_consistency", ENOMEM, 1));
 
     if (use_checkpoint) {
-        testutil_check(
-          __wt_snprintf(ckpt_buf, sizeof(ckpt_buf), "checkpoint=%s", g.checkpoint_name));
+        testutil_snprintf(ckpt_buf, sizeof(ckpt_buf), "checkpoint=%s", g.checkpoint_name);
         ckpt = ckpt_buf;
     } else {
         ckpt = NULL;
         if (verify_ts != WT_TS_NONE)
-            testutil_check(__wt_snprintf(cfg_buf, sizeof(cfg_buf),
-              "isolation=snapshot,read_timestamp=%" PRIx64 ",roundup_timestamps=read", verify_ts));
+            testutil_snprintf(cfg_buf, sizeof(cfg_buf),
+              "isolation=snapshot,read_timestamp=%" PRIx64 ",roundup_timestamps=read", verify_ts);
         else
-            testutil_check(__wt_snprintf(cfg_buf, sizeof(cfg_buf), "isolation=snapshot"));
+            testutil_snprintf(cfg_buf, sizeof(cfg_buf), "isolation=snapshot");
         testutil_check(session->begin_transaction(session, cfg_buf));
     }
 
@@ -478,7 +477,7 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_check
             cursors[i] = NULL;
             continue;
         }
-        testutil_check(__wt_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", i));
+        testutil_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", i);
         if ((ret = session->open_cursor(session, next_uri, NULL, ckpt, &cursors[i])) != 0) {
             (void)log_print_err("verify_consistency:session.open_cursor", ret, 1);
             goto err;
@@ -584,7 +583,7 @@ compare_cursors(WT_CURSOR *cursor1, table_type type1, WT_CURSOR *cursor2, table_
     if (type1 == FIX) {
         if (cursor1->get_value(cursor1, &fixval1) != 0)
             goto valuefail;
-        testutil_check(__wt_snprintf(fixbuf1, sizeof(fixbuf1), "%" PRIu8, fixval1));
+        testutil_snprintf(fixbuf1, sizeof(fixbuf1), "%" PRIu8, fixval1);
         strval1 = fixbuf1;
     } else {
         if (cursor1->get_value(cursor1, &strval1) != 0)
@@ -595,7 +594,7 @@ compare_cursors(WT_CURSOR *cursor1, table_type type1, WT_CURSOR *cursor2, table_
     if (type2 == FIX) {
         if (cursor2->get_value(cursor2, &fixval2) != 0)
             goto valuefail;
-        testutil_check(__wt_snprintf(fixbuf2, sizeof(fixbuf2), "%" PRIu8, fixval2));
+        testutil_snprintf(fixbuf2, sizeof(fixbuf2), "%" PRIu8, fixval2);
         strval2 = fixbuf2;
     } else {
         if (cursor2->get_value(cursor2, &strval2) != 0)
@@ -662,7 +661,7 @@ diagnose_key_error(WT_CURSOR *cursor1, table_type type1, int index1, WT_CURSOR *
     session = cursor1->session;
     key1_orig = key2_orig = 0;
 
-    testutil_check(__wt_snprintf(ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name));
+    testutil_snprintf(ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name);
 
     /* Save the failed keys. */
     if (cursor1->get_key(cursor1, &key1_orig) != 0 || cursor2->get_key(cursor2, &key2_orig) != 0) {
@@ -705,7 +704,7 @@ diagnose_key_error(WT_CURSOR *cursor1, table_type type1, int index1, WT_CURSOR *
      * Now try opening new cursors on the checkpoints and see if we get the same missing key via
      * searching.
      */
-    testutil_check(__wt_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index1));
+    testutil_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index1);
     if (session->open_cursor(session, next_uri, NULL, ckpt, &c) != 0)
         return (1);
     c->set_key(c, key1_orig);
@@ -717,7 +716,7 @@ diagnose_key_error(WT_CURSOR *cursor1, table_type type1, int index1, WT_CURSOR *
     if (c->close(c) != 0)
         return (1);
 
-    testutil_check(__wt_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index2));
+    testutil_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index2);
     if (session->open_cursor(session, next_uri, NULL, ckpt, &c) != 0)
         return (1);
     c->set_key(c, key1_orig);
@@ -734,7 +733,7 @@ live_check:
      * Now try opening cursors on the live checkpoint to see if we get the same missing key via
      * searching.
      */
-    testutil_check(__wt_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index1));
+    testutil_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index1);
     if (session->open_cursor(session, next_uri, NULL, NULL, &c) != 0)
         return (1);
     c->set_key(c, key1_orig);
@@ -743,7 +742,7 @@ live_check:
     if (c->close(c) != 0)
         return (1);
 
-    testutil_check(__wt_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index2));
+    testutil_snprintf(next_uri, sizeof(next_uri), "table:__wt%04d", index2);
     if (session->open_cursor(session, next_uri, NULL, NULL, &c) != 0)
         return (1);
     c->set_key(c, key2_orig);

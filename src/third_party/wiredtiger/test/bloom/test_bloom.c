@@ -130,9 +130,9 @@ setup(void)
      * Open configuration -- put command line configuration options at the end so they can override
      * "standard" configuration.
      */
-    testutil_check(__wt_snprintf(config, sizeof(config),
+    testutil_snprintf(config, sizeof(config),
       "create,statistics=(all),error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s", progname,
-      g.c_cache, g.config_open == NULL ? "" : g.config_open));
+      g.c_cache, g.config_open == NULL ? "" : g.config_open);
 
     testutil_check(wiredtiger_open(home, NULL, config, &conn));
 

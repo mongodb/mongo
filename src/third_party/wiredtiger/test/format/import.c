@@ -96,10 +96,10 @@ import(void *arg)
         /* Perform import with either repair or file metadata. */
         import_value = mmrand(&g.extra_rnd, 0, 1);
         if (import_value == 0)
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)"));
+            testutil_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)");
         else
-            testutil_check(__wt_snprintf(buf, sizeof(buf),
-              "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config));
+            testutil_snprintf(buf, sizeof(buf),
+              "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config);
         testutil_check(session->create(session, IMPORT_URI, buf));
 
         verify_import(session);
@@ -197,6 +197,6 @@ copy_file_into_directory(WT_SESSION *session, const char *name)
     char to[64];
 
     buf_len = strlen(name) + 10;
-    testutil_check(__wt_snprintf(to, buf_len, "../%s", name));
+    testutil_snprintf(to, buf_len, "../%s", name);
     testutil_check(__wt_copy_and_sync(session, name, to));
 }

@@ -77,8 +77,8 @@ copy_directory_int(const char *fromdir, const char *todir, bool directio)
          */
         if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
             continue;
-        testutil_check(__wt_snprintf(fromfile, sizeof(fromfile), "%s/%s", fromdir, dp->d_name));
-        testutil_check(__wt_snprintf(tofile, sizeof(tofile), "%s/%s", todir, dp->d_name));
+        testutil_snprintf(fromfile, sizeof(fromfile), "%s/%s", fromdir, dp->d_name);
+        testutil_snprintf(tofile, sizeof(tofile), "%s/%s", todir, dp->d_name);
         if (dp->d_type == DT_DIR) {
             copy_directory_int(fromfile, tofile, directio);
             continue;

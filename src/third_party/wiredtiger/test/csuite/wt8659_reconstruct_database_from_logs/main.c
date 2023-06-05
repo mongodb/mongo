@@ -69,8 +69,8 @@ dump_table(const char *home, const char *table, const char *out_file)
 {
     char buf[1024];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s -R -h %s/%s dump %s > %s/%s", wt_tool_path,
-      test_root, home, table, test_root, out_file));
+    testutil_snprintf(buf, sizeof(buf), "%s -R -h %s/%s dump %s > %s/%s", wt_tool_path, test_root,
+      home, table, test_root, out_file);
     testutil_check(system(buf));
 }
 
@@ -130,8 +130,8 @@ compare_backups(void)
     reset_dir(home_incr_copy);
 
     /* Compare the files. */
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), "cmp %s/%s %s/%s", test_root, full_out, test_root, incr_out));
+    testutil_snprintf(
+      buf, sizeof(buf), "cmp %s/%s %s/%s", test_root, full_out, test_root, incr_out);
     if ((ret = system(buf)) != 0) {
         printf(
           "Tables \"%s\" don't match in \"%s\" and \"%s\"!\n See \"%s\" and \"%s\" for details.\n",
@@ -164,8 +164,8 @@ add_work(int iter)
 
     /* Perform some operations with individual auto-commit transactions. */
     for (i = 0; i < MAX_KEYS; i++) {
-        testutil_check(__wt_snprintf(k, sizeof(k), "key.%d.%d", iter, i));
-        testutil_check(__wt_snprintf(v, sizeof(v), "value.%d.%d", iter, i));
+        testutil_snprintf(k, sizeof(k), "key.%d.%d", iter, i);
+        testutil_snprintf(v, sizeof(v), "value.%d.%d", iter, i);
         cursor->set_key(cursor, k);
         cursor->set_value(cursor, v);
         testutil_check(cursor->insert(cursor));
@@ -280,7 +280,7 @@ reopen_conn(void)
         session = NULL;
     }
 
-    testutil_check(__wt_snprintf(full_home, sizeof(full_home), "%s/%s", test_root, home_live));
+    testutil_snprintf(full_home, sizeof(full_home), "%s/%s", test_root, home_live);
     testutil_check(wiredtiger_open(full_home, NULL, conn_config, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 }

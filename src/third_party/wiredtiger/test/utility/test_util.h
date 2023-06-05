@@ -255,6 +255,20 @@ typedef struct {
 #define testutil_snprintf(out, size, ...) testutil_check(__wt_snprintf(out, size, __VA_ARGS__))
 
 /*
+ * testutil_snprintf_len_incr --
+ *     Do snprintf, incrementing the returned size; fail on error.
+ */
+#define testutil_snprintf_len_incr(out, size, retsizep, ...) \
+    testutil_check(__wt_snprintf_len_incr(out, size, retsizep, __VA_ARGS__))
+
+/*
+ * testutil_snprintf_len_set --
+ *     Do snprintf, setting the returned size; fail on error.
+ */
+#define testutil_snprintf_len_set(out, size, retsizep, ...) \
+    testutil_check(__wt_snprintf_len_set(out, size, retsizep, __VA_ARGS__))
+
+/*
  * WT_OP_CHECKPOINT_WAIT --
  *	If an operation returns EBUSY checkpoint and retry.
  */

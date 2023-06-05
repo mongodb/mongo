@@ -49,7 +49,7 @@ fuzzutil_generate_home_name(char *buf, int buf_len)
      * the end of the name.
      */
     pid = getpid();
-    testutil_check(__wt_snprintf(buf, buf_len, "WT_TEST_%d", pid));
+    testutil_snprintf(buf, buf_len, "WT_TEST_%d", pid);
 }
 
 /*

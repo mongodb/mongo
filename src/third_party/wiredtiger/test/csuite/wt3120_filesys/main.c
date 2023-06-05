@@ -54,10 +54,10 @@ main(int argc, char *argv[])
 #define WT_FAIL_FS_LIB "ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
 #endif
     testutil_build_dir(opts, buf, 1024);
-    testutil_check(__wt_snprintf(config, sizeof(config),
+    testutil_snprintf(config, sizeof(config),
       "create,extensions=(%s/"
       "%s=(early_load=true)),statistics=(all),statistics_log=(json,on_close,wait=1)",
-      buf, WT_FAIL_FS_LIB));
+      buf, WT_FAIL_FS_LIB);
     testutil_check(wiredtiger_open(opts->home, NULL, config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(session->create(session, opts->uri, "key_format=S,value_format=S"));

@@ -169,8 +169,8 @@ run_test_clean(const char *suffix, uint32_t num_records)
     avg_wtime = avg_rtime = avg_rthroughput = avg_wthroughput = 0;
 
     for (counter = 0; counter < MAX_RUN; ++counter) {
-        testutil_check(__wt_snprintf(
-          home_full, HOME_BUF_SIZE, "%s_%s_%d_%" PRIu32, opts->home, suffix, flush, counter));
+        testutil_snprintf(
+          home_full, HOME_BUF_SIZE, "%s_%s_%d_%" PRIu32, opts->home, suffix, flush, counter);
         run_test(home_full, num_records, counter);
     }
 
@@ -258,7 +258,7 @@ remove_local_cached_files(const char *home)
 
     closedir(dir);
 
-    testutil_check(__wt_snprintf(file_prefix, sizeof(file_prefix), "%s-000", tablename));
+    testutil_snprintf(file_prefix, sizeof(file_prefix), "%s-000", tablename);
     if (highest > 1 && nmatches > 1) {
         for (index = 1; index < highest; index++) {
             testutil_snprintf(buf, sizeof(buf), "%s/%s*0%d.wtobj", home, file_prefix, index);
@@ -372,7 +372,7 @@ run_test(const char *home, uint32_t num_records, uint32_t counter)
     /* Create and populate table. Checkpoint the data after that. */
     testutil_check(session->create(session, opts->uri, table_config));
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), flush ? "flush_tier=(enabled,force=true)" : ""));
+    testutil_snprintf(buf, sizeof(buf), flush ? "flush_tier=(enabled,force=true)" : "");
 
     gettimeofday(&start, 0);
 
@@ -441,8 +441,8 @@ compute_tiered_file_size(const char *home, const char *tablename, uint64_t *file
 
     *file_size = 0;
     for (index = 1; index < MAX_TIERED_FILES; ++index) {
-        testutil_check(__wt_snprintf(
-          stat_path, sizeof(stat_path), "%s/%s-%10.10d.wtobj", home, tablename, index));
+        testutil_snprintf(
+          stat_path, sizeof(stat_path), "%s/%s-%10.10d.wtobj", home, tablename, index);
 
         /* Return if the stat fails that means the file does not exist. */
         if (stat(stat_path, &stats) == 0)
@@ -461,7 +461,7 @@ compute_wt_file_size(const char *home, const char *tablename, uint64_t *file_siz
     struct stat stats;
 
     *file_size = 0;
-    testutil_check(__wt_snprintf(stat_path, sizeof(stat_path), "%s/%s.wt", home, tablename));
+    testutil_snprintf(stat_path, sizeof(stat_path), "%s/%s.wt", home, tablename);
     if (stat(stat_path, &stats) == 0)
         *file_size = (uint64_t)stats.st_size;
     else

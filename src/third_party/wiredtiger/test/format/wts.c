@@ -127,8 +127,7 @@ handle_progress(
     (void)handler;
 
     if (session->app_private != NULL) {
-        testutil_check(
-          __wt_snprintf(buf, sizeof(buf), "%s %s", (char *)session->app_private, operation));
+        testutil_snprintf(buf, sizeof(buf), "%s %s", (char *)session->app_private, operation);
         track(buf, progress);
         return (0);
     }
@@ -139,14 +138,14 @@ handle_progress(
 
 static WT_EVENT_HANDLER event_handler = {NULL, handle_message, handle_progress, NULL, NULL};
 
-#define CONFIG_APPEND(p, ...)                                               \
-    do {                                                                    \
-        size_t __len;                                                       \
-        testutil_check(__wt_snprintf_len_set(p, max, &__len, __VA_ARGS__)); \
-        if (__len > max)                                                    \
-            __len = max;                                                    \
-        p += __len;                                                         \
-        max -= __len;                                                       \
+#define CONFIG_APPEND(p, ...)                                   \
+    do {                                                        \
+        size_t __len;                                           \
+        testutil_snprintf_len_set(p, max, &__len, __VA_ARGS__); \
+        if (__len > max)                                        \
+            __len = max;                                        \
+        p += __len;                                             \
+        max -= __len;                                           \
     } while (0)
 
 /*
@@ -712,7 +711,7 @@ stats_data_source(TABLE *table, void *arg)
     session = args->session;
 
     testutil_assert(fprintf(fp, "\n\n====== Data source statistics: %s\n", table->uri) >= 0);
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "statistics:%s", table->uri));
+    testutil_snprintf(buf, sizeof(buf), "statistics:%s", table->uri);
     stats_data_print(session, buf, fp);
 }
 

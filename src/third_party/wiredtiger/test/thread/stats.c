@@ -61,7 +61,7 @@ stats(void)
 
     /* File statistics. */
     if (!multiple_files) {
-        testutil_check(__wt_snprintf(name, sizeof(name), "statistics:" FNAME, 0));
+        testutil_snprintf(name, sizeof(name), "statistics:" FNAME, 0);
         testutil_check(session->open_cursor(session, name, NULL, NULL, &cursor));
 
         while ((ret = cursor->next(cursor)) == 0 &&

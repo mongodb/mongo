@@ -270,7 +270,7 @@ test_bulk_unique(THREAD_DATA *td, uint64_t unique_id, int force)
      * Generate a unique object name. Use the iteration count provided by the caller. The caller
      * ensures it to be unique.
      */
-    testutil_check(__wt_snprintf(new_uri, sizeof(new_uri), "%s.%" PRIu64, uri, unique_id));
+    testutil_snprintf(new_uri, sizeof(new_uri), "%s.%" PRIu64, uri, unique_id);
 
     if (use_txn)
         testutil_check(session->begin_transaction(session, NULL));
@@ -286,7 +286,7 @@ test_bulk_unique(THREAD_DATA *td, uint64_t unique_id, int force)
     else if (ret != EINVAL)
         testutil_die(ret, "session.open_cursor bulk unique: %s, new_uri");
 
-    testutil_check(__wt_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false"));
+    testutil_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false");
     /* For testing we want to remove objects too. */
     if (opts->tiered_storage)
         strcat(dropconf, ",remove_shared=true");
@@ -381,7 +381,7 @@ test_create_unique(THREAD_DATA *td, uint64_t unique_id, int force)
      * Generate a unique object name. Use the iteration count provided by the caller. The caller
      * ensures it to be unique.
      */
-    testutil_check(__wt_snprintf(new_uri, sizeof(new_uri), "%s.%" PRIu64, uri, unique_id));
+    testutil_snprintf(new_uri, sizeof(new_uri), "%s.%" PRIu64, uri, unique_id);
 
     if (use_txn)
         testutil_check(session->begin_transaction(session, NULL));
@@ -393,7 +393,7 @@ test_create_unique(THREAD_DATA *td, uint64_t unique_id, int force)
     if (use_txn)
         testutil_check(session->begin_transaction(session, NULL));
 
-    testutil_check(__wt_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false"));
+    testutil_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false");
     /* For testing we want to remove objects too. */
     if (opts->tiered_storage)
         strcat(dropconf, ",remove_shared=true");
@@ -421,7 +421,7 @@ test_drop(THREAD_DATA *td, int force)
 
     if (use_txn)
         testutil_check(session->begin_transaction(session, NULL));
-    testutil_check(__wt_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false"));
+    testutil_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false");
     /* For testing we want to remove objects too. */
     if (opts->tiered_storage)
         strcat(dropconf, ",remove_shared=true");
@@ -543,8 +543,8 @@ thread_ts_run(void *arg)
              * Set both the oldest and stable timestamp so that we don't need to maintain read
              * availability at older timestamps.
              */
-            testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
-              "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, oldest_ts, oldest_ts));
+            testutil_snprintf(tscfg, sizeof(tscfg),
+              "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, oldest_ts, oldest_ts);
             testutil_check(td->conn->set_timestamp(td->conn, tscfg));
             last_ts = oldest_ts;
             stable_timestamp = oldest_ts;
@@ -586,10 +586,10 @@ thread_ckpt_run(void *arg)
     ts = 0;
     created_ready = ready_for_kill = false;
 
-    testutil_check(__wt_snprintf(ckpt_config, sizeof(ckpt_config), "use_timestamp=true"));
+    testutil_snprintf(ckpt_config, sizeof(ckpt_config), "use_timestamp=true");
 
-    testutil_check(__wt_snprintf(
-      ckpt_flush_config, sizeof(ckpt_flush_config), "flush_tier=(enabled,force),%s", ckpt_config));
+    testutil_snprintf(
+      ckpt_flush_config, sizeof(ckpt_flush_config), "flush_tier=(enabled,force),%s", ckpt_config);
 
     set_flush_tier_delay(&td->extra_rnd);
 
@@ -694,7 +694,7 @@ thread_run(void *arg)
     /*
      * Set up the separate file for checking.
      */
-    testutil_check(__wt_snprintf(cbuf, sizeof(cbuf), RECORDS_FILE, td->info));
+    testutil_snprintf(cbuf, sizeof(cbuf), RECORDS_FILE, td->info);
     (void)unlink(cbuf);
     testutil_assert_errno((fp = fopen(cbuf, "w")) != NULL);
     /*
@@ -809,7 +809,7 @@ thread_run(void *arg)
             cur_local->set_key(cur_local, i + 1);
             cur_oplog->set_key(cur_oplog, i + 1);
         } else {
-            testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, i));
+            testutil_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, i);
             cur_coll->set_key(cur_coll, kname);
             cur_local->set_key(cur_local, kname);
             cur_oplog->set_key(cur_oplog, kname);
@@ -817,12 +817,12 @@ thread_run(void *arg)
         /*
          * Put an informative string into the value so that it can be viewed well in a binary dump.
          */
-        testutil_check(__wt_snprintf(cbuf, sizeof(cbuf),
-          "COLL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, stable_ts, i));
-        testutil_check(__wt_snprintf(lbuf, sizeof(lbuf),
-          "LOCAL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, stable_ts, i));
-        testutil_check(__wt_snprintf(obuf, sizeof(obuf),
-          "OPLOG: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, stable_ts, i));
+        testutil_snprintf(cbuf, sizeof(cbuf),
+          "COLL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, stable_ts, i);
+        testutil_snprintf(lbuf, sizeof(lbuf),
+          "LOCAL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, stable_ts, i);
+        testutil_snprintf(obuf, sizeof(obuf),
+          "OPLOG: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->info, stable_ts, i);
         data.size = __wt_random(&td->data_rnd) % MAX_VAL;
         data.data = cbuf;
         cur_coll->set_value(cur_coll, &data);
@@ -837,17 +837,15 @@ thread_run(void *arg)
              * This is only done on the regular session.
              */
             if (use_prep && i % PREPARE_FREQ == 0) {
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "prepare_timestamp=%" PRIx64, stable_ts));
+                testutil_snprintf(tscfg, sizeof(tscfg), "prepare_timestamp=%" PRIx64, stable_ts);
                 testutil_check(session->prepare_transaction(session, tscfg));
                 if (i % PREPARE_YIELD == 0)
                     __wt_yield();
 
-                testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
-                  "commit_timestamp=%" PRIx64 ",durable_timestamp=%" PRIx64, stable_ts, stable_ts));
+                testutil_snprintf(tscfg, sizeof(tscfg),
+                  "commit_timestamp=%" PRIx64 ",durable_timestamp=%" PRIx64, stable_ts, stable_ts);
             } else
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, stable_ts));
+                testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, stable_ts);
 
             testutil_check(session->commit_transaction(session, tscfg));
             if (use_prep) {
@@ -855,8 +853,7 @@ thread_run(void *arg)
                  * Durable timestamp should not be passed as oplog transaction is a non-prepared
                  * transaction.
                  */
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, stable_ts));
+                testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, stable_ts);
                 testutil_check(oplog_session->commit_transaction(oplog_session, tscfg));
             }
             /*
@@ -938,11 +935,11 @@ run_workload(void)
     /*
      * Create all the tables.
      */
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
-      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S"));
+    testutil_snprintf(tableconf, sizeof(tableconf),
+      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S");
     testutil_check(session->create(session, uri_collection, tableconf));
-    testutil_check(__wt_snprintf(
-      tableconf, sizeof(tableconf), "key_format=%s,value_format=u", use_columns ? "r" : "S"));
+    testutil_snprintf(
+      tableconf, sizeof(tableconf), "key_format=%s,value_format=u", use_columns ? "r" : "S");
     testutil_check(session->create(session, uri_local, tableconf));
     testutil_check(session->create(session, uri_oplog, tableconf));
     /*
@@ -1230,7 +1227,7 @@ main(int argc, char *argv[])
          * If we have a stop timestamp, the ready file is created when the child threads have all
          * reached the stop point, so there's no reason to sleep.
          */
-        testutil_check(__wt_snprintf(statname, sizeof(statname), "%s/%s", home, ready_file));
+        testutil_snprintf(statname, sizeof(statname), "%s/%s", home, ready_file);
         while (stat(statname, &sb) != 0)
             testutil_sleep_wait(1, pid);
         if (stop_timestamp == 0)
@@ -1300,7 +1297,7 @@ main(int argc, char *argv[])
         initialize_rep(&c_rep[i]);
         initialize_rep(&l_rep[i]);
         initialize_rep(&o_rep[i]);
-        testutil_check(__wt_snprintf(fname, sizeof(fname), RECORDS_FILE, i));
+        testutil_snprintf(fname, sizeof(fname), RECORDS_FILE, i);
         if ((fp = fopen(fname, "r")) == NULL)
             testutil_die(errno, "fopen: %s", fname);
 
@@ -1341,7 +1338,7 @@ main(int argc, char *argv[])
                 cur_local->set_key(cur_local, key + 1);
                 cur_oplog->set_key(cur_oplog, key + 1);
             } else {
-                testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, key));
+                testutil_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, key);
                 cur_coll->set_key(cur_coll, kname);
                 cur_local->set_key(cur_local, kname);
                 cur_oplog->set_key(cur_oplog, kname);

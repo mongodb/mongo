@@ -125,7 +125,7 @@ main(int argc, char *argv[])
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-    testutil_check(__wt_snprintf(table_format, sizeof(table_format), "key_format=r,value_format="));
+    testutil_snprintf(table_format, sizeof(table_format), "key_format=r,value_format=");
     for (i = 0; i < NR_FIELDS; i++)
         strcat(table_format, "Q");
 

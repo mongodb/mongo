@@ -136,7 +136,7 @@ cursor_insert(const char *uri, uint64_t i)
     if (recno)
         cursor->set_key(cursor, i);
     else {
-        testutil_check(__wt_snprintf(keybuf, sizeof(keybuf), "%s-%" PRIu64, KEY, i));
+        testutil_snprintf(keybuf, sizeof(keybuf), "%s-%" PRIu64, KEY, i);
         cursor->set_key(cursor, keybuf);
     }
     strcpy(valuebuf, VALUE);
@@ -165,8 +165,8 @@ create_data(TABLE_INFO *t)
      */
     len = strlen(APP_STR);
     for (i = 0; i + len < APP_BUF_SIZE; i += len)
-        testutil_check(__wt_snprintf(&buf[i], APP_BUF_SIZE - i, "%s", APP_STR));
-    testutil_check(__wt_snprintf(cfg, sizeof(cfg), "%s,app_metadata=\"%s\"", t->kvformat, buf));
+        testutil_snprintf(&buf[i], APP_BUF_SIZE - i, "%s", APP_STR);
+    testutil_snprintf(cfg, sizeof(cfg), "%s,app_metadata=\"%s\"", t->kvformat, buf);
     testutil_check(wt_session->create(wt_session, t->name, cfg));
     data_val = 1;
     cursor_insert(t->name, data_val);
@@ -191,7 +191,7 @@ corrupt_file(const char *file_name, const char *uri)
      * Open the file, read its contents. Find the string "corrupt" and modify one byte at that
      * offset. That will cause a checksum error when WiredTiger next reads it.
      */
-    testutil_check(__wt_snprintf(path, sizeof(path), "%s/%s", home, file_name));
+    testutil_snprintf(path, sizeof(path), "%s/%s", home, file_name);
     if ((fp = fopen(path, "r+")) == NULL)
         testutil_die(errno, "fopen: %s", path);
     testutil_check(fstat(fileno(fp), &sb));
@@ -361,9 +361,9 @@ open_with_corruption(const char *sfx)
     /* We should not abort the test in the message handler. Set it here, don't inherit. */
     test_abort = false;
     if (sfx != NULL)
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
+        testutil_snprintf(buf, sizeof(buf), "%s.%s", home, sfx);
     else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
+        testutil_snprintf(buf, sizeof(buf), "%s", home);
 
     /* Don't abort in the diagnostic builds on detecting corruption. */
     ret = wiredtiger_open(buf, &event_handler,
@@ -399,16 +399,16 @@ open_with_salvage(const char *sfx, TABLE_INFO *table_data)
      */
     test_abort = true;
     if (sfx != NULL)
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
+        testutil_snprintf(buf, sizeof(buf), "%s.%s", home, sfx);
     else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
+        testutil_snprintf(buf, sizeof(buf), "%s", home);
     testutil_check(wiredtiger_open(buf, &event_handler,
       "salvage=true,statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
     testutil_assert(conn != NULL);
     if (sfx != NULL)
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s/%s", home, sfx, WT_METAFILE_SLVG));
+        testutil_snprintf(buf, sizeof(buf), "%s.%s/%s", home, sfx, WT_METAFILE_SLVG);
     else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, WT_METAFILE_SLVG));
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, WT_METAFILE_SLVG);
     testutil_assert(file_exists(buf));
 
     /*
@@ -431,9 +431,9 @@ open_normal(const char *sfx, TABLE_INFO *table_data)
 
     printf("=== wt_open normal ===\n");
     if (sfx != NULL)
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
+        testutil_snprintf(buf, sizeof(buf), "%s.%s", home, sfx);
     else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
+        testutil_snprintf(buf, sizeof(buf), "%s", home);
     testutil_check(wiredtiger_open(
       buf, &event_handler, "statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
     verify_metadata(conn, &table_data[0]);

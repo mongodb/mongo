@@ -184,11 +184,11 @@ fill_db(void)
         if (use_columns)
             cursor->set_key(cursor, i + 1);
         else {
-            testutil_check(__wt_snprintf(k, sizeof(k), "key%03" PRIu32, i));
+            testutil_snprintf(k, sizeof(k), "key%03" PRIu32, i);
             cursor->set_key(cursor, k);
         }
-        testutil_check(
-          __wt_snprintf(v, sizeof(v), "value%0*" PRIu32, (int)(V_SIZE - (strlen("value") + 1)), i));
+        testutil_snprintf(
+          v, sizeof(v), "value%0*" PRIu32, (int)(V_SIZE - (strlen("value") + 1)), i);
         cursor->set_value(cursor, v);
         testutil_check(cursor->insert(cursor));
 

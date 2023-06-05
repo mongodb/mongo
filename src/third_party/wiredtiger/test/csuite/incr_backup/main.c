@@ -194,8 +194,7 @@ key_value(uint64_t change_count, char *key, size_t key_size, WT_ITEM *item, OPER
     key_num = change_count % KEYS_PER_TABLE;
     *typep = op_type = get_operation_type(change_count);
 
-    testutil_check(
-      __wt_snprintf(key, key_size, KEY_FORMAT, (int)(key_num % 100), (int)(key_num / 100)));
+    testutil_snprintf(key, key_size, KEY_FORMAT, (int)(key_num % 100), (int)(key_num / 100));
     if (op_type == REMOVE)
         return; /* remove needs no key */
 
@@ -315,8 +314,7 @@ again:
              * There is something in the prev list not in the current list. Remove it, and continue
              * - don't advance the current list.
              */
-            testutil_check(
-              __wt_snprintf(filename, sizeof(filename), "%s/%s", dirname, prev->names[prevpos]));
+            testutil_snprintf(filename, sizeof(filename), "%s/%s", dirname, prev->names[prevpos]);
             VERBOSE(3, "Removing file from backup: %s\n", filename);
             testutil_check(remove(filename));
         } else {
@@ -438,8 +436,8 @@ create_table(WT_SESSION *session, WT_RAND_STATE *rand, TABLE_INFO *tinfo, uint32
 
     testutil_assert(!TABLE_VALID(&tinfo->table[slot]));
     uri = dcalloc(1, URI_MAX_LEN);
-    testutil_check(
-      __wt_snprintf(uri, URI_MAX_LEN, URI_FORMAT, (int)slot, (int)tinfo->table[slot].name_index++));
+    testutil_snprintf(
+      uri, URI_MAX_LEN, URI_FORMAT, (int)slot, (int)tinfo->table[slot].name_index++);
 
     /*
      * A quarter of the time use a non-default allocation size on the table. This is set
@@ -448,11 +446,11 @@ create_table(WT_SESSION *session, WT_RAND_STATE *rand, TABLE_INFO *tinfo, uint32
     if (__wt_random(rand) % 4 == 0) {
         alloc = __wt_random(rand) % NUM_ALLOC;
         allocstr = alloc_sizes[alloc];
-        testutil_check(__wt_snprintf(buf, sizeof(buf),
+        testutil_snprintf(buf, sizeof(buf),
           "%s,allocation_size=%s,internal_page_max=%s,leaf_page_max=%s", TABLE_FORMAT, allocstr,
-          allocstr, allocstr));
+          allocstr, allocstr);
     } else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", TABLE_FORMAT));
+        testutil_snprintf(buf, sizeof(buf), "%s", TABLE_FORMAT);
     VERBOSE(3, "create %s: %s\n", uri, buf);
     testutil_check(session->create(session, uri, buf));
     tinfo->table[slot].name = uri;
@@ -470,8 +468,8 @@ rename_table(WT_SESSION *session, TABLE_INFO *tinfo, uint32_t slot)
 
     testutil_assert(TABLE_VALID(&tinfo->table[slot]));
     uri = dcalloc(1, URI_MAX_LEN);
-    testutil_check(
-      __wt_snprintf(uri, URI_MAX_LEN, URI_FORMAT, (int)slot, (int)tinfo->table[slot].name_index++));
+    testutil_snprintf(
+      uri, URI_MAX_LEN, URI_FORMAT, (int)slot, (int)tinfo->table[slot].name_index++);
 
     olduri = tinfo->table[slot].name;
     VERBOSE(3, "rename %s %s\n", olduri, uri);
@@ -559,9 +557,9 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
         cons = ",consolidate=true";
     else
         cons = ",consolidate=false";
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
+    testutil_snprintf(buf, sizeof(buf),
       "incremental=(granularity=%" PRIu32 "%c,enabled=true,%s,this_id=ID%" PRIu32 ")", granularity,
-      granularity_unit, cons, tinfo->full_backup_number));
+      granularity_unit, cons, tinfo->full_backup_number);
     VERBOSE(3, "open_cursor(session, \"backup:\", NULL, \"%s\", &cursor)\n", buf);
     testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
 
@@ -626,9 +624,8 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
 
     active_files_init(&active);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), "incremental=(src_id=ID%" PRIu32 ",this_id=ID%" PRIu32 ")",
-        tinfo->full_backup_number, tinfo->incr_backup_number++));
+    testutil_snprintf(buf, sizeof(buf), "incremental=(src_id=ID%" PRIu32 ",this_id=ID%" PRIu32 ")",
+      tinfo->full_backup_number, tinfo->incr_backup_number++);
     VERBOSE(3, "open_cursor(session, \"backup:\", NULL, \"%s\", &cursor)\n", buf);
     testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
 
@@ -651,7 +648,7 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
              * Here is the normal incremental backup. Now that we know what file has changed, we get
              * the specific changes
              */
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename));
+            testutil_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
             testutil_check(session->open_cursor(session, NULL, cursor, buf, &file_cursor));
             VERBOSE(3, "open_cursor(session, NULL, cursor, \"%s\", &file_cursor)\n", buf);
             while ((ret = file_cursor->next(file_cursor)) == 0) {
@@ -663,13 +660,13 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
                     nrange++;
                     tmp = dcalloc(1, size);
 
-                    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, filename));
+                    testutil_snprintf(buf, sizeof(buf), "%s/%s", home, filename);
                     VERBOSE(5, "Reopen read file: %s\n", buf);
                     reopen_file(&rfd, rbuf, sizeof(rbuf), buf, O_RDONLY);
                     rdsize = pread(rfd, tmp, (size_t)size, (wt_off_t)offset);
                     testutil_assert(rdsize >= 0);
 
-                    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", backup_home, filename));
+                    testutil_snprintf(buf, sizeof(buf), "%s/%s", backup_home, filename);
                     VERBOSE(5, "Reopen write file: %s\n", buf);
                     reopen_file(&wfd, wbuf, sizeof(wbuf), buf, O_WRONLY | O_CREAT);
                     /* Use the read size since we may have read less than the granularity. */
@@ -869,9 +866,9 @@ main(int argc, char *argv[])
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
     /* Put the backup directories as the same level as the home directory. */
-    testutil_check(__wt_snprintf(backup_check, sizeof(backup_check), "./%s.CHECK", home));
-    testutil_check(__wt_snprintf(backup_dir, sizeof(backup_dir), "./%s.BACKUP", home));
-    testutil_check(__wt_snprintf(backup_src, sizeof(backup_src), "./%s.BACKUP.SRC", home));
+    testutil_snprintf(backup_check, sizeof(backup_check), "./%s.CHECK", home);
+    testutil_snprintf(backup_dir, sizeof(backup_dir), "./%s.BACKUP", home);
+    testutil_snprintf(backup_src, sizeof(backup_src), "./%s.BACKUP.SRC", home);
     printf("Seed: %" PRIu64 "\n", seed);
 
     testutil_recreate_dir(home);
@@ -898,9 +895,8 @@ main(int argc, char *argv[])
         file_max = 200 + __wt_random(&rnd) % WT_THOUSAND; /* 200K to ~1M */
     else
         file_max = WT_THOUSAND + __wt_random(&rnd) % (20 * WT_THOUSAND); /* 1M to ~20M */
-    testutil_check(
-      __wt_snprintf(conf, sizeof(conf), "%s,create,%s,log=(enabled=true,file_max=%" PRIu32 "K)",
-        CONN_CONFIG_COMMON, backup_verbose, file_max));
+    testutil_snprintf(conf, sizeof(conf), "%s,create,%s,log=(enabled=true,file_max=%" PRIu32 "K)",
+      CONN_CONFIG_COMMON, backup_verbose, file_max);
     VERBOSE(2, "wiredtiger config: %s\n", conf);
     testutil_check(wiredtiger_open(home, NULL, conf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));

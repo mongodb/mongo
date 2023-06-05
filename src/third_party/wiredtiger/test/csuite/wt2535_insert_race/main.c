@@ -109,9 +109,9 @@ main(int argc, char *argv[])
       "close,wait=1)",
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+    testutil_snprintf(tableconf, sizeof(tableconf),
       "key_format=%s,value_format=%s,leaf_page_max=32k,", opts->table_type == TABLE_ROW ? "Q" : "r",
-      opts->table_type == TABLE_FIX ? "8t" : "Q"));
+      opts->table_type == TABLE_FIX ? "8t" : "Q");
     testutil_check(session->create(session, opts->uri, tableconf));
 
     /* Create the single record. */

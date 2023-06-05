@@ -260,9 +260,9 @@ enable_failures(uint64_t allow_writes, uint64_t allow_reads)
     char value[100];
 
     testutil_check(setenv("WT_FAIL_FS_ENABLE", "1", 1));
-    testutil_check(__wt_snprintf(value, sizeof(value), "%" PRIu64, allow_writes));
+    testutil_snprintf(value, sizeof(value), "%" PRIu64, allow_writes);
     testutil_check(setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1));
-    testutil_check(__wt_snprintf(value, sizeof(value), "%" PRIu64, allow_reads));
+    testutil_snprintf(value, sizeof(value), "%" PRIu64, allow_reads);
     testutil_check(setenv("WT_FAIL_FS_READ_ALLOW", value, 1));
 }
 
@@ -321,10 +321,10 @@ run_check_subtest(
     subtest_args[narg++] = (char *)"-v"; /* subtest is always verbose */
     subtest_args[narg++] = (char *)"-p";
     subtest_args[narg++] = (char *)"-o";
-    testutil_check(__wt_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops));
+    testutil_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops);
     subtest_args[narg++] = sarg; /* number of operations */
     subtest_args[narg++] = (char *)"-n";
-    testutil_check(__wt_snprintf(rarg, sizeof(rarg), "%" PRIu64, opts->nrecords));
+    testutil_snprintf(rarg, sizeof(rarg), "%" PRIu64, opts->nrecords);
     subtest_args[narg++] = rarg; /* number of records */
     subtest_args[narg++] = (char *)"-t";
     subtest_args[narg++] = (char *)(opts->table_type == TABLE_ROW ? "r" : "c");
@@ -512,30 +512,30 @@ subtest_main(int argc, char *argv[], bool close_test)
     testutil_recreate_dir(opts->home);
 
     /* Redirect stderr, stdout. */
-    testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE));
+    testutil_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE);
     testutil_assert(freopen(filename, "a", stderr) != NULL);
-    testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
+    testutil_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE);
     testutil_assert(freopen(filename, "a", stdout) != NULL);
 
 #ifndef WT_FAIL_FS_LIB
 #define WT_FAIL_FS_LIB "ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
 #endif
     testutil_build_dir(opts, buf, 1024);
-    testutil_check(__wt_snprintf(config, sizeof(config),
+    testutil_snprintf(config, sizeof(config),
       "create,cache_size=250M,log=(enabled),transaction_sync=(enabled,method=none),extensions=(%s/"
       "%s=(early_load,config={environment=true,verbose=true})),statistics=(all),statistics_log=("
       "json,on_close,wait=1)",
-      buf, WT_FAIL_FS_LIB));
+      buf, WT_FAIL_FS_LIB);
     testutil_check(wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+    testutil_snprintf(tableconf, sizeof(tableconf),
       "key_format=%s,value_format=iiiS,columns=(id,v0,v1,v2,big)",
-      opts->table_type == TABLE_ROW ? "i" : "r"));
+      opts->table_type == TABLE_ROW ? "i" : "r");
     testutil_check(session->create(session, "table:subtest", tableconf));
 
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf), "key_format=%s,value_format=i",
-      opts->table_type == TABLE_ROW ? "i" : "r"));
+    testutil_snprintf(tableconf, sizeof(tableconf), "key_format=%s,value_format=i",
+      opts->table_type == TABLE_ROW ? "i" : "r");
     testutil_check(session->create(session, "table:subtest2", tableconf));
 
     testutil_check(session->create(session, "index:subtest:v0", "columns=(v0)"));

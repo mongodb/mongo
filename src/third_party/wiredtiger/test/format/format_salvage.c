@@ -45,12 +45,12 @@ uri_path(TABLE *table, char **object_namep, char *buf, size_t len)
     testutil_assert(p != NULL);
     ++p;
 
-    testutil_check(__wt_snprintf(buf, len, "%s/%s", g.home, p));
+    testutil_snprintf(buf, len, "%s/%s", g.home, p);
     if (object_namep != NULL)
         *object_namep = strrchr(buf, '/') + 1;
     if (!access(buf, F_OK))
         return;
-    testutil_check(__wt_snprintf(buf, len, "%s/%s.wt", g.home, p));
+    testutil_snprintf(buf, len, "%s/%s.wt", g.home, p);
     if (object_namep != NULL)
         *object_namep = strrchr(buf, '/') + 1;
     if (!access(buf, F_OK))
@@ -90,7 +90,7 @@ corrupt(TABLE *table)
     len = WT_MIN(len, WT_MEGABYTE);
 
     /* Log the corruption offset and length. */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/SALVAGE.corrupt", g.home));
+    testutil_snprintf(buf, sizeof(buf), "%s/SALVAGE.corrupt", g.home);
     testutil_assert((fp = fopen(buf, "w")) != NULL);
     (void)fprintf(fp, "salvage-corrupt: offset %" PRIuMAX ", length %" WT_SIZET_FMT "\n",
       (uintmax_t)offset, len);

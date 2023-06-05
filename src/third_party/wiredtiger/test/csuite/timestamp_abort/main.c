@@ -352,10 +352,10 @@ thread_ts_run(void *arg)
         /* Let the oldest timestamp lag 25% of the time. */
         rand_op = __wt_random(&td->extra_rnd) % 4;
         if (rand_op == 1)
-            testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%" PRIx64, ts));
+            testutil_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%" PRIx64, ts);
         else
-            testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
-              "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, ts, ts));
+            testutil_snprintf(tscfg, sizeof(tscfg),
+              "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, ts, ts);
         testutil_check(conn->set_timestamp(conn, tscfg));
 
         /*
@@ -371,11 +371,9 @@ thread_ts_run(void *arg)
              */
             dbg = __wt_random(&td->extra_rnd) % 2;
             if (dbg == 0)
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=0)"));
+                testutil_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=0)");
             else
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=5)"));
+                testutil_snprintf(tscfg, sizeof(tscfg), "debug_mode=(checkpoint_retention=5)");
             testutil_check(conn->reconfigure(conn, tscfg));
             last_reconfig = now;
         }
@@ -505,7 +503,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
         testutil_check(cursor->get_key(cursor, &filename));
 
         /* Process ranges within each file. */
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename));
+        testutil_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
         testutil_check(session->open_cursor(session, NULL, cursor, buf, &file_cursor));
 
         first_range = true;
@@ -529,7 +527,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
                     printf("INCR: cp %s %s\n", copy_from, copy_to);
                     fflush(stdout);
 
-                    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", WT_HOME_DIR, filename));
+                    testutil_snprintf(buf, sizeof(buf), "%s/%s", WT_HOME_DIR, filename);
                     testutil_assert((rfd = open(buf, O_RDONLY, 0666)) >= 0);
                     testutil_assert((wfd = open(copy_to, O_WRONLY | O_CREAT, 0666)) >= 0);
                 }
@@ -638,7 +636,7 @@ backup_delete_old_backups(int retain, int last_full)
                 indexes[count++] = i;
 
                 /* If the backup failed to finish, delete it right away. */
-                testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", dir->d_name));
+                testutil_snprintf(buf, sizeof(buf), "%s/done", dir->d_name);
                 if (stat(buf, &sb) != 0 && errno == ENOENT) {
                     testutil_remove(dir->d_name);
                     ndeleted++;
@@ -657,7 +655,7 @@ backup_delete_old_backups(int retain, int last_full)
 
         __wt_qsort(indexes, (size_t)count, sizeof(*indexes), __int_comparator);
         for (i = 0; i < count - retain; i++) {
-            testutil_check(__wt_snprintf(buf, sizeof(buf), BACKUP_BASE "%d", indexes[i]));
+            testutil_snprintf(buf, sizeof(buf), BACKUP_BASE "%d", indexes[i]);
             testutil_remove(buf);
             ndeleted++;
         }
@@ -688,9 +686,9 @@ thread_ckpt_run(void *arg)
     memset(ckpt_flush_config, 0, sizeof(ckpt_flush_config));
     memset(ckpt_config, 0, sizeof(ckpt_config));
 
-    testutil_check(__wt_snprintf(ckpt_config, sizeof(ckpt_config), "use_timestamp=true"));
-    testutil_check(__wt_snprintf(
-      ckpt_flush_config, sizeof(ckpt_flush_config), "flush_tier=(enabled,force),%s", ckpt_config));
+    testutil_snprintf(ckpt_config, sizeof(ckpt_config), "use_timestamp=true");
+    testutil_snprintf(
+      ckpt_flush_config, sizeof(ckpt_flush_config), "flush_tier=(enabled,force),%s", ckpt_config);
 
     set_flush_tier_delay(&td->extra_rnd);
 
@@ -781,7 +779,7 @@ thread_backup_run(void *arg)
             u = (uint32_t)atoi(str + 2);
 
             /* Check whether the backup has indeed completed. */
-            testutil_check(__wt_snprintf(buf, sizeof(buf), BACKUP_BASE "%" PRIu32 "/done", u));
+            testutil_snprintf(buf, sizeof(buf), BACKUP_BASE "%" PRIu32 "/done", u);
             if (stat(buf, &sb) != 0) {
                 testutil_assert_errno(errno == ENOENT);
                 printf("Found backup %" PRIu32 ", but it is incomplete\n", u);
@@ -859,7 +857,7 @@ thread_run(void *arg)
     /*
      * Set up the separate file for checking.
      */
-    testutil_check(__wt_snprintf(cbuf, sizeof(cbuf), RECORDS_FILE, td->threadnum));
+    testutil_snprintf(cbuf, sizeof(cbuf), RECORDS_FILE, td->threadnum);
     (void)unlink(cbuf);
     testutil_assert_errno((fp = fopen(cbuf, "w")) != NULL);
 
@@ -891,25 +889,25 @@ thread_run(void *arg)
     /*
      * Open a cursor to each table.
      */
-    testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
+    testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_collection);
     if (use_prep)
         testutil_check(prepared_session->open_cursor(prepared_session, uri, NULL, NULL, &cur_coll));
     else
         testutil_check(session->open_cursor(session, uri, NULL, NULL, &cur_coll));
-    testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_shadow));
+    testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_shadow);
     if (use_prep)
         testutil_check(
           prepared_session->open_cursor(prepared_session, uri, NULL, NULL, &cur_shadow));
     else
         testutil_check(session->open_cursor(session, uri, NULL, NULL, &cur_shadow));
 
-    testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
+    testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_local);
     if (use_prep)
         testutil_check(
           prepared_session->open_cursor(prepared_session, uri, NULL, NULL, &cur_local));
     else
         testutil_check(session->open_cursor(session, uri, NULL, NULL, &cur_local));
-    testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
+    testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog);
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cur_oplog));
 
     /*
@@ -928,8 +926,7 @@ thread_run(void *arg)
              * iteration. Use the first reserved timestamp.
              */
             active_ts = RESERVED_TIMESTAMPS_FOR_ITERATION(td, iter);
-            testutil_check(
-              __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
+            testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts);
             /*
              * Set the transaction's timestamp now before performing the operation. If we are using
              * prepared transactions, set the timestamp for the session used for oplog. The
@@ -944,7 +941,7 @@ thread_run(void *arg)
             cur_oplog->set_key(cur_oplog, i + 1);
             cur_shadow->set_key(cur_shadow, i + 1);
         } else {
-            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_STRINGFORMAT, i));
+            testutil_snprintf(kname, sizeof(kname), KEY_STRINGFORMAT, i);
             cur_coll->set_key(cur_coll, kname);
             cur_local->set_key(cur_local, kname);
             cur_oplog->set_key(cur_oplog, kname);
@@ -953,12 +950,12 @@ thread_run(void *arg)
         /*
          * Put an informative string into the value so that it can be viewed well in a binary dump.
          */
-        testutil_check(__wt_snprintf(cbuf, sizeof(cbuf),
-          "COLL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->threadnum, active_ts, i));
-        testutil_check(__wt_snprintf(lbuf, sizeof(lbuf),
-          "LOCAL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->threadnum, active_ts, i));
-        testutil_check(__wt_snprintf(obuf, sizeof(obuf),
-          "OPLOG: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->threadnum, active_ts, i));
+        testutil_snprintf(cbuf, sizeof(cbuf),
+          "COLL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->threadnum, active_ts, i);
+        testutil_snprintf(lbuf, sizeof(lbuf),
+          "LOCAL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->threadnum, active_ts, i);
+        testutil_snprintf(obuf, sizeof(obuf),
+          "OPLOG: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64, td->threadnum, active_ts, i);
         data.size = __wt_random(&td->data_rnd) % MAX_VAL;
         data.data = cbuf;
         cur_coll->set_value(cur_coll, &data);
@@ -972,8 +969,7 @@ thread_run(void *arg)
              * secondary. This uses our second reserved timestamp.
              */
             ++active_ts;
-            testutil_check(
-              __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
+            testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts);
             testutil_check(session->timestamp_transaction(session, tscfg));
         }
         if ((ret = cur_shadow->insert(cur_shadow)) == WT_ROLLBACK)
@@ -991,8 +987,7 @@ thread_run(void *arg)
              * This is only done on the collection session.
              */
             if (i % PREPARE_FREQ == 0) {
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "prepare_timestamp=%" PRIx64, active_ts));
+                testutil_snprintf(tscfg, sizeof(tscfg), "prepare_timestamp=%" PRIx64, active_ts);
                 testutil_check(prepared_session->prepare_transaction(prepared_session, tscfg));
                 if (i % PREPARE_YIELD == 0)
                     __wt_yield();
@@ -1001,12 +996,11 @@ thread_run(void *arg)
                  * commit timestamp.
                  */
                 durable_ahead_commit = i % PREPARE_DURABLE_AHEAD_COMMIT == 0;
-                testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
+                testutil_snprintf(tscfg, sizeof(tscfg),
                   "commit_timestamp=%" PRIx64 ",durable_timestamp=%" PRIx64, active_ts,
-                  durable_ahead_commit ? active_ts + 1 : active_ts));
+                  durable_ahead_commit ? active_ts + 1 : active_ts);
             } else
-                testutil_check(
-                  __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
+                testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts);
 
             testutil_check(prepared_session->commit_transaction(prepared_session, tscfg));
         }
@@ -1095,14 +1089,14 @@ run_workload(uint32_t workload_iteration)
     cache_mb = ((32 * WT_KILOBYTE * 10) * nth) / WT_MEGABYTE + 20;
 
     if (opts->inmem)
-        testutil_check(__wt_snprintf(
-          envconf, sizeof(envconf), ENV_CONFIG_DEF, cache_mb, SESSION_MAX, STAT_WAIT));
+        testutil_snprintf(
+          envconf, sizeof(envconf), ENV_CONFIG_DEF, cache_mb, SESSION_MAX, STAT_WAIT);
     else if (use_lazyfs)
-        testutil_check(__wt_snprintf(
-          envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC_FSYNC, cache_mb, SESSION_MAX, STAT_WAIT));
+        testutil_snprintf(
+          envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC_FSYNC, cache_mb, SESSION_MAX, STAT_WAIT);
     else
-        testutil_check(__wt_snprintf(
-          envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb, SESSION_MAX, STAT_WAIT));
+        testutil_snprintf(
+          envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb, SESSION_MAX, STAT_WAIT);
     if (opts->compat)
         strcat(envconf, TESTUTIL_ENV_CONFIG_COMPAT);
     if (stress)
@@ -1129,13 +1123,13 @@ run_workload(uint32_t workload_iteration)
             table_config_nolog = "key_format=S,value_format=u,log=(enabled=false)";
             table_config = "key_format=S,value_format=u";
         }
-        testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
+        testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_collection);
         testutil_check(session->create(session, uri, table_config_nolog));
-        testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_shadow));
+        testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_shadow);
         testutil_check(session->create(session, uri, table_config_nolog));
-        testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
+        testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_local);
         testutil_check(session->create(session, uri, table_config));
-        testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
+        testutil_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog);
         testutil_check(session->create(session, uri, table_config));
     }
 
@@ -1251,7 +1245,7 @@ backup_exists(WT_CONNECTION *conn, uint32_t index)
     const char *idstr;
     bool found;
 
-    testutil_check(__wt_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index));
+    testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /*
@@ -1298,7 +1292,7 @@ backup_verify(WT_CONNECTION *conn, uint32_t workload_iteration)
         if (strncmp(dir->d_name, BACKUP_BASE, len) == 0) {
 
             /* Verify the backup only if it has completed. */
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", dir->d_name));
+            testutil_snprintf(buf, sizeof(buf), "%s/done", dir->d_name);
             if (stat(buf, &sb) != 0) {
                 testutil_assert_errno(errno == ENOENT);
                 continue;
@@ -1315,8 +1309,7 @@ backup_verify(WT_CONNECTION *conn, uint32_t workload_iteration)
                 /* Continue the verification only if we have the backup ID. */
                 if (backup_exists(conn, index)) {
                     PRINT_BACKUP_VERIFY(index);
-                    testutil_check(
-                      __wt_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index));
+                    testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
                     testutil_verify_src_backup(conn, dir->d_name, WT_HOME_DIR, backup_id);
                     PRINT_BACKUP_VERIFY_DONE(index);
                 }
@@ -1428,7 +1421,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
         initialize_rep(&c_rep[i]);
         initialize_rep(&l_rep[i]);
         initialize_rep(&o_rep[i]);
-        testutil_check(__wt_snprintf(fname, sizeof(fname), RECORDS_FILE, i));
+        testutil_snprintf(fname, sizeof(fname), RECORDS_FILE, i);
         if ((fp = fopen(fname, "r")) == NULL)
             testutil_die(errno, "fopen: %s", fname);
 
@@ -1477,7 +1470,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
                 cur_oplog->set_key(cur_oplog, key + 1);
                 cur_shadow->set_key(cur_shadow, key + 1);
             } else {
-                testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_STRINGFORMAT, key));
+                testutil_snprintf(kname, sizeof(kname), KEY_STRINGFORMAT, key);
                 cur_coll->set_key(cur_coll, kname);
                 cur_local->set_key(cur_local, kname);
                 cur_oplog->set_key(cur_oplog, kname);

@@ -76,7 +76,7 @@ config_random_generator(
     /* If we generated a seed just now, put it into the configuration file. */
     if (!seed_set) {
         testutil_assert(seed != 0);
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%" PRIu64, config_name, seed));
+        testutil_snprintf(buf, sizeof(buf), "%s=%" PRIu64, config_name, seed);
         config_single(NULL, buf, true);
     }
 
@@ -151,11 +151,11 @@ config_random(TABLE *table, bool table_only)
          * is "on" (so "on" if random rolled <= N, otherwise "off").
          */
         if (F_ISSET(cp, C_BOOL))
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%s", cp->name,
-              mmrand(&g.data_rnd, 1, 100) <= cp->min ? "on" : "off"));
+            testutil_snprintf(buf, sizeof(buf), "%s=%s", cp->name,
+              mmrand(&g.data_rnd, 1, 100) <= cp->min ? "on" : "off");
         else
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%" PRIu32, cp->name,
-              mmrand(&g.data_rnd, cp->min, cp->maxrand)));
+            testutil_snprintf(
+              buf, sizeof(buf), "%s=%" PRIu32, cp->name, mmrand(&g.data_rnd, cp->min, cp->maxrand));
         config_single(table, buf, false);
     }
 }
@@ -170,9 +170,9 @@ config_promote(TABLE *table, CONFIG *cp, CONFIGV *v)
     char buf[128];
 
     if (F_ISSET(cp, C_STRING))
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%s", cp->name, v->vstr));
+        testutil_snprintf(buf, sizeof(buf), "%s=%s", cp->name, v->vstr);
     else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s=%" PRIu32, cp->name, v->v));
+        testutil_snprintf(buf, sizeof(buf), "%s=%" PRIu32, cp->name, v->v);
     config_single(table, buf, true);
 }
 
@@ -191,7 +191,7 @@ config_table_am(TABLE *table)
      * the original global specification, not the choice set for the global table.
      */
     if (!table->v[V_TABLE_RUNS_TYPE].set && tables[0]->v[V_TABLE_RUNS_TYPE].set) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "runs.type=%s", g.runs_type));
+        testutil_snprintf(buf, sizeof(buf), "runs.type=%s", g.runs_type);
         config_single(table, buf, true);
     }
 
@@ -302,13 +302,12 @@ config_table(TABLE *table, void *arg)
      * objects are "tables", but files are tested as well.
      */
     if (ntables == 0)
-        testutil_check(__wt_snprintf(table->uri, sizeof(table->uri), "%s",
-          DATASOURCE(table, "file") ? "file:wt" : "table:wt"));
+        testutil_snprintf(
+          table->uri, sizeof(table->uri), "%s", DATASOURCE(table, "file") ? "file:wt" : "table:wt");
     else
-        testutil_check(__wt_snprintf(table->uri, sizeof(table->uri),
-          DATASOURCE(table, "file") ? "file:F%05u" : "table:T%05u", table->id));
-    testutil_check(
-      __wt_snprintf(table->track_prefix, sizeof(table->track_prefix), "table %u", table->id));
+        testutil_snprintf(table->uri, sizeof(table->uri),
+          DATASOURCE(table, "file") ? "file:F%05u" : "table:T%05u", table->id);
+    testutil_snprintf(table->track_prefix, sizeof(table->track_prefix), "table %u", table->id);
 
     /* Fill in random values for the rest of the run. */
     config_random(table, true);
@@ -619,8 +618,7 @@ config_backup_incr_granularity(void)
         break;
     }
 
-    testutil_check(
-      __wt_snprintf(confbuf, sizeof(confbuf), "backup.incr_granularity=%" PRIu32, granularity));
+    testutil_snprintf(confbuf, sizeof(confbuf), "backup.incr_granularity=%" PRIu32, granularity);
     config_single(NULL, confbuf, false);
 }
 
@@ -893,7 +891,7 @@ config_compression(TABLE *table, const char *conf_name)
         break;
     }
 
-    testutil_check(__wt_snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr));
+    testutil_snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
     config_single(table, confbuf, false);
 }
 
@@ -1292,8 +1290,7 @@ config_mirrors(void)
      * Give each mirror the same number of rows (it's not necessary, we could treat end-of-table on
      * a mirror as OK, but this lets us assert matching rows).
      */
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), "runs.rows=%" PRIu32, NTV(g.base_mirror, RUNS_ROWS)));
+    testutil_snprintf(buf, sizeof(buf), "runs.rows=%" PRIu32, NTV(g.base_mirror, RUNS_ROWS));
     for (i = 1; i <= ntables; ++i)
         if (tables[i]->mirror && tables[i] != g.base_mirror)
             config_single(tables[i], buf, false);
@@ -1615,7 +1612,7 @@ config_print_table(FILE *fp, TABLE *table)
     char buf[128];
     bool lsm;
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "table%u.", table->id));
+    testutil_snprintf(buf, sizeof(buf), "table%u.", table->id);
     fprintf(fp, "############################################\n");
     fprintf(fp, "#  TABLE PARAMETERS: table %u\n", table->id);
     fprintf(fp, "############################################\n");
@@ -1817,8 +1814,7 @@ config_off(TABLE *table, const char *s)
     char buf[100];
 
     cp = config_find(s, strlen(s), true);
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), "%s=%s", s, F_ISSET(cp, C_BOOL | C_STRING) ? "off" : "0"));
+    testutil_snprintf(buf, sizeof(buf), "%s=%s", s, F_ISSET(cp, C_BOOL | C_STRING) ? "off" : "0");
     config_single(table, buf, false);
 }
 
@@ -1963,7 +1959,7 @@ config_single(TABLE *table, const char *s, bool explicit)
         } else if (strncmp(s, "runs.type", strlen("runs.type")) == 0) {
             /* Save any global configuration for later table configuration. */
             if (table == tables[0])
-                testutil_check(__wt_snprintf(g.runs_type, sizeof(g.runs_type), "%s", equalp));
+                testutil_snprintf(g.runs_type, sizeof(g.runs_type), "%s", equalp);
 
             config_map_file_type(equalp, &table->type);
             equalp = config_file_type(table->type);

@@ -134,9 +134,9 @@ testutil_deduce_build_dir(TEST_OPTS *opts)
 
     /* This condition is when the full path name is used for argv0. */
     if (opts->argv0[0] == '/')
-        testutil_check(__wt_snprintf(path, sizeof(path), "%s", opts->argv0));
+        testutil_snprintf(path, sizeof(path), "%s", opts->argv0);
     else
-        testutil_check(__wt_snprintf(path, sizeof(path), "%s/%s", pwd, opts->argv0));
+        testutil_snprintf(path, sizeof(path), "%s/%s", pwd, opts->argv0);
 
     token = strrchr(path, '/');
     while (strlen(path) > 0) {
@@ -144,7 +144,7 @@ testutil_deduce_build_dir(TEST_OPTS *opts)
         index = (int)(token - path);
         path[index] = '\0';
 
-        testutil_check(__wt_snprintf(stat_path, sizeof(stat_path), "%s/wt", path));
+        testutil_snprintf(stat_path, sizeof(stat_path), "%s/wt", path);
 
         if (stat(stat_path, &stats) == 0) {
             opts->build_dir = dstrdup(path);
@@ -353,11 +353,11 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
 
     /* Go through each id and open a backup cursor on it to test incremental values. */
     for (j = 0; j < i; ++j) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "incremental=(src_id=%s)", id[j]));
+        testutil_snprintf(buf, sizeof(buf), "incremental=(src_id=%s)", id[j]);
         testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
         while ((ret = cursor->next(cursor)) == 0) {
             testutil_check(cursor->get_key(cursor, &filename));
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename));
+            testutil_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
             testutil_check(session->open_cursor(session, NULL, cursor, buf, &file_cursor));
             prev_offset = 0;
             while ((ret = file_cursor->next(file_cursor)) == 0) {
@@ -365,7 +365,7 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
                 /* We only want to check ranges for files. So if it is a full file copy, ignore. */
                 if (type != WT_BACKUP_RANGE)
                     break;
-                testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", backup, filename));
+                testutil_snprintf(buf, sizeof(buf), "%s/%s", backup, filename);
                 ret = stat(buf, &sb);
                 /*
                  * The file may not exist in the backup directory. If the stat call doesn't succeed
@@ -382,9 +382,9 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
                 if (offset > prev_offset) {
                     /* Compare the unchanged chunk. */
                     cmp_size = offset - prev_offset;
-                    testutil_check(__wt_snprintf(buf, sizeof(buf),
+                    testutil_snprintf(buf, sizeof(buf),
                       "cmp -n %" PRIu64 " %s/%s %s/%s %" PRIu64 " %" PRIu64, cmp_size, home,
-                      filename, backup, filename, prev_offset, prev_offset));
+                      filename, backup, filename, prev_offset, prev_offset);
                     status = system(buf);
                     if (status != 0)
                         fprintf(stderr, "FAIL: status %d ID %s from cmd: %s\n", status, id[j], buf);
@@ -414,7 +414,7 @@ testutil_copy_file(WT_SESSION *session, const char *name)
 
     len = strlen("BACKUP") + strlen(name) + 10;
     first = dmalloc(len);
-    testutil_check(__wt_snprintf(first, len, "BACKUP/%s", name));
+    testutil_snprintf(first, len, "BACKUP/%s", name);
     testutil_check(__wt_copy_and_sync(session, name, first));
 
     /*
@@ -422,7 +422,7 @@ testutil_copy_file(WT_SESSION *session, const char *name)
      */
     len = strlen("BACKUP.copy") + strlen(name) + 10;
     second = dmalloc(len);
-    testutil_check(__wt_snprintf(second, len, "BACKUP.copy/%s", name));
+    testutil_snprintf(second, len, "BACKUP.copy/%s", name);
     testutil_check(__wt_copy_and_sync(session, first, second));
 
     free(first);
@@ -509,9 +509,9 @@ testutil_wiredtiger_open(TEST_OPTS *opts, const char *home, const char *config,
     testutil_tiered_storage_configuration(
       opts, home, tiered_cfg, sizeof(tiered_cfg), tiered_ext_cfg, sizeof(tiered_ext_cfg));
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%s%s%s,extensions=[%s]",
-      config == NULL ? "" : config, (rerun ? TESTUTIL_ENV_CONFIG_REC : ""),
-      (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""), tiered_cfg, tiered_ext_cfg));
+    testutil_snprintf(buf, sizeof(buf), "%s%s%s%s,extensions=[%s]", config == NULL ? "" : config,
+      (rerun ? TESTUTIL_ENV_CONFIG_REC : ""), (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""),
+      tiered_cfg, tiered_ext_cfg);
 
     if (opts->verbose)
         printf("wiredtiger_open configuration: %s\n", buf);
@@ -691,7 +691,7 @@ is_mounted(const char *mount_dir)
     struct stat sb, parent_sb;
     char buf[PATH_MAX];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", mount_dir));
+    testutil_snprintf(buf, sizeof(buf), "%s", mount_dir);
     testutil_assert_errno(stat(mount_dir, &sb) == 0);
     testutil_assert_errno(stat(dirname(buf), &parent_sb) == 0);
 

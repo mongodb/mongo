@@ -243,7 +243,7 @@ testutil_parse_begin_opt(int argc, char *const *argv, const char *getopts_string
 
 #define USAGE_STR(ch, usage) ((strchr(getopts_string, (ch)) == NULL) ? "" : (usage))
 
-    testutil_check(__wt_snprintf(opts->usage, sizeof(opts->usage), "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+    testutil_snprintf(opts->usage, sizeof(opts->usage), "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
       USAGE_STR('A', " [-A append thread count]"), USAGE_STR('b', " [-b build directory]"),
       USAGE_STR('C', " [-C]"), USAGE_STR('d', " [-d add data]"), USAGE_STR('h', " [-h home]"),
       USAGE_STR('m', " [-m]"), USAGE_STR('n', " [-n record count]"),
@@ -253,7 +253,7 @@ testutil_parse_begin_opt(int argc, char *const *argv, const char *getopts_string
         " [-Pe <force_error>,<error_ms>] [-Po storage source]"),
       USAGE_STR('p', " [-p]"), USAGE_STR('R', " [-R read thread count]"),
       USAGE_STR('T', " [-T thread count]"), USAGE_STR('t', " [-t c|f|r table type]"),
-      USAGE_STR('v', " [-v]"), USAGE_STR('W', " [-W write thread count]")));
+      USAGE_STR('v', " [-v]"), USAGE_STR('W', " [-W write thread count]"));
 }
 
 /*
@@ -272,7 +272,7 @@ testutil_parse_end_opt(TEST_OPTS *opts)
     if (opts->home == NULL) {
         len = strlen("WT_TEST.") + strlen(opts->progname) + 10;
         opts->home = dmalloc(len);
-        testutil_check(__wt_snprintf(opts->home, len, "WT_TEST.%s", opts->progname));
+        testutil_snprintf(opts->home, len, "WT_TEST.%s", opts->progname);
     }
 
     /*
@@ -280,12 +280,12 @@ testutil_parse_end_opt(TEST_OPTS *opts)
      */
     len = strlen(opts->home) + 20;
     opts->progress_file_name = dmalloc(len);
-    testutil_check(__wt_snprintf(opts->progress_file_name, len, "%s/progress.txt", opts->home));
+    testutil_snprintf(opts->progress_file_name, len, "%s/progress.txt", opts->home);
 
     /* Setup the default URI string */
     len = strlen("table:") + strlen(opts->progname) + 10;
     opts->uri = dmalloc(len);
-    testutil_check(__wt_snprintf(opts->uri, len, "table:%s", opts->progname));
+    testutil_snprintf(opts->uri, len, "table:%s", opts->progname);
 
     if (opts->tiered_storage) {
         if (opts->tiered_storage_source == NULL)
