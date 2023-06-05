@@ -35,7 +35,6 @@
 
 #include "gcp_connection.h"
 #include "gcp_log_system.h"
-#include "wt_internal.h"
 
 struct gcp_file_system;
 struct gcp_file_handle;
