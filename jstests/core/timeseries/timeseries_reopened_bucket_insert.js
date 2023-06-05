@@ -218,7 +218,7 @@ const expectToReopenArchivedBuckets = function() {
 }();
 
 const expectToReopenCompressedBuckets = function() {
-    if (!FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
         return;
     }
 
