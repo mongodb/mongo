@@ -503,6 +503,7 @@ struct __wt_connection_stats {
     int64_t cache_read;
     int64_t cache_read_deleted;
     int64_t cache_read_deleted_prepared;
+    int64_t cache_eviction_clear_ordinary;
     int64_t cache_pages_requested;
     int64_t cache_eviction_pages_seen;
     int64_t cache_eviction_pages_already_queued;
