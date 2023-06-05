@@ -662,8 +662,6 @@ public:
                 auto&& [stats, _] =
                     explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
                 LOGV2_WARNING(23798,
-                              "Plan executor error during find command: {error}, "
-                              "stats: {stats}, cmd: {cmd}",
                               "Plan executor error during find command",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
