@@ -34,6 +34,7 @@
 #include "MongoCxx20BannedIncludesCheck.h"
 #include "MongoFCVConstantCheck.h"
 #include "MongoHeaderBracketCheck.h"
+#include "MongoMacroDefinitionLeaksCheck.h"
 #include "MongoMutexCheck.h"
 #include "MongoStdAtomicCheck.h"
 #include "MongoStdOptionalCheck.h"
@@ -70,6 +71,8 @@ public:
         CheckFactories.registerCheck<MongoUnstructuredLogCheck>("mongo-unstructured-log-check");
         CheckFactories.registerCheck<MongoCollectionShardingRuntimeCheck>(
             "mongo-collection-sharding-runtime-check");
+        CheckFactories.registerCheck<MongoMacroDefinitionLeaksCheck>(
+            "mongo-macro-definition-leaks-check");
     }
 };
 

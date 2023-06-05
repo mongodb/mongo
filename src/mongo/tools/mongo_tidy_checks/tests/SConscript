@@ -39,6 +39,7 @@ if env.GetOption('ninja') == 'disabled':
         'test_MongoFCVConstantCheck.cpp',
         'test_MongoUnstructuredLogCheck.cpp',
         'test_MongoCollectionShardingRuntimeCheck.cpp',
+        'test_MongoMacroDefinitionLeaksCheck.cpp',
     ]
 
     # So that we can do fast runs, we will generate a separate compilation database file for each

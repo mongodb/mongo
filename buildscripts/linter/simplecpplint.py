@@ -141,9 +141,6 @@ class Linter:
         self._check_newlines()
         self._check_and_strip_comments()
 
-        # File-level checks
-        self._check_macro_definition_leaks()
-
         # Line-level checks
         for linenum in range(start_line, len(self.clean_lines)):
             if not self.clean_lines[linenum]:
@@ -208,26 +205,6 @@ class Linter:
                 clean_line = ""
 
             self.clean_lines.append(clean_line)
-
-    def _check_macro_definition_leaks(self):
-        """Some header macros should appear in define/undef pairs."""
-        if not _RE_HEADER.search(self.file_name):
-            return
-        # Naive check: doesn't consider `#if` scoping.
-        # Assumes an #undef matches the nearest #define.
-        for macro in ['MONGO_LOGV2_DEFAULT_COMPONENT']:
-            re_define = re.compile(fr"^\s*#\s*define\s+{macro}\b")
-            re_undef = re.compile(fr"^\s*#\s*undef\s+{macro}\b")
-            def_line = None
-            for idx, line in enumerate(self.clean_lines):
-                if def_line is None:
-                    if re_define.match(line):
-                        def_line = idx
-                else:
-                    if re_undef.match(line):
-                        def_line = None
-            if def_line is not None:
-                self._error(def_line, 'mongodb/undefmacro', f'Missing "#undef {macro}"')
 
     def _check_for_mongo_polyfill(self, linenum):
         line = self.clean_lines[linenum]

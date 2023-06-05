@@ -312,6 +312,21 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoMacroDefinitionLeaksCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-macro-definition-leaks-check'
+                WarningsAsErrors: '*'
+                HeaderFilterRegex: '(mongo/.*)'
+                """))
+
+        self.expected_output = [
+            "Missing #undef 'MONGO_LOGV2_DEFAULT_COMPONENT'",
+        ]
+
+        self.run_clang_tidy()
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
