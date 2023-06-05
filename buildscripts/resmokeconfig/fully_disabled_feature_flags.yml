@@ -1,4 +1,5 @@
 # Feature flags here are turned off even on the "all feature flags" build variants.
+# Feature flags here disable jstests that are tagged with these feature flags on all variants.
 #
 # These flags can be enabled on a per-task or per-build-variant basis
 # by modifying their respective definitions in evergreen.yml.
