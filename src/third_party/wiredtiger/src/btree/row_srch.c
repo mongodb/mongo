@@ -112,7 +112,7 @@ __wt_search_insert(
          *
          * Place a read barrier here to avoid these issues.
          */
-        WT_ORDERED_READ(ins, *insp);
+        WT_ORDERED_READ_WEAK_MEMORDER(ins, *insp);
         if (ins == NULL) {
             cbt->next_stack[i] = NULL;
             cbt->ins_stack[i--] = insp--;
@@ -181,10 +181,10 @@ __wt_search_insert(
         } else
             for (; i >= 0; i--) {
                 /*
-                 * It is possible that we read an old value down the stack due to CPU read
-                 * reordering. Add a read barrier to avoid this issue.
+                 * It is possible that we read an old value down the stack due to read reordering on
+                 * CPUs with weak memory ordering. Add a read barrier to avoid this issue.
                  */
-                WT_ORDERED_READ(cbt->next_stack[i], ins->next[i]);
+                WT_ORDERED_READ_WEAK_MEMORDER(cbt->next_stack[i], ins->next[i]);
                 cbt->ins_stack[i] = &ins->next[i];
             }
     }

@@ -277,6 +277,7 @@ MADV
 MALLOC
 MEM
 MEMALIGN
+MEMORDER
 MERCHANTABILITY
 METADATA
 MONGODB
@@ -754,6 +755,7 @@ datalen
 datasets
 datasource
 datastore
+dbar
 dbc
 dbs
 dcalloc
@@ -1102,6 +1104,7 @@ logtest
 lookaside
 lookup
 lookups
+loongarch
 lossy
 lr
 lrt
@@ -1410,6 +1413,7 @@ snaplen
 snapsort
 snprintf
 sp
+sparc
 spinlock
 spinlocks
 sprintf
