@@ -8,7 +8,7 @@
           "a:27017",
           {
             "ok": 1,
-            "ismaster": false,
+            "isWritablePrimary": false,
             "secondary": true,
             "me": "c:27017",
             "hosts": [
@@ -39,7 +39,7 @@
           "b:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "me": "b:27017",
             "hosts": [
               "b:27017"

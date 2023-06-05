@@ -47,15 +47,15 @@ public:
                                        BSONObj reply) override;
 
     /**
-     * Returns true if _serverIsMasterReplies contains an element corresponding to hostAndPort.
+     * Returns true if _serverHelloReplies contains an element corresponding to hostAndPort.
      */
-    bool hasIsMasterResponse(const HostAndPort& hostAndPort);
-    bool _hasIsMasterResponse(WithLock, const HostAndPort& hostAndPort);
+    bool hasHelloResponse(const HostAndPort& hostAndPort);
+    bool _hasHelloResponse(WithLock, const HostAndPort& hostAndPort);
 
     /**
      * Returns the responses for the most recent onServerHeartbeat events.
      */
-    std::vector<Status> getIsMasterResponse(const HostAndPort& hostAndPort);
+    std::vector<Status> getHelloResponse(const HostAndPort& hostAndPort);
 
     void onServerPingSucceededEvent(HelloRTT latency, const HostAndPort& hostAndPort) override;
 
@@ -74,7 +74,7 @@ public:
 
 private:
     Mutex _mutex;
-    stdx::unordered_map<HostAndPort, std::vector<Status>> _serverIsMasterReplies;
+    stdx::unordered_map<HostAndPort, std::vector<Status>> _serverHelloReplies;
     stdx::unordered_map<HostAndPort, std::vector<StatusWith<HelloRTT>>> _serverPingRTTs;
 };
 

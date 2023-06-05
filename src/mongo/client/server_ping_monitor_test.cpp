@@ -164,7 +164,7 @@ protected:
         ASSERT_LT(elapsed(), deadline);
         auto pingResponse = _topologyListener->getPingResponse(hostAndPort);
 
-        // There should only be one isMaster response queued up.
+        // There should only be one "hello" response queued up.
         ASSERT_EQ(pingResponse.size(), 1);
         ASSERT(pingResponse[0].isOK());
 

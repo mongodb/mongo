@@ -240,7 +240,7 @@ protected:
     static inline const auto kBsonMissingOk = BSONObjBuilder().obj();
     static inline const auto kBsonMongos = okBuilder().append("msg", "isdbgrid").obj();
     static inline const auto kBsonRsPrimary =
-        okBuilder().append("ismaster", true).append("setName", "foo").obj();
+        okBuilder().append("isWritablePrimary", true).append("setName", "foo").obj();
     static inline const auto kBsonRsSecondary =
         okBuilder().append("secondary", true).append("setName", "foo").obj();
     static inline const auto kBsonRsArbiter =
@@ -288,7 +288,7 @@ protected:
         okBuilder().append("topologyVersion", TopologyVersion(OID::max(), 0).toBSON()).obj();
 };
 
-TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsUnknownForIsMasterError) {
+TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsUnknownForHelloError) {
     auto response = HelloOutcome(HostAndPort("foo:1234"), kTopologyVersion, "an error occurred");
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(ServerType::kUnknown, description.getType());
@@ -315,7 +315,7 @@ TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsMongos) {
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsRSPrimary) {
-    // "ismaster: true", "setName" in response
+    // "isWritablePrimary: true", "setName" in response
     auto response = HelloOutcome(HostAndPort("foo:1234"), kBsonRsPrimary, HelloRTT::min());
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(ServerType::kRSPrimary, description.getType());

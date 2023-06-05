@@ -105,12 +105,12 @@ public:
     virtual SecurityPropertySet properties() const = 0;
 
     /**
-     * This returns a number that represents the "amount" of security provided by this mechanism
-     * to determine the order in which it is offered to clients in the isMaster
-     * saslSupportedMechs response.
+     * This returns a number that represents the "amount" of security provided by this mechanism to
+     * determine the order in which it is offered to clients in the "hello" saslSupportedMechs
+     * response.
      *
-     * The value of securityLevel is arbitrary so long as the more secure mechanisms return a
-     * higher value than the less secure mechanisms.
+     * The value of securityLevel is arbitrary so long as the more secure mechanisms return a higher
+     * value than the less secure mechanisms.
      *
      * For example, SCRAM-SHA-256 > SCRAM-SHA-1 > PLAIN
      */

@@ -115,7 +115,7 @@ public:
     }
 
     /**
-     * Gets the horizon name for which the parameters (captured during the first `isMaster`)
+     * Gets the horizon name for which the parameters (captured during the first `hello`)
      * correspond.
      */
     StringData determineHorizon(const SplitHorizon::Parameters& params) const {
@@ -194,7 +194,7 @@ public:
     }
 
     /**
-     * Returns true if this member is hidden (not reported by isMaster, not electable).
+     * Returns true if this member is hidden (not reported by "hello", not electable).
      */
     bool isHidden() const {
         return getHidden();

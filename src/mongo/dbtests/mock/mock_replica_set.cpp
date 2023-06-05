@@ -149,7 +149,7 @@ void MockReplicaSet::setPrimary(const string& hostAndPort) {
 
     _primaryHost = hostAndPort;
 
-    mockIsMasterCmd();
+    mockHelloCmd();
     mockReplSetGetStatusCmd();
 }
 
@@ -183,7 +183,7 @@ repl::ReplSetConfig MockReplicaSet::getReplConfig() const {
 
 void MockReplicaSet::setConfig(const repl::ReplSetConfig& newConfig) {
     _replConfig = newConfig;
-    mockIsMasterCmd();
+    mockHelloCmd();
     mockReplSetGetStatusCmd();
 }
 
@@ -211,14 +211,14 @@ BSONObj MockReplicaSet::mockHelloResponseFor(const MockRemoteDBServer& server) c
 
     const MemberConfig* member = _replConfig.findMemberByHostAndPort(hostAndPort);
     if (!member) {
-        builder.append("ismaster", false);
+        builder.append("isWritablePrimary", false);
         builder.append("secondary", false);
 
         vector<string> hostList;
         builder.append("hosts", hostList);
     } else {
         const bool isPrimary = hostAndPort.toString() == getPrimary();
-        builder.append("ismaster", isPrimary);
+        builder.append("isWritablePrimary", isPrimary);
         builder.append("secondary", !isPrimary);
 
         {
@@ -285,14 +285,12 @@ BSONObj MockReplicaSet::mockHelloResponseFor(const MockRemoteDBServer& server) c
     return builder.obj();
 }
 
-void MockReplicaSet::mockIsMasterCmd() {
+void MockReplicaSet::mockHelloCmd() {
     for (ReplNodeMap::iterator nodeIter = _nodeMap.begin(); nodeIter != _nodeMap.end();
          ++nodeIter) {
-        auto isMaster = mockHelloResponseFor(*nodeIter->second);
+        auto helloReply = mockHelloResponseFor(*nodeIter->second);
 
-        // DBClientBase::isMaster() sends "ismaster", but ReplicaSetMonitor sends "isMaster".
-        nodeIter->second->setCommandReply("ismaster", isMaster);
-        nodeIter->second->setCommandReply("isMaster", isMaster);
+        nodeIter->second->setCommandReply("hello", helloReply);
     }
 }
 

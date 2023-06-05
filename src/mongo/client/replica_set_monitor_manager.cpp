@@ -74,8 +74,8 @@ const auto getGlobalRSMMonitorManager =
 
 Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
     const HostAndPort& remoteHost,
-    const BSONObj& isMasterRequest,
-    const executor::RemoteCommandResponse& isMasterReply) {
+    const BSONObj& helloRequest,
+    const executor::RemoteCommandResponse& helloReply) {
     auto monitor = ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost);
     if (!monitor) {
         return Status::OK();
@@ -87,19 +87,19 @@ Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
         auto publisher = streamableMonitor->getEventsPublisher();
         if (publisher) {
             try {
-                if (isMasterReply.status.isOK()) {
+                if (helloReply.status.isOK()) {
                     publisher->onServerHandshakeCompleteEvent(
-                        *isMasterReply.elapsed, remoteHost, isMasterReply.data);
+                        *helloReply.elapsed, remoteHost, helloReply.data);
                 } else {
                     publisher->onServerHandshakeFailedEvent(
-                        remoteHost, isMasterReply.status, isMasterReply.data);
+                        remoteHost, helloReply.status, helloReply.data);
                 }
             } catch (const DBException& exception) {
                 LOGV2_ERROR(4712101,
                             "An error occurred publishing a ReplicaSetMonitor handshake event",
                             "error"_attr = exception.toStatus(),
                             "replicaSet"_attr = monitor->getName(),
-                            "handshakeStatus"_attr = isMasterReply.status);
+                            "handshakeStatus"_attr = helloReply.status);
                 return exception.toStatus();
             }
         }

@@ -85,13 +85,13 @@ public:
         for (auto& response : bsonResponses) {
             const auto pair = response.Array();
             const auto address = HostAndPort(pair[0].String());
-            const auto bsonIsMaster = pair[1].Obj();
+            const auto bsonHello = pair[1].Obj();
 
-            if (bsonIsMaster.nFields() == 0) {
-                _isMasterResponses.push_back(HelloOutcome(address, BSONObj(), "network error"));
+            if (bsonHello.nFields() == 0) {
+                _helloResponses.push_back(HelloOutcome(address, BSONObj(), "network error"));
             } else {
-                _isMasterResponses.push_back(
-                    HelloOutcome(address, bsonIsMaster, duration_cast<HelloRTT>(kLatency)));
+                _helloResponses.push_back(
+                    HelloOutcome(address, bsonHello, duration_cast<HelloRTT>(kLatency)));
             }
         }
         _topologyOutcome = phase["outcome"].Obj();
@@ -112,7 +112,7 @@ public:
     PhaseResult execute(TopologyManager& topology) const {
         PhaseResult testResult{{}, _phaseNum};
 
-        for (const auto& response : _isMasterResponses) {
+        for (const auto& response : _helloResponses) {
             auto descriptionStr =
                 (response.getResponse()) ? response.getResponse()->toString() : "[ Network Error ]";
             LOGV2(20202,
@@ -429,7 +429,7 @@ private:
 
     MongoURI _testUri;
     int _phaseNum;
-    std::vector<HelloOutcome> _isMasterResponses;
+    std::vector<HelloOutcome> _helloResponses;
     BSONObj _topologyOutcome;
 };
 

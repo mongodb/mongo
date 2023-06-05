@@ -74,13 +74,13 @@ class DBClientCursor;
 class DBClientConnection : public DBClientBase {
 public:
     /**
-     * A hook used to validate the reply of an 'isMaster' command during connection. If the hook
+     * A hook used to validate the reply of a "hello" command during connection. If the hook
      * returns a non-OK Status, the DBClientConnection object will disconnect from the remote
      * server. This function must not throw - it can only indicate failure by returning a non-OK
      * status.
      */
     using HandshakeValidationHook =
-        std::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
+        std::function<Status(const executor::RemoteCommandResponse& helloReply)>;
 
     /**
        @param _autoReconnect if true, automatically reconnect on a connection failure
@@ -123,8 +123,8 @@ public:
                            boost::optional<TransientSSLParams> transientSSLParams);
 
     /**
-     * This version of connect does not run 'isMaster' after creating a TCP connection to the
-     * remote host. This method should be used only when calling 'isMaster' would create a deadlock,
+     * This version of connect does not run "hello" after creating a TCP connection to the
+     * remote host. This method should be used only when calling "hello" would create a deadlock,
      * such as in 'isSelf'.
      *
      * @param server The server to connect to.

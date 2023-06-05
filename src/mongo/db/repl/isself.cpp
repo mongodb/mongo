@@ -267,11 +267,11 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
         double timeoutSeconds = static_cast<double>(durationCount<Milliseconds>(timeout)) / 1000.0;
         conn.setSoTimeout(timeoutSeconds);
 
-        // We need to avoid the isMaster call triggered by a normal connect, which would
-        // cause a deadlock. 'isSelf' is called by the Replication Coordinator when validating
-        // a replica set configuration document, but the 'isMaster' command requires a lock on the
-        // replication coordinator to execute. As such we call we call 'connectSocketOnly', which
-        // does not call 'isMaster'.
+        // We need to avoid the "hello" call triggered by a normal connect, which would cause a
+        // deadlock. 'isSelf' is called by the Replication Coordinator when validating a replica set
+        // configuration document, but the "hello" command requires a lock on the replication
+        // coordinator to execute. As such we call we call 'connectSocketOnly', which does not call
+        // "hello".
         auto connectSocketResult = conn.connectSocketOnly(hostAndPort, boost::none);
         if (!connectSocketResult.isOK()) {
             LOGV2(4834700,
