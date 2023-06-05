@@ -514,51 +514,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
     logConfigureCollectionBalancing();
 }
 
-void ShardingCatalogManager::renameShardedMetadata(
-    OperationContext* opCtx,
-    const NamespaceString& from,
-    const NamespaceString& to,
-    const WriteConcernOptions& writeConcern,
-    boost::optional<CollectionType> optFromCollType) {
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection placement versions
-    Lock::ExclusiveLock chunkLk(opCtx, _kChunkOpLock);
-    Lock::ExclusiveLock zoneLk(opCtx, _kZoneOpLock);
-
-    std::string logMsg = str::stream()
-        << toStringForLogging(from) << " to " << toStringForLogging(to);
-    if (optFromCollType) {
-        // Rename CSRS metadata in case the source collection is sharded
-        auto collType = *optFromCollType;
-        sharding_ddl_util::shardedRenameMetadata(
-            opCtx, _localConfigShard, _localCatalogClient.get(), collType, to, writeConcern);
-        ShardingLogging::get(opCtx)->logChange(
-            opCtx,
-            "renameCollection.metadata",
-            str::stream() << logMsg << ": dropped target collection and renamed source collection",
-            BSON("newCollMetadata" << collType.toBSON()),
-            ShardingCatalogClient::kLocalWriteConcern,
-            _localConfigShard,
-            _localCatalogClient.get());
-    } else {
-        // Remove stale CSRS metadata in case the source collection is unsharded and the
-        // target collection was sharded
-        // throws if the provided UUID does not match
-        sharding_ddl_util::removeCollAndChunksMetadataFromConfig_notIdempotent(
-            opCtx, _localConfigShard, _localCatalogClient.get(), to, writeConcern);
-        sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(
-            opCtx, _localConfigShard, to, writeConcern);
-        ShardingLogging::get(opCtx)->logChange(opCtx,
-                                               "renameCollection.metadata",
-                                               str::stream()
-                                                   << logMsg << " : dropped target collection.",
-                                               BSONObj(),
-                                               ShardingCatalogClient::kLocalWriteConcern,
-                                               _localConfigShard,
-                                               _localCatalogClient.get());
-    }
-}
-
 void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
     OperationContext* opCtx,
     const NamespaceString& nss,

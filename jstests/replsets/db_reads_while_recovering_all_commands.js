@@ -58,7 +58,6 @@ const allCommands = {
     _configsvrRemoveShardFromZone: {skip: isPrimaryOnly},
     _configsvrRemoveTags: {skip: isPrimaryOnly},
     _configsvrRepairShardedCollectionChunksHistory: {skip: isPrimaryOnly},
-    _configsvrRenameCollectionMetadata: {skip: isPrimaryOnly},
     _configsvrResetPlacementHistory: {skip: isPrimaryOnly},
     _configsvrReshardCollection: {skip: isPrimaryOnly},
     _configsvrRunRestore: {skip: isPrimaryOnly},
