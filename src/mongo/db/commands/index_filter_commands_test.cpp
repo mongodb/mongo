@@ -31,15 +31,11 @@
  * This file contains tests for mongo/db/commands/index_filter_commands.h
  */
 
-#include "mongo/db/commands/index_filter_commands.h"
-
-#include <memory>
-
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
@@ -50,13 +46,8 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
-using namespace mongo;
-
+namespace mongo {
 namespace {
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
 class IndexFilterCommandsTest : public unittest::Test {
 protected:
@@ -231,14 +222,14 @@ protected:
     /**
      * Utility function to get list of index filters from the query settings.
      */
-    vector<BSONObj> getFilters() {
+    std::vector<BSONObj> getFilters() {
         BSONObjBuilder bob;
         ASSERT_OK(ListFilters::list(_querySettings, &bob));
         BSONObj resultObj = bob.obj();
         BSONElement filtersElt = resultObj.getField("filters");
         ASSERT_EQUALS(filtersElt.type(), mongo::Array);
-        vector<BSONElement> filtersEltArray = filtersElt.Array();
-        vector<BSONObj> filters;
+        std::vector<BSONElement> filtersEltArray = filtersElt.Array();
+        std::vector<BSONObj> filters;
         for (auto&& elt : filtersEltArray) {
             ASSERT_TRUE(elt.isABSONObj());
             BSONObj obj = elt.Obj();
@@ -388,7 +379,7 @@ const NamespaceString IndexFilterCommandsTest::_nss(
  */
 
 TEST_F(IndexFilterCommandsTest, ListFiltersEmpty) {
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_TRUE(filters.empty());
 }
 
@@ -416,7 +407,7 @@ TEST_F(IndexFilterCommandsTest, ClearNonexistentIndexFilter) {
     std::string clearCmdObject{"{query: {b: 1}}"};
 
     ASSERT_OK(setIndexFilter(setCmdObject));
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_EQUALS(filters.size(), 1U);
 
     // Clear nonexistent index filter.
@@ -468,7 +459,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFilters) {
             indexes: [{a: 1}]})");
 
     size_t expectedNumFilters = 1;
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_EQ(expectedNumFilters, filters.size());
 
     // Query shape should not exist in plan cache after index filter is updated.
@@ -546,7 +537,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
               collation: {locale: 'mock_reverse_string'},
               indexes: [{a: 1}]})");
 
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_EQUALS(filters.size(), 1U);
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("query"), fromjson("{a: 'foo'}"));
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("sort"), fromjson("{}"));
@@ -610,3 +601,4 @@ TEST_F(IndexFilterCommandsTest, SBEPlanCacheBudgetTest) {
 }
 
 }  // namespace
+}  // namespace mongo

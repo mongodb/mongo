@@ -27,15 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/storage/record_store_test_harness.h"
-
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -56,19 +52,16 @@ auto newRecordStoreHarnessHelper(RecordStoreHarnessHelper::Options options)
 
 namespace {
 
-using std::string;
-using std::unique_ptr;
-
 TEST(RecordStoreTestHarness, Simple1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string s = "eliot was here";
+    std::string s = "eliot was here";
 
     RecordId loc1;
 
@@ -118,14 +111,14 @@ TEST(RecordStoreTestHarness, Simple1) {
 
 TEST(RecordStoreTestHarness, Delete1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string s = "eliot was here";
+    std::string s = "eliot was here";
 
     RecordId loc;
     {
@@ -163,14 +156,14 @@ TEST(RecordStoreTestHarness, Delete1) {
 
 TEST(RecordStoreTestHarness, Delete2) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string s = "eliot was here";
+    std::string s = "eliot was here";
 
     RecordId loc;
     {
@@ -206,15 +199,15 @@ TEST(RecordStoreTestHarness, Delete2) {
 
 TEST(RecordStoreTestHarness, Update1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string s1 = "eliot was here";
-    string s2 = "eliot was here again";
+    std::string s1 = "eliot was here";
+    std::string s2 = "eliot was here again";
 
     RecordId loc;
     {
@@ -254,13 +247,13 @@ TEST(RecordStoreTestHarness, Update1) {
 
 TEST(RecordStoreTestHarness, UpdateInPlace1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
 
-    string s1 = "aaa111bbb";
-    string s2 = "aaa222bbb";
+    std::string s1 = "aaa111bbb";
+    std::string s2 = "aaa222bbb";
 
     RecordId loc;
     const RecordData s1Rec(s1.c_str(), s1.size() + 1);
@@ -306,17 +299,16 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
     }
 }
 
-
 TEST(RecordStoreTestHarness, Truncate1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string s = "eliot was here";
+    std::string s = "eliot was here";
 
     RecordId loc;
     {
@@ -361,7 +353,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
     const int N = 10;
 
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -373,7 +365,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             for (int i = 0; i < N; i++) {
-                string s = str::stream() << "eliot" << i;
+                std::string s = str::stream() << "eliot" << i;
                 ASSERT_OK(rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp())
                               .getStatus());
             }
@@ -391,7 +383,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
         while (auto record = cursor->next()) {
-            string s = str::stream() << "eliot" << x++;
+            std::string s = str::stream() << "eliot" << x++;
             ASSERT_EQUALS(s, record->data.data());
         }
         ASSERT_EQUALS(N, x);
@@ -403,7 +395,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get(), false);
         while (auto record = cursor->next()) {
-            string s = str::stream() << "eliot" << --x;
+            std::string s = str::stream() << "eliot" << --x;
             ASSERT_EQUALS(s, record->data.data());
         }
         ASSERT_EQUALS(0, x);

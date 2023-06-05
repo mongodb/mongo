@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,7 +34,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -56,7 +51,6 @@
 #include "mongo/util/periodic_runner_factory.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace {
@@ -734,5 +728,6 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     ASSERT_TRUE(collectionExists(opCtx.get(), coll1Ns));
     ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 }
+
 }  // namespace
 }  // namespace mongo

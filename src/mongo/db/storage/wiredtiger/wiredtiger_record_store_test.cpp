@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
@@ -54,10 +53,6 @@
 
 namespace mongo {
 namespace {
-
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyDocument) {
     BSONObj spec = fromjson("{}");
@@ -102,7 +97,7 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigStringOption) {
 
 TEST(WiredTigerRecordStoreTest, Isolation1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId id1;
     RecordId id2;
@@ -129,8 +124,8 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
         auto t2 = harnessHelper->newOperationContext(client2.get());
 
-        unique_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
-        unique_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
+        std::unique_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
+        std::unique_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
 
         rs->dataFor(t1.get(), id1);
         rs->dataFor(t2.get(), id1);
@@ -153,7 +148,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
 
 TEST(WiredTigerRecordStoreTest, Isolation2) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId id1;
     RecordId id2;
@@ -192,7 +187,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
         {
             WriteUnitOfWork w(t2.get());
-            ASSERT_EQUALS(string("a"), rs->dataFor(t2.get(), id1).data());
+            ASSERT_EQUALS(std::string("a"), rs->dataFor(t2.get(), id1).data());
             try {
                 // this should fail as our version of id1 is too old
                 rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();
@@ -204,7 +199,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 }
 
 StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
-                                unique_ptr<RecordStore>& rs,
+                                std::unique_ptr<RecordStore>& rs,
                                 const Timestamp& opTime) {
     BSONObj obj = BSON("ts" << opTime);
     WriteUnitOfWork wuow(opCtx.get());
@@ -220,7 +215,7 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
 }
 
 RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
-                                const unique_ptr<RecordStore>& rs,
+                                const std::unique_ptr<RecordStore>& rs,
                                 int inc) {
     Timestamp opTime = Timestamp(5, inc);
     Status status = rs->oplogDiskLocRegister(opCtx, opTime, false);
@@ -237,8 +232,8 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
     ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
     WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
 
-    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
 
     {
@@ -266,8 +261,8 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
     WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
 
-    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
 
@@ -311,7 +306,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
 
 TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.b"));
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     BSONObjBuilder builder;
@@ -335,7 +330,7 @@ TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
 
 TEST(WiredTigerRecordStoreTest, AppendCustomNumericStats) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.c"));
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.c"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     BSONObjBuilder builder;
@@ -1033,7 +1028,7 @@ void testTruncateRange(int64_t numRecordsToInsert,
                        int64_t deletionPosBegin,
                        int64_t deletionPosEnd) {
     auto harnessHelper = newRecordStoreHarnessHelper();
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
 
@@ -1099,8 +1094,8 @@ DEATH_TEST(WiredTigerRecordStoreTest,
 }
 
 TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
-    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
 
@@ -1145,8 +1140,8 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 }
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
-    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId rid1;
     {
@@ -1185,8 +1180,8 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
 }
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
-    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId rid1;
     {
@@ -1228,7 +1223,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
 // This test case complements StorageEngineTest:TemporaryRecordStoreClustered which verifies
 // clustered temporary record stores.
 TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
-    const unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    const std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
     ASSERT(opCtx.get());
@@ -1304,7 +1299,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
 // transaction deletes the same rows before we have a chance of patching up the metadata.
 TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId rid;  // This record will be deleted by two transactions.
 

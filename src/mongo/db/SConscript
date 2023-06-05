@@ -1114,6 +1114,19 @@ env.Library(
 )
 
 env.Library(
+    target='service_context_non_d',
+    source=[
+        'transaction_resources_decoration_non_mongod.cpp',
+    ],
+    LIBDEPS=[
+        'service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        'concurrency/lock_manager',
+    ],
+)
+
+env.Library(
     target='service_entry_point_common',
     source=[
         'service_entry_point_common.cpp',
@@ -2113,6 +2126,13 @@ env.Library(
     ],
 )
 
+# This library is the base class for tests which require the presence of ServiceContext. However it
+# does not perform any default initialisation of the relevant services, such as lockers and
+# transaction resources, so any test which directly references it must perform its own
+# initialisation.
+#
+# If a test requires the presence of a storage engine, it should use the
+# service_context_d_test_fixture below directly.
 env.Library(
     target='service_context_test_fixture',
     source=[

@@ -268,7 +268,7 @@ protected:
      * progressing time past that point, takes in what time to expect an election to occur at.
      * Useful for simulating elections triggered via priority takeover.
      */
-    void simulateSuccessfulV1ElectionAt(Date_t electionTime);
+    void simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date_t electionTime);
 
     /**
      * When the test has been configured with a replica set config with a single member, use this

@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <vector>
 
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/platform/mutex.h"
@@ -39,10 +36,8 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
+namespace mongo::repl {
 namespace {
-
-using namespace mongo;
-using namespace mongo::repl;
 
 using Task = TaskRunner::Task;
 
@@ -357,3 +352,4 @@ TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
 }
 
 }  // namespace
+}  // namespace mongo::repl

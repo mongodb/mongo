@@ -27,26 +27,19 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <boost/filesystem.hpp>
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {

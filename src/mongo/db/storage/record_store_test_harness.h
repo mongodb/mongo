@@ -39,8 +39,6 @@
 
 namespace mongo {
 
-class RecoveryUnit;
-
 class RecordStoreHarnessHelper : public HarnessHelper {
 public:
     enum class Options { Standalone, ReplicationEnabled };

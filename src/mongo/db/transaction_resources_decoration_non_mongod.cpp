@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,34 @@
  *    it in the license file.
  */
 
-#include <boost/intrusive_ptr.hpp>
-#include <string>
-#include <vector>
-
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
-#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/concurrency/locker_impl.h"
 
 namespace mongo {
+namespace shard_role_details {
 namespace {
-using DocumentSourceInternalSplitPipelineTest = AggregationContextFixture;
 
-TEST_F(DocumentSourceInternalSplitPipelineTest, NotAllowedInLookupIfMustRunOnMongos) {
-    auto expCtx = getExpCtx();
-    auto split = DocumentSourceInternalSplitPipeline::create(
-        expCtx, StageConstraints::HostTypeRequirement::kMongoS);
-    ASSERT_FALSE(split->constraints().isAllowedInLookupPipeline());
-    ASSERT(split->constraints().hostRequirement == StageConstraints::HostTypeRequirement::kMongoS);
-}
+class TransactionResourcesNonMongoDClientObserver : public ServiceContext::ClientObserver {
+public:
+    TransactionResourcesNonMongoDClientObserver() = default;
+    ~TransactionResourcesNonMongoDClientObserver() = default;
+
+    void onCreateClient(Client* client) final {}
+
+    void onDestroyClient(Client* client) final {}
+
+    void onCreateOperationContext(OperationContext* opCtx) final {
+        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+    }
+
+    void onDestroyOperationContext(OperationContext* opCtx) final {}
+};
+
+ServiceContext::ConstructorActionRegisterer transactionResourcesConstructor{
+    "TransactionResourcesConstructor", [](ServiceContext* service) {
+        service->registerClientObserver(
+            std::make_unique<TransactionResourcesNonMongoDClientObserver>());
+    }};
 
 }  // namespace
+}  // namespace shard_role_details
 }  // namespace mongo

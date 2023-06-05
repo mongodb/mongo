@@ -353,7 +353,8 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
           "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
           "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
-    simulateSuccessfulV1ElectionAt(electionTimeoutWhen);
+    auto opCtx{makeOperationContext()};
+    simulateSuccessfulV1ElectionAt(opCtx.get(), electionTimeoutWhen);
 }
 
 void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime,
@@ -422,15 +423,14 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
     ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
 }
 
-void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
-    auto opCtx = makeOperationContext();
-    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx.get());
+void ReplCoordTest::simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date_t electionTime) {
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx);
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
 
-    signalDrainComplete(opCtx.get());
+    signalDrainComplete(opCtx);
 
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
-    auto helloResponse = replCoord->awaitHelloResponse(opCtx.get(), {}, boost::none, boost::none);
+    auto helloResponse = replCoord->awaitHelloResponse(opCtx, {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_FALSE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
 
