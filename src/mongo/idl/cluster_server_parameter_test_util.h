@@ -92,7 +92,10 @@ private:
 
 void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId = boost::none);
 void remove(const boost::optional<TenantId>& tenantId = boost::none);
-BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, StringData strValue);
+BSONObj makeClusterParametersDoc(const LogicalTime& cpTime,
+                                 int intValue,
+                                 StringData strValue,
+                                 StringData parameterName = kCSPTest);
 
 }  // namespace cluster_server_parameter_test_util
 }  // namespace mongo

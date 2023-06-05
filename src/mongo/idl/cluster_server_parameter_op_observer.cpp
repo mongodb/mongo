@@ -67,10 +67,13 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
     }
 
     for (auto it = first; it != last; ++it) {
-        opCtx->recoveryUnit()->onCommit([doc = it->doc, tenantId = coll->ns().dbName().tenantId()](
-                                            OperationContext* opCtx, boost::optional<Timestamp>) {
-            cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
-        });
+        auto& doc = it->doc;
+        auto tenantId = coll->ns().dbName().tenantId();
+        cluster_parameters::validateParameter(opCtx, doc, tenantId);
+        opCtx->recoveryUnit()->onCommit(
+            [doc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
+                cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
+            });
     }
 }
 
@@ -82,10 +85,12 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    opCtx->recoveryUnit()->onCommit([updatedDoc, tenantId = args.coll->ns().dbName().tenantId()](
-                                        OperationContext* opCtx, boost::optional<Timestamp>) {
-        cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
-    });
+    auto tenantId = args.coll->ns().dbName().tenantId();
+    cluster_parameters::validateParameter(opCtx, updatedDoc, tenantId);
+    opCtx->recoveryUnit()->onCommit(
+        [updatedDoc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
+            cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
+        });
 }
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
