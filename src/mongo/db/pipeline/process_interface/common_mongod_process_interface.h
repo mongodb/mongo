@@ -66,7 +66,7 @@ public:
                             const NamespaceString& nss,
                             bool includeHistograms,
                             BSONObjBuilder* builder) const final;
-    Status appendStorageStats(OperationContext* opCtx,
+    Status appendStorageStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const NamespaceString& nss,
                               const StorageStatsSpec& spec,
                               BSONObjBuilder* builder,

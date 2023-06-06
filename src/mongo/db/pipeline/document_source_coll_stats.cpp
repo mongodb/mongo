@@ -112,10 +112,9 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     if (auto storageStats = spec.getStorageStats()) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        uassertStatusOKWithContext(
-            expCtx->mongoProcessInterface->appendStorageStats(
-                expCtx->opCtx, nss, *storageStats, &storageBuilder, filterObj),
-            "Unable to retrieve storageStats in $collStats stage");
+        uassertStatusOKWithContext(expCtx->mongoProcessInterface->appendStorageStats(
+                                       expCtx, nss, *storageStats, &storageBuilder, filterObj),
+                                   "Unable to retrieve storageStats in $collStats stage");
         storageBuilder.doneFast();
     }
 

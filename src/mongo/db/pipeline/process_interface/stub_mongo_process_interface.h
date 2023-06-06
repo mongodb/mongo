@@ -148,7 +148,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status appendStorageStats(OperationContext* opCtx,
+    Status appendStorageStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const NamespaceString& nss,
                               const StorageStatsSpec& spec,
                               BSONObjBuilder* builder,

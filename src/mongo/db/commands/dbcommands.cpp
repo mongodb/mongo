@@ -485,7 +485,8 @@ public:
             result.append("ns", NamespaceStringUtil::serialize(nss, serializationCtx));
 
             const auto& spec = request().getStorageStatsSpec();
-            Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
+            Status status =
+                appendCollectionStorageStats(opCtx, nss, spec, serializationCtx, &result);
             if (!status.isOK() && (status.code() != ErrorCodes::NamespaceNotFound)) {
                 uassertStatusOK(status);  // throws
             }

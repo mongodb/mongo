@@ -252,7 +252,7 @@ public:
      * specific stats to be appended to parameter 'builder'. By passing 'boost::none' to
      * 'filterObj', the caller is requesting to append all possible storage stats.
      */
-    virtual Status appendStorageStats(OperationContext* opCtx,
+    virtual Status appendStorageStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,
                                       const StorageStatsSpec& spec,
                                       BSONObjBuilder* builder,

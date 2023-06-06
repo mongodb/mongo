@@ -94,6 +94,7 @@ namespace mongo {
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const StorageStatsSpec& spec,
+                                    const SerializationContext& serializationCtx,
                                     BSONObjBuilder* builder,
                                     const boost::optional<BSONObj>& filterObj = boost::none);
 

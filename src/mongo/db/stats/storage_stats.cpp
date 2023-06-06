@@ -86,6 +86,7 @@ const stdx::unordered_map<std::string, StorageStatsGroups> _mapStorageStatsField
 void _appendRecordStats(OperationContext* opCtx,
                         const CollectionPtr& collection,
                         const NamespaceString& collNss,
+                        const SerializationContext& serializationCtx,
                         bool isNamespaceAlwaysUnsharded,
                         int scale,
                         bool isTimeseries,
@@ -97,7 +98,7 @@ void _appendRecordStats(OperationContext* opCtx,
     long long numRecords = collection->numRecords(opCtx);
     if (isTimeseries) {
         BSONObjBuilder bob(result->subobjStart("timeseries"));
-        bob.append("bucketsNs", NamespaceStringUtil::serialize(collNss));
+        bob.append("bucketsNs", NamespaceStringUtil::serialize(collNss, serializationCtx));
         bob.appendNumber("bucketCount", numRecords);
         if (numRecords) {
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
@@ -289,6 +290,7 @@ void _appendTotalSize(OperationContext* opCtx,
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const StorageStatsSpec& storageStatsSpec,
+                                    const SerializationContext& serializationCtx,
                                     BSONObjBuilder* result,
                                     const boost::optional<BSONObj>& filterObj) {
     auto scale = storageStatsSpec.getScale().value_or(1);
@@ -375,6 +377,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                 _appendRecordStats(opCtx,
                                    collection,
                                    collNss,
+                                   serializationCtx,
                                    nss.isNamespaceAlwaysUnsharded(),
                                    scale,
                                    isTimeseries,

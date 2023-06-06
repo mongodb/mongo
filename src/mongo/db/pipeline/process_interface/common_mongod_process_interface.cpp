@@ -367,12 +367,13 @@ void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
 }
 
 Status CommonMongodProcessInterface::appendStorageStats(
-    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const StorageStatsSpec& spec,
     BSONObjBuilder* builder,
     const boost::optional<BSONObj>& filterObj) const {
-    return appendCollectionStorageStats(opCtx, nss, spec, builder, filterObj);
+    return appendCollectionStorageStats(
+        expCtx->opCtx, nss, spec, expCtx->serializationCtxt, builder, filterObj);
 }
 
 Status CommonMongodProcessInterface::appendRecordCount(OperationContext* opCtx,
