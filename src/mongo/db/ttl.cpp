@@ -509,13 +509,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                                    TTLCollectionCache* ttlCollectionCache,
                                    const UUID& uuid,
                                    const TTLCollectionCache::Info& info) {
-    // Skip collections that have not been made visible yet. The TTLCollectionCache
-    // already has the index information available, so we want to avoid removing it
-    // until the collection is visible.
     auto collectionCatalog = CollectionCatalog::get(opCtx);
-    if (collectionCatalog->isCollectionAwaitingVisibility(uuid)) {
-        return false;
-    }
 
     // The collection was dropped.
     auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);
@@ -848,9 +842,6 @@ void TTLMonitor::onStepUp(OperationContext* opCtx) {
     auto ttlInfos = ttlCollectionCache.getTTLInfos();
     for (const auto& [uuid, infos] : ttlInfos) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
-        if (collectionCatalog->isCollectionAwaitingVisibility(uuid)) {
-            continue;
-        }
 
         // The collection was dropped.
         auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);

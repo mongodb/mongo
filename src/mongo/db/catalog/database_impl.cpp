@@ -813,7 +813,6 @@ Collection* DatabaseImpl::_createCollection(
     }();
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
-    ownedCollection->setCommitted(false);
 
     CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
     openCreateCollectionWindowFp.executeIf(

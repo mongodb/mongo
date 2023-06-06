@@ -86,7 +86,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
     // Verify that we are using the latest instance if we intend to perform writes.
     if (verifyWriteEligible) {
         auto latest = CollectionCatalog::latest(opCtx);
-        if (!latest->containsCollection(opCtx, coll)) {
+        if (!latest->isLatestCollection(opCtx, coll)) {
             throwWriteConflictException(str::stream() << "Unable to write to collection '"
                                                       << coll->ns().toStringForErrorMsg()
                                                       << "' due to catalog changes; please "

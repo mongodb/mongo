@@ -83,13 +83,7 @@ void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
 
 void RecoveryUnit::registerChangeForCatalogVisibility(std::unique_ptr<Change> change) {
     validateInUnitOfWork();
-    invariant(!_changeForCatalogVisibility);
-    _changeForCatalogVisibility = std::move(change);
-}
-
-bool RecoveryUnit::hasRegisteredChangeForCatalogVisibility() {
-    validateInUnitOfWork();
-    return _changeForCatalogVisibility.get();
+    _changesForCatalogVisibility.push_back(std::move(change));
 }
 
 void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp) {
@@ -136,6 +130,18 @@ void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
 
 void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
     invariant(_opCtx);
+    for (auto& change : _changesForCatalogVisibility) {
+        try {
+            // Log at higher level because commits occur far more frequently than rollbacks.
+            LOGV2_DEBUG(5255701,
+                        3,
+                        "Custom commit",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            change->commit(_opCtx, commitTimestamp);
+        } catch (...) {
+            std::terminate();
+        }
+    }
     for (auto& change : _changes) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
@@ -148,21 +154,8 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
             std::terminate();
         }
     }
-    try {
-        if (_changeForCatalogVisibility) {
-            // Log at higher level because commits occur far more frequently than rollbacks.
-            LOGV2_DEBUG(5255701,
-                        2,
-                        "Custom commit",
-                        "changeName"_attr =
-                            redact(demangleName(typeid(*_changeForCatalogVisibility))));
-            _changeForCatalogVisibility->commit(_opCtx, commitTimestamp);
-        }
-    } catch (...) {
-        std::terminate();
-    }
     _changes.clear();
-    _changeForCatalogVisibility.reset();
+    _changesForCatalogVisibility.clear();
 }
 
 void RecoveryUnit::abortRegisteredChanges() {
@@ -175,16 +168,24 @@ void RecoveryUnit::abortRegisteredChanges() {
 void RecoveryUnit::_executeRollbackHandlers() {
     // Make sure we have an OperationContext when executing rollback handlers. Unless we have no
     // handlers to run, which might be the case in unit tests.
-    invariant(_opCtx || (_changes.empty() && !_changeForCatalogVisibility));
+    invariant(_opCtx || (_changes.empty() && _changesForCatalogVisibility.empty()));
     try {
-        if (_changeForCatalogVisibility) {
+        // TODO SERVER-77425: Rollback handlers should execute in the reverse order of commit
+        // handlers. However, the ScopedLocalCatalogWriteFence currently expects the local catalog
+        // to already have been rolled back when it executes its own rollback handler. When this is
+        // fixed we should move the rollback handler for local catalog visibility last.
+        for (Changes::const_reverse_iterator it = _changesForCatalogVisibility.rbegin(),
+                                             end = _changesForCatalogVisibility.rend();
+             it != end;
+             ++it) {
+            Change* change = it->get();
             LOGV2_DEBUG(5255702,
                         2,
                         "Custom rollback",
-                        "changeName"_attr =
-                            redact(demangleName(typeid(*_changeForCatalogVisibility))));
-            _changeForCatalogVisibility->rollback(_opCtx);
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            change->rollback(_opCtx);
         }
+
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
              ++it) {
@@ -195,7 +196,8 @@ void RecoveryUnit::_executeRollbackHandlers() {
                         "changeName"_attr = redact(demangleName(typeid(*change))));
             change->rollback(_opCtx);
         }
-        _changeForCatalogVisibility.reset();
+
+        _changesForCatalogVisibility.clear();
         _changes.clear();
     } catch (...) {
         std::terminate();

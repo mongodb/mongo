@@ -997,6 +997,7 @@ public:
         // invalidating a transaction, or starting a new transaction. It releases the Client lock
         // before releasing this participant's locks and aborting its storage transaction.
         void _resetTransactionStateAndUnlock(stdx::unique_lock<Client>* lk,
+                                             OperationContext* opCtx,
                                              TransactionState::StateFlag state);
 
         /* Releases the resources held in *o().txnResources to the operation context.

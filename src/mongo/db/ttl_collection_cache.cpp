@@ -43,8 +43,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(hangTTLCollectionCacheAfterRegisteringInfo);
-
 namespace {
 const auto getTTLCollectionCache = ServiceContext::declareDecoration<TTLCollectionCache>();
 }
@@ -57,11 +55,6 @@ void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
     {
         stdx::lock_guard<Latch> lock(_ttlInfosLock);
         _ttlInfos[uuid].push_back(info);
-    }
-
-    if (MONGO_unlikely(hangTTLCollectionCacheAfterRegisteringInfo.shouldFail())) {
-        LOGV2(4664000, "Hanging due to hangTTLCollectionCacheAfterRegisteringInfo fail point");
-        hangTTLCollectionCacheAfterRegisteringInfo.pauseWhileSet();
     }
 }
 

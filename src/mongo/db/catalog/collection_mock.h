@@ -341,14 +341,6 @@ public:
         return _uuid;
     }
 
-    bool isCommitted() const final {
-        return _committed;
-    }
-
-    void setCommitted(bool val) final {
-        _committed = val;
-    }
-
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
         MONGO_UNREACHABLE;
     }
