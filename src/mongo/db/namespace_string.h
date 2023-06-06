@@ -1149,6 +1149,10 @@ inline bool NamespaceString::validCollectionName(StringData coll) {
     return true;
 }
 
+inline std::string stringifyForAssert(const NamespaceString& nss) {
+    return toStringForLogging(nss);
+}
+
 // Here are the `constexpr` definitions for the `NamespaceString::ConstantProxy`
 // constant static data members of `NamespaceString`. They cannot be defined
 // `constexpr` inside the class definition, but they can be upgraded to
