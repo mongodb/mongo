@@ -1808,12 +1808,7 @@ TEST(Accumulators, SerializeWithRedaction) {
         R"({
             "$topN": {
                 "n": "?number",
-                "output": {
-                    "HASH<output>": "$HASH<output>",
-                    "HASH<sortFields>": [
-                        "$HASH<sortKey>"
-                    ]
-                },
+                "output": "$HASH<output>",
                 "sortBy": {
                     "HASH<sortKey>": 1
                 }
@@ -1867,12 +1862,7 @@ TEST(Accumulators, SerializeWithRedaction) {
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({
             "$top": {
-                "output": {
-                    "HASH<output>": "$HASH<b>",
-                    "HASH<sortFields>": [
-                        "$HASH<sales>"
-                    ]
-                },
+                "output": "$HASH<b>",
                 "sortBy": {
                     "HASH<sales>": 1
                 }

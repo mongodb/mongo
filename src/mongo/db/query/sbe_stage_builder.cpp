@@ -2495,8 +2495,8 @@ sbe::value::SlotVector generateAccumulator(
                         str::stream()
                             << accStmt.expr.name << " accumulator must have an object argument",
                         objConst.isObject());
-                auto outputField =
-                    objConst.getDocument().toBson().getField(AccumulatorN::kFieldNameOutput);
+                auto objBson = objConst.getDocument().toBson();
+                auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
                 if (outputField.ok()) {
                     auto [outputTag, outputVal] =
                         sbe::bson::convertFrom<false /* View */>(outputField);
