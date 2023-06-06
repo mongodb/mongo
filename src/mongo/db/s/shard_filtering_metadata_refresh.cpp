@@ -444,8 +444,8 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 if (!currentMetadata.allowMigrations()) {
                     boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
                     {
-                        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-                        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
+                        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+                        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
                         auto const& csr = CollectionShardingRuntime::get(opCtx, nss);
                         auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
