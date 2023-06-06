@@ -30,8 +30,10 @@ longTermSupportReleases:
   - "6.0"
   - "7.0"
 
-# List of stable MongoDB versions since 2.0 that have been EOL'd. This does not
-# include developer builds (ex: 4.1), but does include rapid releases.
+# List of stable MongoDB versions since 2.0 that have been EOL'd.
+# Entries to this section will also stop them from running as "old" versions in
+# multiversion testing across all branches. This is because there is no need to
+# run multiversion testing against EOL versions.
 eolVersions:
   - "2.0"
   - "2.2"
