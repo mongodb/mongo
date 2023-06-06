@@ -89,8 +89,8 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
         if (elem.isABSONObj()) {
             // We expect this won't work or parse on the main command path, but for shapification we
             // don't really care, just treat it as a literal and don't bother parsing.
-            bob << opts.serializeFieldPathFromString(elem.fieldNameStringData())
-                << kLiteralArgString;
+            opts.appendLiteral(
+                &bob, opts.serializeFieldPathFromString(elem.fieldNameStringData()), elem);
         } else if (elem.fieldNameStringData() == natural.fieldNameStringData()) {
             bob.append(elem);
         } else {

@@ -77,12 +77,7 @@ public:
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
         AggregateKeyGenerator aggKeyGenerator(acr, pipeline, expCtx);
 
-        SerializationOptions opts;
-        if (literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-            // TODO SERVER-75419 Use only 'literalPolicy.'
-            opts.replacementForLiteralArgs = "?";
-            opts.literalPolicy = literalPolicy;
-        }
+        SerializationOptions opts(literalPolicy);
         if (applyHmac) {
             opts.transformIdentifiers = true;
             opts.transformIdentifiersCallback = applyHmacForTest;

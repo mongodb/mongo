@@ -2124,7 +2124,6 @@ TEST(SerializesInternalSchema, EqRedactsCorrectly) {
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.transformIdentifiersCallback = applyHmacForTest;
     opts.transformIdentifiers = true;
-    opts.replacementForLiteralArgs = "?";
     auto query = fromjson("{$_internalSchemaEq: {a:1, b: {c: 1, d: [1]}}}");
     BSONObjBuilder bob;
     InternalSchemaEqMatchExpression e("a"_sd, query.firstElement());

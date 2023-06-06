@@ -779,7 +779,6 @@ std::string applyHmacForTest(StringData s) {
 
 TEST_F(ProjectionASTTest, TestASTRedaction) {
     SerializationOptions options;
-    options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.transformIdentifiers = true;
     options.transformIdentifiersCallback = applyHmacForTest;

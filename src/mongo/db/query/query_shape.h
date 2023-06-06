@@ -37,9 +37,6 @@
 namespace mongo::query_shape {
 
 using QueryShapeHash = SHA256Block;
-
-constexpr StringData kLiteralArgString = "?"_sd;
-
 /**
  * Computes a BSONObj that is meant to be used to classify queries according to their shape, for the
  * purposes of collecting queryStats.

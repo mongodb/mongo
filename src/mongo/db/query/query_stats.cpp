@@ -259,8 +259,6 @@ std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
     return hashed.toString();
 }
 
-static const StringData replacementForLiteralArgs = "?"_sd;
-
 std::size_t hash(const BSONObj& obj) {
     return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
 }

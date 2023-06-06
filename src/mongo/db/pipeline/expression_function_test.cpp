@@ -46,11 +46,8 @@ std::string applyHmacForTest(StringData s) {
 
 
 TEST(ExpressionFunction, SerializeAndRedactArgs) {
-
     SerializationOptions options;
-    std::string replacementChar = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementChar;
     options.transformIdentifiers = true;
     options.transformIdentifiersCallback = applyHmacForTest;
 

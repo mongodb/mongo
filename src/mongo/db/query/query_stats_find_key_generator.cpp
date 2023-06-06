@@ -78,8 +78,6 @@ BSONObj FindKeyGenerator::generate(
         ? SerializationOptions(*hmacPolicy, LiteralSerializationPolicy::kToDebugTypeString)
         : SerializationOptions(LiteralSerializationPolicy::kToDebugTypeString);
 
-    opts.replacementForLiteralArgs = "?";
-
     return generateWithQueryShape(query_shape::extractQueryShape(*parsedRequest, opts, expCtx),
                                   opts);
 }
