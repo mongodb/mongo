@@ -60,6 +60,10 @@ public:
     ReshardingOpObserver();
     ~ReshardingOpObserver() override;
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kConfigAndSystem, NamespaceFilter::kConfigAndSystem};
+    }
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
