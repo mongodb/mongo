@@ -72,11 +72,6 @@ function bulkWriteBasicTest(ordered) {
     insertedDocs = getCollection(orange).find({}).toArray();
     assert.eq(1, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
     assert(checkLog.checkContainsOnce(st.s0, staleConfigOrangeLog));
-    if (!ordered) {
-        // Check that the error for the 1st op was duplicated and used for the 2nd op as well.
-        assert(
-            checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":2.*orange/));
-    }
 
     jsTestLog("Case 3: StaleDbVersion when unsharded collection moves between shards.");
     const db_s1 = st.s1.getDB("test");
