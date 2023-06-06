@@ -63,11 +63,16 @@ BSONObj makeNewDocumentForWrite(
     const boost::optional<TimeseriesOptions>& options,
     const boost::optional<const StringData::ComparatorInterface*>& comparator);
 
-std::vector<write_ops::InsertCommandRequest> makeInsertsToNewBuckets(
-    const std::vector<BSONObj>& measurements,
-    const NamespaceString& nss,
-    const TimeseriesOptions& options,
-    const StringData::ComparatorInterface* comparator);
+/**
+ * Returns the document for writing a new bucket with 'measurements'. Generates the id and
+ * calculates the min and max fields while building the document.
+ *
+ * The measurements must already be known to fit in the same bucket. No checks will be done.
+ */
+BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
+                           const NamespaceString& nss,
+                           const TimeseriesOptions& options,
+                           const StringData::ComparatorInterface* comparator);
 
 /**
  * Returns an update request to the bucket when the 'measurements' is non-empty. Otherwise, returns
@@ -190,6 +195,30 @@ void performAtomicWrites(
     const boost::optional<stdx::variant<write_ops::UpdateCommandRequest,
                                         write_ops::DeleteCommandRequest>>& modificationOp,
     const std::vector<write_ops::InsertCommandRequest>& insertOps,
+    bool fromMigrate,
+    StmtId stmtId);
+
+/**
+ * Constructs the write request with the provided measurements and performs the write atomically for
+ * a time-series user delete on one bucket.
+ */
+void performAtomicWritesForDelete(OperationContext* opCtx,
+                                  const CollectionPtr& coll,
+                                  const RecordId& recordId,
+                                  const std::vector<BSONObj>& unchangedMeasurements,
+                                  bool fromMigrate,
+                                  StmtId stmtId);
+
+/**
+ * Constructs the write requests with the provided measurements and performs the writes atomically
+ * for a time-series user update on one bucket.
+ */
+void performAtomicWritesForUpdate(
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    const RecordId& recordId,
+    const boost::optional<std::vector<BSONObj>>& unchangedMeasurements,
+    const std::vector<BSONObj>& modifiedMeasurements,
     bool fromMigrate,
     StmtId stmtId);
 }  // namespace mongo::timeseries

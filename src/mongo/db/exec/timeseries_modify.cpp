@@ -117,9 +117,8 @@ std::unique_ptr<PlanStageStats> TimeseriesModifyStage::getStats() {
     return ret;
 }
 
-std::pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>>
-TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasurements,
-                                       std::vector<BSONObj>& unchangedMeasurements) {
+std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
+    const std::vector<BSONObj>& matchedMeasurements, std::vector<BSONObj>& unchangedMeasurements) {
     // Determine which documents to update based on which ones are actually being changed.
     std::vector<BSONObj> modifiedMeasurements;
 
@@ -128,7 +127,7 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
         // measurement plus an insert of the modified one.
         mutablebson::Document doc(measurement, mutablebson::Document::kInPlaceDisabled);
 
-        // Note that timeseries measurment _ids are allowed to be changed, so we don't have any
+        // Note that timeseries measurement _ids are allowed to be changed, so we don't have any
         // immutable fields.
         FieldRefSet immutablePaths;
         const bool isInsert = false;
@@ -172,12 +171,7 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
         }
     }
 
-    auto insertOps = timeseries::makeInsertsToNewBuckets(modifiedMeasurements,
-                                                         collection()->ns(),
-                                                         *collection()->getTimeseriesOptions(),
-                                                         collection()->getDefaultCollator());
-    return std::make_pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>>(
-        std::move(modifiedMeasurements), std::move(insertOps));
+    return modifiedMeasurements;
 }
 
 void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
@@ -372,25 +366,24 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         return {false, PlanStage::NEED_TIME};
     }
     _specificStats.nMeasurementsMatched += matchedMeasurements.size();
-
-    std::vector<BSONObj> updatedMeasurements;
-    std::vector<write_ops::InsertCommandRequest> insertOps;
-    if (_params.isUpdate) {
-        std::tie(updatedMeasurements, insertOps) =
-            _buildInsertOps(matchedMeasurements, unchangedMeasurements);
-
-        if (_isUserInitiatedUpdate && !updatedMeasurements.empty()) {
-            tassert(7717800,
-                    "Must have insert ops for updated measurement(s) at this point",
-                    !insertOps.empty() && !insertOps[0].getDocuments().empty());
-            _checkUpdateChangesShardKeyFields(
-                insertOps[0].getDocuments()[0], _bucketUnpacker.bucket(), matchedMeasurements[0]);
-        }
-    }
+    bool isUpdate = _params.isUpdate;
 
     // If this is a delete, we will be deleting all matched measurements. If this is an update, we
     // may not need to modify all measurements, since some may be no-op updates.
-    const auto& modifiedMeasurements = _params.isUpdate ? updatedMeasurements : matchedMeasurements;
+    const auto& modifiedMeasurements =
+        isUpdate ? _applyUpdate(matchedMeasurements, unchangedMeasurements) : matchedMeasurements;
+
+    // Checks for shard key value changes. We will fail the command if it's a multi-update, so only
+    // performing the check needed for a single-update.
+    if (isUpdate && _isUserInitiatedUpdate && !modifiedMeasurements.empty()) {
+        _checkUpdateChangesShardKeyFields(
+            timeseries::makeBucketDocument({modifiedMeasurements[0]},
+                                           collection()->ns(),
+                                           *collection()->getTimeseriesOptions(),
+                                           collection()->getDefaultCollator()),
+            _bucketUnpacker.bucket(),
+            matchedMeasurements[0]);
+    }
 
     ScopeGuard setMeasurementToReturnGuard([&] {
         // If asked to return the old or new measurement and the write was successful, we should
@@ -398,12 +391,12 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         if (_params.returnOld) {
             _measurementToReturn = std::move(matchedMeasurements[0]);
         } else if (_params.returnNew) {
-            if (updatedMeasurements.empty()) {
+            if (modifiedMeasurements.empty()) {
                 // If we are returning the new measurement, then we must have modified at least one
                 // measurement. If we did not, then we should return the old measurement instead.
                 _measurementToReturn = std::move(matchedMeasurements[0]);
             } else {
-                _measurementToReturn = std::move(updatedMeasurements[0]);
+                _measurementToReturn = std::move(modifiedMeasurements[0]);
             }
         }
     });
@@ -434,22 +427,27 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         });
 
     auto recordId = _ws->get(bucketWsmId)->recordId;
-
-    OID bucketId = record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID();
-    auto modificationOp =
-        timeseries::makeModificationOp(bucketId, collection(), unchangedMeasurements);
     try {
         const auto modificationRet = handlePlanStageYield(
             expCtx(),
-            "TimeseriesModifyStage modifyBucket",
+            "TimeseriesModifyStage writeToBuckets",
             [&] {
-                timeseries::performAtomicWrites(opCtx(),
-                                                collection(),
-                                                recordId,
-                                                modificationOp,
-                                                insertOps,
-                                                bucketFromMigrate,
-                                                _params.stmtId);
+                if (isUpdate) {
+                    timeseries::performAtomicWritesForUpdate(opCtx(),
+                                                             collection(),
+                                                             recordId,
+                                                             unchangedMeasurements,
+                                                             modifiedMeasurements,
+                                                             bucketFromMigrate,
+                                                             _params.stmtId);
+                } else {
+                    timeseries::performAtomicWritesForDelete(opCtx(),
+                                                             collection(),
+                                                             recordId,
+                                                             unchangedMeasurements,
+                                                             bucketFromMigrate,
+                                                             _params.stmtId);
+                }
                 return PlanStage::NEED_TIME;
             },
             [&] {

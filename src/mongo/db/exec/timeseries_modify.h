@@ -176,11 +176,10 @@ private:
     }
 
     /**
-     * Builds insert requests based on the measurements needing to be updated.
+     * Applies update and returns the updated measurements.
      */
-    std::pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>> _buildInsertOps(
-        const std::vector<BSONObj>& matchedMeasurements,
-        std::vector<BSONObj>& unchangedMeasurements);
+    std::vector<BSONObj> _applyUpdate(const std::vector<BSONObj>& matchedMeasurements,
+                                      std::vector<BSONObj>& unchangedMeasurements);
 
     /**
      * Writes the modifications to a bucket.

@@ -57,7 +57,6 @@ public:
 
 private:
     BSONObj _produceNewDocumentForInsert();
-    void _performInsert(BSONObj newDocument);
 
     // The original update request.
     const UpdateRequest& _request;

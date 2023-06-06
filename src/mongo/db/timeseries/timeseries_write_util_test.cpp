@@ -510,5 +510,148 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
     }
 }
 
+TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "PerformAtomicWritesForUserDelete");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    // Inserts a bucket document.
+    const BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    OID bucketId = bucketDoc["_id"].OID();
+    auto recordId = record_id_helpers::keyForOID(bucketId);
+
+    AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wunit{opCtx};
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        wunit.commit();
+    }
+
+    // Deletes two measurements from the bucket.
+    {
+        ASSERT_DOES_NOT_THROW(performAtomicWritesForDelete(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId,
+            {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})")},
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId));
+    }
+
+    // Checks only one measurement is left in the bucket.
+    {
+        const BSONObj replaceDoc = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":2,"b":2},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":2},
+                    "b":{"0":2}}})");
+        Snapshotted<BSONObj> doc;
+        bool found = bucketsColl->findDoc(opCtx, recordId, &doc);
+
+        ASSERT_TRUE(found);
+        UnorderedFieldsBSONObjComparator comparator;
+        ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+    }
+
+    // Deletes the last measurement from the bucket.
+    {
+        ASSERT_DOES_NOT_THROW(performAtomicWritesForDelete(opCtx,
+                                                           bucketsColl.getCollection(),
+                                                           recordId,
+                                                           {},
+                                                           /*fromMigrate=*/false,
+                                                           /*stmtId=*/kUninitializedStmtId));
+    }
+
+    // Checks the document is removed.
+    {
+        Snapshotted<BSONObj> doc;
+        bool found = bucketsColl->findDoc(opCtx, recordId, &doc);
+        ASSERT_FALSE(found);
+    }
+}
+
+TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "PerformAtomicWritesForUserUpdate");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    // Inserts a bucket document.
+    const BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    OID bucketId = bucketDoc["_id"].OID();
+    auto recordId = record_id_helpers::keyForOID(bucketId);
+
+    AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wunit{opCtx};
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        wunit.commit();
+    }
+
+    // Updates two measurements from the bucket.
+    {
+        std::vector<BSONObj> unchangedMeasurements{
+            ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})")};
+        ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId,
+            unchangedMeasurements,
+            {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":10,"b":10})"),
+             ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":30,"b":30})")},
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId));
+    }
+
+    // Checks only one measurement is left in the original bucket and a new document was inserted.
+    {
+        const BSONObj replaceDoc = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":2,"b":2},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":2},
+                    "b":{"0":2}}})");
+        Snapshotted<BSONObj> doc;
+        bool found = bucketsColl->findDoc(opCtx, recordId, &doc);
+
+        ASSERT_TRUE(found);
+        UnorderedFieldsBSONObjComparator comparator;
+        ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+
+        ASSERT_EQ(2, bucketsColl->numRecords(opCtx));
+    }
+}
+
 }  // namespace
 }  // namespace mongo::timeseries

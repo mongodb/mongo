@@ -88,7 +88,15 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
 
     // If this is an explain, skip performing the actual insert.
     if (!_params.isExplain) {
-        _performInsert(_specificStats.objInserted);
+        writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
+            timeseries::performAtomicWritesForUpdate(opCtx(),
+                                                     collection(),
+                                                     RecordId{},
+                                                     boost::none,
+                                                     {_specificStats.objInserted},
+                                                     _params.fromMigrate,
+                                                     _params.stmtId);
+        });
     }
 
     // We should always be EOF at this point.
@@ -103,23 +111,6 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
     _measurementToReturn = _specificStats.objInserted;
     _prepareToReturnMeasurement(*out);
     return PlanStage::ADVANCED;
-}
-
-void TimeseriesUpsertStage::_performInsert(BSONObj newDocument) {
-    auto insertOp = timeseries::makeInsertsToNewBuckets({newDocument},
-                                                        collection()->ns(),
-                                                        *collection()->getTimeseriesOptions(),
-                                                        collection()->getDefaultCollator());
-
-    writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
-        timeseries::performAtomicWrites(opCtx(),
-                                        collection(),
-                                        RecordId{},
-                                        boost::none,
-                                        insertOp,
-                                        _params.fromMigrate,
-                                        _params.stmtId);
-    });
 }
 
 BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
