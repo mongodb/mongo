@@ -74,8 +74,6 @@ public:
         return Status(ErrorCodes::UnknownError, "unknown");
     };
 
-    void setCommitted(bool) {}
-
     bool isInitialized() const final {
         return true;
     };

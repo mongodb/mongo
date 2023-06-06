@@ -350,10 +350,7 @@ std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
 }
 
 std::shared_ptr<Collection> CollectionImpl::clone() const {
-    auto cloned = std::make_shared<CollectionImpl>(*this);
-    // We are per definition committed if we get cloned
-    cloned->_cachedCommitted = true;
-    return cloned;
+    return std::make_shared<CollectionImpl>(*this);
 }
 
 SharedCollectionDecorations* CollectionImpl::getSharedDecorations() const {
@@ -396,9 +393,6 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
                                         const std::shared_ptr<const Collection>& collection,
                                         const DurableCatalogEntry& catalogEntry,
                                         boost::optional<Timestamp> readTimestamp) {
-    // We are per definition committed if we initialize from an existing collection.
-    _cachedCommitted = true;
-
     if (collection) {
         // Use the shared state from the existing collection.
         LOGV2_DEBUG(
@@ -501,22 +495,6 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
 
 bool CollectionImpl::isInitialized() const {
     return _initialized;
-}
-
-bool CollectionImpl::isCommitted() const {
-    return _cachedCommitted || _shared->_committed.load();
-}
-
-void CollectionImpl::setCommitted(bool val) {
-    bool previous = isCommitted();
-    invariant((!previous && val) || (previous && !val));
-    _shared->_committed.store(val);
-
-    // Going from false->true need to be synchronized by an atomic. Leave this as false and read
-    // from the atomic in the shared state that will be flipped to true at first clone.
-    if (!val) {
-        _cachedCommitted = val;
-    }
 }
 
 bool CollectionImpl::requiresIdIndex() const {
