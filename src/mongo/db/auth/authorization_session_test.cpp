@@ -1580,7 +1580,7 @@ TEST_F(SystemBucketsTest, CheckAnySystemBuckets) {
 TEST_F(SystemBucketsTest, CheckAnySystemBucketsInDatabase) {
     // If we have a system_buckets in a db priv
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBucketsInDatabase("sb_db_test"), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find));
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
                                                                 ActionType::insert));

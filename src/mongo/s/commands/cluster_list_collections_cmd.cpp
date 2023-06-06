@@ -119,8 +119,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // system_buckets DB resource grants all system_buckets.* collections so create a filter to
     // include them
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forAnySystemBucketsInDatabase(
-                DatabaseNameUtil::serializeForAuth(dbName))) ||
+            ResourcePattern::forAnySystemBucketsInDatabase(dbName)) ||
         authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnySystemBuckets())) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^system\\.buckets\\."))));
