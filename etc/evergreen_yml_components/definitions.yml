@@ -7187,8 +7187,8 @@ tasks:
       content_type: ${content_type|application/gzip}
       display_name: Source tarball
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/windows.
-      build_variants: [rhel70, windows]
+      # because it should be the same everywhere, so just use rhel80/windows.
+      build_variants: [rhel80, windows]
   - command: s3.put
     params:
       optional: true

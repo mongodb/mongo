@@ -20,6 +20,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import git
 import SCons
 import os
 import os.path as ospath
@@ -192,11 +193,32 @@ def distsrc_action_generator(source, target, env, for_signature):
         print("Invalid file format for distsrc. Must be tar or zip file")
         env.Exit(1)
 
-    git_cmd = ('"%s" archive --format %s --output %s --prefix ${MONGO_DIST_SRC_PREFIX} HEAD' %
-               (git_path, target_ext, target[0]))
+    def create_archive(target=None, source=None, env=None):
+        try:
+            git_repo = git.Repo(os.getcwd())
+            # get the original HEAD position of repo
+            head_commit_sha = git_repo.head.object.hexsha
+
+            # add and commit the uncommited changes
+            git_repo.git.add(all=True)
+            # only commit changes if there are any
+            if len(git_repo.index.diff("HEAD")) != 0:
+                with git_repo.git.custom_environment(GIT_COMMITTER_NAME="Evergreen",
+                                                     GIT_COMMITTER_EMAIL="evergreen@mongodb.com"):
+                    git_repo.git.commit("--author='Evergreen <>'", "-m", "temp commit")
+
+            # archive repo
+            dist_src_prefix = env.get("MONGO_DIST_SRC_PREFIX")
+            git_repo.git.archive("--format", target_ext, "--output", target[0], "--prefix",
+                                 dist_src_prefix, "HEAD")
+
+            # reset branch to original state
+            git_repo.git.reset("--mixed", head_commit_sha)
+        except Exception as e:
+            env.FatalError(f"Error archiving: {e}")
 
     return [
-        SCons.Action.Action(git_cmd, "Running git archive for $TARGET"),
+        SCons.Action.Action(create_archive, "Creating archive for $TARGET"),
         SCons.Action.Action(
             run_distsrc_callbacks,
             "Running distsrc callbacks for $TARGET",

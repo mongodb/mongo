@@ -28,6 +28,7 @@
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 import errno
+import git
 from glob import glob
 import os
 import re
@@ -251,12 +252,33 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
         print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
+        git_repo = git.Repo(srcdir)
+        # get the original HEAD position of repo
+        head_commit_sha = git_repo.head.object.hexsha
+
+        # add and commit the uncommited changes
+        print("Commiting uncommited changes")
+        git_repo.git.add(all=True)
+        # only commit changes if there are any
+        if len(git_repo.index.diff("HEAD")) != 0:
+            with git_repo.git.custom_environment(GIT_COMMITTER_NAME="Evergreen",
+                                                 GIT_COMMITTER_EMAIL="evergreen@mongodb.com"):
+                git_repo.git.commit("--author='Evergreen <>'", "-m", "temp commit")
+
+        # original command to preserve functionality
+        # FIXME: make consistent with the rest of the code when we have more packaging testing
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
+        print("Copying packaging files from specified gitspec:", spec.metadata_gitspec())
         packager.sysassert([
             "sh", "-c",
             "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" %
             (srcdir, spec.metadata_gitspec(), pkgdir, sdir)
         ])
+
+        # reset branch to original state
+        print("Resetting branch to original state")
+        git_repo.git.reset("--mixed", head_commit_sha)
+
     # Splat the binaries under sdir.  The "build" stages of the
     # packaging infrastructure will move the files to wherever they
     # need to go.
