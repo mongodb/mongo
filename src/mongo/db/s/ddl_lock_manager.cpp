@@ -31,6 +31,7 @@
 #include "mongo/db/s/ddl_lock_manager.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -57,11 +58,22 @@ DDLLockManager* DDLLockManager::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-DDLLockManager::ScopedLock DDLLockManager::lock(OperationContext* opCtx,
-                                                StringData ns,
-                                                StringData reason,
-                                                Milliseconds timeout,
-                                                bool waitForRecovery) {
+void DDLLockManager::setState(const State& state) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    _state = state;
+    _stateCV.notify_all();
+}
+
+void DDLLockManager::_lock(OperationContext* opCtx,
+                           StringData ns,
+                           const ResourceId& resId,
+                           StringData reason,
+                           LockMode mode,
+                           Milliseconds timeout,
+                           bool waitForRecovery) {
+    // TODO SERVER-77421 remove invariant
+    invariant(mode == MODE_X, "DDL lock modes other than exclusive are not supported yet");
+
     stdx::unique_lock<Latch> lock(_mutex);
 
     // Wait for primary and DDL recovered state
@@ -107,42 +119,108 @@ DDLLockManager::ScopedLock DDLLockManager::lock(OperationContext* opCtx,
     }
 
     LOGV2(6855301, "Acquired DDL lock", "resource"_attr = ns, "reason"_attr = reason);
-    return {ns, reason, this};
+
+    // TODO SERVER-77421 Use resId variable or remove it
+    (void)resId;
 }
 
-DDLLockManager::ScopedLock::ScopedLock(StringData ns,
-                                       StringData reason,
-                                       DDLLockManager* lockManager)
-    : _ns(ns.toString()), _reason(reason.toString()), _lockManager(lockManager) {}
+void DDLLockManager::_unlock(StringData ns, const ResourceId& resId, StringData reason) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    auto iter = _inProgressMap.find(ns);
 
-DDLLockManager::ScopedLock::ScopedLock(ScopedLock&& other)
-    : _ns(std::move(other._ns)),
-      _reason(std::move(other._reason)),
-      _lockManager(other._lockManager) {
-    other._lockManager = nullptr;
+    iter->second->numWaiting--;
+    iter->second->reason.clear();
+    iter->second->isInProgress = false;
+    iter->second->cvLocked.notify_one();
+
+    if (iter->second->numWaiting == 0) {
+        _inProgressMap.erase(ns);
+    }
+    LOGV2(6855302, "Released DDL lock", "resource"_attr = ns, "reason"_attr = reason);
+
+    // TODO SERVER-77421 Use resId variable or remove it
+    (void)resId;
 }
 
-DDLLockManager::ScopedLock::~ScopedLock() {
+DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* opCtx,
+                                                             const DatabaseName& db,
+                                                             StringData reason,
+                                                             LockMode mode,
+                                                             Milliseconds timeout)
+    : DDLLockManager::ScopedBaseDDLLock(
+          opCtx, db, reason, mode, timeout, true /*waitForRecovery*/) {
+
+    // Check under the DDL dbLock if this is still the primary shard for the database
+    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, db);
+}
+
+DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContext* opCtx,
+                                                                 const NamespaceString& ns,
+                                                                 StringData reason,
+                                                                 LockMode mode,
+                                                                 Milliseconds timeout)
+    : DDLLockManager::ScopedBaseDDLLock(
+          opCtx, ns, reason, mode, timeout, true /*waitForRecovery*/) {}
+
+DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
+                                                     StringData resName,
+                                                     const ResourceId& resId,
+                                                     StringData reason,
+                                                     LockMode mode,
+                                                     Milliseconds timeout,
+                                                     bool waitForRecovery)
+    : _resourceName(resName.toString()),
+      _resourceId(resId),
+      _reason(reason.toString()),
+      _mode(mode),
+      _lockManager(DDLLockManager::get(opCtx)) {
+
+    invariant(_lockManager);
+    _lockManager->_lock(
+        opCtx, _resourceName, _resourceId, _reason, _mode, timeout, waitForRecovery);
+}
+
+DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
+                                                     const NamespaceString& ns,
+                                                     StringData reason,
+                                                     LockMode mode,
+                                                     Milliseconds timeout,
+                                                     bool waitForRecovery)
+    : ScopedBaseDDLLock(opCtx,
+                        NamespaceStringUtil::serialize(ns),
+                        ResourceId{RESOURCE_DDL_COLLECTION, NamespaceStringUtil::serialize(ns)},
+                        reason,
+                        mode,
+                        timeout,
+                        waitForRecovery) {}
+
+DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
+                                                     const DatabaseName& db,
+                                                     StringData reason,
+                                                     LockMode mode,
+                                                     Milliseconds timeout,
+                                                     bool waitForRecovery)
+    : ScopedBaseDDLLock(opCtx,
+                        DatabaseNameUtil::serialize(db),
+                        ResourceId{RESOURCE_DDL_DATABASE, DatabaseNameUtil::serialize(db)},
+                        reason,
+                        mode,
+                        timeout,
+                        waitForRecovery) {}
+
+DDLLockManager::ScopedBaseDDLLock::~ScopedBaseDDLLock() {
     if (_lockManager) {
-        stdx::unique_lock<Latch> lock(_lockManager->_mutex);
-        auto iter = _lockManager->_inProgressMap.find(_ns);
-
-        iter->second->numWaiting--;
-        iter->second->reason.clear();
-        iter->second->isInProgress = false;
-        iter->second->cvLocked.notify_one();
-
-        if (iter->second->numWaiting == 0) {
-            _lockManager->_inProgressMap.erase(_ns);
-        }
-        LOGV2(6855302, "Released DDL lock", "resource"_attr = _ns, "reason"_attr = _reason);
+        _lockManager->_unlock(_resourceName, _resourceId, _reason);
     }
 }
 
-void DDLLockManager::setState(const State& state) {
-    stdx::unique_lock<Latch> lock(_mutex);
-    _state = state;
-    _stateCV.notify_all();
+DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(ScopedBaseDDLLock&& other)
+    : _resourceName(std::move(other._resourceName)),
+      _resourceId(std::move(other._resourceId)),
+      _reason(std::move(other._reason)),
+      _mode(std::move(other._mode)),
+      _lockManager(other._lockManager) {
+    other._lockManager = nullptr;
 }
 
 }  // namespace mongo

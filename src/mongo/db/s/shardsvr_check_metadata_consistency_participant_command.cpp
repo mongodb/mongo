@@ -120,7 +120,6 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
     }();
 
     static constexpr StringData kLockReason{"checkMetadataConsistency::indexCheck"_sd};
-    auto ddlLockManager = DDLLockManager::get(opCtx);
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     std::vector<MetadataInconsistencyItem> indexIncons;
@@ -128,10 +127,8 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
         const auto& nss = coll.getNss();
 
         // Serialize with concurrent DDL operations that modify indexes
-        const auto collectionDDLLock = ddlLockManager->lock(opCtx,
-                                                            NamespaceStringUtil::serialize(nss),
-                                                            kLockReason,
-                                                            DDLLockManager::kDefaultLockTimeout);
+        const DDLLockManager::ScopedCollectionDDLLock collectionDDLLock{
+            opCtx, nss, kLockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
         AggregateCommandRequest aggRequest{nss, rawPipelineStages};
 

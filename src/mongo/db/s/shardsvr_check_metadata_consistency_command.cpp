@@ -31,7 +31,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -197,11 +196,8 @@ public:
 
             // Take a DDL lock on the database
             static constexpr StringData kLockReason{"checkMetadataConsistency"_sd};
-            auto ddlLockManager = DDLLockManager::get(opCtx);
-            const auto dbDDLLock = ddlLockManager->lock(
-                opCtx, nss.db(), kLockReason, DDLLockManager::kDefaultLockTimeout);
-
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
+            const DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                opCtx, nss.dbName(), kLockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
             return establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),

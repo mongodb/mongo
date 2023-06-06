@@ -63,6 +63,52 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 }  // namespace
 
+template <typename T>
+ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const T& resource,
+    LockMode lockMode) {
+    return AsyncTry([this, resource, lockMode] {
+               auto opCtxHolder = cc().makeOperationContext();
+               auto* opCtx = opCtxHolder.get();
+
+               const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
+
+               const auto lockTimeOut = [&]() -> Milliseconds {
+                   if (auto sfp = overrideDDLLockTimeout.scoped(); MONGO_unlikely(sfp.isActive())) {
+                       if (auto timeoutElem = sfp.getData()["timeoutMillisecs"]; timeoutElem.ok()) {
+                           const auto timeoutMillisecs = Milliseconds(timeoutElem.safeNumberLong());
+                           LOGV2(6320700,
+                                 "Overriding DDL lock timeout",
+                                 "timeout"_attr = timeoutMillisecs);
+                           return timeoutMillisecs;
+                       }
+                   }
+                   return DDLLockManager::kDefaultLockTimeout;
+               }();
+
+               _scopedLocks.emplace(DDLLockManager::ScopedBaseDDLLock{
+                   opCtx, resource, coorName, lockMode, lockTimeOut, false /* waitForRecovery */});
+           })
+        .until([this, resource, lockMode](Status status) {
+            if (!status.isOK()) {
+                LOGV2_WARNING(6819300,
+                              "DDL lock acquisition attempt failed",
+                              "coordinatorId"_attr = _coordId,
+                              "resource"_attr = toStringForLogging(resource),
+                              "mode"_attr = lockMode,
+                              "error"_attr = redact(status));
+            }
+            // Sharding DDL operations are not rollbackable so in case we recovered a coordinator
+            // from disk we need to ensure eventual completion of the DDL operation, so we must
+            // retry until we manage to acquire the lock.
+            return (!_recoveredFromDisk) || status.isOK();
+        })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token);
+}
+
 ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONObj& coorDoc) {
     return ShardingDDLCoordinatorMetadata::parse(IDLParserContext("ShardingDDLCoordinatorMetadata"),
                                                  coorDoc);
@@ -201,10 +247,11 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireAllLocksAsync(
         if (lastDb != lockNss.dbName()) {
             // Acquiring the database DDL lock
             const auto& dbName = lockNss.dbName();
-            futureChain = std::move(futureChain)
-                              .then([this, executor, token, dbName, anchor = shared_from_this()] {
-                                  return _acquireLockAsync(executor, token, dbName.db());
-                              });
+            futureChain =
+                std::move(futureChain)
+                    .then([this, executor, token, dbName, anchor = shared_from_this()] {
+                        return _acquireLockAsync<DatabaseName>(executor, token, dbName, MODE_X);
+                    });
             lastDb = dbName;
         }
 
@@ -213,56 +260,13 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireAllLocksAsync(
             futureChain =
                 std::move(futureChain)
                     .then([this, executor, token, nss = lockNss, anchor = shared_from_this()] {
-                        return _acquireLockAsync(executor, token, nss.ns());
+                        return _acquireLockAsync<NamespaceString>(executor, token, nss, MODE_X);
                     });
         }
     }
     return futureChain;
 }
 
-ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token,
-    StringData resource) {
-    return AsyncTry([this, resource = resource.toString()] {
-               auto opCtxHolder = cc().makeOperationContext();
-               auto* opCtx = opCtxHolder.get();
-               auto ddlLockManager = DDLLockManager::get(opCtx);
-
-               const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
-
-               const auto lockTimeOut = [&]() -> Milliseconds {
-                   if (auto sfp = overrideDDLLockTimeout.scoped(); MONGO_unlikely(sfp.isActive())) {
-                       if (auto timeoutElem = sfp.getData()["timeoutMillisecs"]; timeoutElem.ok()) {
-                           const auto timeoutMillisecs = Milliseconds(timeoutElem.safeNumberLong());
-                           LOGV2(6320700,
-                                 "Overriding DDL lock timeout",
-                                 "timeout"_attr = timeoutMillisecs);
-                           return timeoutMillisecs;
-                       }
-                   }
-                   return DDLLockManager::kDefaultLockTimeout;
-               }();
-
-               _scopedLocks.emplace(ddlLockManager->lock(
-                   opCtx, resource, coorName, lockTimeOut, false /* waitForRecovery */));
-           })
-        .until([this, resource = resource.toString()](Status status) {
-            if (!status.isOK()) {
-                LOGV2_WARNING(6819300,
-                              "DDL lock acquisition attempt failed",
-                              "coordinatorId"_attr = _coordId,
-                              "resource"_attr = resource,
-                              "error"_attr = redact(status));
-            }
-            // Sharding DDL operations are not rollbackable so in case we recovered a coordinator
-            // from disk we need to ensure eventual completion of the DDL operation, so we must
-            // retry until we manage to acquire the lock.
-            return (!_recoveredFromDisk) || status.isOK();
-        })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, token);
-}
 
 ExecutorFuture<void> ShardingDDLCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -347,8 +351,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             if (const auto bucketNss = metadata().getBucketNss()) {
-                return _acquireLockAsync(
-                    executor, token, NamespaceStringUtil::serialize(bucketNss.value()));
+                return _acquireLockAsync<NamespaceString>(
+                    executor, token, bucketNss.value(), MODE_X);
             }
             return ExecutorFuture<void>(**executor);
         })

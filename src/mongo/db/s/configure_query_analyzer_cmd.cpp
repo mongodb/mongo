@@ -35,7 +35,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
@@ -67,24 +66,20 @@ public:
 
     ScopedDDLLock(OperationContext* opCtx, const NamespaceString& nss) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            auto ddlLockManager = DDLLockManager::get(opCtx);
-            auto dbDDLLock = ddlLockManager->lock(
-                opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
+            // TODO SERVER-77546 remove db lock once it's automatically acquired by the
+            // ScopedCollectionDDLLock
+            const DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                opCtx, nss.dbName(), lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
-            // Check under the db lock if this is still the primary shard for the database.
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
-
-            _collDDLLock.emplace(ddlLockManager->lock(opCtx,
-                                                      NamespaceStringUtil::serialize(nss),
-                                                      lockReason,
-                                                      DDLLockManager::kDefaultLockTimeout));
+            _collDDLLock.emplace(
+                opCtx, nss, lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout);
         } else {
             _autoColl.emplace(opCtx, nss, MODE_IX);
         }
     }
 
 private:
-    boost::optional<DDLLockManager::ScopedLock> _collDDLLock;
+    boost::optional<DDLLockManager::ScopedCollectionDDLLock> _collDDLLock;
     boost::optional<AutoGetCollection> _autoColl;
 };
 

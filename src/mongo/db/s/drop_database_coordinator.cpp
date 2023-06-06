@@ -204,8 +204,8 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     // Acquire the collection distributed lock in order to synchronize with an eventual ongoing
     // moveChunk and to prevent new ones from happening.
     const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
-    auto collDDLLock = DDLLockManager::get(opCtx)->lock(
-        opCtx, NamespaceStringUtil::serialize(nss), coorName, DDLLockManager::kDefaultLockTimeout);
+    const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
+        opCtx, nss, coorName, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
     if (!_isPre70Compatible()) {
         ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);

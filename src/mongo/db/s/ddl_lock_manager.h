@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -40,6 +41,56 @@ namespace mongo {
  * Service to manage DDL locks.
  */
 class DDLLockManager {
+
+    /**
+     * ScopedBaseDDLLock will hold a DDL lock for the given resource without performing any check.
+     */
+    class ScopedBaseDDLLock {
+        ScopedBaseDDLLock(const ScopedBaseDDLLock&) = delete;
+        ScopedBaseDDLLock& operator=(const ScopedBaseDDLLock&) = delete;
+
+        ScopedBaseDDLLock(OperationContext* opCtx,
+                          StringData resName,
+                          const ResourceId& resId,
+                          StringData reason,
+                          LockMode mode,
+                          Milliseconds timeout,
+                          bool waitForRecovery);
+
+    public:
+        ScopedBaseDDLLock(OperationContext* opCtx,
+                          const NamespaceString& ns,
+                          StringData reason,
+                          LockMode mode,
+                          Milliseconds timeout,
+                          bool waitForRecovery);
+
+        ScopedBaseDDLLock(OperationContext* opCtx,
+                          const DatabaseName& db,
+                          StringData reason,
+                          LockMode mode,
+                          Milliseconds timeout,
+                          bool waitForRecovery);
+
+        virtual ~ScopedBaseDDLLock();
+
+        ScopedBaseDDLLock(ScopedBaseDDLLock&& other);
+
+        StringData getResourceName() const {
+            return _resourceName;
+        }
+        StringData getReason() const {
+            return _reason;
+        }
+
+    protected:
+        const std::string _resourceName;
+        const ResourceId _resourceId;
+        const std::string _reason;
+        const LockMode _mode;
+        DDLLockManager* _lockManager;
+    };
+
 public:
     // Default timeout which will be used if one is not passed to the lock method.
     static const Minutes kDefaultLockTimeout;
@@ -48,30 +99,64 @@ public:
     // should be made to wait for it to become free.
     static const Milliseconds kSingleLockAttemptTimeout;
 
-    /**
-     * RAII type for the DDL lock.
-     */
-    class ScopedLock {
-        ScopedLock(const ScopedLock&) = delete;
-        ScopedLock& operator=(const ScopedLock&) = delete;
-
+    // RAII-style class to acquire a DDL lock on the given database
+    class ScopedDatabaseDDLLock : public ScopedBaseDDLLock {
     public:
-        ScopedLock(StringData lockName, StringData reason, DDLLockManager* lockManager);
-        ~ScopedLock();
+        /**
+         * Constructs a ScopedDatabaseDDLLock object
+         *
+         * @db      Database to lock.
+         * @reason 	Reason for which the lock is being acquired (e.g. 'createCollection').
+         * @mode    Lock mode.
+         * @timeout Time after which this acquisition attempt will give up in case of lock
+         * contention. A timeout value of -1 means the acquisition will be retried forever.
+         *
+         * Throws:
+         *     ErrorCodes::LockBusy in case the timeout is reached.
+         *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout
+         *         is reached
+         *     ErrorCategory::Interruption in case the operation context is interrupted.
+         *     ErrorCodes::IllegalOperation in case of not being on the db primary shard
+         *
+         * Note that object can only be instantiated from the replica set primary node of the
+         * db primary shard. It's caller's responsability to release the acquired locks on
+         * step-downs
+         */
+        ScopedDatabaseDDLLock(OperationContext* opCtx,
+                              const DatabaseName& db,
+                              StringData reason,
+                              LockMode mode,
+                              Milliseconds timeout = kDefaultLockTimeout);
+    };
 
-        ScopedLock(ScopedLock&& other);
-
-        StringData getNs() {
-            return _ns;
-        }
-        StringData getReason() {
-            return _reason;
-        }
-
-    private:
-        std::string _ns;
-        std::string _reason;
-        DDLLockManager* _lockManager;
+    // RAII-style class to acquire a DDL lock on the given collection
+    class ScopedCollectionDDLLock : public ScopedBaseDDLLock {
+    public:
+        /**
+         * Constructs a ScopedCollectionDDLLock object
+         *
+         * @ns      Collection to lock.
+         * @reason 	Reason for which the lock is being acquired (e.g. 'createCollection').
+         * @mode    Lock mode.
+         * @timeout Time after which this acquisition attempt will give up in case of lock
+         * contention. A timeout value of -1 means the acquisition will be retried forever.
+         *
+         * Throws:
+         *     ErrorCodes::LockBusy in case the timeout is reached.
+         *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout
+         *         is reached
+         *     ErrorCategory::Interruption in case the operation context is interrupted.
+         *     ErrorCodes::IllegalOperation in case of not being on the db primary shard
+         *
+         * Note that object can only be instantiated from the replica set primary node of the
+         * db primary shard. It's caller's responsability to release the acquired locks on
+         * step-downs
+         */
+        ScopedCollectionDDLLock(OperationContext* opCtx,
+                                const NamespaceString& ns,
+                                StringData reason,
+                                LockMode mode,
+                                Milliseconds timeout = kDefaultLockTimeout);
     };
 
     DDLLockManager() = default;
@@ -82,29 +167,6 @@ public:
      */
     static DDLLockManager* get(ServiceContext* service);
     static DDLLockManager* get(OperationContext* opCtx);
-
-    /**
-     * Returns a RAII style lock on the given namespace @ns.
-     *
-     * @ns		Namespace to lock (both database and collections).
-     * @reason 	Reson for which the lock is being acquired (e.g. 'createCollection').
-     * @timeout Time after which this acquisition attempt will give up in case of lock contention.
-     * 			A timeout value of -1 means the acquisition will be retried forever.
-     *
-     * Throws ErrorCodes::LockBusy in case the timeout is reached.
-     * Throws ErrorCategory::Interruption in case the opeartion context is interrupted.
-     * Throws ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout is
-     * reached (except if the caller is a DDL coordinator)
-     *
-     * Note that `lock` can only be called from a replica set primary node, however, the caller has
-     * the responsibility to release the acquired locks on step-downs
-     */
-    ScopedLock lock(OperationContext* opCtx,
-                    StringData ns,
-                    StringData reason,
-                    Milliseconds timeout) {
-        return lock(opCtx, ns, reason, timeout, true /*waitForRecovery*/);
-    }
 
 protected:
     struct NSLock {
@@ -139,15 +201,20 @@ protected:
 
     void setState(const State& state);
 
-    ScopedLock lock(OperationContext* opCtx,
-                    StringData ns,
-                    StringData reason,
-                    Milliseconds timeout,
-                    bool waitForRecovery);
+    void _lock(OperationContext* opCtx,
+               StringData ns,
+               const ResourceId& resId,
+               StringData reason,
+               LockMode mode,
+               Milliseconds timeout,
+               bool waitForRecovery);
 
-    friend class ShardingDDLCoordinator;
+    void _unlock(StringData ns, const ResourceId& resId, StringData reason);
+
     friend class ShardingDDLCoordinatorService;
+    friend class ShardingDDLCoordinator;
     friend class ShardingDDLCoordinatorServiceTest;
+    friend class ShardingCatalogManager;
 };
 
 }  // namespace mongo

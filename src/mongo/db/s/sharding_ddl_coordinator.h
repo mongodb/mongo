@@ -179,9 +179,12 @@ private:
         std::shared_ptr<executor::ScopedTaskExecutor> executor,
         const CancellationToken& token);
 
+    template <typename T>
     ExecutorFuture<void> _acquireLockAsync(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                            const CancellationToken& token,
-                                           StringData resource);
+                                           const T& resource,
+                                           LockMode lockMode);
+
     ExecutorFuture<void> _translateTimeseriesNss(
         std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
 
@@ -191,7 +194,7 @@ private:
     SharedPromise<void> _constructionCompletionPromise;
     SharedPromise<void> _completionPromise;
 
-    std::stack<DDLLockManager::ScopedLock> _scopedLocks;
+    std::stack<DDLLockManager::ScopedBaseDDLLock> _scopedLocks;
 };
 
 template <class StateDoc>

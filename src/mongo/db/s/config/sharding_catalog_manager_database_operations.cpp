@@ -124,8 +124,6 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
     DBDirectClient client(opCtx);
 
-    boost::optional<DDLLockManager::ScopedLock> dbLock;
-
     // Resolve the shard against the received parameter (which may encode either a shard ID or a
     // connection string).
     if (optPrimaryShard) {
@@ -148,6 +146,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         return filterBuilder.obj();
     }();
 
+    boost::optional<DDLLockManager::ScopedBaseDDLLock> dbLock;
 
     // First perform an optimistic attempt without taking the lock to check if database exists.
     // If the database is not found take the lock and try again.
@@ -164,10 +163,12 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
         // Do another loop, with the db lock held in order to avoid taking the expensive path on
         // concurrent create database operations
-        dbLock.emplace(DDLLockManager::get(opCtx)->lock(opCtx,
-                                                        str::toLower(dbName),
-                                                        "createDatabase" /* reason */,
-                                                        DDLLockManager::kDefaultLockTimeout));
+        dbLock.emplace(opCtx,
+                       DatabaseNameUtil::deserialize(boost::none, str::toLower(dbName)),
+                       "createDatabase" /* reason */,
+                       MODE_X,
+                       DDLLockManager::kDefaultLockTimeout,
+                       true /*waitForRecovery*/);
     }
 
     // Expensive createDatabase code path

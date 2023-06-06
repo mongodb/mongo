@@ -87,20 +87,19 @@ public:
              * - Check safely if the target collection is sharded or not.
              */
             static constexpr StringData lockReason{"internalRenameCollection"_sd};
-            auto ddlLockManager = DDLLockManager::get(opCtx);
-            auto fromCollDDLLock = ddlLockManager->lock(
-                opCtx, fromNss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout);
+            const DDLLockManager::ScopedCollectionDDLLock fromCollDDLLock{
+                opCtx, fromNss, lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
             // If we are renaming a buckets collection in the $out stage, we must acquire a lock on
             // the view namespace, instead of the buckets namespace. This lock avoids concurrent
             // modifications, since users run operations on the view and not the buckets namespace
             // and all time-series DDL operations take a lock on the view namespace.
-            auto toCollDDLLock = ddlLockManager->lock(opCtx,
-                                                      fromNss.isOutTmpBucketsCollection()
-                                                          ? toNss.getTimeseriesViewNamespace().ns()
-                                                          : toNss.ns(),
-                                                      lockReason,
-                                                      DDLLockManager::kDefaultLockTimeout);
+            const DDLLockManager::ScopedCollectionDDLLock toCollDDLLock{
+                opCtx,
+                fromNss.isOutTmpBucketsCollection() ? toNss.getTimeseriesViewNamespace() : toNss,
+                lockReason,
+                MODE_X,
+                DDLLockManager::kDefaultLockTimeout};
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "cannot rename to sharded collection '"
