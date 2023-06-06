@@ -7,19 +7,22 @@ import time
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.run import compare_start_time
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
+from buildscripts.resmokelib.symbolizer import Symbolizer
 
 _DEBUG_FILE_BASE_NAMES = ['mongo', 'mongod', 'mongos']
 
 
-def download_debug_symbols(root_logger, symbolizer):
+def download_debug_symbols(root_logger, symbolizer: Symbolizer, retry_secs: int = 10,
+                           download_timeout_secs: int = 10 * 60):
     """
     Extract debug symbols. Idempotent.
 
     :param root_logger: logger to use
     :param symbolizer: pre-configured instance of symbolizer for downloading symbols.
+    :param retry_secs: seconds before retrying to download symbols
+    :param download_timeout_secs: timeout in seconds before failing to download
     :return: None
     """
-    retry_secs = 10
 
     # Check if the files are already there. They would be on *SAN builds.
     sym_files = _get_symbol_files()
@@ -32,17 +35,18 @@ def download_debug_symbols(root_logger, symbolizer):
     while True:
         try:
             symbolizer.execute()
+            root_logger.info("Debug symbols successfully downloaded")
             break
         except (tarfile.ReadError, DownloadError):
-            root_logger.info("Debug symbols unavailable after %s secs, retrying in %s secs",
-                             compare_start_time(time.time()), retry_secs)
+            root_logger.warn(
+                "Debug symbols unavailable after %s secs, retrying in %s secs, waiting for a total of %s secs",
+                compare_start_time(time.time()), retry_secs, download_timeout_secs)
         time.sleep(retry_secs)
 
-        ten_min = 10 * 60
-        if compare_start_time(time.time()) > ten_min:
-            root_logger.info(
+        if compare_start_time(time.time()) > download_timeout_secs:
+            root_logger.warn(
                 'Debug-symbols archive-file does not exist after %s secs; '
-                'Hang-Analyzer may not complete successfully.', ten_min)
+                'Hang-Analyzer may not complete successfully.', download_timeout_secs)
             break
 
 
