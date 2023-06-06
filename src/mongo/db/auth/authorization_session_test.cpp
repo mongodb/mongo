@@ -1472,9 +1472,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
 class SystemBucketsTest : public AuthorizationSessionTest {
 protected:
-    static constexpr auto sb_db_test = "sb_db_test"_sd;
-    static constexpr auto sb_db_other = "sb_db_other"_sd;
-    static constexpr auto sb_coll_test = "sb_coll_test"_sd;
+    static const DatabaseName sb_db_test;
+    static const DatabaseName sb_db_other;
 
     static const ResourcePattern testMissingSystemBucketResource;
     static const ResourcePattern otherMissingSystemBucketResource;
@@ -1490,6 +1489,11 @@ protected:
 
     static const ResourcePattern sbCollTestInAnyDB;
 };
+
+const DatabaseName SystemBucketsTest::sb_db_test =
+    DatabaseName::createDatabaseName_forTest(boost::none, "sb_db_test"_sd);
+const DatabaseName SystemBucketsTest::sb_db_other =
+    DatabaseName::createDatabaseName_forTest(boost::none, "sb_db_other"_sd);
 
 const ResourcePattern SystemBucketsTest::testMissingSystemBucketResource(
     ResourcePattern::forExactNamespace(

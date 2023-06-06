@@ -166,27 +166,29 @@ public:
             // and compute total sizes.
             long long totalSize = 0;
             std::vector<ListDatabasesReplyItem> items;
+            const auto& tenantId = cmd.getDbName().tenantId();
             for (const auto& sizeEntry : sizes) {
-                const auto& name = sizeEntry.first;
+                const auto dbname = DatabaseNameUtil::deserialize(tenantId, sizeEntry.first);
                 const long long size = sizeEntry.second;
 
                 // Skip the local database, since all shards have their own independent local
-                if (name == DatabaseName::kLocal.db())
+                if (dbname.db() == DatabaseName::kLocal.db()) {
                     continue;
+                }
 
-                if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(name)) {
+                if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
                     // We don't have listDatabases on the cluser or find on this database.
                     continue;
                 }
 
-                ListDatabasesReplyItem item(name);
+                ListDatabasesReplyItem item(sizeEntry.first);
                 if (!nameOnly) {
                     item.setSizeOnDisk(size);
                     item.setEmpty(size == 1);
-                    item.setShards(dbShardInfo[name]->obj());
+                    item.setShards(dbShardInfo[sizeEntry.first]->obj());
 
                     uassert(ErrorCodes::BadValue,
-                            str::stream() << "Found negative 'sizeOnDisk' in: " << name,
+                            str::stream() << "Found negative 'sizeOnDisk' in: " << dbname,
                             size >= 0);
 
                     totalSize += size;

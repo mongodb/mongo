@@ -255,7 +255,7 @@ public:
 
     // Returns true if the current session possesses a privilege which could apply to the
     // database resource, or a specific or arbitrary resource within the database.
-    virtual bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData dbname) = 0;
+    virtual bool isAuthorizedForAnyActionOnAnyResourceInDB(const DatabaseName&) = 0;
 
     // Returns true if the current session possesses a privilege which applies to the resource.
     virtual bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) = 0;

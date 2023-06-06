@@ -579,7 +579,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListColle
     _contract.addAccessCheck(AccessCheckEnum::kCheckAuthorizedToListCollections);
 
     if (cmd.getAuthorizedCollections() && cmd.getNameOnly() &&
-        AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname.db())) {
+        AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
         return PrivilegeVector();
     }
 
@@ -731,8 +731,10 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     updateUser(std::move(user));
 }
 
-bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringData db) {
+bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(
+    const DatabaseName& dbname) {
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedForAnyActionOnAnyResourceInDB);
+    const auto& tenantId = dbname.tenantId();
 
     if (_externalState->shouldIgnoreAuthChecks()) {
         return true;
@@ -744,25 +746,25 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
 
     const auto& user = _authenticatedUser.value();
     // First lookup any Privileges on this database specifying Database resources
-    if (user->hasActionsForResource(ResourcePattern::forDatabaseName(db))) {
+    if (user->hasActionsForResource(ResourcePattern::forDatabaseName(dbname))) {
         return true;
     }
 
     // Any resource will match any collection in the database
-    if (user->hasActionsForResource(ResourcePattern::forAnyResource())) {
+    if (user->hasActionsForResource(ResourcePattern::forAnyResource(tenantId))) {
         return true;
     }
 
     // Any resource will match any system_buckets collection in the database
-    if (user->hasActionsForResource(ResourcePattern::forAnySystemBuckets()) ||
-        user->hasActionsForResource(ResourcePattern::forAnySystemBucketsInDatabase(db))) {
+    if (user->hasActionsForResource(ResourcePattern::forAnySystemBuckets(tenantId)) ||
+        user->hasActionsForResource(ResourcePattern::forAnySystemBucketsInDatabase(dbname))) {
         return true;
     }
 
     // If the user is authorized for anyNormalResource, then they implicitly have access
     // to most databases.
-    if (db != DatabaseName::kLocal.db() && db != DatabaseName::kConfig.db() &&
-        user->hasActionsForResource(ResourcePattern::forAnyNormalResource())) {
+    if (dbname.db() != DatabaseName::kLocal.db() && dbname.db() != DatabaseName::kConfig.db() &&
+        user->hasActionsForResource(ResourcePattern::forAnyNormalResource(tenantId))) {
         return true;
     }
 
@@ -770,28 +772,29 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
     // iterate all privileges, until we see something that could reside in the target database.
     auto map = user->getPrivileges();
     for (const auto& privilege : map) {
+        const auto& privRsrc = privilege.first;
+
         // If the user has a Collection privilege, then they're authorized for this resource
         // on all databases.
-        if (privilege.first.isCollectionPattern()) {
+        if (privRsrc.isCollectionPattern()) {
             return true;
         }
 
         // User can see system_buckets in any database so we consider them to have permission in
         // this database
-        if (privilege.first.isAnySystemBucketsCollectionInAnyDB()) {
+        if (privRsrc.isAnySystemBucketsCollectionInAnyDB()) {
             return true;
         }
 
         // If the user has an exact namespace privilege on a collection in this database, they
         // have access to a resource in this database.
-        if (privilege.first.isExactNamespacePattern() && privilege.first.databaseToMatch() == db) {
+        if (privRsrc.isExactNamespacePattern() && (privRsrc.dbNameToMatch() == dbname)) {
             return true;
         }
 
         // If the user has an exact namespace privilege on a system.buckets collection in this
         // database, they have access to a resource in this database.
-        if (privilege.first.isExactSystemBucketsCollection() &&
-            privilege.first.databaseToMatch() == db) {
+        if (privRsrc.isExactSystemBucketsCollection() && (privRsrc.dbNameToMatch() == dbname)) {
             return true;
         }
     }

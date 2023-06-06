@@ -92,8 +92,7 @@ int64_t setReplyItems(OperationContext* opCtx,
     int64_t totalSize = 0;
 
     for (const auto& dbName : dbNames) {
-        if (authorizedDatabases &&
-            !as->isAuthorizedForAnyActionOnAnyResourceInDB(DatabaseNameUtil::serialize(dbName))) {
+        if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(dbName)) {
             // We don't have listDatabases on the cluster or find on this database.
             continue;
         }

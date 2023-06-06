@@ -205,7 +205,7 @@ public:
         return Status::OK();
     }
 
-    bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData) override {
+    bool isAuthorizedForAnyActionOnAnyResourceInDB(const DatabaseName&) override {
         return true;
     }
 

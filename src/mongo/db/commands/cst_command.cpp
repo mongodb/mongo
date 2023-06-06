@@ -61,7 +61,7 @@ public:
         // The CST command constructs a Pipeline, which might hold execution resources.
         // We could do fine-grained permission checking similar to the find or aggregate commands,
         // but that seems more complicated than necessary since this is only a test command.
-        if (!authSession->isAuthorizedForAnyActionOnAnyResourceInDB(dbname.db())) {
+        if (!authSession->isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
