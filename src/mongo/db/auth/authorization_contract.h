@@ -56,6 +56,7 @@ namespace mongo {
 class AuthorizationContract {
 public:
     AuthorizationContract() = default;
+    AuthorizationContract(bool isTestModeEnabled) : _isTestModeEnabled(isTestModeEnabled){};
 
     template <typename Checks, typename Privileges>
     AuthorizationContract(const Checks& checks, const Privileges& privileges) {
@@ -110,6 +111,9 @@ private:
 
     // Set of privileges performed per resource pattern type
     std::array<ActionSet, kNumMatchTypeEnum> _privilegeChecks;
+
+    // If false accounting and mutex guards are disabled
+    bool _isTestModeEnabled{true};
 };
 
 }  // namespace mongo

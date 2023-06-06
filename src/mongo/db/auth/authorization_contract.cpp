@@ -52,6 +52,10 @@ void AuthorizationContract::clear() {
 }
 
 void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
+    if (!_isTestModeEnabled) {
+        return;
+    }
+
     stdx::lock_guard<Mutex> lck(_mutex);
 
     _checks.set(static_cast<size_t>(check), true);
@@ -64,6 +68,10 @@ bool AuthorizationContract::hasAccessCheck(AccessCheckEnum check) const {
 }
 
 void AuthorizationContract::addPrivilege(const Privilege& p) {
+    if (!_isTestModeEnabled) {
+        return;
+    }
+
     stdx::lock_guard<Mutex> lck(_mutex);
 
     auto matchType = p.getResourcePattern().matchType();

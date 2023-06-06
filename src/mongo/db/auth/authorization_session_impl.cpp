@@ -162,6 +162,7 @@ AuthorizationSessionImpl::AuthorizationSessionImpl(
     std::unique_ptr<AuthzSessionExternalState> externalState, InstallMockForTestingOrAuthImpl)
     : _externalState(std::move(externalState)),
       _impersonationFlag(false),
+      _contract(TestingProctor::instance().isEnabled()),
       _mayBypassWriteBlockingMode(false) {}
 
 AuthorizationSessionImpl::~AuthorizationSessionImpl() {
