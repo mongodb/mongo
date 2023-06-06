@@ -1471,7 +1471,7 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-rhel90-arm64
+- name: enterprise-rhel-90-arm64
   display_name: "Enterprise RHEL 9.0 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -1505,7 +1505,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel90-arm64-large
-    compile_variant: enterprise-rhel90-arm64
+    compile_variant: enterprise-rhel-90-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
