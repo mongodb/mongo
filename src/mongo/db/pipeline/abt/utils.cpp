@@ -74,7 +74,7 @@ ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
             if (trailingEmptyPath) {
                 auto arrCase = make<PathArr>();
                 maybeComposePath(arrCase, result.cast<PathGet>()->getPath());
-                maybeComposePath<PathComposeA>(result, arrCase);
+                maybeComposePath<PathComposeA>(result, std::move(arrCase));
             } else {
                 result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
             }

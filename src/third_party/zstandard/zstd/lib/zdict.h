@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -8,32 +8,43 @@
  * You may select, at your option, one of the above-listed licenses.
  */
 
-#ifndef DICTBUILDER_H_001
-#define DICTBUILDER_H_001
-
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
+#ifndef ZSTD_ZDICT_H
+#define ZSTD_ZDICT_H
 
 /*======  Dependencies  ======*/
 #include <stddef.h>  /* size_t */
 
 
 /* =====   ZDICTLIB_API : control library symbols visibility   ===== */
-#ifndef ZDICTLIB_VISIBILITY
-#  if defined(__GNUC__) && (__GNUC__ >= 4)
-#    define ZDICTLIB_VISIBILITY __attribute__ ((visibility ("default")))
+#ifndef ZDICTLIB_VISIBLE
+   /* Backwards compatibility with old macro name */
+#  ifdef ZDICTLIB_VISIBILITY
+#    define ZDICTLIB_VISIBLE ZDICTLIB_VISIBILITY
+#  elif defined(__GNUC__) && (__GNUC__ >= 4) && !defined(__MINGW32__)
+#    define ZDICTLIB_VISIBLE __attribute__ ((visibility ("default")))
 #  else
-#    define ZDICTLIB_VISIBILITY
+#    define ZDICTLIB_VISIBLE
 #  endif
 #endif
+
+#ifndef ZDICTLIB_HIDDEN
+#  if defined(__GNUC__) && (__GNUC__ >= 4) && !defined(__MINGW32__)
+#    define ZDICTLIB_HIDDEN __attribute__ ((visibility ("hidden")))
+#  else
+#    define ZDICTLIB_HIDDEN
+#  endif
+#endif
+
 #if defined(ZSTD_DLL_EXPORT) && (ZSTD_DLL_EXPORT==1)
-#  define ZDICTLIB_API __declspec(dllexport) ZDICTLIB_VISIBILITY
+#  define ZDICTLIB_API __declspec(dllexport) ZDICTLIB_VISIBLE
 #elif defined(ZSTD_DLL_IMPORT) && (ZSTD_DLL_IMPORT==1)
-#  define ZDICTLIB_API __declspec(dllimport) ZDICTLIB_VISIBILITY /* It isn't required but allows to generate better code, saving a function pointer load from the IAT and an indirect jump.*/
+#  define ZDICTLIB_API __declspec(dllimport) ZDICTLIB_VISIBLE /* It isn't required but allows to generate better code, saving a function pointer load from the IAT and an indirect jump.*/
 #else
-#  define ZDICTLIB_API ZDICTLIB_VISIBILITY
+#  define ZDICTLIB_API ZDICTLIB_VISIBLE
 #endif
 
 /*******************************************************************************
@@ -110,8 +121,8 @@ extern "C" {
  * The zstd CLI defaults to a 110KB dictionary. You likely don't need a
  * dictionary larger than that. But, most use cases can get away with a
  * smaller dictionary. The advanced dictionary builders can automatically
- * shrink the dictionary for you, and select a the smallest size that
- * doesn't hurt compression ratio too much. See the `shrinkDict` parameter.
+ * shrink the dictionary for you, and select the smallest size that doesn't
+ * hurt compression ratio too much. See the `shrinkDict` parameter.
  * A smaller dictionary can save memory, and potentially speed up
  * compression.
  *
@@ -201,9 +212,9 @@ ZDICTLIB_API size_t ZDICT_trainFromBuffer(void* dictBuffer, size_t dictBufferCap
                                     const size_t* samplesSizes, unsigned nbSamples);
 
 typedef struct {
-    int      compressionLevel;   /*< optimize for a specific zstd compression level; 0 means default */
-    unsigned notificationLevel;  /*< Write log to stderr; 0 = none (default); 1 = errors; 2 = progression; 3 = details; 4 = debug; */
-    unsigned dictID;             /*< force dictID value; 0 means auto mode (32-bits random value)
+    int      compressionLevel;   /**< optimize for a specific zstd compression level; 0 means default */
+    unsigned notificationLevel;  /**< Write log to stderr; 0 = none (default); 1 = errors; 2 = progression; 3 = details; 4 = debug; */
+    unsigned dictID;             /**< force dictID value; 0 means auto mode (32-bits random value)
                                   *   NOTE: The zstd format reserves some dictionary IDs for future use.
                                   *         You may use them in private settings, but be warned that they
                                   *         may be used by zstd in a public dictionary registry in the future.
@@ -260,9 +271,21 @@ ZDICTLIB_API size_t ZDICT_getDictHeaderSize(const void* dictBuffer, size_t dictS
 ZDICTLIB_API unsigned ZDICT_isError(size_t errorCode);
 ZDICTLIB_API const char* ZDICT_getErrorName(size_t errorCode);
 
+#endif   /* ZSTD_ZDICT_H */
 
+#if defined(ZDICT_STATIC_LINKING_ONLY) && !defined(ZSTD_ZDICT_H_STATIC)
+#define ZSTD_ZDICT_H_STATIC
 
-#ifdef ZDICT_STATIC_LINKING_ONLY
+/* This can be overridden externally to hide static symbols. */
+#ifndef ZDICTLIB_STATIC_API
+#  if defined(ZSTD_DLL_EXPORT) && (ZSTD_DLL_EXPORT==1)
+#    define ZDICTLIB_STATIC_API __declspec(dllexport) ZDICTLIB_VISIBLE
+#  elif defined(ZSTD_DLL_IMPORT) && (ZSTD_DLL_IMPORT==1)
+#    define ZDICTLIB_STATIC_API __declspec(dllimport) ZDICTLIB_VISIBLE
+#  else
+#    define ZDICTLIB_STATIC_API ZDICTLIB_VISIBLE
+#  endif
+#endif
 
 /* ====================================================================================
  * The definitions in this section are considered experimental.
@@ -318,7 +341,7 @@ typedef struct {
  *        In general, it's recommended to provide a few thousands samples, though this can vary a lot.
  *        It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
  */
-ZDICTLIB_API size_t ZDICT_trainFromBuffer_cover(
+ZDICTLIB_STATIC_API size_t ZDICT_trainFromBuffer_cover(
           void *dictBuffer, size_t dictBufferCapacity,
     const void *samplesBuffer, const size_t *samplesSizes, unsigned nbSamples,
           ZDICT_cover_params_t parameters);
@@ -340,7 +363,7 @@ ZDICTLIB_API size_t ZDICT_trainFromBuffer_cover(
  *          See ZDICT_trainFromBuffer() for details on failure modes.
  * Note: ZDICT_optimizeTrainFromBuffer_cover() requires about 8 bytes of memory for each input byte and additionally another 5 bytes of memory for each byte of memory for each thread.
  */
-ZDICTLIB_API size_t ZDICT_optimizeTrainFromBuffer_cover(
+ZDICTLIB_STATIC_API size_t ZDICT_optimizeTrainFromBuffer_cover(
           void* dictBuffer, size_t dictBufferCapacity,
     const void* samplesBuffer, const size_t* samplesSizes, unsigned nbSamples,
           ZDICT_cover_params_t* parameters);
@@ -361,7 +384,7 @@ ZDICTLIB_API size_t ZDICT_optimizeTrainFromBuffer_cover(
  *        In general, it's recommended to provide a few thousands samples, though this can vary a lot.
  *        It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
  */
-ZDICTLIB_API size_t ZDICT_trainFromBuffer_fastCover(void *dictBuffer,
+ZDICTLIB_STATIC_API size_t ZDICT_trainFromBuffer_fastCover(void *dictBuffer,
                     size_t dictBufferCapacity, const void *samplesBuffer,
                     const size_t *samplesSizes, unsigned nbSamples,
                     ZDICT_fastCover_params_t parameters);
@@ -384,7 +407,7 @@ ZDICTLIB_API size_t ZDICT_trainFromBuffer_fastCover(void *dictBuffer,
  *          See ZDICT_trainFromBuffer() for details on failure modes.
  * Note: ZDICT_optimizeTrainFromBuffer_fastCover() requires about 6 * 2^f bytes of memory for each thread.
  */
-ZDICTLIB_API size_t ZDICT_optimizeTrainFromBuffer_fastCover(void* dictBuffer,
+ZDICTLIB_STATIC_API size_t ZDICT_optimizeTrainFromBuffer_fastCover(void* dictBuffer,
                     size_t dictBufferCapacity, const void* samplesBuffer,
                     const size_t* samplesSizes, unsigned nbSamples,
                     ZDICT_fastCover_params_t* parameters);
@@ -409,7 +432,7 @@ typedef struct {
  *        It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
  *  Note: ZDICT_trainFromBuffer_legacy() will send notifications into stderr if instructed to, using notificationLevel>0.
  */
-ZDICTLIB_API size_t ZDICT_trainFromBuffer_legacy(
+ZDICTLIB_STATIC_API size_t ZDICT_trainFromBuffer_legacy(
     void* dictBuffer, size_t dictBufferCapacity,
     const void* samplesBuffer, const size_t* samplesSizes, unsigned nbSamples,
     ZDICT_legacy_params_t parameters);
@@ -421,32 +444,31 @@ ZDICTLIB_API size_t ZDICT_trainFromBuffer_legacy(
    or _CRT_SECURE_NO_WARNINGS in Visual.
    Otherwise, it's also possible to manually define ZDICT_DISABLE_DEPRECATE_WARNINGS */
 #ifdef ZDICT_DISABLE_DEPRECATE_WARNINGS
-#  define ZDICT_DEPRECATED(message) ZDICTLIB_API   /* disable deprecation warnings */
+#  define ZDICT_DEPRECATED(message) /* disable deprecation warnings */
 #else
 #  define ZDICT_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #  if defined (__cplusplus) && (__cplusplus >= 201402) /* C++14 or greater */
-#    define ZDICT_DEPRECATED(message) [[deprecated(message)]] ZDICTLIB_API
+#    define ZDICT_DEPRECATED(message) [[deprecated(message)]]
 #  elif defined(__clang__) || (ZDICT_GCC_VERSION >= 405)
-#    define ZDICT_DEPRECATED(message) ZDICTLIB_API __attribute__((deprecated(message)))
+#    define ZDICT_DEPRECATED(message) __attribute__((deprecated(message)))
 #  elif (ZDICT_GCC_VERSION >= 301)
-#    define ZDICT_DEPRECATED(message) ZDICTLIB_API __attribute__((deprecated))
+#    define ZDICT_DEPRECATED(message) __attribute__((deprecated))
 #  elif defined(_MSC_VER)
-#    define ZDICT_DEPRECATED(message) ZDICTLIB_API __declspec(deprecated(message))
+#    define ZDICT_DEPRECATED(message) __declspec(deprecated(message))
 #  else
 #    pragma message("WARNING: You need to implement ZDICT_DEPRECATED for this compiler")
-#    define ZDICT_DEPRECATED(message) ZDICTLIB_API
+#    define ZDICT_DEPRECATED(message)
 #  endif
 #endif /* ZDICT_DISABLE_DEPRECATE_WARNINGS */
 
 ZDICT_DEPRECATED("use ZDICT_finalizeDictionary() instead")
+ZDICTLIB_STATIC_API
 size_t ZDICT_addEntropyTablesFromBuffer(void* dictBuffer, size_t dictContentSize, size_t dictBufferCapacity,
                                   const void* samplesBuffer, const size_t* samplesSizes, unsigned nbSamples);
 
 
-#endif   /* ZDICT_STATIC_LINKING_ONLY */
+#endif   /* ZSTD_ZDICT_H_STATIC */
 
 #if defined (__cplusplus)
 }
 #endif
-
-#endif   /* DICTBUILDER_H_001 */

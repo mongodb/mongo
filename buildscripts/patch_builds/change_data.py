@@ -87,7 +87,7 @@ def find_changed_files(repo: Repo, revision_map: Optional[RevisionMap] = None) -
     work_tree_files = _modified_files_for_diff(diff, LOGGER.bind(diff="working tree diff"))
 
     commit = repo.index
-    diff = commit.diff(revision_map.get(repo.git_dir, repo.head.commit))
+    diff = commit.diff(revision_map.get(repo.git_dir, repo.head.commit), R=True)
     index_files = _modified_files_for_diff(diff, LOGGER.bind(diff="index diff"))
 
     untracked_files = set(repo.untracked_files)

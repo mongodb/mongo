@@ -74,7 +74,7 @@ void ValueStorage::verifyRefCountingIfShould() const {
         case NumberLong:
         case NumberDouble:
             // the above types never reference external data
-            verify(!refCounter);
+            MONGO_verify(!refCounter);
             break;
 
         case String:
@@ -338,12 +338,12 @@ double Value::getDouble() const {
     if (type == NumberDecimal)
         return _storage.getDecimal().toDouble();
 
-    verify(type == NumberDouble);
+    MONGO_verify(type == NumberDouble);
     return _storage.doubleValue;
 }
 
 Document Value::getDocument() const {
-    verify(getType() == Object);
+    MONGO_verify(getType() == Object);
     return _storage.getDocument();
 }
 
@@ -421,7 +421,7 @@ BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val)
             return builder.builder();
         }
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 void Value::addToBsonObj(BSONObjBuilder* builder,
@@ -508,7 +508,7 @@ bool Value::coerceToBool() const {
         case NumberDecimal:
             return !_storage.getDecimal().isZero();
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 namespace {
@@ -883,7 +883,7 @@ int Value::compare(const Value& rL,
             return l->scope.woCompare(r->scope);
         }
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 void Value::hash_combine(size_t& seed,
@@ -1191,7 +1191,7 @@ size_t Value::getApproximateSize() const {
         case Undefined:
             return sizeof(Value);
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 string Value::toString() const {
@@ -1272,7 +1272,7 @@ ostream& operator<<(ostream& out, const Value& val) {
     }
 
     // Not in default case to trigger better warning if a case is missing
-    verify(false);
+    MONGO_verify(false);
 }
 
 void Value::fillCache() const {
@@ -1453,7 +1453,7 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
             return Value(std::move(array));
         }
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 void Value::serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const {

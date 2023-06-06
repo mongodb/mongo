@@ -34,7 +34,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/remove_saver.h"
 
 namespace mongo {
 
@@ -79,15 +78,6 @@ struct DeleteStageParams {
 
     // Optional. When not null, delete metrics are recorded here.
     OpDebug* opDebug;
-
-    // Optional. When not null, send document about to be deleted to removeSaver.
-    // RemoveSaver is called before actual deletes are executed.
-    // Note: the differentiating factor between this and returnDeleted is that the caller will get
-    // the deleted document after it was already deleted. That means that if the caller would have
-    // to use the removeSaver at that point, they miss the document if the process dies before it
-    // reaches the removeSaver. However, this is still best effort since the RemoveSaver
-    // operates on a different persistence system from the the database storage engine.
-    std::unique_ptr<RemoveSaver> removeSaver;
 
     // Determines how the delete stats should be incremented. Will be incremented by 1 if the
     // function is empty.

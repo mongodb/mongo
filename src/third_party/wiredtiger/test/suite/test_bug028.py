@@ -82,7 +82,6 @@ class test_bug028(wttest.WiredTigerTestCase, suite_subprocess):
             config += ',data'
         if self.log_directio:
             config += ',log'
-            self.skipTest('FIXME WT-8684 skipping test of logging with direct I/O')
         config += ')'
         if self.log_directio:
             config += ',log=(enabled=true)'

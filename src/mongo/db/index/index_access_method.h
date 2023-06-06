@@ -284,7 +284,7 @@ public:
         const IndexCatalogEntry* entry,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
-        StringData dbName) = 0;
+        const DatabaseName& dbName) = 0;
 };
 
 /**
@@ -586,7 +586,7 @@ public:
     std::unique_ptr<BulkBuilder> initiateBulk(const IndexCatalogEntry* entry,
                                               size_t maxMemoryUsageBytes,
                                               const boost::optional<IndexStateInfo>& stateInfo,
-                                              StringData dbName) final;
+                                              const DatabaseName& dbName) final;
 
 protected:
     /**

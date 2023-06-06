@@ -157,6 +157,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/shell/kms_idl',
         '$BUILD_DIR/mongo/util/net/http_client_impl',
         '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else [],

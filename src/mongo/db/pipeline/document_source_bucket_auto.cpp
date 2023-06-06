@@ -384,10 +384,10 @@ Value DocumentSourceBucketAuto::serialize(SerializationOptions opts) const {
     MutableDocument insides;
 
     insides["groupBy"] = _groupByExpression->serialize(opts);
-    insides["buckets"] = opts.serializeLiteralValue(_nBuckets);
+    insides["buckets"] = opts.serializeLiteral(_nBuckets);
 
     if (_granularityRounder) {
-        insides["granularity"] = opts.serializeLiteralValue(_granularityRounder->getName());
+        insides["granularity"] = opts.serializeLiteral(_granularityRounder->getName());
     }
 
     MutableDocument outputSpec(_accumulatedFields.size());
@@ -426,7 +426,7 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,
                                         numBuckets,
-                                        accumulationStatements,
+                                        std::move(accumulationStatements),
                                         granularityRounder,
                                         maxMemoryUsageBytes);
 }
@@ -539,8 +539,11 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
             "$bucketAuto requires 'groupBy' and 'buckets' to be specified",
             groupByExpression && numBuckets);
 
-    return DocumentSourceBucketAuto::create(
-        pExpCtx, groupByExpression, numBuckets.value(), accumulationStatements, granularityRounder);
+    return DocumentSourceBucketAuto::create(pExpCtx,
+                                            groupByExpression,
+                                            numBuckets.value(),
+                                            std::move(accumulationStatements),
+                                            granularityRounder);
 }
 
 }  // namespace mongo

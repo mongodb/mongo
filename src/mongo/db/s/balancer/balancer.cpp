@@ -43,9 +43,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/auto_merger_policy.h"
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
-#include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
+#include "mongo/db/s/balancer/balancer_defragmentation_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
@@ -294,10 +293,9 @@ Balancer* Balancer::get(OperationContext* operationContext) {
 Balancer::Balancer()
     : _balancedLastTime(0),
       _clusterStats(std::make_unique<ClusterStatisticsImpl>()),
-      _chunkSelectionPolicy(
-          std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())),
+      _chunkSelectionPolicy(std::make_unique<BalancerChunkSelectionPolicy>(_clusterStats.get())),
       _commandScheduler(std::make_unique<BalancerCommandsSchedulerImpl>()),
-      _defragmentationPolicy(std::make_unique<BalancerDefragmentationPolicyImpl>(
+      _defragmentationPolicy(std::make_unique<BalancerDefragmentationPolicy>(
           _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })),
       _autoMergerPolicy(
           std::make_unique<AutoMergerPolicy>([this]() { _onActionsStreamPolicyStateUpdate(); })),

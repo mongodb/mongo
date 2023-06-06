@@ -352,8 +352,7 @@ void checkRemoteIterator(int numNetworkFailures, bool expectedToSucceed) {
     };
 
     auto localOperation = makeOpAndRecordId(1);
-    OplogInterfaceRemote remoteOplogMock(
-        HostAndPort("229w43rd", 10036), getConnection, "somecollection", 0);
+    OplogInterfaceRemote remoteOplogMock(HostAndPort("229w43rd", 10036), getConnection, 0);
 
     auto result = Status::OK();
 

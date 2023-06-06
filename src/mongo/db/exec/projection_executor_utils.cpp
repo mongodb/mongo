@@ -128,7 +128,7 @@ Value applyFindSliceProjectionToArray(const std::vector<Value>& array,
                 : elem);
     }
 
-    return Value{output};
+    return Value{std::move(output)};
 }
 
 /**

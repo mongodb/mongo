@@ -7,7 +7,7 @@
 
 load("jstests/libs/fail_point_util.js");
 
-function oplogRolloverTest(storageEngine, initialSyncMethod) {
+function oplogRolloverTest(storageEngine, initialSyncMethod, serverless = false) {
     jsTestLog("Testing with storageEngine: " + storageEngine);
     if (initialSyncMethod) {
         jsTestLog("  and initial sync method: " + initialSyncMethod);
@@ -25,14 +25,20 @@ function oplogRolloverTest(storageEngine, initialSyncMethod) {
     if (initialSyncMethod) {
         parameters = Object.merge(parameters, {initialSyncMethod: initialSyncMethod});
     }
-    const replSet = new ReplSetTest({
+
+    let replSetOptions = {
         // Set the syncdelay to 1s to speed up checkpointing.
         nodeOptions: {
             syncdelay: 1,
             setParameter: parameters,
         },
         nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
-    });
+    };
+
+    if (serverless)
+        replSetOptions = Object.merge(replSetOptions, {serverless: true});
+
+    const replSet = new ReplSetTest(replSetOptions);
     // Set max oplog size to 1MB.
     replSet.startSet({storageEngine: storageEngine, oplogSize: 1});
     replSet.initiate();

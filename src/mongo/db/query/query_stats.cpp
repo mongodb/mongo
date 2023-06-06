@@ -106,7 +106,7 @@ size_t capQueryStatsStoreSize(size_t requestedSize) {
  * Get the queryStats store size based on the query job's value.
  */
 size_t getQueryStatsStoreSize() {
-    auto status = memory_util::MemorySize::parse(queryQueryStatsStoreSize.get());
+    auto status = memory_util::MemorySize::parse(internalQueryStatsCacheSize.get());
     uassertStatusOK(status);
     size_t requestedSize = memory_util::convertToSizeInBytes(status.getValue());
     return capQueryStatsStoreSize(requestedSize);
@@ -211,7 +211,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         }
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
-        auto configuredSamplingRate = queryQueryStatsSamplingRate.load();
+        auto configuredSamplingRate = internalQueryStatsRateLimit.load();
         queryStatsRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
             configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate);
     }};
@@ -268,16 +268,22 @@ std::size_t hash(const BSONObj& obj) {
 }  // namespace
 
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              bool applyHmacToIdentifiers,
+                                              TransformAlgorithm algorithm,
                                               std::string hmacKey) const {
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
-    if (applyHmacToIdentifiers) {
-        options.applyHmacToIdentifiers = true;
-        options.identifierHmacPolicy = [&](StringData sd) {
-            return sha256HmacStringDataHasher(hmacKey, sd);
-        };
+    switch (algorithm) {
+        case TransformAlgorithm::kHmacSha256:
+            options.transformIdentifiers = true;
+            options.transformIdentifiersCallback = [&](StringData sd) {
+                return sha256HmacStringDataHasher(hmacKey, sd);
+            };
+            break;
+        case TransformAlgorithm::kNone:
+            break;
+        default:
+            MONGO_UNREACHABLE;
     }
     return requestShapifier->makeQueryStatsKey(options, opCtx);
 }
@@ -319,6 +325,7 @@ void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<RequestShapifier> requestShapifier,
                      const uint64_t queryExecMicros,
+                     const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
     if (!queryStatsKeyHash) {
         return;
@@ -355,9 +362,11 @@ void writeQueryStats(OperationContext* opCtx,
         metrics = newMetrics.getValue()->second;
     }
 
+    metrics->latestSeenTimestamp = Date_t::now();
     metrics->lastExecutionMicros = queryExecMicros;
     metrics->execCount++;
-    metrics->queryExecMicros.aggregate(queryExecMicros);
+    metrics->totalExecMicros.aggregate(queryExecMicros);
+    metrics->firstResponseExecMicros.aggregate(firstResponseExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
 }
 }  // namespace query_stats

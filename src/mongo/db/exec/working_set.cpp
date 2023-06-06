@@ -76,8 +76,8 @@ WorkingSetID WorkingSet::allocate() {
 
 void WorkingSet::free(WorkingSetID i) {
     MemberHolder& holder = _data[i];
-    verify(i < _data.size());            // ID has been allocated.
-    verify(holder.nextFreeOrSelf == i);  // ID currently in use.
+    MONGO_verify(i < _data.size());            // ID has been allocated.
+    MONGO_verify(holder.nextFreeOrSelf == i);  // ID currently in use.
 
     // Free resources and push this WSM to the head of the freelist.
     holder.member.clear();

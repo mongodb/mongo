@@ -97,13 +97,12 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
             ++_specificStats.alreadyHasObj;
         } else {
             // We need a valid RecordId to fetch from and this is the only state that has one.
-            verify(WorkingSetMember::RID_AND_IDX == member->getState());
-            verify(member->hasRecordId());
+            MONGO_verify(WorkingSetMember::RID_AND_IDX == member->getState());
+            MONGO_verify(member->hasRecordId());
 
             const auto ret = handlePlanStageYield(
                 expCtx(),
                 "FetchStage",
-                collection()->ns().ns(),
                 [&] {
                     const auto& coll = collection();
                     if (!_cursor)

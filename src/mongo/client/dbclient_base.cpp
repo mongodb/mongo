@@ -453,7 +453,7 @@ void DBClientBase::logout(const string& dbname, BSONObj& info) {
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObjBuilder bob;
-    bob.append(_apiParameters.getVersion() ? "hello" : "ismaster", 1);
+    bob.append("hello", 1);
     if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
         WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
@@ -462,8 +462,7 @@ bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     if (info == nullptr)
         info = &o;
     bool ok = runCommand(DatabaseName::kAdmin, bob.obj(), *info);
-    isPrimary =
-        info->getField(_apiParameters.getVersion() ? "isWritablePrimary" : "ismaster").trueValue();
+    isPrimary = info->getField("isWritablePrimary").trueValue();
     return ok;
 }
 
@@ -473,7 +472,7 @@ bool DBClientBase::createCollection(const NamespaceString& nss,
                                     int max,
                                     BSONObj* info,
                                     boost::optional<BSONObj> writeConcernObj) {
-    verify(!capped || size);
+    MONGO_verify(!capped || size);
     BSONObj o;
     if (info == nullptr)
         info = &o;

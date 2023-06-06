@@ -653,7 +653,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_persistCollectionsToClo
     int numBytes = 0;
     auto collectionsToCloneNSS = _getCollectionsToCloneNSS();
     for (const auto& coll : collsToClone) {
-        auto doc = BSON("_id" << i << "nss" << coll.ns());
+        auto doc = BSON("_id" << i << "nss" << NamespaceStringUtil::serialize(coll));
         ++i;
         if (wouldSurpassBatchLimit(numBytes, doc.objsize())) {
             resharding::data_copy::insertBatch(opCtx, collectionsToCloneNSS, batch);
@@ -720,10 +720,10 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOperationMetadat
         AutoGetDb autoDb(opCtx, DatabaseName::kConfig, MODE_S);
         colls = catalogClient->getAllCollectionNamesFromDb(opCtx, DatabaseName::kConfig);
     }
-    const auto& nssPrefix =
-        NamespaceString::makeMovePrimaryTempCollectionsPrefix(getMigrationId()).toString();
+    const auto nssPrefix = NamespaceStringUtil::serialize(
+        NamespaceString::makeMovePrimaryTempCollectionsPrefix(getMigrationId()));
     for (const auto& nss : colls) {
-        if (!nss.ns().startsWith(nssPrefix)) {
+        if (!NamespaceStringUtil::serialize(nss).starts_with(nssPrefix)) {
             continue;
         }
         LOGV2(7621600, "MovePrimaryRecipient dropping collection", "ns"_attr = nss);

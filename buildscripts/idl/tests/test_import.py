@@ -110,7 +110,7 @@ class TestImport(testcase.IDLTestcase):
             "basetypes.idl":
                 textwrap.dedent("""
             global:
-                cpp_namespace: 'something'
+                cpp_namespace: 'mongo'
 
             types:
                 string:
@@ -174,7 +174,7 @@ class TestImport(testcase.IDLTestcase):
             "cycle1a.idl":
                 textwrap.dedent("""
             global:
-                cpp_namespace: 'something'
+                cpp_namespace: 'mongo'
 
             imports:
                 - "cycle1b.idl"
@@ -204,7 +204,7 @@ class TestImport(testcase.IDLTestcase):
             "cycle1b.idl":
                 textwrap.dedent("""
             global:
-                cpp_namespace: 'something'
+                cpp_namespace: 'mongo'
 
             imports:
                 - "cycle1a.idl"
@@ -227,7 +227,7 @@ class TestImport(testcase.IDLTestcase):
             "cycle2.idl":
                 textwrap.dedent("""
             global:
-                cpp_namespace: 'something'
+                cpp_namespace: 'mongo'
 
             imports:
                 - "cycle2.idl"
@@ -254,7 +254,7 @@ class TestImport(testcase.IDLTestcase):
         self.assert_bind(
             textwrap.dedent("""
         global:
-            cpp_namespace: 'something'
+            cpp_namespace: 'mongo'
 
         imports:
             - "basetypes.idl"
@@ -271,7 +271,7 @@ class TestImport(testcase.IDLTestcase):
         self.assert_bind(
             textwrap.dedent("""
         global:
-            cpp_namespace: 'something'
+            cpp_namespace: 'mongo'
 
         imports:
             - "recurse2.idl"
@@ -290,7 +290,7 @@ class TestImport(testcase.IDLTestcase):
         self.assert_bind(
             textwrap.dedent("""
         global:
-            cpp_namespace: 'something'
+            cpp_namespace: 'mongo'
 
         imports:
             - "recurse2.idl"
@@ -311,7 +311,7 @@ class TestImport(testcase.IDLTestcase):
         self.assert_bind(
             textwrap.dedent("""
         global:
-            cpp_namespace: 'something'
+            cpp_namespace: 'mongo'
 
         imports:
             - "cycle1a.idl"
@@ -329,7 +329,7 @@ class TestImport(testcase.IDLTestcase):
         self.assert_bind(
             textwrap.dedent("""
         global:
-            cpp_namespace: 'something'
+            cpp_namespace: 'mongo'
 
         imports:
             - "cycle2.idl"
@@ -350,7 +350,7 @@ class TestImport(testcase.IDLTestcase):
             "basetypes.idl":
                 textwrap.dedent("""
             global:
-                cpp_namespace: 'something'
+                cpp_namespace: 'mongo'
 
             types:
                 string:
@@ -380,7 +380,7 @@ class TestImport(testcase.IDLTestcase):
             "bug.idl":
                 textwrap.dedent("""
             global:
-                cpp_namespace: 'something'
+                cpp_namespace: 'mongo'
 
             types:
                 bool:

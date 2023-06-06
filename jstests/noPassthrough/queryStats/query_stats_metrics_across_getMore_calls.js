@@ -10,7 +10,7 @@ load("jstests/libs/telemetry_utils.js");  // For verifyMetrics and getQueryStats
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 };
 
 const conn = MongoRunner.runMongod(options);
@@ -41,7 +41,7 @@ assert.commandWorked(bulk.execute());
     jsTestLog(telemetryEntry);
     assert.eq(telemetryEntry.key.queryShape.cmdNs.db, "test");
     assert.eq(telemetryEntry.key.queryShape.cmdNs.coll, jsTestName());
-    assert.eq(telemetryEntry.key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryEntry.key.client.application.name, "MongoDB Shell");
 
     // Assert we update execution count for identically shaped queries.
     assert.eq(telemetryEntry.metrics.execCount, 2);
@@ -80,10 +80,10 @@ const fooNeBatchSize = 3;
     assert.eq(telemetryResults.length, 2, telemetryResults);
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.db, "test");
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.coll, jsTestName());
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].key.client.application.name, "MongoDB Shell");
     assert.eq(telemetryResults[1].key.queryShape.cmdNs.db, "test");
     assert.eq(telemetryResults[1].key.queryShape.cmdNs.coll, jsTestName());
-    assert.eq(telemetryResults[1].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[1].key.client.application.name, "MongoDB Shell");
 
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[1].metrics.execCount, 1);
@@ -91,6 +91,19 @@ const fooNeBatchSize = 3;
     assert.eq(telemetryResults[1].metrics.docsReturned.sum, fooNeBatchSize);
 
     verifyMetrics(telemetryResults);
+
+    const distributionFields = ['sum', 'max', 'min', 'sumOfSquares'];
+    for (const field of distributionFields) {
+        // If there are getMore calls, queryExecMicros should be greater than or equal to
+        // firstResponseExecMicros.
+        assert.gt(telemetryResults[0].metrics.totalExecMicros[field],
+                  telemetryResults[0].metrics.firstResponseExecMicros[field]);
+
+        // If there is no getMore calls, firstResponseExecMicros and queryExecMicros should be
+        // equal.
+        assert.eq(telemetryResults[1].metrics.totalExecMicros[field],
+                  telemetryResults[1].metrics.firstResponseExecMicros[field]);
+    }
 }
 
 // Assert that options such as limit/sort create different keys, and that repeating a query shape
@@ -116,7 +129,7 @@ const fooNeBatchSize = 3;
     assert.eq(telemetryResults.length, 1, telemetryResults);
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.db, "test");
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.coll, jsTestName());
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].key.client.application.name, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs);
 
@@ -129,7 +142,7 @@ const fooNeBatchSize = 3;
     assert.eq(telemetryResults.length, 1, telemetryResults);
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.db, "test");
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.coll, jsTestName());
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].key.client.application.name, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, query2Limit);
 
@@ -149,7 +162,7 @@ const fooNeBatchSize = 3;
     assert.eq(telemetryResults.length, 1, telemetryResults);
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.db, "test");
     assert.eq(telemetryResults[0].key.queryShape.cmdNs.coll, jsTestName());
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].key.client.application.name, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 2);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs / 2 + 2 * fooEqBatchSize);
     assert.eq(telemetryResults[0].metrics.docsReturned.max, numDocs / 2);

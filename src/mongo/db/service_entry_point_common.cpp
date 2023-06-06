@@ -524,8 +524,8 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // NotPrimary errors always include a topologyVersion, since we increment topologyVersion on
     // stepdown. ShutdownErrors only include a topologyVersion if the server is in quiesce mode,
-    // since we only increment the topologyVersion at shutdown and alert waiting isMaster commands
-    // if the server enters quiesce mode.
+    // since we only increment the topologyVersion at shutdown and alert waiting isMaster/hello
+    // commands if the server enters quiesce mode.
     const auto shouldAppendTopologyVersion =
         (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
          isNotPrimaryError) ||
@@ -1224,7 +1224,6 @@ void RunCommandImpl::_epilogue() {
                 &waitAfterCommandFinishesExecution, opCtx, "waitAfterCommandFinishesExecution");
         },
         [&](const BSONObj& data) {
-            auto ns = data["ns"].valueStringDataSafe();
             auto commands =
                 data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
             bool requestMatchesComment = data.hasField("comment")
@@ -1233,7 +1232,8 @@ void RunCommandImpl::_epilogue() {
 
             // If 'ns', 'commands', or 'comment' is not set, block for all the namespaces, commands,
             // or comments respectively.
-            return (ns.empty() || _ecd->getInvocation()->ns().ns() == ns) &&
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+            return (fpNss.isEmpty() || _ecd->getInvocation()->ns() == fpNss) &&
                 (commands.empty() ||
                  std::any_of(commands.begin(),
                              commands.end(),
@@ -1693,9 +1693,9 @@ void ExecCommandDatabase::_initiateCommand() {
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
-    // If the parent operation runs in a transaction, we don't override the read concern.
-    auto skipReadConcern =
-        opCtx->getClient()->isInDirectClient() && opCtx->inMultiDocumentTransaction();
+    // If the operation is being executed as part of DBDirectClient this means we must use the
+    // original read concern.
+    auto skipReadConcern = opCtx->getClient()->isInDirectClient();
     bool startTransaction = static_cast<bool>(_sessionOptions.getStartTransaction());
     if (!skipReadConcern) {
         auto newReadConcernArgs = uassertStatusOK(_extractReadConcern(
@@ -2454,7 +2454,7 @@ BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* comman
 }
 
 void logHandleRequestFailure(const Status& status) {
-    LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(status));
+    LOGV2_INFO(4879802, "Failed to handle request", "error"_attr = redact(status));
 }
 
 void onHandleRequestException(const HandleRequest& hr, const Status& status) {

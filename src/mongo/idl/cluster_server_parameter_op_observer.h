@@ -36,6 +36,10 @@ namespace mongo {
  */
 class ClusterServerParameterOpObserver final : public OpObserverNoop {
 public:
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};
+    }
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,
@@ -51,6 +55,7 @@ public:
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
                        OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onDelete(OperationContext* opCtx,

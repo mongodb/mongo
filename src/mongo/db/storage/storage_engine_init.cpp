@@ -33,7 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
@@ -408,9 +408,6 @@ public:
     void onCreateClient(Client* client) override{};
     void onDestroyClient(Client* client) override{};
     void onCreateOperationContext(OperationContext* opCtx) {
-        // Use a fully fledged lock manager even when the storage engine is not set.
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-
         auto service = opCtx->getServiceContext();
 
         // There are a few cases where we don't have a storage engine available yet when creating an
@@ -431,8 +428,15 @@ public:
     void onDestroyOperationContext(OperationContext* opCtx) {}
 };
 
+ServiceContext::ConstructorActionRegisterer registerLockerImplClientObserverConstructor{
+    "LockerImplClientObserver", [](ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
+    }};
+
 ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstructor{
-    "RegisterStorageClientObserverConstructor", [](ServiceContext* service) {
+    "RegisterStorageClientObserverConstructor",
+    {"LockerImplClientObserver"},
+    [](ServiceContext* service) {
         service->registerClientObserver(std::make_unique<StorageClientObserver>());
     }};
 

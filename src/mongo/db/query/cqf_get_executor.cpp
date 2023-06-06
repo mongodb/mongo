@@ -306,11 +306,17 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
         OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
     }
 
-    stage_builder::PlanStageData data{std::move(runtimeEnvironment)};
-    data.outputs.set(stage_builder::PlanStageSlots::kResult, slotMap.begin()->second);
+    stage_builder::PlanStageSlots outputs;
+    outputs.set(stage_builder::PlanStageSlots::kResult, slotMap.begin()->second);
     if (requireRID) {
-        data.outputs.set(stage_builder::PlanStageSlots::kRecordId, *ridSlot);
+        outputs.set(stage_builder::PlanStageSlots::kRecordId, *ridSlot);
     }
+
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+    staticData->outputs = std::move(outputs);
+
+    stage_builder::PlanStageData data(
+        stage_builder::PlanStageEnvironment(std::move(runtimeEnvironment)), std::move(staticData));
 
     sbePlan->attachToOperationContext(opCtx);
     if (needsExplain || expCtx->mayDbProfile) {
@@ -353,7 +359,7 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
         abtPrinter = std::make_unique<ABTPrinter>(std::move(toExplain), explainVersion);
     }
 
-    sbePlan->prepare(data.ctx);
+    sbePlan->prepare(data.env.ctx);
     CurOp::get(opCtx)->stopQueryPlanningTimer();
 
     return {opCtx,

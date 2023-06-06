@@ -175,7 +175,7 @@ public:
     /**
      * Dumps all the slots currently defined in this environment into the given string builder.
      */
-    void debugString(StringBuilder* builder);
+    void debugString(StringBuilder* builder) const;
 
 private:
     RuntimeEnvironment(const RuntimeEnvironment&);

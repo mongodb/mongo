@@ -1211,8 +1211,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOps) {
     // unable to locate the source collection.  If the targetNss tenantId doesn't match, well we're
     // going to rename the db/collection within the _tenantId, so this effectively ensures it isn't
     // possible to rename across tenantIds.
-    auto cmd =
-        BSON("renameCollection" << _sourceNssTid.toString() << "to" << targetNssTid.toString());
+    auto cmd = BSON("renameCollection" << _sourceNssTid.toString_forTest() << "to"
+                                       << targetNssTid.toString_forTest());
 
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), boost::none, _tenantId, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), targetNssTid));
@@ -1228,8 +1228,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsCommonRandom
     ASSERT_NOT_EQUALS(_sourceNssTid, targetNssTid);
 
     // This test only has a single tenantId that belongs to neither source nor target.
-    auto cmd =
-        BSON("renameCollection" << _sourceNssTid.toString() << "to" << targetNssTid.toString());
+    auto cmd = BSON("renameCollection" << _sourceNssTid.toString_forTest() << "to"
+                                       << targetNssTid.toString_forTest());
 
     // Because the tenantId doesn't belong to the source, we should see a collection not found
     // error.
@@ -1248,12 +1248,12 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsCommonTid) {
     ASSERT_NOT_EQUALS(_sourceNssTid, targetNssTid);
 
     // A tid field supersedes tenantIds maintained in source or target. See above.
-    auto cmd =
-        BSON("renameCollection" << _sourceNssTid.toString() << "to" << targetNssTid.toString());
+    auto cmd = BSON("renameCollection" << _sourceNssTid.toString_forTest() << "to"
+                                       << targetNssTid.toString_forTest());
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), boost::none, _tenantId, cmd, {}));
-    ASSERT_TRUE(_collectionExists(
-        _opCtx.get(),
-        NamespaceString::createNamespaceString_forTest(_tenantId, targetNssTid.toString())));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(),
+                                  NamespaceString::createNamespaceString_forTest(
+                                      _tenantId, targetNssTid.toString_forTest())));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNssTid));
 }
 
@@ -1268,8 +1268,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSourceExists
     ASSERT_NOT_EQUALS(otherSourceNssTid, targetNssTid);
 
     // A tid field supersedes tenantIds maintained in source or target. See above.
-    auto cmd =
-        BSON("renameCollection" << otherSourceNssTid.toString() << "to" << targetNssTid.toString());
+    auto cmd = BSON("renameCollection" << otherSourceNssTid.toString_forTest() << "to"
+                                       << targetNssTid.toString_forTest());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   renameCollectionForApplyOps(_opCtx.get(), boost::none, _otherTenantId, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNssTid));
@@ -1318,8 +1318,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSameNS) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
     // A tid field supersedes tenantIds maintained in source or target. See above.
-    auto cmd =
-        BSON("renameCollection" << _sourceNssTid.toString() << "to" << _sourceNssTid.toString());
+    auto cmd = BSON("renameCollection" << _sourceNssTid.toString_forTest() << "to"
+                                       << _sourceNssTid.toString_forTest());
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), boost::none, _tenantId, cmd, {}));
 }
 

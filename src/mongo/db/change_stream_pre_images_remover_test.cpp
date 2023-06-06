@@ -190,7 +190,7 @@ protected:
         return change_stream_pre_image_util::toRecordId(preImageId);
     }
 
-    bool hasExcessMarkers(OperationContext* opCtx, PreImagesTruncateMarkersPerCollection& markers) {
+    bool hasExcessMarkers(OperationContext* opCtx, PreImagesTruncateMarkersPerNsUUID& markers) {
         return markers._hasExcessMarkers(opCtx);
     }
 
@@ -243,7 +243,7 @@ TEST_F(PreImagesRemoverTest, hasExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerCollection markers(
+    PreImagesTruncateMarkersPerNsUUID markers(
         boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
@@ -273,7 +273,7 @@ TEST_F(PreImagesRemoverTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerCollection markers(
+    PreImagesTruncateMarkersPerNsUUID markers(
         boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
@@ -292,7 +292,7 @@ TEST_F(PreImagesRemoverTest, serverlessHasNoExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerCollection markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(tenantId, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
 }
@@ -310,7 +310,7 @@ TEST_F(PreImagesRemoverTest, serverlessHasExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerCollection markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(tenantId, std::move(initialMarkers), 0, 0, 100);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
 }

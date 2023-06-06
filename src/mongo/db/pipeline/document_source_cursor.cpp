@@ -217,7 +217,8 @@ Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
     auto verbosity = opts.verbosity;
     // We never parse a DocumentSourceCursor, so we only serialize for explain. Since it's never
     // part of user input, there's no need to compute its query shape.
-    if (!verbosity || opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs)
+    if (!verbosity || opts.transformIdentifiers ||
+        opts.literalPolicy != LiteralSerializationPolicy::kUnchanged)
         return Value();
 
     invariant(_exec);
@@ -249,6 +250,7 @@ Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
                                _execStatus,
                                _winningPlanTrialStats,
                                BSONObj(),
+                               SerializationContext::stateCommandReply(pExpCtx->serializationCtxt),
                                BSONObj(),
                                &explainStatsBuilder);
     }

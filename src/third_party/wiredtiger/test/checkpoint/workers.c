@@ -53,14 +53,13 @@ create_table(WT_SESSION *session, COOKIE *cookie)
      * If we're using timestamps, turn off logging for the table.
      */
     if (g.use_timestamps)
-        testutil_check(__wt_snprintf(config, sizeof(config),
+        testutil_snprintf(config, sizeof(config),
           "key_format=%s,value_format=%s,allocation_size=512,"
           "leaf_page_max=1KB,internal_page_max=1KB,"
           "memory_page_max=64KB,log=(enabled=false),%s",
-          kf, vf, lsm));
+          kf, vf, lsm);
     else
-        testutil_check(
-          __wt_snprintf(config, sizeof(config), "key_format=%s,value_format=%s,%s", kf, vf, lsm));
+        testutil_snprintf(config, sizeof(config), "key_format=%s,value_format=%s,%s", kf, vf, lsm);
 
     if ((ret = session->create(session, cookie->uri, config)) != 0)
         if (ret != EEXIST)
@@ -312,7 +311,7 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
         }
 
         /* If key doesn't exist, turn modify into an insert. */
-        testutil_check(__wt_snprintf(valuebuf, sizeof(valuebuf), "%052u", new_val));
+        testutil_snprintf(valuebuf, sizeof(valuebuf), "%052u", new_val);
         if (type == FIX)
             cursor->set_value(cursor, flcs_encode(valuebuf));
         else
@@ -470,20 +469,20 @@ real_worker(THREAD_DATA *td)
                             base_ts = g.ts_stable + 1;
                         next_rnd = __wt_random(&td->data_rnd);
                         if (g.prepare && next_rnd % 2 == 0) {
-                            testutil_check(__wt_snprintf(
-                              buf, sizeof(buf), "prepare_timestamp=%" PRIx64, base_ts));
+                            testutil_snprintf(
+                              buf, sizeof(buf), "prepare_timestamp=%" PRIx64, base_ts);
                             if ((ret = session->prepare_transaction(session, buf)) != 0) {
                                 if (!g.predictable_replay)
                                     __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:prepare_transaction", ret, 1);
                                 goto err;
                             }
-                            testutil_check(__wt_snprintf(buf, sizeof(buf),
+                            testutil_snprintf(buf, sizeof(buf),
                               "durable_timestamp=%" PRIx64 ",commit_timestamp=%" PRIx64,
-                              base_ts + 2, base_ts));
+                              base_ts + 2, base_ts);
                         } else
-                            testutil_check(__wt_snprintf(
-                              buf, sizeof(buf), "commit_timestamp=%" PRIx64, base_ts));
+                            testutil_snprintf(
+                              buf, sizeof(buf), "commit_timestamp=%" PRIx64, base_ts);
 
                         /* Commit majority of times. */
                         if (next_rnd % 49 != 0) {

@@ -537,7 +537,8 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
     try {
         uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
 
-        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        auto catalogCache =
+            Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogCache() : nullptr;
         auto sii = catalogCache
             ? uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, *nss)).sii
             : boost::none;

@@ -55,7 +55,7 @@
 namespace mongo::stage_builder {
 namespace {
 
-boost::optional<sbe::value::SlotId> registerOplogTs(sbe::RuntimeEnvironment* env,
+boost::optional<sbe::value::SlotId> registerOplogTs(PlanStageEnvironment& env,
                                                     sbe::value::SlotIdGenerator* slotIdGenerator) {
     boost::optional<sbe::value::SlotId> slotId = env->getSlotIfExists("oplogTs"_sd);
     if (!slotId) {
@@ -71,7 +71,7 @@ boost::optional<sbe::value::SlotId> registerOplogTs(sbe::RuntimeEnvironment* env
  * standalone value of the same SlotId (the latter is returned purely for convenience purposes).
  */
 std::tuple<std::vector<std::string>, sbe::value::SlotVector, boost::optional<sbe::value::SlotId>>
-makeOplogTimestampSlotIfNeeded(sbe::RuntimeEnvironment* env,
+makeOplogTimestampSlotIfNeeded(PlanStageEnvironment& env,
                                sbe::value::SlotIdGenerator* slotIdGenerator,
                                bool shouldTrackLatestOplogTimestamp) {
     if (shouldTrackLatestOplogTimestamp) {
@@ -81,6 +81,21 @@ makeOplogTimestampSlotIfNeeded(sbe::RuntimeEnvironment* env,
     return {};
 }
 
+void openCallback(OperationContext* opCtx, const CollectionPtr& collection) {
+    // Forward, non-tailable scans from the oplog need to wait until all oplog entries
+    // before the read begins to be visible. This isn't needed for reverse scans because
+    // we only hide oplog entries from forward scans, and it isn't necessary for tailing
+    // cursors because they ignore EOF and will eventually see all writes. Forward,
+    // non-tailable scans are the only case where a meaningful EOF will be seen that
+    // might not include writes that finished before the read started. This also must be
+    // done before we create the cursor as that is when we establish the endpoint for
+    // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
+    // storage engine snapshot while waiting. Otherwise, we will end up reading from the
+    // snapshot where the oplog entries are not yet visible even after the wait.
+    opCtx->recoveryUnit()->abandonSnapshot();
+    collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+}
+
 /**
  * Checks whether a callback function should be created for a ScanStage and returns it, if so. The
  * logic in the provided callback will be executed when the ScanStage is opened (but not reopened).
@@ -88,26 +103,13 @@ makeOplogTimestampSlotIfNeeded(sbe::RuntimeEnvironment* env,
 sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const CollectionPtr& collection,
                                                const CollectionScanNode* csn) {
     if (csn->direction == CollectionScanParams::FORWARD && csn->shouldWaitForOplogVisibility) {
-        invariant(!csn->tailable);
-        invariant(collection->ns().isOplog());
+        tassert(7714200, "Expected 'tailable' to be false", !csn->tailable);
+        tassert(7714201, "Expected 'collection' to be the oplog", collection->ns().isOplog());
 
-        return [](OperationContext* opCtx, const CollectionPtr& collection) {
-            // Forward, non-tailable scans from the oplog need to wait until all oplog entries
-            // before the read begins to be visible. This isn't needed for reverse scans because
-            // we only hide oplog entries from forward scans, and it isn't necessary for tailing
-            // cursors because they ignore EOF and will eventually see all writes. Forward,
-            // non-tailable scans are the only case where a meaningful EOF will be seen that
-            // might not include writes that finished before the read started. This also must be
-            // done before we create the cursor as that is when we establish the endpoint for
-            // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
-            // storage engine snapshot while waiting. Otherwise, we will end up reading from the
-            // snapshot where the oplog entries are not yet visible even after the wait.
-
-            opCtx->recoveryUnit()->abandonSnapshot();
-            collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
-        };
+        return &openCallback;
+    } else {
+        return nullptr;
     }
-    return {};
 }
 
 // If the scan should be started after the provided resume RecordId, we will construct a nested-loop
@@ -142,7 +144,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     sbe::value::SlotId seekRecordIdSlot,
     std::unique_ptr<sbe::EExpression> seekRecordIdExpression,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch,
+    bool isResumingTailableScan,
     bool resumeAfterRecordId) {
     invariant(seekRecordIdExpression);
 
@@ -190,7 +192,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // $_resumeAfter.
     auto unusedSlot = state.slotId();
     auto [errorCode, errorMessage] = [&]() -> std::pair<ErrorCodes::Error, std::string> {
-        if (isTailableResumeBranch) {
+        if (isResumingTailableScan) {
             return {ErrorCodes::CappedPositionLost,
                     "CollectionScan died due to failure to restore tailable cursor position."};
         }
@@ -217,7 +219,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // the supplied position. For a resume token case we also inject a 'skip 1' stage on top of the
     // inner branch, as we need to start _after_ the resume RecordId. In both cases we inject a
     // 'limit 1' stage on top of the outer branch, as it should produce just a single seek recordId.
-    auto innerStage = isTailableResumeBranch || !resumeAfterRecordId
+    auto innerStage = isResumingTailableScan || !resumeAfterRecordId
         ? std::move(inputStage)
         : sbe::makeS<sbe::LimitSkipStage>(std::move(inputStage), boost::none, 1, csn->nodeId());
     return sbe::makeS<sbe::LoopJoinStage>(
@@ -255,9 +257,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     const CollectionScanNode* csn,
     std::vector<std::string> scanFieldNames,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch) {
+    bool isResumingTailableScan) {
+
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
-    sbe::RuntimeEnvironment* env = state.data->env;
+    sbe::RuntimeEnvironment* env = state.env.runtimeEnv;
 
     invariant(csn->doSbeClusteredCollectionScan());
     invariant(!csn->resumeAfterRecordId || forward);
@@ -279,7 +282,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     // scan from. Otherwise we must create a slot for it.
     auto [seekRecordIdSlot, seekRecordIdExpression] =
         [&]() -> std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::EExpression>> {
-        if (isTailableResumeBranch) {
+        if (isResumingTailableScan) {
             sbe::value::SlotId resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
         } else if (csn->resumeAfterRecordId) {
@@ -337,7 +340,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
                                                *seekRecordIdSlot,
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
-                                               isTailableResumeBranch,
+                                               isResumingTailableScan,
                                                csn->resumeAfterRecordId.has_value());
     }
 
@@ -367,7 +370,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
  * Generates a generic collection scan sub-tree.
  *  - If a resume token has been provided, the scan will start from a RecordId contained within this
  *    token.
- *  - Else if 'isTailableResumeBranch' is true, the scan will start from a RecordId contained in
+ *  - Else if 'isResumingTailableScan' is true, the scan will start from a RecordId contained in
  *    slot "resumeRecordId".
  *  - Otherwise the scan will start from the beginning of the collection.
  */
@@ -377,7 +380,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     const CollectionScanNode* csn,
     std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch) {
+    bool isResumingTailableScan) {
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
 
     invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
@@ -404,8 +407,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         if (csn->resumeAfterRecordId) {
             auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
             return {state.slotId(), makeConstant(tag, val)};
-        } else if (isTailableResumeBranch) {
-            auto resumeRecordIdSlot = state.data->env->getSlot("resumeRecordId"_sd);
+        } else if (isResumingTailableScan) {
+            auto resumeRecordIdSlot = state.env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
         }
         return {};
@@ -413,7 +416,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
 
     // See if we need to project out an oplog latest timestamp.
     auto&& [scanFields, scanFieldSlots, oplogTsSlot] = makeOplogTimestampSlotIfNeeded(
-        state.data->env, state.slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
+        state.env, state.slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
 
     scanFields.insert(scanFields.end(), fields.begin(), fields.end());
     scanFieldSlots.insert(scanFieldSlots.end(), fieldSlots.begin(), fieldSlots.end());
@@ -446,7 +449,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                *seekRecordIdSlot,
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
-                                               isTailableResumeBranch,
+                                               isResumingTailableScan,
                                                true /* resumeAfterRecordId  */);
     }
 
@@ -479,14 +482,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     const CollectionScanNode* csn,
     std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch) {
+    bool isResumingTailableScan) {
 
     if (csn->doSbeClusteredCollectionScan()) {
         return generateClusteredCollScan(
-            state, collection, csn, std::move(fields), yieldPolicy, isTailableResumeBranch);
+            state, collection, csn, std::move(fields), yieldPolicy, isResumingTailableScan);
     } else {
         return generateGenericCollScan(
-            state, collection, csn, std::move(fields), yieldPolicy, isTailableResumeBranch);
+            state, collection, csn, std::move(fields), yieldPolicy, isResumingTailableScan);
     }
 }
 }  // namespace mongo::stage_builder

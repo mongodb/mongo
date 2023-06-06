@@ -410,7 +410,6 @@ void BulkWriteOp::noteBatchResponse(
     for (const auto& write : targetedBatch.getWrites()) {
         ++index;
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
-        // TODO (SERVER-76953) : Handle unordered operations
         // When an error is encountered on an ordered bulk write, it is impossible for any of the
         // remaining operations to have been executed. For that reason we cancel them here so they
         // may be retargeted and retried.
@@ -420,12 +419,34 @@ void BulkWriteOp::noteBatchResponse(
             continue;
         }
 
-        auto& reply = replyItems[index];
+        // On most errors (for example, a DuplicateKeyError) unordered bulkWrite on a shard attempts
+        // to execute following operations even if a preceding operation errored. This isn't true
+        // for StaleConfig or StaleDbVersion errors. On these errors, since the shard knows that it
+        // following operations will also be stale, it stops right away.
+        // For that reason, although typically we can expect the size of replyItems to match the
+        // size of the number of operations sent (even in the case of errors), when a staleness
+        // error is received the size of replyItems will be <= the size of the number of operations.
+        // When this is the case, we treat all the remaining operations which may not have a
+        // replyItem as having failed with a staleness error.
+        if (!ordered && lastError &&
+            (lastError->getStatus().code() == ErrorCodes::StaleDbVersion ||
+             ErrorCodes::isStaleShardVersionError(lastError->getStatus()))) {
+            // Decrement the index so it keeps pointing to the same error (i.e. the
+            // last error, which is a staleness error).
+            LOGV2_DEBUG(7695304,
+                        4,
+                        "Duplicating the error for op",
+                        "opIdx"_attr = write->writeOpRef.first,
+                        "error"_attr = lastError->getStatus());
+            invariant(index == (int)replyItems.size());
+            index--;
+        }
 
+        auto& reply = replyItems[index];
         if (reply.getStatus().isOK()) {
             writeOp.noteWriteComplete(*write);
         } else {
-            lastError.emplace(reply.getIdx(), reply.getStatus());
+            lastError.emplace(write->writeOpRef.first, reply.getStatus());
             writeOp.noteWriteError(*write, *lastError);
 
             auto origWrite = BulkWriteCRUDOp(_clientRequest.getOps()[write->writeOpRef.first]);

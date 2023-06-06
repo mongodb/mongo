@@ -60,7 +60,7 @@
 namespace mongo {
 namespace {
 
-const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
 bool isStandaloneOrPrimary(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -208,7 +208,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             opCtx->recoveryUnit()->onCommit(
                 [insertedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                     OperationContext* opCtx, boost::optional<Timestamp>) {
-                    if (nsIsDbOnly(insertedNss.ns())) {
+                    if (nsIsDbOnly(NamespaceStringUtil::serialize(insertedNss))) {
                         boost::optional<AutoGetDb> lockDbIfNotPrimary;
                         if (!isStandaloneOrPrimary(opCtx)) {
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
@@ -351,7 +351,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         opCtx->recoveryUnit()->onCommit(
             [updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
-                if (nsIsDbOnly(updatedNss.ns())) {
+                if (nsIsDbOnly(NamespaceStringUtil::serialize(updatedNss))) {
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
                         lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
@@ -399,15 +399,16 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           BSONObj const& doc,
+                                          OplogDeleteEntryArgs* args,
                                           OpStateAccumulator* opAccumulator) {
 
     if (coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace ||
         coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        documentIdDecoration(opCtx) = doc;
+        documentIdDecoration(args) = doc;
     } else {
         // Extract the _id field from the document. If it does not have an _id, use the
         // document itself as the _id.
-        documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
+        documentIdDecoration(args) = doc["_id"] ? doc["_id"].wrap() : doc;
     }
 }
 
@@ -529,7 +530,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const OplogDeleteEntryArgs& args,
                                      OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    auto& documentId = documentIdDecoration(opCtx);
+    auto& documentId = documentIdDecoration(args);
     invariant(!documentId.isEmpty());
 
     if (nss == NamespaceString::kShardConfigCollectionsNamespace) {
@@ -583,7 +584,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         opCtx->recoveryUnit()->onCommit(
             [deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
-                if (nsIsDbOnly(deletedNss.ns())) {
+                if (nsIsDbOnly(NamespaceStringUtil::serialize(deletedNss))) {
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx)) {
                         lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);

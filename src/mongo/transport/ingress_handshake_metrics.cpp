@@ -41,17 +41,11 @@ namespace {
 const auto getIngressHandshakeMetricsDecoration =
     Session::declareDecoration<IngressHandshakeMetrics>();
 
-bool connHealthMetricsEnabled() {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-}
-
 bool connHealthMetricsLoggingEnabled() {
     return gEnableDetailedConnectionHealthMetricLogLines;
 }
 
-CounterMetric totalTimeToFirstNonAuthCommandMillis("network.totalTimeToFirstNonAuthCommandMillis",
-                                                   connHealthMetricsEnabled);
+CounterMetric totalTimeToFirstNonAuthCommandMillis("network.totalTimeToFirstNonAuthCommandMillis");
 }  // namespace
 
 IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
@@ -59,9 +53,6 @@ IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
 }
 
 void IngressHandshakeMetrics::onSessionStarted(TickSource* tickSource) {
-    if (!connHealthMetricsEnabled())
-        return;
-
     invariant(!_tickSource);
     invariant(!_sessionStartedTicks);
 
@@ -70,7 +61,7 @@ void IngressHandshakeMetrics::onSessionStarted(TickSource* tickSource) {
 }
 
 void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
-    if (MONGO_likely(_firstNonAuthCommandTicks || !connHealthMetricsEnabled()))
+    if (MONGO_likely(_firstNonAuthCommandTicks))
         return;
 
     invariant(_sessionStartedTicks);
@@ -105,7 +96,7 @@ void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
 
 void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
                                                  rpc::ReplyBuilderInterface* response) {
-    if (MONGO_likely(_firstNonAuthCommandTicks || _helloSucceeded || !connHealthMetricsEnabled()))
+    if (MONGO_likely(_firstNonAuthCommandTicks || _helloSucceeded))
         return;
 
     if (command->handshakeRole() != Command::HandshakeRole::kHello)
@@ -123,8 +114,7 @@ void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
 
 void IngressHandshakeMetrics::onResponseSent(Milliseconds processingDuration,
                                              Milliseconds sendingDuration) {
-    if (MONGO_likely(_helloSucceeded || !_helloReceivedTime) || !connHealthMetricsEnabled() ||
-        !connHealthMetricsLoggingEnabled())
+    if (MONGO_likely(_helloSucceeded || !_helloReceivedTime) || !connHealthMetricsLoggingEnabled())
         return;
 
     LOGV2(6724100,

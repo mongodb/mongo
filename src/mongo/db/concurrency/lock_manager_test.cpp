@@ -37,7 +37,14 @@ namespace mongo {
 
 class LockManagerTest : public ServiceContextTest {};
 
-TEST(ResourceId, Semantics) {
+class ResourceIdTest : public unittest::Test {
+protected:
+    constexpr int getResourceTypeBits() {
+        return ResourceId::resourceTypeBits;
+    }
+};
+
+TEST(ResourceIdTest, Semantics) {
     ResourceId resIdDb(RESOURCE_DATABASE, 324334234);
     ASSERT(resIdDb.getType() == RESOURCE_DATABASE);
     ASSERT(resIdDb.getHashId() == 324334234);
@@ -60,8 +67,9 @@ TEST(ResourceId, Semantics) {
     ASSERT_EQUALS(resId, resIdColl);
 }
 
-TEST(ResourceId, Masking) {
-    const uint64_t maxHash = (1ULL << 61) - 1;  //  Only 61 bits usable for hash
+TEST_F(ResourceIdTest, Masking) {
+    const uint64_t maxHash =
+        (1ULL << (64 - getResourceTypeBits())) - 1;  //  Only 60 bits usable for hash
     ResourceType resources[3] = {RESOURCE_GLOBAL, RESOURCE_COLLECTION, RESOURCE_METADATA};
     uint64_t hashes[3] = {maxHash, maxHash / 3, maxHash / 3 * 2};
 
@@ -74,8 +82,6 @@ TEST(ResourceId, Masking) {
         }
     }
 }
-
-class ResourceIdTest : public unittest::Test {};
 
 DEATH_TEST_F(ResourceIdTest, StringConstructorMustNotBeCollection, "invariant") {
     ResourceId(RESOURCE_COLLECTION, "TestDB.collection");

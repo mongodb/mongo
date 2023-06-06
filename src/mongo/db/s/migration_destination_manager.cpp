@@ -71,7 +71,6 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
@@ -262,7 +261,7 @@ bool opReplicatedEnough(OperationContext* opCtx,
  */
 BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_migrateClone", nss.ns());
+    builder.append("_migrateClone", NamespaceStringUtil::serialize(nss));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -274,7 +273,7 @@ BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSes
  */
 BSONObj createTransferModsRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_transferMods", nss.ns());
+    builder.append("_transferMods", NamespaceStringUtil::serialize(nss));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -436,7 +435,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
         b.append("sessionId", _sessionId->toString());
     }
 
-    b.append("ns", _nss.ns());
+    b.append("ns", NamespaceStringUtil::serialize(_nss));
     b.append("from", _fromShardConnString.toString());
     b.append("fromShardId", _fromShard.toString());
     b.append("min", _min);
@@ -1181,8 +1180,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     boost::optional<Timer> timeInCriticalSection;
 
     if (!skipToCritSecTaken) {
-        timing.emplace(
-            outerOpCtx, "to", _nss.ns(), _min, _max, 8 /* steps */, &_errmsg, _toShard, _fromShard);
+        timing.emplace(outerOpCtx,
+                       "to",
+                       NamespaceStringUtil::serialize(_nss),
+                       _min,
+                       _max,
+                       8 /* steps */,
+                       &_errmsg,
+                       _toShard,
+                       _fromShard);
 
         LOGV2(
             22000,
@@ -1674,11 +1680,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {
-        boost::optional<RemoveSaver> rs;
-        if (serverGlobalParams.moveParanoia) {
-            rs.emplace("moveChunk", _nss.ns().toString(), "removedDuring");
-        }
-
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
             totalDocs++;
@@ -1705,10 +1706,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                     }
                     continue;
                 }
-            }
-
-            if (rs) {
-                uassertStatusOK(rs->goingToDelete(fullObj));
             }
 
             writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {

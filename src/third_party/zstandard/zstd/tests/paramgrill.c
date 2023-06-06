@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -555,7 +555,7 @@ static int feasible(const BMK_benchResult_t results, const constraint_t target) 
 }
 
 /* hill climbing value for part 1 */
-/* Scoring here is a linear reward for all set constraints normalized between 0 to 1
+/* Scoring here is a linear reward for all set constraints normalized between 0 and 1
  * (with 0 at 0 and 1 being fully fulfilling the constraint), summed with a logarithmic
  * bonus to exceeding the constraint value. We also give linear ratio for compression ratio.
  * The constant factors are experimental.
@@ -566,10 +566,10 @@ resultScore(const BMK_benchResult_t res, const size_t srcSize, const constraint_
     double cs = 0., ds = 0., rt, cm = 0.;
     const double r1 = 1, r2 = 0.1, rtr = 0.5;
     double ret;
-    if(target.cSpeed) { cs = res.cSpeed / (double)target.cSpeed; }
-    if(target.dSpeed) { ds = res.dSpeed / (double)target.dSpeed; }
-    if(target.cMem != (U32)-1) { cm = (double)target.cMem / res.cMem; }
-    rt = ((double)srcSize / res.cSize);
+    if(target.cSpeed) { cs = (double)res.cSpeed / (double)target.cSpeed; }
+    if(target.dSpeed) { ds = (double)res.dSpeed / (double)target.dSpeed; }
+    if(target.cMem != (U32)-1) { cm = (double)target.cMem / (double)res.cMem; }
+    rt = ((double)srcSize / (double)res.cSize);
 
     ret = (MIN(1, cs) + MIN(1, ds)  + MIN(1, cm))*r1 + rt * rtr +
          (MAX(0, log(cs))+ MAX(0, log(ds))+ MAX(0, log(cm))) * r2;
@@ -581,8 +581,8 @@ resultScore(const BMK_benchResult_t res, const size_t srcSize, const constraint_
 static double
 resultDistLvl(const BMK_benchResult_t result1, const BMK_benchResult_t lvlRes)
 {
-    double normalizedCSpeedGain1 = ((double)result1.cSpeed / lvlRes.cSpeed) - 1;
-    double normalizedRatioGain1 = ((double)lvlRes.cSize / result1.cSize) - 1;
+    double normalizedCSpeedGain1 = ((double)result1.cSpeed / (double)lvlRes.cSpeed) - 1;
+    double normalizedRatioGain1 = ((double)lvlRes.cSize / (double)result1.cSize) - 1;
     if(normalizedRatioGain1 < 0 || normalizedCSpeedGain1 < 0) {
         return 0.0;
     }
@@ -854,7 +854,7 @@ BMK_displayOneResult(FILE* f, winnerInfo_t res, const size_t srcSize)
     }
 
     {   double const ratio = res.result.cSize ?
-                            (double)srcSize / res.result.cSize : 0;
+                            (double)srcSize / (double)res.result.cSize : 0;
         double const cSpeedMBps = (double)res.result.cSpeed / MB_UNIT;
         double const dSpeedMBps = (double)res.result.dSpeed / MB_UNIT;
 
@@ -937,7 +937,7 @@ BMK_printWinnerOpt(FILE* f, const U32 cLevel, const BMK_benchResult_t result, co
         }
         fprintf(f, "================================\n");
         fprintf(f, "Level Bounds: R: > %.3f AND C: < %.1f MB/s \n\n",
-            (double)srcSize / g_lvltarget.cSize, (double)g_lvltarget.cSpeed / MB_UNIT);
+            (double)srcSize / (double)g_lvltarget.cSize, (double)g_lvltarget.cSpeed / MB_UNIT);
 
 
         fprintf(f, "Overall Winner: \n");
@@ -977,7 +977,7 @@ BMK_print_cLevelEntry(FILE* f, const int cLevel,
     }
     /* print comment */
     {   double const ratio = result.cSize ?
-                            (double)srcSize / result.cSize : 0;
+                            (double)srcSize / (double)result.cSize : 0;
         double const cSpeedMBps = (double)result.cSpeed / MB_UNIT;
         double const dSpeedMBps = (double)result.dSpeed / MB_UNIT;
 
@@ -1726,19 +1726,19 @@ static int allBench(BMK_benchResult_t* resultPtr,
 
     /* calculate uncertainty in compression / decompression runs */
     if (benchres.cSpeed) {
-        U64 const loopDurationC = (((U64)buf.srcSize * TIMELOOP_NANOSEC) / benchres.cSpeed);
+        double const loopDurationC = (double)(((U64)buf.srcSize * TIMELOOP_NANOSEC) / benchres.cSpeed);
         uncertaintyConstantC = ((loopDurationC + (double)(2 * g_clockGranularity))/loopDurationC);
     }
 
     if (benchres.dSpeed) {
-        U64 const loopDurationD = (((U64)buf.srcSize * TIMELOOP_NANOSEC) / benchres.dSpeed);
+        double const loopDurationD = (double)(((U64)buf.srcSize * TIMELOOP_NANOSEC) / benchres.dSpeed);
         uncertaintyConstantD = ((loopDurationD + (double)(2 * g_clockGranularity))/loopDurationD);
     }
 
     /* optimistic assumption of benchres */
     {   BMK_benchResult_t resultMax = benchres;
-        resultMax.cSpeed = (unsigned long long)(resultMax.cSpeed * uncertaintyConstantC * VARIANCE);
-        resultMax.dSpeed = (unsigned long long)(resultMax.dSpeed * uncertaintyConstantD * VARIANCE);
+        resultMax.cSpeed = (unsigned long long)((double)resultMax.cSpeed * uncertaintyConstantC * VARIANCE);
+        resultMax.dSpeed = (unsigned long long)((double)resultMax.dSpeed * uncertaintyConstantD * VARIANCE);
 
         /* disregard infeasible results in feas mode */
         /* disregard if resultMax < winner in infeas mode */
@@ -1850,8 +1850,8 @@ static int BMK_seed(winnerInfo_t* winners,
 
         if ((double)testResult.cSize <= ((double)winners[cLevel].result.cSize * (1. + (0.02 / cLevel))) ) {
             /* Validate solution is "good enough" */
-            double W_ratio = (double)buf.srcSize / testResult.cSize;
-            double O_ratio = (double)buf.srcSize / winners[cLevel].result.cSize;
+            double W_ratio = (double)buf.srcSize / (double)testResult.cSize;
+            double O_ratio = (double)buf.srcSize / (double)winners[cLevel].result.cSize;
             double W_ratioNote = log (W_ratio);
             double O_ratioNote = log (O_ratio);
             size_t W_DMemUsed = (1 << params.vals[wlog_ind]) + (16 KB);
@@ -1864,11 +1864,11 @@ static int BMK_seed(winnerInfo_t* winners,
             double W_CMemUsed_note = W_ratioNote * ( 50 + 13*cLevel) - log((double)W_CMemUsed);
             double O_CMemUsed_note = O_ratioNote * ( 50 + 13*cLevel) - log((double)O_CMemUsed);
 
-            double W_CSpeed_note = W_ratioNote * (double)( 30 + 10*cLevel) + log(testResult.cSpeed);
-            double O_CSpeed_note = O_ratioNote * (double)( 30 + 10*cLevel) + log(winners[cLevel].result.cSpeed);
+            double W_CSpeed_note = W_ratioNote * (double)( 30 + 10*cLevel) + log((double)testResult.cSpeed);
+            double O_CSpeed_note = O_ratioNote * (double)( 30 + 10*cLevel) + log((double)winners[cLevel].result.cSpeed);
 
-            double W_DSpeed_note = W_ratioNote * (double)( 20 + 2*cLevel) + log(testResult.dSpeed);
-            double O_DSpeed_note = O_ratioNote * (double)( 20 + 2*cLevel) + log(winners[cLevel].result.dSpeed);
+            double W_DSpeed_note = W_ratioNote * (double)( 20 + 2*cLevel) + log((double)testResult.dSpeed);
+            double O_DSpeed_note = O_ratioNote * (double)( 20 + 2*cLevel) + log((double)winners[cLevel].result.dSpeed);
 
             if (W_DMemUsed_note < O_DMemUsed_note) {
                 /* uses too much Decompression memory for too little benefit */

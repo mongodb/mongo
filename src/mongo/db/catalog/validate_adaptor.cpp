@@ -539,11 +539,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        long long* nNonCompliantDocuments,
                                        size_t* dataSize,
                                        ValidateResults* results) {
-    auto validateBSONMode = BSONValidateMode::kDefault;
-    if (feature_flags::gExtendValidateCommand.isEnabled(serverGlobalParams.featureCompatibility)) {
-        validateBSONMode = _validateState->getBSONValidateMode();
-    }
-    const Status status = validateBSON(record.data(), record.size(), validateBSONMode);
+    const Status status =
+        validateBSON(record.data(), record.size(), _validateState->getBSONValidateMode());
     if (!status.isOK()) {
         if (status.code() != ErrorCodes::NonConformantBSON) {
             return status;
@@ -710,9 +707,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
                 nNonCompliantDocuments++;
                 schemaValidationFailed(_validateState, result.first, results);
-            } else if (feature_flags::gExtendValidateCommand.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                       coll->getTimeseriesOptions()) {
+            } else if (coll->getTimeseriesOptions()) {
                 // Checks for time-series collection consistency.
                 Status bucketStatus =
                     _validateTimeSeriesBucketRecord(coll, record->data.toBson(), results);

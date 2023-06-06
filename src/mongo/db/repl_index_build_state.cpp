@@ -104,7 +104,7 @@ void IndexBuildState::setState(State state,
     if (timestamp)
         _timestamp = timestamp;
     if (abortStatus) {
-        invariant(_state == kAborted || _state == kAwaitPrimaryAbort || _state == kForceSelfAbort);
+        invariant(_state == kAborted || _state == kFailureCleanUp || _state == kExternalAbort);
         _abortStatus = *abortStatus;
     }
 }
@@ -118,21 +118,18 @@ bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentStat
             return
                 // Normal case.
                 newState == IndexBuildState::State::kPostSetup ||
-                // Setup failed on a primary.
-                newState == IndexBuildState::State::kAborted ||
-                // Setup failed and we signalled the current primary to abort.
-                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort);
+                // Setup failed on a primary, proceed to cleanup. At this point cleanup only
+                // requires unregistering.
+                newState == IndexBuildState::State::kFailureCleanUp;
 
         case IndexBuildState::State::kPostSetup:
             return
                 // Normal case.
                 newState == IndexBuildState::State::kInProgress ||
-                // After setup, the primary aborted the index build.
-                newState == IndexBuildState::State::kAborted ||
-                // After setup, we signalled the current primary to abort the index build.
-                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort) ||
-                // We were forced to abort ourselves externally.
-                (graceful && newState == IndexBuildState::State::kForceSelfAbort);
+                // The index build was aborted, and the caller took responsibility for cleanup.
+                newState == IndexBuildState::State::kExternalAbort ||
+                // Internal failure or interrupted (user killOp, disk space monitor, or shutdown).
+                newState == IndexBuildState::State::kFailureCleanUp;
 
         case IndexBuildState::State::kInProgress:
             return
@@ -141,12 +138,9 @@ bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentStat
                 // As a secondary, we received a commit oplog entry.
                 newState == IndexBuildState::State::kApplyCommitOplogEntry ||
                 // The index build was aborted, and the caller took responsibility for cleanup.
-                newState == IndexBuildState::State::kAborted ||
-                // The index build failed and we are waiting for the primary to send an abort oplog
-                // entry.
-                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort) ||
-                // We were forced to abort ourselves externally and cleanup is required.
-                (graceful && newState == IndexBuildState::State::kForceSelfAbort);
+                newState == IndexBuildState::State::kExternalAbort ||
+                // Internal failure or interrupted (user killOp, disk space monitor, or shutdown).
+                newState == IndexBuildState::State::kFailureCleanUp;
 
         case IndexBuildState::State::kApplyCommitOplogEntry:
             return
@@ -155,16 +149,22 @@ bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentStat
 
         case IndexBuildState::State::kAwaitPrimaryAbort:
             return
-                // We successfully aborted the index build as a primary or secondary.
-                (graceful && newState == IndexBuildState::State::kAborted);
+                // Abort for shutdown.
+                newState == IndexBuildState::State::kAborted ||
+                // The oplog applier is externally aborting the index build while applying
+                // 'abortIndexBuild'.
+                (graceful && newState == IndexBuildState::State::kExternalAbort);
 
-        case IndexBuildState::State::kForceSelfAbort:
+        case IndexBuildState::State::kFailureCleanUp:
             return
-                // After being signalled to self-abort a second caller explicitly aborted the index
-                // build. The second caller has taken responsibility of cleanup.
-                (graceful && newState == IndexBuildState::State::kAborted) ||
+                // A primary node completed self-abort or abort for shutdown.
+                newState == IndexBuildState::State::kAborted ||
                 // We are waiting for the current primary to abort the index build.
                 (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort);
+
+        case IndexBuildState::State::kExternalAbort:
+            // The external aborter has finished cleaned up the index build.
+            return newState == IndexBuildState::State::kAborted;
 
         case IndexBuildState::State::kAborted:
             return false;
@@ -223,6 +223,32 @@ void ReplIndexBuildState::setInProgress(OperationContext* opCtx) {
     _indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
 }
 
+void ReplIndexBuildState::setPostFailureState(const Status& status) {
+    stdx::lock_guard lk(_mutex);
+    if (_indexBuildState.isFailureCleanUp() || _indexBuildState.isExternalAbort() ||
+        _indexBuildState.isAborted()) {
+        LOGV2_DEBUG(7693500,
+                    1,
+                    "Index build: already in an abort handling state",
+                    "state"_attr = _indexBuildState.toString());
+        return;
+    }
+
+    // It is possible that a 'commitIndexBuild' oplog entry is applied while the index builder is
+    // transitioning to an abort, or even to have been in a state where the oplog applier is already
+    // waiting for the index build to finish.
+    if (_indexBuildState.isApplyingCommitOplogEntry()) {
+        LOGV2_FATAL(7329407,
+                    "Trying to abort an index build while a 'commitIndexBuild' oplog entry is "
+                    "being applied. The primary has already committed the build, but this node is "
+                    "trying to abort it. This is an inconsistent state we cannot recover from.",
+                    "buildUUID"_attr = buildUUID);
+    }
+
+    _indexBuildState.setState(
+        IndexBuildState::kFailureCleanUp, false /* skipCheck */, boost::none, status);
+}
+
 void ReplIndexBuildState::setVotedForCommitReadiness(OperationContext* opCtx) {
     stdx::lock_guard lk(_mutex);
     invariant(!_votedForCommitReadiness);
@@ -244,30 +270,10 @@ void ReplIndexBuildState::commit(OperationContext* opCtx) {
         });
 }
 
-bool ReplIndexBuildState::requestAbortFromPrimary(const Status& abortStatus) {
+void ReplIndexBuildState::requestAbortFromPrimary() {
     invariant(protocol == IndexBuildProtocol::kTwoPhase);
     stdx::lock_guard lk(_mutex);
-
-    // It is possible that a 'commitIndexBuild' oplog entry is applied while the index builder is
-    // transitioning to an abort, or even to have been in a state where the oplog applier is already
-    // waiting for the index build to finish. In such instances, the node cannot try to recover by
-    // requesting an abort from the primary, as the commitQuorum already decided to commit.
-    if (_indexBuildState.isApplyingCommitOplogEntry()) {
-        LOGV2_FATAL(7329407,
-                    "Trying to abort an index build while a 'commitIndexBuild' oplog entry is "
-                    "being applied. The primary has already committed the build, but this node is "
-                    "trying to abort it. This is an inconsistent state we cannot recover from.",
-                    "buildUUID"_attr = buildUUID);
-    }
-
-    if (_indexBuildState.isAborted()) {
-        return false;
-    }
-
-    _indexBuildState.setState(
-        IndexBuildState::kAwaitPrimaryAbort, false /* skipCheck */, boost::none, abortStatus);
-
-    return true;
+    _indexBuildState.setState(IndexBuildState::kAwaitPrimaryAbort, false /* skipCheck */);
 }
 
 Timestamp ReplIndexBuildState::getCommitTimestamp() const {
@@ -282,7 +288,7 @@ void ReplIndexBuildState::onOplogCommit(bool isPrimary) const {
                             << ",  index build state: " << _indexBuildState.toString());
 }
 
-void ReplIndexBuildState::abortSelf(OperationContext* opCtx) {
+void ReplIndexBuildState::completeAbort(OperationContext* opCtx) {
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
     stdx::lock_guard lk(_mutex);
     _indexBuildState.setState(IndexBuildState::kAborted, skipCheck);
@@ -305,7 +311,7 @@ void ReplIndexBuildState::onOplogAbort(OperationContext* opCtx, const NamespaceS
     invariant(!isPrimary, str::stream() << "Index build: " << buildUUID);
 
     stdx::lock_guard lk(_mutex);
-    invariant(_indexBuildState.isAborted(),
+    invariant(_indexBuildState.isExternalAbort(),
               str::stream() << "Index build: " << buildUUID
                             << ",  index build state: " << _indexBuildState.toString());
     invariant(_indexBuildState.getTimestamp() && _indexBuildState.getAbortReason(),
@@ -331,7 +337,7 @@ bool ReplIndexBuildState::isAborted() const {
 
 bool ReplIndexBuildState::isAborting() const {
     stdx::lock_guard lk(_mutex);
-    return _indexBuildState.isAwaitingPrimaryAbort() || _indexBuildState.isForceSelfAbort();
+    return _indexBuildState.isAborting();
 }
 
 bool ReplIndexBuildState::isCommitted() const {
@@ -344,9 +350,19 @@ bool ReplIndexBuildState::isSettingUp() const {
     return _indexBuildState.isSettingUp();
 }
 
+bool ReplIndexBuildState::isExternalAbort() const {
+    stdx::lock_guard lk(_mutex);
+    return _indexBuildState.isExternalAbort();
+}
+
+bool ReplIndexBuildState::isFailureCleanUp() const {
+    stdx::lock_guard lk(_mutex);
+    return _indexBuildState.isFailureCleanUp();
+}
+
 std::string ReplIndexBuildState::getAbortReason() const {
     stdx::lock_guard lk(_mutex);
-    invariant(_indexBuildState.isAborted() || _indexBuildState.isAwaitingPrimaryAbort(),
+    invariant(_indexBuildState.isAborted() || _indexBuildState.isAborting(),
               str::stream() << "Index build: " << buildUUID
                             << ",  index build state: " << _indexBuildState.toString());
     auto reason = _indexBuildState.getAbortReason();
@@ -409,7 +425,7 @@ bool ReplIndexBuildState::tryCommit(OperationContext* opCtx) {
 
     // If the node is secondary, and awaiting a primary abort, the transition is invalid, and the
     // node should crash.
-    if (_indexBuildState.isAwaitingPrimaryAbort() || _indexBuildState.isForceSelfAbort()) {
+    if (_indexBuildState.isAwaitingPrimaryAbort() || _indexBuildState.isFailureCleanUp()) {
         LOGV2_FATAL(7329403,
                     "Received an index build commit from the primary for an index build that we "
                     "were unable to build successfully and was waiting for an abort",
@@ -442,12 +458,31 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
                                                                   IndexBuildAction signalAction,
                                                                   std::string reason) {
     stdx::lock_guard lk(_mutex);
+    // It is not possible for the index build to be in kExternalAbort state, as the collection
+    // MODE_X lock is held and there cannot be concurrent external aborters.
+    auto nssOptional = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, collectionUUID);
+    invariant(!_indexBuildState.isExternalAbort());
+    invariant(nssOptional &&
+              opCtx->lockState()->isCollectionLockedForMode(nssOptional.get(), MODE_X));
+
     // Wait until the build is done setting up. This indicates that all required state is
     // initialized to attempt an abort.
     if (_indexBuildState.isSettingUp()) {
         LOGV2_DEBUG(465605,
                     2,
                     "waiting until index build is done setting up before attempting to abort",
+                    "buildUUID"_attr = buildUUID);
+        return TryAbortResult::kRetry;
+    }
+    // Wait until an earlier self-abort finishes. The kAwaitPrimaryAbort state must be allowed, in
+    // case the voteAbortIndexBuild command ends up in a loopback or 'abortIndexBuild' is being
+    // applied. We retry here instead of returning kAlreadyAborted to ensure that by the time the
+    // external aborter receives TryAbortResult::kAlreadyAborted, the build is actually aborted and
+    // not in the process of aborting.
+    if (_indexBuildState.isFailureCleanUp()) {
+        LOGV2_DEBUG(7693501,
+                    2,
+                    "waiting until index build is finishes abort",
                     "buildUUID"_attr = buildUUID);
         return TryAbortResult::kRetry;
     }
@@ -495,7 +530,8 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
         ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName)
         : Status(ErrorCodes::IndexBuildAborted, reason);
     invariant(!abortStatus.isOK());
-    _indexBuildState.setState(IndexBuildState::kAborted, skipCheck, abortTimestamp, abortStatus);
+    _indexBuildState.setState(
+        IndexBuildState::kExternalAbort, skipCheck, abortTimestamp, abortStatus);
 
     // Aside from setting the tenantMigrationAbortStatus, tenant migration aborts are identical to
     // primary aborts.
@@ -525,10 +561,11 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
 bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& error) {
     stdx::lock_guard lk(_mutex);
     if (_indexBuildState.isSettingUp() || _indexBuildState.isAborted() ||
-        _indexBuildState.isCommitted() || _indexBuildState.isAwaitingPrimaryAbort() ||
+        _indexBuildState.isCommitted() || _indexBuildState.isAborting() ||
         _indexBuildState.isApplyingCommitOplogEntry() || _votedForCommitReadiness) {
         // If the build is setting up, it is not yet abortable. If the index build has already
-        // passed a point of no return, interrupting will not be productive.
+        // passed a point of no return, interrupting will not be productive. If the index build is
+        // already in the process of aborting, it cannot be aborted again.
         LOGV2(7617000,
               "Index build: cannot force abort",
               "buildUUID"_attr = buildUUID,
@@ -537,7 +574,7 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
         return false;
     }
 
-    _indexBuildState.setState(IndexBuildState::kForceSelfAbort,
+    _indexBuildState.setState(IndexBuildState::kFailureCleanUp,
                               false /* skipCheck */,
                               boost::none /* timestamp */,
                               error);

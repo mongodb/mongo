@@ -45,7 +45,7 @@ structs:
         query_shape_component: true
         strict: true
         description: ""
-        fields: 
+        fields:
             stringField:
                 query_shape: literal
                 type: string
@@ -75,6 +75,12 @@ structs:
             plainNss:
                 query_shape: parameter
                 type: namespacestring
+            safeInt64Field:
+                query_shape: literal
+                type: safeInt64
+            boolField:
+                query_shape: literal
+                type: bool
 
     ParentStruct:
         query_shape_component: true

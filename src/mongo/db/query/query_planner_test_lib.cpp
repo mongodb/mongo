@@ -1415,7 +1415,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                   << testSoln.toString()};
         }
 
-        if (expectedForeignCollection.str() != actualEqLookupNode->foreignCollection.toString()) {
+        if (expectedForeignCollection.str() !=
+            actualEqLookupNode->foreignCollection.toString_forTest()) {
             return {
                 ErrorCodes::Error{6267502},
                 str::stream() << "Test solution 'foreignCollection' does not match actual; test "

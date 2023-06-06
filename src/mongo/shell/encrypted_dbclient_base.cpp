@@ -842,7 +842,7 @@ void createCollectionObject(JSContext* cx,
     collectionArgs[0].setObject(client.toObject());
     collectionArgs[1].setObject(*databaseObj);
     mozjs::ValueReader(cx, collectionArgs[2]).fromStringData(ns.coll());
-    mozjs::ValueReader(cx, collectionArgs[3]).fromStringData(ns.ns());
+    mozjs::ValueReader(cx, collectionArgs[3]).fromStringData(ns.toString_forTest());
 
     scope->getProto<mozjs::DBCollectionInfo>().newInstance(collectionArgs, collection);
 }

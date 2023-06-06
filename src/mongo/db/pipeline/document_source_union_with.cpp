@@ -75,7 +75,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     opts.validator = validatorCallback;
 
     return Pipeline::makePipelineFromViewDefinition(
-        expCtx->copyForSubPipeline(expCtx->ns, resolvedNs.uuid), resolvedNs, currentPipeline, opts);
+        expCtx->copyForSubPipeline(expCtx->ns, resolvedNs.uuid),
+        resolvedNs,
+        std::move(currentPipeline),
+        opts);
 }
 
 }  // namespace
@@ -235,7 +238,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
             _pipeline = buildPipelineFromViewDefinition(
                 pExpCtx,
                 ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
-                serializedPipe);
+                std::move(serializedPipe));
             logShardedViewFound(e);
             return doGetNext();
         }

@@ -135,7 +135,7 @@ size_t getSupportedMax() {
         return serverGlobalParams.maxConns;
 #else
         struct rlimit limit;
-        verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
+        MONGO_verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
 
         size_t max = (size_t)(limit.rlim_cur * .8);
 
@@ -436,11 +436,7 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     appendInt("current", sessionCount);
     appendInt("available", _maxSessions - sessionCount);
     appendInt("totalCreated", sessionsCreated);
-
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-        appendInt("rejected", _rejectedSessions);
-    }
+    appendInt("rejected", _rejectedSessions);
 
     invariant(_svcCtx);
     appendInt("active", _svcCtx->getActiveClientOperations());

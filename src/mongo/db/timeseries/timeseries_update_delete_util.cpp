@@ -257,14 +257,14 @@ std::unique_ptr<MatchExpression> andCombineMatchExpressions(Ts&&... matchExprs) 
 
 BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          const TimeseriesOptions& tsOptions) {
+                                          const TimeseriesOptions& tsOptions,
+                                          bool allowArbitraryWrites) {
     if (originalQuery.isEmpty()) {
         return BSONObj();
     }
 
     auto&& metaField = tsOptions.getMetaField();
-    if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!allowArbitraryWrites) {
         if (!metaField) {
             // In case the time-series collection does not have meta field defined, we broadcast
             // the request to all shards or use two phase protocol using empty predicate.

@@ -170,7 +170,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "DeleteStage ensureStillMatches",
-        collection()->ns().ns(),
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
                 collection(), opCtx(), _ws, id, _params->canonicalQuery);
@@ -226,14 +225,9 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     Snapshotted<Document> memberDoc = member->doc;
     BSONObj bsonObjDoc = memberDoc.value().toBson();
 
-    if (_params->removeSaver) {
-        uassertStatusOK(_params->removeSaver->goingToDelete(bsonObjDoc));
-    }
-
     handlePlanStageYield(
         expCtx(),
         "DeleteStage saveState",
-        collection()->ns().ns(),
         [&] {
             child()->saveState();
             return PlanStage::NEED_TIME /* unused */;
@@ -249,7 +243,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             const auto ret = handlePlanStageYield(
                 expCtx(),
                 "DeleteStage deleteDocument",
-                collection()->ns().ns(),
                 [&] {
                     WriteUnitOfWork wunit(opCtx());
                     collection_internal::deleteDocument(
@@ -308,7 +301,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     const auto restoreStateRet = handlePlanStageYield(
         expCtx(),
         "DeleteStage restoreState",
-        collection()->ns().ns(),
         [&] {
             child()->restoreState(&collection());
             return PlanStage::NEED_TIME;

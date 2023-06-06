@@ -21,7 +21,8 @@ const denylistedTests = [
     "addShardToZone",
     "removeShardFromZone",
     "oidcListKeys",
-    "oidcRefreshKeys"
+    "oidcRefreshKeys",
+    "aggregate_$search"  // TODO SERVER-76087 reenable this test
 ];
 
 function runTests(tests, conn, impls, options) {

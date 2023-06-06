@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
-
-#include <functional>
-#include <memory>
 
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/hello_response.h"
@@ -46,7 +40,6 @@
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
@@ -57,7 +50,6 @@
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace repl {
@@ -361,7 +353,8 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
           "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
           "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
-    simulateSuccessfulV1ElectionAt(electionTimeoutWhen);
+    auto opCtx{makeOperationContext()};
+    simulateSuccessfulV1ElectionAt(opCtx.get(), electionTimeoutWhen);
 }
 
 void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime,
@@ -430,15 +423,14 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
     ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
 }
 
-void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
-    auto opCtx = makeOperationContext();
-    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx.get());
+void ReplCoordTest::simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date_t electionTime) {
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx);
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
 
-    signalDrainComplete(opCtx.get());
+    signalDrainComplete(opCtx);
 
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
-    auto helloResponse = replCoord->awaitHelloResponse(opCtx.get(), {}, boost::none, boost::none);
+    auto helloResponse = replCoord->awaitHelloResponse(opCtx, {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_FALSE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
 

@@ -49,20 +49,21 @@ BSONObj representativePredicateShape(const MatchExpression* predicate) {
 }
 
 BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> identifierHmacPolicy) {
+                            std::function<std::string(StringData)> transformIdentifiersCallback) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierHmacPolicy = identifierHmacPolicy;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = transformIdentifiersCallback;
+    opts.transformIdentifiers = true;
     return predicate->serialize(opts);
 }
 
-BSONObj representativePredicateShape(const MatchExpression* predicate,
-                                     std::function<std::string(StringData)> identifierHmacPolicy) {
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> transformIdentifiersCallback) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
-    opts.identifierHmacPolicy = identifierHmacPolicy;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = transformIdentifiersCallback;
+    opts.transformIdentifiers = true;
     return predicate->serialize(opts);
 }
 
@@ -144,14 +145,17 @@ void addRemainingFindCommandFields(BSONObjBuilder* bob,
     }
 }
 
-BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool redactValues) {
+BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool preserveValue) {
     BSONObjBuilder bob;
     for (BSONElement elem : obj) {
         if (hintSpecialField.compare(elem.fieldName()) == 0) {
-            tassert(7421703,
-                    "Hinted field must be a string with $hint operator",
-                    elem.type() == BSONType::String);
-            bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            if (elem.type() == BSONType::String) {
+                bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            } else if (elem.type() == BSONType::Object) {
+                opts.appendLiteral(&bob, hintSpecialField, elem.Obj());
+            } else {
+                uasserted(ErrorCodes::FailedToParse, "$hint must be a string or an object");
+            }
             continue;
         }
 
@@ -161,11 +165,10 @@ BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool red
             continue;
         }
 
-        if (opts.replacementForLiteralArgs && redactValues) {
-            bob.append(opts.serializeFieldPathFromString(elem.fieldName()),
-                       opts.replacementForLiteralArgs.get());
-        } else {
+        if (preserveValue) {
             bob.appendAs(elem, opts.serializeFieldPathFromString(elem.fieldName()));
+        } else {
+            opts.appendLiteral(&bob, opts.serializeFieldPathFromString(elem.fieldName()), elem);
         }
     }
     return bob.obj();
@@ -239,15 +242,15 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
     // Hint, max, and min won't serialize if the object is empty.
     if (!findCmd.getHint().isEmpty()) {
         bob.append(FindCommandRequest::kHintFieldName,
-                   extractHintShape(findCmd.getHint(), opts, false));
+                   extractHintShape(findCmd.getHint(), opts, true));
         // Max/Min aren't valid without hint.
         if (!findCmd.getMax().isEmpty()) {
             bob.append(FindCommandRequest::kMaxFieldName,
-                       extractHintShape(findCmd.getMax(), opts, true));
+                       extractHintShape(findCmd.getMax(), opts, false));
         }
         if (!findCmd.getMin().isEmpty()) {
             bob.append(FindCommandRequest::kMinFieldName,
-                       extractHintShape(findCmd.getMin(), opts, true));
+                       extractHintShape(findCmd.getMin(), opts, false));
         }
     }
 
@@ -308,7 +311,7 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
     // hint
     if (auto hint = aggregateCommand.getHint()) {
         bob.append(AggregateCommandRequest::kHintFieldName,
-                   extractHintShape(hint.get(), opts, false));
+                   extractHintShape(hint.get(), opts, true));
     }
 
     // let

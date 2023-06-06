@@ -72,9 +72,11 @@ hangAfterCollDropHasLocks.wait();
 hangBeforeCleanup.off();
 hangAfterCollDropHasLocks.off();
 
-jsTestLog("Waiting for the index build to be killed");
-// "Index build: joined after abort".
-checkLog.containsJson(primary, 20655, {
+// The index build should not be externally abortable once the index builder thread is in the
+// process of aborting.
+jsTestLog("Waiting for the index build to abort");
+// Cleaned up index build after abort.
+checkLog.containsJson(primary, 465611, {
     buildUUID: function(uuid) {
         return uuid && uuid["uuid"]["$uuid"] === extractUUIDFromObject(buildUUID);
     }

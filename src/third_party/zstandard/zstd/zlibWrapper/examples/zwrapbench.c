@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-present, Przemyslaw Skibinski, Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -26,7 +26,7 @@
 #include "datagen.h"     /* RDG_genBuffer */
 #include "xxhash.h"
 
-#include "zstd_zlibwrapper.h"
+#include "../zstd_zlibwrapper.h"
 
 
 
@@ -109,17 +109,17 @@ static unsigned g_nbIterations = NBLOOPS;
 static size_t g_blockSize = 0;
 int g_additionalParam = 0;
 
-void BMK_setNotificationLevel(unsigned level) { g_displayLevel=level; }
+static void BMK_setNotificationLevel(unsigned level) { g_displayLevel=level; }
 
-void BMK_setAdditionalParam(int additionalParam) { g_additionalParam=additionalParam; }
+static void BMK_setAdditionalParam(int additionalParam) { g_additionalParam=additionalParam; }
 
-void BMK_SetNbIterations(unsigned nbLoops)
+static void BMK_SetNbIterations(unsigned nbLoops)
 {
     g_nbIterations = nbLoops;
     DISPLAYLEVEL(3, "- test >= %u seconds per compression / decompression -\n", g_nbIterations);
 }
 
-void BMK_SetBlockSize(size_t blockSize)
+static void BMK_SetBlockSize(size_t blockSize)
 {
     g_blockSize = blockSize;
     DISPLAYLEVEL(2, "using blocks of size %u KB \n", (unsigned)(blockSize>>10));
@@ -388,7 +388,7 @@ static int BMK_benchMem(z_const void* srcBuffer, size_t srcSize,
             markNb = (markNb+1) % NB_MARKS;
             DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s\r",
                     marks[markNb], displayName, (unsigned)srcSize, (unsigned)cSize, ratio,
-                    (double)srcSize / fastestC );
+                    (double)srcSize / (double)fastestC );
 
             (void)fastestD; (void)crcOrig;   /*  unused when decompression disabled */
 #if 1
@@ -428,8 +428,10 @@ static int BMK_benchMem(z_const void* srcBuffer, size_t srcSize,
                     ZSTD_DStream* zbd = ZSTD_createDStream();
                     size_t rSize;
                     if (zbd == NULL) EXM_THROW(1, "ZSTD_createDStream() allocation failure");
-                    rSize = ZSTD_initDStream_usingDict(zbd, dictBuffer, dictBufferSize);
-                    if (ZSTD_isError(rSize)) EXM_THROW(1, "ZSTD_initDStream() failed : %s", ZSTD_getErrorName(rSize));
+                    rSize = ZSTD_DCtx_reset(zbd, ZSTD_reset_session_only);
+                    if (ZSTD_isError(rSize)) EXM_THROW(1, "ZSTD_DCtx_reset() failed : %s", ZSTD_getErrorName(rSize));
+                    rSize = ZSTD_DCtx_loadDictionary(zbd, dictBuffer, dictBufferSize);
+                    if (ZSTD_isError(rSize)) EXM_THROW(1, "ZSTD_DCtx_loadDictionary() failed : %s", ZSTD_getErrorName(rSize));
                     do {
                         U32 blockNb;
                         for (blockNb=0; blockNb<nbBlocks; blockNb++) {
@@ -527,8 +529,8 @@ static int BMK_benchMem(z_const void* srcBuffer, size_t srcSize,
             markNb = (markNb+1) % NB_MARKS;
             DISPLAYLEVEL(2, "%2s-%-17.17s :%10u ->%10u (%5.3f),%6.1f MB/s ,%6.1f MB/s\r",
                     marks[markNb], displayName, (unsigned)srcSize, (unsigned)cSize, ratio,
-                    (double)srcSize / fastestC,
-                    (double)srcSize / fastestD );
+                    (double)srcSize / (double)fastestC,
+                    (double)srcSize / (double)fastestD );
 
             /* CRC Checking */
             {   U64 const crcCheck = XXH64(resultBuffer, srcSize, 0);
@@ -558,8 +560,8 @@ static int BMK_benchMem(z_const void* srcBuffer, size_t srcSize,
         }   /* for (testNb = 1; testNb <= (g_nbIterations + !g_nbIterations); testNb++) */
 
         if (g_displayLevel == 1) {
-            double cSpeed = (double)srcSize / fastestC;
-            double dSpeed = (double)srcSize / fastestD;
+            double cSpeed = (double)srcSize / (double)fastestC;
+            double dSpeed = (double)srcSize / (double)fastestD;
             if (g_additionalParam)
                 DISPLAY("-%-3i%11i (%5.3f) %6.2f MB/s %6.1f MB/s  %s (param=%d)\n", cLevel, (int)cSize, ratio, cSpeed, dSpeed, displayName, g_additionalParam);
             else
@@ -796,7 +798,7 @@ static void BMK_syntheticTest(int cLevel, int cLevelLast, double compressibility
 }
 
 
-int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
+static int BMK_benchFiles(const char** fileNamesTable, unsigned nbFiles,
                    const char* dictFileName, int cLevel, int cLevelLast)
 {
     double const compressibility = (double)g_compressibilityDefault / 100;
@@ -836,7 +838,7 @@ static int usage(const char* programName)
     DISPLAY( " -b#    : benchmark file(s), using # compression level (default : %d) \n", ZSTDCLI_CLEVEL_DEFAULT);
     DISPLAY( " -e#    : test all compression levels from -bX to # (default: %d)\n", ZSTDCLI_CLEVEL_DEFAULT);
     DISPLAY( " -i#    : minimum evaluation time in seconds (default : 3s)\n");
-    DISPLAY( " -B#    : cut file into independent blocks of size # (default: no block)\n");
+    DISPLAY( " -B#    : cut file into independent chunks of size # (default: no chunking)\n");
     return 0;
 }
 

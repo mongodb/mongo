@@ -62,8 +62,8 @@ private:
      */
     bool _deleteExcessDocuments();
 
-    std::string _name =
-        std::string("OplogCapMaintainerThread-") + NamespaceString::kRsOplogNamespace.toString();
+    std::string _name = std::string("OplogCapMaintainerThread-") +
+        toStringForLogging(NamespaceString::kRsOplogNamespace);
 };
 
 }  // namespace mongo

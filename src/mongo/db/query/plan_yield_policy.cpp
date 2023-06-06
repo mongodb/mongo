@@ -182,7 +182,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }
-            logWriteConflictAndBackoff(attempt, "query yield", e.reason(), ""_sd);
+            logWriteConflictAndBackoff(
+                attempt, "query yield", e.reason(), NamespaceStringOrUUID(NamespaceString()));
             // Retry the yielding process.
         } catch (...) {
             // Errors other than write conflicts don't get retried, and should instead result in
@@ -263,17 +264,8 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     }
 
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
-    ScopeGuard disposeYieldedTransactionResourcesScopeGuard([&yieldedTransactionResources] {
-        if (yieldedTransactionResources) {
-            yieldedTransactionResources->dispose();
-        }
-    });
-
-    if (!yieldedTransactionResources) {
-        // Nothing was unlocked. Recursively held locks are not the only reason locks cannot be
-        // released.
-        return;
-    }
+    ScopeGuard disposeYieldedTransactionResourcesScopeGuard(
+        [&yieldedTransactionResources] { yieldedTransactionResources.dispose(); });
 
     if (_callbacks) {
         _callbacks->duringYield(opCtx);
@@ -286,7 +278,7 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     disposeYieldedTransactionResourcesScopeGuard.dismiss();
     try {
         restoreTransactionResourcesToOperationContext(opCtx,
-                                                      std::move(*yieldedTransactionResources));
+                                                      std::move(yieldedTransactionResources));
     } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
         const auto extraInfo = ex.extraInfo<CollectionUUIDMismatchInfo>();
         if (extraInfo->actualCollection()) {

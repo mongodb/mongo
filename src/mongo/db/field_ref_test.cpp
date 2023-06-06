@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -90,6 +91,17 @@ TEST(Normal, SinglePart) {
     ASSERT_EQUALS(fieldRef.getPart(0), field);
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
+
+DEATH_TEST_REGEX(Normal, Overflow, "Tripwire assertion.*1589700") {
+    std::string field = "a";
+    for (size_t s = 1; s <= BSONObjMaxInternalSize / 2; s++) {
+        field.append(".a");
+    }
+    ASSERT_GT(field.size(), BSONObjMaxInternalSize);
+    FieldRef fieldRef;
+    ASSERT_THROWS_CODE(fieldRef.parse(field), AssertionException, 1589700);
+}
+
 
 TEST(Normal, ParseTwice) {
     std::string field = "a";

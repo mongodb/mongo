@@ -136,6 +136,68 @@ public:
         const std::vector<IndexEntry>& indices,
         const QueryPlannerParams& params);
 
+    /**
+     * Helper method that checks to see if min() or max() were provided along with the query. If so,
+     * adjusts the collection scan bounds to fit the constraints.
+     *
+     * This method is shared by QO planner and QE SBE cached plan variable bind, which must get the
+     * same answers for the output args (hence sharing one implementation instead of creating a
+     * separate parallel one).
+     *
+     * Arguments
+     *   (in) query - current query
+     *   (in) direction - 'query's scan direction: 1: forward; -1: reverse
+     *   (in) queryCollator - 'query's collator
+     *   (in) ccCollator - clustered collection's collator
+     *   (out) minRecord - scan start bound
+     *   (out) maxRecord - scan end bound
+     *   (out) boundInclusion - whether to exclude 'maxRecord' because it was specified by the 'max'
+     *     keyword
+     */
+    static void handleRIDRangeMinMax(const CanonicalQuery& query,
+                                     int direction,
+                                     const CollatorInterface* queryCollator,
+                                     const CollatorInterface* ccCollator,
+                                     boost::optional<RecordIdBound>& minRecord,
+                                     boost::optional<RecordIdBound>& maxRecord,
+                                     CollectionScanParams::ScanBoundInclusion& boundInclusion);
+
+    /**
+     * Helper method to add an RID range to collection scans. If the query solution tree contains a
+     * collection scan node with a suitable comparison predicate on '_id', we add a minRecord and
+     * maxRecord on the collection node.
+     *
+     * This method is shared by QO planner and QE SBE cached plan variable bind, which must get the
+     * same answers for the output args (hence sharing one implementation instead of creating a
+     * separate parallel one).
+     *
+     * Returns true if the MatchExpression is a comparison against the cluster key which either:
+     * 1) is guaranteed to exclude values of the cluster key which are affected by collation or
+     * 2) may return values of the cluster key which are affected by collation, but the query and
+     *    collection collations match.
+     * Otherwise, returns false.
+     *
+     * For example, assuming the cluster key is "_id":
+     * Given {a: {$eq: 2}}, we return false, because the comparison is not against the cluster key.
+     * Given {_id: {$gte: 5}}, we return true, because this comparison against the cluster key
+     *    excludes keys which are affected by collations.
+     * Given {_id: {$eq: "str"}}, we return true only if the query and collection collations match.
+     *
+     * Arguments
+     *   (in) conjunct - current query's match expression (or subexpression in recursive calls)
+     *   (in) queryCollator - current query's collator
+     *   (in) ccCollator - clustered collection's collator
+     *   (in) clusterKeyFieldName - only "_id" is officially supported, but this may change someday
+     *   (out) minRecord - scan start bound
+     *   (out) maxRecord - scan end bound
+     */
+    [[nodiscard]] static bool handleRIDRangeScan(const MatchExpression* conjunct,
+                                                 const CollatorInterface* queryCollator,
+                                                 const CollatorInterface* ccCollator,
+                                                 const StringData& clusterKeyFieldName,
+                                                 boost::optional<RecordIdBound>& minRecord,
+                                                 boost::optional<RecordIdBound>& maxRecord);
+
 private:
     /**
      * Building the leaves (i.e. the index scans) is done by looping through

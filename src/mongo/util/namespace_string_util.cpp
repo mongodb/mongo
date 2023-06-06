@@ -37,10 +37,9 @@
 namespace mongo {
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
-                                           const SerializationContext& context,
-                                           const SerializationOptions& options) {
+                                           const SerializationContext& context) {
     if (!gMultitenancySupport)
-        return options.serializeIdentifier(ns.toString());
+        return ns.toString();
 
     // TODO SERVER-74284: uncomment to redirect command-sepcific serialization requests
     // if (context.getSource() == SerializationContext::Source::Command &&
@@ -48,7 +47,13 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
     //     return serializeForCommands(ns, context);
 
     // if we're not serializing a Command Reply, use the default serializing rules
-    return options.serializeIdentifier(serializeForStorage(ns, context));
+    return serializeForStorage(ns, context);
+}
+
+std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
+                                           const SerializationOptions& options,
+                                           const SerializationContext& context) {
+    return options.serializeIdentifier(serialize(ns, context));
 }
 
 std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) {
@@ -265,6 +270,16 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(const DatabaseName& d
 NamespaceString NamespaceStringUtil::parseNamespaceFromResponse(const DatabaseName& dbName,
                                                                 StringData coll) {
     return parseNamespaceFromDoc(dbName, coll);
+}
+
+NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
+                                                        StringData nsFieldName) {
+    const auto ns = data.getStringField(nsFieldName);
+    const auto tenantField = data.getField("$tenant");
+    const auto tenantId = tenantField.eoo()
+        ? boost::none
+        : boost::optional<TenantId>(TenantId::parseFromBSON(tenantField));
+    return NamespaceStringUtil::deserialize(tenantId, ns);
 }
 
 }  // namespace mongo

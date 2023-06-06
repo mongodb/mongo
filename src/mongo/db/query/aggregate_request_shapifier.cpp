@@ -41,7 +41,7 @@ BSONObj AggregateRequestShapifier::makeQueryStatsKey(const SerializationOptions&
 
 BSONObj AggregateRequestShapifier::makeQueryStatsKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    if (_initialQueryStatsKey && !opts.applyHmacToIdentifiers &&
+    if (_initialQueryStatsKey && !opts.transformIdentifiers &&
         opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
         auto tmp = std::move(*_initialQueryStatsKey);
         _initialQueryStatsKey = boost::none;
@@ -87,10 +87,8 @@ BSONObj AggregateRequestShapifier::_makeQueryStatsKeyHelper(
         opts.appendLiteral(&bob, "comment", *_comment);
     }
 
-    // TODO SERVER-77190 include the whole client metadata
-    // applicationName
-    if (_applicationName.has_value()) {
-        bob.append("applicationName", _applicationName.value());
+    if (_clientMetaData) {
+        bob.append("client", *_clientMetaData);
     }
 
     return bob.obj();

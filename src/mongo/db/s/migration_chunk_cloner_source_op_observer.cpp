@@ -29,14 +29,25 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 
+#include "mongo/db/op_observer/op_observer_util.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
+#include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+namespace {
+
+// Used to coordinate delete operations between aboutToDelete() and onDelete().
+const auto getIsMigrating = OplogDeleteEntryArgs::declareDecoration<bool>();
+
+}  // namespace
 
 // static
 void MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
@@ -104,6 +115,202 @@ void MigrationChunkClonerSourceOpObserver::onUnpreparedTransactionCommit(
     opCtx->recoveryUnit()->registerChange(
         std::make_unique<LogTransactionOperationsForShardingHandler>(
             *opCtx->getLogicalSessionId(), statements, commitOpTime));
+}
+
+void MigrationChunkClonerSourceOpObserver::onInserts(
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    std::vector<InsertStatement>::const_iterator first,
+    std::vector<InsertStatement>::const_iterator last,
+    std::vector<bool> fromMigrate,
+    bool defaultFromMigrate,
+    InsertsOpStateAccumulator* opAccumulator) {
+    // Take ownership of ShardingWriteRouter attached to the op accumulator by OpObserverImpl.
+    // Release upon return from this function because this resource is not needed by downstream
+    // OpObserver instances.
+    // If there's no ShardingWriteRouter instance available, it means that OpObserverImpl did not
+    // get far enough to require one so there's nothing to do here but return early.
+    auto shardingWriteRouter =
+        std::move(shardingWriteRouterInsertsOpStateAccumulatorDecoration(opAccumulator));
+    if (!shardingWriteRouter) {
+        return;
+    }
+
+    if (defaultFromMigrate) {
+        return;
+    }
+
+    const auto& nss = coll->ns();
+    if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+        return;
+    }
+
+    auto* const css = shardingWriteRouter->getCss();
+    css->checkShardVersionOrThrow(opCtx);
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
+
+    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded()) {
+        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
+        return;
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+    if (inMultiDocumentTransaction && !opCtx->getWriteUnitOfWork()) {
+        return;
+    }
+
+    int index = 0;
+    const auto& opTimeList = opAccumulator->opTimes;
+    for (auto it = first; it != last; it++, index++) {
+        auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
+
+        if (inMultiDocumentTransaction) {
+            const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+            if (atClusterTime) {
+                const auto shardKey =
+                    metadata->getShardKeyPattern().extractShardKeyFromDocThrows(it->doc);
+                MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
+                    opCtx, *metadata, shardKey, *atClusterTime);
+            }
+
+            return;
+        }
+
+        auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
+        if (cloner) {
+            cloner->onInsertOp(opCtx, it->doc, opTime);
+        }
+    }
+}
+
+void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
+                                                    const OplogUpdateEntryArgs& args,
+                                                    OpStateAccumulator* opAccumulator) {
+    // Take ownership of ShardingWriteRouter attached to the op accumulator by OpObserverImpl.
+    // Release upon return from this function because this resource is not needed by downstream
+    // OpObserver instances.
+    // If there's no ShardingWriteRouter instance available, it means that OpObserverImpl did not
+    // get far enough to require one so there's nothing to do here but return early.
+    auto shardingWriteRouter =
+        std::move(shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator));
+    if (!shardingWriteRouter) {
+        return;
+    }
+
+    if (args.updateArgs->source == OperationSource::kFromMigrate) {
+        return;
+    }
+
+    if (args.updateArgs->update.isEmpty()) {
+        return;
+    }
+
+    const auto& nss = args.coll->ns();
+    if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+        return;
+    }
+
+    const auto& preImageDoc = args.updateArgs->preImageDoc;
+    const auto& postImageDoc = args.updateArgs->updatedDoc;
+
+    auto* const css = shardingWriteRouter->getCss();
+    css->checkShardVersionOrThrow(opCtx);
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
+
+    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded()) {
+        MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
+        return;
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+    if (inMultiDocumentTransaction) {
+        if (auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+            const auto shardKey =
+                metadata->getShardKeyPattern().extractShardKeyFromDocThrows(postImageDoc);
+            MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
+                opCtx, *metadata, shardKey, *atClusterTime);
+        }
+
+        return;
+    }
+
+    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
+    if (cloner) {
+        cloner->onUpdateOp(opCtx, preImageDoc, postImageDoc, opAccumulator->opTime.writeOpTime);
+    }
+}
+
+void MigrationChunkClonerSourceOpObserver::aboutToDelete(OperationContext* opCtx,
+                                                         const CollectionPtr& coll,
+                                                         const BSONObj& docToDelete,
+                                                         OplogDeleteEntryArgs* args,
+                                                         OpStateAccumulator* opAccumulator) {
+    const auto& nss = coll->ns();
+    getIsMigrating(args) = MigrationSourceManager::isMigrating(opCtx, nss, docToDelete);
+}
+
+void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
+                                                    const CollectionPtr& coll,
+                                                    StmtId stmtId,
+                                                    const OplogDeleteEntryArgs& args,
+                                                    OpStateAccumulator* opAccumulator) {
+    if (args.fromMigrate) {
+        return;
+    }
+
+    const auto& nss = coll->ns();
+    if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+        return;
+    }
+
+    ShardingWriteRouter shardingWriteRouter(opCtx, nss);
+    auto* const css = shardingWriteRouter.getCss();
+    css->checkShardVersionOrThrow(opCtx);
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
+
+    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded()) {
+        assertNoMovePrimaryInProgress(opCtx, nss);
+        return;
+    }
+
+    auto getShardKeyAndId = [&nss](const OplogDeleteEntryArgs& args) -> BSONObj {
+        auto optDocKey = documentKeyDecoration(args);
+        invariant(optDocKey, nss.toStringForErrorMsg());
+        return optDocKey.value().getShardKeyAndId();
+    };
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+    if (inMultiDocumentTransaction) {
+        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+        if (atClusterTime) {
+            const auto shardKey =
+                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(
+                    getShardKeyAndId(args));
+            assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
+        }
+
+        return;
+    }
+
+    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
+    if (cloner && getIsMigrating(args)) {
+        const auto& opTime = opAccumulator->opTime.writeOpTime;
+        cloner->onDeleteOp(opCtx, getShardKeyAndId(args), opTime);
+    }
 }
 
 void MigrationChunkClonerSourceOpObserver::onTransactionPrepare(

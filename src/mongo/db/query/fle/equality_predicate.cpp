@@ -192,7 +192,7 @@ std::unique_ptr<MatchExpression> EqualityPredicate::rewriteToRuntimeComparison(
  */
 boost::optional<std::pair<ExpressionFieldPath*, ExpressionConstant*>>
 EqualityPredicate::extractDetailsFromComparison(ExpressionCompare* expr) const {
-    auto equalitiesList = expr->getChildren();
+    auto& equalitiesList = expr->getChildren();
 
     auto leftConstant = dynamic_cast<ExpressionConstant*>(equalitiesList[0].get());
     auto rightConstant = dynamic_cast<ExpressionConstant*>(equalitiesList[1].get());

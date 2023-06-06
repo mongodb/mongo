@@ -53,6 +53,9 @@ using BSONNumeric = long long;
 
 namespace query_stats {
 
+/** The type of algorithm to be used for transformIdentifiers */
+enum TransformAlgorithm { kHmacSha256, kNone };
+
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
  * with the reduction in required storage.
@@ -96,7 +99,7 @@ extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
 class QueryStatsEntry {
 public:
     QueryStatsEntry(std::unique_ptr<RequestShapifier> requestShapifier, NamespaceStringOrUUID nss)
-        : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0),
+        : firstSeenTimestamp(Date_t::now()),
           requestShapifier(std::move(requestShapifier)),
           nss(nss) {
         // Increment by size of query stats store key (hash returns size_t) and value
@@ -104,6 +107,10 @@ public:
         queryStatsStoreSizeEstimateBytesMetric.increment(sizeof(QueryStatsEntry) +
                                                          sizeof(std::size_t));
     }
+
+    QueryStatsEntry(QueryStatsEntry& entry) = delete;
+
+    QueryStatsEntry(QueryStatsEntry&& entry) = delete;
 
     ~QueryStatsEntry() {
         // Decrement by size of query stats store key (hash returns size_t) and value
@@ -116,24 +123,32 @@ public:
         BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
         builder.append("lastExecutionMicros", (BSONNumeric)lastExecutionMicros);
         builder.append("execCount", (BSONNumeric)execCount);
-        queryExecMicros.appendTo(builder, "queryExecMicros");
+        totalExecMicros.appendTo(builder, "totalExecMicros");
+        firstResponseExecMicros.appendTo(builder, "firstResponseExecMicros");
         docsReturned.appendTo(builder, "docsReturned");
         builder.append("firstSeenTimestamp", firstSeenTimestamp);
+        builder.append("latestSeenTimestamp", latestSeenTimestamp);
         return builder.obj();
     }
 
     /**
-     * Generate the queryStats key for this entry's request. If applyHmacToIdentifiers is true, any
-     * identifying information (field names, namespace) will be anonymized.
+     * Generate the queryStats key for this entry's request. If algorithm is not
+     * TransformAlgorithm::kNone, any identifying information (field names, namespace) will be
+     * anonymized.
      */
     BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 bool applyHmacToIdentifiers,
+                                 TransformAlgorithm algorithm,
                                  std::string hmacKey) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
      */
-    const Timestamp firstSeenTimestamp;
+    const Date_t firstSeenTimestamp;
+
+    /**
+     * Timestamp for when the latest time this query shape was seen.
+     */
+    Date_t latestSeenTimestamp;
 
     /**
      * Last execution time in microseconds.
@@ -145,7 +160,15 @@ public:
      */
     uint64_t execCount = 0;
 
-    AggregatedMetric queryExecMicros;
+    /**
+     * Aggregates the total time for execution including getMore requests.
+     */
+    AggregatedMetric totalExecMicros;
+
+    /**
+     * Aggregates the time for execution for first batch only.
+     */
+    AggregatedMetric firstResponseExecMicros;
 
     AggregatedMetric docsReturned;
 
@@ -234,6 +257,7 @@ void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<RequestShapifier> requestShapifier,
                      uint64_t queryExecMicros,
+                     uint64_t firstResponseExecMicros,
                      uint64_t docsReturned);
 }  // namespace query_stats
 }  // namespace mongo

@@ -138,8 +138,8 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
         testutil_assert(stable_timestamp >= g.stable_timestamp);
     }
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,
-      oldest_timestamp, stable_timestamp_str, stable_timestamp));
+    testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,
+      oldest_timestamp, stable_timestamp_str, stable_timestamp);
 
     lock_writelock(session, &g.prepare_commit_lock);
     testutil_check(conn->set_timestamp(conn, buf));
@@ -228,8 +228,7 @@ timestamp_set_oldest(void)
     if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest_timestamp")) == 0) {
         oldest_ts = testutil_timestamp_parse(tsbuf);
         g.timestamp = oldest_ts;
-        testutil_check(
-          __wt_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp));
+        testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp);
     } else if (ret != WT_NOTFOUND)
         /*
          * Its possible there may not be an oldest timestamp as such we could get not found. This

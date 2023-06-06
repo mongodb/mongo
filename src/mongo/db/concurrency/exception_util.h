@@ -48,12 +48,12 @@ extern FailPoint skipWriteConflictRetries;
 void logWriteConflictAndBackoff(int attempt,
                                 StringData operation,
                                 StringData reason,
-                                StringData ns);
+                                const NamespaceStringOrUUID& nssOrUUID);
 
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            int attempts,
                                            StringData opStr,
-                                           StringData ns,
+                                           const NamespaceStringOrUUID& nssOrUUID,
                                            const TemporarilyUnavailableException& e);
 
 /**
@@ -61,13 +61,12 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
  */
 void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
                                                         StringData opStr,
-                                                        StringData ns,
                                                         const TemporarilyUnavailableException& e);
 
 void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
                                                 int* writeConflictAttempts,
                                                 StringData opStr,
-                                                StringData ns,
+                                                const NamespaceStringOrUUID& nssOrUUID,
                                                 const TransactionTooLargeForCacheException& e);
 
 namespace error_details {
@@ -144,8 +143,7 @@ auto writeConflictRetry(OperationContext* opCtx,
             return f();
         } catch (TemporarilyUnavailableException const& e) {
             if (opCtx->inMultiDocumentTransaction()) {
-                handleTemporarilyUnavailableExceptionInTransaction(
-                    opCtx, opStr, toStringForLogging(nssOrUUID), e);
+                handleTemporarilyUnavailableExceptionInTransaction(opCtx, opStr, e);
             }
             throw;
         }
@@ -158,16 +156,15 @@ auto writeConflictRetry(OperationContext* opCtx,
             return f();
         } catch (WriteConflictException const& e) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            logWriteConflictAndBackoff(
-                writeConflictAttempts, opStr, e.reason(), toStringForLogging(nssOrUUID));
+            logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), nssOrUUID);
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
         } catch (TemporarilyUnavailableException const& e) {
             handleTemporarilyUnavailableException(
-                opCtx, ++attemptsTempUnavailable, opStr, toStringForLogging(nssOrUUID), e);
+                opCtx, ++attemptsTempUnavailable, opStr, nssOrUUID, e);
         } catch (TransactionTooLargeForCacheException const& e) {
             handleTransactionTooLargeForCacheException(
-                opCtx, &writeConflictAttempts, opStr, toStringForLogging(nssOrUUID), e);
+                opCtx, &writeConflictAttempts, opStr, nssOrUUID, e);
         }
     }
 }

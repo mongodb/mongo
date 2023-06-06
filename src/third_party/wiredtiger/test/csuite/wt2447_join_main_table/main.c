@@ -104,7 +104,7 @@ main(int argc, char *argv[])
     /* 0 isn't a valid table_type; use rows by default */
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     switch (opts->table_type) {
     case TABLE_COL:
@@ -122,17 +122,17 @@ main(int argc, char *argv[])
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
     tablename++;
-    testutil_check(__wt_snprintf(index1uri, sizeof(index1uri), "index:%s:index1", tablename));
-    testutil_check(__wt_snprintf(index2uri, sizeof(index2uri), "index:%s:index2", tablename));
-    testutil_check(__wt_snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri));
+    testutil_snprintf(index1uri, sizeof(index1uri), "index:%s:index1", tablename);
+    testutil_snprintf(index2uri, sizeof(index2uri), "index:%s:index2", tablename);
+    testutil_snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
       "statistics=(all),statistics_log=(json,on_close,wait=1),create", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-    testutil_check(__wt_snprintf(table_cfg, sizeof(table_cfg),
+    testutil_snprintf(table_cfg, sizeof(table_cfg),
       "key_format=%s,value_format=iiu,columns=(k,v1,v2,d)",
-      opts->table_type == TABLE_ROW ? "i" : "r"));
+      opts->table_type == TABLE_ROW ? "i" : "r");
     testutil_check(session->create(session, opts->uri, table_cfg));
     testutil_check(session->create(session, index1uri, "columns=(v1)"));
     testutil_check(session->create(session, index2uri, "columns=(v2)"));
@@ -166,8 +166,7 @@ main(int argc, char *argv[])
     cursor2->set_key(cursor2, half + 1);
     testutil_check(cursor2->search(cursor2));
 
-    testutil_check(
-      __wt_snprintf(bloom_cfg, sizeof(bloom_cfg), "compare=lt,strategy=bloom,count=%d", half));
+    testutil_snprintf(bloom_cfg, sizeof(bloom_cfg), "compare=lt,strategy=bloom,count=%d", half);
 
     testutil_check(session->open_cursor(session, joinuri, NULL, NULL, &jcursor));
     testutil_check(session->join(session, jcursor, cursor1, "compare=ge"));

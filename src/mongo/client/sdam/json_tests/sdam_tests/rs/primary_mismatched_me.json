@@ -26,7 +26,7 @@
               "a:27017",
               "b:27017"
             ],
-            "ismaster": true,
+            "isWritablePrimary": true,
             "ok": 1,
             "setName": "rs",
             "setVersion": 1,

@@ -394,8 +394,8 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
             auto currentMetadata = forceGetCurrentMetadata(opCtx, nss);
 
             if (currentMetadata.isSharded()) {
-                // If migrations are disallowed for the namespace, join any migrations which may be
-                // executing currently
+                // Abort and join any ongoing migration if migrations are disallowed for the
+                // namespace.
                 if (!currentMetadata.allowMigrations()) {
                     boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
                     {
@@ -405,9 +405,12 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                         const auto scopedCsr =
                             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx,
                                                                                               nss);
-
-                        if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
-                            waitForMigrationAbort.emplace(msm->abort());
+                        // There is no need to abort an ongoing migration if the refresh is
+                        // cancelled.
+                        if (!cancellationToken.isCanceled()) {
+                            if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
+                                waitForMigrationAbort.emplace(msm->abort());
+                            }
                         }
                     }
 
@@ -425,25 +428,51 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                 }
             }
 
-            // Only if all actions taken as part of refreshing the placement version completed
-            // successfully do we want to install the current metadata.
-            // A view can potentially be created after spawning a thread to recover nss's shard
-            // version. It is then ok to lock views in order to clear filtering metadata.
-            //
-            // DBLock and CollectionLock must be used in order to avoid placement version checks
-            Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-            Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-            auto scopedCsr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
+            boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
+            {
+                // Only if all actions taken as part of refreshing the placement version completed
+                // successfully do we want to install the current metadata. A view can potentially
+                // be created after spawning a thread to recover nss's shard version. It is then ok
+                // to lock views in order to clear filtering metadata. DBLock and CollectionLock
+                // must be used in order to avoid placement version checks
+                Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
+                Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
+                                                                                         nss);
 
-            // cancellationToken needs to be checked under the CSR lock before overwriting the
-            // filtering metadata to serialize with other threads calling 'clearFilteringMetadata'.
-            if (!cancellationToken.isCanceled()) {
-                scopedCsr->setFilteringMetadata(opCtx, currentMetadata);
+                // cancellationToken needs to be checked under the CSR lock before overwriting the
+                // filtering metadata to serialize with other threads calling
+                // 'clearFilteringMetadata'.
+                if (!cancellationToken.isCanceled()) {
+                    // Atomically set the new filtering metadata and check if there is a migration
+                    // that must be aborted.
+                    scopedCsr->setFilteringMetadata(opCtx, currentMetadata);
+
+                    if (currentMetadata.isSharded() && !currentMetadata.allowMigrations()) {
+                        if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
+                            waitForMigrationAbort.emplace(msm->abort());
+                        }
+                    }
+                }
             }
 
-            scopedCsr->resetPlacementVersionRecoverRefreshFuture();
-            resetRefreshFutureOnError.dismiss();
+            // Join any ongoing migration outside of the CSR lock.
+            if (waitForMigrationAbort) {
+                waitForMigrationAbort->get(opCtx);
+            }
+
+            {
+                // Remember to wake all waiting threads for this refresh to finish.
+                Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
+                Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
+                                                                                         nss);
+
+                scopedCsr->resetPlacementVersionRecoverRefreshFuture();
+                resetRefreshFutureOnError.dismiss();
+            }
         })
         .onCompletion([=](Status status) {
             // Check the cancellation token here to ensure we throw in all cancelation events.

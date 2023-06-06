@@ -107,14 +107,14 @@ std::unique_ptr<SolutionCacheData> SolutionCacheData::clone() const {
 std::string SolutionCacheData::toString() const {
     switch (this->solnType) {
         case WHOLE_IXSCAN_SOLN:
-            verify(this->tree.get());
+            MONGO_verify(this->tree.get());
             return str::stream() << "(whole index scan solution: "
                                  << "dir=" << this->wholeIXSolnDir << "; "
                                  << "tree=" << this->tree->toString() << ")";
         case COLLSCAN_SOLN:
             return "(collection scan)";
         case USE_INDEX_TAGS_SOLN:
-            verify(this->tree.get());
+            MONGO_verify(this->tree.get());
             return str::stream() << "(index-tagged expression tree: "
                                  << "tree=" << this->tree->toString() << ")";
     }

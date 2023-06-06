@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
+#include "mongo/db/s/balancer/balancer_defragmentation_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -147,7 +147,7 @@ protected:
     }
 
     ClusterStatisticsMock _clusterStats;
-    BalancerDefragmentationPolicyImpl _defragmentationPolicy;
+    BalancerDefragmentationPolicy _defragmentationPolicy;
 
     ShardStatistics buildShardStats(ShardId id,
                                     uint64_t currentSizeBytes,

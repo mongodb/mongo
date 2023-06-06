@@ -21,7 +21,7 @@ def valgrindTest(valgrind, datagen, fuzzer, zstd, fullbench):
 
   if subprocess.call([*VALGRIND_ARGS, zstd],
                      stdout=subprocess.DEVNULL) == 0:
-    raise subprocess.CalledProcessError('zstd without argument should have failed')
+    raise subprocess.SubprocessError('zstd without argument should have failed')
 
   with subprocess.Popen([datagen, '-g80'], stdout=subprocess.PIPE) as p1, \
        subprocess.Popen([*VALGRIND_ARGS, zstd, '-', '-c'],
@@ -30,7 +30,7 @@ def valgrindTest(valgrind, datagen, fuzzer, zstd, fullbench):
     p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
     p2.communicate()
     if p2.returncode != 0:
-      raise subprocess.CalledProcessError()
+      raise subprocess.SubprocessError()
 
   with subprocess.Popen([datagen, '-g16KB'], stdout=subprocess.PIPE) as p1, \
        subprocess.Popen([*VALGRIND_ARGS, zstd, '-vf', '-', '-c'],
@@ -39,7 +39,7 @@ def valgrindTest(valgrind, datagen, fuzzer, zstd, fullbench):
     p1.stdout.close()
     p2.communicate()
     if p2.returncode != 0:
-      raise subprocess.CalledProcessError()
+      raise subprocess.SubprocessError()
 
   with tempfile.NamedTemporaryFile() as tmp_fd:
     with subprocess.Popen([datagen, '-g2930KB'], stdout=subprocess.PIPE) as p1, \
@@ -48,7 +48,7 @@ def valgrindTest(valgrind, datagen, fuzzer, zstd, fullbench):
       p1.stdout.close()
       p2.communicate()
       if p2.returncode != 0:
-        raise subprocess.CalledProcessError()
+        raise subprocess.SubprocessError()
 
     subprocess.check_call([*VALGRIND_ARGS, zstd, '-vdf', tmp_fd.name, '-c'],
                           stdout=subprocess.DEVNULL)
@@ -60,7 +60,7 @@ def valgrindTest(valgrind, datagen, fuzzer, zstd, fullbench):
       p1.stdout.close()
       p2.communicate()
       if p2.returncode != 0:
-        raise subprocess.CalledProcessError()
+        raise subprocess.SubprocessError()
 
   subprocess.check_call([*VALGRIND_ARGS, fuzzer, '-T1mn', '-t1'])
   subprocess.check_call([*VALGRIND_ARGS, fullbench, '-i1'])

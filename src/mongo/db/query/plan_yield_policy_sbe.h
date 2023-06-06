@@ -42,7 +42,7 @@ public:
                        ClockSource* clockSource,
                        int yieldFrequency,
                        Milliseconds yieldPeriod,
-                       const Yieldable* yieldable,
+                       stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                        std::unique_ptr<YieldPolicyCallbacks> callbacks)
         : PlanYieldPolicy(opCtx,
                           policy,

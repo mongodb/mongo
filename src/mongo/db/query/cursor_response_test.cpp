@@ -274,7 +274,9 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResults
     CursorResponseBuilder crb(&builder, options);
     crb.append(testDoc);
     crb.setPartialResultsReturned(true);
-    crb.done(CursorId(123), NamespaceString::createNamespaceString_forTest(boost::none, "db.coll"));
+    crb.done(CursorId(123),
+             NamespaceString::createNamespaceString_forTest(boost::none, "db.coll"),
+             SerializationContext::stateCommandReply());
 
     // Confirm that the resulting BSONObj response matches the expected body.
     auto msg = builder.done();
@@ -328,11 +330,14 @@ TEST(CursorResponseTest,
                                                << true << "id" << CursorId(123) << "ns"
                                                << NamespaceStringUtil::serialize(nss)));
 
+        auto scReply = SerializationContext::stateCommandReply();
+        scReply.setTenantIdSource(true /*nonPrefixedTenantId*/);
+
         // Use CursorResponseBuilder to serialize the cursor response to OpMsgReplyBuilder.
         CursorResponseBuilder crb(&builder, options);
         crb.append(testDoc);
         crb.setPartialResultsReturned(true);
-        crb.done(CursorId(123), nss);
+        crb.done(CursorId(123), nss, scReply);
 
         // Confirm that the resulting BSONObj response matches the expected body.
         auto msg = builder.done();
@@ -349,6 +354,8 @@ TEST(CursorResponseTest,
         CursorResponse response = std::move(swCursorResponse.getValue());
         ASSERT_EQ(response.getCursorId(), CursorId(123));
 
+        // TODO SERVER-74284 Using flagStatus, add cases for both scReplyConfig.setTenantIdSource()
+        // values and check the response here.
         ASSERT_EQ(response.getNSS(), nss);
         ASSERT_EQ(response.getBatch().size(), 1U);
         ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);

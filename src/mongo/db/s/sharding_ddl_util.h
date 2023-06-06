@@ -76,15 +76,6 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
                                   const OperationSessionInfo& osi);
 
 /**
- * Erase tags metadata from config server for the given namespace.
- */
-void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                const std::shared_ptr<Shard>& configShard,
-                                                const NamespaceString& nss,
-                                                const WriteConcernOptions& writeConcern);
-
-
-/**
  * Erase collection metadata from config server and invalidate the locally cached one.
  * In particular remove the collection and chunks metadata associated with the given namespace.
  */
@@ -99,37 +90,9 @@ void removeCollAndChunksMetadataFromConfig(
     const std::shared_ptr<executor::TaskExecutor>& executor = nullptr);
 
 /**
- * Erase collection metadata from config server and invalidate the locally cached one.
- * In particular remove the collection, chunks and index metadata associated with the given
- * namespace.
- *
- * Returns true if the collection existed before being removed.
- */
-bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                         const std::shared_ptr<Shard>& configShard,
-                                                         ShardingCatalogClient* catalogClient,
-                                                         const NamespaceString& nss,
-                                                         const WriteConcernOptions& writeConcern);
-
-/**
  * Delete the query analyzer documents that match the given filter.
  */
 void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONObj& filter);
-
-/**
- * Rename sharded collection metadata as part of a renameCollection operation.
- *
- * - Update namespace associated with tags (FROM -> TO)
- * - Update FROM collection entry to TO
- *
- * This function is idempotent and can just be invoked by the CSRS.
- */
-void shardedRenameMetadata(OperationContext* opCtx,
-                           const std::shared_ptr<Shard>& configShard,
-                           ShardingCatalogClient* catalogClient,
-                           CollectionType fromCollType,
-                           const NamespaceString& toNss,
-                           const WriteConcernOptions& writeConcern);
 
 /**
  * Ensure source collection uuid is consistent on every shard

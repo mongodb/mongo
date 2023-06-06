@@ -81,8 +81,8 @@ IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type) {
     auto&& [max, maxInclusive] = getMinMaxBoundForType(false /*isMin*/, type);
     tassert(7051104, str::stream() << "Type " << type << " has no maximum", max);
 
-    return IntervalRequirement{BoundRequirement(minInclusive, *min),
-                               BoundRequirement(maxInclusive, *max)};
+    return IntervalRequirement{BoundRequirement(minInclusive, std::move(*min)),
+                               BoundRequirement(maxInclusive, std::move(*max))};
 }
 
 bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type) {

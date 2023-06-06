@@ -95,6 +95,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/mongo/db/server_base',
         'auth',
         'authentication_restriction',
         'authprivilege',
@@ -144,6 +145,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'auth',
         'auth_options',
         'authprivilege',
@@ -258,8 +260,8 @@ env.Library(
         'action_type.cpp',
         'action_type.idl',
         'authorization_contract.cpp',
+        'parsed_privilege.idl',
         'privilege.cpp',
-        'privilege_parser.cpp',
         'resource_pattern.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -555,6 +557,7 @@ env.CppUnitTest(
         'builtin_roles_test.cpp',
         'oauth_discovery_factory_test.cpp',
         'privilege_parser_test.cpp',
+        'resource_pattern_search_list_test.cpp',
         'restriction_test.cpp',
         'sasl_authentication_session_test.cpp',
         'sasl_mechanism_registry_test.cpp',

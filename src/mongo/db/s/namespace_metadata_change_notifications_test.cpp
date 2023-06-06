@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"

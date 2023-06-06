@@ -361,7 +361,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
                              "queryableBackupMode. If not in queryableBackupMode, you can edit "
                              "the shardIdentity document by starting the server *without* "
                              "--shardsvr, manually updating the shardIdentity document in the "
-                          << NamespaceString::kServerConfigurationNamespace.toString()
+                          << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
                           << " collection, and restarting the server with --shardsvr.",
             serverGlobalParams.overrideShardIdentity.isEmpty());
 
@@ -438,7 +438,6 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     const auto& configSvrConnStr = shardIdentity.getConfigsvrConnectionString();
 
     auto const shardingState = ShardingState::get(opCtx);
-    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     hangDuringShardingInitialization.pauseWhileSet();
 
@@ -454,6 +453,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
 
         // If run on a config server, we may not know our connection string yet.
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
             auto prevConfigsvrConnStr = shardRegistry->getConfigServerConnectionString();
             uassert(
                 40373,
@@ -570,8 +570,6 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
 
     const auto service = opCtx->getServiceContext();
 
-    ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
-
     auto configCS = []() -> boost::optional<ConnectionString> {
         if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             // When the config server can operate as a shard, it sets up a ShardRemote for the
@@ -600,6 +598,8 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
     }
 
     initializeGlobalShardingStateForMongoD(opCtx, configCS);
+
+    ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 
     // ShardLocal to use for explicitly local commands on the config server.
     auto localConfigShard = Grid::get(opCtx)->shardRegistry()->createLocalConfigShard();
@@ -706,8 +706,6 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     OperationContext* opCtx, const ShardIdentity& shardIdentity) {
     auto const service = opCtx->getServiceContext();
 
-    installReplicaSetChangeListener(service);
-
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -727,6 +725,24 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
 
         initializeGlobalShardingStateForMongoD(opCtx,
                                                {shardIdentity.getConfigsvrConnectionString()});
+
+        installReplicaSetChangeListener(service);
+
+        // Reset the shard register config connection string in case it missed the replica set
+        // monitor notification. Config server does not need to do this since it gets the connection
+        // string directly from the replication coordinator.
+        auto configShardConnStr = Grid::get(opCtx->getServiceContext())
+                                      ->shardRegistry()
+                                      ->getConfigServerConnectionString();
+        if (configShardConnStr.type() == ConnectionString::ConnectionType::kReplicaSet) {
+            ConnectionString rsMonitorConfigConnStr(
+                ReplicaSetMonitor::get(configShardConnStr.getSetName())->getServerAddress(),
+                ConnectionString::ConnectionType::kReplicaSet);
+            Grid::get(opCtx->getServiceContext())
+                ->shardRegistry()
+                ->updateReplSetHosts(rsMonitorConfigConnStr,
+                                     ShardRegistry::ConnectionStringUpdateType::kConfirmed);
+        }
 
         CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
 

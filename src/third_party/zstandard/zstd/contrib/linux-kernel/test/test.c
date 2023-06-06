@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -186,11 +186,14 @@ static void __attribute__((noinline)) use(void *x) {
   asm volatile("" : "+r"(x));
 }
 
+static void __attribute__((noinline)) fill_stack(void) {
+  memset(g_stack, 0x33, 8192);
+}
+
 static void __attribute__((noinline)) set_stack(void) {
 
   char stack[8192];
   g_stack = stack;
-  memset(g_stack, 0x33, 8192);
   use(g_stack);
 }
 
@@ -208,6 +211,7 @@ static void __attribute__((noinline)) check_stack(void) {
 
 static void test_stack_usage(test_data_t const *data) {
   set_stack();
+  fill_stack();
   test_f2fs();
   test_btrfs(data);
   test_decompress_unzstd(data);

@@ -1270,10 +1270,11 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         }
 
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardid));
-        shard->runFireAndForgetCommand(opCtx,
-                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                       DatabaseName::kAdmin.toString(),
-                                       BSON("_flushRoutingTableCacheUpdates" << nss().ns()));
+        shard->runFireAndForgetCommand(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin.toString(),
+            BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss())));
     }
 
     LOGV2(5277901,
@@ -1296,11 +1297,12 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
 
 void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* opCtx) {
     BSONObjBuilder collectionDetail;
+    const auto serializedNss = NamespaceStringUtil::serialize(originalNss());
     collectionDetail.append("shardKey", *_request.getShardKey());
-    collectionDetail.append("collection", originalNss().ns());
+    collectionDetail.append("collection", serializedNss);
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "shardCollection.start", originalNss().ns(), collectionDetail.obj());
+        opCtx, "shardCollection.start", serializedNss, collectionDetail.obj());
 }
 
 void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCtx) {
@@ -1312,8 +1314,10 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
     if (_initialChunks)
         collectionDetail.appendNumber("numChunks",
                                       static_cast<long long>(_initialChunks->chunks.size()));
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "shardCollection.end", originalNss().ns(), collectionDetail.obj());
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "shardCollection.end",
+                                           NamespaceStringUtil::serialize(originalNss()),
+                                           collectionDetail.obj());
 }
 
 }  // namespace mongo

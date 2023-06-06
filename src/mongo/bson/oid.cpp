@@ -153,7 +153,7 @@ void OID::initFromTermNumber(int64_t term) {
 }
 
 void OID::init(StringData s) {
-    verify(s.size() == (2 * kOIDSize));
+    MONGO_verify(s.size() == (2 * kOIDSize));
     std::string blob = hexblob::decode(s.substr(0, 2 * kOIDSize));
     std::copy(blob.begin(), blob.end(), _data);
 }

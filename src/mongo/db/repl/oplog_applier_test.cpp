@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <deque>
 #include <limits>
-#include <memory>
 
 #include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_batcher_test_fixture.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
@@ -75,29 +71,26 @@ StatusWith<OpTime> OplogApplierMock::_applyOplogBatch(OperationContext* opCtx,
     return OpTime();
 }
 
-class OplogApplierTest : public unittest::Test {
+class OplogApplierTest : public ServiceContextTest {
 public:
     void setUp() override;
     void tearDown() override;
     virtual OperationContext* opCtx() {
-        return _opCtxNoop.get();
+        return _opCtxHolder.get();
     }
 
 
 protected:
     std::unique_ptr<OplogBuffer> _buffer;
     std::unique_ptr<OplogApplier> _applier;
-    std::unique_ptr<OperationContext> _opCtxNoop;
+    ServiceContext::UniqueOperationContext _opCtxHolder;
     OplogApplier::BatchLimits _limits;
 };
 
 void OplogApplierTest::setUp() {
     _buffer = std::make_unique<OplogBufferBlockingQueue>(nullptr);
     _applier = std::make_unique<OplogApplierMock>(_buffer.get());
-    // The OplogApplier interface expects an OperationContext* but the mock implementations in this
-    // test will not be dereferencing the pointer. Therefore, it is sufficient to use an
-    // OperationContextNoop.
-    _opCtxNoop = std::make_unique<OperationContextNoop>();
+    _opCtxHolder = makeOperationContext();
 
     _limits.bytes = std::numeric_limits<decltype(_limits.bytes)>::max();
     _limits.ops = std::numeric_limits<decltype(_limits.ops)>::max();
@@ -105,7 +98,7 @@ void OplogApplierTest::setUp() {
 
 void OplogApplierTest::tearDown() {
     _limits = {};
-    _opCtxNoop = {};
+    _opCtxHolder = {};
     _applier = {};
     _buffer = {};
 }
@@ -433,35 +426,21 @@ TEST_F(OplogApplierTest, LastOpInLargeTransactionIsProcessedIndividually) {
     ASSERT_EQUALS(srcOps[4], batch[0]);
 }
 
-class OplogApplierDelayTest : public OplogApplierTest, public ScopedGlobalServiceContextForTest {
+class OplogApplierDelayTest : public OplogApplierTest {
 public:
     void setUp() override {
         OplogApplierTest::setUp();
-        auto* service = getServiceContext();
-        _origThreadName = *getThreadNameRef().get();
-        Client::initThread("OplogApplierDelayTest", service, nullptr);
 
-        _mockClock = std::make_shared<ClockSourceMock>();
         // Avoid any issues due to a clock exactly at 0 (e.g. dates being default Date_t());
+        _mockClock = std::make_shared<ClockSourceMock>();
         _mockClock->advance(Milliseconds(60000));
+
+        auto service = getServiceContext();
         service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClock));
         service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClock));
 
-        // The delay tests need a real operation context to use the service context clock.
-        _opCtxHolder = cc().makeOperationContext();
-
         // Use a smaller limit for these tests.
         _limits.ops = 3;
-    }
-    void tearDown() override {
-        _opCtxHolder = nullptr;
-        Client::releaseCurrent();
-        OplogApplierTest::tearDown();
-        setThreadName(_origThreadName);
-    }
-
-    OperationContext* opCtx() override {
-        return _opCtxHolder.get();
     }
 
     // Wait for the opCtx to be waited on, or for killWaits() to be run.

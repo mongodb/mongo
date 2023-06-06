@@ -133,8 +133,8 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
                                 commandType,
                                 commandName.toString(),
                                 swBuildUUID.getValue(),
-                                indexNames,
-                                indexSpecs,
+                                std::move(indexNames),
+                                std::move(indexSpecs),
                                 cause};
 }
 }  // namespace mongo

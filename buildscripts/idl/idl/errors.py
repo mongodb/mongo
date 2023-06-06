@@ -139,6 +139,7 @@ ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0099"
 ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0100"
 ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION = "ID0101"
 ERROR_ID_QUERY_SHAPE_INVALID_VALUE = "ID0102"
+ERROR_ID_BAD_CPP_NAMESPACE = "ID0103"
 
 
 class IDLError(Exception):
@@ -996,6 +997,13 @@ class ParserContext(object):
             location, ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED,
             "Fields cannot have unsafe_dangerous_disable_extra_field_duplicate_checks = true. unsafe_dangerous_disable_extra_field_duplicate_checks on non field structs"
         )
+
+    def add_bad_cpp_namespace(self, location, namespace):
+        # type: (common.SourceLocation, str) -> None
+        self._add_error(
+            location, ERROR_ID_BAD_CPP_NAMESPACE,
+            "cpp_namespace must start with 'mongo::' or be just 'mongo', namespace '%s' is not supported"
+            % (namespace))
 
 
 def _assert_unique_error_messages():

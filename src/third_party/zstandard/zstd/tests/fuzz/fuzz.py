@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # ################################################################
-# Copyright (c) Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -78,6 +78,7 @@ CFLAGS = os.environ.get('CFLAGS', '-O3')
 CXXFLAGS = os.environ.get('CXXFLAGS', CFLAGS)
 LDFLAGS = os.environ.get('LDFLAGS', '')
 MFLAGS = os.environ.get('MFLAGS', '-j')
+THIRD_PARTY_SEQ_PROD_OBJ = os.environ.get('THIRD_PARTY_SEQ_PROD_OBJ', '')
 
 # Fuzzing environment variables
 LIB_FUZZING_ENGINE = os.environ.get('LIB_FUZZING_ENGINE', 'libregression.a')
@@ -320,6 +321,12 @@ def build_parser(args):
         action='store_true',
         help='Reuse contexts between runs (makes reproduction impossible)')
     parser.add_argument(
+        '--custom-seq-prod',
+        dest='third_party_seq_prod_obj',
+        type=str,
+        default=THIRD_PARTY_SEQ_PROD_OBJ,
+        help='Path to an object file with symbols for fuzzing your sequence producer plugin.')
+    parser.add_argument(
         '--cc',
         dest='cc',
         type=str,
@@ -449,6 +456,10 @@ def build(args):
 
     if args.stateful_fuzzing:
         cppflags += ['-DSTATEFUL_FUZZING']
+
+    if args.third_party_seq_prod_obj:
+        cppflags += ['-DFUZZ_THIRD_PARTY_SEQ_PROD']
+        mflags += ['THIRD_PARTY_SEQ_PROD_OBJ={}'.format(args.third_party_seq_prod_obj)]
 
     if args.fuzzing_mode:
         cppflags += ['-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION']
@@ -636,7 +647,7 @@ def regression(args):
     try:
         description = """
         Runs one or more regression tests.
-        The fuzzer should have been built with with
+        The fuzzer should have been built with
         LIB_FUZZING_ENGINE='libregression.a'.
         Takes input from CORPORA.
         """

@@ -237,9 +237,9 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
             }
         },
         [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
             // Only hang when cloning the specified collection, or if no collection was specified.
-            auto nss = data["nss"].str();
-            return nss.empty() || nss == _sourceNss.toString();
+            return fpNss.isEmpty() || fpNss == _sourceNss;
         });
 
     BSONObj readResult;
@@ -513,9 +513,9 @@ void TenantCollectionCloner::handleNextBatch(DBClientCursor& cursor) {
             }
         },
         [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
             // Only hang when cloning the specified collection, or if no collection was specified.
-            auto nss = data["nss"].str();
-            return nss.empty() || nss == _sourceNss.toString();
+            return fpNss.isEmpty() || fpNss == _sourceNss;
         });
 }
 
@@ -567,8 +567,8 @@ void TenantCollectionCloner::insertDocuments(std::vector<BSONObj> docsToInsert) 
 }
 
 bool TenantCollectionCloner::isMyFailPoint(const BSONObj& data) const {
-    auto nss = data["nss"].str();
-    return (nss.empty() || nss == _sourceNss.toString()) && BaseCloner::isMyFailPoint(data);
+    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+    return (fpNss.isEmpty() || fpNss == _sourceNss) && BaseCloner::isMyFailPoint(data);
 }
 
 TenantCollectionCloner::Stats TenantCollectionCloner::getStats() const {

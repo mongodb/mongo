@@ -244,7 +244,8 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                    return DDLLockManager::kDefaultLockTimeout;
                }();
 
-               _scopedLocks.emplace(ddlLockManager->lock(opCtx, resource, coorName, lockTimeOut));
+               _scopedLocks.emplace(ddlLockManager->lock(
+                   opCtx, resource, coorName, lockTimeOut, false /* waitForRecovery */));
            })
         .until([this, resource = resource.toString()](Status status) {
             if (!status.isOK()) {
@@ -346,7 +347,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             if (const auto bucketNss = metadata().getBucketNss()) {
-                return _acquireLockAsync(executor, token, bucketNss.value().ns());
+                return _acquireLockAsync(
+                    executor, token, NamespaceStringUtil::serialize(bucketNss.value()));
             }
             return ExecutorFuture<void>(**executor);
         })

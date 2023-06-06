@@ -276,7 +276,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // exclusive lock.
     if (modeColl == MODE_X) {
         invariant(!opCtx->recoveryUnit()->isActive(),
-                  str::stream() << "Snapshot opened before acquiring X lock for " << nsOrUUID);
+                  str::stream() << "Snapshot opened before acquiring X lock for "
+                                << toStringForLogging(nsOrUUID));
     }
 
     // Acquire the collection locks. If there's only one lock, then it can simply be taken. If

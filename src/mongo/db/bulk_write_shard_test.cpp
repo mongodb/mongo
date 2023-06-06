@@ -38,8 +38,8 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/assert.h"
@@ -66,16 +66,13 @@ namespace {
 // | testDB1 | sharded.porcupine.tree  |     YES     |      dbV1     |       sV1     |
 // | testDB2 |       sharded.oasis     |     YES     |      dbV2     |       sV2     |
 // +---------+-------------------------+-------------+---------------+---------------+
-class BulkWriteShardTest : public ServiceContextMongoDTest {
+class BulkWriteShardTest : public ShardServerTestFixture {
 protected:
     OperationContext* opCtx() {
-        return _opCtx.get();
+        return operationContext();
     }
 
     void setUp() override;
-    void tearDown() override;
-
-    const ShardId thisShardId{"this"};
 
     const DatabaseName dbNameTestDb1 =
         DatabaseName::createDatabaseName_forTest(boost::none, "testDB1");
@@ -106,12 +103,11 @@ protected:
         ShardVersionFactory::make(ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(12, 0)},
                                                CollectionPlacement(10, 1)),
                                   boost::optional<CollectionIndexes>(boost::none));
-
-private:
-    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 void createTestCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        opCtx);
     uassertStatusOK(createCollection(opCtx, nss.dbName(), BSON("create" << nss.coll())));
 }
 
@@ -180,21 +176,7 @@ UUID getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 void BulkWriteShardTest::setUp() {
-    ServiceContextMongoDTest::setUp();
-    _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-    const repl::ReplSettings replSettings = {};
-    repl::ReplicationCoordinator::set(
-        getGlobalServiceContext(),
-        std::unique_ptr<repl::ReplicationCoordinator>(
-            new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings)));
-    ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
-                  ->setFollowerMode(repl::MemberState::RS_PRIMARY));
-
-    repl::createOplog(_opCtx.get());
-
-    ShardingState::get(getServiceContext())->setInitialized(ShardId("this"), OID::gen());
+    ShardServerTestFixture::setUp();
 
     // Setup test collections and metadata
     installDatabaseMetadata(opCtx(), dbNameTestDb1, dbVersionTestDb1);
@@ -206,7 +188,7 @@ void BulkWriteShardTest::setUp() {
 
     // Create nssShardedCollection1
     createTestCollection(opCtx(), nssShardedCollection1);
-    const auto uuidShardedCollection1 = getCollectionUUID(_opCtx.get(), nssShardedCollection1);
+    const auto uuidShardedCollection1 = getCollectionUUID(opCtx(), nssShardedCollection1);
     installShardedCollectionMetadata(
         opCtx(),
         nssShardedCollection1,
@@ -214,12 +196,12 @@ void BulkWriteShardTest::setUp() {
         {ChunkType(uuidShardedCollection1,
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection1.placementVersion(),
-                   thisShardId)},
-        thisShardId);
+                   _myShardName)},
+        _myShardName);
 
     // Create nssShardedCollection2
     createTestCollection(opCtx(), nssShardedCollection2);
-    const auto uuidShardedCollection2 = getCollectionUUID(_opCtx.get(), nssShardedCollection2);
+    const auto uuidShardedCollection2 = getCollectionUUID(opCtx(), nssShardedCollection2);
     installShardedCollectionMetadata(
         opCtx(),
         nssShardedCollection2,
@@ -227,14 +209,8 @@ void BulkWriteShardTest::setUp() {
         {ChunkType(uuidShardedCollection2,
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection2.placementVersion(),
-                   thisShardId)},
-        thisShardId);
-}
-
-void BulkWriteShardTest::tearDown() {
-    _opCtx.reset();
-    ServiceContextMongoDTest::tearDown();
-    repl::ReplicationCoordinator::set(getGlobalServiceContext(), nullptr);
+                   _myShardName)},
+        _myShardName);
 }
 
 NamespaceInfoEntry nsInfoWithShardDatabaseVersions(NamespaceString nss,

@@ -107,7 +107,7 @@ public:
 
             const auto& authoritativeTags =
                 uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
-            if (!authoritativeTags.empty()) {
+            if (!authoritativeTags.empty() && !request().getForceRedistribution()) {
                 uassert(ErrorCodes::BadValue,
                         "Must specify value for zones field",
                         request().getZones());
@@ -133,6 +133,10 @@ public:
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject shardDistribution parameter",
                     !request().getShardDistribution().has_value());
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, reject forceRedistribution parameter",
+                    !request().getForceRedistribution().has_value());
             }
 
             if (const auto& shardDistribution = request().getShardDistribution()) {
@@ -192,6 +196,7 @@ public:
                     coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
                     coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
                     coordinatorDoc.setShardDistribution(request().getShardDistribution());
+                    coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
 
                     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
                     auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);

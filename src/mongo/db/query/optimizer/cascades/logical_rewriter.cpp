@@ -1286,11 +1286,10 @@ struct SplitRequirementsFetchTransport {
 
         const auto& [key, req] = node.getExpr();
         const bool perfOnly = req.getIsPerfOnly();
-        const auto outputBinding = keepProj ? req.getBoundProjectionName() : boost::none;
+        auto outputBinding = keepProj ? req.getBoundProjectionName() : boost::none;
         // perfOnly predicates on the fetch side become trivially true.
-        const auto intervals = ((perfOnly && !left) || !keepPred)
-            ? IntervalReqExpr::makeSingularDNF()
-            : req.getIntervals();
+        auto intervals = ((perfOnly && !left) || !keepPred) ? IntervalReqExpr::makeSingularDNF()
+                                                            : req.getIntervals();
 
         if (outputBinding || !isIntervalReqFullyOpenDNF(intervals)) {
             builder.atom(key,

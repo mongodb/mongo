@@ -83,9 +83,9 @@ PlanStage::StageState AndSortedStage::doWork(WorkingSetID* out) {
 }
 
 PlanStage::StageState AndSortedStage::getTargetRecordId(WorkingSetID* out) {
-    verify(numeric_limits<size_t>::max() == _targetNode);
-    verify(WorkingSet::INVALID_ID == _targetId);
-    verify(RecordId() == _targetRecordId);
+    MONGO_verify(numeric_limits<size_t>::max() == _targetNode);
+    MONGO_verify(WorkingSet::INVALID_ID == _targetId);
+    MONGO_verify(RecordId() == _targetRecordId);
 
     // Pick one, and get a RecordId to work toward.
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -127,8 +127,8 @@ PlanStage::StageState AndSortedStage::getTargetRecordId(WorkingSetID* out) {
 }
 
 PlanStage::StageState AndSortedStage::moveTowardTargetRecordId(WorkingSetID* out) {
-    verify(numeric_limits<size_t>::max() != _targetNode);
-    verify(WorkingSet::INVALID_ID != _targetId);
+    MONGO_verify(numeric_limits<size_t>::max() != _targetNode);
+    MONGO_verify(WorkingSet::INVALID_ID != _targetId);
 
     // We have nodes that haven't hit _targetRecordId yet.
     size_t workingChildNumber = _workingTowardRep.front();

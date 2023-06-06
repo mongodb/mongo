@@ -62,8 +62,8 @@ alter(void *arg)
     while (!g.workers_finished) {
         period = mmrand(&g.extra_rnd, 1, 10);
 
-        testutil_check(__wt_snprintf(
-          buf, sizeof(buf), "access_pattern_hint=%s", access_value ? "random" : "none"));
+        testutil_snprintf(
+          buf, sizeof(buf), "access_pattern_hint=%s", access_value ? "random" : "none");
         access_value = !access_value;
 
         /* Alter can return EBUSY if concurrent with other operations. */

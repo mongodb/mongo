@@ -34,8 +34,8 @@ namespace mongo {
 
 Value WindowFunctionIntegral::integralOfTwoPointsByTrapezoidalRule(const Value& preValue,
                                                                    const Value& newValue) {
-    auto preArr = preValue.getArray();
-    auto newArr = newValue.getArray();
+    const auto& preArr = preValue.getArray();
+    const auto& newArr = newValue.getArray();
 
     if (preArr[0].isNaN() || preArr[1].isNaN() || newArr[0].isNaN() || newArr[1].isNaN())
         return Value(0);
@@ -62,7 +62,7 @@ void WindowFunctionIntegral::assertValueType(const Value& value) {
             value.isArray() && value.getArray().size() == 2 && value.getArray()[1].numeric() &&
                 (value.getArray()[0].numeric() || value.getArray()[0].getType() == BSONType::Date));
 
-    auto arr = value.getArray();
+    const auto& arr = value.getArray();
     if (_unitMillis) {
         uassert(5423901,
                 "$integral with 'unit' expects the sortBy field to be a Date",
@@ -77,7 +77,7 @@ void WindowFunctionIntegral::assertValueType(const Value& value) {
 void WindowFunctionIntegral::add(Value value) {
     assertValueType(value);
 
-    auto arr = value.getArray();
+    const auto& arr = value.getArray();
     if (arr[0].isNaN() || arr[1].isNaN())
         _nanCount++;
 
@@ -105,7 +105,7 @@ void WindowFunctionIntegral::remove(Value value) {
         "Attempted to remove an element other than the first element from WindowFunctionIntegral",
         _expCtx->getValueComparator().evaluate(_values.front() == value));
 
-    auto arr = value.getArray();
+    const auto& arr = value.getArray();
     if (arr[0].isNaN() || arr[1].isNaN())
         _nanCount--;
 

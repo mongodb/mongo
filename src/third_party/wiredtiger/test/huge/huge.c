@@ -101,7 +101,7 @@ run(CONFIG *cp, int bigkey, size_t bytes)
       bytes < MEGABYTE ? "B" : (bytes < GIGABYTE ? "MB" : "GB"), cp->uri, cp->config,
       bigkey ? "key" : "value");
 
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     /*
      * Open/create the database, connection, session and cursor; set the cache size large, we don't
@@ -195,7 +195,7 @@ main(int argc, char *argv[])
     }
     free(big);
 
-    testutil_clean_work_dir(home);
+    testutil_remove(home);
 
     return (EXIT_SUCCESS);
 }

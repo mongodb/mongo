@@ -360,8 +360,8 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx,
                 fp->pauseWhileSet();
             },
             [opCtx, indexCatalogEntry](auto&& config) {
-                return config.getStringField("namespace") ==
-                    indexCatalogEntry->getNSSFromCatalog(opCtx).ns();
+                return NamespaceStringUtil::parseFailPointData(config, "namespace") ==
+                    indexCatalogEntry->getNSSFromCatalog(opCtx);
             });
     };
     failPointHang(&hangDuringIndexBuildDrainYield);

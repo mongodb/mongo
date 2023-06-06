@@ -1414,7 +1414,7 @@ struct GroupNode : public QuerySolutionNode {
             expression::addDependencies(acc.expr.argument.get(), &deps);
         }
 
-        requiredFields = deps.fields;
+        requiredFields = std::move(deps.fields);
         needWholeDocument = deps.needWholeDocument;
         needsAnyMetadata = deps.getNeedsAnyMetadata();
     }

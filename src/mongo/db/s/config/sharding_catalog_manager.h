@@ -519,18 +519,6 @@ public:
      */
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
 
-    /*
-     * Rename collection metadata as part of a renameCollection operation.
-     *
-     * - Updates the FROM collection entry if the source collection is sharded
-     * - Removes the TO collection entry if the target collection was sharded
-     */
-    void renameShardedMetadata(OperationContext* opCtx,
-                               const NamespaceString& from,
-                               const NamespaceString& to,
-                               const WriteConcernOptions& writeConcern,
-                               boost::optional<CollectionType> optFromCollType);
-
     //
     // For Diagnostics
     //

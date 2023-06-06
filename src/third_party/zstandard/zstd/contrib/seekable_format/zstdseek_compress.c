@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-present, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -230,6 +230,8 @@ size_t ZSTD_seekable_compressStream(ZSTD_seekable_CStream* zcs, ZSTD_outBuffer* 
     const BYTE* const inBase = (const BYTE*) input->src + input->pos;
     size_t inLen = input->size - input->pos;
 
+    assert(zcs->maxFrameSize < INT_MAX);
+    ZSTD_CCtx_setParameter(zcs->cstream, ZSTD_c_srcSizeHint, (int)zcs->maxFrameSize);
     inLen = MIN(inLen, (size_t)(zcs->maxFrameSize - zcs->frameDSize));
 
     /* if we haven't finished flushing the last frame, don't start writing a new one */
@@ -350,7 +352,7 @@ size_t ZSTD_seekable_writeSeekTable(ZSTD_frameLog* fl, ZSTD_outBuffer* output)
 
 size_t ZSTD_seekable_endStream(ZSTD_seekable_CStream* zcs, ZSTD_outBuffer* output)
 {
-    if (!zcs->writingSeekTable && zcs->frameDSize) {
+    if (!zcs->writingSeekTable) {
         const size_t endFrame = ZSTD_seekable_endFrame(zcs, output);
         if (ZSTD_isError(endFrame)) return endFrame;
         /* return an accurate size hint */

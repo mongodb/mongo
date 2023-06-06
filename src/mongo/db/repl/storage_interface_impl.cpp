@@ -682,8 +682,9 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                               collectionAccessMode);
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
-                                        << "Unable to proceed with " << opStr << "."};
+                          str::stream()
+                              << "Collection [" << nsOrUUID.toStringForErrorMsg() << "] not found. "
+                              << "Unable to proceed with " << opStr << "."};
         }
 
         auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
@@ -993,9 +994,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
         // CanonicalQuery whose ownership will be transferred to the plan executor in
         // getExecutorUpdate().
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(
-            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
+        ParsedUpdate parsedUpdate(opCtx, &request, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;
@@ -1050,8 +1049,9 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
                               MODE_IX);
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
-                                        << "Unable to update document."};
+                          str::stream()
+                              << "Collection [" << nsOrUUID.toStringForErrorMsg() << "] not found. "
+                              << "Unable to update document."};
         }
 
         // We can create an UpdateRequest now that the collection's namespace has been resolved, in
@@ -1068,9 +1068,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 
         // ParsedUpdate needs to be inside the write conflict retry loop because it contains
         // the UpdateDriver whose state may be modified while we are applying the update.
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-        ParsedUpdate parsedUpdate(
-            opCtx, &request, extensionsCallback, collection.getCollectionPtr());
+        ParsedUpdate parsedUpdate(opCtx, &request, collection.getCollectionPtr());
         auto parsedUpdateStatus = parsedUpdate.parseRequest();
         if (!parsedUpdateStatus.isOK()) {
             return parsedUpdateStatus;

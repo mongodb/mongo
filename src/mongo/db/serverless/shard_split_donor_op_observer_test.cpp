@@ -505,9 +505,9 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteAbortedDocumentDoesNotRemoveBlockers
 
     WriteUnitOfWork wuow(_opCtx.get());
     AutoGetCollection autoColl(_opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, MODE_IX);
-    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc);
-
     OplogDeleteEntryArgs deleteArgs;
+    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc, &deleteArgs);
+
     deleteArgs.deletedDoc = &bsonDoc;
 
     _observer->onDelete(_opCtx.get(), *autoColl, 0 /* stmtId */, deleteArgs);
@@ -545,9 +545,9 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteCommittedDocumentRemovesBlockers) {
 
     WriteUnitOfWork wuow(_opCtx.get());
     AutoGetCollection autoColl(_opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, MODE_IX);
-    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc);
-
     OplogDeleteEntryArgs deleteArgs;
+    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc, &deleteArgs);
+
     deleteArgs.deletedDoc = &bsonDoc;
 
     _observer->onDelete(_opCtx.get(), *autoColl, 0 /* stmtId */, deleteArgs);

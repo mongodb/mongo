@@ -50,35 +50,60 @@ function getTelemetry(conn) {
             {$queryStats: {}},
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
-            {$match: {"key.applicationName": kShellApplicationName}}
+            {$match: {"key.client.application.name": kShellApplicationName}}
         ],
         cursor: {}
     });
     assert.commandWorked(result);
     return result.cursor.firstBatch;
 }
+/**
+ * TODO SERVER-77279: refactor to have single getTelemetry function that is passed a test options
+ * object
+ */
+function getTelemetryReplSet(conn, collectionName) {
+    const pipeline = [
+        {$queryStats: {}},
+        // Sort on telemetry key so entries are in a deterministic order.
+        {$sort: {key: 1}},
+        {
+            $match: {
+                "key.client.application.name": kShellApplicationName,
+                "key.queryShape.cmdNs.coll": collectionName
+            }
+        }
+    ];
+    return conn.getDB("admin").aggregate(pipeline).toArray();
+}
 
 // TODO SERVER-77279 refactor to pass options as object
 function getQueryStatsFindCmd(
-    conn, applyHmacToIdentifiers = false, collName = "", hmacKey = kDefaultQueryStatsHmacKey) {
+    conn, transformIdentifiers = false, collName = "", hmacKey = kDefaultQueryStatsHmacKey) {
     let matchExpr = {
         "key.queryShape.command": "find",
-        "key.applicationName": kShellApplicationName
+        "key.client.application.name": kShellApplicationName
     };
     if (collName != "") {
         matchExpr["key.queryShape.cmdNs.coll"] = collName;
     }
     // Filter out agg queries, including $queryStats.
-    const result = conn.adminCommand({
-        aggregate: 1,
-        pipeline: [
-            {$queryStats: {applyHmacToIdentifiers, hmacKey}},
+    var pipeline;
+    if (transformIdentifiers) {
+        pipeline = [
+            {$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey}}},
             {$match: matchExpr},
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
-        ],
-        cursor: {}
-    });
+        ];
+    } else {
+        pipeline = [
+            {$queryStats: {}},
+            {$match: matchExpr},
+            // Sort on telemetry key so entries are in a deterministic order.
+            {$sort: {key: 1}},
+        ];
+    }
+    const result = conn.adminCommand({aggregate: 1, pipeline: pipeline, cursor: {}});
     assert.commandWorked(result);
     return result.cursor.firstBatch;
 }
@@ -89,24 +114,55 @@ function getQueryStatsFindCmd(
  */
 // TODO SERVER-77279 refactor to pass options as object
 function getQueryStatsAggCmd(
-    conn, applyHmacToIdentifiers = false, hmacKey = kDefaultQueryStatsHmacKey) {
-    const result = conn.adminCommand({
-        aggregate: 1,
-        pipeline: [
-            {$queryStats: {applyHmacToIdentifiers, hmacKey}},
+    conn, transformIdentifiers = false, hmacKey = kDefaultQueryStatsHmacKey) {
+    var pipeline;
+    if (transformIdentifiers) {
+        pipeline = [
+            {$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey}}},
             // Filter out find queries and $queryStats aggregations.
             {
                 $match: {
                     "key.queryShape.command": "aggregate",
                     "key.queryShape.pipeline.0.$queryStats": {$exists: false},
-                    "key.applicationName": kShellApplicationName
+                    "key.client.application.name": kShellApplicationName
                 }
             },
             // Sort on key so entries are in a deterministic order.
             {$sort: {key: 1}},
-        ],
-        cursor: {}
-    });
+        ];
+    } else {
+        pipeline = [
+            {$queryStats: {}},
+            // Filter out find queries and $queryStats aggregations.
+            {
+                $match: {
+                    "key.queryShape.command": "aggregate",
+                    "key.queryShape.pipeline.0.$queryStats": {$exists: false},
+                    "key.client.application.name": kShellApplicationName
+                }
+            },
+            // Sort on key so entries are in a deterministic order.
+            {$sort: {key: 1}},
+        ];
+    }
+    const result = conn.adminCommand({aggregate: 1, pipeline: pipeline, cursor: {}});
     assert.commandWorked(result);
     return result.cursor.firstBatch;
+}
+
+function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
+    let fieldsCounter = 0;
+    for (const field in resultingKey) {
+        fieldsCounter++;
+        if (field === "client") {
+            // client meta data is environment/machine dependent, so do not
+            // assert on fields or specific fields other than the application name.
+            assert.eq(resultingKey.client.application.name, kShellApplicationName);
+            continue;
+        }
+        assert(expectedKey.hasOwnProperty(field));
+        assert.eq(expectedKey[field], resultingKey[field]);
+    }
+    // Make sure the resulting key isn't missing any fields.
+    assert.eq(fieldsCounter, Object.keys(expectedKey).length, resultingKey);
 }

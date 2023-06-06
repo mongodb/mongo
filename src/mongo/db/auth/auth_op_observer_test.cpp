@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keys_collection_client_sharded.h"
@@ -146,29 +143,30 @@ TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     WriteUnitOfWork wunit(opCtx.get());
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1), &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1), &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 DEATH_TEST_F(AuthOpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    cc().swapLockState(std::make_unique<LockerNoop>());
     AutoGetCollection autoColl(opCtx.get(), _nss, MODE_IX);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, {});
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, {}, &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 }  // namespace

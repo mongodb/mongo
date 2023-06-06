@@ -60,8 +60,11 @@ public:
      * Do not use this function when serializing a NamespaceString object for catalog.
      */
     static std::string serialize(const NamespaceString& ns,
-                                 const SerializationContext& context = SerializationContext(),
-                                 const SerializationOptions& = {});
+                                 const SerializationContext& context = SerializationContext());
+
+    static std::string serialize(const NamespaceString& ns,
+                                 const SerializationOptions& options,
+                                 const SerializationContext& context = SerializationContext());
 
     /**
      * Serializes a NamespaceString object for catalog.
@@ -139,6 +142,8 @@ public:
     static NamespaceString parseNamespaceFromDoc(const DatabaseName& dbName, StringData coll);
 
     static NamespaceString parseNamespaceFromResponse(const DatabaseName& dbName, StringData coll);
+
+    static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
 };
 
 }  // namespace mongo

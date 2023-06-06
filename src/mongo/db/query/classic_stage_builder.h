@@ -36,16 +36,18 @@ namespace mongo::stage_builder {
 /**
  * A stage builder which builds an executable tree using classic PlanStages.
  */
-class ClassicStageBuilder : public StageBuilder<PlanStage> {
+class ClassicStageBuilder : public StageBuilder<std::unique_ptr<PlanStage>> {
 public:
+    using PlanType = std::unique_ptr<PlanStage>;
+
     ClassicStageBuilder(OperationContext* opCtx,
                         const CollectionPtr& collection,
                         const CanonicalQuery& cq,
                         const QuerySolution& solution,
                         WorkingSet* ws)
-        : StageBuilder<PlanStage>{opCtx, cq, solution}, _collection(collection), _ws{ws} {}
+        : StageBuilder<PlanType>{opCtx, cq, solution}, _collection(collection), _ws{ws} {}
 
-    std::unique_ptr<PlanStage> build(const QuerySolutionNode* root) final;
+    PlanType build(const QuerySolutionNode* root) final;
 
 private:
     const CollectionPtr& _collection;

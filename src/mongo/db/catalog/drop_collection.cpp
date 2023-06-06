@@ -249,12 +249,12 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
 
         // Send the abort signal to any active index builds on the collection. This waits until all
         // aborted index builds complete.
-        indexBuildsCoord->abortCollectionIndexBuilds(opCtx,
-                                                     collectionNs,
-                                                     collectionUUID,
-                                                     str::stream()
-                                                         << "Collection " << collectionNs << "("
-                                                         << collectionUUID << ") is being dropped");
+        indexBuildsCoord->abortCollectionIndexBuilds(
+            opCtx,
+            collectionNs,
+            collectionUUID,
+            str::stream() << "Collection " << toStringForLogging(collectionNs) << "("
+                          << collectionUUID << ") is being dropped");
 
         // Take an exclusive lock to finish the collection drop.
         optionalAutoDb.emplace(opCtx, startingNss.dbName(), MODE_IX);

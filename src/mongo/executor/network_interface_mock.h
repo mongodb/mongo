@@ -287,9 +287,9 @@ public:
     void runReadyNetworkOperations();
 
     /**
-     * Sets the reply of the 'isMaster' handshake for a specific host. This reply will only
+     * Sets the reply of the 'hello' handshake for a specific host. This reply will only
      * be given to the 'validateHost' method of the ConnectionHook set on this object - NOT
-     * to the completion handlers of any 'isMaster' commands scheduled with 'startCommand'.
+     * to the completion handlers of any 'hello' commands scheduled with 'startCommand'.
      *
      * This reply will persist until it is changed again using this method.
      *

@@ -104,17 +104,19 @@ void _finishDropDatabase(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
     }
 
+    // Testing depends on this failpoint stopping execution before the dropDatabase oplog entry is
+    // written, as well as before the in-memory state is cleared.
+    if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
+        LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
+        dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet(opCtx);
+    }
+
     writeConflictRetry(opCtx, "dropDatabase_database", NamespaceString(dbName), [&] {
         // We need to replicate the dropDatabase oplog entry and clear the collection catalog in the
         // same transaction. This is to prevent stepdown from interrupting between these two
         // operations and leaving this node in an inconsistent state.
         WriteUnitOfWork wunit(opCtx);
         opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
-
-        if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
-            LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
-            dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet(opCtx);
-        }
 
         auto databaseHolder = DatabaseHolder::get(opCtx);
         databaseHolder->dropDb(opCtx, db);
@@ -204,7 +206,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // yielded.
                 ScopeGuard dropPendingGuardWhileUnlocked(
                     [dbName, opCtx, &dropPendingGuard, tenantLockMode] {
-                        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+                        // This scope guard must succeed in acquiring locks and reverting the drop
+                        // pending state even when the failure is due to an interruption.
                         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                         AutoGetDb autoDB(
                             opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
@@ -378,7 +381,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // any errors while we await the replication of any collection drops and then reacquire the
     // locks (which can throw) needed to finish the drop database.
     ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
-        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+        // This scope guard must succeed in acquiring locks and reverting the drop pending state
+        // even when the failure is due to an interruption.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
         AutoGetDb autoDB(opCtx, dbName, MODE_IX);

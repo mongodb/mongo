@@ -357,7 +357,7 @@ void CurOp::setMessage_inlock(StringData message) {
                     "Updating message",
                     "old"_attr = redact(_message),
                     "new"_attr = redact(message));
-        verify(!_progressMeter.isActive());
+        MONGO_verify(!_progressMeter.isActive());
     }
     _message = message.toString();  // copy
 }
@@ -1277,6 +1277,11 @@ void OpDebug::append(OperationContext* opCtx,
 
     if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
         b.append("writeConcern", writeConcern->toBSON());
+    }
+
+    if (waitForWriteConcernDurationMillis > Milliseconds::zero()) {
+        b.append("waitForWriteConcernDuration",
+                 durationCount<Milliseconds>(waitForWriteConcernDurationMillis));
     }
 
     if (storageStats) {

@@ -61,8 +61,8 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
                 }
             },
             [nss](const BSONObj& config) {
-                StringData ns = config.getStringField("namespace");
-                return ns.empty() || ns == nss.ns();
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(config, "namespace");
+                return fpNss.isEmpty() || fpNss == nss;
             });
     };
     failPointHang(&setYieldAllLocksHang);
@@ -71,8 +71,8 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
     setYieldAllLocksWait.executeIf(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
         [&](const BSONObj& config) {
-            BSONElement dataNs = config["namespace"];
-            return !dataNs || _nss.ns() == dataNs.str();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(config, "namespace");
+            return fpNss.isEmpty() || _nss == fpNss;
         });
 }
 

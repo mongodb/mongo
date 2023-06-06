@@ -5,6 +5,7 @@
 //   assumes_unsharded_collection,
 //   assumes_write_concern_unchanged,
 //   does_not_support_stepdowns,
+//   references_foreign_collection,
 //   requires_non_retryable_commands,
 // ]
 

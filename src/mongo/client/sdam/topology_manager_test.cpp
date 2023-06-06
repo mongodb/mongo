@@ -58,7 +58,7 @@ protected:
     static inline const auto kBsonTopologyVersionHigh =
         okBuilder().append("topologyVersion", TopologyVersion(OID::max(), 1).toBSON()).obj();
     static inline const auto kBsonRsPrimary = okBuilder()
-                                                  .append("ismaster", true)
+                                                  .append("isWritablePrimary", true)
                                                   .append("setName", kSetName)
                                                   .append("minWireVersion", 2)
                                                   .append("maxWireVersion", 10)

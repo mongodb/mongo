@@ -127,7 +127,7 @@ protected:
     BSONObj createListExistingCollectionsOnDonorResponse(const std::vector<BSONObj>& collections) {
         auto ns = NamespaceString::makeCollectionlessAggregateNSS(
                       DatabaseName::createDatabaseName_forTest(boost::none, "admin"))
-                      .toString();
+                      .toString_forTest();
         BSONObjBuilder bob;
         {
             BSONObjBuilder cursorBob(bob.subobjStart("cursor"));

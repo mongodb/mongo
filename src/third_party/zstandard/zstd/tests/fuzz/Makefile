@@ -1,5 +1,5 @@
 # ################################################################
-# Copyright (c) Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -34,9 +34,14 @@ ZSTDDIR = ../../lib
 PRGDIR = ../../programs
 CONTRIBDIR = ../../contrib
 
+DEFAULT_SEQ_PROD_DIR = $(CONTRIBDIR)/externalSequenceProducer
+DEFAULT_SEQ_PROD_SRC = $(DEFAULT_SEQ_PROD_DIR)/sequence_producer.c
+THIRD_PARTY_SEQ_PROD_OBJ ?=
+
 FUZZ_CPPFLAGS := -I$(ZSTDDIR) -I$(ZSTDDIR)/common -I$(ZSTDDIR)/compress \
 	-I$(ZSTDDIR)/dictBuilder -I$(ZSTDDIR)/deprecated -I$(ZSTDDIR)/legacy \
-	-I$(CONTRIBDIR)/seekable_format -I$(PRGDIR) -DZSTD_MULTITHREAD -DZSTD_LEGACY_SUPPORT=1 $(CPPFLAGS)
+	-I$(CONTRIBDIR)/seekable_format -I$(PRGDIR) -I$(DEFAULT_SEQ_PROD_DIR) \
+	-DZSTD_MULTITHREAD -DZSTD_LEGACY_SUPPORT=1 $(CPPFLAGS)
 FUZZ_EXTRA_FLAGS := -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
 	-Wstrict-aliasing=1 -Wswitch-enum -Wdeclaration-after-statement \
 	-Wstrict-prototypes -Wundef \
@@ -69,7 +74,8 @@ FUZZ_SRC       := \
 	$(ZSTDCOMMON_SRC) \
 	$(ZSTDCOMP_SRC) \
 	$(ZSTDDICT_SRC) \
-	$(ZSTDLEGACY_SRC)
+	$(ZSTDLEGACY_SRC) \
+	$(DEFAULT_SEQ_PROD_SRC)
 FUZZ_SRC := $(sort $(wildcard $(FUZZ_SRC)))
 
 FUZZ_D_OBJ1 := $(subst $(ZSTDDIR)/common/,d_lib_common_,$(FUZZ_SRC))
@@ -78,9 +84,11 @@ FUZZ_D_OBJ3 := $(subst $(ZSTDDIR)/decompress/,d_lib_decompress_,$(FUZZ_D_OBJ2))
 FUZZ_D_OBJ4 := $(subst $(ZSTDDIR)/dictBuilder/,d_lib_dictBuilder_,$(FUZZ_D_OBJ3))
 FUZZ_D_OBJ5 := $(subst $(ZSTDDIR)/legacy/,d_lib_legacy_,$(FUZZ_D_OBJ4))
 FUZZ_D_OBJ6 := $(subst $(PRGDIR)/,d_prg_,$(FUZZ_D_OBJ5))
-FUZZ_D_OBJ7 := $(subst $\./,d_fuzz_,$(FUZZ_D_OBJ6))
-FUZZ_D_OBJ8 := $(FUZZ_D_OBJ7:.c=.o)
-FUZZ_DECOMPRESS_OBJ := $(FUZZ_D_OBJ8:.S=.o)
+FUZZ_D_OBJ7 := $(subst $(DEFAULT_SEQ_PROD_DIR)/,d_default_seq_prod_,$(FUZZ_D_OBJ6))
+FUZZ_D_OBJ8 := $(subst $\./,d_fuzz_,$(FUZZ_D_OBJ7))
+FUZZ_D_OBJ9 := $(FUZZ_D_OBJ8:.c=.o)
+FUZZ_D_OBJ10 := $(THIRD_PARTY_SEQ_PROD_OBJ) $(FUZZ_D_OBJ9)
+FUZZ_DECOMPRESS_OBJ := $(FUZZ_D_OBJ10:.S=.o)
 
 FUZZ_RT_OBJ1 := $(subst $(ZSTDDIR)/common/,rt_lib_common_,$(FUZZ_SRC))
 FUZZ_RT_OBJ2 := $(subst $(ZSTDDIR)/compress/,rt_lib_compress_,$(FUZZ_RT_OBJ1))
@@ -88,9 +96,11 @@ FUZZ_RT_OBJ3 := $(subst $(ZSTDDIR)/decompress/,rt_lib_decompress_,$(FUZZ_RT_OBJ2
 FUZZ_RT_OBJ4 := $(subst $(ZSTDDIR)/dictBuilder/,rt_lib_dictBuilder_,$(FUZZ_RT_OBJ3))
 FUZZ_RT_OBJ5 := $(subst $(ZSTDDIR)/legacy/,rt_lib_legacy_,$(FUZZ_RT_OBJ4))
 FUZZ_RT_OBJ6 := $(subst $(PRGDIR)/,rt_prg_,$(FUZZ_RT_OBJ5))
-FUZZ_RT_OBJ7 := $(subst $\./,rt_fuzz_,$(FUZZ_RT_OBJ6))
-FUZZ_RT_OBJ8 := $(FUZZ_RT_OBJ7:.c=.o)
-FUZZ_ROUND_TRIP_OBJ := $(FUZZ_RT_OBJ8:.S=.o)
+FUZZ_RT_OBJ7 := $(subst $(DEFAULT_SEQ_PROD_DIR)/,rt_default_seq_prod_,$(FUZZ_RT_OBJ6))
+FUZZ_RT_OBJ8 := $(subst $\./,rt_fuzz_,$(FUZZ_RT_OBJ7))
+FUZZ_RT_OBJ9 := $(FUZZ_RT_OBJ8:.c=.o)
+FUZZ_RT_OBJ10 := $(THIRD_PARTY_SEQ_PROD_OBJ) $(FUZZ_RT_OBJ9)
+FUZZ_ROUND_TRIP_OBJ := $(FUZZ_RT_OBJ10:.S=.o)
 
 .PHONY: default all clean cleanall
 
@@ -143,6 +153,9 @@ rt_prg_%.o: $(PRGDIR)/%.c
 rt_fuzz_%.o: %.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $(FUZZ_ROUND_TRIP_FLAGS) $< -c -o $@
 
+rt_default_seq_prod_%.o: $(DEFAULT_SEQ_PROD_DIR)/%.c
+	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $(FUZZ_ROUND_TRIP_FLAGS) $< -c -o $@
+
 d_lib_common_%.o: $(ZSTDDIR)/common/%.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $< -c -o $@
 
@@ -165,6 +178,9 @@ d_prg_%.o: $(PRGDIR)/%.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $< -c -o $@
 
 d_fuzz_%.o: %.c
+	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $< -c -o $@
+
+d_default_seq_prod_%.o: $(DEFAULT_SEQ_PROD_DIR)/%.c
 	$(CC) $(FUZZ_CPPFLAGS) $(FUZZ_CFLAGS) $< -c -o $@
 
 simple_round_trip: $(FUZZ_HEADERS) $(FUZZ_ROUND_TRIP_OBJ) rt_fuzz_simple_round_trip.o

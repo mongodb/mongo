@@ -134,12 +134,12 @@ run_test_clean(bool stress_test, bool column_store, bool preserve, const char *h
     printf("Running %s test with %s store...\n", stress_test ? "stress" : "normal",
       column_store ? "column" : "row");
     testutil_assert(sizeof(home_full) > strlen(home) + strlen(suffix) + 2);
-    testutil_check(__wt_snprintf(home_full, HOME_BUF_SIZE, "%s.%s", home, suffix));
+    testutil_snprintf(home_full, HOME_BUF_SIZE, "%s.%s", home, suffix);
     run_test(stress_test, column_store, home_full, uri);
 
     /* Cleanup */
     if (!preserve)
-        testutil_clean_work_dir(home_full);
+        testutil_remove(home_full);
 }
 
 /*
@@ -156,7 +156,7 @@ run_test(bool stress_test, bool column_store, const char *home, const char *uri)
     uint64_t pages_reviewed, pages_rewritten, pages_skipped;
     bool size_check_res;
 
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
     testutil_check(wiredtiger_open(home, NULL, conn_config, &conn));
 
     if (stress_test) {
@@ -373,7 +373,7 @@ get_file_stats(WT_SESSION *session, const char *uri, uint64_t *file_sz, uint64_t
     WT_CURSOR *cur_stat;
     char *descr, *str_val, stat_uri[STAT_BUF_SIZE];
 
-    testutil_check(__wt_snprintf(stat_uri, STAT_BUF_SIZE, "statistics:%s", uri));
+    testutil_snprintf(stat_uri, STAT_BUF_SIZE, "statistics:%s", uri);
     testutil_check(session->open_cursor(session, stat_uri, NULL, "statistics=(all)", &cur_stat));
 
     /* Get file size. */
@@ -416,7 +416,7 @@ get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_revie
     char *descr, *str_val;
     char stat_uri[STAT_BUF_SIZE];
 
-    testutil_check(__wt_snprintf(stat_uri, STAT_BUF_SIZE, "statistics:%s", uri));
+    testutil_snprintf(stat_uri, STAT_BUF_SIZE, "statistics:%s", uri);
     testutil_check(session->open_cursor(session, stat_uri, NULL, "statistics=(all)", &cur_stat));
 
     cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REVIEWED);

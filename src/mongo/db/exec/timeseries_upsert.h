@@ -49,6 +49,7 @@ public:
                           const ScopedCollectionAcquisition& coll,
                           BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate,
+                          std::unique_ptr<MatchExpression> originalPredicate,
                           const UpdateRequest& request);
 
     bool isEOF() final;
@@ -56,7 +57,6 @@ public:
 
 private:
     BSONObj _produceNewDocumentForInsert();
-    void _performInsert(BSONObj newDocument);
 
     // The original update request.
     const UpdateRequest& _request;

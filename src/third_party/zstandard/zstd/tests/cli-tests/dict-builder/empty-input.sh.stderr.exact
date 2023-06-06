@@ -1,0 +1,1 @@
+zstd -q --train empty file*

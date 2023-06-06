@@ -31,7 +31,7 @@ If this number is not suitable, during compilation you can define `PZSTD_NUM_THR
 
 ## Benchmarks
 
-As a reference, PZstandard and Pigz were compared on an Intel Core i7 @ 3.1 GHz, each using 4 threads, with the [Silesia compression corpus](http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia).
+As a reference, PZstandard and Pigz were compared on an Intel Core i7 @ 3.1 GHz, each using 4 threads, with the [Silesia compression corpus](https://sun.aei.polsl.pl//~sdeor/index.php?page=silesia).
 
 Compression Speed vs Ratio with 4 Threads | Decompression Speed with 4 Threads
 ------------------------------------------|-----------------------------------

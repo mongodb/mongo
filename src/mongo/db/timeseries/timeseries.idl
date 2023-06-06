@@ -116,6 +116,8 @@ structs:
                 type: string
                 stability: stable
                 query_shape: anonymize
+                validator:
+                    callback: "validateTimeAndMetaField"
             metaField:
                 description: "The name of the top-level field describing the series. This field is
                               used to group related data and may be of any BSON type. This may not 
@@ -124,6 +126,8 @@ structs:
                 optional: true
                 stability: stable
                 query_shape: anonymize
+                validator:
+                    callback: "validateTimeAndMetaField"
             granularity:
                 description: "Describes the expected interval between subsequent measurements"
                 type: BucketGranularity

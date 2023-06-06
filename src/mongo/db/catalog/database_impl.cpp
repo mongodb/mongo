@@ -768,8 +768,8 @@ Collection* DatabaseImpl::_createCollection(
             uasserted(51267, "hangAndFailAfterCreateCollectionReservesOpTime fail point enabled");
         },
         [&](const BSONObj& data) {
-            auto fpNss = data["nss"].str();
-            return fpNss.empty() || fpNss == nss.toString();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+            return fpNss.isEmpty() || fpNss == nss;
         });
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
@@ -792,6 +792,12 @@ Collection* DatabaseImpl::_createCollection(
     // Create Collection object
     auto ownedCollection = [&]() -> std::shared_ptr<Collection> {
         if (!vopts) {
+            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+                throwWriteConflictException(str::stream()
+                                            << "Namespace '" << nss.toStringForErrorMsg()
+                                            << "' is already in use.");
+            }
+
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
                 uassertStatusOK(storageEngine->getCatalog()->createCollection(
@@ -810,11 +816,12 @@ Collection* DatabaseImpl::_createCollection(
     ownedCollection->setCommitted(false);
 
     CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
-    openCreateCollectionWindowFp.executeIf([&](const BSONObj& data) { sleepsecs(3); },
-                                           [&](const BSONObj& data) {
-                                               const auto collElem = data["collectionNS"];
-                                               return !collElem || nss.toString() == collElem.str();
-                                           });
+    openCreateCollectionWindowFp.executeIf(
+        [&](const BSONObj& data) { sleepsecs(3); },
+        [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS"_sd);
+            return fpNss.isEmpty() || nss == fpNss;
+        });
 
     BSONObj fullIdIndexSpec;
 

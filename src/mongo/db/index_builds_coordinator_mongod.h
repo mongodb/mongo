@@ -158,8 +158,7 @@ private:
                                          std::shared_ptr<ReplIndexBuildState> replState) override;
 
     void _signalPrimaryForAbortAndWaitForExternalAbort(OperationContext* opCtx,
-                                                       ReplIndexBuildState* replState,
-                                                       const Status& abortStatus) override;
+                                                       ReplIndexBuildState* replState) override;
 
     void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;

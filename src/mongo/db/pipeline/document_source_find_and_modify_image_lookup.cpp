@@ -179,11 +179,11 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
 }
 
 Value DocumentSourceFindAndModifyImageLookup::serialize(SerializationOptions opts) const {
-    return Value(Document{
-        {kStageName,
-         Value(Document{
-             {kIncludeCommitTransactionTimestampFieldName,
-              _includeCommitTransactionTimestamp ? opts.serializeLiteralValue(true) : Value()}})}});
+    return Value(
+        Document{{kStageName,
+                  Value(Document{{kIncludeCommitTransactionTimestampFieldName,
+                                  _includeCommitTransactionTimestamp ? opts.serializeLiteral(true)
+                                                                     : Value()}})}});
 }
 
 DepsTracker::State DocumentSourceFindAndModifyImageLookup::getDependencies(

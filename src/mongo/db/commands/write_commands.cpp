@@ -71,6 +71,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
@@ -296,8 +297,8 @@ public:
             }
 
             if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
-                    const auto ns = data.getStringField("ns");
-                    return ns == request().getNamespace().toString();
+                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                    return fpNss == request().getNamespace();
                 })) {
                 hangInsertBeforeWrite.pauseWhileSet();
             }
@@ -555,9 +556,6 @@ public:
             updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             updateRequest.setExplain(verbosity);
 
-            const ExtensionsCallbackReal extensionsCallback(opCtx,
-                                                            &updateRequest.getNamespaceString());
-
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
             const auto collection =
@@ -567,16 +565,11 @@ public:
                                   MODE_IX);
 
             if (isRequestToTimeseries) {
-                uassert(ErrorCodes::NamespaceNotFound,
-                        "Could not find time-series buckets collection for write explain",
-                        collection.getCollectionPtr());
-                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series buckets collection is missing time-series options",
-                        timeseriesOptions);
+                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 const auto& requestHint = request().getUpdates()[0].getHint();
                 if (timeseries::isHintIndexKey(requestHint)) {
+                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
                     updateRequest.setHint(
                         uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                             *timeseriesOptions, requestHint)));
@@ -585,7 +578,6 @@ public:
 
             ParsedUpdate parsedUpdate(opCtx,
                                       &updateRequest,
-                                      extensionsCallback,
                                       collection.getCollectionPtr(),
                                       false /* forgoOpCounterIncrements */,
                                       isRequestToTimeseries);
@@ -594,12 +586,14 @@ public:
             auto exec = uassertStatusOK(getExecutorUpdate(
                 &CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(),
-                                   collection.getCollectionPtr(),
-                                   verbosity,
-                                   BSONObj(),
-                                   _commandObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(),
+                collection.getCollectionPtr(),
+                verbosity,
+                BSONObj(),
+                SerializationContext::stateCommandReply(request().getSerializationContext()),
+                _commandObj,
+                &bodyBuilder);
         }
 
         BSONObj _commandObj;
@@ -756,15 +750,10 @@ public:
                     opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
                 MODE_IX);
             if (isRequestToTimeseries) {
-                uassert(ErrorCodes::NamespaceNotFound,
-                        "Could not find time-series buckets collection for write explain",
-                        collection.exists());
-                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series buckets collection is missing time-series options",
-                        timeseriesOptions);
+                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 if (timeseries::isHintIndexKey(firstDelete.getHint())) {
+                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
                     deleteRequest.setHint(
                         uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                             *timeseriesOptions, firstDelete.getHint())));
@@ -779,12 +768,14 @@ public:
             auto exec = uassertStatusOK(getExecutorDelete(
                 &CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(),
-                                   collection.getCollectionPtr(),
-                                   verbosity,
-                                   BSONObj(),
-                                   _commandObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(),
+                collection.getCollectionPtr(),
+                verbosity,
+                BSONObj(),
+                SerializationContext::stateCommandReply(request().getSerializationContext()),
+                _commandObj,
+                &bodyBuilder);
         }
 
         const BSONObj& _commandObj;

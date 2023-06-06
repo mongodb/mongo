@@ -437,12 +437,12 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_processBat
                _lastProcessedIdSinceStepUp = Value(next.documentKey["_id"]);
                _fetcher->setResumeId(_lastProcessedIdSinceStepUp);
 
-               _fetchedDocs.pop();
-
                _metrics->onDocumentsProcessed(1,
                                               next.documentKey.objsize() +
                                                   next.indexKeyValues.objsize(),
                                               duration_cast<Milliseconds>(timer.elapsed()));
+
+               _fetchedDocs.pop();
            })
         .until([this](const Status& status) { return !status.isOK() || _fetchedDocs.empty(); })
         .on(**executor, cancelToken)

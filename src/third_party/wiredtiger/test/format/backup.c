@@ -50,20 +50,20 @@ check_copy(void)
      * restart to avoid a window where they could exist and the backup directory has had recovery
      * run.
      */
-    testutil_check(__wt_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE_TMP));
+    testutil_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE_TMP);
     ret = unlink(path);
     /* Check if unlink command failed. It is fine if the file does not exist. */
     if (ret != 0 && errno != ENOENT)
         testutil_die(errno, "unlink command failed with error code: %s", path);
 
-    testutil_check(__wt_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE));
+    testutil_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE);
     ret = unlink(path);
     /* Check if unlink command failed. It is fine if the file does not exist. */
     if (ret != 0 && errno != ENOENT)
         testutil_die(errno, "unlink command failed with error code: %s", path);
 
     /* Now setup and open the path for real. */
-    testutil_check(__wt_snprintf(path, len, "%s/BACKUP", g.home));
+    testutil_snprintf(path, len, "%s/BACKUP", g.home);
     wts_open(path, &conn, false);
 
     /* Verify the objects. */
@@ -185,14 +185,14 @@ again:
              * There is something in the prev list not in the current list. Remove it, and continue
              * - don't advance the current list.
              */
-            testutil_check(__wt_snprintf(
-              filename, sizeof(filename), "%s/BACKUP/%s", g.home, prev->names[prevpos]));
+            testutil_snprintf(
+              filename, sizeof(filename), "%s/BACKUP/%s", g.home, prev->names[prevpos]);
 #if 0
             fprintf(stderr, "Removing file from backup: %s\n", filename);
 #endif
             testutil_assert_errno(unlink(filename) == 0);
-            testutil_check(__wt_snprintf(
-              filename, sizeof(filename), "%s/BACKUP.copy/%s", g.home, prev->names[prevpos]));
+            testutil_snprintf(
+              filename, sizeof(filename), "%s/BACKUP.copy/%s", g.home, prev->names[prevpos]);
             testutil_assert_errno(unlink(filename) == 0);
         } else {
             /*
@@ -244,7 +244,7 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
     rfd = wfd1 = wfd2 = -1;
 
     /* Open the duplicate incremental backup cursor with the file name given. */
-    testutil_check(__wt_snprintf(config, sizeof(config), "incremental=(file=%s)", name));
+    testutil_snprintf(config, sizeof(config), "incremental=(file=%s)", name);
     testutil_check(session->open_cursor(session, NULL, bkup_c, config, &incr_cur));
     while ((ret = incr_cur->next(incr_cur)) == 0) {
         testutil_check(incr_cur->get_key(incr_cur, &offset, &size, &type));
@@ -259,21 +259,21 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
             if (first_pass) {
                 len = strlen(g.home) + strlen(name) + 10;
                 tmp = dmalloc(len);
-                testutil_check(__wt_snprintf(tmp, len, "%s/%s", g.home, name));
+                testutil_snprintf(tmp, len, "%s/%s", g.home, name);
                 testutil_assert_errno((rfd = open(tmp, O_RDONLY, 0644)) != -1);
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP") + strlen(name) + 10;
                 tmp = dmalloc(len);
-                testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP/%s", g.home, name));
+                testutil_snprintf(tmp, len, "%s/BACKUP/%s", g.home, name);
                 testutil_assert_errno((wfd1 = open(tmp, O_WRONLY | O_CREAT, 0644)) != -1);
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
                 tmp = dmalloc(len);
-                testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP.copy/%s", g.home, name));
+                testutil_snprintf(tmp, len, "%s/BACKUP.copy/%s", g.home, name);
                 testutil_assert_errno((wfd2 = open(tmp, O_WRONLY | O_CREAT, 0644)) != -1);
                 free(tmp);
                 tmp = NULL;
@@ -321,14 +321,14 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
              */
             len = strlen("BACKUP") + strlen(name) + 10;
             tmp = dmalloc(len);
-            testutil_check(__wt_snprintf(tmp, len, "BACKUP/%s", name));
+            testutil_snprintf(tmp, len, "BACKUP/%s", name);
             testutil_check(__wt_copy_and_sync(session, name, tmp));
             free(tmp);
             tmp = NULL;
 
             len = strlen("BACKUP.copy") + strlen(name) + 10;
             tmp = dmalloc(len);
-            testutil_check(__wt_snprintf(tmp, len, "BACKUP.copy/%s", name));
+            testutil_snprintf(tmp, len, "BACKUP.copy/%s", name);
             testutil_check(__wt_copy_and_sync(session, name, tmp));
             free(tmp);
             tmp = NULL;
@@ -364,7 +364,7 @@ restore_backup_info(WT_SESSION *session, ACTIVE_FILES *active)
     testutil_assert(g.backup_incr_flag == INCREMENTAL_BLOCK);
     len = strlen(g.home) + strlen(BACKUP_INFO_FILE) + 2;
     path = dmalloc(len);
-    testutil_check(__wt_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE));
+    testutil_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE);
     errno = 0;
     ret = RESTORE_SUCCESS;
     if ((fp = fopen(path, "r")) == NULL && errno != ENOENT)
@@ -384,8 +384,8 @@ restore_backup_info(WT_SESSION *session, ACTIVE_FILES *active)
      * tries to generate one that cannot possibly be in use. This call can/should be changed if the
      * API ever allows us to open a cursor with a source id that does not require a this id.
      */
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "incremental=(enabled,src_id=%" PRIu64 ",this_id=%" PRIu64 ")", id, id / 2));
+    testutil_snprintf(
+      buf, sizeof(buf), "incremental=(enabled,src_id=%" PRIu64 ",this_id=%" PRIu64 ")", id, id / 2);
     while ((ret = session->open_cursor(session, "backup:", NULL, buf, &cursor)) == EBUSY)
         __wt_yield();
     if (ret != 0) {
@@ -439,7 +439,7 @@ save_backup_info(ACTIVE_FILES *active, uint64_t id)
         return;
     len = strlen(g.home) + strlen(BACKUP_INFO_FILE_TMP) + 2;
     from_path = dmalloc(len);
-    testutil_check(__wt_snprintf(from_path, len, "%s/%s", g.home, BACKUP_INFO_FILE_TMP));
+    testutil_snprintf(from_path, len, "%s/%s", g.home, BACKUP_INFO_FILE_TMP);
     if ((fp = fopen(from_path, "w")) == NULL)
         testutil_die(errno, "save_backup_info fopen: %s", from_path);
     fprintf(fp, "%" PRIu64 "\n", id);
@@ -451,7 +451,7 @@ save_backup_info(ACTIVE_FILES *active, uint64_t id)
     fclose_and_clear(&fp);
     len = strlen(g.home) + strlen(BACKUP_INFO_FILE) + 2;
     to_path = dmalloc(len);
-    testutil_check(__wt_snprintf(to_path, len, "%s/%s", g.home, BACKUP_INFO_FILE));
+    testutil_snprintf(to_path, len, "%s/%s", g.home, BACKUP_INFO_FILE);
     testutil_assert_errno(rename(from_path, to_path) == 0);
     free(from_path);
     free(to_path);
@@ -480,7 +480,7 @@ copy_format_files(WT_SESSION *session)
         filename = dmalloc(file_len);
 
         for (i = 1; i <= ntables; ++i) {
-            testutil_check(__wt_snprintf(filename, file_len, "CONFIG.keylen.%u", i));
+            testutil_snprintf(filename, file_len, "CONFIG.keylen.%u", i);
             testutil_copy_if_exists(session, filename);
         }
         free(filename);
@@ -567,9 +567,9 @@ backup(void *arg)
                 active_files_free(&active[1]);
                 active_now = &active[g.backup_id % 2];
                 active_prev = NULL;
-                testutil_check(__wt_snprintf(cfg, sizeof(cfg),
+                testutil_snprintf(cfg, sizeof(cfg),
                   "incremental=(enabled,granularity=%" PRIu32 "K,this_id=%" PRIu64 ")",
-                  GV(BACKUP_INCR_GRANULARITY), g.backup_id));
+                  GV(BACKUP_INCR_GRANULARITY), g.backup_id);
                 full = true;
                 incr_full = false;
             } else {
@@ -579,9 +579,9 @@ backup(void *arg)
                     active_now = &active[0];
                 src_id = g.backup_id - 1;
                 /* Use consolidation too. */
-                testutil_check(__wt_snprintf(cfg, sizeof(cfg),
+                testutil_snprintf(cfg, sizeof(cfg),
                   "incremental=(enabled,consolidate=true,src_id=%" PRIu64 ",this_id=%" PRIu64 ")",
-                  src_id, g.backup_id));
+                  src_id, g.backup_id);
                 /* Restart a full incremental every once in a while. */
                 full = false;
                 incr_full = mmrand(&g.extra_rnd, 1, 8) == 1;
@@ -596,7 +596,7 @@ backup(void *arg)
                 full = true;
                 incr_full = false;
             } else {
-                testutil_check(__wt_snprintf(cfg, sizeof(cfg), "target=(\"log:\")"));
+                testutil_snprintf(cfg, sizeof(cfg), "target=(\"log:\")");
                 config = cfg;
                 full = false;
                 /* Restart a full incremental every once in a while. */

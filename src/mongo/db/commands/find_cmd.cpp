@@ -151,7 +151,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // optimizing the query, each of which would alter the query shape.
     if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
         query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
-            return std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedRequest);
+            return std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedRequest);
         });
     }
 
@@ -387,8 +387,13 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
-            Explain::explainStages(
-                exec.get(), collection, verbosity, BSONObj(), _request.body, &bodyBuilder);
+            Explain::explainStages(exec.get(),
+                                   collection,
+                                   verbosity,
+                                   BSONObj(),
+                                   SerializationContext::stateCommandReply(reqSerializationContext),
+                                   _request.body,
+                                   &bodyBuilder);
         }
 
         /**
@@ -632,7 +637,12 @@ public:
                 const CursorId cursorId = 0;
                 endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
                 auto bodyBuilder = result->getBodyBuilder();
-                appendCursorResponseObject(cursorId, nss, BSONArray(), boost::none, &bodyBuilder);
+                appendCursorResponseObject(cursorId,
+                                           nss,
+                                           BSONArray(),
+                                           boost::none,
+                                           &bodyBuilder,
+                                           respSerializationContext);
                 return;
             }
 
@@ -680,8 +690,6 @@ public:
                 auto&& [stats, _] =
                     explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
                 LOGV2_WARNING(23798,
-                              "Plan executor error during find command: {error}, "
-                              "stats: {stats}, cmd: {cmd}",
                               "Plan executor error during find command",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
@@ -754,7 +762,7 @@ public:
             }
 
             // Generate the response object to send to the client.
-            firstBatch.done(cursorId, nss);
+            firstBatch.done(cursorId, nss, respSerializationContext);
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.

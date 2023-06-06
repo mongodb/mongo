@@ -207,6 +207,26 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
     return me->path() == repl::OpTime::kTimestampFieldName;
 }
 
+/**
+ * Sets the lowPriority parameter on the given index scan node.
+ */
+void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
+                                    const FindCommandRequest& findCommand) {
+    auto sort = findCommand.getSort();
+    if (findCommand.getLimit() &&
+        (sort.isEmpty() || sort[query_request_helper::kNaturalSortField])) {
+        // There is a limit with either no sort or the natural sort.
+        return;
+    }
+
+    auto indexScan = checked_cast<IndexScanNode*>(solnRoot);
+    if (!indexScan->bounds.isUnbounded()) {
+        return;
+    }
+
+    indexScan->lowPriority = true;
+}
+
 // True if the element type is affected by a collator (i.e. it is or contains a String).
 bool affectedByCollator(const BSONElement& element) {
     switch (element.type()) {
@@ -250,22 +270,22 @@ void setHighestRecord(boost::optional<RecordIdBound>& curr, const BSONObj& newMa
 
 // Returns whether element is not affected by collators or query and collection collators are
 // compatible.
-bool compatibleCollator(const QueryPlannerParams& params,
+bool compatibleCollator(const CollatorInterface* collCollator,
                         const CollatorInterface* queryCollator,
                         const BSONElement& element) {
-    auto const collCollator = params.clusteredCollectionCollator;
     bool compatible = CollatorInterface::collatorsMatch(queryCollator, collCollator);
     return compatible || !affectedByCollator(element);
 }
+}  // namespace
 
-/**
- * Helper function that checks to see if min() or max() were provided along with the query. If so,
- * adjusts the collection scan bounds to fit the constraints.
- */
-void handleRIDRangeMinMax(const CanonicalQuery& query,
-                          CollectionScanNode* collScan,
-                          const QueryPlannerParams& params,
-                          const CollatorInterface* collator) {
+void QueryPlannerAccess::handleRIDRangeMinMax(
+    const CanonicalQuery& query,
+    const int direction,
+    const CollatorInterface* queryCollator,
+    const CollatorInterface* ccCollator,
+    boost::optional<RecordIdBound>& minRecord,
+    boost::optional<RecordIdBound>& maxRecord,
+    CollectionScanParams::ScanBoundInclusion& boundInclusion) {
     BSONObj minObj = query.getFindCommandRequest().getMin();
     BSONObj maxObj = query.getFindCommandRequest().getMax();
     if (minObj.isEmpty() && maxObj.isEmpty()) {
@@ -279,58 +299,46 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
     uassert(
         6137402,
         "min() / max() are only supported for forward collection scans on clustered collections",
-        collScan->direction == 1);
+        direction == 1);
 
     boost::optional<RecordId> newMinRecord, newMaxRecord;
-    if (!maxObj.isEmpty() && compatibleCollator(params, collator, maxObj.firstElement())) {
+    if (!maxObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, maxObj.firstElement())) {
         // max() is exclusive.
         // Assumes clustered collection scans are only supported with the forward direction.
-        collScan->boundInclusion =
-            CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
-        setLowestRecord(collScan->maxRecord,
-                        IndexBoundsBuilder::objFromElement(maxObj.firstElement(), collator));
+        boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
+        setLowestRecord(maxRecord,
+                        IndexBoundsBuilder::objFromElement(maxObj.firstElement(), queryCollator));
     }
 
-    if (!minObj.isEmpty() && compatibleCollator(params, collator, minObj.firstElement())) {
+    if (!minObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, minObj.firstElement())) {
         // The min() is inclusive as are bounded collection scans by default.
-        setHighestRecord(collScan->minRecord,
-                         IndexBoundsBuilder::objFromElement(minObj.firstElement(), collator));
+        setHighestRecord(minRecord,
+                         IndexBoundsBuilder::objFromElement(minObj.firstElement(), queryCollator));
     }
 }
 
-/**
- * Helper function to add an RID range to collection scans.
- * If the query solution tree contains a collection scan node with a suitable comparison predicate
- * on '_id', we add a minRecord and maxRecord on the collection node.
- *
- * Returns true if the MatchExpression is a comparison against the cluster key which either:
- * 1) is guaranteed to exclude values of the cluster key which are affected by collation or
- * 2) may return values of the cluster key which are affected by collation, but the query and
- *    collection collations match.
- * Otherwise, returns false.
- *
- * For example, assuming the cluster key is "_id":
- * Given {a: {$eq: 2}}, we return false, because the comparison is not against the cluster key.
- * Given {_id: {$gte: 5}}, we return true, because this comparison against the cluster key excludes
- *    keys which are affected by collations.
- * Given {_id: {$eq: "str"}}, we return true only if the query and collection collations match.
- *
- */
-[[nodiscard]] bool handleRIDRangeScan(const MatchExpression* conjunct,
-                                      CollectionScanNode* collScan,
-                                      const QueryPlannerParams& params,
-                                      const CollatorInterface* collator) {
-    invariant(params.clusteredInfo);
-
+[[nodiscard]] bool QueryPlannerAccess::handleRIDRangeScan(
+    const MatchExpression* conjunct,
+    const CollatorInterface* queryCollator,
+    const CollatorInterface* ccCollator,
+    const StringData& clusterKeyFieldName,
+    boost::optional<RecordIdBound>& minRecord,
+    boost::optional<RecordIdBound>& maxRecord) {
     if (conjunct == nullptr) {
         return false;
     }
 
-    auto* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
+    const AndMatchExpression* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
     if (andMatchPtr != nullptr) {
         bool atLeastOneConjunctCompatibleCollation = false;
         for (size_t index = 0; index < andMatchPtr->numChildren(); index++) {
-            if (handleRIDRangeScan(andMatchPtr->getChild(index), collScan, params, collator)) {
+            // Recursive call on each branch of 'andMatchPtr'.
+            if (handleRIDRangeScan(andMatchPtr->getChild(index),
+                                   queryCollator,
+                                   ccCollator,
+                                   clusterKeyFieldName,
+                                   minRecord,
+                                   maxRecord)) {
                 atLeastOneConjunctCompatibleCollation = true;
             }
         }
@@ -340,14 +348,14 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
         return atLeastOneConjunctCompatibleCollation;
     }
 
-    if (conjunct->path() !=
-        clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec())) {
-        // No match on the cluster key.
+    // If 'conjunct' does not apply to the cluster key, return early here, as updating bounds based
+    // on this conjunct is incorrect and can result in garbage bounds.
+    if (conjunct->path() != clusterKeyFieldName) {
         return false;
     }
 
     // TODO SERVER-62707: Allow $in with regex to use a clustered index.
-    auto inMatch = dynamic_cast<const InMatchExpression*>(conjunct);
+    const InMatchExpression* inMatch = dynamic_cast<const InMatchExpression*>(conjunct);
     if (inMatch && !inMatch->hasRegex()) {
         // Iterate through the $in equalities to find the min/max values. The min/max bounds for the
         // collscan need to be loose enough to cover all of these values.
@@ -355,9 +363,9 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
         boost::optional<RecordIdBound> maxBound;
 
         bool allEltsCollationCompatible = true;
-        for (const auto& element : inMatch->getEqualities()) {
-            if (compatibleCollator(params, collator, element)) {
-                const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
+        for (const BSONElement& element : inMatch->getEqualities()) {
+            if (compatibleCollator(ccCollator, queryCollator, element)) {
+                const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
                 setLowestRecord(minBound, collated);
                 setHighestRecord(maxBound, collated);
             } else {
@@ -376,10 +384,10 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
 
         // Finally, tighten the collscan bounds with the min/max bounds for the $in.
         if (minBound) {
-            setHighestRecord(collScan->minRecord, *minBound);
+            setHighestRecord(minRecord, *minBound);
         }
         if (maxBound) {
-            setLowestRecord(collScan->maxRecord, *maxBound);
+            setLowestRecord(maxRecord, *maxBound);
         }
         return allEltsCollationCompatible;
     }
@@ -389,60 +397,39 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
         return false;  // Not a comparison match expression.
     }
 
-    const auto& element = match->getData();
+    const BSONElement& element = match->getData();
 
     // Set coarse min/max bounds based on type in case we can't set tight bounds.
     BSONObjBuilder minb;
     minb.appendMinForType("", element.type());
-    setHighestRecord(collScan->minRecord, minb.obj());
+    setHighestRecord(minRecord, minb.obj());
 
     BSONObjBuilder maxb;
     maxb.appendMaxForType("", element.type());
-    setLowestRecord(collScan->maxRecord, maxb.obj());
+    setLowestRecord(maxRecord, maxb.obj());
 
-    bool compatible = compatibleCollator(params, collator, element);
+    bool compatible = compatibleCollator(ccCollator, queryCollator, element);
     if (!compatible) {
-        return false;  // Collator affects probe and it's not compatible with collection's collator.
+        // Collator affects probe and it's not compatible with collection's collator.
+        return false;
     }
 
     // Even if the collations don't match at this point, it's fine,
     // because the bounds exclude values that use it
-    const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
+    const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
     if (dynamic_cast<const EqualityMatchExpression*>(match)) {
-        setHighestRecord(collScan->minRecord, collated);
-        setLowestRecord(collScan->maxRecord, collated);
+        setHighestRecord(minRecord, collated);
+        setLowestRecord(maxRecord, collated);
     } else if (dynamic_cast<const LTMatchExpression*>(match) ||
                dynamic_cast<const LTEMatchExpression*>(match)) {
-        setLowestRecord(collScan->maxRecord, collated);
+        setLowestRecord(maxRecord, collated);
     } else if (dynamic_cast<const GTMatchExpression*>(match) ||
                dynamic_cast<const GTEMatchExpression*>(match)) {
-        setHighestRecord(collScan->minRecord, collated);
+        setHighestRecord(minRecord, collated);
     }
 
     return true;
 }
-
-/**
- * Sets the lowPriority parameter on the given index scan node.
- */
-void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
-                                    const FindCommandRequest& findCommand) {
-    auto sort = findCommand.getSort();
-    if (findCommand.getLimit() &&
-        (sort.isEmpty() || sort[query_request_helper::kNaturalSortField])) {
-        // There is a limit with either no sort or the natural sort.
-        return;
-    }
-
-    auto indexScan = checked_cast<IndexScanNode*>(solnRoot);
-    if (!indexScan->bounds.isUnbounded()) {
-        return;
-    }
-
-    indexScan->lowPriority = true;
-}
-
-}  // namespace
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
@@ -553,15 +540,26 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // query is guaranteed to exclude values of the cluster key which are affected by collation.
         // If so, then even if the query and collection collations differ, the collation difference
         // won't affect the query results. In that case, we can say hasCompatibleCollation is true.
-        bool compatibleCollation =
-            handleRIDRangeScan(csn->filter.get(), csn.get(), params, queryCollator);
+        bool compatibleCollation = handleRIDRangeScan(
+            csn->filter.get(),
+            queryCollator,
+            collCollator,
+            clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec()),
+            csn->minRecord,
+            csn->maxRecord);
         csn->hasCompatibleCollation |= compatibleCollation;
 
-        handleRIDRangeMinMax(query, csn.get(), params, queryCollator);
+        handleRIDRangeMinMax(query,
+                             csn->direction,
+                             queryCollator,
+                             collCollator,
+                             csn->minRecord,
+                             csn->maxRecord,
+                             csn->boundInclusion);
     }
 
     return csn;
-}
+}  // makeCollectionScan
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     const CanonicalQuery& query,
@@ -637,10 +635,10 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         BSONObjIterator it(index.keyPattern);
         BSONElement keyElt = it.next();
         for (size_t i = 0; i < pos; ++i) {
-            verify(it.more());
+            MONGO_verify(it.more());
             keyElt = it.next();
         }
-        verify(!keyElt.eoo());
+        MONGO_verify(!keyElt.eoo());
 
         IndexBoundsBuilder::translate(
             expr, keyElt, index, &isn->bounds.fields[pos], tightnessOut, ietBuilder);
@@ -787,7 +785,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
         GeoNear2DSphereNode* gn = static_cast<GeoNear2DSphereNode*>(node);
         boundsToFillOut = &gn->baseBounds;
     } else {
-        verify(type == STAGE_IXSCAN);
+        MONGO_verify(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
 
         // See STAGE_GEO_NEAR_2D above - 2D indexes can only accumulate scan bounds over the first
@@ -810,13 +808,13 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     BSONObjIterator it(index.keyPattern);
     BSONElement keyElt = it.next();
     for (size_t i = 0; i < pos; ++i) {
-        verify(it.more());
+        MONGO_verify(it.more());
         keyElt = it.next();
     }
-    verify(!keyElt.eoo());
+    MONGO_verify(!keyElt.eoo());
     scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
 
-    verify(boundsToFillOut->fields.size() > pos);
+    MONGO_verify(boundsToFillOut->fields.size() > pos);
 
     OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
 
@@ -828,7 +826,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
             IndexBoundsBuilder::translateAndIntersect(
                 expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
         } else {
-            verify(MatchExpression::OR == mergeType);
+            MONGO_verify(MatchExpression::OR == mergeType);
             IndexBoundsBuilder::translateAndUnion(
                 expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
         }
@@ -1074,7 +1072,7 @@ void QueryPlannerAccess::finishLeafNode(
         bounds = &gnode->baseBounds;
         nodeIndex = &gnode->index;
     } else {
-        verify(type == STAGE_IXSCAN);
+        MONGO_verify(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
         nodeIndex = &scan->index;
         bounds = &scan->bounds;
@@ -1090,7 +1088,7 @@ void QueryPlannerAccess::finishLeafNode(
     size_t firstEmptyField = 0;
     for (firstEmptyField = 0; firstEmptyField < bounds->fields.size(); ++firstEmptyField) {
         if (bounds->fields[firstEmptyField].name.empty()) {
-            verify(bounds->fields[firstEmptyField].intervals.empty());
+            MONGO_verify(bounds->fields[firstEmptyField].intervals.empty());
             break;
         }
     }
@@ -1100,7 +1098,7 @@ void QueryPlannerAccess::finishLeafNode(
         // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
         BSONObjIterator it(nodeIndex->keyPattern);
         for (size_t i = 0; i < firstEmptyField; ++i) {
-            verify(it.more());
+            MONGO_verify(it.more());
             it.next();
         }
 
@@ -1110,14 +1108,14 @@ void QueryPlannerAccess::finishLeafNode(
             // There may be filled-in fields to the right of the firstEmptyField; for instance, the
             // index {loc:"2dsphere", x:1} with a predicate over x and a near search over loc.
             if (bounds->fields[firstEmptyField].name.empty()) {
-                verify(bounds->fields[firstEmptyField].intervals.empty());
+                MONGO_verify(bounds->fields[firstEmptyField].intervals.empty());
                 IndexBoundsBuilder::allValuesForField(kpElt, &bounds->fields[firstEmptyField]);
             }
             ++firstEmptyField;
         }
 
         // Make sure that the length of the key is the length of the bounds we started.
-        verify(firstEmptyField == bounds->fields.size());
+        MONGO_verify(firstEmptyField == bounds->fields.size());
     }
 
     // Build Interval Evaluation Trees used to restore index bounds from cached SBE Plans.
@@ -1233,7 +1231,7 @@ bool projNeedsFetch(const CanonicalQuery& query) {
     // document, or requires metadata, we will still need a FETCH stage.
     if (proj->type() == projection_ast::ProjectType::kInclusion && !proj->requiresMatchDetails() &&
         proj->metadataDeps().none() && !proj->requiresDocument()) {
-        auto projFields = proj->getRequiredFields();
+        const auto& projFields = proj->getRequiredFields();
         // Note that it is not possible to project onto dotted paths of _id here, since they may be
         // null or missing, and the index cannot differentiate between the two cases, so we would
         // still need a FETCH stage.
@@ -1290,7 +1288,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
 
         scanState.ixtag = checked_cast<IndexTag*>(child->getTag());
         // If there's a tag it must be valid.
-        verify(IndexTag::kNoIndex != scanState.ixtag->index);
+        MONGO_verify(IndexTag::kNoIndex != scanState.ixtag->index);
 
         // If the child can't use an index on its own field (and the child is not a negation
         // of a bounds-generating expression), then it's indexed by virtue of one of
@@ -1340,7 +1338,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
         if (shouldMergeWithLeaf(child, scanState)) {
             // The child uses the same index we're currently building a scan for.  Merge
             // the bounds and filters.
-            verify(scanState.currentIndexNumber == scanState.ixtag->index);
+            MONGO_verify(scanState.currentIndexNumber == scanState.ixtag->index);
             scanState.tightness = IndexBoundsBuilder::INEXACT_FETCH;
             mergeWithLeafNode(child, &scanState);
             refineTightnessForMaybeCoveredQuery(query, scanState.tightness);
@@ -1350,7 +1348,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                 // Output the current scan before starting to construct a new out.
                 finishAndOutputLeaf(&scanState, out);
             } else {
-                verify(IndexTag::kNoIndex == scanState.currentIndexNumber);
+                MONGO_verify(IndexTag::kNoIndex == scanState.currentIndexNumber);
             }
 
             // Reset state before producing a new leaf.
@@ -1485,7 +1483,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
         if (shouldMergeWithLeaf(emChild, *scanState)) {
             // The child uses the same index we're currently building a scan for.  Merge
             // the bounds and filters.
-            verify(scanState->currentIndexNumber == scanState->ixtag->index);
+            MONGO_verify(scanState->currentIndexNumber == scanState->ixtag->index);
 
             scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
             mergeWithLeafNode(emChild, scanState);
@@ -1493,7 +1491,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
             if (nullptr != scanState->currentScan.get()) {
                 finishAndOutputLeaf(scanState, out);
             } else {
-                verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
+                MONGO_verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
             }
 
             // Reset state before producing a new leaf.
@@ -1581,7 +1579,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
 
     // We must use an index for at least one child of the AND.  We shouldn't be here if this
     // isn't the case.
-    verify(ixscanNodes.size() >= 1);
+    MONGO_verify(ixscanNodes.size() >= 1);
 
     // Short-circuit: an AND of one child is just the child.
     if (ixscanNodes.size() == 1) {
@@ -1673,7 +1671,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     // index, so we put a fetch with filter.
     if (root->numChildren() > 0) {
         auto fetch = std::make_unique<FetchNode>();
-        verify(ownedRoot);
+        MONGO_verify(ownedRoot);
         if (ownedRoot->numChildren() == 1) {
             // An $and of one thing is that thing.
             fetch->filter = std::move((*ownedRoot->getChildVector())[0]);
@@ -1829,7 +1827,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             }
 
             auto soln = makeLeafNode(query, index, tag->pos, root, &tightness, ietBuilder);
-            verify(nullptr != soln);
+            MONGO_verify(nullptr != soln);
             finishLeafNode(soln.get(), index, std::move(ietBuilders));
 
             if (!ownedRoot) {
@@ -1855,7 +1853,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
                 return soln;
             } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                        !indices[tag->index].multikey) {
-                verify(nullptr == soln->filter.get());
+                MONGO_verify(nullptr == soln->filter.get());
                 soln->filter = std::move(ownedRoot);
                 return soln;
             } else {
@@ -1949,7 +1947,7 @@ void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
         if (MatchExpression::AND == type) {
             listFilter = std::make_unique<AndMatchExpression>();
         } else {
-            verify(MatchExpression::OR == type);
+            MONGO_verify(MatchExpression::OR == type);
             listFilter = std::make_unique<OrMatchExpression>();
         }
         unique_ptr<MatchExpression> oldFilter = node->filter->clone();

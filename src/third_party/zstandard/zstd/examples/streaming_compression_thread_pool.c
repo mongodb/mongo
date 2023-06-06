@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Martin Liska, SUSE, Facebook, Inc.
+ * Copyright (c) Martin Liska, SUSE, Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the

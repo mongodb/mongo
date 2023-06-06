@@ -4,6 +4,7 @@
  *   # Uses index building in background
  *   requires_background_index,
  *   does_not_support_stepdowns,
+ *   does_not_support_transactions,
  * ]
  */
 (function() {

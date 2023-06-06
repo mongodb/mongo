@@ -800,10 +800,8 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
     StorageInterface* storageInterface,
     OplogInterfaceRemote::GetConnectionFn getConnection) {
 
-    OplogInterfaceRemote remoteOplog(source,
-                                     getConnection,
-                                     NamespaceString::kRsOplogNamespace.ns(),
-                                     rollbackRemoteOplogQueryBatchSize.load());
+    OplogInterfaceRemote remoteOplog(
+        source, getConnection, rollbackRemoteOplogQueryBatchSize.load());
 
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -843,10 +841,8 @@ void BackgroundSync::_fallBackOnRollbackViaRefetch(
     OplogInterface* localOplog,
     OplogInterfaceRemote::GetConnectionFn getConnection) {
 
-    RollbackSourceImpl rollbackSource(getConnection,
-                                      source,
-                                      NamespaceString::kRsOplogNamespace.ns(),
-                                      rollbackRemoteOplogQueryBatchSize.load());
+    RollbackSourceImpl rollbackSource(
+        getConnection, source, rollbackRemoteOplogQueryBatchSize.load());
 
     rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
 }

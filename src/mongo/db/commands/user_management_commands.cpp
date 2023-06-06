@@ -48,7 +48,6 @@
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
@@ -887,6 +886,34 @@ private:
     TransactionState _state = TransactionState::kInit;
 };
 
+void uassertNoUnrecognizedActions(const std::vector<std::string>& unrecognizedActions) {
+    if (unrecognizedActions.empty()) {
+        return;
+    }
+
+    // Dedupe
+    std::set<StringData> actions;
+    for (const auto& action : unrecognizedActions) {
+        actions.insert(StringData{action});
+    }
+
+    StringBuilder sb;
+    sb << "Unknown action type";
+    if (actions.size() > 1) {
+        sb << 's';
+    }
+    sb << " in privilege set:";
+    for (const auto& action : actions) {
+        sb << " '" << action << "',";
+    }
+
+    // Trim last comma off.
+    auto msg = sb.str();
+    msg.pop_back();
+
+    uasserted(ErrorCodes::BadValue, msg);
+}
+
 enum class SupportTenantOption {
     kNever,
     kTestOnly,
@@ -1529,9 +1556,13 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole());
     roleObjBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB());
 
-    BSONArray privileges;
-    uassertStatusOK(privilegeVectorToBSONArray(cmd.getPrivileges(), &privileges));
-    roleObjBuilder.append("privileges", privileges);
+    std::vector<std::string> unrecognizedActions;
+    PrivilegeVector privileges = Privilege::privilegeVectorFromParsedPrivilegeVector(
+        dbname.tenantId(), cmd.getPrivileges(), &unrecognizedActions);
+    uassertNoUnrecognizedActions(unrecognizedActions);
+    BSONArray privBSON;
+    uassertStatusOK(privilegeVectorToBSONArray(privileges, &privBSON));
+    roleObjBuilder.append("privileges", privBSON);
 
     auto resolvedRoleNames = auth::resolveRoleNames(cmd.getRoles(), dbname);
     roleObjBuilder.append("roles", containerToBSONArray(resolvedRoleNames));
@@ -1549,10 +1580,9 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
 
     // Role existence has to be checked after acquiring the update lock
     uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, resolvedRoleNames, authzManager));
-    uassertStatusOK(checkOkayToGrantPrivilegesToRole(roleName, cmd.getPrivileges()));
+    uassertStatusOK(checkOkayToGrantPrivilegesToRole(roleName, privileges));
 
-    audit::logCreateRole(
-        client, roleName, resolvedRoleNames, cmd.getPrivileges(), bsonAuthRestrictions);
+    audit::logCreateRole(client, roleName, resolvedRoleNames, privileges, bsonAuthRestrictions);
 
     uassertStatusOK(insertRoleDocument(opCtx, roleObjBuilder.done(), roleName.getTenant()));
 }
@@ -1574,10 +1604,15 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     BSONObjBuilder updateSetBuilder;
     BSONObjBuilder updateUnsetBuilder;
 
+    PrivilegeVector privileges;
     if (auto privs = cmd.getPrivileges()) {
-        BSONArray privileges;
-        uassertStatusOK(privilegeVectorToBSONArray(privs.get(), &privileges));
-        updateSetBuilder.append("privileges", privileges);
+        std::vector<std::string> unrecognizedActions;
+        privileges = Privilege::privilegeVectorFromParsedPrivilegeVector(
+            dbname.tenantId(), privs.get(), &unrecognizedActions);
+        uassertNoUnrecognizedActions(unrecognizedActions);
+        BSONArray privBSON;
+        uassertStatusOK(privilegeVectorToBSONArray(privileges, &privBSON));
+        updateSetBuilder.append("privileges", privBSON);
     }
 
     boost::optional<std::vector<RoleName>> optRoles;
@@ -1608,13 +1643,15 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
         uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, *optRoles, authzManager));
     }
 
-    auto privs = cmd.getPrivileges();
-    if (privs) {
-        uassertStatusOK(checkOkayToGrantPrivilegesToRole(roleName, privs.get()));
+    if (!privileges.empty()) {
+        uassertStatusOK(checkOkayToGrantPrivilegesToRole(roleName, privileges));
     }
 
-    audit::logUpdateRole(
-        client, roleName, optRoles ? &*optRoles : nullptr, privs ? &*privs : nullptr, authRest);
+    audit::logUpdateRole(client,
+                         roleName,
+                         optRoles ? &*optRoles : nullptr,
+                         hasPrivs ? &privileges : nullptr,
+                         authRest);
 
     const auto updateSet = updateSetBuilder.obj();
     const auto updateUnset = updateUnsetBuilder.obj();
@@ -1652,13 +1689,17 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
     auto* authzManager = AuthorizationManager::get(serviceContext);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
-    uassertStatusOK(checkOkayToGrantPrivilegesToRole(roleName, cmd.getPrivileges()));
+    std::vector<std::string> unrecognizedActions;
+    PrivilegeVector newPrivileges = Privilege::privilegeVectorFromParsedPrivilegeVector(
+        dbname.tenantId(), cmd.getPrivileges(), &unrecognizedActions);
+    uassertNoUnrecognizedActions(unrecognizedActions);
+    uassertStatusOK(checkOkayToGrantPrivilegesToRole(roleName, newPrivileges));
 
     // Add additional privileges to existing set.
     auto data = uassertStatusOK(authzManager->resolveRoles(
         opCtx, {roleName}, AuthorizationManager::ResolveRoleOption::kDirectPrivileges));
     auto privileges = std::move(data.privileges.get());
-    for (const auto& priv : cmd.getPrivileges()) {
+    for (const auto& priv : newPrivileges) {
         Privilege::addPrivilegeToPrivilegeVector(&privileges, priv);
     }
 
@@ -1673,7 +1714,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
     BSONObjBuilder updateBSONBuilder;
     updateObj.writeTo(&updateBSONBuilder);
 
-    audit::logGrantPrivilegesToRole(client, roleName, cmd.getPrivileges());
+    audit::logGrantPrivilegesToRole(client, roleName, newPrivileges);
 
     auto status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -1701,10 +1742,14 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
     auto* authzManager = AuthorizationManager::get(serviceContext);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
+    std::vector<std::string> unrecognizedActions;
+    PrivilegeVector rmPrivs = Privilege::privilegeVectorFromParsedPrivilegeVector(
+        dbname.tenantId(), cmd.getPrivileges(), &unrecognizedActions);
+    uassertNoUnrecognizedActions(unrecognizedActions);
     auto data = uassertStatusOK(authzManager->resolveRoles(
         opCtx, {roleName}, AuthorizationManager::ResolveRoleOption::kDirectPrivileges));
     auto privileges = std::move(data.privileges.get());
-    for (const auto& rmPriv : cmd.getPrivileges()) {
+    for (const auto& rmPriv : rmPrivs) {
         for (auto it = privileges.begin(); it != privileges.end(); ++it) {
             if (it->getResourcePattern() == rmPriv.getResourcePattern()) {
                 it->removeActions(rmPriv.getActions());
@@ -1724,7 +1769,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
     uassertStatusOK(setElement.pushBack(privilegesElement));
     uassertStatusOK(Privilege::getBSONForPrivileges(privileges, privilegesElement));
 
-    audit::logRevokePrivilegesFromRole(client, roleName, cmd.getPrivileges());
+    audit::logRevokePrivilegesFromRole(client, roleName, rmPrivs);
 
     BSONObjBuilder updateBSONBuilder;
     updateObj.writeTo(&updateBSONBuilder);

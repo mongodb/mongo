@@ -573,8 +573,8 @@ TEST(SortPatternShape, RespectsRedactionPolicy) {
     expCtx = make_intrusive<ExpressionContextForTest>();
     SerializationOptions opts;
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"REDACT_normal":1,"REDACT_y":1})",
         query_shape::extractSortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
@@ -587,11 +587,11 @@ TEST(SortPatternShape, RespectsRedactionPolicy) {
 
 TEST(QueryShapeIDL, ShapifyIDLStruct) {
     SerializationOptions options;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = [](StringData s) -> std::string {
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = [](StringData s) -> std::string {
         return str::stream() << "HASH<" << s << ">";
     };
-    options.replacementForLiteralArgs = "?"_sd;
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
 
     auto nested = NestedStruct("value",
                                ExampleEnumEnum::Value1,
@@ -601,7 +601,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                                "field.path",
                                {"field.path.1", "fieldpath2"},
                                NamespaceString{"db", "coll"},
-                               NamespaceString{"db", "coll"});
+                               NamespaceString{"db", "coll"},
+                               177,
+                               true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "stringField": "value",
@@ -620,24 +622,28 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpath2"
             ],
             "nss": "db.coll",
-            "plainNss": "db.coll"
+            "plainNss": "db.coll",
+            "safeInt64Field": 177,
+            "boolField": true
         })",
         nested.toBSON());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "stringField": "?",
+            "stringField": "?string",
             "enumField": "EnumValue1",
-            "stringIntVariant": "?",
+            "stringIntVariant": "?number",
             "stringIntVariantEnum": "hello",
-            "arrayOfInts": "?",
+            "arrayOfInts": "?array<?number>",
             "fieldpath": "HASH<field>.HASH<path>",
             "fieldpathList": [
                 "HASH<field>.HASH<path>.HASH<1>",
                 "HASH<fieldpath2>"
             ],
             "nss": "HASH<db.coll>",
-            "plainNss": "db.coll"
+            "plainNss": "db.coll",
+            "safeInt64Field": "?number",
+            "boolField": "?bool"
         })",
         nested.toBSON(options));
 
@@ -662,7 +668,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                     "fieldpath2"
                 ],
                 "nss": "db.coll",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": 177,
+                "boolField": true
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -681,7 +689,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                     "fieldpath2"
                 ],
                 "nss": "db.coll",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": 177,
+                "boolField": true
             }
         })",
         parent.toBSON());
@@ -689,18 +699,20 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "nested_shape": {
-                "stringField": "?",
+                "stringField": "?string",
                 "enumField": "EnumValue1",
-                "stringIntVariant": "?",
+                "stringIntVariant": "?number",
                 "stringIntVariantEnum": "hello",
-                "arrayOfInts": "?",
+                "arrayOfInts": "?array<?number>",
                 "fieldpath": "HASH<field>.HASH<path>",
                 "fieldpathList": [
                     "HASH<field>.HASH<path>.HASH<1>",
                     "HASH<fieldpath2>"
                 ],
                 "nss": "HASH<db.coll>",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": "?number",
+                "boolField": "?bool"
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -719,7 +731,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                     "fieldpath2"
                 ],
                 "nss": "db.coll",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": 177,
+                "boolField": true
             }
         })",
         parent.toBSON(options));

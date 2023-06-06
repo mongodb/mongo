@@ -50,10 +50,7 @@ public:
      */
     using GetConnectionFn = std::function<DBClientBase*()>;
 
-    OplogInterfaceRemote(HostAndPort hostAndPort,
-                         GetConnectionFn getConnection,
-                         StringData collectionName,
-                         int batchSize);
+    OplogInterfaceRemote(HostAndPort hostAndPort, GetConnectionFn getConnection, int batchSize);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
     std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
@@ -63,7 +60,6 @@ public:
 private:
     HostAndPort _hostAndPort;
     GetConnectionFn _getConnection;
-    std::string _collectionName;
     int _batchSize;
 };
 

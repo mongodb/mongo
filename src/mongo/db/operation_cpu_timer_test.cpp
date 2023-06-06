@@ -57,7 +57,7 @@ public:
         return OperationCPUTimers::get(_opCtx.get());
     }
 
-    std::unique_ptr<OperationCPUTimer> makeTimer() const {
+    std::shared_ptr<OperationCPUTimer> makeTimer() const {
         return getTimers()->makeTimer();
     }
 
@@ -168,7 +168,10 @@ TEST_F(OperationCPUTimerTest, MultipleTimers) {
         ASSERT_EQ(2, getTimers()->count());
     }
 
-    ASSERT_EQ(1, getTimers()->count());
+    // We don't clean up unused timers.
+    ASSERT_EQ(2, getTimers()->count());
+    { auto timer3 = makeTimer(); }
+    ASSERT_EQ(3, getTimers()->count());
 
     timer1->stop();
 

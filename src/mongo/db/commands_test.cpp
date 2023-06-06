@@ -399,7 +399,11 @@ public:
         // Set up the auth subsystem to authorize the command.
         auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
         _managerState = localManagerState.get();
-        _managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        {
+            auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            _managerState->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
+        }
         auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
             getServiceContext(), std::move(localManagerState));
         _authzManager = uniqueAuthzManager.get();

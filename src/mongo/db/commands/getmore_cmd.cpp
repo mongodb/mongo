@@ -435,7 +435,6 @@ public:
                 auto&& [stats, _] =
                     explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
                 LOGV2_WARNING(20478,
-                              "getMore command executor error: {error}, stats: {stats}, cmd: {cmd}",
                               "getMore command executor error",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
@@ -695,7 +694,9 @@ public:
                 curOp->debug().cursorExhausted = true;
             }
 
-            nextBatch.done(respondWithId, nss);
+            nextBatch.done(respondWithId,
+                           nss,
+                           SerializationContext::stateCommandReply(_cmd.getSerializationContext()));
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.

@@ -60,7 +60,7 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
     tassert(6590800, "Did not set old collectionUUID", doc.getOldCollectionUUID());
     tassert(6590801, "Did not set old ShardKey", doc.getOldShardKey());
     UUID collUUID = *doc.getOldCollectionUUID();
-    cmdBuilder.append("reshardCollection", collNss.ns());
+    cmdBuilder.append("reshardCollection", NamespaceStringUtil::serialize(collNss));
     reshardUUID.appendToBuilder(&cmdBuilder, "reshardUUID");
     cmdBuilder.append("shardKey", doc.getKey());
     cmdBuilder.append("oldShardKey", *doc.getOldShardKey());
@@ -171,8 +171,13 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject shardDistribution parameter",
                     !_doc.getShardDistribution().has_value());
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, reject forceRedistribution parameter",
+                    !_doc.getForceRedistribution().has_value());
             }
             configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
+            configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
 
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

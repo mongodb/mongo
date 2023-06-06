@@ -156,11 +156,13 @@ bool handleCursorCommand(OperationContext* opCtx,
             invariant(cursors[idx]);
 
             BSONObjBuilder cursorResult;
-            appendCursorResponseObject(cursors[idx]->cursorid(),
-                                       nsForCursor,
-                                       BSONArray(),
-                                       cursors[idx]->getExecutor()->getExecutorType(),
-                                       &cursorResult);
+            appendCursorResponseObject(
+                cursors[idx]->cursorid(),
+                nsForCursor,
+                BSONArray(),
+                cursors[idx]->getExecutor()->getExecutorType(),
+                &cursorResult,
+                SerializationContext::stateCommandReply(request.getSerializationContext()));
             cursorResult.appendBool("ok", 1);
 
             cursorsBuilder.append(cursorResult.obj());
@@ -228,7 +230,6 @@ bool handleCursorCommand(OperationContext* opCtx,
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23799,
-                          "Aggregate command executor error: {error}, stats: {stats}, cmd: {cmd}",
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
                           "stats"_attr = redact(stats),
@@ -291,7 +292,10 @@ bool handleCursorCommand(OperationContext* opCtx,
     }
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
-    responseBuilder.done(cursorId, nsForCursor);
+    responseBuilder.done(
+        cursorId,
+        nsForCursor,
+        SerializationContext::stateCommandReply(request.getSerializationContext()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
@@ -775,7 +779,10 @@ Status runAggregate(OperationContext* opCtx,
             options.isInitialResponse = true;
             CursorResponseBuilder responseBuilder(result, options);
             responseBuilder.setWasStatementExecuted(true);
-            responseBuilder.done(0LL, origNss);
+            responseBuilder.done(
+                0LL,
+                origNss,
+                SerializationContext::stateCommandReply(request.getSerializationContext()));
             return Status::OK();
         }
     }
@@ -1197,12 +1204,14 @@ Status runAggregate(OperationContext* opCtx,
             // appropriate collection lock must be already held. Make sure it has not been released
             // yet.
             invariant(ctx);
-            Explain::explainStages(explainExecutor,
-                                   collections,
-                                   *(expCtx->explain),
-                                   BSON("optimizedPipeline" << true),
-                                   cmdObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                explainExecutor,
+                collections,
+                *(expCtx->explain),
+                BSON("optimizedPipeline" << true),
+                SerializationContext::stateCommandReply(request.getSerializationContext()),
+                cmdObj,
+                &bodyBuilder);
         }
     } else {
         // Cursor must be specified, if explain is not.

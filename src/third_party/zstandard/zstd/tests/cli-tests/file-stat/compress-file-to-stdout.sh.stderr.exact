@@ -1,0 +1,24 @@
+Trace:FileStat: > UTIL_isLink(file)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(1)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(2)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_getFileSize(file)
+Trace:FileStat:  > UTIL_stat(-1, file)
+Trace:FileStat:  < 1
+Trace:FileStat: < 65537
+Trace:FileStat: > UTIL_stat(-1, file)
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_isDirectoryStat()
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_stat(-1, file)
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_isRegularFile(/*stdout*\)
+Trace:FileStat:  > UTIL_stat(-1, /*stdout*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_getFileSize(file)
+Trace:FileStat:  > UTIL_stat(-1, file)
+Trace:FileStat:  < 1
+Trace:FileStat: < 65537

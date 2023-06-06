@@ -38,7 +38,7 @@ namespace repl {
 
 namespace {
 
-const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
 }  // namespace
 
@@ -52,10 +52,11 @@ PrimaryOnlyServiceOpObserver::~PrimaryOnlyServiceOpObserver() = default;
 void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
                                                  BSONObj const& doc,
+                                                 OplogDeleteEntryArgs* args,
                                                  OpStateAccumulator* opAccumulator) {
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.
-    documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
+    documentIdDecoration(args) = doc["_id"] ? doc["_id"].wrap() : doc;
 }
 
 void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
@@ -64,7 +65,7 @@ void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
                                             const OplogDeleteEntryArgs& args,
                                             OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    auto& documentId = documentIdDecoration(opCtx);
+    auto& documentId = documentIdDecoration(args);
     invariant(!documentId.isEmpty());
 
     auto service = _registry->lookupServiceByNamespace(nss);

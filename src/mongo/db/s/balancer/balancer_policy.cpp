@@ -534,7 +534,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
 
         tassert(ErrorCodes::BadValue,
                 str::stream() << "Total data size for shards in zone " << zone << " and collection "
-                              << distribution.nss() << " must be greater or equal than zero but is "
+                              << distribution.nss().toStringForErrorMsg()
+                              << " must be greater or equal than zero but is "
                               << totalDataSizeOfShardsWithZone,
                 totalDataSizeOfShardsWithZone >= 0);
 
@@ -761,7 +762,7 @@ std::string SplitInfo::toString() const {
     }
 
     return "Splitting chunk in {} [ {}, {} ), residing on {} at [ {} ] with version {} and collection placement version {}"_format(
-        nss.ns(),
+        toStringForLogging(nss),
         minKey.toString(),
         maxKey.toString(),
         shardId.toString(),

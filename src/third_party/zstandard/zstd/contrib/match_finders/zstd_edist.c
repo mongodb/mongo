@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-present, Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -12,7 +12,7 @@
 *  Dependencies
 ***************************************/
 
-/* Currently relies on qsort when combining contiguous matches. This can probabily 
+/* Currently relies on qsort when combining contiguous matches. This can probably 
  * be avoided but would require changes to the algorithm. The qsort is far from 
  * the bottleneck in this algorithm even for medium sized files so it's probably 
  * not worth trying to address */ 
@@ -26,7 +26,7 @@
 *  Constants
 ***************************************/
 
-/* Just a sential for the entires of the diagnomal matrix */
+/* Just a sential for the entries of the diagonal matrix */
 #define ZSTD_EDIST_DIAG_MAX (S32)(1 << 30)
 
 /* How large should a snake be to be considered a 'big' snake. 
@@ -39,7 +39,7 @@
 #define ZSTD_EDIST_SNAKE_ITER_THRESH 200
 
 /* After how many iterations should be just give up and take 
- * the best availabe edit script for this round */ 
+ * the best available edit script for this round */ 
 #define ZSTD_EDIST_EXPENSIVE_THRESH 1024
 
 /*-*************************************
@@ -57,10 +57,10 @@ typedef struct {
     const BYTE* src;
     size_t dictSize;
     size_t srcSize;
-    S32* forwardDiag;            /* Entires of the forward diagonal stored here */ 
-    S32* backwardDiag;           /* Entires of the backward diagonal stored here.
+    S32* forwardDiag;            /* Entries of the forward diagonal stored here */
+    S32* backwardDiag;           /* Entries of the backward diagonal stored here.
                                   *   Note: this buffer and the 'forwardDiag' buffer 
-                                  *   are contiguous. See the ZSTD_eDist_genSequences */ 
+                                  *   are contiguous. See the ZSTD_eDist_genSequences */
     ZSTD_eDist_match* matches;   /* Accumulate matches of length 1 in this buffer. 
                                   *   In a subsequence post-processing step, we combine 
                                   *   contiguous matches. */
@@ -192,7 +192,7 @@ static void ZSTD_eDist_diag(ZSTD_eDist_state* state,
         if (!useHeuristics)
             continue;
 
-        /* Everything under this point is a heuritic. Using these will 
+        /* Everything under this point is a heuristic. Using these will 
          * substantially speed up the match finding. In some cases, taking 
          * the total match finding time from several minutes to seconds.
          * Of course, the caveat is that the edit script found may no longer 
@@ -366,8 +366,8 @@ static int ZSTD_eDist_compare(ZSTD_eDist_state* state,
         }
     } else if (srcLow == srcHigh) {
         while (dictLow < dictHigh) {
-            /* Reaching this point means deleteing dict[dictLow] from 
-             * the current positino of dict */ 
+            /* Reaching this point means deleting dict[dictLow] from 
+             * the current position of dict */ 
             dictLow++;
         }
     } else {
@@ -395,7 +395,7 @@ static int ZSTD_eDist_matchComp(const void* p, const void* q)
 }
 
 /* The matches from the approach above will all be of the form 
- * (dictIdx, srcIdx, 1). this method combines contiguous matches 
+ * (dictIdx, srcIdx, 1). This method combines contiguous matches 
  * of length MINMATCH or greater. Matches less than MINMATCH 
  * are discarded */ 
 static void ZSTD_eDist_combineMatches(ZSTD_eDist_state* state)
@@ -460,7 +460,7 @@ static size_t ZSTD_eDist_convertMatchesToSequences(ZSTD_Sequence* sequences,
 }
 
 /*-*************************************
-*  Interal utils
+*  Internal utils
 ***************************************/
 
 static size_t ZSTD_eDist_hamingDist(const BYTE* const a,

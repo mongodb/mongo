@@ -223,7 +223,7 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     }
 
     return DocumentSourceSort::create(
-        sort.getContext(), SortPattern{updatedPattern}, 0, maxMemoryUsageBytes);
+        sort.getContext(), SortPattern{std::move(updatedPattern)}, 0, maxMemoryUsageBytes);
 }
 
 /**
@@ -243,7 +243,7 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
             expCtx.get(), field.firstElement(), expCtx->variablesParseState));
     };
 
-    return DocumentSourceGroup::create(expCtx, groupByExpr, accumulators);
+    return DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators));
 }
 
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.
@@ -524,17 +524,17 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
         out.addField(timeseries::kMetaFieldName,
                      Value{opts.serializeFieldPathFromString(*spec.metaField())});
     }
-    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteralValue(Value{_bucketMaxSpanSeconds}));
+    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteral(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
         out.addField(kAssumeNoMixedSchemaData,
-                     opts.serializeLiteralValue(Value(_assumeNoMixedSchemaData)));
+                     opts.serializeLiteral(Value(_assumeNoMixedSchemaData)));
 
     if (spec.usesExtendedRange()) {
         // Include this flag so that 'explain' is more helpful.
         // But this is not so useful for communicating from one process to another,
         // because mongos and/or the primary shard don't know whether any other shard
         // has extended-range data.
-        out.addField(kUsesExtendedRange, opts.serializeLiteralValue(Value{true}));
+        out.addField(kUsesExtendedRange, opts.serializeLiteral(Value{true}));
     }
 
     if (!spec.computedMetaProjFields().empty())
@@ -552,11 +552,11 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
 
     if (_bucketUnpacker.includeMinTimeAsMetadata()) {
         out.addField(kIncludeMinTimeAsMetadata,
-                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
     }
     if (_bucketUnpacker.includeMaxTimeAsMetadata()) {
         out.addField(kIncludeMaxTimeAsMetadata,
-                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
     }
 
     if (_wholeBucketFilter) {
@@ -575,8 +575,8 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     } else {
         if (_sampleSize) {
             out.addField("sample",
-                         opts.serializeLiteralValue(Value{static_cast<long long>(*_sampleSize)}));
-            out.addField("bucketMaxCount", opts.serializeLiteralValue(Value{_bucketMaxCount}));
+                         opts.serializeLiteral(Value{static_cast<long long>(*_sampleSize)}));
+            out.addField("bucketMaxCount", opts.serializeLiteral(Value{_bucketMaxCount}));
         }
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
     }
@@ -763,6 +763,15 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
 std::pair<bool, Pipeline::SourceContainer::iterator>
 DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContainer::iterator itr,
                                                          Pipeline::SourceContainer* container) {
+    // The computed min/max for each bucket uses the default collation. If the collation of the
+    // query doesn't match the default we cannot rely on the computed values as they might differ
+    // (e.g. numeric and lexicographic collations compare "5" and "10" in opposite order).
+    // NB: Unfortuntealy, this means we have to forgo the optimization even if the source field is
+    // numeric and not affected by the collation as we cannot know the data type until runtime.
+    if (pExpCtx->collationMatchesDefault == ExpressionContext::CollationMatchesDefault::kNo) {
+        return {};
+    }
+
     const auto* groupPtr = dynamic_cast<DocumentSourceGroup*>(std::next(itr)->get());
     if (groupPtr == nullptr) {
         return {};

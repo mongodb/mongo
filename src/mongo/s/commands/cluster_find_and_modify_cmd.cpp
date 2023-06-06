@@ -150,7 +150,7 @@ BSONObj getQueryForShardKey(boost::intrusive_ptr<ExpressionContext> expCtx,
         // If the collection is a sharded timeseries collection, rewrite the query into a
         // bucket-level query.
         return timeseries::getBucketLevelPredicateForRouting(
-            query, expCtx, tsFields->getTimeseriesOptions());
+            query, expCtx, tsFields->getTimeseriesOptions(), /* allowArbitraryWrites */ true);
     }
 
     return query;

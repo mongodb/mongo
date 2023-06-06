@@ -39,7 +39,7 @@ namespace mongo {
 class SingleServerDiscoveryMonitorExpeditedFixture : public unittest::Test {
 public:
     struct TestCase {
-        boost::optional<Milliseconds> timeElapsedSinceLastIsMaster;
+        boost::optional<Milliseconds> timeElapsedSinceLastHello;
         Milliseconds previousRefreshPeriod;
         boost::optional<Milliseconds> expectedResult;
     };
@@ -47,11 +47,11 @@ public:
     void verifyTestCase(TestCase testCase) {
         LOGV2_INFO(4712103,
                    "TestCase",
-                   "timeElapsedSinceLastIsMaster"_attr = testCase.timeElapsedSinceLastIsMaster,
+                   "timeElapsedSinceLastHello"_attr = testCase.timeElapsedSinceLastHello,
                    "previousRefreshPeriod"_attr = testCase.previousRefreshPeriod,
                    "expeditedRefreshPeriod"_attr = kExpeditedRefreshPeriod);
         auto result = SingleServerDiscoveryMonitor::calculateExpeditedDelayUntilNextCheck(
-            testCase.timeElapsedSinceLastIsMaster,
+            testCase.timeElapsedSinceLastHello,
             kExpeditedRefreshPeriod,
             testCase.previousRefreshPeriod);
         ASSERT_EQUALS(testCase.expectedResult, result);

@@ -361,7 +361,9 @@ SharedCollectionDecorations* CollectionImpl::getSharedDecorations() const {
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {
-    _metadata = DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId());
+    const auto catalogEntry =
+        DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, getCatalogId());
+    _metadata = catalogEntry->metadata;
     const auto& collectionOptions = _metadata->options;
 
     _initShared(opCtx, collectionOptions);
@@ -1545,7 +1547,9 @@ bool CollectionImpl::isIndexMultikey(OperationContext* opCtx,
     // We need to read from the durable catalog if there are concurrent multikey writers to avoid
     // reading between the multikey write committing in the storage engine but before its onCommit
     // handler made the write visible for readers.
-    auto snapshotMetadata = DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId());
+    const auto catalogEntry =
+        DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, getCatalogId());
+    const auto snapshotMetadata = catalogEntry->metadata;
     int snapshotOffset = snapshotMetadata->findIndexOffset(indexName);
     invariant(snapshotOffset >= 0,
               str::stream() << "cannot get multikey for index " << indexName << " @ "
@@ -1650,7 +1654,9 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
         // collection. We cannot use the cached metadata in this collection as we may have just
         // committed a multikey change concurrently to the storage engine without being able to
         // observe it if its onCommit handlers haven't run yet.
-        auto metadataLocal = *DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId());
+        const auto catalogEntry =
+            DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, getCatalogId());
+        auto metadataLocal = *catalogEntry->metadata;
         // When reading from the durable catalog the index offsets are different because when
         // removing indexes in-memory just zeros out the slot instead of actually removing it. We
         // must adjust the entries so they match how they are stored in _metadata so we can rely on

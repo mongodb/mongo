@@ -83,7 +83,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
     // Verify that the specified namespace is valid for the initial stage of this pipeline.
     const NamespaceString& nss = pipeline.getContext()->ns;
 
-    auto sources = pipeline.getSources();
+    const auto& sources = pipeline.getSources();
 
     if (sources.empty()) {
         uassert(ErrorCodes::InvalidNamespace,
@@ -184,7 +184,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone(
     for (auto&& stage : _sources) {
         clonedStages.push_back(stage->clone(expCtx));
     }
-    return create(clonedStages, expCtx);
+    return create(std::move(clonedStages), expCtx);
 }
 
 template <class T>

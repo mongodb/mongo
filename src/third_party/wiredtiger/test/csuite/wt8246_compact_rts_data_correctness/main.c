@@ -137,7 +137,7 @@ run_test(bool column_store, const char *uri, bool preserve)
       home, sizeof(home), column_store ? working_dir_col : working_dir_row);
 
     printf("Work directory: %s\n", home);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     /* Fork a child to create tables and perform operations on them. */
     memset(&sa, 0, sizeof(sa));
@@ -163,7 +163,7 @@ run_test(bool column_store, const char *uri, bool preserve)
      * killing the child. Start the timeout from the time we notice that child process has started
      * compact. That allows the test to run correctly on really slow machines.
      */
-    testutil_check(__wt_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home));
+    testutil_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home);
     while (stat(compact_file, &sb) != 0)
         testutil_sleep_wait(1, pid);
 
@@ -204,7 +204,7 @@ run_test(bool column_store, const char *uri, bool preserve)
 
     /* Cleanup */
     if (!preserve) {
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
         testutil_clean_test_artifacts(home);
     }
 
@@ -227,10 +227,10 @@ workload_compact(const char *home, const char *table_config, const char *uri)
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
+    testutil_snprintf(tscfg, sizeof(tscfg),
       "oldest_timestamp=%d"
       ",stable_timestamp=%d",
-      10, 10));
+      10, 10);
     testutil_check(conn->set_timestamp(conn, tscfg));
 
     /* Create and populate table. Checkpoint the data after that. */
@@ -252,7 +252,7 @@ workload_compact(const char *home, const char *table_config, const char *uri)
     check(session, uri, value_d, 50);
 
     /* Pin stable to timestamp 30. */
-    testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%d", 30));
+    testutil_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%d", 30);
     testutil_check(conn->set_timestamp(conn, tscfg));
 
     /*
@@ -270,7 +270,7 @@ workload_compact(const char *home, const char *table_config, const char *uri)
     /*
      * Create the compact_started file so that the parent process can start its timer.
      */
-    testutil_check(__wt_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home));
+    testutil_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home);
     testutil_assert_errno((fp = fopen(compact_file, "w")) != NULL);
     testutil_assert_errno(fclose(fp) == 0);
 
@@ -293,7 +293,7 @@ check(WT_SESSION *session, const char *uri, char *value, int read_ts)
 
     printf("Checking value : %s...\n", value);
 
-    testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "read_timestamp=%d", read_ts));
+    testutil_snprintf(tscfg, sizeof(tscfg), "read_timestamp=%d", read_ts);
     testutil_check(session->begin_transaction(session, tscfg));
 
     val_1_size = strlen(value);
@@ -333,7 +333,7 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
     __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
-    testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%d", commit_ts));
+    testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%d", commit_ts);
     for (i = 0; i < NUM_RECORDS; i++) {
         testutil_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, i + 1);
@@ -405,7 +405,7 @@ remove_records(WT_SESSION *session, const char *uri, int commit_ts)
     printf("Removing records...\n");
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
-    testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%d", commit_ts));
+    testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%d", commit_ts);
     /* Remove 1/3 of the records from the middle of the key range. */
     for (i = NUM_RECORDS / 3; i < (NUM_RECORDS * 2) / 2; i++) {
         testutil_check(session->begin_transaction(session, NULL));

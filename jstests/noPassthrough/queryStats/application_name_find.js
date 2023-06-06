@@ -12,7 +12,7 @@ const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 };
 
 const conn = MongoRunner.runMongod(options);
@@ -29,11 +29,11 @@ coll.find({v: 1}).toArray();
 
 let telemetry = getTelemetry(conn);
 assert.eq(1, telemetry.length, telemetry);
-assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
+assert.eq(kApplicationName, telemetry[0].key.client.application.name, telemetry);
 
 telemetry = getQueryStatsFindCmd(conn, true);
 assert.eq(1, telemetry.length, telemetry);
-assert.eq(kApplicationName, telemetry[0].key.applicationName, telemetry);
+assert.eq(kApplicationName, telemetry[0].key.client.application.name, telemetry);
 
 MongoRunner.stopMongod(conn);
 }());

@@ -42,11 +42,12 @@ namespace mongo {
  * OpObserver methods.
  *
  * This class replaces OpObserverShardingImpl without deriving directly from OpObserverImpl
- * while implementing the standard OpObserver methods.
+ * while implementing the standard OpObserver methods. OpObserverShardingImpl was removed in
+ * SERVER-76271.
  *
  * See ShardServerOpObserver.
  */
-class MigrationChunkClonerSourceOpObserver : public OpObserverNoop {
+class MigrationChunkClonerSourceOpObserver final : public OpObserverNoop {
 public:
     /**
      * Write operations do shard version checking, but if an update operation runs as part of a
@@ -65,6 +66,30 @@ public:
      * Ensures that there is no movePrimary operation in progress for the given namespace.
      */
     static void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss);
+
+    void onInserts(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   std::vector<InsertStatement>::const_iterator first,
+                   std::vector<InsertStatement>::const_iterator last,
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate,
+                   InsertsOpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void aboutToDelete(OperationContext* opCtx,
+                       const CollectionPtr& coll,
+                       const BSONObj& docToDelete,
+                       OplogDeleteEntryArgs* args,
+                       OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onDelete(OperationContext* opCtx,
+                  const CollectionPtr& coll,
+                  StmtId stmtId,
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator) final;
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        const TransactionOperations& transactionOperations,

@@ -228,12 +228,13 @@ TEST(ChangeStreamEventTransformTest, TestRenameTransformWithTenantId) {
     NamespaceString renameTo =
         NamespaceString::createNamespaceString_forTest(tenantId, "unittests.rename_coll");
 
-    auto renameField = makeOplogEntry(
-        repl::OpTypeEnum::kCommand,  // op type
-        renameFrom.getCommandNS(),   // namespace
-        BSON("renameCollection" << renameFrom.toString() << "to" << renameTo.toString()),  // o
-        testUuid()                                                                         // uuid
-    );
+    auto renameField =
+        makeOplogEntry(repl::OpTypeEnum::kCommand,  // op type
+                       renameFrom.getCommandNS(),   // namespace
+                       BSON("renameCollection" << renameFrom.toString_forTest() << "to"
+                                               << renameTo.toString_forTest()),  // o
+                       testUuid()                                                // uuid
+        );
 
     Document expectedDoc{{DocumentSourceChangeStream::kNamespaceField,
                           Document{{"db", renameFrom.dbName().db()}, {"coll", renameFrom.coll()}}},
@@ -258,12 +259,13 @@ TEST(ChangeStreamEventTransformTest, TestRenameTransformWithTenantId) {
     // in the oplog entry. It should still not be a part of the db name in the change event.
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
-    auto oplogEntry = makeOplogEntry(
-        repl::OpTypeEnum::kCommand,  // op type
-        renameFrom.getCommandNS(),   // namespace
-        BSON("renameCollection" << renameFrom.toString() << "to" << renameTo.toString()),  // o
-        testUuid()                                                                         // uuid
-    );
+    auto oplogEntry =
+        makeOplogEntry(repl::OpTypeEnum::kCommand,  // op type
+                       renameFrom.getCommandNS(),   // namespace
+                       BSON("renameCollection" << renameFrom.toString_forTest() << "to"
+                                               << renameTo.toString_forTest()),  // o
+                       testUuid()                                                // uuid
+        );
 
     changeStreamDoc = applyTransformation(oplogEntry, renameFrom);
     renameDoc = Document{

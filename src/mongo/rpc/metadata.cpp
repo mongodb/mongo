@@ -48,6 +48,7 @@
 
 namespace mongo {
 namespace rpc {
+MONGO_FAIL_POINT_DEFINE(failIfOperationKeyMismatch);
 
 BSONObj makeEmptyMetadata() {
     return BSONObj();
@@ -87,6 +88,12 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
                                                        ActionType::internal))) {
         auto opKey = uassertStatusOK(UUID::parse(clientOperationKeyElem));
         opCtx->setOperationKey(std::move(opKey));
+        failIfOperationKeyMismatch.execute([&](const BSONObj& data) {
+            tassert(7446600,
+                    "OperationKey in request does not match test provided OperationKey",
+                    data["clientOperationKey"].String() ==
+                        opCtx->getOperationKey()->toBSON()["uuid"].String());
+        });
     }
 
     if (readPreferenceElem) {

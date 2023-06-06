@@ -42,6 +42,7 @@ TimeseriesUpsertStage::TimeseriesUpsertStage(ExpressionContext* expCtx,
                                              const ScopedCollectionAcquisition& coll,
                                              BucketUnpacker bucketUnpacker,
                                              std::unique_ptr<MatchExpression> residualPredicate,
+                                             std::unique_ptr<MatchExpression> originalPredicate,
                                              const UpdateRequest& request)
     : TimeseriesModifyStage(expCtx,
                             std::move(params),
@@ -49,7 +50,8 @@ TimeseriesUpsertStage::TimeseriesUpsertStage(ExpressionContext* expCtx,
                             std::move(child),
                             coll,
                             std::move(bucketUnpacker),
-                            std::move(residualPredicate)),
+                            std::move(residualPredicate),
+                            std::move(originalPredicate)),
       _request(request) {
     // We should never create this stage for a non-upsert request.
     tassert(7655100, "request must be an upsert", _params.isUpdate && _request.isUpsert());
@@ -86,31 +88,29 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
 
     // If this is an explain, skip performing the actual insert.
     if (!_params.isExplain) {
-        _performInsert(_specificStats.objInserted);
+        writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
+            timeseries::performAtomicWritesForUpdate(opCtx(),
+                                                     collection(),
+                                                     RecordId{},
+                                                     boost::none,
+                                                     {_specificStats.objInserted},
+                                                     _params.fromMigrate,
+                                                     _params.stmtId);
+        });
     }
 
     // We should always be EOF at this point.
     tassert(7655101, "must be at EOF if we performed an upsert", isEOF());
 
-    // If we don't need to return the inserted document, we're done.
-    return PlanStage::IS_EOF;
-}
+    if (!_params.returnNew) {
+        // If we don't need to return the inserted document, we're done.
+        return PlanStage::IS_EOF;
+    }
 
-void TimeseriesUpsertStage::_performInsert(BSONObj newDocument) {
-    auto insertOp = timeseries::makeInsertsToNewBuckets({newDocument},
-                                                        collection()->ns(),
-                                                        *collection()->getTimeseriesOptions(),
-                                                        collection()->getDefaultCollator());
-
-    writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
-        timeseries::performAtomicWrites(opCtx(),
-                                        collection(),
-                                        RecordId{},
-                                        boost::none,
-                                        insertOp,
-                                        _params.fromMigrate,
-                                        _params.stmtId);
-    });
+    // If we want to return the document we just inserted, create it as a WorkingSetMember.
+    _measurementToReturn = _specificStats.objInserted;
+    _prepareToReturnMeasurement(*out);
+    return PlanStage::ADVANCED;
 }
 
 BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
@@ -120,17 +120,8 @@ BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
     if (_request.shouldUpsertSuppliedDocument()) {
         update::generateNewDocumentFromSuppliedDoc(opCtx(), immutablePaths, &_request, doc);
     } else {
-        // Generate the match expression with which to fill in the new document. We use the original
-        // query on the request rather than our parsed canonical query because we want the complete,
-        // un-translated query for this.
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kAllowAllSpecialFeatures &
-            ~MatchExpressionParser::AllowedFeatures::kExpr;
-        auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(
-            _request.getQuery(), expCtx(), ExtensionsCallbackNoop(), allowedFeatures));
-
-        uassertStatusOK(
-            _params.updateDriver->populateDocumentWithQueryFields(*matchExpr, immutablePaths, doc));
+        uassertStatusOK(_params.updateDriver->populateDocumentWithQueryFields(
+            *_originalPredicate, immutablePaths, doc));
 
         update::generateNewDocumentFromUpdateOp(opCtx(), immutablePaths, _params.updateDriver, doc);
     }

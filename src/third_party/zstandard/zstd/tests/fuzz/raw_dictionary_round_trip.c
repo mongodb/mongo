@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -21,6 +21,7 @@
 #include "fuzz_helpers.h"
 #include "zstd_helpers.h"
 #include "fuzz_data_producer.h"
+#include "fuzz_third_party_seq_prod.h"
 
 static ZSTD_CCtx *cctx = NULL;
 static ZSTD_DCtx *dctx = NULL;
@@ -42,7 +43,7 @@ static size_t roundTripTest(void *result, size_t resultCapacity,
         FUZZ_ZASSERT(ZSTD_CCtx_refPrefix_advanced(
             cctx, dict, dictSize,
             ZSTD_dct_rawContent));
-    else 
+    else
         FUZZ_ZASSERT(ZSTD_CCtx_loadDictionary_advanced(
             cctx, dict, dictSize,
             (ZSTD_dictLoadMethod_e)FUZZ_dataProducer_uint32Range(producer, 0, 1),
@@ -68,6 +69,8 @@ static size_t roundTripTest(void *result, size_t resultCapacity,
 
 int LLVMFuzzerTestOneInput(const uint8_t *src, size_t size)
 {
+    FUZZ_SEQ_PROD_SETUP();
+
     /* Give a random portion of src data to the producer, to use for
     parameter generation. The rest will be used for (de)compression */
     FUZZ_dataProducer_t *producer = FUZZ_dataProducer_create(src, size);
@@ -111,5 +114,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *src, size_t size)
     ZSTD_freeCCtx(cctx); cctx = NULL;
     ZSTD_freeDCtx(dctx); dctx = NULL;
 #endif
+    FUZZ_SEQ_PROD_TEARDOWN();
     return 0;
 }

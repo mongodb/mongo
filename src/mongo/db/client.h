@@ -109,7 +109,7 @@ public:
     }
 
     HostAndPort getRemote() const {
-        verify(_session);
+        MONGO_verify(_session);
         return _session->remote();
     }
 

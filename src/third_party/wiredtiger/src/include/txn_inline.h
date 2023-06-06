@@ -1227,6 +1227,9 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
     if (F_ISSET(S2C(session), WT_CONN_READONLY))
         F_SET(txn, WT_TXN_READONLY);
 
+    WT_ASSERT_ALWAYS(
+      session, txn->mod_count == 0, "The mod count should be 0 when beginning a transaction");
+
     return (0);
 }
 

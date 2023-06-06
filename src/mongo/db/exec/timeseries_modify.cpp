@@ -29,10 +29,15 @@
 
 #include "mongo/db/exec/timeseries_modify.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -46,9 +51,11 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
                                              std::unique_ptr<PlanStage> child,
                                              const ScopedCollectionAcquisition& coll,
                                              BucketUnpacker bucketUnpacker,
-                                             std::unique_ptr<MatchExpression> residualPredicate)
+                                             std::unique_ptr<MatchExpression> residualPredicate,
+                                             std::unique_ptr<MatchExpression> originalPredicate)
     : RequiresWritableCollectionStage(kStageType, expCtx, coll),
       _params(std::move(params)),
+      _originalPredicate(std::move(originalPredicate)),
       _ws(ws),
       _bucketUnpacker{std::move(bucketUnpacker)},
       _residualPredicate(std::move(residualPredicate)),
@@ -57,8 +64,14 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
             "Multi deletes must have a residual predicate",
             _isSingletonWrite() || _residualPredicate || _params.isUpdate);
     tassert(7308300,
-            "Can return the deleted measurement only if deleting one",
-            !_params.returnDeleted || (_isSingletonWrite() && !_params.isUpdate));
+            "Can return the old measurement only if modifying one",
+            !_params.returnOld || _isSingletonWrite());
+    tassert(7314602,
+            "Can return the new measurement only if updating one",
+            !_params.returnNew || (_isSingletonWrite() && _params.isUpdate));
+    tassert(7743100,
+            "Updates must provide original predicate",
+            !_params.isUpdate || _originalPredicate);
     _children.emplace_back(std::move(child));
 
     // These three properties are only used for the queryPlanner explain and will not change while
@@ -86,10 +99,10 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
 }
 
 bool TimeseriesModifyStage::isEOF() {
-    if (_isSingletonWrite() && _specificStats.nMeasurementsModified > 0) {
+    if (_isSingletonWrite() && _specificStats.nMeasurementsMatched > 0) {
         // If we have a measurement to return, we should not return EOF so that we can get a chance
         // to get called again and return the measurement.
-        return !_deletedMeasurementToReturn;
+        return !_measurementToReturn;
     }
     return child()->isEOF() && _retryBucketId == WorkingSet::INVALID_ID;
 }
@@ -104,10 +117,8 @@ std::unique_ptr<PlanStageStats> TimeseriesModifyStage::getStats() {
     return ret;
 }
 
-
-std::pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>>
-TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasurements,
-                                       std::vector<BSONObj>& unchangedMeasurements) {
+std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
+    const std::vector<BSONObj>& matchedMeasurements, std::vector<BSONObj>& unchangedMeasurements) {
     // Determine which documents to update based on which ones are actually being changed.
     std::vector<BSONObj> modifiedMeasurements;
 
@@ -116,7 +127,7 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
         // measurement plus an insert of the modified one.
         mutablebson::Document doc(measurement, mutablebson::Document::kInPlaceDisabled);
 
-        // Note that timeseries measurment _ids are allowed to be changed, so we don't have any
+        // Note that timeseries measurement _ids are allowed to be changed, so we don't have any
         // immutable fields.
         FieldRefSet immutablePaths;
         const bool isInsert = false;
@@ -139,7 +150,7 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
             // We have to re-apply the filter to get the matched element.
             tassert(7662500,
                     "measurement must pass filter",
-                    _residualPredicate->matchesBSON(measurement, &matchDetails));
+                    _originalPredicate->matchesBSON(measurement, &matchDetails));
 
             uassertStatusOK(_params.updateDriver->update(
                 opCtx(),
@@ -160,12 +171,187 @@ TimeseriesModifyStage::_buildInsertOps(const std::vector<BSONObj>& matchedMeasur
         }
     }
 
-    auto insertOps = timeseries::makeInsertsToNewBuckets(modifiedMeasurements,
-                                                         collection()->ns(),
-                                                         *collection()->getTimeseriesOptions(),
-                                                         collection()->getDefaultCollator());
-    return std::make_pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>>(
-        std::move(modifiedMeasurements), std::move(insertOps));
+    return modifiedMeasurements;
+}
+
+void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
+    const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths) {
+    // We do not allow modifying either the current shard key value or new shard key value (if
+    // resharding) without specifying the full current shard key in the query.
+    // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
+    // But if we are here, we already know that the shard key is not _id, since we have an assertion
+    // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
+    // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
+    // shard key fields.
+    const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
+    pathsupport::EqualityMatches equalities;
+
+    // We do not allow updates to the shard key when 'multi' is true.
+    uassert(ErrorCodes::InvalidOptions,
+            "Multi-update operations are not allowed when updating the shard key field.",
+            _params.isUpdate && _isSingletonWrite());
+
+    // With the introduction of PM-1632, we allow updating a document shard key without
+    // providing a full shard key if the update is executed in a retryable write or transaction.
+    // PM-1632 uses an internal transaction to execute these updates, so to make sure that we can
+    // only update the document shard key in a retryable write or transaction, mongos only sets
+    // $_allowShardKeyUpdatesWithoutFullShardKeyInQuery to true if the client executed write was a
+    // retryable write or in a transaction.
+    if (_params.allowShardKeyUpdatesWithoutFullShardKeyInQuery &&
+        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bool isInternalClient =
+            !cc().session() || (cc().session()->getTags() & transport::Session::kInternalClient);
+        uassert(ErrorCodes::InvalidOptions,
+                "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
+                isInternalClient);
+
+        // If this node is a replica set primary node, an attempted update to the shard key value
+        // must either be a retryable write or inside a transaction. An update without a transaction
+        // number is legal if gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled
+        // because mongos will be able to start an internal transaction to handle the
+        // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
+        // we can skip validation.
+        if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Must run update to shard key field in a multi-statement transaction or with "
+                    "retryWrites: true.",
+                    _params.allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+        }
+    } else {
+        uassert(7717803,
+                "Shard key update is not allowed without specifying the full shard key in the "
+                "query",
+                (_params.canonicalQuery &&
+                 pathsupport::extractFullEqualityMatches(
+                     *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                     .isOK() &&
+                 equalities.size() == shardKeyPathsVector.size()));
+
+        // If this node is a replica set primary node, an attempted update to the shard key value
+        // must either be a retryable write or inside a transaction. An update without a transaction
+        // number is legal if gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled
+        // because mongos will be able to start an internal transaction to handle the
+        // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
+        // we can skip validation.
+        if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Must run update to shard key field in a multi-statement transaction or with "
+                    "retryWrites: true.",
+                    opCtx()->getTxnNumber());
+        }
+    }
+}
+
+void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
+                                                                const BSONObj& oldBucket,
+                                                                const BSONObj& oldMeasurement) {
+    using namespace fmt::literals;
+    const auto& collDesc = collectionAcquisition().getShardingDescription();
+    const auto& shardKeyPattern = collDesc.getShardKeyPattern();
+
+    auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldBucket);
+    auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newBucket);
+
+    // If the shard key fields remain unchanged by this update we can skip the rest of the checks.
+    // Using BSONObj::binaryEqual() still allows a missing shard key field to be filled in with an
+    // explicit null value.
+    if (newShardKey.binaryEqual(oldShardKey)) {
+        return;
+    }
+
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
+
+    // Assert that the updated doc has no arrays or array descendants for the shard key fields.
+    update::assertPathsNotArray(mutablebson::Document{oldBucket}, shardKeyPaths);
+
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
+
+    // At this point we already asserted that the complete shardKey have been specified in the
+    // query, this implies that mongos is not doing a broadcast update and that it attached a
+    // shardVersion to the command. Thus it is safe to call getOwnershipFilter
+    const auto& collFilter = collectionAcquisition().getShardingFilter();
+    invariant(collFilter);
+
+    // If the shard key of an orphan document is allowed to change, and the document is allowed to
+    // become owned by the shard, the global uniqueness assumption for _id values would be violated.
+    invariant(collFilter->keyBelongsToMe(oldShardKey));
+
+    if (!collFilter->keyBelongsToMe(newShardKey)) {
+        uasserted(
+            7717801,
+            "This update would cause the doc to change owning shards, old = {}, new = {}"_format(
+                oldBucket.toString(), newBucket.toString()));
+        // TODO SERVER-76871 or SERVER-77607 would allow us to throw the following error instead.
+        /*
+        // We would need 'oldMeasurement' to be able to delete it using timeseries deleteOne instead
+        // of the old bucket document.
+        uasserted(WouldChangeOwningShardInfo(
+                      oldMeasurement, newObj, false, collection()->ns(), collection()->uuid()),
+                  "This update would cause the doc to change owning shards");
+        */
+    }
+}
+
+void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(
+    const ShardingWriteRouter& shardingWriteRouter,
+    const BSONObj& newBucket,
+    const BSONObj& oldBucket,
+    const BSONObj& oldMeasurement) {
+    using namespace fmt::literals;
+    const auto& collDesc = collectionAcquisition().getShardingDescription();
+
+    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
+    if (!reshardingKeyPattern)
+        return;
+
+    auto oldShardKey = reshardingKeyPattern->extractShardKeyFromDoc(oldBucket);
+    auto newShardKey = reshardingKeyPattern->extractShardKeyFromDoc(newBucket);
+
+    if (newShardKey.binaryEqual(oldShardKey))
+        return;
+
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
+
+    auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldBucket);
+    auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newBucket);
+
+    if (oldRecipShard != newRecipShard) {
+        uasserted(
+            7717802,
+            "This update would cause the doc to change owning shards from {} to {}, old = {}, new = {}"_format(
+                oldRecipShard.toString(),
+                newRecipShard.toString(),
+                oldBucket.toString(),
+                newBucket.toString()));
+        // TODO SERVER-76871 or SERVER-77607 would allow us to throw the following error instead.
+        /*
+        // We would need 'oldMeasurement' to be able to delete it using timeseries deleteOne instead
+        // of the old bucket document.
+        uasserted(
+            WouldChangeOwningShardInfo(
+                oldMeasurement, newObj, false, collection()->ns(), collection()->uuid()),
+            "This update would cause the doc to change owning shards under the new shard key");
+        */
+    }
+}
+
+void TimeseriesModifyStage::_checkUpdateChangesShardKeyFields(const BSONObj& newBucket,
+                                                              const BSONObj& oldBucket,
+                                                              const BSONObj& oldMeasurement) {
+    const auto isSharded = collectionAcquisition().getShardingDescription().isSharded();
+    if (!isSharded) {
+        return;
+    }
+
+    // It is possible that both the existing and new shard keys are being updated, so we do not want
+    // to short-circuit checking whether either is being modified.
+    _checkUpdateChangesExistingShardKey(newBucket, oldBucket, oldMeasurement);
+    ShardingWriteRouter shardingWriteRouter(opCtx(), collection()->ns());
+    _checkUpdateChangesReshardingKey(shardingWriteRouter, newBucket, oldBucket, oldMeasurement);
 }
 
 template <typename F>
@@ -173,29 +359,56 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     ScopeGuard<F>& bucketFreer,
     WorkingSetID bucketWsmId,
     std::vector<BSONObj>&& unchangedMeasurements,
-    const std::vector<BSONObj>& matchedMeasurements,
+    std::vector<BSONObj>&& matchedMeasurements,
     bool bucketFromMigrate) {
     // No measurements needed to be updated or deleted from the bucket document.
     if (matchedMeasurements.empty()) {
         return {false, PlanStage::NEED_TIME};
     }
     _specificStats.nMeasurementsMatched += matchedMeasurements.size();
-
-    auto updateResult = _params.isUpdate
-        ? _buildInsertOps(matchedMeasurements, unchangedMeasurements)
-        : std::pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>>{};
+    bool isUpdate = _params.isUpdate;
 
     // If this is a delete, we will be deleting all matched measurements. If this is an update, we
     // may not need to modify all measurements, since some may be no-op updates.
-    const auto& modifiedMeasurements = _params.isUpdate ? updateResult.first : matchedMeasurements;
+    const auto& modifiedMeasurements =
+        isUpdate ? _applyUpdate(matchedMeasurements, unchangedMeasurements) : matchedMeasurements;
 
-    // After applying the updates, no measurements needed to be updated in the bucket document.
+    // Checks for shard key value changes. We will fail the command if it's a multi-update, so only
+    // performing the check needed for a single-update.
+    if (isUpdate && _isUserInitiatedUpdate && !modifiedMeasurements.empty()) {
+        _checkUpdateChangesShardKeyFields(
+            timeseries::makeBucketDocument({modifiedMeasurements[0]},
+                                           collection()->ns(),
+                                           *collection()->getTimeseriesOptions(),
+                                           collection()->getDefaultCollator()),
+            _bucketUnpacker.bucket(),
+            matchedMeasurements[0]);
+    }
+
+    ScopeGuard setMeasurementToReturnGuard([&] {
+        // If asked to return the old or new measurement and the write was successful, we should
+        // save the measurement so that we can return it later.
+        if (_params.returnOld) {
+            _measurementToReturn = std::move(matchedMeasurements[0]);
+        } else if (_params.returnNew) {
+            if (modifiedMeasurements.empty()) {
+                // If we are returning the new measurement, then we must have modified at least one
+                // measurement. If we did not, then we should return the old measurement instead.
+                _measurementToReturn = std::move(matchedMeasurements[0]);
+            } else {
+                _measurementToReturn = std::move(modifiedMeasurements[0]);
+            }
+        }
+    });
+
+    // After applying the updates, no measurements needed to be updated in the bucket document. This
+    // case is still considered a successful write.
     if (modifiedMeasurements.empty()) {
-        return {false, PlanStage::NEED_TIME};
+        return {true, PlanStage::NEED_TIME};
     }
 
     // We don't actually write anything if we are in explain mode but we still need to update the
-    // stats and let the caller think as if the write succeeded if there's any deleted measurement.
+    // stats and let the caller think as if the write succeeded if there's any modified measurement.
     if (_params.isExplain) {
         _specificStats.nMeasurementsModified += modifiedMeasurements.size();
         return {true, PlanStage::NEED_TIME};
@@ -204,7 +417,6 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage saveState",
-        collection()->ns().ns(),
         [&] {
             child()->saveState();
             return PlanStage::NEED_TIME /* unused */;
@@ -215,23 +427,27 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         });
 
     auto recordId = _ws->get(bucketWsmId)->recordId;
-
-    OID bucketId = record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID();
-    auto modificationOp =
-        timeseries::makeModificationOp(bucketId, collection(), unchangedMeasurements);
     try {
         const auto modificationRet = handlePlanStageYield(
             expCtx(),
-            "TimeseriesModifyStage modifyBucket",
-            collection()->ns().ns(),
+            "TimeseriesModifyStage writeToBuckets",
             [&] {
-                timeseries::performAtomicWrites(opCtx(),
-                                                collection(),
-                                                recordId,
-                                                modificationOp,
-                                                updateResult.second,
-                                                bucketFromMigrate,
-                                                _params.stmtId);
+                if (isUpdate) {
+                    timeseries::performAtomicWritesForUpdate(opCtx(),
+                                                             collection(),
+                                                             recordId,
+                                                             unchangedMeasurements,
+                                                             modifiedMeasurements,
+                                                             bucketFromMigrate,
+                                                             _params.stmtId);
+                } else {
+                    timeseries::performAtomicWritesForDelete(opCtx(),
+                                                             collection(),
+                                                             recordId,
+                                                             unchangedMeasurements,
+                                                             bucketFromMigrate,
+                                                             _params.stmtId);
+                }
                 return PlanStage::NEED_TIME;
             },
             [&] {
@@ -241,6 +457,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
                 _retryBucket(bucketWsmId);
             });
         if (modificationRet != PlanStage::NEED_TIME) {
+            setMeasurementToReturnGuard.dismiss();
             return {false, PlanStage::NEED_YIELD};
         }
     } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
@@ -253,6 +470,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
             planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
             // We need to retry the bucket, so we should not free the current bucket.
             bucketFreer.dismiss();
+            setMeasurementToReturnGuard.dismiss();
             _retryBucket(bucketWsmId);
             return {false, PlanStage::NEED_YIELD};
         }
@@ -266,7 +484,6 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     auto status = handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage restoreState",
-        collection()->ns().ns(),
         [&] {
             child()->restoreState(&collection());
             return PlanStage::NEED_TIME;
@@ -322,7 +539,6 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
     const auto status = handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage:: ensureStillMatches",
-        collection()->ns().ns(),
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
                 collection(), opCtx(), _ws, id, _params.canonicalQuery);
@@ -350,14 +566,18 @@ void TimeseriesModifyStage::_retryBucket(WorkingSetID bucketId) {
     _retryBucketId = bucketId;
 }
 
-void TimeseriesModifyStage::_prepareToReturnDeletedMeasurement(WorkingSetID& out,
-                                                               BSONObj measurement) {
+void TimeseriesModifyStage::_prepareToReturnMeasurement(WorkingSetID& out) {
+    tassert(7314601,
+            "Must be called only when need to return the old or new measurement",
+            _params.returnOld || _params.returnNew);
+
     out = _ws->allocate();
     auto member = _ws->get(out);
     // The measurement does not have record id.
     member->recordId = RecordId{};
-    member->doc.value() = Document{std::move(measurement)};
+    member->doc.value() = Document{std::move(*_measurementToReturn)};
     _ws->transitionToOwnedObj(out);
+    _measurementToReturn.reset();
 }
 
 PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
@@ -365,12 +585,11 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    if (_deletedMeasurementToReturn) {
-        // If we fall into this case, then we were asked to return the deleted measurement but we
+    if (_measurementToReturn) {
+        // If we fall into this case, then we were asked to return the old or new measurement but we
         // were not able to do so in the previous call to doWork() because we needed to yield. Now
-        // that we are back, we can return the deleted measurement.
-        _prepareToReturnDeletedMeasurement(*out, *_deletedMeasurementToReturn);
-        _deletedMeasurementToReturn.reset();
+        // that we are back, we can return it.
+        _prepareToReturnMeasurement(*out);
         return PlanStage::ADVANCED;
     }
 
@@ -414,38 +633,33 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     ++_specificStats.nBucketsUnpacked;
 
     std::vector<BSONObj> unchangedMeasurements;
-    std::vector<BSONObj> modifiedMeasurements;
+    std::vector<BSONObj> matchedMeasurements;
 
     while (_bucketUnpacker.hasNext()) {
         auto measurement = _bucketUnpacker.getNext().toBson();
-        // We should stop deleting measurements once we hit the limit of one in the not multi case.
-        bool shouldContinueModifying = _isMultiWrite() || modifiedMeasurements.empty();
-        if (shouldContinueModifying &&
+        // We should stop matching measurements once we hit the limit of one in the non-multi case.
+        bool shouldContinueMatching = _isMultiWrite() || matchedMeasurements.empty();
+        if (shouldContinueMatching &&
             (!_residualPredicate || _residualPredicate->matchesBSON(measurement))) {
-            modifiedMeasurements.push_back(measurement);
+            matchedMeasurements.push_back(measurement);
         } else {
             unchangedMeasurements.push_back(measurement);
         }
     }
 
     auto isWriteSuccessful = false;
-    std::tie(isWriteSuccessful, status) = _writeToTimeseriesBuckets(
-        bucketFreer, id, std::move(unchangedMeasurements), modifiedMeasurements, bucketFromMigrate);
+    std::tie(isWriteSuccessful, status) =
+        _writeToTimeseriesBuckets(bucketFreer,
+                                  id,
+                                  std::move(unchangedMeasurements),
+                                  std::move(matchedMeasurements),
+                                  bucketFromMigrate);
     if (status != PlanStage::NEED_TIME) {
         *out = WorkingSet::INVALID_ID;
-        if (_params.returnDeleted && isWriteSuccessful) {
-            // If asked to return the deleted measurement and the write was successful but we need
-            // to yield, we need to save the deleted measurement to return it later. See isEOF() for
-            // more info.
-            tassert(7308301,
-                    "Can return only one deleted measurement",
-                    modifiedMeasurements.size() == 1);
-            _deletedMeasurementToReturn = std::move(modifiedMeasurements[0]);
-        }
-    } else if (_params.returnDeleted && isWriteSuccessful) {
-        // If the write was successful and if asked to return the deleted measurement, we return it
-        // immediately.
-        _prepareToReturnDeletedMeasurement(*out, modifiedMeasurements[0]);
+    } else if (isWriteSuccessful && _measurementToReturn) {
+        // If the write was successful and if asked to return the old or new measurement, then
+        // '_measurementToReturn' must have been filled out and we can return it immediately.
+        _prepareToReturnMeasurement(*out);
         status = PlanStage::ADVANCED;
     }
     return status;

@@ -164,7 +164,7 @@ table_verify_mirror(WT_CONNECTION *conn, TABLE *base, TABLE *table, const char *
 
     /* Optionally open a checkpoint to verify. */
     if (checkpoint != NULL)
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "checkpoint=%s", checkpoint));
+        testutil_snprintf(buf, sizeof(buf), "checkpoint=%s", checkpoint);
 
     /*
      * If opening a checkpoint, retry if the cursor checkpoint IDs don't match, it just means that a
@@ -185,10 +185,10 @@ table_verify_mirror(WT_CONNECTION *conn, TABLE *base, TABLE *table, const char *
         testutil_check(table_cursor->close(table_cursor));
     }
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
+    testutil_snprintf(buf, sizeof(buf),
       "table %u %s%s"
       "mirror verify",
-      table->id, checkpoint == NULL ? "" : checkpoint, checkpoint == NULL ? "" : " checkpoint "));
+      table->id, checkpoint == NULL ? "" : checkpoint, checkpoint == NULL ? "" : " checkpoint ");
     trace_msg(session, "%s: start", buf);
 
     for (failures = 0, rows = 1; rows <= TV(RUNS_ROWS); ++rows) {
@@ -282,26 +282,26 @@ table_verify_mirror(WT_CONNECTION *conn, TABLE *base, TABLE *table, const char *
 page_dump:
                 /* Dump the cursor pages for the first failure. */
                 if (++failures == 1) {
-                    testutil_check(__wt_snprintf(
-                      tagbuf, sizeof(tagbuf), "mirror error: base cursor (table %u)", base->id));
+                    testutil_snprintf(
+                      tagbuf, sizeof(tagbuf), "mirror error: base cursor (table %u)", base->id);
                     cursor_dump_page(base_cursor, tagbuf);
-                    testutil_check(__wt_snprintf(
-                      tagbuf, sizeof(tagbuf), "mirror error: table cursor (table %u)", table->id));
+                    testutil_snprintf(
+                      tagbuf, sizeof(tagbuf), "mirror error: table cursor (table %u)", table->id);
                     cursor_dump_page(table_cursor, tagbuf);
                     for (i = 1; i <= ntables; ++i) {
                         if (!tables[i]->mirror)
                             continue;
                         if (tables[i] != base &&
                           (tables[i] != table || table_keyno != base_keyno)) {
-                            testutil_check(__wt_snprintf(tagbuf, sizeof(tagbuf),
+                            testutil_snprintf(tagbuf, sizeof(tagbuf),
                               "mirror error: base key number %" PRIu64 " in table %u", base_keyno,
-                              i));
+                              i);
                             table_dump_page(session, checkpoint, tables[i], base_keyno, tagbuf);
                         }
                         if (tables[i] != table && table_keyno != base_keyno) {
-                            testutil_check(__wt_snprintf(tagbuf, sizeof(tagbuf),
+                            testutil_snprintf(tagbuf, sizeof(tagbuf),
                               "mirror error: table key number %" PRIu64 " in table %u", table_keyno,
-                              i));
+                              i);
                             table_dump_page(session, checkpoint, tables[i], table_keyno, tagbuf);
                         }
                     }

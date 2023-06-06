@@ -121,10 +121,10 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
 
 Value ExpressionShift::serialize(SerializationOptions opts) const {
     MutableDocument args;
-    args.addField(kByArg, opts.serializeLiteralValue(_offset));
+    args.addField(kByArg, opts.serializeLiteral(_offset));
     args.addField(kOutputArg, _input->serialize(opts));
     args.addField(kDefaultArg,
-                  opts.serializeLiteralValue(_defaultVal.get_value_or(mongo::Value(BSONNULL))));
+                  opts.serializeLiteral(_defaultVal.get_value_or(mongo::Value(BSONNULL))));
     MutableDocument windowFun;
     windowFun.addField(_accumulatorName, args.freezeToValue());
     return windowFun.freezeToValue();

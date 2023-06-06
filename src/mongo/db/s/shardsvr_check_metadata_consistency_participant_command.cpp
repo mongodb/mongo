@@ -228,80 +228,20 @@ public:
             const auto nss = ns();
             const auto shardId = ShardingState::get(opCtx)->shardId();
             const auto& primaryShardId = request().getPrimaryShardId();
+            const auto commandLevel = metadata_consistency_util::getCommandLevel(nss);
 
             // Get the list of collections from configsvr sorted by namespace
-            const auto catalogClientCollections = [&] {
-                switch (metadata_consistency_util::getCommandLevel(nss)) {
-                    case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
-                        return Grid::get(opCtx)->catalogClient()->getCollections(
-                            opCtx,
-                            nss.db(),
-                            repl::ReadConcernLevel::kMajorityReadConcern,
-                            BSON(CollectionType::kNssFieldName << 1) /*sort*/);
-                    case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
-                        try {
-                            auto collectionType =
-                                Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-                            return std::vector<CollectionType>{std::move(collectionType)};
-                        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                            // If we don't find the nss, it means that the collection is not
-                            // sharded.
-                            return std::vector<CollectionType>{};
-                        }
-                    default:
-                        MONGO_UNREACHABLE;
-                }
-            }();
+            const auto configsvrCollections =
+                getCollectionsListFromConfigServer(opCtx, nss, commandLevel);
 
-            auto inconsistencies = [&] {
-                auto collCatalogSnapshot = [&] {
-                    // Lock db in mode IS while taking the collection catalog snapshot to ensure
-                    // that we serialize with non-atomic collection and index creation performed by
-                    // the MigrationDestinationManager.
-                    // Without this lock we could potentially acquire a snapshot in which a
-                    // collection have been already created by the MigrationDestinationManager but
-                    // the relative shardkey index is still missing.
-                    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
-                    return CollectionCatalog::get(opCtx);
-                }();
-
-                std::vector<CollectionPtr> localCollections;
-                switch (metadata_consistency_util::getCommandLevel(nss)) {
-                    case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
-                        for (auto&& coll : collCatalogSnapshot->range(nss.dbName())) {
-                            if (!coll) {
-                                continue;
-                            }
-                            localCollections.emplace_back(CollectionPtr(coll));
-                        }
-                        std::sort(localCollections.begin(),
-                                  localCollections.end(),
-                                  [](const CollectionPtr& prev, const CollectionPtr& next) {
-                                      return prev->ns() < next->ns();
-                                  });
-                        break;
-                    }
-                    case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
-                        if (auto coll =
-                                collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
-                            localCollections.emplace_back(CollectionPtr(coll));
-                        }
-                        break;
-                    }
-                    default:
-                        MONGO_UNREACHABLE;
-                }
-
-                // Check consistency between local metadata and configsvr metadata
-                return metadata_consistency_util::checkCollectionMetadataInconsistencies(
-                    opCtx, shardId, primaryShardId, catalogClientCollections, localCollections);
-            }();
+            auto inconsistencies = checkCollectionMetadataInconsistencies(
+                opCtx, nss, commandLevel, shardId, primaryShardId, configsvrCollections);
 
             // If this is the primary shard of the db coordinate index check across shards
             const auto& optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
             if (shardId == primaryShardId && optionalCheckIndexes && *optionalCheckIndexes) {
                 auto indexInconsistencies =
-                    checkIndexesInconsistencies(opCtx, catalogClientCollections);
+                    checkIndexesInconsistencies(opCtx, configsvrCollections);
                 inconsistencies.insert(inconsistencies.end(),
                                        std::make_move_iterator(indexInconsistencies.begin()),
                                        std::make_move_iterator(indexInconsistencies.end()));
@@ -335,6 +275,104 @@ public:
         }
 
     private:
+        std::vector<CollectionType> getCollectionsListFromConfigServer(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            const MetadataConsistencyCommandLevelEnum& commandLevel) {
+            switch (commandLevel) {
+                case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
+                    return Grid::get(opCtx)->catalogClient()->getCollections(
+                        opCtx,
+                        nss.db(),
+                        repl::ReadConcernLevel::kMajorityReadConcern,
+                        BSON(CollectionType::kNssFieldName << 1) /*sort*/);
+                }
+                case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
+                    try {
+                        auto collectionType =
+                            Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+                        return {std::move(collectionType)};
+                    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        // If we don't find the nss, it means that the collection is not sharded.
+                        return {};
+                    }
+                }
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+
+        std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            const MetadataConsistencyCommandLevelEnum& commandLevel,
+            const ShardId& shardId,
+            const ShardId& primaryShardId,
+            const std::vector<mongo::CollectionType>& catalogClientCollections) {
+            std::vector<CollectionPtr> localCollections;
+            auto collCatalogSnapshot = [&] {
+                switch (commandLevel) {
+                    case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
+                        auto collCatalogSnapshot = [&] {
+                            // Lock db in mode IS while taking the collection catalog snapshot to
+                            // ensure that we serialize with non-atomic collection and index
+                            // creation performed by the MigrationDestinationManager. Without this
+                            // lock we could potentially acquire a snapshot in which a collection
+                            // have been already created by the MigrationDestinationManager but the
+                            // relative shardkey index is still missing.
+                            AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
+                            return CollectionCatalog::get(opCtx);
+                        }();
+
+                        for (auto&& coll : collCatalogSnapshot->range(nss.dbName())) {
+                            if (!coll) {
+                                continue;
+                            }
+                            localCollections.emplace_back(CollectionPtr(coll));
+                        }
+                        std::sort(localCollections.begin(),
+                                  localCollections.end(),
+                                  [](const CollectionPtr& prev, const CollectionPtr& next) {
+                                      return prev->ns() < next->ns();
+                                  });
+
+                        return collCatalogSnapshot;
+                    }
+                    case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
+                        auto collCatalogSnapshot = [&] {
+                            // Lock collection in mode IS while taking the collection catalog
+                            // snapshot to ensure that we serialize with non-atomic collection and
+                            // index creation performed by the MigrationDestinationManager. Without
+                            // this lock we could potentially acquire a snapshot in which a
+                            // collection have been already created by the
+                            // MigrationDestinationManager but the relative shardkey index is still
+                            // missing.
+                            AutoGetCollection coll(
+                                opCtx,
+                                nss,
+                                MODE_IS,
+                                AutoGetCollection::Options{}.viewMode(
+                                    auto_get_collection::ViewMode::kViewsPermitted));
+                            return CollectionCatalog::get(opCtx);
+                        }();
+
+                        if (auto coll =
+                                collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
+                            localCollections.emplace_back(CollectionPtr(coll));
+                        }
+
+                        return collCatalogSnapshot;
+                    }
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            }();
+
+            // Check consistency between local metadata and configsvr metadata
+            return metadata_consistency_util::checkCollectionMetadataInconsistencies(
+                opCtx, shardId, primaryShardId, catalogClientCollections, localCollections);
+        }
+
         NamespaceString ns() const override {
             return request().getNamespace();
         }

@@ -59,9 +59,7 @@ bool requiresOriginalQuery(OperationContext* opCtx,
                            const boost::optional<BSONObj>& query = boost::none,
                            const boost::optional<BSONObj>& projection = boost::none) {
     if (updateRequest) {
-        ExtensionsCallbackNoop extensionsCallback = ExtensionsCallbackNoop();
-        ParsedUpdate parsedUpdate(
-            opCtx, &updateRequest.get(), extensionsCallback, CollectionPtr::null);
+        ParsedUpdateForMongos parsedUpdate(opCtx, &updateRequest.get());
         uassertStatusOK(parsedUpdate.parseRequest());
         if (parsedUpdate.getDriver()->needMatchDetails()) {
             return true;

@@ -389,7 +389,7 @@ public:
     explicit Message(SharedBuffer data) : _buf(std::move(data)) {}
 
     MsgData::View header() const {
-        verify(!empty());
+        MONGO_verify(!empty());
         return _buf.get();
     }
 
@@ -431,7 +431,7 @@ public:
 
     // use to set first buffer if empty
     void setData(SharedBuffer buf) {
-        verify(empty());
+        MONGO_verify(empty());
         _buf = std::move(buf);
     }
 

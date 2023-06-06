@@ -59,7 +59,6 @@ private:
 TEST_F(ConnectionPoolTest, ConnectionPoolHistogramStats) {
     using namespace unittest::match;
 
-    RAIIServerParameterControllerForTest controller("featureFlagConnHealthMetrics", true);
     FailPointEnableBlock fp("injectWaitTimeForConnpoolAcquisition", BSON("sleepTimeMillis" << 60));
 
     const auto host = getServerHostAndPort().toString();

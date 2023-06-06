@@ -143,7 +143,7 @@ public:
     /** append element to the object we are building */
     Derived& append(const BSONElement& e) {
         // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
-        verify(!e.eoo());
+        MONGO_verify(!e.eoo());
         _b.appendBuf((void*)e.rawdata(), e.size());
         return static_cast<Derived&>(*this);
     }
@@ -151,7 +151,7 @@ public:
     /** append an element but with a new name */
     Derived& appendAs(const BSONElement& e, StringData fieldName) {
         // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
-        verify(!e.eoo());
+        MONGO_verify(!e.eoo());
         _b.appendNum((char)e.type());
         _b.appendStr(fieldName);
         _b.appendBuf((void*)e.value(), e.valuesize());
@@ -168,12 +168,12 @@ public:
 
     /** add a subobject as a member */
     Derived& appendObject(StringData fieldName, const char* objdata, int size = 0) {
-        verify(objdata);
+        MONGO_verify(objdata);
         if (size == 0) {
             size = ConstDataView(objdata).read<LittleEndian<int>>();
         }
 
-        verify(size > 4 && size < 100000000);
+        MONGO_verify(size > 4 && size < 100000000);
 
         _b.appendNum((char)Object);
         _b.appendStr(fieldName);

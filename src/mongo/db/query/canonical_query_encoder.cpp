@@ -587,7 +587,7 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
         return;
     }
 
-    auto requiredFields = proj->getRequiredFields();
+    const auto& requiredFields = proj->getRequiredFields();
 
     // If the only requirement is that $sortKey be included with some value, we just act as if the
     // entire document is needed.

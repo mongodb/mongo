@@ -232,16 +232,9 @@ public:
                                     << " and { enforceFastCount: true } is not supported.");
         }
 
-        const auto rawcheckBSONConformance = cmdObj["checkBSONConformance"];
-        const bool checkBSONConformance = rawcheckBSONConformance.trueValue();
-        if (rawcheckBSONConformance &&
-            !feature_flags::gExtendValidateCommand.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            uasserted(ErrorCodes::InvalidOptions,
-                      str::stream() << "The 'checkBSONConformance' option is not supported by the "
-                                       "validate command.");
-        }
-        if (rawcheckBSONConformance && !checkBSONConformance &&
+        const auto rawCheckBSONConformance = cmdObj["checkBSONConformance"];
+        const bool checkBSONConformance = rawCheckBSONConformance.trueValue();
+        if (rawCheckBSONConformance && !checkBSONConformance &&
             (fullValidate || enforceFastCount)) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Cannot explicitly set 'checkBSONConformance: false' with "

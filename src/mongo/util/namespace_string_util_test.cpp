@@ -423,4 +423,47 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
     }
 }
 
+TEST(NamespaceStringUtilTest, ParseFailPointData) {
+    const TenantId tid = TenantId(OID::gen());
+
+    for (bool multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
+        // Test fail point data has both name space and $tenant.
+        {
+            BSONObjBuilder bob;
+            bob.append("nss", "myDb.myColl");
+            tid.serializeToBSON("$tenant", &bob);
+            if (multitenancy) {
+                auto fpNss = NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd);
+                ASSERT_EQ(NamespaceString::createNamespaceString_forTest(tid, "myDb.myColl"),
+                          fpNss);
+            } else {
+                ASSERT_THROWS_CODE(NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd),
+                                   AssertionException,
+                                   6972102);
+            }
+        }
+        // Test fail point data only has $tenant.
+        {
+            BSONObjBuilder bob;
+            tid.serializeToBSON("$tenant", &bob);
+            auto fpNss = NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd);
+            ASSERT_EQ(NamespaceString(), fpNss);
+        }
+        // Test fail point data only has name space.
+        {
+            BSONObjBuilder bob;
+            bob.append("nss", "myDb.myColl");
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd);
+            ASSERT_EQ(NamespaceString::createNamespaceString_forTest(boost::none, "myDb.myColl"),
+                      fpNss);
+        }
+        // Test fail point data has neither $teannt nor name sapce.
+        {
+            auto fpNss = NamespaceStringUtil::parseFailPointData(BSONObj(), "nss"_sd);
+            ASSERT_EQ(NamespaceString(), fpNss);
+        }
+    }
+}
 }  // namespace mongo

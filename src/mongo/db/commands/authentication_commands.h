@@ -45,6 +45,6 @@ void disableX509Auth(ServiceContext* svcCtx);
 bool isX509AuthDisabled(ServiceContext* svcCtx);
 UserRequest getX509UserRequest(OperationContext* opCtx, UserRequest request);
 
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj isMaster, BSONObjBuilder* result);
+void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj helloCmd, BSONObjBuilder* result);
 
 }  // namespace mongo

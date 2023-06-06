@@ -27,18 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -51,8 +45,6 @@
 
 namespace mongo {
 namespace {
-
-using std::string;
 
 TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     auto harnessHelper = newSortedDataInterfaceHarnessHelper();

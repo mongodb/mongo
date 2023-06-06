@@ -27,15 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
 #include <vector>
 
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/unittest/unittest.h"
@@ -45,13 +42,14 @@ namespace mongo {
 namespace {
 
 using unittest::assertGet;
+
 const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collection");
 
 class ClusterCursorManagerTest : public ServiceContextTest {
 protected:
     ClusterCursorManagerTest() {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtx = makeOperationContext();
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }

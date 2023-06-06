@@ -129,7 +129,7 @@ function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
  * eviction.
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryStatsCacheSize: "1MB", internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsCacheSize: "1MB", internalQueryStatsRateLimit: -1},
 },
                          evictionTest,
                          {resetCacheSize: false});
@@ -137,7 +137,7 @@ runTestWithMongodOptions({
  * In this configuration, eviction is triggered only when the telemetry store size is reset.
  * */
 runTestWithMongodOptions({
-    setParameter: {internalQueryStatsCacheSize: "4MB", internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsCacheSize: "4MB", internalQueryStatsRateLimit: -1},
 },
                          evictionTest,
                          {resetCacheSize: true});
@@ -146,7 +146,7 @@ runTestWithMongodOptions({
  * In this configuration, every query is sampled, so no requests should be rate-limited.
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 },
                          countRateLimitedRequestsTest,
                          {samplingRate: 2147483647, numRequests: 20});
@@ -156,7 +156,7 @@ runTestWithMongodOptions({
  * rate-limited.
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryStatsSamplingRate: 10},
+    setParameter: {internalQueryStatsRateLimit: 10},
 },
                          countRateLimitedRequestsTest,
                          {samplingRate: 10, numRequests: 20});
@@ -166,7 +166,7 @@ runTestWithMongodOptions({
  * size
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 },
                          telemetryStoreSizeEstimateTest);
 
@@ -175,7 +175,7 @@ runTestWithMongodOptions({
  * are tracked.
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryStatsCacheSize: "0.00001MB", internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsCacheSize: "0.00001MB", internalQueryStatsRateLimit: -1},
 },
                          telemetryStoreWriteErrorsTest);
 }());

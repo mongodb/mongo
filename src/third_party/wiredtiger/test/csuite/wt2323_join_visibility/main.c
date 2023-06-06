@@ -102,19 +102,15 @@ main(int argc, char *argv[])
     memset(sharedopts, 0, sizeof(*sharedopts));
 
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
     tablename++;
-    testutil_check(
-      __wt_snprintf(sharedopts->posturi, sizeof(sharedopts->posturi), "index:%s:post", tablename));
-    testutil_check(
-      __wt_snprintf(sharedopts->baluri, sizeof(sharedopts->baluri), "index:%s:bal", tablename));
-    testutil_check(
-      __wt_snprintf(sharedopts->flaguri, sizeof(sharedopts->flaguri), "index:%s:flag", tablename));
-    testutil_check(
-      __wt_snprintf(sharedopts->joinuri, sizeof(sharedopts->joinuri), "join:%s", opts->uri));
+    testutil_snprintf(sharedopts->posturi, sizeof(sharedopts->posturi), "index:%s:post", tablename);
+    testutil_snprintf(sharedopts->baluri, sizeof(sharedopts->baluri), "index:%s:bal", tablename);
+    testutil_snprintf(sharedopts->flaguri, sizeof(sharedopts->flaguri), "index:%s:flag", tablename);
+    testutil_snprintf(sharedopts->joinuri, sizeof(sharedopts->joinuri), "join:%s", opts->uri);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=1G,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
@@ -338,19 +334,17 @@ thread_join(void *arg)
         balcur->set_key(balcur, 0);
         testutil_check(balcur->search(balcur));
         if (sharedopts->bloom)
-            testutil_check(
-              __wt_snprintf(cfg, sizeof(cfg), "compare=lt,strategy=bloom,count=%d", N_RECORDS));
+            testutil_snprintf(cfg, sizeof(cfg), "compare=lt,strategy=bloom,count=%d", N_RECORDS);
         else
-            testutil_check(__wt_snprintf(cfg, sizeof(cfg), "compare=lt"));
+            testutil_snprintf(cfg, sizeof(cfg), "compare=lt");
         testutil_check(session->join(session, joincur, balcur, cfg));
 
         flagcur->set_key(flagcur, 0);
         testutil_check(flagcur->search(flagcur));
         if (sharedopts->bloom)
-            testutil_check(
-              __wt_snprintf(cfg, sizeof(cfg), "compare=eq,strategy=bloom,count=%d", N_RECORDS));
+            testutil_snprintf(cfg, sizeof(cfg), "compare=eq,strategy=bloom,count=%d", N_RECORDS);
         else
-            testutil_check(__wt_snprintf(cfg, sizeof(cfg), "compare=eq"));
+            testutil_snprintf(cfg, sizeof(cfg), "compare=eq");
         testutil_check(session->join(session, joincur, flagcur, cfg));
 
         /* Expect no values returned */

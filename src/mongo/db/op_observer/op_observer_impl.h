@@ -32,9 +32,7 @@
 #include <memory>
 
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/op_observer/oplog_writer.h"
-#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 namespace repl {
@@ -52,6 +50,10 @@ class OpObserverImpl : public OpObserver {
 public:
     OpObserverImpl(std::unique_ptr<OplogWriter> oplogWriter);
     virtual ~OpObserverImpl() = default;
+
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kAll, NamespaceFilter::kAll};
+    }
 
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
@@ -123,6 +125,7 @@ public:
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
                        OpStateAccumulator* opAccumulator = nullptr) final;
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
@@ -238,31 +241,6 @@ public:
                                      const repl::OpTime& newCommitPoint) final {}
 
 private:
-    virtual void shardObserveAboutToDelete(OperationContext* opCtx,
-                                           NamespaceString const& nss,
-                                           BSONObj const& doc) {}
-    virtual void shardObserveInsertsOp(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       std::vector<InsertStatement>::const_iterator first,
-                                       std::vector<InsertStatement>::const_iterator last,
-                                       const std::vector<repl::OpTime>& opTimeList,
-                                       const ShardingWriteRouter& shardingWriteRouter,
-                                       bool fromMigrate,
-                                       bool inMultiDocumentTransaction){};
-    virtual void shardObserveUpdateOp(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      boost::optional<BSONObj> preImageDoc,
-                                      const BSONObj& postImageDoc,
-                                      const repl::OpTime& opTime,
-                                      const ShardingWriteRouter& shardingWriteRouter,
-                                      const bool inMultiDocumentTransaction) {}
-    virtual void shardObserveDeleteOp(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const BSONObj& documentKey,
-                                      const repl::OpTime& opTime,
-                                      const ShardingWriteRouter& shardingWriteRouter,
-                                      const bool inMultiDocumentTransaction) {}
-
     std::unique_ptr<OplogWriter> _oplogWriter;
 };
 

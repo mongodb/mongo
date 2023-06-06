@@ -154,7 +154,6 @@ PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
     return handlePlanStageYield(
         expCtx(),
         "TextOrStage initStage",
-        collection()->ns().ns(),
         [&] {
             _recordCursor = collection()->getCursor(opCtx());
             _internalState = State::kReadingTerms;
@@ -262,7 +261,6 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         const auto ret = handlePlanStageYield(
             expCtx(),
             "TextOrStage addTerm",
-            collection()->ns().ns(),
             [&] {
                 if (!WorkingSetCommon::fetch(opCtx(),
                                              _ws,

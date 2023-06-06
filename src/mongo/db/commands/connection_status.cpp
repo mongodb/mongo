@@ -76,7 +76,7 @@ public:
             return ret;
         }
 
-        static std::vector<Privilege> expandPrivileges(AuthorizationSession* as) {
+        static std::vector<auth::ParsedPrivilege> expandPrivileges(AuthorizationSession* as) {
             // Create a unified map of resources to privileges, to avoid duplicate
             // entries in the connection status output.
             User::ResourcePrivilegeMap unified;
@@ -92,11 +92,11 @@ public:
                 }
             }
 
-            std::vector<Privilege> ret;
+            std::vector<auth::ParsedPrivilege> ret;
             std::transform(unified.cbegin(),
                            unified.cend(),
                            std::back_inserter(ret),
-                           [](const auto& it) { return it.second; });
+                           [](const auto& it) { return it.second.toParsedPrivilege(); });
             return ret;
         }
 

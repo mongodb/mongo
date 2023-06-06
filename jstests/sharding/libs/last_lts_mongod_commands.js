@@ -8,6 +8,7 @@ const commandsRemovedFromMongodSinceLastLTS = [
     "_configsvrMoveChunk",
     "_configsvrRepairShardedCollectionChunksHistory",
     "_configsvrTransitionToCatalogShard",
+    "_configsvrRenameCollectionMetadata",
     "mapreduce.shardedfinish",
     "getLastError",
     "driverOIDTest",

@@ -556,13 +556,13 @@ bool haveTripwireAssertionsOccurred();
 void warnIfTripwireAssertionsOccurred();
 
 /**
- * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.
+ * MONGO_verify is deprecated. It is like invariant() in debug builds and massert() in release
+ * builds.
  */
-#define verify(expression) MONGO_verify(expression)
-#define MONGO_verify(_Expression)                                    \
+#define MONGO_verify(expression_)                                    \
     do {                                                             \
-        if (MONGO_unlikely(!(_Expression))) {                        \
-            ::mongo::verifyFailed(#_Expression, __FILE__, __LINE__); \
+        if (MONGO_unlikely(!(expression_))) {                        \
+            ::mongo::verifyFailed(#expression_, __FILE__, __LINE__); \
         }                                                            \
     } while (false)
 

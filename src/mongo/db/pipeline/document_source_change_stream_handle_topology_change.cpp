@@ -256,7 +256,7 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInComm
     pipeline[0] =
         Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
     MutableDocument newCmd(std::move(originalCmd));
-    newCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline);
+    newCmd[AggregateCommandRequest::kPipelineFieldName] = Value(std::move(pipeline));
     return newCmd.freeze().toBson();
 }
 

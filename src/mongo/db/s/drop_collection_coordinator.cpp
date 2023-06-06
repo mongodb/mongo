@@ -41,6 +41,7 @@
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -247,8 +248,10 @@ void DropCollectionCoordinator::_freezeMigrations(
         logChangeDetail.append("collectionUUID", _doc.getCollInfo()->getUuid().toBSON());
     }
 
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "dropCollection.start", nss().ns(), logChangeDetail.obj());
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "dropCollection.start",
+                                           NamespaceStringUtil::serialize(nss()),
+                                           logChangeDetail.obj());
 
     if (_doc.getCollInfo()) {
         const auto collUUID = _doc.getCollInfo()->getUuid();
@@ -319,6 +322,11 @@ void DropCollectionCoordinator::_commitDropCollection(
     // Remove tags even if the collection is not sharded or didn't exist
     sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getNewSession(opCtx));
 
+    // Checkpoint the configTime to ensure that, in the case of a stepdown, the new primary will
+    // start-up from a configTime that is inclusive of the metadata removable that was committed
+    // during the critical section.
+    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
     // We need to send the drop to all the shards because both movePrimary and
@@ -337,7 +345,8 @@ void DropCollectionCoordinator::_commitDropCollection(
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx, nss(), {primaryShardId}, **executor, getNewSession(opCtx), false /*fromMigrate*/);
 
-    ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx, "dropCollection", NamespaceStringUtil::serialize(nss()));
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));
 }
 

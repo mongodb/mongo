@@ -36,9 +36,7 @@ namespace mongo {
 
 class ShardingWriteRouter {
 public:
-    ShardingWriteRouter(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        CatalogCache* catalogCache);
+    ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss);
 
     CollectionShardingState* getCss() const {
         return _scopedCss ? &(**_scopedCss) : nullptr;

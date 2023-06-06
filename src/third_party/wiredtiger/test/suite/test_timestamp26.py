@@ -308,7 +308,7 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
         c[key] = ds.value(1)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
-        # Upate the data item at timestamp 1, which should fail.
+        # Update the data item at timestamp 1, which should fail.
         self.session.begin_transaction()
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
         c[key] = ds.value(2)

@@ -63,7 +63,7 @@ Value serializePartialSum(BSONType nonDecimalTotalType,
 void AccumulatorAvg::processInternal(const Value& input, bool merging) {
     if (merging) {
         // We expect an object that contains both a partial sum and a count.
-        verify(input.getType() == Object);
+        MONGO_verify(input.getType() == Object);
 
         auto partialSumVal = input[stage_builder::partialSumName];
         tassert(6422700, "'ps' field must be present", !partialSumVal.missing());

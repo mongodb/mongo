@@ -300,6 +300,9 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"statistics_log.sources", "statistics_log sources (file: | off)", C_IGNORE | C_STRING, 0, 0, 0,
     V_GLOBAL_STATISTICS_LOG_SOURCES},
 
+  {"stress.aggressive_stash_free", "stress freeing stashed memory aggressively", C_BOOL, 2, 0, 0,
+    V_GLOBAL_STRESS_AGGRESSIVE_STASH_FREE},
+
   {"stress.aggressive_sweep", "stress aggressive sweep", C_BOOL, 2, 0, 0,
     V_GLOBAL_STRESS_AGGRESSIVE_SWEEP},
 

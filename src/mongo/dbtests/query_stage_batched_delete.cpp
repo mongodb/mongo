@@ -67,6 +67,7 @@ public:
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
                        OpStateAccumulator* opAccumulator = nullptr) override {
 
         if (docDurationMap.find(doc) != docDurationMap.end()) {
@@ -180,7 +181,7 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasRecordId());
+                MONGO_verify(member->hasRecordId());
                 out->push_back(member->recordId);
             }
         }

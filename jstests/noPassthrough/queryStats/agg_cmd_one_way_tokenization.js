@@ -28,7 +28,7 @@ function runTest(conn) {
         .toArray();
 
     let stats = getTelemetry(admin);
-    stats = getQueryStatsAggCmd(admin, /*applyHmacToIdentifiers*/ true);
+    stats = getQueryStatsAggCmd(admin, /*transformIdentifiers*/ true);
 
     assert.eq(1, stats.length);
     assert.eq({"db": `${kHashedDbName}`, "coll": `${kHashedCollName}`},
@@ -45,12 +45,12 @@ function runTest(conn) {
                     ]
                 }
             },
-            {"$skip": "?"}
+            {"$skip": "?number"}
         ],
         stats[0].key.queryShape.pipeline);
 
     db.test.aggregate([{$match: {a: {$regex: "foo(.*)"}, b: {$gt: 0}}}]).toArray();
-    stats = getQueryStatsAggCmd(admin, /*applyHmacToIdentifiers*/ true);
+    stats = getQueryStatsAggCmd(admin, /*transformIdentifiers*/ true);
 
     assert.eq(2, stats.length);
     assert.eq({"db": `${kHashedDbName}`, "coll": `${kHashedCollName}`},
@@ -69,26 +69,24 @@ function runTest(conn) {
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryStatsSamplingRate: -1,
-        featureFlagQueryStats: true,
+        internalQueryStatsRateLimit: -1,
     }
 });
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
-// TODO SERVER-77325 reenable these tests
-// const st = new ShardingTest({
-//     mongos: 1,
-//     shards: 1,
-//     config: 1,
-//     rs: {nodes: 1},
-//     mongosOptions: {
-//         setParameter: {
-//             internalQueryStatsSamplingRate: -1,
-//             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-//         }
-//     },
-// });
-// runTest(st.s);
-// st.stop();
+const st = new ShardingTest({
+    mongos: 1,
+    shards: 1,
+    config: 1,
+    rs: {nodes: 1},
+    mongosOptions: {
+        setParameter: {
+            internalQueryStatsRateLimit: -1,
+            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
+        }
+    },
+});
+runTest(st.s);
+st.stop();
 }());

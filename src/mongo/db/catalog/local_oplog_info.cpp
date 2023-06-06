@@ -77,7 +77,6 @@ void LocalOplogInfo::resetCollection() {
 }
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
-    stdx::lock_guard<Latch> lk(_newOpMutex);
     VectorClockMutable::get(service)->tickClusterTimeTo(LogicalTime(newTime));
 }
 

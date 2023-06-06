@@ -87,13 +87,20 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
                                                std::unique_ptr<sbe::EExpression> rhs,
-                                               sbe::RuntimeEnvironment* env) {
-    invariant(env);
+                                               sbe::RuntimeEnvironment* runtimeEnv) {
+    invariant(runtimeEnv);
 
-    auto collatorSlot = env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = runtimeEnv->getSlotIfExists("collator"_sd);
     auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
 
     return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
+}
+
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               PlanStageEnvironment& env) {
+    return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), env.runtimeEnv);
 }
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
@@ -108,13 +115,19 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
-                                               sbe::RuntimeEnvironment* env) {
-    invariant(env);
+                                               sbe::RuntimeEnvironment* runtimeEnv) {
+    invariant(runtimeEnv);
 
-    auto collatorSlot = env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = runtimeEnv->getSlotIfExists("collator"_sd);
     auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
 
     return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
+}
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               PlanStageEnvironment& env) {
+    return makeIsMember(std::move(input), std::move(arr), env.runtimeEnv);
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
@@ -144,7 +157,7 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EEx
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg, StageBuilderState& state) {
-    auto expr = arg.extractExpr(state.slotVarMap, *state.data->env);
+    auto expr = arg.extractExpr(state.slotVarMap, *state.env);
     return generateNullOrMissingExpr(*expr);
 }
 
@@ -153,7 +166,7 @@ std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& 
 }
 
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, *state.data->env)));
+    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, *state.env)));
 }
 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
@@ -176,7 +189,7 @@ std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
 }
 
 std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, *state.data->env));
+    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, *state.env));
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var) {
@@ -184,7 +197,7 @@ std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& va
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, *state.data->env));
+    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, *state.env));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
@@ -342,7 +355,7 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     // into a slot.
     auto slot = slotIdGenerator->generate();
     stage = makeProject(
-        std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, *state.data->env));
+        std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, *state.env));
     return {slot, std::move(stage)};
 }
 
@@ -641,8 +654,8 @@ sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variab
         return it->second;
     }
 
-    auto slotId = data->env->registerSlot(
-        sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+    auto slotId =
+        env->registerSlot(sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
     data->variableIdToSlotMap.emplace(variableId, slotId);
     return slotId;
 }
@@ -884,8 +897,8 @@ sbe::value::SlotId StageBuilderState::registerInputParamSlot(
         return it->second;
     }
 
-    auto slotId = data->env->registerSlot(
-        sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+    auto slotId =
+        env->registerSlot(sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
     data->inputParamToSlotMap.emplace(paramId, slotId);
     return slotId;
 }
@@ -1208,12 +1221,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 tassert(7182002, "Expected DfsState to have at least 2 entries", dfs.size() >= 2);
 
                 auto parent = dfs[dfs.size() - 2].first;
-                auto getFieldExpr = makeFunction(
-                    "getField"_sd,
-                    parent->value.hasSlot()
-                        ? makeVariable(*parent->value.getSlot())
-                        : parent->value.extractExpr(state.slotVarMap, *state.data->env),
-                    makeConstant(node->name));
+                auto getFieldExpr =
+                    makeFunction("getField"_sd,
+                                 parent->value.hasSlot()
+                                     ? makeVariable(*parent->value.getSlot())
+                                     : parent->value.extractExpr(state.slotVarMap, *state.env),
+                                 makeConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;

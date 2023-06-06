@@ -87,17 +87,17 @@ struct SerializationOptions {
 
     SerializationOptions(ExplainOptions::Verbosity verbosity_) : verbosity(verbosity_) {}
 
-    SerializationOptions(std::function<std::string(StringData)> identifierHmacPolicy_,
+    SerializationOptions(std::function<std::string(StringData)> transformIdentifiersCallback_,
                          boost::optional<StringData> replacementForLiteralArgs_)
         : replacementForLiteralArgs(replacementForLiteralArgs_),
-          applyHmacToIdentifiers(identifierHmacPolicy_),
-          identifierHmacPolicy(identifierHmacPolicy_) {}
+          transformIdentifiers(transformIdentifiersCallback_),
+          transformIdentifiersCallback(transformIdentifiersCallback_) {}
 
     SerializationOptions(std::function<std::string(StringData)> fieldNamesHmacPolicy_,
                          LiteralSerializationPolicy policy)
         : literalPolicy(policy),
-          applyHmacToIdentifiers(fieldNamesHmacPolicy_),
-          identifierHmacPolicy(fieldNamesHmacPolicy_) {
+          transformIdentifiers(fieldNamesHmacPolicy_),
+          transformIdentifiersCallback(fieldNamesHmacPolicy_) {
         // TODO SERVER-75400 Remove replacementForLiteralArgs
         if (policy == LiteralSerializationPolicy::kToDebugTypeString) {
             replacementForLiteralArgs = "?";
@@ -113,16 +113,17 @@ struct SerializationOptions {
 
     /**
      * Checks if this SerializationOptions represents the same options as another
-     * SerializationOptions. Note it cannot compare whether the two 'identifierHmacPolicy's are the
-     * same - the language purposefully leaves the comparison operator undefined.
+     * SerializationOptions. Note it cannot compare whether the two 'transformIdentifiersCallback's
+     * are the same - the language purposefully leaves the comparison operator undefined.
      */
     bool operator==(const SerializationOptions& other) const {
-        return this->applyHmacToIdentifiers == other.applyHmacToIdentifiers &&
+        return this->transformIdentifiers == other.transformIdentifiers &&
             this->includePath == other.includePath &&
             this->replacementForLiteralArgs == other.replacementForLiteralArgs &&
             // You cannot well determine std::function equivalence in C++, so this is the best we'll
             // do.
-            (this->identifierHmacPolicy == nullptr) == (other.identifierHmacPolicy == nullptr) &&
+            (this->transformIdentifiersCallback == nullptr) ==
+            (other.transformIdentifiersCallback == nullptr) &&
             this->literalPolicy == other.literalPolicy && this->verbosity == other.verbosity;
     }
 
@@ -130,20 +131,20 @@ struct SerializationOptions {
     // Note: serializeFieldPath/serializeFieldPathFromString should be used for field
     // names.
     std::string serializeIdentifier(StringData str) const {
-        if (applyHmacToIdentifiers) {
-            return identifierHmacPolicy(str);
+        if (transformIdentifiers) {
+            return transformIdentifiersCallback(str);
         }
         return str.toString();
     }
 
     std::string serializeFieldPath(FieldPath path) const {
-        if (applyHmacToIdentifiers) {
+        if (transformIdentifiers) {
             std::stringstream hmaced;
             for (size_t i = 0; i < path.getPathLength(); ++i) {
                 if (i > 0) {
                     hmaced << ".";
                 }
-                hmaced << identifierHmacPolicy(path.getFieldName(i));
+                hmaced << transformIdentifiersCallback(path.getFieldName(i));
             }
             return hmaced.str();
         }
@@ -238,7 +239,7 @@ struct SerializationOptions {
      * - If it is 'kToRepresentativeValue', it Returns an arbitrary value of the same type as the
      *   one given. For any number, this will be the number 1. For any boolean this will be true.
      *
-     *   TODO SERVER-XYZ If you need a different value to make sure it will parse, you should not
+     *   TODO SERVER-76330 If you need a different value to make sure it will parse, you should not
      *   use this API - but use serializeConstrainedLiteral() instead.
      */
     Value serializeLiteral(const BSONElement& e) const;
@@ -253,7 +254,7 @@ struct SerializationOptions {
     // expressions in {$and: [{a: {$gt: 3}}, {b: {$gt: 4}}]}. There the only literals are 3 and
     // 4, so the serialization expected would be {$and: [{a: {$gt: '?'}}, {b: {$lt: '?'}}]}.
     //
-    // TODO SERVER-XXX remove this option in favor of 'literalPolicy' below.
+    // TODO SERVER-75400 remove this option in favor of 'literalPolicy' below.
     boost::optional<StringData> replacementForLiteralArgs = boost::none;
 
     // 'literalPolicy' is an independent option to serialize in a general format with the aim of
@@ -266,11 +267,11 @@ struct SerializationOptions {
     // so the serialization expected would be {$and: [{a: {$gt: '?'}}, {b: {$lt: '?'}}]}.
     LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged;
 
-    // If true the caller must set identifierHmacPolicy. 'applyHmacToIdentifiers' if set along with
-    // a strategy the redaction strategy will be called on any personal identifiable information
-    // (e.g., field paths/names, collection names) encountered before serializing them.
-    bool applyHmacToIdentifiers = false;
-    std::function<std::string(StringData)> identifierHmacPolicy = defaultHmacStrategy;
+    // If true the caller must set transformIdentifiersCallback. 'transformIdentifiers' if set along
+    // with a strategy the redaction strategy will be called on any personal identifiable
+    // information (e.g., field paths/names, collection names) encountered before serializing them.
+    bool transformIdentifiers = false;
+    std::function<std::string(StringData)> transformIdentifiersCallback = defaultHmacStrategy;
 
     // If set, serializes without including the path. For example {a: {$gt: 2}} would serialize
     // as just {$gt: 2}.

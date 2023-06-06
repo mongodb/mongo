@@ -201,7 +201,7 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     }
 }
 
-void addCollectionExecutionStats(ExecutionStatsController stats, const ExecutionStats& collStats) {
+void addCollectionExecutionStats(ExecutionStatsController& stats, const ExecutionStats& collStats) {
     stats.incNumBucketInserts(collStats.numBucketInserts.load());
     stats.incNumBucketUpdates(collStats.numBucketUpdates.load());
     stats.incNumBucketsOpenedDueToMetadata(collStats.numBucketsOpenedDueToMetadata.load());

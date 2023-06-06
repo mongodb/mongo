@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/json.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/util/clock_source_mock.h"
@@ -49,7 +47,7 @@ class StorePossibleCursorTest : public ServiceContextTest {
 protected:
     StorePossibleCursorTest() : _manager(&_clockSourceMock) {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtx = makeOperationContext();
     }
 

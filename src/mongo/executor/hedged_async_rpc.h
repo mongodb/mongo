@@ -40,6 +40,7 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/executor/async_rpc_util.h"
 #include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/hedging_metrics.h"
 #include "mongo/executor/remote_command_response.h"
@@ -108,6 +109,24 @@ HedgingMetrics* getHedgingMetrics(ServiceContext* svcCtx) {
     return hm;
 }
 
+UUID getOrCreateOperationKey(bool isHedge, GenericArgs& genericArgs) {
+    // Check if the caller has provided an operation key, and hedging is not enabled. If so,
+    // we will attach the caller-provided key to all remote commands sent to resolved
+    // targets. Note that doing so may have side-effects if the operation is retried:
+    // cancelling the Nth attempt may impact the (N + 1)th attempt as they share `opKey`.
+    if (auto& opKey = genericArgs.stable.getClientOperationKey(); opKey && !isHedge) {
+        return *opKey;
+    }
+
+    // The caller has not provided an operation key or hedging is enabled, so we generate a
+    // new `clientOperationKey` for each attempt. The operationKey allows cancelling remote
+    // operations. A new one is generated here to ensure retry attempts are isolated:
+    // cancelling the Nth attempt does not impact the (N + 1)th attempt.
+    auto opKey = UUID::gen();
+    genericArgs.stable.setClientOperationKey(opKey);
+    return opKey;
+}
+
 /**
  * Schedules a remote `_killOperations` on `exec` (or `baton`) for all targets, aiming to kill any
  * operations identified by `opKey`.
@@ -134,6 +153,7 @@ void killOperations(ServiceContext* svcCtx,
             .getAsync([](Status) {});
     }
 }
+
 }  // namespace hedging_rpc_details
 
 /**
@@ -158,16 +178,11 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
     ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
     GenericArgs genericArgs = GenericArgs(),
-    BatonHandle baton = nullptr,
-    boost::optional<UUID> clientOperationKey = boost::none) {
+    BatonHandle baton = nullptr) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
     invariant(opCtx);
     auto svcCtx = opCtx->getServiceContext();
-
-    if (MONGO_unlikely(clientOperationKey && !genericArgs.stable.getClientOperationKey())) {
-        genericArgs.stable.setClientOperationKey(*clientOperationKey);
-    }
 
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
@@ -175,24 +190,8 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     auto proxyExec = std::make_shared<detail::ProxyingExecutor>(baton, exec);
     auto tryBody = [=, targeter = std::move(targeter)]() mutable {
         HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
-        auto operationKey = [&] {
-            // Check if the caller has provided an operation key, and hedging is not enabled. If so,
-            // we will attach the caller-provided key to all remote commands sent to resolved
-            // targets. Note that doing so may have side-effects if the operation is retried:
-            // cancelling the Nth attempt may impact the (N + 1)th attempt as they share `opKey`.
-            if (auto& opKey = genericArgs.stable.getClientOperationKey();
-                opKey && !opts.isHedgeEnabled) {
-                return *opKey;
-            }
-
-            // The caller has not provided an operation key or hedging is enabled, so we generate a
-            // new `clientOperationKey` for each attempt. The operationKey allows cancelling remote
-            // operations. A new one is generated here to ensure retry attempts are isolated:
-            // cancelling the Nth attempt does not impact the (N + 1)th attempt.
-            auto opKey = UUID::gen();
-            genericArgs.stable.setClientOperationKey(opKey);
-            return opKey;
-        }();
+        auto operationKey =
+            hedging_rpc_details::getOrCreateOperationKey(opts.isHedgeEnabled, genericArgs);
 
         return targeter->resolve(token)
             .thenRunOn(proxyExec)

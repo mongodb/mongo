@@ -56,10 +56,11 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
                                                            const UUID& collUUID) {
 
     const std::string oMessage = str::stream()
-        << "Refine shard key for collection " << collNss << " with " << shardKey.toString();
+        << "Refine shard key for collection " << NamespaceStringUtil::serialize(collNss) << " with "
+        << shardKey.toString();
 
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("refineCollectionShardKey", collNss.ns());
+    cmdBuilder.append("refineCollectionShardKey", NamespaceStringUtil::serialize(collNss));
     cmdBuilder.append("shardKey", shardKey.toBSON());
     cmdBuilder.append("oldShardKey", oldShardKey.toBSON());
 

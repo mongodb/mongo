@@ -1,0 +1,38 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target="boolean_simplification",
+    source=[
+        "bitset_algebra.cpp",
+        "petrick.cpp",
+        "quine_mccluskey.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/mongohasher",
+    ],
+)
+
+env.CppUnitTest(
+    target="boolean_simplification_test",
+    source=[
+        "bitset_algebra_test.cpp",
+        "petrick_test.cpp",
+        "quine_mccluskey_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query_expressions",
+        "boolean_simplification",
+    ],
+)
+
+env.Benchmark(
+    target="quine_mccluskey_bm",
+    source=[
+        "quine_mccluskey_bm.cpp",
+    ],
+    LIBDEPS=[
+        "boolean_simplification",
+    ],
+)

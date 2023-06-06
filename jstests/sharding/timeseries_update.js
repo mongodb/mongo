@@ -679,21 +679,22 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
         pathToMetaFieldBeingUpdated: "",
     });
 
-    // Query for documents using $jsonSchema with a field that is not the metaField required.
-    testUpdate({
-        updates: [{
-            q: {"$jsonSchema": {"required": [metaField, timeField]}},
-            u: {$set: {[metaField]: "a"}},
-            multi: true
-        }],
-    },
-               expectFailedUpdate([doc1, doc2, doc3]));
-
-    const nestedMetaObj = {_id: 6, [timeField]: dateTime, [metaField]: {[metaField]: "A", a: 1}};
-
-    // Query for documents using $jsonSchema with the metaField required and a required subfield of
-    // the metaField with the same name as the metaField.
     if (!arbitraryUpdatesEnabled) {
+        // Query for documents using $jsonSchema with a field that is not the metaField required.
+        testUpdate({
+            updates: [{
+                q: {"$jsonSchema": {"required": [metaField, timeField]}},
+                u: {$set: {[metaField]: "a"}},
+                multi: true
+            }],
+        },
+                   expectFailedUpdate([doc1, doc2, doc3]));
+
+        const nestedMetaObj =
+            {_id: 6, [timeField]: dateTime, [metaField]: {[metaField]: "A", a: 1}};
+
+        // Query for documents using $jsonSchema with the metaField required and a required subfield
+        // of the metaField with the same name as the metaField.
         testUpdate({
             initialDocList: [doc1, nestedMetaObj],
             updates: [{
@@ -710,23 +711,23 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             n: 1,
             pathToMetaFieldBeingUpdated: "",
         });
-    }
 
-    // Query for documents using $jsonSchema with the metaField required and an optional field that
-    // is not the metaField.
-    testUpdate({
-        updates: [{
-            q: {
-                "$jsonSchema": {
-                    "required": [metaField],
-                    "properties": {"measurement": {description: "can be any value"}}
-                }
-            },
-            u: {$set: {[metaField]: "a"}},
-            multi: true
-        }]
-    },
-               expectFailedUpdate([doc1, nestedMetaObj]));
+        // Query for documents using $jsonSchema with the metaField required and an optional field
+        // that is not the metaField.
+        testUpdate({
+            updates: [{
+                q: {
+                    "$jsonSchema": {
+                        "required": [metaField],
+                        "properties": {"measurement": {description: "can be any value"}}
+                    }
+                },
+                u: {$set: {[metaField]: "a"}},
+                multi: true
+            }]
+        },
+                   expectFailedUpdate([doc1, nestedMetaObj]));
+    }
 
     // Query for documents on the metaField with the metaField nested within nested operators.
     testUpdate({

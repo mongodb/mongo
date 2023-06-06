@@ -193,7 +193,7 @@ TEST_F(SampleBasics, RedactsCorrectly) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$sample": {
-                "size": "?"
+                "size": "?number"
             }
         })",
         redact(*sample()));
@@ -415,13 +415,9 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
 
 TEST_F(SampleFromRandomCursorBasics, RedactsCorrectly) {
     createSample(2);
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = "?"_sd;
-    std::vector<Value> vec;
-    sample()->serializeToArray(vec, opts);
     ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$sampleFromRandomCursor: {size: \"?\"}}",
-        vec[0]);
+        "{ $sampleFromRandomCursor: { size: \"?number\" } }",
+        redact(*sample()));
 }
 
 }  // namespace

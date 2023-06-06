@@ -114,15 +114,15 @@ track_ops(TINFO *tinfo)
             last_cur = cur_ts;
         }
 
-        testutil_check(__wt_snprintf(ts_msg, sizeof(ts_msg),
+        testutil_snprintf(ts_msg, sizeof(ts_msg),
           " old%s"
           "stb%s%s"
           "ts%s%s",
           track_ts_dots(old_dot_cnt), track_ts_diff(old_ts, stable_ts),
           track_ts_dots(stable_dot_cnt), track_ts_diff(stable_ts, cur_ts),
-          track_ts_dots(cur_dot_cnt)));
+          track_ts_dots(cur_dot_cnt));
     }
-    testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len,
+    testutil_snprintf_len_set(msg, sizeof(msg), &len,
       "ops: "
       "S %" PRIu64
       "%s, "
@@ -141,7 +141,7 @@ track_ops(TINFO *tinfo)
       tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove, tinfo->remove > M(9) ? "M" : "",
       tinfo->modify > M(9) ? tinfo->modify / M(1) : tinfo->modify, tinfo->modify > M(9) ? "M" : "",
       tinfo->truncate > M(9) ? tinfo->truncate / M(1) : tinfo->truncate,
-      tinfo->truncate > M(9) ? "M" : "", ts_msg));
+      tinfo->truncate > M(9) ? "M" : "", ts_msg);
 
     track_write(msg, len);
 }
@@ -160,9 +160,9 @@ track(const char *tag, uint64_t cnt)
         return;
 
     if (cnt == 0)
-        testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len, "%s", tag));
+        testutil_snprintf_len_set(msg, sizeof(msg), &len, "%s", tag);
     else
-        testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len, "%s: %" PRIu64, tag, cnt));
+        testutil_snprintf_len_set(msg, sizeof(msg), &len, "%s: %" PRIu64, tag, cnt);
 
     track_write(msg, len);
 }
@@ -184,25 +184,25 @@ path_setup(const char *home)
     name = "WiredTiger.backup";
     len = strlen(g.home) + strlen(name) + 2;
     g.home_backup = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_backup, len, "%s/%s", g.home, name));
+    testutil_snprintf(g.home_backup, len, "%s/%s", g.home, name);
 
     /* Configuration file. */
     name = "CONFIG";
     len = strlen(g.home) + strlen(name) + 2;
     g.home_config = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_config, len, "%s/%s", g.home, name));
+    testutil_snprintf(g.home_config, len, "%s/%s", g.home, name);
 
     /* Key length configuration file. */
     name = "CONFIG.keylen";
     len = strlen(g.home) + strlen(name) + 2;
     g.home_key = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_key, len, "%s/%s", g.home, name));
+    testutil_snprintf(g.home_key, len, "%s/%s", g.home, name);
 
     /* Statistics file. */
     name = "OPERATIONS.stats";
     len = strlen(g.home) + strlen(name) + 2;
     g.home_stats = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_stats, len, "%s/%s", g.home, name));
+    testutil_snprintf(g.home_stats, len, "%s/%s", g.home, name);
 }
 
 /*
@@ -270,7 +270,7 @@ cursor_dump_page(WT_CURSOR *cursor, const char *tag)
     static int next;
     char buf[MAX_FORMAT_PATH];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/FAIL.pagedump.%d", g.home, ++next));
+    testutil_snprintf(buf, sizeof(buf), "%s/FAIL.pagedump.%d", g.home, ++next);
 
     fprintf(stderr, "%s: dumping to %s\n", tag, buf);
     trace_msg(CUR2S(cursor), "%s: dumping to %s", tag, buf);
@@ -302,7 +302,7 @@ table_dump_page(
     char cfg[256];
 
     if (checkpoint != NULL)
-        testutil_check(__wt_snprintf(cfg, sizeof(cfg), "checkpoint=%s", checkpoint));
+        testutil_snprintf(cfg, sizeof(cfg), "checkpoint=%s", checkpoint);
 
     wt_wrap_open_cursor(session, tbl->uri, checkpoint == NULL ? NULL : cfg, &cursor);
 

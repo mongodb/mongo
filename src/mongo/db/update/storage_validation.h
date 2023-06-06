@@ -73,12 +73,16 @@ void scanDocument(const mutablebson::Document& doc,
  *
  * 'containsDotsAndDollarsField' is set to true if there exists any field name containing '.'/'$'
  * during validation.
+ *
+ * 'isEmbeddedInIdField' is set to true if the element is embedded inside an _id field. This allows
+ * to reject $-prefixed fields at all levels under an _id field.
  */
 void scanDocument(mutablebson::ConstElement elem,
                   bool deep,
                   std::uint32_t recursionLevel,
                   bool allowTopLevelDollarPrefixes,
                   bool shouldValidate,
+                  bool isEmbeddedInIdField,
                   bool* containsDotsAndDollarsField);
 
 }  // namespace storage_validation

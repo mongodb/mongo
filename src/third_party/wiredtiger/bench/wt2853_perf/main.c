@@ -104,7 +104,7 @@ main(int argc, char *argv[])
         testutil_die(ENOTSUP, "Fixed-length column store not supported");
     sharedopts->usecolumns = (opts->table_type == TABLE_COL);
 
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
     testutil_progress(opts, "start");
 
     testutil_check(wiredtiger_open(opts->home, NULL,
@@ -118,20 +118,17 @@ main(int argc, char *argv[])
      * Note: id is repeated as id2. This makes it easier to identify the primary key in dumps of the
      * index files.
      */
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+    testutil_snprintf(tableconf, sizeof(tableconf),
       "key_format=%s,value_format=iiSii,columns=(id,post,bal,extra,flag,id2)",
-      sharedopts->usecolumns ? "r" : "i"));
+      sharedopts->usecolumns ? "r" : "i");
     testutil_check(session->create(session, opts->uri, tableconf));
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
     tablename++;
-    testutil_check(
-      __wt_snprintf(sharedopts->posturi, sizeof(sharedopts->posturi), "index:%s:post", tablename));
-    testutil_check(
-      __wt_snprintf(sharedopts->baluri, sizeof(sharedopts->baluri), "index:%s:bal", tablename));
-    testutil_check(
-      __wt_snprintf(sharedopts->flaguri, sizeof(sharedopts->flaguri), "index:%s:flag", tablename));
+    testutil_snprintf(sharedopts->posturi, sizeof(sharedopts->posturi), "index:%s:post", tablename);
+    testutil_snprintf(sharedopts->baluri, sizeof(sharedopts->baluri), "index:%s:bal", tablename);
+    testutil_snprintf(sharedopts->flaguri, sizeof(sharedopts->flaguri), "index:%s:flag", tablename);
 
     testutil_check(session->create(session, sharedopts->posturi, "columns=(post)"));
     testutil_check(session->create(session, sharedopts->baluri, "columns=(bal)"));
@@ -382,8 +379,7 @@ create_perf_json(bool usecolumns, int njoins, int nwarnings)
 
     fp = NULL;
 
-    testutil_check(
-      __wt_snprintf(testname, sizeof(testname), "wt2853_perf_%s", usecolumns ? "col" : "row"));
+    testutil_snprintf(testname, sizeof(testname), "wt2853_perf_%s", usecolumns ? "col" : "row");
     testutil_assert_errno((fp = fopen("wt2853_perf.json", "w")) != NULL);
     testutil_assert(fprintf(fp,
                       "[{\"info\":{\"test_name\": \"%s\"},"

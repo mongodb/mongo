@@ -69,7 +69,8 @@ const char* DocumentSourceMatch::getSourceName() const {
 }
 
 Value DocumentSourceMatch::serialize(SerializationOptions opts) const {
-    if (opts.verbosity || opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.verbosity || opts.transformIdentifiers ||
+        opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
         return Value(DOC(getSourceName() << Document(_expression->serialize(opts))));
     }
     return Value(DOC(getSourceName() << Document(getQuery())));
@@ -503,7 +504,7 @@ DocumentSourceMatch::splitMatchByModifiedFields(
             // This stage modifies all paths, so cannot be swapped with a $match at all.
             return {nullptr, match};
         case DocumentSource::GetModPathsReturn::Type::kFiniteSet:
-            modifiedPaths = std::move(modifiedPathsRet.paths);
+            modifiedPaths = modifiedPathsRet.paths;
             break;
         case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
             DepsTracker depsTracker;

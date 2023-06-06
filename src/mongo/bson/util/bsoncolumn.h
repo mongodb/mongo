@@ -226,6 +226,8 @@ public:
          * Internal state for interleaved decoding mode (decoding of objects/arrays)
          */
         struct Interleaved {
+            Interleaved(BSONObj refObj, BSONType referenceObjType, bool interleavedArrays);
+
             std::vector<DecodingState> states;
 
             // Interleaving reference object read when encountered the interleaving start control

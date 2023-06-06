@@ -48,12 +48,15 @@
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(pauseShardingDDLCoordinatorServiceOnRecovery);
 
 std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
     ShardingDDLCoordinatorService* service, BSONObj initialState) {
@@ -136,6 +139,8 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
         }
     }
 
+    pauseShardingDDLCoordinatorServiceOnRecovery.pauseWhileSet();
+
     coord->getConstructionCompletionFuture()
         .thenRunOn(getInstanceCleanupExecutor())
         .getAsync([this](auto status) {
@@ -145,8 +150,8 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
             }
             invariant(_numCoordinatorsToWait > 0);
             if (--_numCoordinatorsToWait == 0) {
-                _state = State::kRecovered;
-                _recoveredOrCoordinatorCompletedCV.notify_all();
+                auto opCtx = cc().makeOperationContext();
+                _transitionToRecovered(lg, opCtx.get());
             }
         });
 
@@ -194,6 +199,7 @@ void ShardingDDLCoordinatorService::_afterStepDown() {
     stdx::lock_guard lg(_mutex);
     _state = State::kPaused;
     _numCoordinatorsToWait = 0;
+    DDLLockManager::get(cc().getServiceContext())->setState(DDLLockManager::State::kPaused);
 }
 
 size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* opCtx) {
@@ -236,13 +242,14 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
                       "Found Sharding DDL Coordinators to rebuild",
                       "numCoordinators"_attr = numCoordinators);
             }
-            stdx::lock_guard lg(_mutex);
             if (numCoordinators > 0) {
+                stdx::lock_guard lg(_mutex);
                 _state = State::kRecovering;
                 _numCoordinatorsToWait = numCoordinators;
             } else {
-                _state = State::kRecovered;
-                _recoveredOrCoordinatorCompletedCV.notify_all();
+                pauseShardingDDLCoordinatorServiceOnRecovery.pauseWhileSet();
+                stdx::lock_guard lg(_mutex);
+                _transitionToRecovered(lg, opCtx.get());
             }
         })
         .onError([this](const Status& status) {
@@ -298,6 +305,12 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
 std::shared_ptr<executor::TaskExecutor> ShardingDDLCoordinatorService::getInstanceCleanupExecutor()
     const {
     return PrimaryOnlyService::getInstanceCleanupExecutor();
+}
+
+void ShardingDDLCoordinatorService::_transitionToRecovered(WithLock lk, OperationContext* opCtx) {
+    _state = State::kRecovered;
+    DDLLockManager::get(opCtx)->setState(DDLLockManager::State::kPrimaryAndRecovered);
+    _recoveredOrCoordinatorCompletedCV.notify_all();
 }
 
 }  // namespace mongo

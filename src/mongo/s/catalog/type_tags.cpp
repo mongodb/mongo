@@ -136,7 +136,7 @@ BSONObj TagsType::toBSON() const {
     BSONObjBuilder builder;
 
     if (_ns)
-        builder.append(ns.name(), getNS().ns());
+        builder.append(ns.name(), NamespaceStringUtil::serialize(getNS()));
     if (_tag)
         builder.append(tag.name(), getTag());
     if (_minKey)

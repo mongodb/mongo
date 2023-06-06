@@ -836,7 +836,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
 
     // We're tagging the tree here, so it shouldn't have
     // any tags hanging off yet.
-    verify(nullptr == filter->getTag());
+    MONGO_verify(nullptr == filter->getTag());
 
     if (filter->numChildren() != indexTree->children.size()) {
         str::stream ss;
@@ -1635,7 +1635,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     invariant(out.size() > 0);
     return {std::move(out)};
-}
+}  // QueryPlanner::plan
 
 /**
  * The 'query' might contain parts of aggregation pipeline. For now, we plan those separately and

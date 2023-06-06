@@ -110,7 +110,7 @@ std::string decode(StringData s) {
 }  // namespace hexblob
 
 std::string hexdump(StringData data) {
-    verify(data.size() < 1000000);
+    MONGO_verify(data.size() < 1000000);
     std::string out;
     out.reserve(3 * data.size());
     char sep = 0;

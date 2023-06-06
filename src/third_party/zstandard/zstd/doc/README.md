@@ -5,8 +5,9 @@ This directory contains material defining the Zstandard format,
 as well as detailed instructions to use `zstd` library.
 
 __`zstd_manual.html`__ : Documentation of `zstd.h` API, in html format.
-Click on this link: [http://zstd.net/zstd_manual.html](http://zstd.net/zstd_manual.html)
-to display documentation of latest release in readable format within a browser.
+Unfortunately, Github doesn't display `html` files in parsed format, just as source code.
+For a readable display of html API documentation of latest release,
+use this link: [https://raw.githack.com/facebook/zstd/release/doc/zstd_manual.html](https://raw.githack.com/facebook/zstd/release/doc/zstd_manual.html) .
 
 __`zstd_compression_format.md`__ : This document defines the Zstandard compression format.
 Compliant decoders must adhere to this document,

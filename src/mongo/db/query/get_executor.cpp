@@ -1307,7 +1307,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     // we will need to do the runtime planning to check if the cached plan still
     // performs efficiently, or requires re-planning.
     tassert(6693503, "PlanStageData must be present", planStageData);
-    const bool hasHashLookup = !planStageData->foreignHashJoinCollections.empty();
+    const bool hasHashLookup = !planStageData->staticData->foreignHashJoinCollections.empty();
     if (decisionWorks || hasHashLookup) {
         QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;
@@ -1418,7 +1418,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(yieldPolicy),
                                        planningResult->isRecoveredFromPlanCache(),
                                        false /* generatedByBonsai */);
-}
+}  // getSlotBasedExecutor
 
 /**
  * Checks if the result of query planning is SBE compatible. If any of the query solutions in
@@ -2134,6 +2134,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 coll,
                 BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
                 parsedUpdate->releaseResidualExpr(),
+                parsedUpdate->releaseOriginalExpr(),
                 *request);
         } else {
             root = std::make_unique<TimeseriesModifyStage>(
@@ -2143,7 +2144,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 std::move(root),
                 coll,
                 BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-                parsedUpdate->releaseResidualExpr());
+                parsedUpdate->releaseResidualExpr(),
+                parsedUpdate->releaseOriginalExpr());
         }
     } else if (isUpsert) {
         root = std::make_unique<UpsertStage>(

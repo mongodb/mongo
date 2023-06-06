@@ -109,22 +109,22 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
  * applicable). Should be called in a writeConflictRetry loop.
  */
 UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
-                                      const NamespaceString& nsString,
+                                      const NamespaceString& nss,
                                       CurOp* curOp,
                                       OpDebug* opDebug,
                                       bool inTransaction,
                                       bool remove,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
-                                      const UpdateRequest* updateRequest);
+                                      const UpdateRequest& updateRequest);
 
 /**
  * Executes a findAndModify with remove:true, the returned document is placed into docFound (if
  * applicable). Should be called in a writeConflictRetry loop.
  */
 long long writeConflictRetryRemove(OperationContext* opCtx,
-                                   const NamespaceString& nsString,
-                                   DeleteRequest* deleteRequest,
+                                   const NamespaceString& nss,
+                                   const DeleteRequest& deleteRequest,
                                    CurOp* curOp,
                                    OpDebug* opDebug,
                                    bool inTransaction,

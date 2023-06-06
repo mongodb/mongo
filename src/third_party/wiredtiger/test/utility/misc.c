@@ -42,12 +42,6 @@ void (*custom_die)(void) = NULL;
 const char *progname = "program name not set";
 
 /*
- * Backup directory initialize command, remove and re-create the primary backup directory, plus a
- * copy we maintain for recovery testing.
- */
-#define HOME_BACKUP_INIT_CMD "rm -rf %s/BACKUP %s/BACKUP.copy && mkdir %s/BACKUP %s/BACKUP.copy "
-
-/*
  * testutil_die --
  *     Report an error and abort.
  */
@@ -123,38 +117,6 @@ testutil_work_dir_from_path(char *buffer, size_t len, const char *dir)
 }
 
 /*
- * testutil_clean_work_dir --
- *     Remove the work directory.
- */
-void
-testutil_clean_work_dir(const char *dir)
-{
-    size_t len;
-    int ret;
-    char *buf;
-
-#ifdef _WIN32
-    /* Additional bytes for the Windows rd command. */
-    len = 2 * strlen(dir) + strlen(RM_COMMAND) + strlen(DIR_EXISTS_COMMAND) + 4;
-    if ((buf = malloc(len)) == NULL)
-        testutil_die(ENOMEM, "Failed to allocate memory");
-
-    testutil_check(
-      __wt_snprintf(buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir, RM_COMMAND, dir));
-#else
-    len = strlen(dir) + strlen(RM_COMMAND) + 1;
-    if ((buf = malloc(len)) == NULL)
-        testutil_die(ENOMEM, "Failed to allocate memory");
-
-    testutil_check(__wt_snprintf(buf, len, "%s%s", RM_COMMAND, dir));
-#endif
-
-    if ((ret = system(buf)) != 0 && ret != ENOENT)
-        testutil_die(ret, "%s", buf);
-    free(buf);
-}
-
-/*
  * testutil_deduce_build_dir --
  *     Deduce the build directory.
  */
@@ -172,9 +134,9 @@ testutil_deduce_build_dir(TEST_OPTS *opts)
 
     /* This condition is when the full path name is used for argv0. */
     if (opts->argv0[0] == '/')
-        testutil_check(__wt_snprintf(path, sizeof(path), "%s", opts->argv0));
+        testutil_snprintf(path, sizeof(path), "%s", opts->argv0);
     else
-        testutil_check(__wt_snprintf(path, sizeof(path), "%s/%s", pwd, opts->argv0));
+        testutil_snprintf(path, sizeof(path), "%s/%s", pwd, opts->argv0);
 
     token = strrchr(path, '/');
     while (strlen(path) > 0) {
@@ -182,7 +144,7 @@ testutil_deduce_build_dir(TEST_OPTS *opts)
         index = (int)(token - path);
         path[index] = '\0';
 
-        testutil_check(__wt_snprintf(stat_path, sizeof(stat_path), "%s/wt", path));
+        testutil_snprintf(stat_path, sizeof(stat_path), "%s/wt", path);
 
         if (stat(stat_path, &stats) == 0) {
             opts->build_dir = dstrdup(path);
@@ -214,29 +176,6 @@ testutil_build_dir(TEST_OPTS *opts, char *buf, int size)
 }
 
 /*
- * testutil_make_work_dir --
- *     Delete the existing work directory, then create a new one.
- */
-void
-testutil_make_work_dir(const char *dir)
-{
-    size_t len;
-    char *buf;
-
-    testutil_clean_work_dir(dir);
-
-    /* Additional bytes for the mkdir command */
-    len = strlen(dir) + strlen(MKDIR_COMMAND) + 1;
-    if ((buf = malloc(len)) == NULL)
-        testutil_die(ENOMEM, "Failed to allocate memory");
-
-    /* mkdir shares syntax between Windows and Linux */
-    testutil_check(__wt_snprintf(buf, len, "%s%s", MKDIR_COMMAND, dir));
-    testutil_check(system(buf));
-    free(buf);
-}
-
-/*
  * testutil_progress --
  *     Print a progress message to the progress file.
  */
@@ -265,11 +204,15 @@ testutil_cleanup(TEST_OPTS *opts)
     if (opts->conn != NULL)
         testutil_check(opts->conn->close(opts->conn, NULL));
 
-    if (!opts->preserve)
-        testutil_clean_work_dir(opts->home);
-
+    /*
+     * Make sure to close the progress file before we attempt to delete it; otherwise we will get an
+     * error on Windows.
+     */
     if (opts->progress_fp != NULL)
         testutil_assert(fclose(opts->progress_fp) == 0);
+
+    if (!opts->preserve)
+        testutil_remove(opts->home);
 
     free(opts->uri);
     free(opts->progress_file_name);
@@ -286,13 +229,15 @@ testutil_cleanup(TEST_OPTS *opts)
 void
 testutil_copy_data(const char *dir)
 {
-    int status;
-    char buf[512];
+    WT_FILE_COPY_OPTS opts;
+    char save_dir[512];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && cp -rp * ../%s.SAVE", dir, dir, dir));
-    if ((status = system(buf)) < 0)
-        testutil_die(status, "system: %s", buf);
+    memset(&opts, 0, sizeof(opts));
+    opts.preserve = true;
+
+    testutil_snprintf(save_dir, sizeof(save_dir), ".." DIR_DELIM_STR "%s.SAVE", dir);
+    testutil_remove(save_dir);
+    testutil_copy_ext(".", save_dir, &opts);
 }
 
 /*
@@ -303,49 +248,17 @@ testutil_copy_data(const char *dir)
 void
 testutil_copy_data_opt(const char *dir, const char *readonly_prefix)
 {
-#if defined(__linux__)
-    struct dirent *e;
-    char to_copy[2048];
-    char to_link[2048];
-    DIR *d;
+    WT_FILE_COPY_OPTS opts;
+    char save_dir[512];
 
-    to_copy[0] = '\0';
-    to_link[0] = '\0';
+    memset(&opts, 0, sizeof(opts));
+    opts.link = true;
+    opts.link_if_prefix = readonly_prefix;
+    opts.preserve = true;
 
-    testutil_system("rm -rf ../%s.SAVE && mkdir ../%s.SAVE", dir, dir);
-
-    testutil_assert_errno((d = opendir(".")) != NULL);
-    while ((e = readdir(d)) != NULL) {
-        if (e->d_name[0] == '.')
-            continue;
-
-        if (readonly_prefix != NULL &&
-          strncmp(e->d_name, readonly_prefix, strlen(readonly_prefix)) == 0) {
-            if (strlen(to_link) + strlen(e->d_name) + 2 >= sizeof(to_link)) {
-                testutil_system("cp -rp -l %s ../%s.SAVE", to_link, dir);
-                to_link[0] = '\0';
-            }
-            testutil_check(__wt_strcat(to_link, sizeof(to_link), " "));
-            testutil_check(__wt_strcat(to_link, sizeof(to_link), e->d_name));
-        } else {
-            if (strlen(to_copy) + strlen(e->d_name) + 2 >= sizeof(to_copy)) {
-                testutil_system("cp -rp %s ../%s.SAVE", to_copy, dir);
-                to_copy[0] = '\0';
-            }
-            testutil_check(__wt_strcat(to_copy, sizeof(to_copy), " "));
-            testutil_check(__wt_strcat(to_copy, sizeof(to_copy), e->d_name));
-        }
-    }
-    testutil_check(closedir(d));
-
-    if (to_copy[0] != '\0')
-        testutil_system("cp -rp %s ../%s.SAVE", to_copy, dir);
-    if (to_link[0] != '\0')
-        testutil_system("cp -rp -l %s ../%s.SAVE", to_link, dir);
-#else
-    WT_UNUSED(readonly_prefix);
-    testutil_copy_data(dir);
-#endif
+    testutil_snprintf(save_dir, sizeof(save_dir), ".." DIR_DELIM_STR "%s.SAVE", dir);
+    testutil_remove(save_dir);
+    testutil_copy_ext(".", save_dir, &opts);
 }
 
 /*
@@ -355,18 +268,19 @@ testutil_copy_data_opt(const char *dir, const char *readonly_prefix)
 void
 testutil_clean_test_artifacts(const char *dir)
 {
-    int status;
     char buf[512];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ../%s.SAVE; "
-      "rm -rf ../%s.CHECK; "
-      "rm -rf ../%s.DEBUG; "
-      "rm -rf ../%s.BACKUP; ",
-      dir, dir, dir, dir));
+    testutil_snprintf(buf, sizeof(buf), ".." DIR_DELIM_STR "%s.SAVE", dir);
+    testutil_remove(buf);
 
-    if ((status = system(buf)) < 0)
-        testutil_die(status, "system: %s", buf);
+    testutil_snprintf(buf, sizeof(buf), ".." DIR_DELIM_STR "%s.CHECK", dir);
+    testutil_remove(buf);
+
+    testutil_snprintf(buf, sizeof(buf), ".." DIR_DELIM_STR "%s.DEBUG", dir);
+    testutil_remove(buf);
+
+    testutil_snprintf(buf, sizeof(buf), ".." DIR_DELIM_STR "%s.BACKUP", dir);
+    testutil_remove(buf);
 }
 
 /*
@@ -376,14 +290,15 @@ testutil_clean_test_artifacts(const char *dir)
 void
 testutil_create_backup_directory(const char *home)
 {
-    size_t len;
-    char *cmd;
+    char buf[512];
 
-    len = strlen(home) * 4 + strlen(HOME_BACKUP_INIT_CMD) + 1;
-    cmd = dmalloc(len);
-    testutil_check(__wt_snprintf(cmd, len, HOME_BACKUP_INIT_CMD, home, home, home, home));
-    testutil_checkfmt(system(cmd), "%s", "backup directory creation failed");
-    free(cmd);
+    testutil_snprintf(buf, sizeof(buf), "%s" DIR_DELIM_STR "BACKUP", home);
+    testutil_remove(buf);
+    testutil_mkdir(buf);
+
+    testutil_snprintf(buf, sizeof(buf), "%s" DIR_DELIM_STR "BACKUP.copy", home);
+    testutil_remove(buf);
+    testutil_mkdir(buf);
 }
 
 /*
@@ -438,11 +353,11 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
 
     /* Go through each id and open a backup cursor on it to test incremental values. */
     for (j = 0; j < i; ++j) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "incremental=(src_id=%s)", id[j]));
+        testutil_snprintf(buf, sizeof(buf), "incremental=(src_id=%s)", id[j]);
         testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
         while ((ret = cursor->next(cursor)) == 0) {
             testutil_check(cursor->get_key(cursor, &filename));
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename));
+            testutil_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
             testutil_check(session->open_cursor(session, NULL, cursor, buf, &file_cursor));
             prev_offset = 0;
             while ((ret = file_cursor->next(file_cursor)) == 0) {
@@ -450,7 +365,7 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
                 /* We only want to check ranges for files. So if it is a full file copy, ignore. */
                 if (type != WT_BACKUP_RANGE)
                     break;
-                testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", backup, filename));
+                testutil_snprintf(buf, sizeof(buf), "%s/%s", backup, filename);
                 ret = stat(buf, &sb);
                 /*
                  * The file may not exist in the backup directory. If the stat call doesn't succeed
@@ -467,9 +382,9 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
                 if (offset > prev_offset) {
                     /* Compare the unchanged chunk. */
                     cmp_size = offset - prev_offset;
-                    testutil_check(__wt_snprintf(buf, sizeof(buf),
+                    testutil_snprintf(buf, sizeof(buf),
                       "cmp -n %" PRIu64 " %s/%s %s/%s %" PRIu64 " %" PRIu64, cmp_size, home,
-                      filename, backup, filename, prev_offset, prev_offset));
+                      filename, backup, filename, prev_offset, prev_offset);
                     status = system(buf);
                     if (status != 0)
                         fprintf(stderr, "FAIL: status %d ID %s from cmd: %s\n", status, id[j], buf);
@@ -499,7 +414,7 @@ testutil_copy_file(WT_SESSION *session, const char *name)
 
     len = strlen("BACKUP") + strlen(name) + 10;
     first = dmalloc(len);
-    testutil_check(__wt_snprintf(first, len, "BACKUP/%s", name));
+    testutil_snprintf(first, len, "BACKUP/%s", name);
     testutil_check(__wt_copy_and_sync(session, name, first));
 
     /*
@@ -507,7 +422,7 @@ testutil_copy_file(WT_SESSION *session, const char *name)
      */
     len = strlen("BACKUP.copy") + strlen(name) + 10;
     second = dmalloc(len);
-    testutil_check(__wt_snprintf(second, len, "BACKUP.copy/%s", name));
+    testutil_snprintf(second, len, "BACKUP.copy/%s", name);
     testutil_check(__wt_copy_and_sync(session, first, second));
 
     free(first);
@@ -594,9 +509,9 @@ testutil_wiredtiger_open(TEST_OPTS *opts, const char *home, const char *config,
     testutil_tiered_storage_configuration(
       opts, home, tiered_cfg, sizeof(tiered_cfg), tiered_ext_cfg, sizeof(tiered_ext_cfg));
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%s%s%s,extensions=[%s]",
-      config == NULL ? "" : config, (rerun ? TESTUTIL_ENV_CONFIG_REC : ""),
-      (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""), tiered_cfg, tiered_ext_cfg));
+    testutil_snprintf(buf, sizeof(buf), "%s%s%s%s,extensions=[%s]", config == NULL ? "" : config,
+      (rerun ? TESTUTIL_ENV_CONFIG_REC : ""), (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""),
+      tiered_cfg, tiered_ext_cfg);
 
     if (opts->verbose)
         printf("wiredtiger_open configuration: %s\n", buf);
@@ -758,7 +673,7 @@ example_setup(int argc, char *const *argv)
      */
     if ((home = getenv("WIREDTIGER_HOME")) == NULL)
         home = "WT_HOME";
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
     return (home);
 }
 
@@ -776,7 +691,7 @@ is_mounted(const char *mount_dir)
     struct stat sb, parent_sb;
     char buf[PATH_MAX];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", mount_dir));
+    testutil_snprintf(buf, sizeof(buf), "%s", mount_dir);
     testutil_assert_errno(stat(mount_dir, &sb) == 0);
     testutil_assert_errno(stat(dirname(buf), &parent_sb) == 0);
 

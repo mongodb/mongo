@@ -75,6 +75,7 @@ void ArrayCullingNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                      recursionLevel,
                                      false, /* allowTopLevelDollarPrefixedFields */
                                      false, /* should validate for storage */
+                                     false, /* isEmbeddedInIdField */
                                      containsDotsAndDollarsField);
 }
 

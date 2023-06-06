@@ -37,6 +37,19 @@
 
 namespace mongo {
 
+namespace FLEStatsUtil {
+static void accumulateStats(ECStats& left, const ECStats& right) {
+    left.setRead(left.getRead() + right.getRead());
+    left.setInserted(left.getInserted() + right.getInserted());
+    left.setUpdated(left.getUpdated() + right.getUpdated());
+    left.setDeleted(left.getDeleted() + right.getDeleted());
+}
+static void accumulateStats(ECOCStats& left, const ECOCStats& right) {
+    left.setRead(left.getRead() + right.getRead());
+    left.setDeleted(left.getDeleted() + right.getDeleted());
+}
+}  // namespace FLEStatsUtil
+
 /**
  * Tracks and reports statistics about the server-side Queryable Encryption integration.
  */
@@ -98,30 +111,18 @@ public:
     void updateCompactionStats(const CompactStats& stats) {
         stdx::lock_guard<Mutex> lock(_compactMutex);
         _hasStats.store(true);
-        accumulateStats(_compactStats.getEsc(), stats.getEsc());
-        accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
+        FLEStatsUtil::accumulateStats(_compactStats.getEsc(), stats.getEsc());
+        FLEStatsUtil::accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
     }
 
     void updateCleanupStats(const CleanupStats& stats) {
         stdx::lock_guard<Mutex> lock(_cleanupMutex);
         _hasStats.store(true);
-        accumulateStats(_cleanupStats.getEsc(), stats.getEsc());
-        accumulateStats(_cleanupStats.getEcoc(), stats.getEcoc());
+        FLEStatsUtil::accumulateStats(_cleanupStats.getEsc(), stats.getEsc());
+        FLEStatsUtil::accumulateStats(_cleanupStats.getEcoc(), stats.getEcoc());
     }
 
 private:
-    static void accumulateStats(ECStats& left, const ECStats& right) {
-        left.setRead(left.getRead() + right.getRead());
-        left.setInserted(left.getInserted() + right.getInserted());
-        left.setUpdated(left.getUpdated() + right.getUpdated());
-        left.setDeleted(left.getDeleted() + right.getDeleted());
-    }
-
-    static void accumulateStats(ECOCStats& left, const ECOCStats& right) {
-        left.setRead(left.getRead() + right.getRead());
-        left.setDeleted(left.getDeleted() + right.getDeleted());
-    }
-
     TickSource* _tickSource;
 
     AtomicWord<bool> _hasStats{false};

@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
@@ -41,16 +40,20 @@ namespace mongo::optimizer {
 class NodeSBE : public ServiceContextTest {};
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
+    const std::vector<BSONObj>& rawPipeline, NamespaceString nss, OperationContext* opCtx);
+std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const std::string& pipelineStr, NamespaceString nss, OperationContext* opCtx);
 
 using ABTSBE = sbe::EExpressionTestFixture;
 
 // Create a pipeline based on the given string, use a DocumentSourceQueue as input initialized with
 // the provided documents encoded as json strings, and return the results as BSON.
+
+ABT createValueArray(const std::vector<BSONObj>& inputObjs);
 std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                                const std::string& pipelineStr,
-                               const std::vector<std::string>& jsonVector);
+                               const std::vector<BSONObj>& inputObjs);
 std::vector<BSONObj> runPipeline(OperationContext* opCtx,
                                  const std::string& pipelineStr,
-                                 const std::vector<std::string>& jsonVector);
+                                 const std::vector<BSONObj>& inputObjs);
 }  // namespace mongo::optimizer

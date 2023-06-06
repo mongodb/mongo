@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"

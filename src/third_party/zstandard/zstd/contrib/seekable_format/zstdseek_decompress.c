@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-present, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -24,12 +24,63 @@
 #endif
 
 /* ************************************************************
+*  Detect POSIX version
+*  PLATFORM_POSIX_VERSION = 0 for non-Unix e.g. Windows
+*  PLATFORM_POSIX_VERSION = 1 for Unix-like but non-POSIX
+*  PLATFORM_POSIX_VERSION > 1 is equal to found _POSIX_VERSION
+*  Value of PLATFORM_POSIX_VERSION can be forced on command line
+***************************************************************/
+#ifndef PLATFORM_POSIX_VERSION
+
+#  if (defined(__APPLE__) && defined(__MACH__)) || defined(__SVR4) || defined(_AIX) || defined(__hpux) /* POSIX.1-2001 (SUSv3) conformant */ \
+     || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)  /* BSD distros */
+     /* exception rule : force posix version to 200112L,
+      * note: it's better to use unistd.h's _POSIX_VERSION whenever possible */
+#    define PLATFORM_POSIX_VERSION 200112L
+
+/* try to determine posix version through official unistd.h's _POSIX_VERSION (https://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html).
+ * note : there is no simple way to know in advance if <unistd.h> is present or not on target system,
+ * Posix specification mandates its presence and its content, but target system must respect this spec.
+ * It's necessary to _not_ #include <unistd.h> whenever target OS is not unix-like
+ * otherwise it will block preprocessing stage.
+ * The following list of build macros tries to "guess" if target OS is likely unix-like, and therefore can #include <unistd.h>
+ */
+#  elif !defined(_WIN32) \
+     && ( defined(__unix__) || defined(__unix) \
+       || defined(__midipix__) || defined(__VMS) || defined(__HAIKU__) )
+
+#    if defined(__linux__) || defined(__linux) || defined(__CYGWIN__)
+#      ifndef _POSIX_C_SOURCE
+#        define _POSIX_C_SOURCE 200809L  /* feature test macro : https://www.gnu.org/software/libc/manual/html_node/Feature-Test-Macros.html */
+#      endif
+#    endif
+#    include <unistd.h>  /* declares _POSIX_VERSION */
+#    if defined(_POSIX_VERSION)  /* POSIX compliant */
+#      define PLATFORM_POSIX_VERSION _POSIX_VERSION
+#    else
+#      define PLATFORM_POSIX_VERSION 1
+#    endif
+
+#    ifdef __UCLIBC__
+#     ifndef __USE_MISC
+#      define __USE_MISC /* enable st_mtim on uclibc */
+#     endif
+#    endif
+
+#  else  /* non-unix target platform (like Windows) */
+#    define PLATFORM_POSIX_VERSION 0
+#  endif
+
+#endif   /* PLATFORM_POSIX_VERSION */
+
+
+/* ************************************************************
 * Avoid fseek()'s 2GiB barrier with MSVC, macOS, *BSD, MinGW
 ***************************************************************/
 #if defined(_MSC_VER) && _MSC_VER >= 1400
 #   define LONG_SEEK _fseeki64
 #elif !defined(__64BIT__) && (PLATFORM_POSIX_VERSION >= 200112L) /* No point defining Large file for 64 bit */
-#  define LONG_SEEK fseeko
+#   define LONG_SEEK fseeko
 #elif defined(__MINGW32__) && !defined(__STRICT_ANSI__) && !defined(__NO_MINGW_LFS) && defined(__MSVCRT__)
 #   define LONG_SEEK fseeko64
 #elif defined(_WIN32) && !defined(__DJGPP__)
@@ -442,7 +493,7 @@ size_t ZSTD_seekable_decompress(ZSTD_seekable* zs, void* dst, size_t len, unsign
     size_t srcBytesRead = 0;
     do {
         /* check if we can continue from a previous decompress job */
-        if (targetFrame != zs->curFrame || offset != zs->decompressedOffset) {
+        if (targetFrame != zs->curFrame || offset < zs->decompressedOffset) {
             zs->decompressedOffset = zs->seekTable.entries[targetFrame].dOffset;
             zs->curFrame = targetFrame;
 
@@ -466,9 +517,9 @@ size_t ZSTD_seekable_decompress(ZSTD_seekable* zs, void* dst, size_t len, unsign
             size_t forwardProgress;
             if (zs->decompressedOffset < offset) {
                 /* dummy decompressions until we get to the target offset */
-                outTmp = (ZSTD_outBuffer){zs->outBuff, MIN(SEEKABLE_BUFF_SIZE, offset - zs->decompressedOffset), 0};
+                outTmp = (ZSTD_outBuffer){zs->outBuff, (size_t) (MIN(SEEKABLE_BUFF_SIZE, offset - zs->decompressedOffset)), 0};
             } else {
-                outTmp = (ZSTD_outBuffer){dst, len, zs->decompressedOffset - offset};
+                outTmp = (ZSTD_outBuffer){dst, len, (size_t) (zs->decompressedOffset - offset)};
             }
 
             prevOutPos = outTmp.pos;

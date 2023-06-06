@@ -261,6 +261,13 @@ std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
                                             const ShardKeyPattern& shardKey);
 
 /**
+ * Create an array of resharding zones from the existing collection. This is used for forced
+ * same-key resharding.
+ */
+std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext* opCtx,
+                                                               const NamespaceString& sourceNss);
+
+/**
  * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`
  * may be `Timestamp::isNull()` to fetch from the beginning of the oplog.
  */

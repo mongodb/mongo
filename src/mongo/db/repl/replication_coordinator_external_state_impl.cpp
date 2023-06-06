@@ -583,7 +583,7 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
                     return StatusWith<BSONObj>(
                         ErrorCodes::NoMatchingDocument,
                         "Did not find replica set configuration document in {}"_format(
-                            NamespaceString::kSystemReplSetNamespace.toString()));
+                            NamespaceString::kSystemReplSetNamespace.toStringForErrorMsg()));
                 }
                 return StatusWith<BSONObj>(config);
             });
@@ -662,7 +662,7 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
     if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
         return {ErrorCodes::CannotCreateCollection,
                 str::stream() << "Failed to create local last vote collection. Ns: "
-                              << NamespaceString::kLastVoteNamespace.toString()
+                              << NamespaceString::kLastVoteNamespace.toStringForErrorMsg()
                               << " Error: " << status.toString()};
     }
 
@@ -706,7 +706,7 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteD
                     return StatusWith<LastVote>(
                         ErrorCodes::NoMatchingDocument,
                         str::stream() << "Did not find replica set lastVote document in "
-                                      << NamespaceString::kLastVoteNamespace.toString());
+                                      << NamespaceString::kLastVoteNamespace.toStringForErrorMsg());
                 }
                 return LastVote::readFromLastVote(lastVoteObj);
             });

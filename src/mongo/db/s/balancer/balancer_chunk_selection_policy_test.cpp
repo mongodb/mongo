@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/commands.h"
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
+#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -53,7 +53,7 @@ protected:
     BalancerChunkSelectionTest()
         : _clusterStats(std::make_unique<ClusterStatisticsImpl>()),
           _chunkSelectionPolicy(
-              std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())) {}
+              std::make_unique<BalancerChunkSelectionPolicy>(_clusterStats.get())) {}
 
     /**
      * Generates a default chunks distribution across shards with the form:

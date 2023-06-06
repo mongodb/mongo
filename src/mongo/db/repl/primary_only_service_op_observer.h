@@ -47,9 +47,14 @@ public:
     explicit PrimaryOnlyServiceOpObserver(ServiceContext* serviceContext);
     ~PrimaryOnlyServiceOpObserver();
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {/*update=*/NamespaceFilter::kNone, /*delete=*/NamespaceFilter::kAll};
+    }
+
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
                        OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onDelete(OperationContext* opCtx,

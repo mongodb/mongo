@@ -30,9 +30,11 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include <memory>
 
 namespace mongo::query_stats {
 
@@ -59,24 +61,30 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
 
 protected:
-    RequestShapifier(OperationContext* opCtx,
-                     const boost::optional<std::string> applicationName = boost::none)
-        : _applicationName(applicationName) {
-        if (!_applicationName) {
-            if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-                _applicationName = metadata->getApplicationName().toString();
-            }
+    RequestShapifier(OperationContext* opCtx) {
+        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+            _clientMetaData = boost::make_optional(metadata->getDocument());
         }
+
         if (const auto& comment = opCtx->getComment()) {
             BSONObjBuilder commentBuilder;
             commentBuilder.append(*comment);
             _commentObj = commentBuilder.obj();
             _comment = _commentObj.firstElement();
         }
+
+        _apiParams = std::make_unique<APIParameters>(APIParameters::get(opCtx));
+
+        if (!ReadPreferenceSetting::get(opCtx).toInnerBSON().isEmpty() &&
+            !ReadPreferenceSetting::get(opCtx).usedDefaultReadPrefValue()) {
+            _readPreference = boost::make_optional(ReadPreferenceSetting::get(opCtx).toInnerBSON());
+        }
     }
 
-    boost::optional<std::string> _applicationName;
+    std::unique_ptr<APIParameters> _apiParams;
+    boost::optional<BSONObj> _clientMetaData = boost::none;
     BSONObj _commentObj;
     boost::optional<BSONElement> _comment = boost::none;
+    boost::optional<BSONObj> _readPreference = boost::none;
 };
 }  // namespace mongo::query_stats

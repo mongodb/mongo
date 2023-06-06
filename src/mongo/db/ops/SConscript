@@ -128,7 +128,7 @@ env.Library(
 
 env.Library(
     target='parsed_update',
-    source='parsed_update.cpp',
+    source='parsed_update_base.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/disk_use_options_idl',
         '$BUILD_DIR/mongo/db/shard_role_api',

@@ -74,13 +74,13 @@ public:
     BulkBuilder(ColumnStoreAccessMethod* index,
                 const IndexCatalogEntry* entry,
                 size_t maxMemoryUsageBytes,
-                StringData dbName);
+                const DatabaseName& dbName);
 
     BulkBuilder(ColumnStoreAccessMethod* index,
                 const IndexCatalogEntry* entry,
                 size_t maxMemoryUsageBytes,
                 const IndexStateInfo& stateInfo,
-                StringData dbName);
+                const DatabaseName& dbName);
 
     //
     // Generic APIs
@@ -134,12 +134,15 @@ private:
 ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index,
                                                   const IndexCatalogEntry* entry,
                                                   size_t maxMemoryUsageBytes,
-                                                  StringData dbName)
+                                                  const DatabaseName& dbName)
     : BulkBuilderCommon(0,
                         "Index Build: inserting keys from external sorter into columnstore index",
                         entry->descriptor()->indexName()),
       _columnsAccess(index),
-      _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats(), bulkBuilderTracker()) {
+      _sorter(maxMemoryUsageBytes,
+              DatabaseNameUtil::serializeForCatalog(dbName),
+              bulkBuilderFileStats(),
+              bulkBuilderTracker()) {
     countNewBuildInStats();
 }
 
@@ -147,13 +150,13 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
                                                   const IndexCatalogEntry* entry,
                                                   size_t maxMemoryUsageBytes,
                                                   const IndexStateInfo& stateInfo,
-                                                  StringData dbName)
+                                                  const DatabaseName& dbName)
     : BulkBuilderCommon(stateInfo.getNumKeys().value_or(0),
                         "Index Build: inserting keys from external sorter into columnstore index",
                         entry->descriptor()->indexName()),
       _columnsAccess(index),
       _sorter(maxMemoryUsageBytes,
-              dbName,
+              DatabaseNameUtil::serializeForCatalog(dbName),
               bulkBuilderFileStats(),
               stateInfo.getFileName()->toString(),
               *stateInfo.getRanges(),
@@ -499,7 +502,7 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> ColumnStoreAccessMethod::initiat
     const IndexCatalogEntry* entry,
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
-    StringData dbName) {
+    const DatabaseName& dbName) {
     return (stateInfo && stateInfo->getFileName())
         ? std::make_unique<BulkBuilder>(this, entry, maxMemoryUsageBytes, *stateInfo, dbName)
         : std::make_unique<BulkBuilder>(this, entry, maxMemoryUsageBytes, dbName);

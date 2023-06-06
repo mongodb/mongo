@@ -53,8 +53,8 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/config_server_op_observer.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -274,12 +274,14 @@ void ShardingMongodTestFixture::setUp() {
 void ShardingMongodTestFixture::tearDown() {
     ReplicaSetMonitor::cleanup();
 
-    if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
-        Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
-    }
+    if (Grid::get(operationContext())->isInitialized()) {
+        if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
+            Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
+        }
 
-    if (Grid::get(operationContext())->shardRegistry()) {
-        Grid::get(operationContext())->shardRegistry()->shutdown();
+        if (Grid::get(operationContext())->shardRegistry()) {
+            Grid::get(operationContext())->shardRegistry()->shutdown();
+        }
     }
 
     CollectionShardingStateFactory::clear(getServiceContext());
@@ -334,7 +336,7 @@ void ShardingMongodTestFixture::setupOpObservers() {
     auto opObserverRegistry =
         checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
     opObserverRegistry->addObserver(
-        std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterImpl>()));
+        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
 }
 

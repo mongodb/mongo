@@ -150,7 +150,7 @@ public:
     void shutdown();
 
     /**
-     * The first isMaster exchange for a connection to the server succeeded. Creates a new
+     * The first "hello" exchange for a connection to the server succeeded. Creates a new
      * SingleServerPingMonitor to monitor the new replica set member.
      */
     void onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,

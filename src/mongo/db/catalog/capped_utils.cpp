@@ -252,7 +252,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             retries++;  // logAndBackoff expects this to be 1 on first call.
             logWriteConflictAndBackoff(
-                retries, "cloneCollectionAsCapped", e.reason(), fromNss.ns());
+                retries, "cloneCollectionAsCapped", e.reason(), NamespaceStringOrUUID(fromNss));
 
             // Can't use writeConflictRetry since we need to save/restore exec around call to
             // abandonSnapshot.

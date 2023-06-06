@@ -51,7 +51,7 @@ TEST_F(DocumentSourceDocumentsTest, DocumentsStageRedactsCorrectly) {
     ASSERT(unwindStage);
     auto generatedField = unwindStage->getUnwindPath();
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        "{$queue: '?'}",
+        R"({"$queue":"?array<?object>"})",
         redact(*docSourcesVec[0]));
 
 

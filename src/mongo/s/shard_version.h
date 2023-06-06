@@ -86,6 +86,8 @@ public:
 
     std::string toString() const;
 
+    BSONObj toBSON() const;
+
 private:
     ShardVersion(const ChunkVersion& chunkVersion,
                  const boost::optional<CollectionIndexes>& collectionIndexes)

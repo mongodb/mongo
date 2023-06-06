@@ -191,7 +191,7 @@ bool Helpers::findById(OperationContext* opCtx,
 RecordId Helpers::findById(OperationContext* opCtx,
                            const CollectionPtr& collection,
                            const BSONObj& idquery) {
-    verify(collection);
+    MONGO_verify(collection);
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
     if (!desc && clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
@@ -277,7 +277,7 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
                              const BSONObj& o,
                              bool fromMigrate) {
     BSONElement e = o["_id"];
-    verify(e.type());
+    MONGO_verify(e.type());
     BSONObj id = e.wrap();
     return upsert(opCtx, coll, id, o, fromMigrate);
 }

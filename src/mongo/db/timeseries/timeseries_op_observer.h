@@ -45,6 +45,10 @@ public:
     TimeSeriesOpObserver() = default;
     ~TimeSeriesOpObserver() = default;
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kSystem, NamespaceFilter::kSystem};
+    }
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,
@@ -60,6 +64,7 @@ public:
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
                        OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;

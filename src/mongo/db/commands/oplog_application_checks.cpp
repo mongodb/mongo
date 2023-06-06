@@ -229,7 +229,7 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
 
     if (validity == OplogApplicationValidity::kNeedsSuperuser) {
         std::vector<Privilege> universalPrivileges;
-        auth::generateUniversalPrivileges(&universalPrivileges);
+        auth::generateUniversalPrivileges(&universalPrivileges, dbName.tenantId());
         if (!authSession->isAuthorizedForPrivileges(universalPrivileges)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }

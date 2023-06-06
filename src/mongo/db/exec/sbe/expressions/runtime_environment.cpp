@@ -142,7 +142,7 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopyForParallelUse()
     return makeCopy();
 }
 
-void RuntimeEnvironment::debugString(StringBuilder* builder) {
+void RuntimeEnvironment::debugString(StringBuilder* builder) const {
     using namespace std::literals;
 
     value::SlotMap<StringData> slotName;

@@ -1,5 +1,5 @@
 # ################################################################
-# Copyright (c) Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--directory", help="directory with files to benchmark", default="golden-compression")
-    parser.add_argument("--levels", help="levels to test eg ('1,2,3')", default="1")
+    parser.add_argument("--levels", help="levels to test e.g. ('1,2,3')", default="1")
     parser.add_argument("--iterations", help="number of benchmark iterations to run", default="1")
     parser.add_argument("--emails", help="email addresses of people who will be alerted upon regression. Only for continuous mode", default=None)
     parser.add_argument("--frequency", help="specifies the number of seconds to wait before each successive check for new PRs in continuous mode", default=DEFAULT_MAX_API_CALL_FREQUENCY_SEC)

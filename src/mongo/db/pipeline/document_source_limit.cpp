@@ -89,7 +89,7 @@ DocumentSource::GetNextResult DocumentSourceLimit::doGetNext() {
 }
 
 Value DocumentSourceLimit::serialize(SerializationOptions opts) const {
-    return Value(Document{{getSourceName(), opts.serializeLiteralValue(_limit)}});
+    return Value(Document{{getSourceName(), opts.serializeLiteral(_limit)}});
 }
 
 intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(

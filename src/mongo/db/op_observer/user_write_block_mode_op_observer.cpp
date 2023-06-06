@@ -38,7 +38,7 @@
 namespace mongo {
 namespace {
 
-const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
 bool isStandaloneOrPrimary(OperationContext* opCtx, const NamespaceString& nss) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -135,9 +135,10 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
 void UserWriteBlockModeOpObserver::aboutToDelete(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
                                                  BSONObj const& doc,
+                                                 OplogDeleteEntryArgs* args,
                                                  OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kUserWritesCriticalSectionsNamespace) {
-        documentIdDecoration(opCtx) = doc;
+        documentIdDecoration(args) = doc;
     }
 }
 
@@ -153,7 +154,7 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
 
     if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
         !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
-        auto& documentId = documentIdDecoration(opCtx);
+        auto& documentId = documentIdDecoration(args);
         invariant(!documentId.isEmpty());
 
         const auto& deletedDoc = documentId;

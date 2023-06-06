@@ -41,7 +41,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_state.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"

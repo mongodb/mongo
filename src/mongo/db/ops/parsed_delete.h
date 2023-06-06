@@ -56,8 +56,6 @@ class OperationContext;
  *
  * A delete request is parsed to a CanonicalQuery, so this class is a thin, delete-specific
  * wrapper around canonicalization.
- *
- * No locks need to be held during parsing.
  */
 class ParsedDelete {
     ParsedDelete(const ParsedDelete&) = delete;

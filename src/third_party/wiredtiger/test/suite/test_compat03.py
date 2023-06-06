@@ -75,7 +75,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     # log_max=3 as such we don't need 3.1 in this list.
     # However the exemption to this rule is versions which include a patch
     # number as the patch number will get removed in the conn_reconfig.c
-    # This rule exemption applies to the minimum verison check as well.
+    # This rule exemption applies to the minimum version check as well.
     compat_max = [
         ('future_max', dict(max_req=future_rel, log_max=future_logv)),
         ('def_max', dict(max_req='none', log_max=5)),

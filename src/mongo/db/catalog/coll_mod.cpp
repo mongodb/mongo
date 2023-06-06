@@ -135,6 +135,10 @@ Status getOnlySupportedOnTimeseriesError(StringData fieldName) {
 boost::optional<ShardKeyPattern> getShardKeyPattern(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID,
                                                     const CollMod& cmd) {
+    if (!Grid::get(opCtx)->isInitialized()) {
+        return boost::none;
+    }
+
     try {
         const NamespaceString nss =
             CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
@@ -144,6 +148,7 @@ boost::optional<ShardKeyPattern> getShardKeyPattern(OperationContext* opCtx,
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The collection is unsharded or doesn't exist.
     }
+
     return boost::none;
 }
 

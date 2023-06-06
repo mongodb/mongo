@@ -361,6 +361,7 @@ void ModifierNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                      recursionLevel,
                                      false, /* allowTopLevelDollarPrefixedFields */
                                      validateForStorage,
+                                     false, /* isEmbeddedInIdField */
                                      containsDotsAndDollarsField);
 }
 

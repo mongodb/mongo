@@ -67,6 +67,10 @@ public:
         return _key;
     }
 
+    size_t keySizeInBytes() const {
+        return _key.size();
+    }
+
     /**
      * Return the 'indexability discriminators', that is, the plan cache key component after the
      * stable key, but before the boolean indicating whether we are using the classic engine.

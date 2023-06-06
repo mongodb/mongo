@@ -37,11 +37,6 @@ class ResourceCatalog {
 public:
     static ResourceCatalog& get();
 
-    // TODO (SERVER-77227): Remove this getter
-    static ResourceCatalog& get(ServiceContext*) {
-        return get();
-    }
-
     void add(ResourceId id, const NamespaceString& ns);
     void add(ResourceId id, const DatabaseName& dbName);
 

@@ -18,6 +18,7 @@
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
+//   references_foreign_collection,
 // ]
 
 (function() {

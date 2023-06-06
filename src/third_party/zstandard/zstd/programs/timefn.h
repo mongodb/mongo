@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -16,70 +16,51 @@ extern "C" {
 #endif
 
 
-/*-****************************************
-*  Dependencies
-******************************************/
-#include <time.h>         /* clock_t, clock, CLOCKS_PER_SEC */
-
-
 
 /*-****************************************
-*  Local Types
+*  Types
 ******************************************/
 
 #if !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
 # if defined(_AIX)
 #  include <inttypes.h>
 # else
-#  include <stdint.h> /* intptr_t */
+#  include <stdint.h> /* uint64_t */
 # endif
   typedef uint64_t           PTime;  /* Precise Time */
 #else
   typedef unsigned long long PTime;  /* does not support compilers without long long support */
 #endif
 
+/* UTIL_time_t contains a nanosecond time counter.
+ * The absolute value is not meaningful.
+ * It's only valid to compute the difference between 2 measurements. */
+typedef struct { PTime t; } UTIL_time_t;
+#define UTIL_TIME_INITIALIZER { 0 }
 
 
 /*-****************************************
 *  Time functions
 ******************************************/
-#if defined(_WIN32)   /* Windows */
-
-    #include <windows.h>   /* LARGE_INTEGER */
-    typedef LARGE_INTEGER UTIL_time_t;
-    #define UTIL_TIME_INITIALIZER { { 0, 0 } }
-
-#elif defined(__APPLE__) && defined(__MACH__)
-
-    #include <mach/mach_time.h>
-    typedef PTime UTIL_time_t;
-    #define UTIL_TIME_INITIALIZER 0
-
-/* C11 requires timespec_get, but FreeBSD 11 lacks it, while still claiming C11 compliance.
-   Android also lacks it but does define TIME_UTC. */
-#elif (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) /* C11 */) \
-    && defined(TIME_UTC) && !defined(__ANDROID__)
-
-    typedef struct timespec UTIL_time_t;
-    #define UTIL_TIME_INITIALIZER { 0, 0 }
-
-#else   /* relies on standard C90 (note : clock_t measurements can be wrong when using multi-threading) */
-
-    typedef clock_t UTIL_time_t;
-    #define UTIL_TIME_INITIALIZER 0
-
-#endif
-
 
 UTIL_time_t UTIL_getTime(void);
-PTime UTIL_getSpanTimeMicro(UTIL_time_t clockStart, UTIL_time_t clockEnd);
-PTime UTIL_getSpanTimeNano(UTIL_time_t clockStart, UTIL_time_t clockEnd);
 
-#define SEC_TO_MICRO ((PTime)1000000)
-PTime UTIL_clockSpanMicro(UTIL_time_t clockStart);
+/* Timer resolution can be low on some platforms.
+ * To improve accuracy, it's recommended to wait for a new tick
+ * before starting benchmark measurements */
+void UTIL_waitForNextTick(void);
+/* tells if timefn will return correct time measurements
+ * in presence of multi-threaded workload.
+ * note : this is not the case if only C90 clock_t measurements are available */
+int UTIL_support_MT_measurements(void);
+
+PTime UTIL_getSpanTimeNano(UTIL_time_t clockStart, UTIL_time_t clockEnd);
 PTime UTIL_clockSpanNano(UTIL_time_t clockStart);
 
-void UTIL_waitForNextTick(void);
+PTime UTIL_getSpanTimeMicro(UTIL_time_t clockStart, UTIL_time_t clockEnd);
+PTime UTIL_clockSpanMicro(UTIL_time_t clockStart);
+
+#define SEC_TO_MICRO ((PTime)1000000)  /* nb of microseconds in a second */
 
 
 #if defined (__cplusplus)

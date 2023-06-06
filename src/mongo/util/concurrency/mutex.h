@@ -79,19 +79,19 @@ class SimpleMutex {
 
 public:
     SimpleMutex() {
-        verify(pthread_mutex_init(&_lock, nullptr) == 0);
+        MONGO_verify(pthread_mutex_init(&_lock, nullptr) == 0);
     }
 
     ~SimpleMutex() {
-        verify(pthread_mutex_destroy(&_lock) == 0);
+        MONGO_verify(pthread_mutex_destroy(&_lock) == 0);
     }
 
     void lock() {
-        verify(pthread_mutex_lock(&_lock) == 0);
+        MONGO_verify(pthread_mutex_lock(&_lock) == 0);
     }
 
     void unlock() {
-        verify(pthread_mutex_unlock(&_lock) == 0);
+        MONGO_verify(pthread_mutex_unlock(&_lock) == 0);
     }
 
 private:

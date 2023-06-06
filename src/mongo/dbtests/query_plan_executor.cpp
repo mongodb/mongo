@@ -114,7 +114,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        verify(nullptr != cq.get());
+        MONGO_verify(nullptr != cq.get());
 
         // Make the stage.
         unique_ptr<PlanStage> root(
@@ -160,9 +160,9 @@ public:
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
-        verify(statusWithCQ.isOK());
+        MONGO_verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        verify(nullptr != cq.get());
+        MONGO_verify(nullptr != cq.get());
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor =

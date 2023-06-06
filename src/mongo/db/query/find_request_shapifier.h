@@ -41,15 +41,12 @@ namespace mongo::query_stats {
  */
 class FindRequestShapifier final : public RequestShapifier {
 public:
-    FindRequestShapifier(OperationContext* opCtx,
-                         const ParsedFindCommand& request,
-                         const boost::optional<std::string> applicationName = boost::none)
-        : RequestShapifier(opCtx, applicationName),
+    FindRequestShapifier(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         const ParsedFindCommand& request)
+        : RequestShapifier(expCtx->opCtx),
           _request(*request.findCommandRequest),
-          _initialQueryStatsKey(
-              makeQueryStatsKey(makeDummyExpCtx(opCtx, *request.findCommandRequest),
-                                request,
-                                SerializationOptions::kDefaultQueryShapeSerializeOptions)) {}
+          _initialQueryStatsKey(makeQueryStatsKey(
+              expCtx, request, SerializationOptions::kDefaultQueryShapeSerializeOptions)) {}
 
     BSONObj makeQueryStatsKey(const SerializationOptions& opts,
                               OperationContext* opCtx) const final;

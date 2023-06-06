@@ -90,7 +90,7 @@ public:
     const boost::optional<std::string>& getSetName() const;
 
     /**
-     * The frequency at which we measure RTT and IsMaster responses.
+     * The frequency at which we measure RTT and "hello" responses.
      */
     Milliseconds getHeartBeatFrequency() const;
 

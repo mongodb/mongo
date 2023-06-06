@@ -28,12 +28,11 @@
  */
 
 #include "mongo/db/s/sharding_write_router.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
-ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         CatalogCache* catalogCache) {
+ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         _scopedCss.emplace(CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss));
         _collDesc = (*_scopedCss)->getCollectionDescription(opCtx);
@@ -54,6 +53,8 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
             invariant(reshardingFields);
             const auto& donorFields = reshardingFields->getDonorFields();
             invariant(donorFields);
+            auto catalogCache = Grid::get(opCtx)->catalogCache();
+            invariant(catalogCache);
 
             _reshardingChunkMgr =
                 uassertStatusOK(

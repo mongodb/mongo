@@ -77,8 +77,13 @@ public:
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject shardDistribution parameter",
                     !request().getShardDistribution().has_value());
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, reject forceRedistribution parameter",
+                    !request().getForceRedistribution().has_value());
             }
             reshardCollectionRequest.setShardDistribution(request().getShardDistribution());
+            reshardCollectionRequest.setForceRedistribution(request().getForceRedistribution());
 
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));

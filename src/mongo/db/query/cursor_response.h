@@ -117,7 +117,10 @@ public:
      * Call this after successfully appending all fields that will be part of this response.
      * After calling, you may not call any more methods on this object.
      */
-    void done(CursorId cursorId, const NamespaceString& cursorNamespace);
+    void done(CursorId cursorId,
+              const NamespaceString& cursorNamespace,
+              const SerializationContext& serializationContext =
+                  SerializationContext::stateCommandReply());
 
     /**
      * Call this if the response should not contain cursor information. It will completely remove
@@ -154,11 +157,13 @@ private:
  *
  * This function is deprecated.  Prefer CursorResponseBuilder or CursorResponse::toBSON() instead.
  */
-void appendCursorResponseObject(long long cursorId,
-                                const NamespaceString& cursorNamespace,
-                                BSONArray firstBatch,
-                                boost::optional<StringData> cursorType,
-                                BSONObjBuilder* builder);
+void appendCursorResponseObject(
+    long long cursorId,
+    const NamespaceString& cursorNamespace,
+    BSONArray firstBatch,
+    boost::optional<StringData> cursorType,
+    BSONObjBuilder* builder,
+    const SerializationContext& serializationContext = SerializationContext::stateCommandReply());
 
 /**
  * Builds a getMore response object from the provided cursor identifiers and "nextBatch",

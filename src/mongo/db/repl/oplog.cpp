@@ -462,8 +462,14 @@ void logOplogRecords(OperationContext* opCtx,
                 hangBeforeLogOpAdvancesLastApplied.pauseWhileSet(opCtx);
             }
 
+            // As an optimization, we skip advancing the global timestamp. In this path on the
+            // primary, the caller will have already advanced the clock to at least this value when
+            // allocating the timestamp.
+            const bool advanceGlobalTimestamp = false;
+
             // Optimes on the primary should always represent consistent database states.
-            replCoord->setMyLastAppliedOpTimeAndWallTimeForward({finalOpTime, wallTime});
+            replCoord->setMyLastAppliedOpTimeAndWallTimeForward({finalOpTime, wallTime},
+                                                                advanceGlobalTimestamp);
 
             // We set the last op on the client to 'finalOpTime', because that contains the
             // timestamp of the operation that the client actually performed.
@@ -826,6 +832,22 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // any temporarily renamed aside collections to be sorted out by the time replay is
           // complete.
           const bool allowRenameOutOfTheWay = (mode != repl::OplogApplication::Mode::kSecondary);
+
+          // Check whether there is an open but empty database where the name conflicts with the new
+          // collection's database name. It is possible for a secondary's in-memory database state
+          // to diverge from the primary's, if the primary rolls back the dropDatabase oplog entry
+          // after closing its own in-memory database state. In this case, the primary may accept
+          // creating a new database with a conflicting name to what the secondary still has open.
+          // It is okay to simply close the empty database on the secondary in this case.
+          auto duplicates = DatabaseHolder::get(opCtx)->getNamesWithConflictingCasing(nss.dbName());
+          if (duplicates.size() == 1) {
+              auto dupDatabaseIt = duplicates.begin();
+              if (CollectionCatalog::get(opCtx)
+                      ->getAllCollectionUUIDsFromDb(*dupDatabaseIt)
+                      .size() == 0) {
+                  fassert(7727801, dropDatabaseForApplyOps(opCtx, *dupDatabaseIt).isOK());
+              }
+          }
 
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           if (auto idIndexElem = cmd["idIndex"]) {
@@ -2047,7 +2069,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         !collection ? str::stream()
                                 << "(NamespaceNotFound): Failed to apply operation due "
                                    "to missing collection ("
-                                << requestNss << ")"
+                                << requestNss.toStringForErrorMsg() << ")"
                                     : "Applied a delete which did not delete anything."s);
                 }
                 // It is legal for a delete operation on the pre-images collection to delete zero

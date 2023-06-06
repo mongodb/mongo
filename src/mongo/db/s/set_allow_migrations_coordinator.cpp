@@ -88,7 +88,8 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
             write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
-                entry.setQ(BSON(CollectionType::kNssFieldName << nss().ns()));
+                entry.setQ(
+                    BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss())));
                 if (_allowMigrations) {
                     entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
                         "$unset" << BSON(CollectionType::kPermitMigrationsFieldName << true))));
@@ -111,8 +112,10 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
 
         uassertStatusOK(response.toStatus());
 
-        ShardingLogging::get(opCtx)->logChange(
-            opCtx, "setPermitMigrations", nss().ns(), BSON("permitMigrations" << _allowMigrations));
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "setPermitMigrations",
+                                               NamespaceStringUtil::serialize(nss()),
+                                               BSON("permitMigrations" << _allowMigrations));
     });
 }
 

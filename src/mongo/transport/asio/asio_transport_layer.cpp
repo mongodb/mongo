@@ -1328,23 +1328,16 @@ std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBackl
 }
 
 void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-        bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
-    }
+    bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
 }
 
 void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-        BSONArrayBuilder queueDepthsArrayBuilder(
-            bob.subarrayStart("listenerSocketBacklogQueueDepths"));
-        for (const auto& record : _acceptorRecords) {
-            BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
-                record->address.toString(), record->backlogQueueDepth.load());
-        }
-        queueDepthsArrayBuilder.done();
+    BSONArrayBuilder queueDepthsArrayBuilder(bob.subarrayStart("listenerSocketBacklogQueueDepths"));
+    for (const auto& record : _acceptorRecords) {
+        BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
+            record->address.toString(), record->backlogQueueDepth.load());
     }
+    queueDepthsArrayBuilder.done();
 }
 
 void AsioTransportLayer::_runListener() noexcept {

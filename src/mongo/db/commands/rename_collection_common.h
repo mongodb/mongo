@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/rename_collection_gen.h"
 
 namespace mongo {
 
@@ -39,9 +40,7 @@ class Client;
 
 namespace rename_collection {
 
-Status checkAuthForRenameCollectionCommand(Client* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
+Status checkAuthForRenameCollectionCommand(Client* client, const RenameCollectionCommand& request);
 
 }  // namespace rename_collection
 }  // namespace mongo

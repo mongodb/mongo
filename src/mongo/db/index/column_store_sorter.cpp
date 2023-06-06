@@ -270,7 +270,7 @@ ColumnStoreSorter::persistDataForShutdown() {
                    std::back_inserter(ranges),
                    [](const auto it) { return it->getRange(); });
 
-    return {_spillFile->path().filename().string(), ranges};
+    return {_spillFile->path().filename().string(), std::move(ranges)};
 }
 
 /**

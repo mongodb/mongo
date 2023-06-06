@@ -171,7 +171,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           << _args.getToShard())),
       _moveTimingHelper(_opCtx,
                         "from",
-                        _args.getCommandParameter().ns(),
+                        NamespaceStringUtil::serialize(_args.getCommandParameter()),
                         _args.getMin(),
                         _args.getMax(),
                         6,  // Total number of steps
@@ -305,7 +305,7 @@ void MigrationSourceManager::startClone() {
     uassertStatusOK(ShardingLogging::get(_opCtx)->logChangeChecked(
         _opCtx,
         "moveChunk.start",
-        nss().ns(),
+        NamespaceStringUtil::serialize(nss()),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
         ShardingCatalogClient::kMajorityWriteConcern));
@@ -430,7 +430,7 @@ void MigrationSourceManager::enterCriticalSection() {
     uassertStatusOKWithContext(
         shardmetadatautil::updateShardCollectionsEntry(
             _opCtx,
-            BSON(ShardCollectionType::kNssFieldName << nss().ns()),
+            BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss())),
             BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
             false /*upsert*/),
         "Persist critical section signal for secondaries");
@@ -620,7 +620,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
         "moveChunk.commit",
-        nss().ns(),
+        NamespaceStringUtil::serialize(nss()),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard() << "counts" << *_recipientCloneCounts),
         ShardingCatalogClient::kMajorityWriteConcern);
@@ -663,7 +663,7 @@ void MigrationSourceManager::_cleanupOnError() noexcept {
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
         "moveChunk.error",
-        _args.getCommandParameter().ns(),
+        NamespaceStringUtil::serialize(_args.getCommandParameter()),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
         ShardingCatalogClient::kMajorityWriteConcern);

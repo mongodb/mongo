@@ -73,10 +73,10 @@ namespace mongo {
 namespace {
 
 boost::optional<HostAndPort> extractHostInfo(const OpMsgRequest& request) {
-    // The initial isMaster request made by mongod and mongos processes should contain a hostInfo
-    // field that identifies the process by its host:port.
+    // The initial hello/isMaster request made by mongod and mongos processes should contain a
+    // hostInfo field that identifies the process by its host:port.
     StringData cmdName = request.getCommandName();
-    if (cmdName != "isMaster" && cmdName != "ismaster") {
+    if (cmdName != "isMaster" && cmdName != "ismaster" && cmdName != "hello") {
         return boost::none;
     }
 
@@ -195,10 +195,10 @@ public:
             return;
         _seenFirstMessage = true;
 
-        // The initial isMaster request made by mongod and mongos processes should contain a
+        // The initial hello/isMaster request made by mongod and mongos processes should contain a
         // hostInfo field that identifies the process by its host:port.
         StringData cmdName = request.getCommandName();
-        if (cmdName != "isMaster" && cmdName != "ismaster") {
+        if (cmdName != "isMaster" && cmdName != "ismaster" && cmdName != "hello") {
             return;
         }
 

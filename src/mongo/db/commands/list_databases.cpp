@@ -137,7 +137,8 @@ public:
 
             // We need to copy the serialization context from the request to the reply object
             ListDatabasesReply reply(
-                items, SerializationContext::stateCommandReply(cmd.getSerializationContext()));
+                std::move(items),
+                SerializationContext::stateCommandReply(cmd.getSerializationContext()));
             if (!nameOnly) {
                 reply.setTotalSize(totalSize);
                 reply.setTotalSizeMb(totalSize / (1024 * 1024));

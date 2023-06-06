@@ -169,7 +169,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleLookup) {
     ASSERT(!cq->pipeline().empty());
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString() +
+        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'x', joinFieldForeign: 'y', joinField: 'out', "
             "strategy: 'NestedLoopJoin', node: "
             "{cscan: {dir:1, filter: {x:1}}}}}",
@@ -198,11 +198,11 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookups) {
     ASSERT(!cq->pipeline().empty());
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString() +
+        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'a', joinFieldForeign: 'b', joinField: 'c', "
             "strategy: 'NestedLoopJoin', node: "
             "{eq_lookup: {foreignCollection: '" +
-            kSecondaryNamespace.toString() +
+            kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'x', joinFieldForeign: 'y', joinField: 'out',"
             "strategy: 'NestedLoopJoin', node: {cscan: {dir:1, filter: {x:1}}}}}}}",
         solution->root()))
@@ -234,12 +234,12 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookupsAndTwoGroups) {
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$c'}, accs: [{count: {$min: '$count'}}], node: "
         "{eq_lookup: {foreignCollection: '" +
-            kSecondaryNamespace.toString() +
+            kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'a', joinFieldForeign: 'b', joinField: 'c', "
             "strategy: 'NestedLoopJoin', node: "
             "{group: {key: {_id: '$out'}, accs: [{count: {$sum: '$x'}}], node: "
             "{eq_lookup: {foreignCollection: '" +
-            kSecondaryNamespace.toString() +
+            kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'x', joinFieldForeign: 'y', joinField: 'out',"
             "strategy: 'NestedLoopJoin', node: "
             "{cscan: {dir:1, filter: {x:1}}}}}}}}}}}",

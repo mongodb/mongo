@@ -85,6 +85,7 @@ TEST_F(UnsetNodeTest, UnsetNoOp) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{b: 5}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -104,6 +105,7 @@ TEST_F(UnsetNodeTest, UnsetNoOpDottedPath) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: 5}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -123,6 +125,7 @@ TEST_F(UnsetNodeTest, UnsetNoOpThroughArray) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a:[{b:1}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -141,6 +144,7 @@ TEST_F(UnsetNodeTest, UnsetNoOpEmptyDoc) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -159,6 +163,7 @@ TEST_F(UnsetNodeTest, UnsetTopLevelPath) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -177,6 +182,7 @@ TEST_F(UnsetNodeTest, UnsetNestedPath) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: {b: {}}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -195,6 +201,7 @@ TEST_F(UnsetNodeTest, UnsetObject) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -213,6 +220,7 @@ TEST_F(UnsetNodeTest, UnsetArrayElement) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"][0]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a:[null], b:1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -232,6 +240,7 @@ TEST_F(UnsetNodeTest, UnsetPositional) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"][1]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [0, null, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -250,6 +259,7 @@ TEST_F(UnsetNodeTest, UnsetEntireArray) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -268,6 +278,7 @@ TEST_F(UnsetNodeTest, UnsetFromObjectInArray) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"][0]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a:[{}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -286,6 +297,7 @@ TEST_F(UnsetNodeTest, CanUnsetInvalidField) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"][0]["$b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{b: 1, a: [{}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -320,6 +332,7 @@ TEST_F(UnsetNodeTest, ApplyDoesNotAffectIndexes) {
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -338,6 +351,7 @@ TEST_F(UnsetNodeTest, ApplyFieldWithDot) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{'a.b':4, a: {}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -355,6 +369,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
     setPathTaken(makeRuntimeUpdatePathForTest("a.$id"));
     auto result = node.apply(getApplyParams(doc.root()["a"]["$id"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     auto updated = BSON("a" << BSON("$ref"
                                     << "c"));
     ASSERT_EQUALS(updated, doc);
@@ -376,6 +391,7 @@ TEST_F(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFal
     setValidateForStorage(false);
     auto result = node.apply(getApplyParams(doc.root()["a"]["$id"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     auto updated = BSON("a" << BSON("$ref"
                                     << "c"));
     ASSERT_EQUALS(updated, doc);
@@ -446,6 +462,7 @@ TEST_F(UnsetNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: {b: 1}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 

@@ -32,7 +32,7 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {
@@ -130,7 +130,7 @@ public:
      *
      * Return true if conflicts were found.
      */
-    bool findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const;
+    StatusWith<bool> checkForConflictsAndPrefix(const FieldRef* toCheck) const;
 
     void clear() {
         _fieldSet.clear();

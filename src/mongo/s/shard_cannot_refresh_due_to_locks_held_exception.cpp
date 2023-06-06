@@ -33,6 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace {
@@ -42,7 +43,7 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ShardCannotRefreshDueToLocksHeldInfo);
 }  // namespace
 
 void ShardCannotRefreshDueToLocksHeldInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append(kNssFieldName, _nss.ns());
+    bob->append(kNssFieldName, NamespaceStringUtil::serialize(_nss));
 }
 
 std::shared_ptr<const ErrorExtraInfo> ShardCannotRefreshDueToLocksHeldInfo::parse(

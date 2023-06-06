@@ -1,0 +1,18 @@
+Trace:FileStat: > UTIL_isConsole(0)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(1)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(2)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_getFileSize(/*stdin*\)
+Trace:FileStat:  > UTIL_stat(-1, /*stdin*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < -1
+Trace:FileStat: > UTIL_isRegularFile(/*stdout*\)
+Trace:FileStat:  > UTIL_stat(-1, /*stdout*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_getFileSize(/*stdin*\)
+Trace:FileStat:  > UTIL_stat(-1, /*stdin*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < -1

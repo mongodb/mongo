@@ -51,7 +51,7 @@ bool MatchDetails::hasElemMatchKey() const {
 }
 
 std::string MatchDetails::elemMatchKey() const {
-    verify(hasElemMatchKey());
+    MONGO_verify(hasElemMatchKey());
     return *(_elemMatchKey.get());
 }
 

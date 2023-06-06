@@ -68,7 +68,7 @@ Status getStatusFromWriteCommandResponse(const BSONObj& commandResult) {
 Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
     return updateShardCollectionsEntry(
         opCtx,
-        BSON(ShardCollectionType::kNssFieldName << nss.ns()),
+        BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
         BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
         false /*upsert*/);
 }
@@ -103,10 +103,11 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
         ShardCollectionType::kLastRefreshedCollectionMajorMinorVersionFieldName,
         refreshedVersion.toLong());
 
-    return updateShardCollectionsEntry(opCtx,
-                                       BSON(ShardCollectionType::kNssFieldName << nss.ns()),
-                                       BSON("$set" << updateBuilder.obj()),
-                                       false /*upsert*/);
+    return updateShardCollectionsEntry(
+        opCtx,
+        BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON("$set" << updateBuilder.obj()),
+        false /*upsert*/);
 }
 
 StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
@@ -145,7 +146,8 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
     try {
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigCollectionsNamespace};
-        findRequest.setFilter(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
+        findRequest.setFilter(
+            BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)));
         findRequest.setLimit(1);
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         if (!cursor) {
@@ -286,7 +288,8 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
                                                    const Timestamp& timestamp) {
-    const auto chunksNss = NamespaceString{ChunkType::ShardNSPrefix + nss.ns()};
+    const auto chunksNss =
+        NamespaceString{ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss)};
 
     try {
         DBDirectClient client(opCtx);
@@ -327,7 +330,8 @@ Status updateShardChunks(OperationContext* opCtx,
                          const OID& currEpoch) {
     invariant(!chunks.empty());
 
-    const auto chunksNss = NamespaceString{ChunkType::ShardNSPrefix + nss.ns()};
+    const auto chunksNss =
+        NamespaceString{ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss)};
 
     try {
         DBDirectClient client(opCtx);
@@ -405,7 +409,8 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
                 NamespaceString::kShardConfigCollectionsNamespace);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
+                entry.setQ(BSON(ShardCollectionType::kNssFieldName
+                                << NamespaceStringUtil::serialize(nss)));
                 entry.setMulti(true);
                 return entry;
             }()});
@@ -436,7 +441,8 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss) {
     // Drop the 'config.cache.chunks.<ns>' collection.
     BSONObj result;
     if (!client.dropCollection(
-            NamespaceStringUtil::deserialize(boost::none, ChunkType::ShardNSPrefix + nss.ns()),
+            NamespaceStringUtil::deserialize(
+                boost::none, ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss)),
             kLocalWriteConcern,
             &result)) {
         auto status = getStatusFromCommandResult(result);

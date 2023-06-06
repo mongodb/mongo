@@ -48,7 +48,7 @@ constexpr auto kAdminDB = "admin"_sd;
  */
 
 //#for $role in $roles
-void addPrivileges_${role.name}(PrivilegeVector* privileges, StringData dbName);
+void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName& dbName);
 //#end for
 
 /* Implemenations */
@@ -59,15 +59,15 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, StringData dbName);
 //#if $db is None
 //#echo 'dbName'
 //#else
-//#echo '"' + $db + '"_sd'
+//#echo 'DatabaseName::createDatabaseNameForAuth(dbName.tenantId(), "' + $db + '"_sd)'
 //#end if
 //#end def
 
 //#for $role in $roles
-void addPrivileges_${role.name}(PrivilegeVector* privileges, StringData dbName) {
+void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName& dbName) {
     //#if $role.adminOnly
     /* Admin only builtin role */
-    fassert(6837401, dbName == kAdminDB);
+    fassert(6837401, dbName.db() == kAdminDB);
     //#end if
 
     //#for $subrole in $role.roles
@@ -79,22 +79,23 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, StringData dbName) 
         privileges,
         Privilege(
             //#if $priv.matchType == 'any'
-            ResourcePattern::forAnyResource(),
+            ResourcePattern::forAnyResource(dbName.tenantId()),
             //#elif $priv.matchType == 'any_normal'
-            ResourcePattern::forAnyNormalResource(),
+            ResourcePattern::forAnyNormalResource(dbName.tenantId()),
             //#elif $priv.matchType == 'cluster'
-            ResourcePattern::forClusterResource(),
+            ResourcePattern::forClusterResource(dbName.tenantId()),
             //#elif $priv.matchType == 'database'
             ResourcePattern::forDatabaseName($dbName($priv.db)),
             //#elif $priv.matchType == 'collection'
-            ResourcePattern::forCollectionName("$priv.collection"_sd),
+            ResourcePattern::forCollectionName(dbName.tenantId(), "$priv.collection"_sd),
             //#elif $priv.matchType == 'exact_namespace'
-            ResourcePattern::forExactNamespace(
-                NamespaceString($dbName($priv.db), "$priv.collection"_sd)),
+            ResourcePattern::forExactNamespace(NamespaceStringUtil::parseNamespaceFromDoc(
+                $dbName($priv.db), "$priv.collection"_sd)),
             //#elif $priv.matchType == 'any_system_buckets'
-            ResourcePattern::forAnySystemBuckets(),
+            ResourcePattern::forAnySystemBuckets(dbName.tenantId()),
             //#elif $priv.matchType == 'system_buckets_in_any_db'
-            ResourcePattern::forAnySystemBucketsInAnyDatabase("$priv.system_buckets"_sd),
+            ResourcePattern::forAnySystemBucketsInAnyDatabase(dbName.tenantId(),
+                                                              "$priv.system_buckets"_sd),
             //#elif $priv.matchType == 'system_buckets'
             ResourcePattern::forExactSystemBucketsCollection($dbName($priv.db),
                                                              "$priv.system_buckets"_sd),
@@ -116,13 +117,13 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, StringData dbName) 
     ActionSet allActions;
     allActions.addAllActions();
     Privilege::addPrivilegeToPrivilegeVector(
-        privileges, Privilege(ResourcePattern::forAnyResource(), allActions));
+        privileges, Privilege(ResourcePattern::forAnyResource(dbName.tenantId()), allActions));
     //#end if
 }
 
 //#end for
 
-using addPrivilegesFn = void (*)(PrivilegeVector*, StringData);
+using addPrivilegesFn = void (*)(PrivilegeVector*, const DatabaseName&);
 struct BuiltinRoleAttributes {
     bool adminOnly;
     addPrivilegesFn addPrivileges;
@@ -142,9 +143,9 @@ const std::map<StringData, BuiltinRoleAttributes> kBuiltinRoleMap = {
     //#end for
 };
 
-const stdx::unordered_set<RoleName> kAdminBuiltinRoles = {
+const stdx::unordered_set<RoleName> kAdminBuiltinRolesNoTenant = {
     //#for $role in $roles
-    RoleName("$role.name"_sd, kAdminDB),
+    RoleName("$role.name"_sd, DatabaseName::createDatabaseNameForAuth(boost::none, kAdminDB)),
     //#end for
 };
 
@@ -167,18 +168,28 @@ stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(const DatabaseName&
     }
 
     if (dbName.db() == kAdminDB) {
-        return kAdminBuiltinRoles;
-    }
+        if (dbName.tenantId() == boost::none) {
+            // Specialcase for the admin DB in non-multitenancy mode.
+            return kAdminBuiltinRolesNoTenant;
+        }
+        return stdx::unordered_set<RoleName>({
+            //#for $role in $roles
+            RoleName("$role.name"_sd, dbName),
+            //#end for
+        });
 
-    return stdx::unordered_set<RoleName>({
-        //#for $role in $global_roles
-        RoleName("$role.name"_sd, dbName),
-        //#end for
-    });
+    } else {
+        return stdx::unordered_set<RoleName>({
+            //#for $role in $global_roles
+            RoleName("$role.name"_sd, dbName),
+            //#end for
+        });
+    }
 }
 
-void auth::generateUniversalPrivileges(PrivilegeVector* privileges) {
-    addPrivileges___system(privileges, kAdminDB);
+void auth::generateUniversalPrivileges(PrivilegeVector* privileges,
+                                       const boost::optional<TenantId>& tenantId) {
+    addPrivileges___system(privileges, DatabaseName::createDatabaseNameForAuth(tenantId, kAdminDB));
 }
 
 bool auth::addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges) {
@@ -196,7 +207,7 @@ bool auth::addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* pr
         return false;
     }
 
-    def.addPrivileges(privileges, role.getDB());
+    def.addPrivileges(privileges, role.getDatabaseName());
     return true;
 }
 

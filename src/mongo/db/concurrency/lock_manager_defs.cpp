@@ -30,7 +30,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 
 #include "mongo/db/concurrency/resource_catalog.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo {
 
@@ -49,9 +48,9 @@ const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(
 std::string ResourceId::toString() const {
     StringBuilder ss;
     ss << "{" << _fullHash << ": " << resourceTypeName(getType()) << ", " << getHashId();
-    if (getType() == RESOURCE_MUTEX || getType() == RESOURCE_DATABASE ||
-        getType() == RESOURCE_COLLECTION) {
-        if (auto resourceName = ResourceCatalog::get(getGlobalServiceContext()).name(*this)) {
+    if (getType() == RESOURCE_DATABASE || getType() == RESOURCE_COLLECTION ||
+        getType() == RESOURCE_MUTEX) {
+        if (auto resourceName = ResourceCatalog::get().name(*this)) {
             ss << ", " << *resourceName;
         }
     }

@@ -282,7 +282,7 @@ public:
             auto findCommand = std::make_unique<FindCommandRequest>(nss);
             findCommand->setFilter(BSON("a" << 100 << "b" << 1));
             auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-            verify(statusWithCQ.isOK());
+            MONGO_verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
             ASSERT(cq.get());
         }
@@ -302,7 +302,7 @@ public:
             auto findCommand = std::make_unique<FindCommandRequest>(nss);
             findCommand->setFilter(BSON("a" << 100 << "b" << 1));
             auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-            verify(statusWithCQ.isOK());
+            MONGO_verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
         }
 
@@ -337,7 +337,7 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << 1 << "b" << BSON("$gt" << 1)));
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
+        MONGO_verify(statusWithCQ.isOK());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 
@@ -486,7 +486,7 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << N + 1 << "b" << 1));
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
+        MONGO_verify(statusWithCQ.isOK());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 
@@ -523,7 +523,7 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
+        MONGO_verify(statusWithCQ.isOK());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 
@@ -584,7 +584,7 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("foo" << 2001));
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
+        MONGO_verify(statusWithCQ.isOK());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 

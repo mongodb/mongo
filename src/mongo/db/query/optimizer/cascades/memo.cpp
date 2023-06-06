@@ -546,7 +546,7 @@ MemoLogicalNodeId Memo::addNode(const Context& ctx,
     if (inserted || noTargetGroup) {
         insertedNodeIds.insert(newId);
         _inputGroupsToNodeIdMap[groupVector].insert(newId);
-        _nodeIdToInputGroupsMap[newId] = groupVector;
+        _nodeIdToInputGroupsMap[newId] = std::move(groupVector);
 
         if (noTargetGroup) {
             estimateCE(ctx, groupId);

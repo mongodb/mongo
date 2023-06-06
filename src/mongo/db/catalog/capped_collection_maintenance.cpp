@@ -165,9 +165,10 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         BSONObj doc = record->data.toBson();
         if (nss.isReplicated()) {
             OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
-            opObserver->aboutToDelete(opCtx, collection, doc);
 
             OplogDeleteEntryArgs args;
+            opObserver->aboutToDelete(opCtx, collection, doc, &args);
+
             // Explicitly setting values despite them being the defaults.
             args.deletedDoc = nullptr;
             args.fromMigrate = false;

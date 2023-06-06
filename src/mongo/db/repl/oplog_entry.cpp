@@ -190,7 +190,7 @@ void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundl
     uassert(6054001,
             fmt::format("{} can only store the pre or post image of one findAndModify operation "
                         "for each transaction",
-                        NamespaceString::kConfigImagesNamespace.toString()),
+                        NamespaceString::kConfigImagesNamespace.toStringForErrorMsg()),
             !(*image));
 
     switch (*needsRetryImage) {

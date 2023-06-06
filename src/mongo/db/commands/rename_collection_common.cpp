@@ -43,27 +43,24 @@
 namespace mongo {
 namespace rename_collection {
 
-Status checkAuthForRenameCollectionCommand(Client* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-    const auto sourceNsElt = cmdObj["renameCollection"];
-    const auto targetNsElt = cmdObj["to"];
+Status checkAuthForRenameCollectionCommand(Client* client, const RenameCollectionCommand& request) {
+    const auto& sourceNS = request.getCommandParameter();
+    const auto& targetNS = request.getTo();
+    const bool dropTarget = [&] {
+        const auto dropTarget = request.getDropTarget();
+        if (stdx::holds_alternative<bool>(dropTarget)) {
+            return stdx::get<bool>(dropTarget);
+        }
 
-    uassert(ErrorCodes::TypeMismatch,
-            "'renameCollection' must be of type String",
-            sourceNsElt.type() == BSONType::String);
-    uassert(ErrorCodes::TypeMismatch,
-            "'to' must be of type String",
-            targetNsElt.type() == BSONType::String);
+        // UUID alternative is "trueish"
+        return true;
+    }();
 
-    const NamespaceString sourceNS(sourceNsElt.valueStringData());
-    const NamespaceString targetNS(targetNsElt.valueStringData());
-    bool dropTarget = cmdObj["dropTarget"].trueValue();
-
-    if (sourceNS.db() == targetNS.db() && sourceNS.isNormalCollection() &&
+    if (sourceNS.dbName() == targetNS.dbName() && sourceNS.isNormalCollection() &&
         targetNS.isNormalCollection()) {
-        bool canRename = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-            ResourcePattern::forDatabaseName(sourceNS.db()), ActionType::renameCollectionSameDB);
+        const bool canRename = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forDatabaseName(sourceNS.dbName()),
+            ActionType::renameCollectionSameDB);
 
         bool canDropTargetIfNeeded = true;
         if (dropTarget) {

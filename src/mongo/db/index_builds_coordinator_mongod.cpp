@@ -681,29 +681,17 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 }
 
 void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort(
-    OperationContext* opCtx, ReplIndexBuildState* replState, const Status& abortStatus) {
-
+    OperationContext* opCtx, ReplIndexBuildState* replState) {
     hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort.pauseWhileSet(opCtx);
 
+    const auto abortStatus = replState->getAbortStatus();
     LOGV2(7419402,
           "Index build: signaling primary to abort index build",
           "buildUUID"_attr = replState->buildUUID,
           logAttrs(replState->dbName),
           "collectionUUID"_attr = replState->collectionUUID,
           "reason"_attr = abortStatus);
-    const auto transitionedToWaitForAbort = replState->requestAbortFromPrimary(abortStatus);
-
-    if (!transitionedToWaitForAbort) {
-        // The index build has likely been aborted externally (e.g. its underlying collection was
-        // dropped), and it's in the midst of tearing down. There's nothing else to do here.
-        LOGV2(7530800,
-              "Index build: the build is already in aborted state; not signaling primary to abort",
-              "buildUUID"_attr = replState->buildUUID,
-              "db"_attr = replState->dbName,
-              "collectionUUID"_attr = replState->collectionUUID,
-              "reason"_attr = abortStatus);
-        return;
-    }
+    replState->requestAbortFromPrimary();
 
     hangIndexBuildBeforeSignalingPrimaryForAbort.pauseWhileSet(opCtx);
 

@@ -9,17 +9,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/feature_flag_util.js");
-
 const numConnections = 10;
 const st = new ShardingTest({shards: 1, mongos: 1});
 const admin = st.s.getDB("admin");
-
-if (!FeatureFlagUtil.isEnabled(st.s.getDB("test"), "ConnHealthMetrics")) {
-    jsTestLog('Skipping test because the connection health metrics feature flag is disabled.');
-    st.stop();
-    return;
-}
 
 let previous = 0;
 for (var i = 0; i < numConnections; i++) {

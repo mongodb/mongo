@@ -69,8 +69,7 @@ auto makeDuration(double secs) {
 }
 
 void recordWaitTime(PoolForHost& p, DBClientBase* conn, Date_t connRequestedAt) {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe() && conn) {
+    if (conn) {
         p.recordConnectionWaitTime(connRequestedAt);
     }
 }
@@ -197,7 +196,7 @@ DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
             continue;
         }
 
-        verify(sc.conn->getSoTimeout() == socketTimeout);
+        MONGO_verify(sc.conn->getSoTimeout() == socketTimeout);
 #ifdef MONGO_CONFIG_SSL
         invariant(!sc.conn->isUsingTransientSSLParams());
 #endif
@@ -622,10 +621,7 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
                                                    0,
                                                    0,
                                                    Milliseconds{0}};
-            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-            if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-                hostStats.acquisitionWaitTimes = i->second.connectionWaitTimeStats();
-            }
+            hostStats.acquisitionWaitTimes = i->second.connectionWaitTimeStats();
             stats->updateStatsForHost("global", host, hostStats);
         }
     }
@@ -654,7 +650,7 @@ bool DBConnectionPool::serverNameCompare::operator()(const string& a, const stri
         ++ap;
         ++bp;
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 bool DBConnectionPool::poolKeyCompare::operator()(const PoolKey& a, const PoolKey& b) const {

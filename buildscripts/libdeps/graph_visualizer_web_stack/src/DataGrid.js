@@ -15,6 +15,8 @@ import { setNodeInfos } from "./redux/nodeInfo";
 import { setLinks } from "./redux/links";
 import { setLinksTrans } from "./redux/linksTrans";
 
+const {REACT_APP_API_URL} = process.env;
+
 function componentToHex(c) {
   var hex = c.toString(16);
   return hex.length == 1 ? "0" + hex : hex;
@@ -113,7 +115,7 @@ const DataGrid = ({
           "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node),
           "transitive_edges": showTransitive
       };
-      fetch('/api/graphs/' + gitHash + '/d3', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/d3', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -126,7 +128,7 @@ const DataGrid = ({
           setLinks(data.graphData.links);
           setLinksTrans(data.graphData.links_trans);
         });
-      fetch('/api/graphs/' + gitHash + '/nodes/details', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/nodes/details', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

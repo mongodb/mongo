@@ -4995,7 +4995,7 @@ PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
 void FLEUtil::checkEFCForECC(const EncryptedFieldConfig& efc) {
     uassert(7568300,
             str::stream()
-                << "Queryable Encryption version 2 collections nust not contain the eccCollection"
+                << "Queryable Encryption version 2 collections must not contain the eccCollection"
                 << " in EncryptedFieldConfig",
             !efc.getEccCollection());
 }

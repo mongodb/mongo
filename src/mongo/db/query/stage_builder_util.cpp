@@ -69,8 +69,7 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
 
     auto builder =
         std::make_unique<SlotBasedStageBuilder>(opCtx, collections, cq, solution, sbeYieldPolicy);
-    auto root = builder->build(solution.root());
-    auto data = builder->getPlanStageData();
+    auto [root, data] = builder->build(solution.root());
 
     return {std::move(root), std::move(data)};
 }

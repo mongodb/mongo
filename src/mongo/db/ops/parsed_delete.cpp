@@ -52,8 +52,8 @@
 
 namespace mongo {
 
-// Note: The caller should hold a lock on the 'collection' so that it can stay alive until the end
-// of the ParsedDelete's lifetime.
+// Note: The caller should hold a lock on the 'collection' if it really exists so that it can stay
+// alive until the end of the ParsedDelete's lifetime.
 ParsedDelete::ParsedDelete(OperationContext* opCtx,
                            const DeleteRequest* request,
                            const CollectionPtr& collection,
@@ -94,16 +94,16 @@ Status ParsedDelete::parseRequest() {
     }
 
     _expCtx->startExpressionCounters();
-    return parseQueryToCQ();
-}
 
-Status ParsedDelete::parseQueryToCQ() {
-    dassert(!_canonicalQuery.get());
-
-    // The projection needs to be applied after the delete operation, so we do not specify a
-    // projection during canonicalization.
-    auto findCommand = std::make_unique<FindCommandRequest>(_request->getNsString());
     if (auto&& queryExprs = _timeseriesDeleteQueryExprs) {
+        // TODO: Due to the complexity which is related to the efficient sort support, we don't
+        // support yet findAndModify with a query and sort but it should not be impossible. This
+        // code assumes that in findAndModify code path, the parsed delete constructor should be
+        // called with isTimeseriesDelete = true for a time-series collection.
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform a findAndModify with a query and sort on a time-series collection.",
+                _request->getMulti() || _request->getSort().isEmpty());
+
         // If we're deleting documents from a time-series collection, splits the match expression
         // into a bucket-level match expression and a residual expression so that we can push down
         // the bucket-level match expression to the system bucket collection SCAN or FETCH/IXSCAN.
@@ -118,45 +118,19 @@ Status ParsedDelete::parseQueryToCQ() {
 
         // At least, the bucket-level filter must contain the closed bucket filter.
         tassert(7542400, "Bucket-level filter must not be null", queryExprs->_bucketExpr);
-        findCommand->setFilter(queryExprs->_bucketExpr->serialize());
-    } else {
-        findCommand->setFilter(_request->getQuery().getOwned());
-    }
-    findCommand->setSort(_request->getSort().getOwned());
-    findCommand->setCollation(_request->getCollation().getOwned());
-    findCommand->setHint(_request->getHint());
-
-    // Limit should only used for the findAndModify command when a sort is specified. If a sort
-    // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
-    // limit through. Generally, a delete stage expects to be able to skip documents that were
-    // deleted out from under it, but a limit could inhibit that and give an EOF when the delete
-    // has not actually deleted a document. This behavior is fine for findAndModify, but should
-    // not apply to deletes in general.
-    if (!_request->getMulti() && !_request->getSort().isEmpty()) {
-        // TODO: Due to the complexity which is related to the efficient sort support, we don't
-        // support yet findAndModify with a query and sort but it should not be impossible.
-        // This code assumes that in findAndModify code path, the parsed delete constructor should
-        // be called with isTimeseriesDelete = true for a time-series collection.
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform a findAndModify with a query and sort on a time-series collection.",
-                !_timeseriesDeleteQueryExprs);
-        findCommand->setLimit(1);
     }
 
-    // If the delete request has runtime constants or let parameters attached to it, pass them to
-    // the FindCommandRequest.
-    if (auto& runtimeConstants = _request->getLegacyRuntimeConstants())
-        findCommand->setLegacyRuntimeConstants(*runtimeConstants);
-    if (auto& letParams = _request->getLet())
-        findCommand->setLet(*letParams);
+    return parseQueryToCQ();
+}
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(_opCtx,
-                                     std::move(findCommand),
-                                     _request->getIsExplain(),
-                                     _expCtx,
-                                     ExtensionsCallbackReal(_opCtx, &_request->getNsString()),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+Status ParsedDelete::parseQueryToCQ() {
+    dassert(!_canonicalQuery.get());
+
+    auto statusWithCQ = mongo::parseWriteQueryToCQ(
+        _expCtx->opCtx,
+        _expCtx.get(),
+        *_request,
+        _timeseriesDeleteQueryExprs ? _timeseriesDeleteQueryExprs->_bucketExpr.get() : nullptr);
 
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());

@@ -88,7 +88,6 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
     return handlePlanStageYield(
         expCtx(),
         "IDHackStage",
-        collection()->ns().ns(),
         [&] {
             // Look up the key by going directly to the index.
             auto recordId = indexAccessMethod()->asSortedData()->findSingle(

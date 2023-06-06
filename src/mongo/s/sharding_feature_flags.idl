@@ -114,3 +114,9 @@ feature_flags:
     cpp_varname: feature_flags::gMultipleGranularityDDLLocking
     default: false
     shouldBeFCVGated: true
+  # TODO (SERVER-73632): Remove once 8.0 becomes last LTS.
+  featureFlagCohostedRouter:
+    description: "Feature flag to enable shard to double as router"
+    cpp_varname: feature_flags::gCohostedRouter
+    default: false
+    shouldBeFCVGated: true

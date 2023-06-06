@@ -107,18 +107,8 @@ public:
         decltype(auto) dbName() const {
             return _get().dbName();
         }
-        decltype(auto) toString() const {
-            return _get().toString();
-        }
         decltype(auto) toStringForErrorMsg() const {
             return _get().toStringForErrorMsg();
-        }
-
-        friend std::ostream& operator<<(std::ostream& stream, const ConstantProxy& nss) {
-            return stream << nss.toString();
-        }
-        friend StringBuilder& operator<<(StringBuilder& builder, const ConstantProxy& nss) {
-            return builder << nss.toString();
         }
 
     private:
@@ -780,14 +770,6 @@ public:
      */
     static bool validCollectionName(StringData coll);
 
-    friend std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
-        return stream << nss.toString();
-    }
-
-    friend StringBuilder& operator<<(StringBuilder& builder, const NamespaceString& nss) {
-        return builder << nss.toString();
-    }
-
     int compare(const NamespaceString& other) const {
         if (_hasTenantId() && !other._hasTenantId()) {
             return 1;
@@ -1030,8 +1012,6 @@ public:
      */
     Status isNssValid() const;
 
-    std::string toString() const;
-
     /**
      * This function should only be used when logging a NamespaceStringOrUUID in an error message.
      */
@@ -1043,14 +1023,6 @@ public:
     friend std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID);
 
     void serialize(BSONObjBuilder* builder, StringData fieldName) const;
-
-    friend std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& o) {
-        return stream << o.toString();
-    }
-
-    friend StringBuilder& operator<<(StringBuilder& builder, const NamespaceStringOrUUID& o) {
-        return builder << o.toString();
-    }
 
 private:
     using UUIDWithDbName = std::tuple<DatabaseName, UUID>;

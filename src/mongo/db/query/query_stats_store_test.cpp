@@ -60,7 +60,7 @@ public:
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
-        FindRequestShapifier findShapifier(expCtx->opCtx, *parsedFind);
+        FindRequestShapifier findShapifier(expCtx, *parsedFind);
 
         SerializationOptions opts;
         if (literalPolicy != LiteralSerializationPolicy::kUnchanged) {
@@ -69,8 +69,8 @@ public:
             opts.literalPolicy = literalPolicy;
         }
         if (applyHmac) {
-            opts.applyHmacToIdentifiers = true;
-            opts.identifierHmacPolicy = applyHmacForTest;
+            opts.transformIdentifiers = true;
+            opts.transformIdentifiersCallback = applyHmacForTest;
         }
         return findShapifier.makeQueryStatsKey(opts, expCtx);
     }
@@ -90,8 +90,8 @@ public:
             opts.literalPolicy = literalPolicy;
         }
         if (applyHmac) {
-            opts.applyHmacToIdentifiers = true;
-            opts.identifierHmacPolicy = applyHmacForTest;
+            opts.transformIdentifiers = true;
+            opts.transformIdentifiersCallback = applyHmacForTest;
         }
         return aggShapifier.makeQueryStatsKey(opts, expCtx);
     }
@@ -323,10 +323,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -373,10 +373,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -387,8 +387,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "maxTimeMS": "?number",
             "batchSize": "?number"
-            }
-        )",
+        })",
         key);
 
     // Add the fields that shouldn't be hmacApplied.
@@ -429,10 +428,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -483,10 +482,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "sort": {
                     "HASH<sortVal>": 1,
@@ -560,10 +559,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "c": 1
                 },
                 "max": {
-                    "z": "?"
+                    "z": "?number"
                 },
                 "min": {
-                    "z": "?"
+                    "z": "?number"
                 }
             }
         })",
@@ -592,10 +591,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "$hint": "z"
                 },
                 "max": {
-                    "z": "?"
+                    "z": "?number"
                 },
                 "min": {
-                    "z": "?"
+                    "z": "?number"
                 }
             }
         })",
@@ -650,10 +649,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "HASH<c>": 1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 }
             }
         })",
@@ -680,10 +679,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "$natural": -1
                 },
                 "max": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 },
                 "min": {
-                    "HASH<z>": "?"
+                    "HASH<z>": "?number"
                 }
             }
         })",
@@ -708,12 +707,11 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     auto&& [expCtx, parsedFind] =
         uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
     QueryStatsEntry testMetrics{
-        std::make_unique<query_stats::FindRequestShapifier>(opCtx.get(), *parsedFind),
+        std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedFind),
         parsedFind->findCommandRequest->getNamespaceOrUUID()};
 
-    bool applyHmacToIdentifiers = false;
     auto hmacApplied =
-        testMetrics.computeQueryStatsKey(opCtx.get(), applyHmacToIdentifiers, std::string{});
+        testMetrics.computeQueryStatsKey(opCtx.get(), TransformAlgorithm::kNone, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -745,9 +743,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
 
     // Now be sure hmac is applied to variable names. We don't currently expose a different way to
     // do the hashing, so we'll just stick with the big long strings here for now.
-    applyHmacToIdentifiers = true;
-    hmacApplied =
-        testMetrics.computeQueryStatsKey(opCtx.get(), applyHmacToIdentifiers, std::string{});
+    hmacApplied = testMetrics.computeQueryStatsKey(
+        opCtx.get(), TransformAlgorithm::kHmacSha256, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -900,7 +897,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {
@@ -963,7 +960,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {
@@ -1034,7 +1031,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {
@@ -1112,7 +1109,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     },
                     {
-                        "$limit": "?"
+                        "$limit": "?number"
                     },
                     {
                         "$out": {

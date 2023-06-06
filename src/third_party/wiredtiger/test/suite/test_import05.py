@@ -103,7 +103,7 @@ class test_import05(test_import_base):
         # Copy over the datafiles for the object we want to import.
         self.copy_file(original_db_file, '.', newdir)
 
-        # Contruct the config string.
+        # Construct the config string.
         if self.repair:
             if self.global_ts == 'stable':
                 import_config = 'import=(enabled,repair=true,compare_timestamp=stable_timestamp)'

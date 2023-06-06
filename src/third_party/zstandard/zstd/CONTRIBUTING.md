@@ -7,7 +7,7 @@ New versions are being developed in the "dev" branch,
 or in their own feature branch.
 When they are deemed ready for a release, they are merged into "release".
 
-As a consequences, all contributions must stage first through "dev"
+As a consequence, all contributions must stage first through "dev"
 or their own feature branch.
 
 ## Pull Requests
@@ -134,11 +134,11 @@ It can be useful to look at additional static analyzers once in a while (and we 
 - Static analyzers are full of false positive. The signal to noise ratio is actually pretty low.
 - A good CI policy is "zero-warning tolerance". That means that all issues must be solved, including false positives. This quickly becomes a tedious workload.
 - Multiple static analyzers will feature multiple kind of false positives, sometimes applying to the same code but in different ways leading to :
-   + torteous code, trying to please multiple constraints, hurting readability and therefore maintenance. Sometimes, such complexity introduce other more subtle bugs, that are just out of scope of the analyzers.
+   + tortuous code, trying to please multiple constraints, hurting readability and therefore maintenance. Sometimes, such complexity introduce other more subtle bugs, that are just out of scope of the analyzers.
    + sometimes, these constraints are mutually exclusive : if one try to solve one, the other static analyzer will complain, they can't be both happy at the same time.
 - As if that was not enough, the list of false positives change with each version. It's hard enough to follow one static analyzer, but multiple ones with their own update agenda, this quickly becomes a massive velocity reducer.
 
-This is different from running a static analyzer once in a while, looking at the output, and __cherry picking__ a few warnings that seem helpful, either because they detected a genuine risk of bug, or because it helps expressing the code in a way which is more readable or more difficult to misuse. These kind of reports can be useful, and are accepted.
+This is different from running a static analyzer once in a while, looking at the output, and __cherry picking__ a few warnings that seem helpful, either because they detected a genuine risk of bug, or because it helps expressing the code in a way which is more readable or more difficult to misuse. These kinds of reports can be useful, and are accepted.
 
 ## Continuous Integration
 CI tests run every time a pull request (PR) is created or updated. The exact tests
@@ -197,7 +197,7 @@ something subtle merged is extensive benchmarking. You will be doing us a great 
 take the time to run extensive, long-duration, and potentially cross-(os, platform, process, etc)
 benchmarks on your end before submitting a PR. Of course, you will not be able to benchmark
 your changes on every single processor and os out there (and neither will we) but do that best
-you can:) We've adding some things to think about when benchmarking below in the Benchmarking
+you can:) We've added some things to think about when benchmarking below in the Benchmarking
 Performance section which might be helpful for you.
 3. Optimizing performance for a certain OS, processor vendor, compiler, or network system is a perfectly
 legitimate thing to do as long as it does not harm the overall performance health of Zstd.
@@ -273,7 +273,7 @@ for that options you have just provided. If you want to look at the internals of
 benchmarking script works, you can check out programs/benchzstd.c
 
 For example: say you have made a change that you believe improves the speed of zstd level 1. The
-very first thing you should use to asses whether you actually achieved any sort of improvement
+very first thing you should use to assess whether you actually achieved any sort of improvement
 is `zstd -b`. You might try to do something like this. Note: you can use the `-i` option to
 specify a running time for your benchmark in seconds (default is 3 seconds).
 Usually, the longer the running time, the more stable your results will be.
@@ -299,7 +299,7 @@ this method of evaluation will not be sufficient.
 ### Profiling
 There are a number of great profilers out there. We're going to briefly mention how you can
 profile your code using `instruments` on mac, `perf` on linux and `visual studio profiler`
-on windows.
+on Windows.
 
 Say you have an idea for a change that you think will provide some good performance gains
 for level 1 compression on Zstd. Typically this means, you have identified a section of
@@ -315,8 +315,8 @@ might be).
 
 Most profilers (including the profilers discussed below) will generate a call graph of
 functions for you. Your goal will be to find your function of interest in this call graph
-and then inspect the time spent inside of it. You might also want to to look at the
-annotated assembly which most profilers will provide you with.
+and then inspect the time spent inside of it. You might also want to look at the annotated
+assembly which most profilers will provide you with.
 
 #### Instruments
 We will once again consider the scenario where you think you've identified a piece of code
@@ -330,7 +330,7 @@ Instruments.
     * You will want a benchmark that runs for at least a few seconds (5 seconds will
     usually be long enough). This way the profiler will have something to work with
     and you will have ample time to attach your profiler to this process:)
-    * I will just use benchzstd as my bencharmking script for this example:
+    * I will just use benchzstd as my benchmarmking script for this example:
 ```
 $ zstd -b1 -i5 <my-data> # this will run for 5 seconds
 ```
@@ -455,7 +455,7 @@ This design requirement is fundamental to preserve the portability of the code b
   Any variable that can be `const` (aka. read-only) **must** be `const`.
   Any pointer which content will not be modified must be `const`.
   This property is then controlled at compiler level.
-  `const` variables are an important signal to readers that this variable isn’t modified.
+  `const` variables are an important signal to readers that this variable isn't modified.
   Conversely, non-const variables are a signal to readers to watch out for modifications later on in the function.
 * If a function must be inlined, mention it explicitly,
   using project's own portable macros, such as `FORCE_INLINE_ATTR`,

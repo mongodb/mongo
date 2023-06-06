@@ -107,8 +107,8 @@ public:
         auto opCtx = cc().makeOperationContext();
         WriteUnitOfWork wuow(opCtx.get());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-        observer.aboutToDelete(opCtx.get(), *autoColl, deletedDoc);
         OplogDeleteEntryArgs args;
+        observer.aboutToDelete(opCtx.get(), *autoColl, deletedDoc, &args);
         args.deletedDoc = includeDeletedDoc ? &deletedDoc : nullptr;
         observer.onDelete(opCtx.get(), *autoColl, 1 /* StmtId */, args);
         if (commit)

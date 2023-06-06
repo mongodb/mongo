@@ -56,8 +56,8 @@ public:
     virtual ~ReplicaSetMonitorManagerNetworkConnectionHook() = default;
 
     Status validateHost(const HostAndPort& remoteHost,
-                        const BSONObj& isMasterRequest,
-                        const executor::RemoteCommandResponse& isMasterReply) override;
+                        const BSONObj& helloRequest,
+                        const executor::RemoteCommandResponse& helloReply) override;
 
     StatusWith<boost::optional<executor::RemoteCommandRequest>> makeRequest(
         const HostAndPort& remoteHost) override;

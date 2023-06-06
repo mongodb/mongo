@@ -434,7 +434,7 @@ private:
 
         try {
             BSONObj c;
-            verify(nullptr != exec.get());
+            MONGO_verify(nullptr != exec.get());
             while (exec->getNext(&c, nullptr) == PlanExecutor::ADVANCED) {
                 md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
             }

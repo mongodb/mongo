@@ -146,6 +146,8 @@ LockManager* getGlobalLockManager() {
 bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
     switch (resId.getType()) {
         case RESOURCE_MUTEX:
+        case RESOURCE_DDL_DATABASE:
+        case RESOURCE_DDL_COLLECTION:
             return false;
 
         case RESOURCE_GLOBAL:
@@ -458,7 +460,8 @@ bool LockerImpl::unlockGlobal() {
         // error for any lock used with multi-granularity locking to have more references than
         // the global lock, because every scope starts by calling lockGlobal.
         const auto resType = it.key().getType();
-        if (resType == RESOURCE_GLOBAL || resType == RESOURCE_MUTEX) {
+        if (resType == RESOURCE_GLOBAL || resType == RESOURCE_MUTEX ||
+            resType == RESOURCE_DDL_DATABASE || resType == RESOURCE_DDL_COLLECTION) {
             it.next();
         } else {
             invariant(_unlockImpl(&it));
@@ -818,7 +821,8 @@ void LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
     for (LockRequestsMap::Iterator it = _requests.begin(); !it.finished(); it.next()) {
         const ResourceId resId = it.key();
         const ResourceType resType = resId.getType();
-        if (resType == RESOURCE_MUTEX)
+        if (resType == RESOURCE_MUTEX || resType == RESOURCE_DDL_DATABASE ||
+            resType == RESOURCE_DDL_COLLECTION)
             continue;
 
         // We should never have to save and restore metadata locks.
@@ -889,8 +893,10 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     dassert(!getWaitingResource().isValid());
 
     // Operations which are holding open an oplog hole cannot block when acquiring locks.
+    const ResourceType resType = resId.getType();
     if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork() &&
-        resId.getType() != RESOURCE_METADATA && resId.getType() != RESOURCE_MUTEX) {
+        resType != RESOURCE_METADATA && resType != RESOURCE_MUTEX &&
+        resType != RESOURCE_DDL_DATABASE && resType != RESOURCE_DDL_COLLECTION) {
         invariant(!opCtx->recoveryUnit()->isTimestamped(),
                   str::stream()
                       << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
@@ -929,13 +935,13 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
 
     // Give priority to the full modes for Global, PBWM, and RSTL resources so we don't stall global
     // operations such as shutdown or stepdown.
-    const ResourceType resType = resId.getType();
     if (resType == RESOURCE_GLOBAL) {
         if (mode == MODE_S || mode == MODE_X) {
             request->enqueueAtFront = true;
             request->compatibleFirst = true;
         }
-    } else if (resType != RESOURCE_MUTEX) {
+    } else if (resType != RESOURCE_MUTEX && resType != RESOURCE_DDL_DATABASE &&
+               resType != RESOURCE_DDL_COLLECTION) {
         // This is all sanity checks that the global locks are always be acquired
         // before any other lock has been acquired and they must be in sync with the nesting.
         if (kDebugBuild) {
@@ -979,8 +985,10 @@ void LockerImpl::_lockComplete(OperationContext* opCtx,
     // Operations which are holding open an oplog hole cannot block when acquiring locks. Lock
     // requests entering this function have been queued up and will be granted the lock as soon as
     // the lock is released, which is a blocking operation.
+    const ResourceType resType = resId.getType();
     if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork() &&
-        resId.getType() != RESOURCE_METADATA && resId.getType() != RESOURCE_MUTEX) {
+        resType != RESOURCE_METADATA && resType != RESOURCE_MUTEX &&
+        resType != RESOURCE_DDL_DATABASE && resType != RESOURCE_DDL_COLLECTION) {
         invariant(!opCtx->recoveryUnit()->isTimestamped(),
                   str::stream()
                       << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
@@ -1169,7 +1177,9 @@ bool LockerImpl::canSaveLockState() {
 
         // If there's no global lock there isn't really anything to do. Check that.
         for (auto it = _requests.begin(); !it.finished(); it.next()) {
-            invariant(it.key().getType() == RESOURCE_MUTEX);
+            const ResourceType resType = it.key().getType();
+            invariant(resType == RESOURCE_MUTEX || resType == RESOURCE_DDL_DATABASE ||
+                      resType == RESOURCE_DDL_COLLECTION);
         }
         return false;
     }
@@ -1177,7 +1187,8 @@ bool LockerImpl::canSaveLockState() {
     for (auto it = _requests.begin(); !it.finished(); it.next()) {
         const ResourceId resId = it.key();
         const ResourceType resType = resId.getType();
-        if (resType == RESOURCE_MUTEX)
+        if (resType == RESOURCE_MUTEX || resType == RESOURCE_DDL_DATABASE ||
+            resType == RESOURCE_DDL_COLLECTION)
             continue;
 
         // If any lock has been acquired more than once, we're probably somewhere in a

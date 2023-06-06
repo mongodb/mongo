@@ -27,21 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
-
-#include <memory>
 #include <string>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/kv/kv_engine_test_harness.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

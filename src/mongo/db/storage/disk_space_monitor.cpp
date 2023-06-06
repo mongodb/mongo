@@ -71,6 +71,7 @@ DiskSpaceMonitor* DiskSpaceMonitor::get(ServiceContext* svcCtx) {
 void DiskSpaceMonitor::_start(ServiceContext* svcCtx) {
     LOGV2(7333401, "Starting the DiskSpaceMonitor");
     invariant(!_job, "DiskSpaceMonitor is already started");
+    _dbpath = storageGlobalParams.dbpath;
     _job = svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
         "DiskSpaceMonitor",
         [this](Client* client) { _run(client); },
@@ -107,7 +108,7 @@ void DiskSpaceMonitor::takeAction(OperationContext* opCtx, int64_t availableByte
 void DiskSpaceMonitor::_run(Client* client) try {
     auto opCtx = client->makeOperationContext();
 
-    const auto availableBytes = getAvailableDiskSpaceBytesInDbPath();
+    const auto availableBytes = getAvailableDiskSpaceBytesInDbPath(_dbpath);
     LOGV2_DEBUG(7333405, 2, "Available disk space", "bytes"_attr = availableBytes);
     takeAction(opCtx.get(), availableBytes);
     monitorPasses.increment();

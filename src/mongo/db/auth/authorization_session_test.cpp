@@ -96,7 +96,7 @@ public:
         _opCtx = _client->makeOperationContext();
         auto localManagerState = std::make_unique<FailureCapableAuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
-        managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
         auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
             getServiceContext(), std::move(localManagerState));
         authzManager = uniqueAuthzManager.get();
@@ -1397,15 +1397,17 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
 
 TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
+    const auto kTenantOID = OID::gen();
+    const TenantId kTenantId(kTenantOID);
+
     // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
     // active (via stateful connection) to unauthenticated.
     using VTS = auth::ValidatedTenancyScope;
 
     // Create and authorize a security token user.
     constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
-    auto kOid = OID::gen();
-    auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    const UserName user("spencer", "test", TenantId(kOid));
+    auto body = BSON("ping" << 1 << "$tenant" << kTenantOID);
+    const UserName user("spencer", "test", kTenantId);
     const UserRequest userRequest(user, boost::none);
     const UserName adminUser("admin", "admin");
     const UserRequest adminUserRequest(adminUser, boost::none);
@@ -1423,7 +1425,13 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), userRequest, boost::none));
 
     // Assert that the session is authenticated and authorized as expected.
-    assertSecurityToken(testFooCollResource, ActionType::insert);
+    const auto kFooCollNss =
+        NamespaceString::createNamespaceStringForAuth(kTenantId, "test"_sd, "foo"_sd);
+    const auto kFooCollRsrc = ResourcePattern::forExactNamespace(kFooCollNss);
+    assertSecurityToken(kFooCollRsrc, ActionType::insert);
+
+    // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
+    // Add additional tests for cross-tenancy authorizations.
 
     // Assert that another user can't be authorized while the security token is auth'd.
     ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, boost::none));
@@ -1436,16 +1444,15 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
     // Assert that a connection-based user with an expiration policy can be authorized after token
     // logout.
+    const auto kSomeCollNss =
+        NamespaceString::createNamespaceStringForAuth(boost::none, "anydb"_sd, "somecollection"_sd);
+    const auto kSomeCollRsrc = ResourcePattern::forExactNamespace(kSomeCollNss);
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, expirationTime));
-    assertActive(ResourcePattern::forExactNamespace(
-                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
-                 ActionType::insert);
+    assertActive(kSomeCollRsrc, ActionType::insert);
 
     // Check that logout proceeds normally.
     authzSession->logoutDatabase(_client.get(), "admin", "Kill the test!");
-    assertLogout(ResourcePattern::forExactNamespace(
-                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
-                 ActionType::insert);
+    assertLogout(kSomeCollRsrc, ActionType::insert);
 }
 
 class SystemBucketsTest : public AuthorizationSessionTest {
@@ -1465,6 +1472,8 @@ protected:
     static const ResourcePattern testBucketResource;
     static const ResourcePattern otherBucketResource;
     static const ResourcePattern otherDbBucketResource;
+
+    static const ResourcePattern sbCollTestInAnyDB;
 };
 
 const ResourcePattern SystemBucketsTest::testMissingSystemBucketResource(
@@ -1488,11 +1497,17 @@ const ResourcePattern SystemBucketsTest::otherDbSystemBucketResource(
         NamespaceString::createNamespaceString_forTest("sb_db_other.system.buckets.sb_coll_test")));
 
 const ResourcePattern SystemBucketsTest::testBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_test", "sb_coll_test"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceStringForAuth(
+        boost::none /* tenantId */, "sb_db_test"_sd, "sb_coll_test"_sd)));
 const ResourcePattern SystemBucketsTest::otherBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_test", "sb_coll_other"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceStringForAuth(
+        boost::none /* tenantId */, "sb_db_test"_sd, "sb_coll_other"_sd)));
 const ResourcePattern SystemBucketsTest::otherDbBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_other", "sb_coll_test"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceStringForAuth(
+        boost::none /* tenantId */, "sb_db_other"_sd, "sb_coll_test"_sd)));
+
+const ResourcePattern SystemBucketsTest::sbCollTestInAnyDB(
+    ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "sb_coll_test"_sd));
 
 TEST_F(SystemBucketsTest, CheckExactSystemBucketsCollection) {
     // If we have a system_buckets exact priv
@@ -1570,8 +1585,7 @@ TEST_F(SystemBucketsTest, CheckAnySystemBucketsInDatabase) {
 
 TEST_F(SystemBucketsTest, CheckforAnySystemBucketsInAnyDatabase) {
     // If we have a system_buckets for a coll in any db priv
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase("sb_coll_test"), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
 
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
@@ -1621,8 +1635,7 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeOnResourceForSystemBuckets) {
 
     // If we have a privilege on any systems buckets in any db, we have actions on all databases and
     // system.buckets.<coll> they contain
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase(sb_coll_test), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forDatabaseName(sb_db_test)));
@@ -1695,8 +1708,7 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeInResourceDBForSystemBuckets)
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase(sb_coll_test), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 

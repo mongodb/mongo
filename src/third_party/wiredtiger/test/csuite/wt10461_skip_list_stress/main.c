@@ -140,7 +140,7 @@ thread_search_insert_run(void *arg)
      * skiplist.
      */
     check_key.data = dmalloc(CHECK_KEY_SIZE);
-    testutil_check(__wt_snprintf((char *)check_key.data, CHECK_KEY_SIZE, "00"));
+    testutil_snprintf((char *)check_key.data, CHECK_KEY_SIZE, "00");
     check_key.size = CHECK_KEY_SIZE;
 
     __wt_atomic_addv32(&active_search_insert_threads, 1);
@@ -163,24 +163,19 @@ thread_search_insert_run(void *arg)
 static void
 run(const char *working_dir)
 {
+    WT_CONNECTION *conn;
+    WT_CURSOR *cursor;
+    WT_SESSION *session;
     wt_thread_t *thr;
     uint32_t num_search_insert_threads;
-
-    WT_CONNECTION *conn;
-    WT_SESSION *session;
-    WT_CURSOR *cursor;
+    char home[1024];
     char *key;
-
-    int status;
-    char command[1024], home[1024];
 
     inserts_finished = false;
     active_search_insert_threads = 0;
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_check(__wt_snprintf(command, sizeof(command), "rm -rf %s; mkdir %s", home, home));
-    if ((status = system(command)) < 0)
-        testutil_die(status, "system: %s", command);
+    testutil_recreate_dir(home);
 
     testutil_check(wiredtiger_open(home, NULL, "create,debug_mode=(stress_skiplist=1)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -212,7 +207,7 @@ run(const char *working_dir)
     testutil_check(session->begin_transaction(session, NULL));
     for (uint32_t i = NUM_KEYS; i > 0; i--) {
         /* All keys use leading zeros. Otherwise "2" is consider larger than "11". */
-        testutil_check(__wt_snprintf(key, KEY_SIZE, "%0*u", KEY_SIZE - 1, i));
+        testutil_snprintf(key, KEY_SIZE, "%0*u", KEY_SIZE - 1, i);
         insert_key(cursor, key);
     }
     testutil_check(session->commit_transaction(session, NULL));
@@ -227,7 +222,7 @@ run(const char *working_dir)
     testutil_check(session->close(session, ""));
     testutil_check(conn->close(conn, ""));
     testutil_clean_test_artifacts(home);
-    testutil_clean_work_dir(home);
+    testutil_remove(home);
 }
 
 /*

@@ -150,6 +150,17 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoCxx20StdChronoCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-cxx20-std-chrono-check'
+                WarningsAsErrors: '*'
+                """))
+        prohibited_types = ["day", "day", "month", "year", "month_day", "month", "day", "day"]
+        self.expected_output = [
+            f"Illegal use of prohibited type 'std::chrono::{t}'." for t in prohibited_types]
+        self.run_clang_tidy()
+
     def test_MongoStdOptionalCheck(self):
 
         self.write_config(
@@ -292,8 +303,40 @@ class MongoTidyTests(unittest.TestCase):
             "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#ifndef MONGO_CONFIG_TEST2",
             "error: MONGO_CONFIG define used without prior inclusion of config.h [mongo-config-header-check,-warnings-as-errors]\n#if defined(MONGO_CONFIG_TEST1)",
         ]
+        self.run_clang_tidy()
+
+    def test_MongoCollectionShardingRuntimeCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-collection-sharding-runtime-check'
+                WarningsAsErrors: '*'
+                CheckOptions:
+                    - key:             mongo-collection-sharding-runtime-check.exceptionDirs
+                      value:           'src/mongo/db/s'
+                """))
+
+        self.expected_output = [
+            "error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details. [mongo-collection-sharding-runtime-check,-warnings-as-errors]\n    CollectionShardingRuntime csr(5, \"Test\");",
+            "error: Illegal use of CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState instead; see src/mongo/db/s/collection_sharding_state.h for details. [mongo-collection-sharding-runtime-check,-warnings-as-errors]\n    int result = CollectionShardingRuntime::functionTest(7, \"Test\");",
+        ]
 
         self.run_clang_tidy()
+
+    def test_MongoMacroDefinitionLeaksCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-macro-definition-leaks-check'
+                WarningsAsErrors: '*'
+                HeaderFilterRegex: '(mongo/.*)'
+                """))
+
+        self.expected_output = [
+            "Missing #undef 'MONGO_LOGV2_DEFAULT_COMPONENT'",
+        ]
+
+        self.run_clang_tidy()
+
 
 if __name__ == '__main__':
 

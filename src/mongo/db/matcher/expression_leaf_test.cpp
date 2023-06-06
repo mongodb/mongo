@@ -171,9 +171,13 @@ TEST(EqOp, MatchesElement) {
     ASSERT(eq.equivalent(&eq));
 }
 
-DEATH_TEST_REGEX(EqOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    EqualityMatchExpression eq(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(EqOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        EqualityMatchExpression eq(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(EqOp, MatchesScalar) {
@@ -342,9 +346,13 @@ TEST(LtOp, MatchesElement) {
     ASSERT(!lt.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    LTMatchExpression lt(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        LTMatchExpression lt(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(LtOp, MatchesScalar) {
@@ -463,9 +471,13 @@ TEST(LteOp, MatchesElement) {
     ASSERT(!lte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    LTEMatchExpression lte(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        LTEMatchExpression lte(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(LteOp, MatchesScalar) {
@@ -564,9 +576,13 @@ TEST(LteOp, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
-DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    GTMatchExpression gt(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        GTMatchExpression gt(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(GtOp, MatchesScalar) {
@@ -680,9 +696,13 @@ TEST(GteOp, MatchesElement) {
     ASSERT(!gte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    GTEMatchExpression gte(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        GTEMatchExpression gte(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(GteOp, MatchesScalar) {

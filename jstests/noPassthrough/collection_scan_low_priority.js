@@ -2,6 +2,7 @@
  * Tests that unbounded collections scans access the storage engine with low priority.
  *
  * @tags: [
+ *   cqf_incompatible, # TODO (SERVER-77792): remove tag
  *   requires_wiredtiger,
  * ]
  */

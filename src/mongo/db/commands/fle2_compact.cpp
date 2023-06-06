@@ -227,6 +227,16 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
     return uniqueEcocEntries;
 }
 
+EncryptionInformation makeEmptyProcessEncryptionInformation() {
+    EncryptionInformation encryptionInformation;
+    encryptionInformation.setCrudProcessed(true);
+
+    // We need to set an empty BSON object here for the schema.
+    encryptionInformation.setSchema(BSONObj());
+
+    return encryptionInformation;
+}
+
 }  // namespace
 
 
@@ -636,13 +646,15 @@ FLECompactESCDeleteSet readRandomESCNonAnchorIds(OperationContext* opCtx,
         aggCmd.setPipeline(std::move(pipeline));
     }
 
+    aggCmd.setEncryptionInformation(makeEmptyProcessEncryptionInformation());
+
     auto swCursor = DBClientCursor::fromAggregationRequest(&client, aggCmd, false, false);
     uassertStatusOK(swCursor.getStatus());
     auto cursor = std::move(swCursor.getValue());
 
     uassert(7293607,
             str::stream() << "Got an invalid cursor while reading the Queryable Encryption ESC "
-                          << escNss,
+                          << escNss.toStringForErrorMsg(),
             cursor);
 
     while (cursor->more()) {
@@ -692,6 +704,9 @@ void cleanupESCNonAnchors(OperationContext* opCtx,
     for (size_t idIndex = 0; idIndex < deleteSet.size();) {
         write_ops::DeleteCommandRequest deleteRequest(escNss,
                                                       std::vector<write_ops::DeleteOpEntry>{});
+        deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
+            makeEmptyProcessEncryptionInformation());
+
         auto& opEntry = deleteRequest.getDeletes().emplace_back();
         opEntry.setMulti(true);
 
@@ -739,7 +754,7 @@ void cleanupESCAnchors(OperationContext* opCtx,
 
     uassert(7618812,
             str::stream() << "Got an invalid cursor while reading the Queryable Encryption ESC "
-                          << escDeletesNss,
+                          << escDeletesNss.toStringForErrorMsg(),
             cursor);
 
     std::vector<PrfBlock> deleteSet;
@@ -748,6 +763,9 @@ void cleanupESCAnchors(OperationContext* opCtx,
     while (cursor->more()) {
         write_ops::DeleteCommandRequest deleteRequest(escNss,
                                                       std::vector<write_ops::DeleteOpEntry>{});
+        deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
+            makeEmptyProcessEncryptionInformation());
+
         auto& opEntry = deleteRequest.getDeletes().emplace_back();
         opEntry.setMulti(true);
 

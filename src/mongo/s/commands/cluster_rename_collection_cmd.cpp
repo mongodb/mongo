@@ -77,6 +77,14 @@ public:
                     "Can't rename a collection to itself",
                     fromNss != toNss);
 
+            if (fromNss.isTimeseriesBucketsCollection() &&
+                !AuthorizationSession::get(opCtx->getClient())
+                     ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                        ActionType::setUserWriteBlockMode)) {
+                uasserted(ErrorCodes::IllegalOperation,
+                          "Renaming a timeseries collection is not allowed");
+            }
+
             RenameCollectionRequest renameCollReq(request().getTo());
             renameCollReq.setStayTemp(request().getStayTemp());
             renameCollReq.setExpectedSourceUUID(request().getCollectionUUID());
@@ -139,7 +147,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(rename_collection::checkAuthForRenameCollectionCommand(
-                opCtx->getClient(), ns().db().toString(), request().toBSON(BSONObj())));
+                opCtx->getClient(), request()));
         }
 
         bool supportsWriteConcern() const override {

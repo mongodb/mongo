@@ -276,14 +276,14 @@ large_buf(char *large, size_t lsize, uint32_t id, bool fill)
     /*
      * Set up a large value putting our id in it every 1024 bytes or so.
      */
-    testutil_check(__wt_snprintf(lgbuf, sizeof(lgbuf),
-      "th-%" PRIu32 "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s", id, SPACES, SPACES, SPACES, SPACES, SPACES,
-      SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES));
+    testutil_snprintf(lgbuf, sizeof(lgbuf), "th-%" PRIu32 "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s", id,
+      SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES, SPACES,
+      SPACES, SPACES, SPACES, SPACES, SPACES);
 
     len = strlen(lgbuf);
     for (i = 0; i < lsize - len; i += len)
         if (fill)
-            testutil_check(__wt_snprintf(&large[i], lsize - i, "%s", lgbuf));
+            testutil_snprintf(&large[i], lsize - i, "%s", lgbuf);
         else
             testutil_check(strncmp(&large[i], lgbuf, len));
 }
@@ -316,14 +316,14 @@ gen_kv(char *buf, size_t buf_size, uint64_t id, uint32_t threadid, const char *l
     size_t keyid_size, large_size;
     char keyid[64];
 
-    testutil_check(__wt_snprintf(keyid, sizeof(keyid), "%10.10" PRIu64, id));
+    testutil_snprintf(keyid, sizeof(keyid), "%10.10" PRIu64, id);
     keyid_size = strlen(keyid);
     if (!forward)
         reverse(keyid);
     testutil_assert(keyid_size + 4 <= buf_size);
     large_size = (buf_size - 4) - keyid_size;
-    testutil_check(__wt_snprintf(
-      buf, buf_size, "%s" KEY_SEP "%1.1x" KEY_SEP "%.*s", keyid, threadid, (int)large_size, large));
+    testutil_snprintf(
+      buf, buf_size, "%s" KEY_SEP "%1.1x" KEY_SEP "%.*s", keyid, threadid, (int)large_size, large);
 }
 
 /*
@@ -333,7 +333,7 @@ gen_kv(char *buf, size_t buf_size, uint64_t id, uint32_t threadid, const char *l
 static void
 gen_table_name(char *buf, size_t buf_size, uint64_t id, uint32_t threadid)
 {
-    testutil_check(__wt_snprintf(buf, buf_size, "table:A%" PRIu64 "-%" PRIu32, id, threadid));
+    testutil_snprintf(buf, buf_size, "table:A%" PRIu64 "-%" PRIu32, id, threadid);
 }
 
 /*
@@ -347,7 +347,7 @@ gen_table2_name(char *buf, size_t buf_size, uint64_t id, uint32_t threadid, uint
         /* table is not renamed, so use original table name */
         gen_table_name(buf, buf_size, id, threadid);
     else
-        testutil_check(__wt_snprintf(buf, buf_size, "table:B%" PRIu64 "-%" PRIu32, id, threadid));
+        testutil_snprintf(buf, buf_size, "table:B%" PRIu64 "-%" PRIu32, id, threadid);
 }
 
 /*
@@ -636,9 +636,9 @@ create_db(const char *method, uint32_t flags)
     WT_SESSION *session;
     char envconf[512], tierconf[128];
 
-    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG, method));
+    testutil_snprintf(envconf, sizeof(envconf), ENV_CONFIG, method);
     if (LF_ISSET(TEST_TIERED)) {
-        testutil_check(__wt_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, ""));
+        testutil_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, "");
         strcat(envconf, tierconf);
         strcat(envconf, ENV_CONFIG_TIER);
     }
@@ -678,9 +678,9 @@ fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
     td = dcalloc(nth + 2, sizeof(WT_THREAD_DATA));
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
-    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG, method));
+    testutil_snprintf(envconf, sizeof(envconf), ENV_CONFIG, method);
     if (LF_ISSET(TEST_TIERED)) {
-        testutil_check(__wt_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, "../"));
+        testutil_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, "../");
         strcat(envconf, tierconf);
         strcat(envconf, ENV_CONFIG_TIER);
     }
@@ -913,9 +913,9 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
         large_arr[th] = dcalloc(LARGE_WRITE_SIZE, 1);
         large_buf(large_arr[th], LARGE_WRITE_SIZE, th, true);
     }
-    testutil_check(__wt_snprintf(checkdir, sizeof(checkdir), "../%s.CHECK", home));
-    testutil_check(__wt_snprintf(dbgdir, sizeof(savedir), "../%s.DEBUG", home));
-    testutil_check(__wt_snprintf(savedir, sizeof(savedir), "../%s.SAVE", home));
+    testutil_snprintf(checkdir, sizeof(checkdir), "../%s.CHECK", home);
+    testutil_snprintf(dbgdir, sizeof(savedir), "../%s.DEBUG", home);
+    testutil_snprintf(savedir, sizeof(savedir), "../%s.SAVE", home);
 
     /*
      * We make a copy of the directory (possibly using direct I/O) for recovery and checking, and an
@@ -933,9 +933,9 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
     copy_directory(checkdir, savedir, false);
 
     printf("Open database, run recovery and verify content\n");
-    testutil_check(__wt_snprintf(envconf, sizeof(envconf), TESTUTIL_ENV_CONFIG_REC));
+    testutil_snprintf(envconf, sizeof(envconf), TESTUTIL_ENV_CONFIG_REC);
     if (LF_ISSET(TEST_TIERED)) {
-        testutil_check(__wt_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, ""));
+        testutil_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, "");
         strcat(envconf, tierconf);
         strcat(envconf, ENV_CONFIG_TIER);
     }
@@ -1189,8 +1189,7 @@ main(int argc, char *argv[])
         return (EXIT_SUCCESS);
     }
     for (i = 0, p = args; i < (uint32_t)argc; i++) {
-        testutil_check(
-          __wt_snprintf_len_set(p, sizeof(args) - (size_t)(p - args), &size, " %s", argv[i]));
+        testutil_snprintf_len_set(p, sizeof(args) - (size_t)(p - args), &size, " %s", argv[i]);
         p += size;
     }
     while ((ch = __wt_getopt(progname, argc, argv, "BCd:f:h:i:m:n:PpS:T:t:v")) != EOF)
@@ -1306,13 +1305,10 @@ main(int argc, char *argv[])
     }
     printf("CONFIG:%s\n", args);
     if (!verify_only) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s", home));
-        if ((status = system(buf)) < 0)
-            testutil_die(status, "system: %s", buf);
-        testutil_make_work_dir(home);
+        testutil_recreate_dir(home);
         if (LF_ISSET(TEST_TIERED)) {
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", home));
-            testutil_make_work_dir(buf);
+            testutil_snprintf(buf, sizeof(buf), "%s/bucket", home);
+            testutil_mkdir(buf);
         }
 
         __wt_random_init_seed(NULL, &rnd);
@@ -1383,7 +1379,7 @@ main(int argc, char *argv[])
 
     if (!preserve) {
         testutil_clean_test_artifacts(home);
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     }
 
     return (EXIT_SUCCESS);

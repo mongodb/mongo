@@ -57,14 +57,8 @@ ABT maxABT(const ABT& v1, const ABT& v2) {
 };
 
 void constFoldInterval(IntervalRequirement& interval, const ConstFoldFn& constFold) {
-    ABT low = interval.getLowBound().getBound();
-    ABT high = interval.getHighBound().getBound();
-    constFold(low);
-    constFold(high);
-    interval = IntervalRequirement{
-        BoundRequirement{interval.getLowBound().isInclusive(), std::move(low)},
-        BoundRequirement{interval.getHighBound().isInclusive(), std::move(high)},
-    };
+    constFold(interval.getLowBound().getBound());
+    constFold(interval.getHighBound().getBound());
 }
 
 // Returns true if the interval can be proven to be empty. If no conclusion can be made, or the

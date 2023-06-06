@@ -1,0 +1,96 @@
+Tests cases where progress information should not be printed
+args =
+compress file to file
+hello*hello.zst*
+compress pipe to pipe
+compress pipe to file
+*stdin*hello.zst*
+compress file to pipe
+compress 2 files
+2 files compressed*
+decompress file to file
+hello.zst*
+decompress pipe to pipe
+decompress pipe to file
+*stdin*
+decompress file to pipe
+decompress 2 files
+2 files decompressed*
+
+args = --fake-stderr-is-console -q
+compress file to file
+compress pipe to pipe
+compress pipe to file
+compress file to pipe
+compress 2 files
+decompress file to file
+decompress pipe to pipe
+decompress pipe to file
+decompress file to pipe
+decompress 2 files
+
+args = --fake-stderr-is-console -qq --progress
+compress file to file
+compress pipe to pipe
+compress pipe to file
+compress file to pipe
+compress 2 files
+decompress file to file
+decompress pipe to pipe
+decompress pipe to file
+decompress file to pipe
+decompress 2 files
+
+args = --no-progress --fake-stderr-is-console
+compress file to file
+hello*hello.zst*
+compress pipe to pipe
+compress pipe to file
+*stdin*hello.zst*
+compress file to pipe
+compress 2 files
+2 files compressed*
+decompress file to file
+hello.zst*
+decompress pipe to pipe
+decompress pipe to file
+*stdin*
+decompress file to pipe
+decompress 2 files
+2 files decompressed*
+
+args = --no-progress --fake-stderr-is-console -v
+compress file to file
+*Zstandard CLI*
+hello*hello.zst*
+compress pipe to pipe
+*Zstandard CLI*
+*stdin*stdout*
+compress pipe to file
+*Zstandard CLI*
+*stdin*hello.zst*
+compress file to pipe
+*Zstandard CLI*
+*hello*stdout*
+compress 2 files
+*Zstandard CLI*
+*hello*hello.zst*
+*world*world.zst*
+2 files compressed*
+decompress file to file
+*Zstandard CLI*
+hello.zst*
+decompress pipe to pipe
+*Zstandard CLI*
+*stdin*
+decompress pipe to file
+*Zstandard CLI*
+*stdin*
+decompress file to pipe
+*Zstandard CLI*
+hello.zst*
+decompress 2 files
+*Zstandard CLI*
+hello.zst*
+world.zst*
+2 files decompressed*

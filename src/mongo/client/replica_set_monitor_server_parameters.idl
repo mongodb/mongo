@@ -32,7 +32,7 @@ server_parameters:
     replicaSetMonitorProtocol:
         description: >-
             Select which replica set monitor protocol to use - the new 'streamable' protocol that is
-            both SDAM compliant and allows for awaitable isMaster with exhaust, the 'sdam' compliant
+            both SDAM compliant and allows for awaitable "hello" with exhaust, the 'sdam' compliant
             protocol or the old 'scanning' protocol.
         set_at: startup
         cpp_class:

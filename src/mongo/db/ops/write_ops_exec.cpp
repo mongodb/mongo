@@ -332,8 +332,8 @@ void insertDocumentsAtomically(OperationContext* opCtx,
         },
         [&](const BSONObj& data) {
             // Check if the failpoint specifies no collection or matches the existing one.
-            const auto collElem = data["collectionNS"];
-            return !collElem || collection.nss().ns() == collElem.str();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
+            return fpNss.isEmpty() || collection.nss() == fpNss;
         });
 
     uassertStatusOK(collection_internal::insertDocuments(opCtx,
@@ -674,11 +674,13 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     PlanExecutor::ExecState state;
     try {
         state = exec->getNext(&value, nullptr);
+    } catch (const WriteConflictException&) {
+        // Propagate the WCE to be retried at a higher-level without logging.
+        throw;
     } catch (DBException& exception) {
         auto&& explainer = exec->getPlanExplainer();
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         LOGV2_WARNING(7267501,
-                      "Plan executor error during findAndModify: {error}, stats: {stats}",
                       "Plan executor error during findAndModify",
                       "error"_attr = exception.toStatus(),
                       "stats"_attr = redact(stats));
@@ -696,27 +698,34 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 }
 
 UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
-                                      const NamespaceString& nsString,
+                                      const NamespaceString& nss,
                                       CurOp* curOp,
                                       OpDebug* opDebug,
                                       bool inTransaction,
                                       bool remove,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
-                                      const UpdateRequest* updateRequest) {
+                                      const UpdateRequest& updateRequest) {
+    auto [isTimeseriesUpdate, nsString] = timeseries::isTimeseries(opCtx, updateRequest);
+    // TODO SERVER-76583: Remove this check.
+    uassert(7314600,
+            "Retryable findAndModify on a timeseries is not supported",
+            !isTimeseriesUpdate || !opCtx->isRetryableWrite());
+
     auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
         MODE_IX);
+    auto dbName = nsString.dbName();
     Database* db = [&]() {
-        AutoGetDb autoDb(opCtx, nsString.dbName(), MODE_IX);
+        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
         return autoDb.ensureDbExists(opCtx);
     }();
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
     }
 
     assertCanWrite_inlock(opCtx, nsString);
@@ -745,10 +754,15 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
             !inTransaction);
     }
 
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
+    if (isTimeseriesUpdate) {
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+    }
 
-    ParsedUpdate parsedUpdate(
-        opCtx, updateRequest, extensionsCallback, collection.getCollectionPtr());
+    ParsedUpdate parsedUpdate(opCtx,
+                              &updateRequest,
+                              collection.getCollectionPtr(),
+                              false /*forgoOpCounterIncrements*/,
+                              isTimeseriesUpdate);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const auto exec = uassertStatusOK(
@@ -798,25 +812,16 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
 
 long long writeConflictRetryRemove(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   DeleteRequest* deleteRequest,
+                                   const DeleteRequest& deleteRequest,
                                    CurOp* curOp,
                                    OpDebug* opDebug,
                                    bool inTransaction,
                                    boost::optional<BSONObj>& docFound) {
-
-    invariant(deleteRequest);
-
-    auto [isTimeseriesDelete, nsString] = timeseries::isTimeseries(opCtx, *deleteRequest);
-    if (isTimeseriesDelete) {
-        // TODO SERVER-76583: Remove this check.
-        uassert(7308305,
-                "Retryable findAndModify on a timeseries is not supported",
-                !opCtx->isRetryableWrite());
-
-        if (nss != nsString) {
-            deleteRequest->setNsString(nsString);
-        }
-    }
+    auto [isTimeseriesDelete, nsString] = timeseries::isTimeseries(opCtx, deleteRequest);
+    // TODO SERVER-76583: Remove this check.
+    uassert(7308305,
+            "Retryable findAndModify on a timeseries is not supported",
+            !isTimeseriesDelete || !opCtx->isRetryableWrite());
 
     const auto collection = acquireCollection(
         opCtx,
@@ -824,7 +829,7 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
         MODE_IX);
     const auto& collectionPtr = collection.getCollectionPtr();
 
-    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesDelete);
+    ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
     {
@@ -1134,16 +1139,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }();
 
     if (source == OperationSource::kTimeseriesUpdate) {
-        uassert(ErrorCodes::NamespaceNotFound,
-                "Could not find time-series buckets collection for update",
-                collection.getCollectionPtr());
-
-        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-        uassert(ErrorCodes::InvalidOptions,
-                "Time-series buckets collection is missing time-series options",
-                timeseriesOptions);
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
         // Only translate the hint if it is specified with an index key.
+        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
         if (timeseries::isHintIndexKey(updateRequest->getHint())) {
             updateRequest->setHint(
                 uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
@@ -1179,11 +1178,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
 
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
-
     ParsedUpdate parsedUpdate(opCtx,
                               updateRequest,
-                              extensionsCallback,
                               collection.getCollectionPtr(),
                               forgoOpCounterIncrements,
                               updateRequest->source() == OperationSource::kTimeseriesUpdate);
@@ -1313,9 +1309,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
             return ret;
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-            const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
-            auto cq = uassertStatusOK(ParsedUpdate::parseQueryToCQ(
-                opCtx, nullptr /* expCtx */, extensionsCallback, request, request.getQuery()));
+            auto cq = uassertStatusOK(parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, request));
 
             if (!write_ops_exec::shouldRetryDuplicateKeyException(
                     request, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
@@ -1523,15 +1517,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     if (source == OperationSource::kTimeseriesDelete) {
-        uassert(ErrorCodes::NamespaceNotFound,
-                "Could not find time-series buckets collection for write",
-                collection.getCollectionPtr());
-        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-        uassert(ErrorCodes::InvalidOptions,
-                "Time-series buckets collection is missing time-series options",
-                timeseriesOptions);
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
         // Only translate the hint if it is specified by index key.
+        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
         if (timeseries::isHintIndexKey(request.getHint())) {
             request.setHint(
                 uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
@@ -1643,7 +1632,7 @@ WriteResult performDeletes(OperationContext* opCtx,
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     str::stream() << "Cannot perform a multi delete inside of a multi-document "
                                      "transaction on a time-series collection: "
-                                  << ns,
+                                  << ns.toStringForErrorMsg(),
                     !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti());
         }
 
@@ -2393,12 +2382,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
     // invalidated.
     auto catalog = CollectionCatalog::get(opCtx);
     auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Could not find time-series buckets collection for write",
-            bucketsColl);
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series buckets collection is missing time-series options",
-            bucketsColl->getTimeseriesOptions());
+    timeseries::assertTimeseriesBucketsCollection(bucketsColl);
 
     auto timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
 

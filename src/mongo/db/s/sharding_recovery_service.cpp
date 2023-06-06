@@ -164,7 +164,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         Lock::GlobalLock lk(opCtx, MODE_IX);
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_S);
         } else {
             // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
@@ -233,11 +233,12 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
         tassert(7032369,
-                fmt::format("Insert did not add any doc to collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            nss.toStringForErrorMsg(),
-                            reason.toString(),
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString()),
+                fmt::format(
+                    "Insert did not add any doc to collection '{}' for namespace '{}' "
+                    "and reason '{}'",
+                    nss.toStringForErrorMsg(),
+                    reason.toString(),
+                    NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg()),
                 batchedResponse.getN() > 0);
     }
 
@@ -276,7 +277,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
             // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
@@ -360,13 +361,14 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        tassert(7032363,
-                fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toStringForErrorMsg(),
-                            reason.toString()),
-                batchedResponse.getNModified() > 0);
+        tassert(
+            7032363,
+            fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
+                        "and reason '{}'",
+                        NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg(),
+                        nss.toStringForErrorMsg(),
+                        reason.toString()),
+            batchedResponse.getNModified() > 0);
     }
 
     WriteConcernResult ignoreResult;
@@ -405,7 +407,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
             // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
@@ -490,13 +492,14 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        tassert(7032367,
-                fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toStringForErrorMsg(),
-                            reason.toString()),
-                batchedResponse.getN() > 0);
+        tassert(
+            7032367,
+            fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
+                        "and reason '{}'",
+                        NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg(),
+                        nss.toStringForErrorMsg(),
+                        reason.toString()),
+            batchedResponse.getN() > 0);
     }
 
     WriteConcernResult ignoreResult;
@@ -537,7 +540,7 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
     store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
         const auto& nss = doc.getNss();
         {
-            if (nsIsDbOnly(nss.ns())) {
+            if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
                 AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
                 auto scopedDss =
                     DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());

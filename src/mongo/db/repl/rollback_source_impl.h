@@ -53,10 +53,7 @@ public:
      */
     using GetConnectionFn = std::function<DBClientBase*()>;
 
-    RollbackSourceImpl(GetConnectionFn getConnection,
-                       const HostAndPort& source,
-                       StringData collectionName,
-                       int batchSize);
+    RollbackSourceImpl(GetConnectionFn getConnection, const HostAndPort& source, int batchSize);
 
     const OplogInterface& getOplog() const override;
 
@@ -80,7 +77,6 @@ public:
 private:
     GetConnectionFn _getConnection;
     HostAndPort _source;
-    std::string _collectionName;
     OplogInterfaceRemote _oplog;
 };
 

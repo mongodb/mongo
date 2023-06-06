@@ -65,16 +65,17 @@ BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
 }
 
 Status AllDatabaseCloner::ensurePrimaryOrSecondary(
-    const executor::RemoteCommandResponse& isMasterReply) {
-    if (!isMasterReply.isOK()) {
-        LOGV2(21054, "Cannot reconnect because isMaster command failed");
-        return isMasterReply.status;
+    const executor::RemoteCommandResponse& helloReply) {
+    if (!helloReply.isOK()) {
+        LOGV2(21054, "Cannot reconnect because 'hello' command failed");
+        return helloReply.status;
     }
-    if (isMasterReply.data["ismaster"].trueValue() || isMasterReply.data["secondary"].trueValue())
+    if (helloReply.data["isWritablePrimary"].trueValue() ||
+        helloReply.data["secondary"].trueValue())
         return Status::OK();
 
     // There is a window during startup where a node has an invalid configuration and will have
-    // an isMaster response the same as a removed node.  So we must check to see if the node is
+    // an "hello" response the same as a removed node.  So we must check to see if the node is
     // removed by checking local configuration.
     auto memberData = ReplicationCoordinator::get(getGlobalServiceContext())->getMemberData();
     auto syncSourceIter = std::find_if(
@@ -115,8 +116,8 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
     // handle the reconnect itself. This is necessary to get correct backoff behavior.
     if (client->getServerHostAndPort() != getSource()) {
         client->setHandshakeValidationHook(
-            [this](const executor::RemoteCommandResponse& isMasterReply) {
-                return ensurePrimaryOrSecondary(isMasterReply);
+            [this](const executor::RemoteCommandResponse& helloReply) {
+                return ensurePrimaryOrSecondary(helloReply);
             });
         uassertStatusOK(client->connect(getSource(), StringData(), boost::none));
     } else {

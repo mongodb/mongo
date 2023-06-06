@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 
 #include "mongo/base/error_extra_info.h"
-#include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
-#include "mongo/db/curop_metrics.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {

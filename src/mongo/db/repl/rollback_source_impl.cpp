@@ -43,12 +43,8 @@ namespace repl {
 
 RollbackSourceImpl::RollbackSourceImpl(GetConnectionFn getConnection,
                                        const HostAndPort& source,
-                                       StringData collectionName,
                                        int batchSize)
-    : _getConnection(getConnection),
-      _source(source),
-      _collectionName(collectionName),
-      _oplog(source, getConnection, collectionName, batchSize) {}
+    : _getConnection(getConnection), _source(source), _oplog(source, getConnection, batchSize) {}
 
 const OplogInterface& RollbackSourceImpl::getOplog() const {
     return _oplog;
@@ -66,7 +62,7 @@ int RollbackSourceImpl::getRollbackId() const {
 }
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
-    FindCommandRequest findCmd{NamespaceString{_collectionName}};
+    FindCommandRequest findCmd{NamespaceString::kRsOplogNamespace};
     findCmd.setSort(BSON("$natural" << -1));
     findCmd.setReadConcern(ReadConcernArgs::kLocal);
     return _getConnection()->findOne(std::move(findCmd),

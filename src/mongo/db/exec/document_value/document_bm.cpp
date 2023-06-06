@@ -90,4 +90,18 @@ void BM_documentToBson(benchmark::State& state) {
 
 BENCHMARK(BM_documentToBson)->DenseRange(2'000, 10'000, 2'000)->Unit(benchmark::kMicrosecond);
 
+void BM_FieldNameHasher(benchmark::State& state) {
+    std::string field;
+    for (auto i = 0; i < state.range(0); i++) {
+        field.append("a");
+    }
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(FieldNameHasher{}(field));
+    }
+}
+
+BENCHMARK(BM_FieldNameHasher)->RangeMultiplier(2)->Range(1, 1 << 8);
+
+
 }  // namespace mongo

@@ -336,7 +336,7 @@ BSONObjBuilder _makeMigrationStatusDocumentCommon(const NamespaceString& nss,
     builder.append(kDestinationShard, toShard.toString());
     builder.append(kIsDonorShard, isDonorShard);
     builder.append(kChunk, BSON(ChunkType::min(min) << ChunkType::max(max)));
-    builder.append(kCollection, nss.ns());
+    builder.append(kCollection, NamespaceStringUtil::serialize(nss));
     return builder;
 }
 
@@ -909,13 +909,12 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                           "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                 }
 
-                // TODO SERVER-71918 once the drop collection coordinator starts persisting the
-                // config time we can remove this. Since the collection has been dropped,
-                // persist config time inclusive of the drop collection event before deleting
-                // leftover migration metadata.
-                // This will ensure that in case of stepdown the new
-                // primary won't read stale data from config server and think that the sharded
-                // collection still exists.
+                // TODO SERVER-77472: remove this once we are sure all operations persist the config
+                // time after a collection drop. Since the collection has been dropped, persist
+                // config time inclusive of the drop collection event before deleting leftover
+                // migration metadata. This will ensure that in case of stepdown the new primary
+                // won't read stale data from config server and think that the sharded collection
+                // still exists.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
                 deleteRangeDeletionTaskOnRecipient(opCtx,
@@ -967,7 +966,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
 
         BSONObjBuilder builder;
-        builder.append("_recvChunkReleaseCritSec", nss.ns());
+        builder.append("_recvChunkReleaseCritSec", NamespaceStringUtil::serialize(nss));
         sessionId.append(&builder);
         const auto commandObj = CommandHelpers::appendMajorityWriteConcern(builder.obj());
 

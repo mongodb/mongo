@@ -188,7 +188,9 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
-SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName, SorterFileStats* stats) {
+SortOptions makeSortOptions(size_t maxMemoryUsageBytes,
+                            const DatabaseName& dbName,
+                            SorterFileStats* stats) {
     return SortOptions()
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .ExtSortAllowed()
@@ -196,7 +198,7 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName, Sorte
         .UseMemoryPool(true)
         .FileStats(stats)
         .Tracker(&indexBulkBuilderSSS.sorterTracker)
-        .DBName(dbName.toString());
+        .DBName(DatabaseNameUtil::serializeForCatalog(dbName));
 }
 
 MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPathsVec) {
@@ -221,7 +223,7 @@ struct BtreeExternalSortComparison {
 SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
                                                          std::unique_ptr<SortedDataInterface> btree)
     : _newInterface(std::move(btree)) {
-    verify(IndexDescriptor::isIndexVersionSupported(btreeState->descriptor()->version()));
+    MONGO_verify(IndexDescriptor::isIndexVersionSupported(btreeState->descriptor()->version()));
 }
 
 Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
@@ -803,7 +805,9 @@ const IndexCatalogEntry* IndexAccessMethod::BulkBuilder::yield(OperationContext*
                 LOGV2(5180600, "Hanging index build during bulk load yield");
                 fp->pauseWhileSet();
             },
-            [opCtx, &ns](auto&& config) { return config.getStringField("namespace") == ns.ns(); });
+            [opCtx, &ns](auto&& config) {
+                return NamespaceStringUtil::parseFailPointData(config, "namespace") == ns;
+            });
     };
     failPointHang(&hangDuringIndexBuildBulkLoadYield);
     failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
@@ -831,13 +835,13 @@ public:
     BulkBuilderImpl(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
                     size_t maxMemoryUsageBytes,
-                    StringData dbName);
+                    const DatabaseName& dbName);
 
     BulkBuilderImpl(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
                     size_t maxMemoryUsageBytes,
                     const IndexStateInfo& stateInfo,
-                    StringData dbName);
+                    const DatabaseName& dbName);
 
     Status insert(OperationContext* opCtx,
                   const CollectionPtr& collection,
@@ -879,7 +883,7 @@ private:
 
     Sorter* _makeSorter(
         size_t maxMemoryUsageBytes,
-        StringData dbName,
+        const DatabaseName& dbName,
         boost::optional<StringData> fileName = boost::none,
         const boost::optional<std::vector<SorterRange>>& ranges = boost::none) const;
 
@@ -907,7 +911,7 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
     const IndexCatalogEntry* entry,
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
-    StringData dbName) {
+    const DatabaseName& dbName) {
     return stateInfo
         ? std::make_unique<BulkBuilderImpl>(entry, this, maxMemoryUsageBytes, *stateInfo, dbName)
         : std::make_unique<BulkBuilderImpl>(entry, this, maxMemoryUsageBytes, dbName);
@@ -916,7 +920,7 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
 SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
                                                               SortedDataIndexAccessMethod* iam,
                                                               size_t maxMemoryUsageBytes,
-                                                              StringData dbName)
+                                                              const DatabaseName& dbName)
     : BulkBuilderCommon(0,
                         "Index Build: inserting keys from external sorter into index",
                         entry->descriptor()->indexName()),
@@ -929,7 +933,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalog
                                                               SortedDataIndexAccessMethod* iam,
                                                               size_t maxMemoryUsageBytes,
                                                               const IndexStateInfo& stateInfo,
-                                                              StringData dbName)
+                                                              const DatabaseName& dbName)
     : BulkBuilderCommon(stateInfo.getNumKeys().value_or(0),
                         "Index Build: inserting keys from external sorter into index",
                         entry->descriptor()->indexName()),
@@ -1038,7 +1042,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
 SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter*
 SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
     size_t maxMemoryUsageBytes,
-    StringData dbName,
+    const DatabaseName& dbName,
     boost::optional<StringData> fileName,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
     return fileName

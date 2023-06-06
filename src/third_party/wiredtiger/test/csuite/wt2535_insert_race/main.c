@@ -102,16 +102,16 @@ main(int argc, char *argv[])
     opts->nrecords = 100 * WT_THOUSAND;
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=2G,eviction=(threads_max=5),statistics=(all),statistics_log=(json,on_"
       "close,wait=1)",
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+    testutil_snprintf(tableconf, sizeof(tableconf),
       "key_format=%s,value_format=%s,leaf_page_max=32k,", opts->table_type == TABLE_ROW ? "Q" : "r",
-      opts->table_type == TABLE_FIX ? "8t" : "Q"));
+      opts->table_type == TABLE_FIX ? "8t" : "Q");
     testutil_check(session->create(session, opts->uri, tableconf));
 
     /* Create the single record. */

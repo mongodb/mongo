@@ -112,7 +112,7 @@ void FTSSpec::_scoreStringV1(const Tools& tools,
 
         double& score = (*docScores)[term];
         score += (weight * data.freq * coeff * adjustment);
-        verify(score <= MAX_WEIGHT);
+        MONGO_verify(score <= MAX_WEIGHT);
     }
 }
 

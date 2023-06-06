@@ -112,7 +112,7 @@ public:
 
         boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-        std::unique_ptr<CollatorInterface> _originalCollator;
+        std::shared_ptr<CollatorInterface> _originalCollator;
     };
 
     /**
@@ -221,6 +221,10 @@ public:
         return _collator.get();
     }
 
+    std::shared_ptr<CollatorInterface> getCollatorShared() const {
+        return _collator;
+    }
+
     /**
      * Whether to track timing information and "work" counts in the agg layer.
      */
@@ -247,7 +251,7 @@ public:
      * Use with caution - '_collator' is used in the context of a Pipeline, and it is illegal
      * to change the collation once a Pipeline has been parsed with this ExpressionContext.
      */
-    void setCollator(std::unique_ptr<CollatorInterface> collator) {
+    void setCollator(std::shared_ptr<CollatorInterface> collator) {
         _collator = std::move(collator);
 
         // Document/Value comparisons must be aware of the collation.
@@ -576,6 +580,39 @@ public:
     // are ineligible will still not be cached.
     bool forcePlanCache = false;
 
+    // This is state that is to be shared between the DocumentInternalSearchMongotRemote and
+    // DocumentInternalSearchIdLookup stages (these stages are the result of desugaring $search)
+    // during runtime.
+    class SharedSearchState {
+    public:
+        SharedSearchState() {}
+
+        long long getDocsReturnedByIdLookup() const {
+            return _docsReturnedByIdLookup;
+        }
+
+        /**
+         * Sets the value of _docsReturnedByIdLookup to 0.
+         */
+        void resetDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup = 0;
+        }
+
+        /**
+         * Increments the value of _docsReturnedByIdLookup by 1.
+         */
+        void incrementDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup++;
+        }
+
+    private:
+        // When there is an extractable limit in the query, DocumentInternalSearchMongotRemote sends
+        // a getMore to mongot that specifies how many more documents it needs to fulfill that
+        // limit, and it incorporates the amount of documents returned by the
+        // DocumentInternalSearchIdLookup stage into that value.
+        long long _docsReturnedByIdLookup = 0;
+    } sharedSearchState;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -586,7 +623,7 @@ protected:
     void checkForInterruptSlow();
 
     // Collator used for comparisons.
-    std::unique_ptr<CollatorInterface> _collator;
+    std::shared_ptr<CollatorInterface> _collator;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
     // Must not be changed after parsing a Pipeline with this ExpressionContext.

@@ -66,10 +66,8 @@ bool shardKeyHasCollatableType(const BSONObj& shardKey) {
 }  // namespace
 
 BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& updateRequest) {
-    ExtensionsCallbackNoop extensionsCallback = ExtensionsCallbackNoop();
-    // We are only using this to parse the query for producing the upsert document, so we don't need
-    // to pass it a real collection object.
-    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback, CollectionPtr::null);
+    // We are only using this to parse the query for producing the upsert document.
+    ParsedUpdateForMongos parsedUpdate(opCtx, &updateRequest);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const CanonicalQuery* canonicalQuery =
@@ -171,12 +169,18 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                                                                let,
                                                                legacyRuntimeConstants);
 
+    bool arbitraryTimeseriesWritesEnabled = feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                                                serverGlobalParams.featureCompatibility) ||
+        feature_flags::gTimeseriesUpdatesSupport.isEnabled(serverGlobalParams.featureCompatibility);
     auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
         expCtx,
         cri.cm.getShardKeyPattern(),
-        !isTimeseries ? query
-                      : timeseries::getBucketLevelPredicateForRouting(
-                            query, expCtx, tsFields->getTimeseriesOptions())));
+        !isTimeseries
+            ? query
+            : timeseries::getBucketLevelPredicateForRouting(query,
+                                                            expCtx,
+                                                            tsFields->getTimeseriesOptions(),
+                                                            arbitraryTimeseriesWritesEnabled)));
 
     // 'shardKey' will only be populated only if a full equality shard key is extracted.
     if (shardKey.isEmpty()) {

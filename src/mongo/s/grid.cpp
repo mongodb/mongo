@@ -78,6 +78,12 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
     _network = network;
 
     _shardRegistry->init();
+
+    _isGridInitialized.store(true);
+}
+
+bool Grid::isInitialized() const {
+    return _isGridInitialized.load();
 }
 
 bool Grid::isShardingInitialized() const {
@@ -114,6 +120,7 @@ void Grid::clearForUnitTests() {
     _balancerConfig.reset();
     _executorPool.reset();
     _network = nullptr;
+    _isGridInitialized.store(false);
 }
 
 }  // namespace mongo

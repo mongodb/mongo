@@ -227,22 +227,21 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
-                    writeJobs.push_back([opCtx,
-                                         &from = entry.nss,
-                                         &to = entry.renameTo,
-                                         commitTime](CollectionCatalog& catalog) {
-                        // We just need to do modifications on 'from' here. 'to' is taken care
-                        // of by a separate kWritableCollection entry.
-                        catalog._collections = catalog._collections.erase(from);
-                        catalog._pendingCommitNamespaces =
-                            catalog._pendingCommitNamespaces.erase(from);
+                    writeJobs.push_back(
+                        [opCtx, &from = entry.nss, &to = entry.renameTo, commitTime](
+                            CollectionCatalog& catalog) {
+                            // We just need to do modifications on 'from' here. 'to' is taken care
+                            // of by a separate kWritableCollection entry.
+                            catalog._collections = catalog._collections.erase(from);
+                            catalog._pendingCommitNamespaces =
+                                catalog._pendingCommitNamespaces.erase(from);
 
-                        auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
-                        resourceCatalog.remove({RESOURCE_COLLECTION, from}, from);
-                        resourceCatalog.add({RESOURCE_COLLECTION, to}, to);
+                            auto& resourceCatalog = ResourceCatalog::get();
+                            resourceCatalog.remove({RESOURCE_COLLECTION, from}, from);
+                            resourceCatalog.add({RESOURCE_COLLECTION, to}, to);
 
-                        catalog._catalogIdTracker.rename(from, to, commitTime);
-                    });
+                            catalog._catalogIdTracker.rename(from, to, commitTime);
+                        });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
@@ -304,16 +303,14 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
                     writeJobs.push_back([opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
-                        ResourceCatalog::get(opCtx->getServiceContext())
-                            .add({RESOURCE_COLLECTION, viewName}, viewName);
+                        ResourceCatalog::get().add({RESOURCE_COLLECTION, viewName}, viewName);
                         catalog.deregisterUncommittedView(viewName);
                     });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
                     writeJobs.push_back([opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
-                        ResourceCatalog::get(opCtx->getServiceContext())
-                            .remove({RESOURCE_COLLECTION, viewName}, viewName);
+                        ResourceCatalog::get().remove({RESOURCE_COLLECTION, viewName}, viewName);
                     });
                     break;
                 }
@@ -865,7 +862,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         return latestCollection->getCatalogId();
     }();
 
-    auto catalogEntry = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, catalogId);
+    auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
 
     const NamespaceString& nss = [&]() {
         if (auto nss = nssOrUUID.nss()) {
@@ -886,7 +883,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
 
     // If the catalog entry is not found in our snapshot then the collection is being dropped and we
     // can observe the drop. Lookups by this namespace or uuid should not find a collection.
-    if (catalogEntry.isEmpty()) {
+    if (!catalogEntry) {
         // If we performed this lookup by UUID we could be in a case where we're looking up
         // concurrently with a rename with dropTarget=true where the UUID that we use is the target
         // that got dropped. If that rename has committed we need to put the correct collection
@@ -906,7 +903,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
 
     // When trying to open the latest collection by namespace and the catalog entry has a different
     // namespace in our snapshot, then there is a rename operation concurrent with this call.
-    NamespaceString nsInDurableCatalog = DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry);
+    NamespaceString nsInDurableCatalog = catalogEntry->metadata->nss;
     if (nssOrUUID.nss() && nss != nsInDurableCatalog) {
         // There are two types of rename depending on the dropTarget flag.
         if (pendingCollection && latestCollection &&
@@ -976,16 +973,16 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         }
     }
 
-    auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
+    auto metadataObj = catalogEntry->metadata->toBSON();
 
-    if (latestCollection && latestCollection->isMetadataEqual(metadata)) {
+    if (latestCollection && latestCollection->isMetadataEqual(metadataObj)) {
         openedCollections.store(latestCollection, nss, uuid);
         return latestCollection.get();
     }
 
     // Use the pendingCollection if there is no latestCollection or if the metadata of the
     // latestCollection doesn't match the durable catalogEntry.
-    if (pendingCollection && pendingCollection->isMetadataEqual(metadata)) {
+    if (pendingCollection && pendingCollection->isMetadataEqual(metadataObj)) {
         // If the latest collection doesn't exist then the pending collection must exist as it's
         // being created in this snapshot. Otherwise, if the latest collection is incompatible
         // with this snapshot, then the change came from an uncommitted update by an operation
@@ -996,13 +993,15 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
 
     // If neither `latestCollection` or `pendingCollection` match the metadata we fully instantiate
     // a new collection instance from durable storage that is guaranteed to match. This can happen
-    // when multikey is not consistent with the storage snapshot.
+    // when multikey is not consistent with the storage snapshot. We use 'pendingCollection' as the
+    // base when available as it might contain an index that is about to be added. Dropped indexes
+    // can be found through other means in the drop pending state.
     invariant(latestCollection || pendingCollection);
     auto durableCatalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
     invariant(durableCatalogEntry);
     auto compatibleCollection =
         _createCompatibleCollection(opCtx,
-                                    latestCollection ? latestCollection : pendingCollection,
+                                    pendingCollection ? pendingCollection : latestCollection,
                                     /*readTimestamp=*/boost::none,
                                     durableCatalogEntry.get());
 
@@ -1297,7 +1296,7 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx,
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_DATABASE, dbName}, dbName);
+    ResourceCatalog::get().remove({RESOURCE_DATABASE, dbName}, dbName);
     _viewsForDatabase = _viewsForDatabase.erase(dbName);
 }
 
@@ -1952,7 +1951,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
 
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
-    auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
+    auto& resourceCatalog = ResourceCatalog::get();
     resourceCatalog.add({RESOURCE_DATABASE, nss.dbName()}, nss.dbName());
     resourceCatalog.add({RESOURCE_COLLECTION, nss}, nss);
 
@@ -2027,7 +2026,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
     coll->onDeregisterFromCatalog(opCtx);
 
-    ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_COLLECTION, ns}, ns);
+    ResourceCatalog::get().remove({RESOURCE_COLLECTION, ns}, ns);
 
     if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
         _viewsForDatabase = _viewsForDatabase.erase(coll->ns().dbName());
@@ -2106,7 +2105,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _dropPendingIndex = {};
     _stats = {};
 
-    ResourceCatalog::get(svcCtx).clear();
+    ResourceCatalog::get().clear();
 }
 
 void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& dbName) const {

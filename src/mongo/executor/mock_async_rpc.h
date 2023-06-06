@@ -101,7 +101,8 @@ public:
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token,
-        BatonHandle) final {
+        BatonHandle,
+        boost::optional<UUID> clientOperationKey) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
         auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
@@ -215,7 +216,8 @@ public:
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token,
-        BatonHandle) final {
+        BatonHandle,
+        boost::optional<UUID> clientOperationKey) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
         auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token).thenRunOn(exec).then([this,

@@ -546,6 +546,10 @@ public:
         return _pool;
     }
 
+    Options getPoolOptions() const {
+        return _pool->_options;
+    }
+
     virtual void updateConnectionPoolStats([[maybe_unused]] ConnectionPoolStats* cps) const = 0;
 
 protected:

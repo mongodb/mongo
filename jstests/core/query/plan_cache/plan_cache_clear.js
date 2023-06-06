@@ -19,6 +19,7 @@
 //   requires_fcv_63,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
+//   references_foreign_collection,
 // ]
 
 (function() {

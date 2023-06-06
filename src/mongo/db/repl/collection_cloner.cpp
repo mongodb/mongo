@@ -442,9 +442,9 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
             }
         },
         [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
             // Only hang when cloning the specified collection, or if no collection was specified.
-            auto nss = data["nss"].str();
-            return nss.empty() || nss == _sourceNss.toString();
+            return fpNss.isEmpty() || fpNss == _sourceNss;
         });
 }
 
@@ -485,14 +485,14 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
             }
         },
         [&](const BSONObj& data) {
-            return data["namespace"].String() == _sourceNss.ns() &&
+            return NamespaceStringUtil::parseFailPointData(data, "namespace") == _sourceNss &&
                 static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt();
         });
 }
 
 bool CollectionCloner::isMyFailPoint(const BSONObj& data) const {
-    auto nss = data["nss"].str();
-    return (nss.empty() || nss == _sourceNss.toString()) && BaseCloner::isMyFailPoint(data);
+    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+    return (fpNss.isEmpty() || fpNss == _sourceNss) && BaseCloner::isMyFailPoint(data);
 }
 
 void CollectionCloner::waitForDatabaseWorkToComplete() {

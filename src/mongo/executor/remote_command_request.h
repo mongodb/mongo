@@ -69,7 +69,8 @@ struct RemoteCommandRequestBase {
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis,
-                             Options options);
+                             Options options,
+                             boost::optional<UUID> operationKey = boost::none);
 
     // Internal id of this request. Not interpreted and used for tracing purposes only.
     RequestId id;
@@ -145,7 +146,8 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis = kNoTimeout,
-                             Options options = {});
+                             Options options = {},
+                             boost::optional<UUID> operationKey = boost::none);
 
     RemoteCommandRequestImpl(const Target& theTarget,
                              const std::string& theDbName,
@@ -153,16 +155,24 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis = kNoTimeout,
-                             Options options = {});
+                             Options options = {},
+                             boost::optional<UUID> operationKey = boost::none);
 
     RemoteCommandRequestImpl(const Target& theTarget,
                              const std::string& theDbName,
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
-                             Options options)
-        : RemoteCommandRequestImpl(
-              theTarget, theDbName, theCmdObj, metadataObj, opCtx, kNoTimeout, options) {}
+                             Options options,
+                             boost::optional<UUID> operationKey = boost::none)
+        : RemoteCommandRequestImpl(theTarget,
+                                   theDbName,
+                                   theCmdObj,
+                                   metadataObj,
+                                   opCtx,
+                                   kNoTimeout,
+                                   options,
+                                   operationKey) {}
 
 
     RemoteCommandRequestImpl(const Target& theTarget,
@@ -170,14 +180,16 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& theCmdObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis = kNoTimeout,
-                             Options options = {})
+                             Options options = {},
+                             boost::optional<UUID> operationKey = boost::none)
         : RemoteCommandRequestImpl(theTarget,
                                    theDbName,
                                    theCmdObj,
                                    rpc::makeEmptyMetadata(),
                                    opCtx,
                                    timeoutMillis,
-                                   options) {}
+                                   options,
+                                   operationKey) {}
 
     std::string toString() const;
 

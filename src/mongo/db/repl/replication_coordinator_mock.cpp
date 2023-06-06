@@ -271,7 +271,7 @@ void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTime(
 }
 
 void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
-    const OpTimeAndWallTime& opTimeAndWallTime) {
+    const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp) {
     stdx::lock_guard<Mutex> lk(_mutex);
 
     if (opTimeAndWallTime.opTime > _myLastAppliedOpTime) {

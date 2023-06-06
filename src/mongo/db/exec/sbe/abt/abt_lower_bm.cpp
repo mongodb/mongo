@@ -135,7 +135,7 @@ protected:
 
     // Create bindings (as above) and also create a scan node source.
     ABT createBindings(std::vector<std::pair<std::string, std::string>> bindingList) {
-        return createBindings(bindingList, _node(scanNode("scan0")), "scan0");
+        return createBindings(std::move(bindingList), _node(scanNode("scan0")), "scan0");
     }
 };
 

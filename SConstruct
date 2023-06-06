@@ -23,8 +23,6 @@ from pkg_resources import parse_version
 
 import SCons
 import SCons.Script
-from mongo_tooling_metrics.client import get_mongo_metrics_client
-from mongo_tooling_metrics.errors import ExternalHostException
 from mongo_tooling_metrics.lib.top_level_metrics import SConsToolingMetrics
 from site_scons.mongo import build_profiles
 
@@ -1643,7 +1641,7 @@ envDict = dict(
     # changes to MCI.
     UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
     PRETTY_PRINTER_TEST_ALIAS='install-pretty-printer-tests',
-    PRETTY_PRINTER_TEST_LIST='$BUILD_DIR/pretty_printer_tests.txt',
+    PRETTY_PRINTER_TEST_LIST='$BUILD_ROOT/pretty_printer_tests.txt',
     LIBFUZZER_TEST_ALIAS='install-fuzzertests',
     LIBFUZZER_TEST_LIST='$BUILD_ROOT/libfuzzer_tests.txt',
     INTEGRATION_TEST_ALIAS='install-integration-tests',
@@ -1669,22 +1667,13 @@ env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption
 
 # The placement of this is intentional. Here we setup an atexit method to store tooling metrics.
 # We should only register this function after env, env_vars and the parser have been properly initialized.
-try:
-    metrics_client = get_mongo_metrics_client()
-    metrics_client.register_metrics(
-        SConsToolingMetrics,
-        utc_starttime=datetime.utcnow(),
-        artifact_dir=env.Dir('$BUILD_DIR').get_abspath(),
-        env_vars=env_vars,
-        env=env,
-        parser=_parser,
-    )
-except ExternalHostException as _:
-    pass
-except Exception as _:
-    print(
-        "This MongoDB Virtual Workstation could not connect to the internal cluster\nThis is a non-issue, but if this message persists feel free to reach out in #server-dev-platform"
-    )
+SConsToolingMetrics.register_metrics(
+    utc_starttime=datetime.utcnow(),
+    artifact_dir=env.Dir('$BUILD_DIR').get_abspath(),
+    env_vars=env_vars,
+    env=env,
+    parser=_parser,
+)
 
 if get_option('build-metrics'):
     env['BUILD_METRICS_ARTIFACTS_DIR'] = '$BUILD_ROOT/$VARIANT_DIR'
@@ -2033,6 +2022,7 @@ if env.get('ENABLE_OOM_RETRY'):
                 ': fatal error: Killed signal terminated program cc1',
                 # TODO: SERVER-77322 remove this non memory related ICE.
                 r'during IPA pass: cp.+g\+\+: internal compiler error',
+                'ld terminated with signal 9',
             ]
         elif env.ToolchainIs('msvc'):
             env['OOM_RETRY_MESSAGES'] = [
@@ -6378,7 +6368,7 @@ if get_option('ninja') == 'disabled':
     compileCommands = env.CompilationDatabase('compile_commands.json')
     # Initialize generated-sources Alias as a placeholder so that it can be used as a
     # dependency for compileCommands. This Alias will be properly updated in other SConscripts.
-    env.Requires(compileCommands, env.Alias("generated-sources"))
+    env.Depends(compileCommands, env.Alias("generated-sources"))
     compileDb = env.Alias("compiledb", compileCommands)
 
 msvc_version = ""

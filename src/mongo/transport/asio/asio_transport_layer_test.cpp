@@ -363,8 +363,6 @@ public:
     }
 
 private:
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagConnHealthMetrics",
-                                                                true};
     std::unique_ptr<transport::AsioTransportLayer> _tla;
     MockSEP _sep;
 

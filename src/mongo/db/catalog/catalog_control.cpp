@@ -270,7 +270,7 @@ void openCatalog(OperationContext* opCtx,
                   "index"_attr = indexName);
         }
 
-        std::vector<BSONObj> indexSpecs = entry.second.second;
+        const std::vector<BSONObj>& indexSpecs = entry.second.second;
         fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
     }
 

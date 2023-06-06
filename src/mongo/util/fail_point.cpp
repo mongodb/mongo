@@ -249,7 +249,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
         uassert(7302300,
                 "$tenant should only be provided once, at the command level.",
                 !data.hasField("$tenant"));
-        if (obj.hasField("$tenant") && data.hasField("namespace")) {
+        if (obj.hasField("$tenant")) {
             data = data.addField(obj.getField("$tenant"));
         }
     }

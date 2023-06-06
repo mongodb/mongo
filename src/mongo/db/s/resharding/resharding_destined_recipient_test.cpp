@@ -318,7 +318,7 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipient) {
 
     AutoGetCollection coll(opCtx, kNss, MODE_IX);
     OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
-    ShardingWriteRouter shardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache());
+    ShardingWriteRouter shardingWriteRouter(opCtx, kNss);
 
     auto destShardId =
         shardingWriteRouter.getReshardingDestinedRecipient(BSON("x" << 2 << "y" << 10));
@@ -335,7 +335,7 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
         OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
 
         FailPointEnableBlock failPoint("blockCollectionCacheLookup");
-        ASSERT_THROWS_WITH_CHECK(ShardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache()),
+        ASSERT_THROWS_WITH_CHECK(ShardingWriteRouter(opCtx, kNss),
                                  ShardCannotRefreshDueToLocksHeldException,
                                  [&](const ShardCannotRefreshDueToLocksHeldException& ex) {
                                      const auto refreshInfo =

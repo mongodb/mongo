@@ -2777,7 +2777,10 @@ public:
             .print(nodeInfo._localCost.getCost())
             .separator(", ")
             .fieldName("adjustedCE")
-            .print(nodeInfo._adjustedCE);
+            .print(nodeInfo._adjustedCE)
+            .separator(", ")
+            .fieldName("rule")
+            .print(cascades::PhysicalRewriterTypeEnum::toString[static_cast<int>(nodeInfo._rule)]);
 
         ExplainGeneratorTransporter<version> subGen(
             _displayProperties, _memoInterface, _nodeMap, nodeInfo._nodeCEMap);
@@ -2831,12 +2834,6 @@ public:
                         local.print(physOptResult->_costLimit.toString());
                     } else {
                         local.print(physOptResult->_costLimit.getCost());
-                    }
-
-                    if (physOptResult->_nodeInfo) {
-                        const cascades::PhysicalRewriteType rule = physOptResult->_nodeInfo->_rule;
-                        local.separator(", ").fieldName("rule").print(
-                            cascades::PhysicalRewriterTypeEnum::toString[static_cast<int>(rule)]);
                     }
 
                     ExplainPrinter propPrinter =

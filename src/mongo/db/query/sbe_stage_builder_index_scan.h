@@ -64,6 +64,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     bool needsCorruptionCheck);
 
 /**
+ * Constructs the most simple version of an index scan from the single interval index bounds.
+ *
+ * In case when the 'lowKey' and 'highKey' are not specified, slots will be registered for them in
+ * the runtime environment and their slot ids returned as a pair in the third element of the tuple.
+ *
+ * If 'indexKeySlot' is provided, than the corresponding slot will be filled out with each KeyString
+ * in the index.
+ */
+std::tuple<std::unique_ptr<sbe::PlanStage>,
+           PlanStageSlots,
+           boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>>>
+generateSingleIntervalIndexScan(StageBuilderState& state,
+                                const CollectionPtr& collection,
+                                const std::string& indexName,
+                                const BSONObj& keyPattern,
+                                bool forward,
+                                std::unique_ptr<KeyString::Value> lowKey,
+                                std::unique_ptr<KeyString::Value> highKey,
+                                sbe::IndexKeysInclusionSet indexKeysToInclude,
+                                sbe::value::SlotVector indexKeySlots,
+                                const PlanStageReqs& reqs,
+                                PlanYieldPolicy* yieldPolicy,
+                                PlanNodeId planNodeId,
+                                bool lowPriority);
+
+/**
  * Constructs low/high key values from the given index 'bounds' if they can be represented either as
  * a single interval between the low and high keys, or multiple single intervals. If index bounds
  * for some interval cannot be expressed as valid low/high keys, then an empty vector is returned.

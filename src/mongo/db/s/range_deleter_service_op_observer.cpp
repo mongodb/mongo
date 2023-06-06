@@ -43,7 +43,7 @@
 namespace mongo {
 namespace {
 // Small hack used to be able to retrieve the full removed document in the `onDelete` method
-const auto deletedDocumentDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto deletedDocumentDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
                                                       const RangeDeletionTask& rdt) {
 
@@ -132,9 +132,10 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
 void RangeDeleterServiceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                   const CollectionPtr& coll,
                                                   BSONObj const& doc,
+                                                  OplogDeleteEntryArgs* args,
                                                   OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        deletedDocumentDecoration(opCtx) = doc;
+        deletedDocumentDecoration(args) = doc;
     }
 }
 
@@ -144,7 +145,7 @@ void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        const auto& deletedDoc = deletedDocumentDecoration(opCtx);
+        const auto& deletedDoc = deletedDocumentDecoration(args);
 
         auto deletionTask =
             RangeDeletionTask::parse(IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);

@@ -45,7 +45,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --directory DIRECTORY
                         directory with files to benchmark
-  --levels LEVELS       levels to test eg ('1,2,3')
+  --levels LEVELS       levels to test e.g. ('1,2,3')
   --iterations ITERATIONS
                         number of benchmark iterations to run
   --emails EMAILS       email addresses of people who will be alerted upon
@@ -70,7 +70,7 @@ After `sleepTime` (an optional parameter, default 300 seconds) seconds the scrip
 If a new commit is found it is compiled and a speed benchmark for this commit is performed.
 The results of the speed benchmark are compared to the previous results.
 If compression or decompression speed for one of zstd levels is lower than `lowerLimit` (an optional parameter, default 0.98) the speed benchmark is restarted.
-If second results are also lower than `lowerLimit` the warning e-mail is send to recipients from the list (the `emails` parameter).
+If second results are also lower than `lowerLimit` the warning e-mail is sent to recipients from the list (the `emails` parameter).
 
 Additional remarks:
 - To be sure that speed results are accurate the script should be run on a "stable" target system with no other jobs running in parallel
@@ -168,7 +168,7 @@ Full list of arguments
                     can use all --zstd parameter names and 'cParams' as a shorthand for all parameters used in ZSTD_compressionParameters
                     (Default: display all params available)
  -P#          : generated sample compressibility (when no file is provided)
- -t#          : Caps runtime of operation in seconds (default : 99999 seconds (about 27 hours ))
+ -t#          : Caps runtime of operation in seconds (default: 99999 seconds (about 27 hours))
  -v           : Prints Benchmarking output
  -D           : Next argument dictionary file
  -s           : Benchmark all files separately

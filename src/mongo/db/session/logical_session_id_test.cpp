@@ -70,7 +70,11 @@ public:
             session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
         auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
-        managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        {
+            auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            managerState->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
+        }
         auto authzManager = std::make_unique<AuthorizationManagerImpl>(
             getServiceContext(), std::move(localManagerState));
         authzManager->setAuthEnabled(true);

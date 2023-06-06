@@ -47,9 +47,9 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, bool applyHmacToIdentifiers, std::string hmacKey)
+        LiteParsed(std::string parseTimeName, TransformAlgorithm algorithm, std::string hmacKey)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _applyHmacToIdentifiers(applyHmacToIdentifiers),
+              _algorithm(algorithm),
               _hmacKey(hmacKey) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -75,7 +75,9 @@ public:
             transactionNotSupported(kStageName);
         }
 
-        bool _applyHmacToIdentifiers;
+        bool _transformIdentifiers;
+
+        TransformAlgorithm _algorithm;
 
         std::string _hmacKey;
     };
@@ -115,11 +117,9 @@ public:
 
 private:
     DocumentSourceQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             bool applyHmacToIdentifiers = false,
+                             TransformAlgorithm algorithm = kNone,
                              std::string hmacKey = {})
-        : DocumentSource(kStageName, expCtx),
-          _applyHmacToIdentifiers(applyHmacToIdentifiers),
-          _hmacKey(hmacKey) {}
+        : DocumentSource(kStageName, expCtx), _algorithm(algorithm), _hmacKey(hmacKey) {}
 
     GetNextResult doGetNext() final;
 
@@ -136,7 +136,11 @@ private:
     QueryStatsStore::PartitionId _currentPartition = -1;
 
     // When true, apply hmac to field names from returned query shapes.
-    bool _applyHmacToIdentifiers;
+    bool _transformIdentifiers;
+
+    // The type of algorithm to use for transform identifiers as an enum, currently only kHmacSha256
+    // ("hmac-sha-256") is supported.
+    TransformAlgorithm _algorithm;
 
     /**
      * Key used for SHA-256 HMAC application on field names.

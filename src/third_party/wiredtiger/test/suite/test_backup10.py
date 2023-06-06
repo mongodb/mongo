@@ -95,7 +95,7 @@ class test_backup10(backup_base):
         self.assertFalse(log4 in dup_set)
 
         # Test a few error cases now.
-        # - We cannot make multiple duplcate backup cursors.
+        # - We cannot make multiple duplicate backup cursors.
         # - We cannot duplicate the duplicate backup cursor.
         # - We must use the log target.
         msg = "/already a duplicate backup cursor open/"

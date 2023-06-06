@@ -75,14 +75,14 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
 
 
     if (conn->type() == ConnectionString::ConnectionType::kStandalone) {
-        BSONObj isMasterResponse;
-        if (!conn->runCommand(DatabaseName::kAdmin, BSON("ismaster" << 1), isMasterResponse)) {
-            uassertStatusOK(getStatusFromCommandResult(isMasterResponse));
+        BSONObj helloResponse;
+        if (!conn->runCommand(DatabaseName::kAdmin, BSON("hello" << 1), helloResponse)) {
+            uassertStatusOK(getStatusFromCommandResult(helloResponse));
         }
 
         long long configServerModeNumber;
         Status status =
-            bsonExtractIntegerField(isMasterResponse, "configsvr", &configServerModeNumber);
+            bsonExtractIntegerField(helloResponse, "configsvr", &configServerModeNumber);
 
         if (status == ErrorCodes::NoSuchKey) {
             // This isn't a config server we're talking to.

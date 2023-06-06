@@ -73,16 +73,11 @@ createIdx();
 const reasonString = `'voteAbortIndexBuild' received from '${secondary.host}'`;
 checkLog.checkContainsOnceJsonStringMatch(testDB, 4656003, "error", reasonString);
 
-// As aborting the build involves interrupting the building thread on which the user op is waiting,
-// the user op will return before the primary has actually aborted the build. Waiting for the
-// 'createIndexes' command to return does not guarantee that the primary has replicated the abort
-// oplog entry, nor that the secondary has applied it.
-IndexBuildTest.waitForIndexBuildToStop(testDB);
-IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
-
-// Assert index does not exist.
-IndexBuildTest.assertIndexes(coll, 1, ['_id_'], []);
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_'], []);
+// Wait for the index build to eventually disappear. Due to an external abort thread doing the
+// cleanup, we can't rely on waitForIndexBuildToStop as it checks for the opId of the builder
+// thread.
+IndexBuildTest.assertIndexesSoon(coll, 1, ['_id_'], []);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ['_id_'], []);
 
 rst.stopSet();
 })();

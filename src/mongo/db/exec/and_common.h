@@ -48,9 +48,9 @@ public:
         // Both 'src' and 'dest' must have a RecordId (and they must be the same RecordId), as
         // we should have just matched them according to this RecordId while doing an
         // intersection.
-        verify(dest->hasRecordId());
-        verify(src.hasRecordId());
-        verify(dest->recordId == src.recordId);
+        MONGO_verify(dest->hasRecordId());
+        MONGO_verify(src.hasRecordId());
+        MONGO_verify(dest->recordId == src.recordId);
 
         dest->metadata().mergeWith(src.metadata());
 
