@@ -152,7 +152,7 @@ public:
     explicit RelOpBase(T v) : _v{std::move(v)} {}
 
     std::string describe() const {
-        return format(FMT_STRING("{}({})"), self().name, stringify::stringifyForAssert(_v));
+        return format(FMT_STRING("{}({})"), self().name, stringify::invoke(_v));
     }
 
     template <typename X, std::enable_if_t<stdx::is_detected_v<CanMatchOp, X>, int> = 0>

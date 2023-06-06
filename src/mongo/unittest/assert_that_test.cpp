@@ -258,22 +258,21 @@ TEST(AssertThat, Demo) {
 }
 
 TEST(StringifyForAssert, PrintableTypes) {
-    using stringify::stringifyForAssert;
-    ASSERT_EQ(stringifyForAssert(3.14), "3.14");
-    ASSERT_EQ(stringifyForAssert(std::string{"pi"}), "pi");
-    ASSERT_EQ(stringifyForAssert(std::pair<std::string, double>{"pi", 3.14}), "(pi, 3.14)");
-    ASSERT_EQ(stringifyForAssert(std::tuple<int, int>{1, 2}), "(1, 2)");
-    ASSERT_EQ(stringifyForAssert(std::tuple<>{}), "()");
-    ASSERT_EQ(stringifyForAssert(std::vector<int>{1, 2, 3}), "[1, 2, 3]");
-    ASSERT_EQ(stringifyForAssert(std::list<int>{1, 2, 3}), "[1, 2, 3]");
-    ASSERT_EQ(stringifyForAssert(std::map<int, std::string>{{1, "a"}, {2, "b"}}),
+    ASSERT_EQ(stringify::invoke(3.14), "3.14");
+    ASSERT_EQ(stringify::invoke(std::string{"pi"}), "pi");
+    ASSERT_EQ(stringify::invoke(std::pair<std::string, double>{"pi", 3.14}), "(pi, 3.14)");
+    ASSERT_EQ(stringify::invoke(std::tuple<int, int>{1, 2}), "(1, 2)");
+    ASSERT_EQ(stringify::invoke(std::tuple<>{}), "()");
+    ASSERT_EQ(stringify::invoke(std::vector<int>{1, 2, 3}), "[1, 2, 3]");
+    ASSERT_EQ(stringify::invoke(std::list<int>{1, 2, 3}), "[1, 2, 3]");
+    ASSERT_EQ(stringify::invoke(std::map<int, std::string>{{1, "a"}, {2, "b"}}),
               "[(1, a), (2, b)]");
     ASSERT_THAT(
-        stringifyForAssert(std::unordered_map<int, std::string>{{1, "a"}, {2, "b"}}),  // NOLINT
+        stringify::invoke(std::unordered_map<int, std::string>{{1, "a"}, {2, "b"}}),  // NOLINT
         AnyOf(Eq("[(1, a), (2, b)]"), Eq("[(2, b), (1, a)]")));
-    ASSERT_THAT(stringifyForAssert(stdx::unordered_map<int, std::string>{{1, "a"}, {2, "b"}}),
+    ASSERT_THAT(stringify::invoke(stdx::unordered_map<int, std::string>{{1, "a"}, {2, "b"}}),
                 AnyOf(Eq("[(1, a), (2, b)]"), Eq("[(2, b), (1, a)]")));
-    ASSERT_EQ(stringifyForAssert(std::array{1, 2, 3, 4}), "[1, 2, 3, 4]")
+    ASSERT_EQ(stringify::invoke(std::array{1, 2, 3, 4}), "[1, 2, 3, 4]")
         << "std::array is both a sequence and a tuple. Should prefer sequence notation";
 }
 
@@ -283,8 +282,7 @@ TEST(AssertThat, UnprintableValues) {
     } v{123};
     std::string lastResort = stringify::lastResortFormat(typeid(v), &v, sizeof(v));
     // Test that the lastResortFormat function is used for unprintable values.
-    using stringify::stringifyForAssert;  // Augment ADL with the "detail" NS.
-    ASSERT_EQ(stringifyForAssert(v), lastResort);
+    ASSERT_EQ(stringify::invoke(v), lastResort);
     // Test that a typical matcher like Eq uses it.
     ASSERT_STRING_CONTAINS(Eq(v).describe(), lastResort);
 }

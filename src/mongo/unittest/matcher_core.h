@@ -146,7 +146,7 @@ struct MatchAssertion {
         if (!mr) {
             msg = format(FMT_STRING("value: {}, actual: {}{}, expected: {}"),
                          eStr,
-                         stringify::stringifyForAssert(e),
+                         stringify::invoke(e),
                          mr.message().empty() ? "" : format(FMT_STRING(", {}"), mr.message()),
                          m.describe());
         }
