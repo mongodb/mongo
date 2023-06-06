@@ -42,6 +42,7 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/config_shard_wrapper.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
@@ -279,7 +280,7 @@ std::shared_ptr<Shard> ShardRegistry::getConfigShard() const {
     auto configShard = _configShardData.findShard(ShardId::kConfigServerId);
     // Note this should only throw if the local node has not learned its replica set config yet.
     uassert(ErrorCodes::NotYetInitialized, "Config shard has not been set up yet", configShard);
-    return configShard;
+    return std::make_shared<ConfigShardWrapper>(configShard);
 }
 
 StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opCtx,
@@ -426,7 +427,9 @@ std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& c
 
 std::shared_ptr<Shard> ShardRegistry::createLocalConfigShard() const {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    return _shardFactory->createShard(ShardId::kConfigServerId, ConnectionString::forLocal());
+    std::shared_ptr<Shard> configShard =
+        _shardFactory->createShard(ShardId::kConfigServerId, ConnectionString::forLocal());
+    return std::make_shared<ConfigShardWrapper>(configShard);
 }
 
 void ShardRegistry::toBSON(BSONObjBuilder* result) const {
