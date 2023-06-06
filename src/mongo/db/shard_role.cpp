@@ -1136,6 +1136,14 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                 // Update the services snapshot on TransactionResources
                 acquiredCollection.collectionPtr = std::move(std::get<CollectionPtr>(collOrView));
             } else {
+                // Make sure that the placement is still correct.
+                if (std::holds_alternative<PlacementConcern>(prerequisites.placementConcern)) {
+                    checkPlacementVersion(
+                        opCtx,
+                        prerequisites.nss,
+                        std::get<PlacementConcern>(prerequisites.placementConcern));
+                }
+
                 auto reacquiredServicesSnapshot =
                     acquireServicesSnapshot(opCtx, *catalog, prerequisites);
 

@@ -1192,7 +1192,8 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_NONE));
 }
 
-TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
+TEST_F(ShardRoleTest,
+       RestoreForWriteInvalidatesAcquisitionIfPlacementConcernShardVersionNoLongerMet) {
     const auto nss = nssShardedCollection1;
 
     PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
@@ -1234,6 +1235,39 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
                                            exInfo->getVersionReceived());
                                  ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
                                  ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+                                 ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
+                             });
+
+    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+}
+
+TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernDbVersionNoLongerMet) {
+    const auto nss = nssUnshardedCollection1;
+
+    PlacementConcern placementConcern{dbVersionTestDb, {}};
+    const auto acquisition = acquireCollection(
+        opCtx(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    opCtx()->recoveryUnit()->abandonSnapshot();
+
+    // Placement changes
+    const auto newDbVersion = dbVersionTestDb.makeUpdated();
+    installDatabaseMetadata(opCtx(), nssUnshardedCollection1.dbName(), newDbVersion);
+
+    // Try to restore the resources should fail because placement concern is no longer met.
+    ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
+                                 opCtx(), std::move(yieldedTransactionResources)),
+                             ExceptionFor<ErrorCodes::StaleDbVersion>,
+                             [&](const DBException& ex) {
+                                 const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
+                                 ASSERT_EQ(nss.db(), exInfo->getDb());
+                                 ASSERT_EQ(dbVersionTestDb, exInfo->getVersionReceived());
+                                 ASSERT_EQ(newDbVersion, exInfo->getVersionWanted());
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 
