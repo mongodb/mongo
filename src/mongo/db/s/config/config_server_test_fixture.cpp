@@ -67,6 +67,7 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/config_shard_wrapper.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
@@ -128,6 +129,7 @@ void ConfigServerTestFixture::setUp() {
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
 
     auto shardLocal = Grid::get(getServiceContext())->shardRegistry()->createLocalConfigShard();
+    ASSERT_EQ(typeid(*shardLocal).name(), typeid(ConfigShardWrapper).name());
     auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(shardLocal);
     ShardingCatalogManager::create(getServiceContext(),
                                    std::move(specialExec),

@@ -304,6 +304,8 @@ private:
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
      */
     const ShardId _id;
+
+    friend class ConfigShardWrapper;
 };
 
 }  // namespace mongo

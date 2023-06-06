@@ -503,21 +503,7 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     const BSONObj& cmdObj,
     const TaskExecutor::RemoteCommandCallbackFn& cb) {
 
-    const auto readPrefWithConfigTime = [&]() -> ReadPreferenceSetting {
-        // TODO SERVER-74281: Append this higher up when we know we're targeting the config to read
-        // metadata or use a better filter to avoid matching logical sessions collection.
-        if (isConfig() &&
-            (dbName == DatabaseName::kConfig.db() || dbName == DatabaseName::kAdmin.db())) {
-            const auto vcTime = VectorClock::get(opCtx)->getTime();
-            ReadPreferenceSetting readPrefToReturn{readPref};
-            readPrefToReturn.minClusterTime = vcTime.configTime().asTimestamp();
-            return readPrefToReturn;
-        } else {
-            return {readPref};
-        }
-    }();
-
-    const auto swHost = _targeter->findHost(opCtx, readPrefWithConfigTime);
+    const auto swHost = _targeter->findHost(opCtx, readPref);
     if (!swHost.isOK()) {
         return swHost.getStatus();
     }
@@ -532,7 +518,7 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
         asyncHandle.hostTargetted,
         dbName.toString(),
         appendMaxTimeToCmdObj(requestTimeout, cmdObj),
-        _appendMetadataForCommand(opCtx, readPrefWithConfigTime),
+        _appendMetadataForCommand(opCtx, readPref),
         opCtx,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 

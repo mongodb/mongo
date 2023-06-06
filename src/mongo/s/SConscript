@@ -323,6 +323,7 @@ env.Library(
     source=[
         'balancer_configuration.cpp',
         'catalog_cache.cpp',
+        'client/config_shard_wrapper.cpp',
         'client/shard_factory.cpp',
         'client/shard_registry.cpp',
         'sharding_index_catalog_cache.cpp',
@@ -666,6 +667,7 @@ env.CppUnitTest(
         'chunk_map_test.cpp',
         'chunk_test.cpp',
         'chunk_version_test.cpp',
+        'client/config_shard_wrapper_test.cpp',
         'client/shard_remote_test.cpp',
         'cluster_identity_loader_test.cpp',
         'collection_routing_info_targeter_test.cpp',
