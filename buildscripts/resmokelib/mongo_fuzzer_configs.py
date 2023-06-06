@@ -136,6 +136,16 @@ def generate_mongod_parameters(rng, mode):
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
     ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
         ["throughputProbing", "fixedConcurrentTransactions"], weights=[10, 1])[0]
+    ret["throughputProbingStepMultiple"] = rng.uniform(0.1, 0.5)
+    ret["throughputProbingInitialConcurrency"] = rng.randint(4, 128)
+    ret["throughputProbingMinConcurrency"] = rng.randint(4,
+                                                         ret["throughputProbingInitialConcurrency"])
+    ret["throughputProbingMaxConcurrency"] = rng.randint(ret["throughputProbingInitialConcurrency"],
+                                                         128)
+    read_pct = 1 - rng.random()
+    ret["throughputProbingReadWriteRatio"] = read_pct / (1 - read_pct)
+    ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
+
     if rng.choice(3 * [True] + [False]):
         # The old retryable writes format is used by other variants. Weight towards turning on the
         # new retryable writes format on in this one.
