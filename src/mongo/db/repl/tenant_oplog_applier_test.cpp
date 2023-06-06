@@ -645,7 +645,8 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
 TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
     // TODO(SERVER-50256): remove nss_workaround, which is used to work around a bug where
     // the first operation assigned to a worker cannot be grouped.
-    NamespaceString nss_workaround(_dbName.toStringWithTenantId_forTest(), "a");
+    NamespaceString nss_workaround =
+        NamespaceString::createNamespaceString_forTest(_dbName.toStringWithTenantId_forTest(), "a");
     NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(
         _dbName.toStringWithTenantId_forTest(), "bar");
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
@@ -1626,8 +1627,10 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoop_Success) {
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_MultiKeyIndex) {
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
-    NamespaceString indexedNss(_dbName.toStringWithTenantId_forTest(), "indexedColl");
-    NamespaceString nonIndexedNss(_dbName.toStringWithTenantId_forTest(), "nonIndexedColl");
+    NamespaceString indexedNss = NamespaceString::createNamespaceString_forTest(
+        _dbName.toStringWithTenantId_forTest(), "indexedColl");
+    NamespaceString nonIndexedNss = NamespaceString::createNamespaceString_forTest(
+        _dbName.toStringWithTenantId_forTest(), "nonIndexedColl");
     auto indexedCollUUID = createCollectionWithUuid(_opCtx.get(), indexedNss);
     createCollection(_opCtx.get(), nonIndexedNss, CollectionOptions());
 

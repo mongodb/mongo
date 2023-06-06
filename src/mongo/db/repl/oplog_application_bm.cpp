@@ -510,7 +510,7 @@ private:
 
     std::vector<BSONObj> _oplogEntries;
     UUID _foobarUUID;
-    NamespaceString _foobarNs{"foo.bar"_sd};
+    NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"_sd);
     repl::OplogBatcher::BatchLimits _batchLimits{std::numeric_limits<std::size_t>::max(),
                                                  std::numeric_limits<std::size_t>::max()};
 };

@@ -461,18 +461,18 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_W
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4", "shard5"}, false);
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(3, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, true);
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(6, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(6, 0));
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
 }
 
@@ -710,18 +710,18 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Wit
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4", "shard5"}, false);
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, true);
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(7, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(7, 0));
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, true);
 }
 

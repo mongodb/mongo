@@ -600,8 +600,8 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                                {1, 2, 3, 4},
                                "field.path",
                                {"field.path.1", "fieldpath2"},
-                               NamespaceString{"db", "coll"},
-                               NamespaceString{"db", "coll"},
+                               NamespaceString::createNamespaceString_forTest("db", "coll"),
+                               NamespaceString::createNamespaceString_forTest("db", "coll"),
                                177,
                                true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

@@ -69,7 +69,8 @@ class MetadataConsistencyTest : public ShardServerTestFixture {
 protected:
     std::string _shardName = "shard0000";
     const ShardId _shardId{_shardName};
-    const NamespaceString _nss{"TestDB", "TestColl"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     const UUID _collUuid = UUID::gen();
     const KeyPattern _keyPattern{BSON("x" << 1)};
     const CollectionType _coll{
@@ -199,7 +200,8 @@ TEST_F(MetadataConsistencyTest, FindZoneRangeOverlapInconsistency) {
 
 class MetadataConsistencyRandomRoutingTableTest : public ShardServerTestFixture {
 protected:
-    const NamespaceString _nss{"TestDB", "TestColl"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     const UUID _collUuid = UUID::gen();
     const KeyPattern _keyPattern{BSON("x" << 1)};
     const CollectionType _coll{

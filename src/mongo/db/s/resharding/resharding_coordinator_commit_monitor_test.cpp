@@ -100,7 +100,7 @@ protected:
         CoordinatorCommitMonitor::RemainingOperationTimes remainingOperationTimes);
 
 private:
-    const NamespaceString _ns{"test.test"};
+    const NamespaceString _ns = NamespaceString::createNamespaceString_forTest("test.test");
     const std::vector<ShardId> _recipientShards = {{"shardOne"}, {"shardTwo"}};
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _futureExecutor;

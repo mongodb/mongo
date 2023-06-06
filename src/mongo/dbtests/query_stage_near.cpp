@@ -48,7 +48,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kTestNamespace("test.coll");
+const NamespaceString kTestNamespace = NamespaceString::createNamespaceString_forTest("test.coll");
 const BSONObj kTestKeyPattern = BSON("testIndex" << 1);
 
 class QueryStageNearTest : public unittest::Test {

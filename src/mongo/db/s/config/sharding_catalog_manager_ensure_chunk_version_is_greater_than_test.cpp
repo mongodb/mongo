@@ -43,7 +43,8 @@ protected:
         shard.setHost(_shardName + ":12");
         setupShards({shard});
     }
-    const NamespaceString _nss{"TestDB", "TestColl"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     const UUID _collUuid = UUID::gen();
     const KeyPattern _keyPattern{BSON("x" << 1)};
 };

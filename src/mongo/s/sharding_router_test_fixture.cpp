@@ -249,7 +249,8 @@ void ShardingTestFixture::setupShards(const std::vector<ShardType>& shards) {
 
 void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) {
     onFindCommand([this, &shards](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
 
         // If there is no '$db', append it.
@@ -345,7 +346,8 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
         ASSERT_EQUALS(configHost, request.target);
         const std::string cmdName(request.cmdObj.firstElement().fieldName());
         ASSERT_EQUALS("count", cmdName);
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQUALS(expectedNs.toString_forTest(), nss.toString_forTest());
 
         if (expectedQuery.isEmpty()) {

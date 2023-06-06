@@ -60,7 +60,8 @@ void createCollections(OperationContext* opCtx, int numCollections) {
     BatchedCollectionCatalogWriter batched(opCtx);
 
     for (auto i = 0; i < numCollections; i++) {
-        const NamespaceString nss("collection_catalog_bm", std::to_string(i));
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            "collection_catalog_bm", std::to_string(i));
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(opCtx,
                                        std::make_shared<CollectionMock>(nss),
@@ -117,7 +118,8 @@ void BM_CollectionCatalogCreateDropCollection(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
         CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
-            const NamespaceString nss("collection_catalog_bm", std::to_string(state.range(0)));
+            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                "collection_catalog_bm", std::to_string(state.range(0)));
             const UUID uuid = UUID::gen();
             catalog.registerCollection(
                 opCtx.get(), std::make_shared<CollectionMock>(uuid, nss), boost::none);
@@ -139,7 +141,8 @@ void BM_CollectionCatalogCreateNCollectionsBatched(benchmark::State& state) {
 
         auto numCollections = state.range(0);
         for (auto i = 0; i < numCollections; i++) {
-            const NamespaceString nss("collection_catalog_bm", std::to_string(i));
+            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                "collection_catalog_bm", std::to_string(i));
             CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
                 catalog.registerCollection(
                     opCtx.get(), std::make_shared<CollectionMock>(nss), boost::none);
@@ -159,7 +162,8 @@ void BM_CollectionCatalogCreateNCollections(benchmark::State& state) {
 
         auto numCollections = state.range(0);
         for (auto i = 0; i < numCollections; i++) {
-            const NamespaceString nss("collection_catalog_bm", std::to_string(i));
+            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                "collection_catalog_bm", std::to_string(i));
             CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
                 catalog.registerCollection(
                     opCtx.get(), std::make_shared<CollectionMock>(nss), boost::none);
@@ -174,7 +178,8 @@ void BM_CollectionCatalogLookupCollectionByNamespace(benchmark::State& state) {
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
     createCollections(opCtx.get(), state.range(0));
-    const NamespaceString nss("collection_catalog_bm", std::to_string(state.range(0) / 2));
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "collection_catalog_bm", std::to_string(state.range(0) / 2));
 
     for (auto _ : state) {
         benchmark::ClobberMemory();
@@ -190,7 +195,8 @@ void BM_CollectionCatalogLookupCollectionByUUID(benchmark::State& state) {
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
     createCollections(opCtx.get(), state.range(0));
-    const NamespaceString nss("collection_catalog_bm", std::to_string(state.range(0) / 2));
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "collection_catalog_bm", std::to_string(state.range(0) / 2));
     auto coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
     invariant(coll->ns() == nss);
     const UUID uuid = coll->uuid();

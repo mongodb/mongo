@@ -49,7 +49,7 @@ public:
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
 
-        auto nss = NamespaceString("test.bm");
+        auto nss = NamespaceString::createNamespaceString_forTest("test.bm");
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss);
 
         std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =

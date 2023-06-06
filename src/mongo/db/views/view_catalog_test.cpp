@@ -720,7 +720,8 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
 }
 
 TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
-    const NamespaceString collectionNamespace("db.coll");
+    const NamespaceString collectionNamespace =
+        NamespaceString::createNamespaceString_forTest("db.coll");
 
     Lock::DBLock dbLock(operationContext(), collectionNamespace.dbName(), MODE_IS);
     auto resolvedView = uassertStatusOK(view_catalog_helpers::resolveView(

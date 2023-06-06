@@ -1006,7 +1006,7 @@ protected:
         // Clean up any previous state from a call to runQueryFull or runQueryAsCommand.
         solns.clear();
 
-        NamespaceString nss("test.collection");
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collection");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
         findCommand->setSort(sort);
@@ -1121,7 +1121,7 @@ protected:
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
 
-        NamespaceString nss("test.collection");
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collection");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
         findCommand->setSort(sort);

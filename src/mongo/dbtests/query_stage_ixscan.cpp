@@ -144,7 +144,7 @@ public:
         return "unittest.QueryStageIxscan";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
 protected:

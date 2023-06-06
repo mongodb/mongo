@@ -65,7 +65,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("test", "foo");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "foo");
 
 ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
     return ShardId(str::stream() << "shard" << (i % nShards));
@@ -100,11 +100,11 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
     const auto reshardKeyPattern = KeyPattern(BSON("y" << 1));
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(100, 5);
-    const auto tempNss =
-        NamespaceString(kNss.db(),
-                        fmt::format("{}{}",
-                                    NamespaceString::kTemporaryReshardingCollectionPrefix,
-                                    collIdentifier.toString()));
+    const auto tempNss = NamespaceString::createNamespaceString_forTest(
+        kNss.db(),
+        fmt::format("{}{}",
+                    NamespaceString::kTemporaryReshardingCollectionPrefix,
+                    collIdentifier.toString()));
 
     std::vector<ChunkType> chunks;
     chunks.reserve(nChunks);

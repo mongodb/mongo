@@ -259,7 +259,8 @@ protected:
         Timestamp fetchTimestamp,
         boost::optional<LogicalSessionId> startAfter) {
         // create expression context
-        static const NamespaceString _transactionsNss{"config.transactions"};
+        static const NamespaceString _transactionsNss =
+            NamespaceString::createNamespaceString_forTest("config.transactions");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
             new ExpressionContextForTest(getOpCtx(), _transactionsNss));
         expCtx->setResolvedNamespace(_transactionsNss, {_transactionsNss, {}});

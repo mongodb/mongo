@@ -170,7 +170,8 @@ TEST_F(QueryStatsStoreTest, EvictEntries) {
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindCommandRequest fcr(
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
 
     fcr.setFilter(BSON("a" << 1));
 
@@ -514,7 +515,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindCommandRequest fcr(
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
     fcr.setFilter(BSONObj());
     fcr.setSort(BSONObj());
     fcr.setProjection(BSONObj());
@@ -536,7 +538,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindCommandRequest fcr(
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
 
     fcr.setFilter(BSON("b" << 1));
     fcr.setHint(BSON("z" << 1 << "c" << 1));
@@ -670,7 +673,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     // 'makeQueryStatsKey' call to do that.
     auto opCtx = makeOperationContext();
     auto fcr = std::make_unique<FindCommandRequest>(
-        NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
     fcr->setLet(BSON("var" << 2));
     fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
     fcr->setProjection(fromjson("{varIs: '$$var'}"));
@@ -752,7 +755,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimplePipeline) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    AggregateCommandRequest acr(NamespaceString("testDB.testColl"));
+    AggregateCommandRequest acr(NamespaceString::createNamespaceString_forTest("testDB.testColl"));
     auto matchStage = fromjson(R"({
             $match: {
                 foo: { $in: ["a", "b"] },
@@ -1118,7 +1121,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
 }
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    AggregateCommandRequest acr(NamespaceString("testDB.testColl"));
+    AggregateCommandRequest acr(NamespaceString::createNamespaceString_forTest("testDB.testColl"));
     acr.setPipeline({});
     auto pipeline = Pipeline::parse({}, expCtx);
 

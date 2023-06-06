@@ -51,7 +51,8 @@ namespace mongo {
 
 using unittest::assertGet;
 
-const NamespaceString QueryPlannerTest::nss("test.collection");
+const NamespaceString QueryPlannerTest::nss =
+    NamespaceString::createNamespaceString_forTest("test.collection");
 
 void QueryPlannerTest::setUp() {
     opCtx = serviceContext.makeOperationContext();

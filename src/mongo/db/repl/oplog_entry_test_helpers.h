@@ -55,9 +55,10 @@ OplogEntry makeOplogEntry(repl::OpTime opTime,
 /**
  * Creates a create collection oplog entry with given optime.
  */
-OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
-                                          const NamespaceString& nss = NamespaceString("test.t"),
-                                          const BSONObj& options = BSONObj());
+OplogEntry makeCreateCollectionOplogEntry(
+    OpTime opTime,
+    const NamespaceString& nss = NamespaceString::createNamespaceString_forTest("test.t"),
+    const BSONObj& options = BSONObj());
 /**
  * Creates an insert oplog entry with given optime and namespace.
  */

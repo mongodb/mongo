@@ -1784,7 +1784,8 @@ public:
         // no leftover collections carry-over.
         const NamespaceString nss =
             NamespaceString::createNamespaceString_forTest("unittestsDropDB.kvDropDatabase");
-        const NamespaceString sysProfile("unittestsDropDB.system.profile");
+        const NamespaceString sysProfile =
+            NamespaceString::createNamespaceString_forTest("unittestsDropDB.system.profile");
 
         std::string collIdent;
         std::string indexIdent;
@@ -2198,7 +2199,8 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
-    NamespaceString renamedNss("unittestsRename.timestampMultiIndexBuildsDuringRename");
+    NamespaceString renamedNss = NamespaceString::createNamespaceString_forTest(
+        "unittestsRename.timestampMultiIndexBuildsDuringRename");
     create(renamedNss);
 
     // Save the pre-state idents so we can capture the specific ident related to index
@@ -2958,7 +2960,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto durableCatalog = storageEngine->getCatalog();
 
-    const NamespaceString backingCollNss("unittests.backingColl");
+    const NamespaceString backingCollNss =
+        NamespaceString::createNamespaceString_forTest("unittests.backingColl");
     create(backingCollNss);
 
     const NamespaceString viewNss =
@@ -3160,7 +3163,9 @@ public:
     const StringData dbName = "unittest"_sd;
     const BSONObj oldObj = BSON("_id" << 0 << "a" << 1);
 
-    RetryableFindAndModifyTest() : nss(dbName, "retryableFindAndModifyTest") {
+    RetryableFindAndModifyTest()
+        : nss(NamespaceString::createNamespaceString_forTest(dbName,
+                                                             "retryableFindAndModifyTest")) {
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
@@ -3376,7 +3381,9 @@ public:
     const BSONObj doc = BSON("_id" << 1 << "TestValue" << 1);
     const BSONObj docKey = BSON("_id" << 1);
 
-    MultiDocumentTransactionTest() : nss(dbName, "multiDocumentTransactionTest") {
+    MultiDocumentTransactionTest()
+        : nss(NamespaceString::createNamespaceString_forTest(dbName,
+                                                             "multiDocumentTransactionTest")) {
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();

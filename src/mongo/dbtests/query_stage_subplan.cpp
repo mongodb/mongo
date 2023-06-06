@@ -52,7 +52,8 @@
 namespace mongo {
 namespace {
 
-static const NamespaceString nss("unittests.QueryStageSubplan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageSubplan");
 
 class QueryStageSubplanTest : public unittest::Test {
 public:

@@ -56,7 +56,7 @@ public:
                                BSONObj projectSpec) override final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
-        auto nss = NamespaceString("test.bm");
+        auto nss = NamespaceString::createNamespaceString_forTest("test.bm");
 
         Metadata metadata{{}};
         auto prefixId = PrefixId::createForTests();

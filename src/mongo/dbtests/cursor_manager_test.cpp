@@ -788,8 +788,8 @@ TEST_F(CursorManagerTestCustomOpCtx,
     // Add a cursor for kTestNss.
     auto pinned = makeCursor(opCtx.get());
     // Get cursors for a different NamespaceString.
-    auto cursorsForNamespace =
-        useCursorManager()->getCursorIdsForNamespace(NamespaceString("somerandom.nss"));
+    auto cursorsForNamespace = useCursorManager()->getCursorIdsForNamespace(
+        NamespaceString::createNamespaceString_forTest("somerandom.nss"));
     ASSERT_EQUALS(cursorsForNamespace.size(), 0ull);
 }
 

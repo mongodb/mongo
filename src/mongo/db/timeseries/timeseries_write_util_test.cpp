@@ -44,7 +44,8 @@ protected:
 
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatch) {
-    NamespaceString ns{"db_timeseries_write_util_test", "MakeNewBucketFromWriteBatch"};
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "MakeNewBucketFromWriteBatch");
 
     // Builds a write batch.
     OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
@@ -83,7 +84,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatch) {
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
-    NamespaceString ns{"db_timeseries_write_util_test", "MakeNewBucketFromWriteBatchWithMeta"};
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "MakeNewBucketFromWriteBatchWithMeta");
 
     // Builds a write batch.
     OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);

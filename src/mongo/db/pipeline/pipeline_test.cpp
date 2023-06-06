@@ -3678,7 +3678,7 @@ class LookupWithDBAndColl : public Base {
     }
 
     NamespaceString getLookupCollNs() override {
-        return {"config", "cache.chunks.test.foo"};
+        return NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo");
     }
 };
 
@@ -3696,7 +3696,7 @@ class LookupWithLetWithDBAndColl : public Base {
     }
 
     NamespaceString getLookupCollNs() override {
-        return {"config", "cache.chunks.test.foo"};
+        return NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo");
     }
 };
 
@@ -3729,7 +3729,7 @@ class CollectionCloningPipeline : public Base {
     }
 
     NamespaceString getLookupCollNs() override {
-        return {"config", "cache.chunks.test"};
+        return NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test");
     }
 };
 

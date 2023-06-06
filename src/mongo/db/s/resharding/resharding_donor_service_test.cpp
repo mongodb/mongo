@@ -148,7 +148,8 @@ public:
                                      isAlsoRecipient ? donorShardId : ShardId{"recipient2"},
                                      ShardId{"recipient3"}});
 
-        NamespaceString sourceNss("sourcedb.sourcecollection");
+        NamespaceString sourceNss =
+            NamespaceString::createNamespaceString_forTest("sourcedb.sourcecollection");
         auto sourceUUID = UUID::gen();
         auto commonMetadata = CommonReshardingMetadata(
             UUID::gen(),
@@ -272,7 +273,8 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
               ErrorCodes::InterruptedDueToReplStateChange);
 
     DBDirectClient client(opCtx.get());
-    NamespaceString sourceNss("sourcedb", "sourcecollection");
+    NamespaceString sourceNss =
+        NamespaceString::createNamespaceString_forTest("sourcedb", "sourcecollection");
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
     findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest()));
     auto cursor = client.find(std::move(findRequest));

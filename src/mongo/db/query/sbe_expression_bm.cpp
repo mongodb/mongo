@@ -48,7 +48,7 @@ std::string debugPrint(const T* sbeElement) {
     return sbeElement ? sbe::DebugPrinter{}.print(sbeElement->debugPrint()) : nullptr;
 }
 
-const NamespaceString kNss{"test.bm"};
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.bm");
 
 class SbeExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
 public:

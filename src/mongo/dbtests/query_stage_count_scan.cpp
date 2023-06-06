@@ -108,7 +108,8 @@ public:
     }
 
     static NamespaceString ns() {
-        return {"unittests", "QueryStageCountScanScan"};
+        return NamespaceString::createNamespaceString_forTest("unittests",
+                                                              "QueryStageCountScanScan");
     }
 
 protected:

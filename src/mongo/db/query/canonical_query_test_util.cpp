@@ -30,7 +30,8 @@
 #include "mongo/db/query/canonical_query_test_util.h"
 
 namespace mongo {
-const NamespaceString CanonicalQueryTest::nss("test.collection");
+const NamespaceString CanonicalQueryTest::nss =
+    NamespaceString::createNamespaceString_forTest("test.collection");
 
 /**
  * Utility functions to create a CanonicalQuery

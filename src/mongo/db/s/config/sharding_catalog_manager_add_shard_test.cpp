@@ -1496,7 +1496,8 @@ TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // Should not run _addShard command, touch user_writes_critical_sections, setParameter, setFCV
 

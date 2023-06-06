@@ -98,7 +98,7 @@ public:
 
         _metrics = ReshardingMetrics::makeInstance(_reshardingUUID,
                                                    BSON("y" << 1),
-                                                   NamespaceString{""},
+                                                   NamespaceString(),
                                                    ReshardingMetrics::Role::kRecipient,
                                                    getServiceContext()->getFastClockSource()->now(),
                                                    getServiceContext());
@@ -550,7 +550,8 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
     const NamespaceString dataCollectionNss =
         NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
-    const NamespaceString otherCollection("dbtests.collectionNotBeingResharded");
+    const NamespaceString otherCollection =
+        NamespaceString::createNamespaceString_forTest("dbtests.collectionNotBeingResharded");
 
     create(outputCollectionNss);
     create(dataCollectionNss);

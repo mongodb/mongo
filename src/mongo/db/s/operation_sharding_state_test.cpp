@@ -34,8 +34,9 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("TestDB", "TestColl");
-const NamespaceString kAnotherNss("TestDB", "AnotherColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+const NamespaceString kAnotherNss =
+    NamespaceString::createNamespaceString_forTest("TestDB", "AnotherColl");
 
 using OperationShardingStateTest = ShardServerTestFixture;
 

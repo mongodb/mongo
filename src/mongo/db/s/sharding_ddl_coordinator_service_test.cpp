@@ -151,7 +151,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     ddlService()->waitForRecoveryCompletion(opCtx.get());
 
     const std::string reason = "dummyReason";
-    const NamespaceString nss{"test.coll"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
 
     // 1- Stepping down
     // Only DDL coordinators can acquire DDL locks after stepping down, otherwise trying to acquire
@@ -199,7 +199,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     ddlService()->waitForRecoveryCompletion(opCtx.get());
 
     const std::string reason = "dummyReason";
-    const NamespaceString nss{"test.coll"};
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
 
     stepDown();
 

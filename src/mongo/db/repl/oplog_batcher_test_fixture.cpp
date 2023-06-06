@@ -233,7 +233,7 @@ OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
     BSONObj oField = BSON("msg" << msg << "count" << t);
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               OpTypeEnum::kNoop,           // op type
-                              NamespaceString(""),         // namespace
+                              NamespaceString(),           // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
                               OplogEntry::kOplogVersion,   // version

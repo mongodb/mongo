@@ -102,7 +102,8 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
     auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
-    auto pipeline = parsePipeline(pipelineStr, NamespaceString("test"), opCtx);
+    auto pipeline =
+        parsePipeline(pipelineStr, NamespaceString::createNamespaceString_forTest("test"), opCtx);
 
     ABT valueArray = createValueArray(inputObjs);
 
@@ -176,7 +177,7 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
 std::vector<BSONObj> runPipeline(OperationContext* opCtx,
                                  const std::string& pipelineStr,
                                  const std::vector<BSONObj>& inputObjs) {
-    NamespaceString nss("test");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test");
     std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> pipeline =
         parsePipeline(pipelineStr, nss, opCtx);
 

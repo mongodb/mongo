@@ -41,7 +41,8 @@
 namespace mongo {
 namespace {
 
-static const NamespaceString testns("TestDB.TestColl");
+static const NamespaceString testns =
+    NamespaceString::createNamespaceString_forTest("TestDB.TestColl");
 
 const IDLParserContext ctxt("count");
 

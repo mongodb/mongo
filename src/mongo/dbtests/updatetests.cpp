@@ -159,7 +159,7 @@ protected:
     }
 
     NamespaceString nss() const {
-        return NamespaceString{ns()};
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 };
 
@@ -425,7 +425,7 @@ class MultiInc : public SetBase {
 public:
     string s() {
         stringstream ss;
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("_id" << 1));
         std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
         bool first = true;
@@ -963,7 +963,7 @@ protected:
     }
 
     NamespaceString nss() const {
-        return NamespaceString{ns()};
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
     void setParams(const BSONArray& fields,
@@ -1852,7 +1852,7 @@ protected:
     virtual const char* ns() = 0;
 
     NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     };
 
     virtual void dotest() = 0;
@@ -1866,7 +1866,8 @@ protected:
     }
 
     BSONObj findOne() {
-        return _client.findOne(NamespaceString{ns()}, BSONObj{} /*filter*/);
+        return _client.findOne(NamespaceString::createNamespaceString_forTest(ns()),
+                               BSONObj{} /*filter*/);
     }
 
     void test(const char* initial, const char* mod, const char* after) {

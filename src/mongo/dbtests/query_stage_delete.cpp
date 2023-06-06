@@ -45,7 +45,8 @@
 namespace mongo {
 namespace QueryStageDelete {
 
-static const NamespaceString nss("unittests.QueryStageDelete");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageDelete");
 
 //
 // Stage-specific tests.

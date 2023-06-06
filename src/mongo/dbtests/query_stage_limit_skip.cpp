@@ -98,7 +98,9 @@ class QueryStageLimitSkipBasicTest {
 public:
     void run() {
         const boost::intrusive_ptr<ExpressionContext> expCtx(make_intrusive<ExpressionContext>(
-            _opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString("test.dummyNS")));
+            _opCtx,
+            std::unique_ptr<CollatorInterface>(nullptr),
+            NamespaceString::createNamespaceString_forTest("test.dummyNS")));
 
         for (int i = 0; i < 2 * N; ++i) {
             WorkingSet ws;

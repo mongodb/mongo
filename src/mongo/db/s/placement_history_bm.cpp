@@ -192,7 +192,8 @@ void BM_initPlacementHistory(benchmark::State& state) {
 
     for (int i = 1; i <= nCollections; i++) {
         const std::string collName = "coll" + std::to_string(i);
-        fixture.setupCollectionWithChunks(NamespaceString("db1." + collName), nChunks);
+        fixture.setupCollectionWithChunks(
+            NamespaceString::createNamespaceString_forTest("db1." + collName), nChunks);
     }
 
     for (auto _ : state) {

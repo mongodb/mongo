@@ -39,7 +39,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kNss("test", "foo");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "foo");
 
 RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
     const auto version = rt.getVersion();

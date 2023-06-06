@@ -364,18 +364,21 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         setupDatabase(dbName, ShardId(primaryShard), DatabaseVersion(UUID::gen(), timestamp));
     }
 
-    NamespaceString coll1Name("dbWithCollections_1_2", "coll1");
+    NamespaceString coll1Name =
+        NamespaceString::createNamespaceString_forTest("dbWithCollections_1_2", "coll1");
     std::vector<ShardId> expectedColl1Placement{ShardId("shard1"), ShardId("shard4")};
     const auto [coll1, coll1Chunks] =
         createCollectionAndChunksMetadata(operationContext(), coll1Name, 2, expectedColl1Placement);
 
-    NamespaceString coll2Name("dbWithCollections_1_2", "coll2");
+    NamespaceString coll2Name =
+        NamespaceString::createNamespaceString_forTest("dbWithCollections_1_2", "coll2");
     std::vector<ShardId> expectedColl2Placement{
         ShardId("shard1"), ShardId("shard2"), ShardId("shard3"), ShardId("shard4")};
     const auto [coll2, coll2Chunks] =
         createCollectionAndChunksMetadata(operationContext(), coll2Name, 8, expectedColl2Placement);
 
-    NamespaceString corruptedCollName("dbWithCorruptedCollection", "corruptedColl");
+    NamespaceString corruptedCollName = NamespaceString::createNamespaceString_forTest(
+        "dbWithCorruptedCollection", "corruptedColl");
     std::vector<ShardId> expectedCorruptedCollPlacement{
         ShardId("shard1"), ShardId("shard2"), ShardId("shard3")};
     const auto [corruptedColl, corruptedCollChunks] =
@@ -414,7 +417,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         // Each database is correctly described
         for (const auto& [dbName, primaryShard, timeOfCreation] : databaseInfos) {
             const NamespacePlacementType expectedEntry(
-                NamespaceString(dbName), timeOfCreation, {primaryShard});
+                NamespaceString::createNamespaceString_forTest(dbName),
+                timeOfCreation,
+                {primaryShard});
             const auto generatedEntry = findOneOnConfigCollection<NamespacePlacementType>(
                 operationContext(),
                 NamespaceString::kConfigsvrPlacementHistoryNamespace,

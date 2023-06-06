@@ -63,7 +63,8 @@ using boost::intrusive_ptr;
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.documentsourcetests");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.documentsourcetests");
 static const BSONObj metaTextScore = BSON("$meta"
                                           << "textScore");
 

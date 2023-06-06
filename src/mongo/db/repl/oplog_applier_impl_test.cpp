@@ -1067,7 +1067,7 @@ TEST_F(OplogApplierImplTest,
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
     sessionInfo.setTxnNumber(3);
-    const NamespaceString& nss{"test", "foo"};
+    const NamespaceString& nss = NamespaceString::createNamespaceString_forTest("test", "foo");
     repl::OpTime firstInsertOpTime(Timestamp(1, 0), 1);
     auto firstRetryableOp = makeInsertDocumentOplogEntryWithSessionInfo(
         firstInsertOpTime, nss, BSON("_id" << 1), sessionInfo);
@@ -1296,7 +1296,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorr
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {
 public:
     MultiOplogEntryOplogApplierImplTest()
-        : _nss1("test.preptxn1"), _nss2("test.preptxn2"), _txnNum(1) {}
+        : _nss1(NamespaceString::createNamespaceString_forTest("test.preptxn1")),
+          _nss2(NamespaceString::createNamespaceString_forTest("test.preptxn2")),
+          _txnNum(1) {}
 
 protected:
     void setUp() override {
@@ -2467,7 +2469,7 @@ protected:
     void setUp() override {
         MultiOplogEntryOplogApplierImplTest::setUp();
 
-        const NamespaceString cmdNss("admin.$cmd");
+        const NamespaceString cmdNss = NamespaceString::createNamespaceString_forTest("admin.$cmd");
         _lsid1 = makeLogicalSessionId(_opCtx.get());
         _lsid2 = makeLogicalSessionId(_opCtx.get());
         _txnNum1 = _txnNum2 = 1;
@@ -3209,7 +3211,8 @@ TEST_F(OplogApplierImplTest,
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kInitialSync));
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    NamespaceString badNss("test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
+    NamespaceString badNss = NamespaceString::createNamespaceString_forTest(
+        "test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
     auto doc1 = BSON("_id" << 1);
     auto keyPattern = BSON("a" << 1);
     auto doc3 = BSON("_id" << 3);
@@ -5029,8 +5032,8 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionIgnoresNamespaceNotFoundErr
 class PreparedTxnSplitTest : public OplogApplierImplTest {
 public:
     PreparedTxnSplitTest()
-        : _nss("test.prepTxnSplit"),
-          _cmdNss("admin.$cmd"),
+        : _nss(NamespaceString::createNamespaceString_forTest("test.prepTxnSplit")),
+          _cmdNss(NamespaceString::createNamespaceString_forTest("admin.$cmd")),
           _uuid(UUID::gen()),
           _txnNum1(1),
           _txnNum2(2) {}
@@ -5361,7 +5364,8 @@ protected:
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(sessionId);
         sessionInfo.setTxnNumber(3);
-        const NamespaceString& nss{"admin", "$cmd"};
+        const NamespaceString& nss =
+            NamespaceString::createNamespaceString_forTest("admin", "$cmd");
         repl::OpTime opTime(Timestamp(1, 0), 1);
 
         return {makeOplogEntry(opTime,                                      // optime

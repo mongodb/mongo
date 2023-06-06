@@ -52,7 +52,7 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     const auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
 
-    NamespaceString nss("test", "doc_seq");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "doc_seq");
     DBDirectClient db(opCtx);
     db.dropCollection(nss);
     ASSERT_EQ(db.count(nss), 0u);
@@ -86,7 +86,7 @@ public:
     }
 
     NamespaceString nss() {
-        return NamespaceString("test.testCollection");
+        return NamespaceString::createNamespaceString_forTest("test.testCollection");
     }
     DatabaseName nsDb() {
         return DatabaseName::createDatabaseName_forTest(boost::none, "test");
@@ -110,7 +110,7 @@ struct Base {
     }
 
     NamespaceString nss() {
-        return NamespaceString("test.fs.chunks");
+        return NamespaceString::createNamespaceString_forTest("test.fs.chunks");
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();

@@ -762,15 +762,15 @@ protected:
     std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(BSONObj obj, uint64_t cm = 0) {
         auto s = getTestESCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
-        auto nssEsc = NamespaceString("test.enxcol_.coll.esc");
+        auto nssEsc = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
         return mongo::fle::getCountInfoSets(_queryImpl.get(), nssEsc, s, d, cm);
     }
 
     std::vector<PrfBlock> readTags(BSONObj obj, uint64_t cm = 0) {
         auto s = getTestESCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
-        auto nssEsc = NamespaceString("test.enxcol_.coll.esc");
-        auto nssEcc = NamespaceString("test.enxcol_.coll.ecc");
+        auto nssEsc = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
+        auto nssEcc = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecc");
 
         return mongo::fle::readTags(_queryImpl.get(), nssEsc, s, d, cm);
     }

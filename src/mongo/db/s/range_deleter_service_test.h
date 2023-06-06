@@ -61,9 +61,11 @@ public:
 
     // Instantiate some collection UUIDs and tasks to be used for testing
     UUID uuidCollA = UUID::gen();
-    inline static const NamespaceString nsCollA{"test", "collA"};
+    inline static const NamespaceString nsCollA =
+        NamespaceString::createNamespaceString_forTest("test", "collA");
     UUID uuidCollB = UUID::gen();
-    inline static const NamespaceString nsCollB{"test", "collB"};
+    inline static const NamespaceString nsCollB =
+        NamespaceString::createNamespaceString_forTest("test", "collB");
 
     inline static std::map<UUID, NamespaceString> nssWithUuid{};
 

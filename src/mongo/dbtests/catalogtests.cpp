@@ -54,7 +54,8 @@ public:
     void run() {
         auto serviceContext = getGlobalServiceContext();
 
-        NamespaceString competingNss("test.competingCollection");
+        NamespaceString competingNss =
+            NamespaceString::createNamespaceString_forTest("test.competingCollection");
 
         auto client1 = serviceContext->makeClient("client1");
         auto client2 = serviceContext->makeClient("client2");

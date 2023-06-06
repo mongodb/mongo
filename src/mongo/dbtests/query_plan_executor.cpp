@@ -64,7 +64,8 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 
-static const NamespaceString nss("unittests.QueryPlanExecutor");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryPlanExecutor");
 
 class PlanExecutorTest : public unittest::Test {
 public:

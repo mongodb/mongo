@@ -69,7 +69,7 @@ public:
 
     std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
         std::string ns = "test.wt";
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
         BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
@@ -97,7 +97,7 @@ public:
                                                                 bool partial,
                                                                 KeyFormat keyFormat) final {
         std::string ns = "test.wt";
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"

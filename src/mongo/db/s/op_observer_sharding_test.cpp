@@ -50,7 +50,8 @@ namespace {
 
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
-const NamespaceString kUnshardedNss("TestDB", "UnshardedColl");
+const NamespaceString kUnshardedNss =
+    NamespaceString::createNamespaceString_forTest("TestDB", "UnshardedColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);

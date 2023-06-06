@@ -46,7 +46,7 @@ class ClassicExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
                              const std::vector<Document>& documents) override final {
         QueryTestServiceContext testServiceContext;
         auto opContext = testServiceContext.makeOperationContext();
-        NamespaceString nss("test.bm");
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.bm");
         auto exprContext = make_intrusive<ExpressionContextForTest>(opContext.get(), nss);
 
         // Build an expression.

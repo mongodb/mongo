@@ -236,7 +236,7 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
 Collection* RollbackTest::_createCollection(OperationContext* opCtx,
                                             const std::string& nss,
                                             const CollectionOptions& options) {
-    return _createCollection(opCtx, NamespaceString(nss), options);
+    return _createCollection(opCtx, NamespaceString::createNamespaceString_forTest(nss), options);
 }
 
 void RollbackTest::_insertDocument(OperationContext* opCtx,

@@ -382,7 +382,7 @@ protected:
         return pipeline;
     }
 
-    const NamespaceString _crudNss{"test.foo"};
+    const NamespaceString _crudNss = NamespaceString::createNamespaceString_forTest("test.foo");
     // Use a constant value so unittests can store oplog entries as extended json strings in code.
     const UUID _reshardingCollUUID =
         fassert(5074001, UUID::parse("8926ba8e-611a-42c2-bb1a-3b7819f610ed"));
@@ -1430,7 +1430,7 @@ using ReshardingAggWithStorageTest = MockReplCoordServerFixture;
 // with no-op pre/post image oplog.
 TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     repl::OpTime opTime(Timestamp(43, 56), 1);
-    const NamespaceString kCrudNs("foo", "bar");
+    const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const UUID kCrudUUID = UUID::gen();
     const ShardId kMyShardId{"shard1"};
     ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
@@ -1525,7 +1525,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
 
 TEST_F(ReshardingAggWithStorageTest,
        RetryableFindAndModifyInsideInternalTransactionWithImageLookup) {
-    const NamespaceString kCrudNs("foo", "bar");
+    const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const UUID kCrudUUID = UUID::gen();
     const ShardId kMyShardId{"shard1"};
 

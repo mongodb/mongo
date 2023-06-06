@@ -170,7 +170,7 @@ void normalTest(CollectionMarkersTest* fixture, std::string collectionName) {
 
     auto opCtx = fixture->getClient()->makeOperationContext();
 
-    auto collNs = NamespaceString("test", collectionName);
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
     ASSERT_OK(fixture->createCollection(opCtx.get(), collNs));
 
     static constexpr auto dataLength = 4;
@@ -199,7 +199,7 @@ TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
 
     auto opCtx = getClient()->makeOperationContext();
 
-    auto collNs = NamespaceString("test", "coll");
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
     ASSERT_OK(createCollection(opCtx.get(), collNs));
 
     static constexpr auto dataLength = 4;
@@ -228,7 +228,7 @@ template <typename T>
 void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionName) {
     auto testMarkers = std::make_shared<T>(0, 0, 100);
 
-    auto collNs = NamespaceString("test", collectionName);
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
         ASSERT_OK(fixture->createCollection(opCtx.get(), collNs));
@@ -298,7 +298,7 @@ template <typename T>
 void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionName) {
     auto testMarkers = std::make_shared<T>(0, 0, 100);
 
-    auto collNs = NamespaceString("test", collectionName);
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
         ASSERT_OK(fixture->createCollection(opCtx.get(), collNs));
@@ -355,7 +355,7 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
     static constexpr auto kElementSize = 15;
     static constexpr auto kMinBytes = (kElementSize * 2) - 1;
 
-    auto collNs = NamespaceString("test", "coll");
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
     {
         auto opCtx = getClient()->makeOperationContext();
         ASSERT_OK(createCollection(opCtx.get(), collNs));
@@ -388,7 +388,7 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
 
     int totalBytes = 0;
     int totalRecords = 0;
-    auto collNs = NamespaceString("test", "coll");
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
     {
         auto opCtx = getClient()->makeOperationContext();
         ASSERT_OK(createCollection(opCtx.get(), collNs));

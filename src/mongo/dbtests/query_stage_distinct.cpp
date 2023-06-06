@@ -50,7 +50,8 @@
 
 namespace QueryStageDistinct {
 
-static const NamespaceString nss{"unittests.QueryStageDistinct"};
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageDistinct");
 
 class DistinctBase {
 public:

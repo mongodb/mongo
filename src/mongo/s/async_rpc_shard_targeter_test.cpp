@@ -299,7 +299,8 @@ DEATH_TEST_F(AsyncRPCShardingTestFixture, CannotCallOnRemoteErrorBeforeResolve, 
  * Test ShardId overload version of 'sendCommand'.
  */
 TEST_F(AsyncRPCShardingTestFixture, ShardIdOverload) {
-    const NamespaceString testNS = NamespaceString("testdb", "testcoll");
+    const NamespaceString testNS =
+        NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     const BSONObj testFirstBatch = BSON("x" << 1);
     const FindCommandRequest findCmd = FindCommandRequest(testNS);
     const BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})

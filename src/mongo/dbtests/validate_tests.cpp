@@ -79,7 +79,11 @@ static const char* const _ns = "unittests.validate_tests";
 class ValidateBase {
 public:
     explicit ValidateBase(bool full, bool background, bool clustered)
-        : _full(full), _background(background), _nss(_ns), _autoDb(nullptr), _db(nullptr) {
+        : _full(full),
+          _background(background),
+          _nss(NamespaceString::createNamespaceString_forTest(_ns)),
+          _autoDb(nullptr),
+          _db(nullptr) {
 
         CollectionOptions options;
         if (clustered) {

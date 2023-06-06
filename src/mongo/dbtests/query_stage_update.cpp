@@ -62,7 +62,8 @@ using std::make_unique;
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.QueryStageUpdate");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageUpdate");
 
 class QueryStageUpdateBase {
 public:

@@ -50,7 +50,8 @@ namespace {
 using std::unique_ptr;
 using unittest::assertGet;
 
-static const NamespaceString testns("testdb.testcoll");
+static const NamespaceString testns =
+    NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 
 TEST(QueryRequestTest, NegativeSkip) {
     FindCommandRequest findCommand(testns);

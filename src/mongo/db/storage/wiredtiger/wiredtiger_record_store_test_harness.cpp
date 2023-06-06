@@ -67,16 +67,16 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
     std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
     StringData ident = ns;
-    NamespaceString nss(ns);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
 
     StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
         kWiredTigerEngineName,
-        NamespaceString(ns),
+        NamespaceString::createNamespaceString_forTest(ns),
         ident,
         collOptions,
         "",
         keyFormat,
-        WiredTigerUtil::useTableLogging(NamespaceString(ns)));
+        WiredTigerUtil::useTableLogging(NamespaceString::createNamespaceString_forTest(ns)));
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 

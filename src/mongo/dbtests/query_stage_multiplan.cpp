@@ -72,7 +72,8 @@ namespace {
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.QueryStageMultiPlan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageMultiPlan");
 
 std::unique_ptr<QuerySolution> createQuerySolution() {
     auto soln = std::make_unique<QuerySolution>();

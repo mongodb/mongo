@@ -84,7 +84,10 @@ ABT translatePipeline(const Metadata& metadata,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
     auto opCtx = cc().makeOperationContext();
     auto pipeline =
-        parsePipeline(NamespaceString("a." + scanDefName), pipelineStr, *opCtx, involvedNss);
+        parsePipeline(NamespaceString::createNamespaceString_forTest("a." + scanDefName),
+                      pipelineStr,
+                      *opCtx,
+                      involvedNss);
     return translatePipelineToABT(metadata,
                                   *pipeline.get(),
                                   scanProjName,

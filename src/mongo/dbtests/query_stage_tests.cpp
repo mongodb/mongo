@@ -82,7 +82,8 @@ public:
     }
 
     int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
-        AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns()));
+        AutoGetCollectionForReadCommand ctx(&_opCtx,
+                                            NamespaceString::createNamespaceString_forTest(ns()));
 
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
@@ -115,7 +116,8 @@ public:
     }
 
     const IndexDescriptor* getIndex(const BSONObj& obj) {
-        AutoGetCollectionForReadCommand collection(&_opCtx, NamespaceString(ns()));
+        AutoGetCollectionForReadCommand collection(
+            &_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
@@ -124,7 +126,8 @@ public:
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
                                         const IndexDescriptor* descriptor) {
-        AutoGetCollectionForReadCommand collection(&_opCtx, NamespaceString(ns()));
+        AutoGetCollectionForReadCommand collection(
+            &_opCtx, NamespaceString::createNamespaceString_forTest(ns()));
         IndexScanParams params(opCtx, *collection, descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.endKey = BSONObj();
@@ -140,15 +143,15 @@ public:
         return "unittests.IndexScan";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
 
-    boost::intrusive_ptr<ExpressionContext> _expCtx =
-        new ExpressionContext(&_opCtx, nullptr, NamespaceString(ns()));
+    boost::intrusive_ptr<ExpressionContext> _expCtx = new ExpressionContext(
+        &_opCtx, nullptr, NamespaceString::createNamespaceString_forTest(ns()));
 
 private:
     DBDirectClient _client;

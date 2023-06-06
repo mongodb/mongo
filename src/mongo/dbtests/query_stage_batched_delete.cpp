@@ -49,7 +49,8 @@
 namespace mongo {
 namespace QueryStageBatchedDelete {
 
-static const NamespaceString nss("unittests.QueryStageBatchedDelete");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageBatchedDelete");
 
 // For the following tests, fix the targetBatchDocs to 10 documents.
 static const int targetBatchDocs = 10;

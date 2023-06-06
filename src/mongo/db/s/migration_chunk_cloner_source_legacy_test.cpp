@@ -50,7 +50,7 @@ namespace {
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kShardKey = "X";
 const BSONObj kShardKeyPattern{BSON(kShardKey << 1)};
 const ConnectionString kDonorConnStr =

@@ -55,7 +55,7 @@ namespace {
 class CollectionCatalogTest : public ServiceContextMongoDTest {
 public:
     CollectionCatalogTest()
-        : nss("testdb", "testcol"),
+        : nss(NamespaceString::createNamespaceString_forTest("testdb", "testcol")),
           col(nullptr),
           colUUID(UUID::gen()),
           nextUUID(UUID::gen()),

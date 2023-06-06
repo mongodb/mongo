@@ -54,7 +54,8 @@ const auto kShardId2 = ShardId("shard2");
 const auto kShardId3 = ShardId("shard3");
 const auto kShardId4 = ShardId("shard4");
 const auto kShardId5 = ShardId("shard5");
-const NamespaceString kNamespace("TestDB", "TestColl");
+const NamespaceString kNamespace =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const KeyPattern kShardKeyPattern(BSON("x" << 1));
 
 /**

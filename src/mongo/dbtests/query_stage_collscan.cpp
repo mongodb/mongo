@@ -59,7 +59,8 @@
 namespace mongo {
 namespace query_stage_collection_scan {
 
-static const NamespaceString kNss{"unittests.QueryStageCollectionScan"};
+static const NamespaceString kNss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageCollectionScan");
 
 //
 // Stage-specific tests.
@@ -337,7 +338,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicBackwardWithMatch) {
 
 TEST_F(QueryStageCollectionScanTest,
        QueryTestCollscanStopsScanningOnFilterFailureInClusteredCollectionIfSpecified) {
-    auto ns = NamespaceString("a.b");
+    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
     auto collDeleter = createClusteredCollection(ns, false /* prePopulate */);
     for (int i = 1; i <= numObj(); ++i) {
         insertDocument(ns, BSON("_id" << i << "foo" << i));
@@ -621,7 +622,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {
-    auto ns = NamespaceString("a.b");
+    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
     auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
@@ -674,7 +675,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxBoundsDateT
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
 
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
         // Create a clustered collection pre-populated with RecordIds generated from type
         // 'objectId'.
@@ -701,7 +702,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateTypeMat
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
 
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
         // Create a clustered collection pre-populated with RecordIds generated from type
         // 'objectId'.
@@ -734,7 +735,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredIgnoreNumericReco
               "Running clustered collection scan test case",
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
         int numOIDDocs = 20;
@@ -770,7 +771,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
 
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
@@ -826,7 +827,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredReverse) {
-    auto ns = NamespaceString("a.b");
+    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
     auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
@@ -870,7 +871,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredReverse) {
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxFullObjectIdRange) {
-    auto ns = NamespaceString("a.b");
+    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
     auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
@@ -914,7 +915,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxFullObjectI
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRange) {
-    auto ns = NamespaceString("a.b");
+    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
     auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
@@ -963,7 +964,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRange) {
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusiveFilter) {
-    auto ns = NamespaceString("a.b");
+    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
     auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
@@ -1028,7 +1029,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusiveFilterReverse) {
-    auto ns = NamespaceString("a.b");
+    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
     auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
@@ -1106,7 +1107,7 @@ TEST_F(QueryStageCollectionScanTest,
               "Running clustered collection scan test case",
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
@@ -1149,7 +1150,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundInc
               "Running clustered collection scan test case",
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
@@ -1193,7 +1194,7 @@ TEST_F(QueryStageCollectionScanTest,
               "Running clustered collection scan test case",
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
@@ -1236,7 +1237,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundYie
               "Running clustered collection scan test case",
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
@@ -1271,7 +1272,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsOv
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
 
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
         std::vector<BSONObj> docs{BSON("_id" << 0),
@@ -1325,7 +1326,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsHa
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
 
-        auto ns = NamespaceString("a.b");
+        auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
         std::vector<BSONObj> docs{BSON("_id" << 0),

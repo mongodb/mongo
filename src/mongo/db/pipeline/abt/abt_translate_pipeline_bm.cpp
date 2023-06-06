@@ -62,8 +62,8 @@ public:
                                const std::vector<BSONObj>& pipeline) override final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
-        auto expCtx =
-            make_intrusive<ExpressionContextForTest>(opCtx.get(), NamespaceString("test.bm"));
+        auto expCtx = make_intrusive<ExpressionContextForTest>(
+            opCtx.get(), NamespaceString::createNamespaceString_forTest("test.bm"));
 
         Metadata metadata{{}};
         auto prefixId = PrefixId::createForTests();

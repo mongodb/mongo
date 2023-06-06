@@ -55,7 +55,7 @@ Value extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet* w
     return wsm->metadata().getSortKey();
 }
 
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 /**
  * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort key

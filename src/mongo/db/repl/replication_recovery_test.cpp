@@ -67,7 +67,7 @@ namespace repl {
 namespace {
 
 const auto& oplogNs = NamespaceString::kRsOplogNamespace;
-const NamespaceString testNs("a.a");
+const NamespaceString testNs = NamespaceString::createNamespaceString_forTest("a.a");
 
 class StorageInterfaceRecovery : public StorageInterfaceImpl {
 public:

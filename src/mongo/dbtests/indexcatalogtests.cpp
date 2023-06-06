@@ -41,7 +41,8 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
-static const NamespaceString _nss("unittests.indexcatalog");
+static const NamespaceString _nss =
+    NamespaceString::createNamespaceString_forTest("unittests.indexcatalog");
 
 class IndexCatalogTestBase {
 protected:

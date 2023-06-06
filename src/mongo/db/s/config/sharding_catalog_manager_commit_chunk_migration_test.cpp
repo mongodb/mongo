@@ -82,7 +82,8 @@ protected:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
-const NamespaceString kNamespace("TestDB.TestColl");
+const NamespaceString kNamespace =
+    NamespaceString::createNamespaceString_forTest("TestDB.TestColl");
 const KeyPattern kKeyPattern(BSON("x" << 1));
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {

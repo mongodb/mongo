@@ -55,7 +55,8 @@ using unittest::assertGet;
 
 namespace QueryStageCachedPlan {
 
-static const NamespaceString nss("unittests.QueryStageCachedPlan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageCachedPlan");
 
 namespace {
 std::unique_ptr<CanonicalQuery> canonicalQueryFromFilterObj(OperationContext* opCtx,

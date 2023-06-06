@@ -100,7 +100,7 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
 }
 
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
-    NamespaceString nss(ns);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
@@ -110,7 +110,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
-            coll = db->createCollection(opCtx, NamespaceString(ns));
+            coll = db->createCollection(opCtx, NamespaceString::createNamespaceString_forTest(ns));
         }
         invariant(coll);
         wunit.commit();
@@ -179,7 +179,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
 }
 
 WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)
-    : _opCtx(opCtx), _nss(ns) {
+    : _opCtx(opCtx), _nss(NamespaceString::createNamespaceString_forTest(ns)) {
     // Lock the database and collection
     _autoDb.emplace(opCtx, _nss.dbName(), MODE_IX);
     _collLock.emplace(opCtx, _nss, MODE_IX);

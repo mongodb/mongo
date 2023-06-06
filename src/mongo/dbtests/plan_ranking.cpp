@@ -64,7 +64,8 @@ extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
 
 namespace PlanRankingTests {
 
-static const NamespaceString nss("unittests.PlanRankingTests");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.PlanRankingTests");
 
 class PlanRankingTestBase {
 public:

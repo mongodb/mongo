@@ -46,7 +46,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
 static const char* const _ns = "unittests.indexupdate";
-static const NamespaceString _nss = NamespaceString(_ns);
+static const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(_ns);
 
 /**
  * Test fixture for a write locked test using collection _ns.  Includes functionality to

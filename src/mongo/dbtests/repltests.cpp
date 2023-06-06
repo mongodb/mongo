@@ -212,7 +212,7 @@ protected:
     }
     int opCount() {
         return DBDirectClient(&_opCtx)
-            .find(FindCommandRequest{NamespaceString{cllNS()}})
+            .find(FindCommandRequest{NamespaceString::createNamespaceString_forTest(cllNS())})
             ->itcount();
     }
     void applyAllOperations() {
@@ -220,7 +220,8 @@ protected:
         std::vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
-            auto cursor = db.find(FindCommandRequest{NamespaceString{cllNS()}});
+            auto cursor = db.find(
+                FindCommandRequest{NamespaceString::createNamespaceString_forTest(cllNS())});
             while (cursor->more()) {
                 ops.push_back(cursor->nextSafe());
             }
@@ -266,7 +267,7 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         ::mongo::writeConflictRetry(&_opCtx, "deleteAll", nss, [&] {
             Lock::GlobalWrite lk(&_opCtx);
             OldClientContext ctx(&_opCtx, nss);
@@ -798,7 +799,7 @@ class MultiInc : public Recovering {
 public:
     std::string s() const {
         StringBuilder ss;
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("_id" << 1));
         std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
         bool first = true;

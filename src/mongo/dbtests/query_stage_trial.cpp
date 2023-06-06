@@ -44,7 +44,7 @@ namespace mongo {
 
 namespace {
 
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 class TrialStageTest : public unittest::Test {
 public:

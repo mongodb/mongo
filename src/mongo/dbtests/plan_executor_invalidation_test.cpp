@@ -131,7 +131,7 @@ public:
     }
 
     bool dropCollection(StringData ns) {
-        bool res = _client.dropCollection(NamespaceString(ns));
+        bool res = _client.dropCollection(NamespaceString::createNamespaceString_forTest(ns));
         _refreshCollection();
         return res;
     }
