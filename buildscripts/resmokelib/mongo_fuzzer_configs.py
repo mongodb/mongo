@@ -127,7 +127,6 @@ def generate_mongod_parameters(rng, mode):
         [1, 10, 100])
     ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(30, 600)])
     ret["mirrorReads"] = {"samplingRate": rng.random()}
-    ret["queryAnalysisSampleExpirationSecs"] = rng.choice([1, 10, 100, 1000])
     ret["queryAnalysisSamplerConfigurationRefreshSecs"] = rng.choice([1, 10, 100])
     ret["queryAnalysisWriterIntervalSecs"] = rng.choice([1, 10, 100])
     ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(1, 100) * 1024 * 1024
