@@ -1,0 +1,407 @@
+# -*- mode: python; -*-
+from SCons.Tool import nasm
+
+Import("env")
+
+# Isal asm objects.
+isalAsmEnv = env.Clone()
+
+if not nasm.exists(isalAsmEnv):
+    isalAsmEnv.FatalError("Please install NASM from 'https://www.nasm.us/' because NASM compiler can not be found!")
+
+# Here must remove "-fno-sanitize=undefined" from COMPILE_OPTIONS.
+# Otherwise nasm compiler would fail to proceed due to unrecognition of "-fno-sanitize=undefined."
+
+try:
+    isalAsmEnv['ASFLAGS'].remove('-fno-sanitize=undefined')
+except ValueError:
+    pass
+
+nasm.generate(isalAsmEnv)
+isalAsmEnv.Append(ASFLAGS=[
+    "-f elf64",
+    "-I" + "src/third_party/qpl-1.1.0/sources/isal/include",
+    '-Isrc/third_party/qpl-1.1.0/sources/isal/igzip',
+    '-Isrc/third_party/qpl-1.1.0/sources/isal/crc',
+    '-DAS_FEATURE_LEVEL=5',
+    '-DQPL_LIB',
+
+])
+
+isalAsmSrc = [
+    'sources/isal/igzip/igzip_body.asm',
+    'sources/isal/igzip/igzip_gen_icf_map_lh1_04.asm',
+    'sources/isal/igzip/igzip_gen_icf_map_lh1_06.asm',
+    'sources/isal/igzip/igzip_decode_block_stateless_04.asm',
+    'sources/isal/igzip/igzip_finish.asm',
+    'sources/isal/igzip/encode_df_04.asm',
+    'sources/isal/igzip/encode_df_06.asm',
+    'sources/isal/igzip/igzip_decode_block_stateless_01.asm',
+    'sources/isal/igzip/proc_heap.asm',
+    'sources/isal/igzip/igzip_icf_body_h1_gr_bt.asm',
+    'sources/isal/igzip/igzip_icf_finish.asm',
+    'sources/isal/igzip/igzip_inflate_multibinary.asm',
+    'sources/isal/igzip/igzip_update_histogram_01.asm',
+    'sources/isal/igzip/igzip_update_histogram_04.asm',
+    'sources/isal/igzip/rfc1951_lookup.asm',
+    'sources/isal/igzip/adler32_sse.asm',
+    'sources/isal/igzip/adler32_avx2_4.asm',
+    'sources/isal/igzip/igzip_deflate_hash.asm',
+    'sources/isal/igzip/igzip_set_long_icf_fg_04.asm',
+    'sources/isal/igzip/igzip_set_long_icf_fg_06.asm',
+    'sources/isal/igzip/igzip_multibinary.asm',
+    'sources/isal/igzip/stdmac.asm',
+    'sources/isal/crc/crc_multibinary.asm',
+    'sources/isal/crc/crc32_gzip_refl_by8.asm',
+    'sources/isal/crc/crc32_gzip_refl_by8_02.asm',
+    'sources/isal/crc/crc32_gzip_refl_by16_10.asm',
+    'sources/isal/crc/crc32_ieee_01.asm',
+    'sources/isal/crc/crc32_ieee_02.asm',
+    'sources/isal/crc/crc32_ieee_by4.asm',
+    'sources/isal/crc/crc32_ieee_by16_10.asm',
+    'sources/isal/crc/crc32_iscsi_00.asm',
+    'sources/isal/crc/crc32_iscsi_01.asm',
+    'sources/isal/crc/crc32_iscsi_by16_10.asm',
+]
+
+isalAsmObj = isalAsmEnv.Object(isalAsmSrc)
+
+
+# Isal objects.
+isalEnv = env.Clone()
+
+isalEnv.Prepend(CPPPATH=[
+    'sources/isal/include',
+    'sources/isal/igzip',
+])
+isalEnv.AppendUnique(CCFLAGS=[
+    "-std=c99",
+])
+ 
+if isalEnv.ToolchainIs('gcc'):
+    isalEnv.AppendUnique(CCFLAGS=[
+        '-O3',
+        '-Wall',
+        '-Wextra',
+        '-fPIC',
+        '-fstack-protector',
+        '-fstack-protector-strong',
+        '-fstack-clash-protection',
+        '--param=ssp-buffer-size=4',
+    ])
+
+isalEnv.AppendUnique(CPPDEFINES=[
+    'QPL_LIB',
+    'NDEBUG',
+    'linux',
+], )
+
+isalSrc = [
+    'sources/isal/igzip/adler32_base.c',
+    'sources/isal/igzip/huff_codes.c',
+    'sources/isal/igzip/hufftables_c.c',
+    'sources/isal/igzip/igzip.c',
+    'sources/isal/igzip/igzip_base.c',
+    'sources/isal/igzip/flatten_ll.c',
+    'sources/isal/igzip/encode_df.c',
+    'sources/isal/igzip/igzip_icf_base.c',
+    'sources/isal/igzip/igzip_inflate.c',
+    'sources/isal/igzip/igzip_icf_body.c',
+    'sources/isal/crc/crc_base.c',
+    'sources/isal/crc/crc64_base.c',
+]
+
+isalObj = isalEnv.Object(isalSrc)
+
+# Core-sw objects.
+localVars = locals()
+
+for platformId in ['px', 'avx512']:
+    coreSWEnv = env.Clone()
+    sources = Glob("sources/core-sw/src/checksums/*.c")
+    sources += Glob("sources/core-sw/src/filtering/*.c")
+    sources += Glob("sources/core-sw/src/other/*.c")
+    sources += Glob("sources/core-sw/src/compression/*.c")
+    dataSources = Glob("sources/core-sw/src/data/*.c") 
+    
+    if platformId == 'px':
+        sources += dataSources
+
+    coreSWEnv.Prepend(CPPPATH=[
+        'sources/core-sw/include',
+        'sources/core-sw/src/include',
+        'sources/core-sw/src/compression/include',
+        'sources/isal/include',
+        'sources/isal/igzip',
+    ])
+
+    coreSWEnv.AppendUnique(CCFLAGS=[
+        "-O3",
+        '-Wall',
+        '-Wextra',
+        '-fPIC',
+        '-fstack-protector',
+        '-fstack-protector-strong',
+        '-fstack-clash-protection',
+        '--param=ssp-buffer-size=4',
+    ])
+    
+    coreSWEnv.AppendUnique(CPPDEFINES=[
+        ('_FORTIFY_SOURCE', 2),
+        'QPL_BADARG_CHECK'
+        'NDEBUG',
+        'linux',
+        'QPL_LIB'
+    ], )
+   
+    if platformId == 'avx512':
+        coreSWEnv.AppendUnique(CPPDEFINES=[
+            ('PLATFORM', 2),
+        ], )
+        coreSWEnv.AppendUnique(CCFLAGS=[
+            "-march=skylake-avx512",
+        ])
+    else:
+        coreSWEnv.AppendUnique(CPPDEFINES=[
+            ('PLATFORM', 0),
+        ], )
+    
+    targets = []
+    targetIndex = 0
+    for src in sources:
+        targets += coreSWEnv.Object('qplcore_' + platformId + "_" + "object" + str(targetIndex), src)
+        targetIndex += 1
+
+    localVars['qplcore_' + platformId] = targets 
+
+# Core_iaa objects
+coreIaaEnv = env.Clone()
+
+coreIaaSources = Glob("sources/core-iaa/sources/aecs/*.c")
+coreIaaSources += Glob("sources/core-iaa/sources/driver_loader/*.c")
+coreIaaSources += Glob("sources/core-iaa/sources/descriptors/*.c")
+coreIaaSources += Glob("sources/core-iaa/sources/bit_rev.c") 
+
+coreIaaEnv.Prepend(CPPPATH=[
+    'uuid',
+    'sources/core-iaa/include',
+    'sources/core-iaa/sources/include',
+    'include',
+    'sources/c_api',
+    'sources/core-sw/include',
+    'sources/core-sw/src/include',
+    'sources/core-sw/src/compression/include',
+    'sources/isal/include',
+    'sources/isal/igzip',
+])
+
+if coreIaaEnv.ToolchainIs('gcc'):
+    coreIaaEnv.AppendUnique(CCFLAGS=[
+        '-Wall',
+        '-Wextra',
+        '-fPIC',
+        '-fstack-protector',
+        '-fstack-protector-strong',
+        '-fstack-clash-protection',
+        '--param=ssp-buffer-size=4',
+    ])
+    coreIaaEnv.AppendUnique(CPPDEFINES=[
+        ('_FORTIFY_SOURCE', 2),
+    ], )
+coreIaaEnv.AppendUnique(CCFLAGS=[
+            "-O3",
+        ])
+coreIaaEnv.AppendUnique(CPPDEFINES=[
+    'BLOCK_ON_FAULT_ENABLED',
+    'DYNAMIC_LOADING_LIBACCEL_CONFIG',
+    'QPL_BADARG_CHECK',
+    'NDEBUG',
+    'linux',
+], )
+
+coreIaaObject = coreIaaEnv.Object(coreIaaSources)
+
+# Middle-layer objects.`
+middleLayerEnv = env.Clone()
+
+middleLayerSources = Glob("sources/middle-layer/analytics/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/c_wrapper/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/checksum/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/common/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/compression/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/compression/*/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/compression/*/*/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/dispatcher/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/other/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/util/*.cpp")
+middleLayerSources += Glob("sources/middle-layer/inflate/*.cpp")
+middleLayerSources += Glob("sources/core-iaa/sources/accelerator/*.cpp")
+
+middleLayerEnv.Prepend(CPPPATH=[
+    'uuid',
+    'sources/middle-layer',
+    'sources/core-iaa/include',
+    'sources/core-iaa/sources/include',
+    'include',
+    'sources/c_api',
+    'sources/core-sw/include',
+    'sources/core-sw/src/include',
+    'sources/core-sw/src/compression/include',
+    'sources/isal/include',
+    'sources/isal/igzip',
+])
+
+if middleLayerEnv.ToolchainIs('gcc'):
+    middleLayerEnv.AppendUnique(CCFLAGS=[
+        '-Wall',
+        '-Wextra',
+        '-fPIC',
+        '-fstack-protector',
+        '-fstack-protector-strong',
+        '-fstack-clash-protection',
+        '--param=ssp-buffer-size=4',
+        '-Wl,-z,relro,-z,now',
+        '-Wl,-z,noexecstack',
+        "-fno-exceptions",
+        "-fno-rtti",
+    ])
+    middleLayerEnv.AppendUnique(CPPDEFINES=[
+        ('_FORTIFY_SOURCE', 2),
+    ], )
+
+try:
+    middleLayerEnv['CXXFLAGS'].remove('-std=c++20')
+except ValueError:
+    pass
+
+middleLayerEnv.AppendUnique(CCFLAGS=[
+            "-O3",
+            "-std=c++17",
+        ])
+middleLayerEnv.AppendUnique(CPPDEFINES=[
+    'NDEBUG',
+    'DYNAMIC_LOADING_LIBACCEL_CONFIG',
+    'QPL_BADARG_CHECK',
+    'QPL_LIB',
+    'linux',
+    ("QPL_VERSION", "\\\"1.1.0\\\"")
+], )
+
+middleLayerObject = middleLayerEnv.Object(middleLayerSources)
+
+# Generated-Avx512 Objects.
+generatedAvx512Env = middleLayerEnv.Clone();
+generatedAvx512Sources = Glob("generated/avx512_*.cpp")
+
+generatedAvx512Env.AppendUnique(CPPDEFINES=[
+    ('PLATFORM', 2),
+], )
+
+generatedAvx512Object = generatedAvx512Env.Object(generatedAvx512Sources)
+
+# Generated-px Objects.
+generatedPxEnv = middleLayerEnv.Clone();
+generatedPxSources = Glob("generated/px_*.cpp")
+
+generatedPxEnv.AppendUnique(CPPDEFINES=[
+    ('PLATFORM', 0),
+], )
+
+generatedPxObject = generatedPxEnv.Object(generatedPxSources)
+
+# C_api objects
+cApiEnv = env.Clone()
+
+cApiSources = Glob("sources/c_api/*.c")
+cApiSources += Glob("sources/c_api/*.cpp")
+cApiSources += Glob("sources/c_api/compression_operations/*.cpp")
+cApiSources += Glob("sources/c_api/compression_operations/*.c")
+cApiSources += Glob("sources/c_api/filter_operations/*.cpp")
+cApiSources += Glob("sources/c_api/filter_operations/*.c")
+cApiSources += Glob("sources/c_api/legacy_hw_path/*.cpp")
+cApiSources += Glob("sources/c_api/legacy_hw_path/*.c")
+cApiSources += Glob("sources/c_api/other_operations/*.cpp")
+cApiSources += Glob("sources/c_api/other_operations/*.c")
+cApiSources += Glob("sources/c_api/serialization/*.cpp")
+cApiSources += Glob("sources/c_api/serialization/*.c")
+
+cApiEnv.Prepend(CPPPATH=[
+    'sources/middle-layer',
+    'sources/core-iaa/include',
+    'sources/core-iaa/sources/include',
+    'include',
+    'sources/c_api',
+    'sources/core-sw/include',
+    'sources/core-sw/src/include',
+    'sources/core-sw/src/compression/include',
+    'sources/isal/include',
+    'sources/isal/igzip',
+    'sources/c_api',
+])
+
+if cApiEnv.ToolchainIs('gcc'):
+    cApiEnv.AppendUnique(CCFLAGS=[
+        '-Wall',
+        '-Wextra',
+        '-fPIC',
+        '-fstack-protector',
+        '-fstack-protector-strong',
+        '-fstack-clash-protection',
+        '--param=ssp-buffer-size=4',
+        '-Wl,-z,relro,-z,now',
+        '-Wl,-z,noexecstack',
+    ])
+    cApiEnv.AppendUnique(CXXFLAGS=[
+        "-fno-exceptions",
+        "-fno-rtti",
+    ])
+    cApiEnv.AppendUnique(CPPDEFINES=[
+        ('_FORTIFY_SOURCE', 2),
+    ], )
+
+cApiEnv.AppendUnique(CCFLAGS=[
+    "-O3",
+])
+
+try:
+    cApiEnv['CXXFLAGS'].remove('-std=c++20')
+except ValueError:
+    pass
+
+cApiEnv.AppendUnique(CXXFLAGS=[
+    "-std=c++17"
+])
+cApiEnv.AppendUnique(CPPDEFINES=[
+    'NDEBUG',
+    'DYNAMIC_LOADING_LIBACCEL_CONFIG',
+    'QPL_BADARG_CHECK',
+    'QPL_LIB',
+    'linux',
+], )
+
+cApiObject = cApiEnv.Object(cApiSources)
+
+# QPL static Library.
+qplObjects = cApiObject
+qplObjects += middleLayerObject
+qplObjects += isalAsmObj
+qplObjects += isalObj
+qplObjects += qplcore_px
+qplObjects += qplcore_avx512
+qplObjects += coreIaaObject
+qplObjects += middleLayerObject
+qplObjects += generatedPxObject
+qplObjects += generatedAvx512Object
+try:
+    cApiEnv['LIBS'].index('dl')
+except ValueError:
+    cApiEnv.Append(SYSLIBDEPS_PRIVATE=['dl'])
+
+cApiEnv.Library(
+    target="qpl",
+    source=qplObjects,
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ],
+)
+
