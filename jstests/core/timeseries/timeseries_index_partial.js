@@ -2,8 +2,6 @@
  * Test creating and using partial indexes, on a time-series collection.
  *
  * @tags: [
- *   # TODO (SERVER-73316): remove
- *   assumes_against_mongod_not_mongos,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
@@ -28,31 +26,41 @@ if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
 const coll = db.timeseries_index_partial;
 const timeField = 'time';
 const metaField = 'm';
-
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField, metaField}}));
-
-const buckets = db.getCollection('system.buckets.' + coll.getName());
 let extraIndexes = [];
 let extraBucketIndexes = [];
-if (FixtureHelpers.isSharded(buckets)) {
-    // If the collection is sharded, expect an implicitly-created index on time.
-    // It will appear differently in listIndexes depending on whether you look at the time-series
-    // collection or the buckets collection.
-    extraIndexes.push({
-        "v": 2,
-        "key": {"time": 1},
-        "name": "control.min.time_1",
-    });
-    extraBucketIndexes.push({
-        "v": 2,
-        "key": {"control.min.time": 1},
-        "name": "control.min.time_1",
-    });
-}
+let buckets = [];
 
-// TODO SERVER-66438: Remove feature flag check.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesScalabilityImprovements")) {
+function resetCollection(collation) {
+    coll.drop();
+    extraIndexes = [];
+    extraBucketIndexes = [];
+
+    if (collation) {
+        assert.commandWorked(db.createCollection(coll.getName(), {
+            timeseries: {timeField, metaField},
+            collation: collation,
+        }));
+    } else {
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField, metaField}}));
+    }
+    buckets = db.getCollection('system.buckets.' + coll.getName());
+    // If the collection is sharded, expect an implicitly-created index on time. It will appear
+    // differently in listIndexes depending on whether you look at the time-series collection or
+    // the buckets collection.
+    // TODO SERVER-77112 fix this logic once this issue is fixed.
+    if (FixtureHelpers.isSharded(buckets)) {
+        extraIndexes.push({
+            "v": 2,
+            "key": {"time": 1},
+            "name": "control.min.time_1",
+        });
+        extraBucketIndexes.push({
+            "v": 2,
+            "key": {"control.min.time": 1},
+            "name": "control.min.time_1",
+        });
+    }
     // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
     // bucket collection.
     extraIndexes.push({
@@ -66,6 +74,8 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesScalabilityImprovements")
         "name": "m_1_time_1",
     });
 }
+
+resetCollection();
 
 assert.sameMembers(coll.getIndexes(), extraIndexes);
 assert.sameMembers(buckets.getIndexes(), extraBucketIndexes);
@@ -109,10 +119,16 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
         // If scan is not present, check rejected plans
         if (scan === null) {
             const rejectedPlans = getRejectedPlans(getAggPlanStage(explain, "$cursor")["$cursor"]);
-            if (rejectedPlans.length === 1) {
-                const scans = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
-                if (scans.length === 1) {
-                    scan = scans[0];
+            if (rejectedPlans.length === 2) {
+                let firstScan = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
+                let secondScan = getPlanStages(getRejectedPlan(rejectedPlans[1]), "IXSCAN");
+                // Both plans should have an "IXSCAN" stage and one stage should scan the index on
+                // the 'a' field.
+                if (firstScan.length === 1 && secondScan.length === 1) {
+                    scan = firstScan[0];
+                    if (secondScan[0]["indexName"] == "a_1") {
+                        scan = secondScan[0];
+                    }
                 }
             }
         } else {
@@ -165,6 +181,12 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
 
     // Test some predicates on the time field.
     {
+        //  TODO SERVER-77112 we can change this to assert.commandWorkedOrFailed, since the indexes
+        //  made by 'createIndex' should be identical to the implicit index made by
+        //  'shardCollection'.
+        if (!FixtureHelpers.isSharded(buckets)) {
+            assert.commandWorked(coll.createIndex({[timeField]: 1}));
+        }
         const t0 = ISODate('2000-01-01T00:00:00Z');
         const t1 = ISODate('2000-01-01T00:00:01Z');
         const t2 = ISODate('2000-01-01T00:00:02Z');
@@ -192,6 +214,11 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
             coll.createIndex({a: 1}, {partialFilterExpression: {[timeField]: {$gte: t1}}}));
         check({a: {$lt: 999}, [timeField]: {$gte: t1}});
         check({a: {$lt: 999}, [timeField]: {$gte: t2}});
+
+        // Drop the index, so it doesn't interfere with other tests.
+        if (!FixtureHelpers.isSharded(buckets)) {
+            assert.commandWorked(coll.dropIndex({[timeField]: 1}));
+        }
     }
 
     assert.commandWorked(coll.dropIndex({a: 1}));
@@ -253,12 +280,9 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
 
 // Test how partialFilterExpression interacts with collation.
 {
+    // Recreate the collection with a collation.
     const numericCollation = {locale: "en_US", numericOrdering: true};
-    coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField, metaField},
-        collation: numericCollation,
-    }));
+    resetCollection(numericCollation);
 
     assert.commandWorked(coll.insert([
         {[timeField]: ISODate(), [metaField]: {x: "1000", y: 1}, a: "120"},
