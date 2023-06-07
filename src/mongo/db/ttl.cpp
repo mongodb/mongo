@@ -75,11 +75,6 @@ namespace mongo {
 namespace {
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
 
-bool isBatchingEnabled() {
-    return feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
-        ttlMonitorBatchDeletes.load();
-}
-
 // When batching is enabled, returns BatchedDeleteStageParams that limit the amount of work done in
 // a delete such that it is possible not all expired documents will be removed. Returns nullptr
 // otherwise.
@@ -704,7 +699,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     // Maintain a consistent view of whether batching is enabled - batching depends on
     // parameters that can be set at runtime, and it is illegal to try to get
     // BatchedDeleteStageStats from a non-batched delete.
-    bool batchingEnabled = isBatchingEnabled();
+    const bool batchingEnabled = ttlMonitorBatchDeletes.load();
 
     Timer timer;
     auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
@@ -777,7 +772,7 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
     // Maintain a consistent view of whether batching is enabled - batching depends on
     // parameters that can be set at runtime, and it is illegal to try to get
     // BatchedDeleteStageStats from a non-batched delete.
-    bool batchingEnabled = isBatchingEnabled();
+    const bool batchingEnabled = ttlMonitorBatchDeletes.load();
 
     // Deletes records using a bounded collection scan from the beginning of time to the
     // expiration time (inclusive).
