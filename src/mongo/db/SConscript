@@ -843,8 +843,6 @@ env.Library(
         'server_base',
         'stats/resource_consumption_metrics',
         'stats/timer_stats',
-        # TODO (SERVER-66896): Remove this dependency.
-        'storage/storage_engine_feature_flags',
         'timeseries/timeseries_options',
     ],
 )
