@@ -124,7 +124,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     std::vector<InsertStatement>::const_iterator last,
     std::vector<bool> fromMigrate,
     bool defaultFromMigrate,
-    InsertsOpStateAccumulator* opAccumulator) {
+    OpStateAccumulator* opAccumulator) {
     // Take ownership of ShardingWriteRouter attached to the op accumulator by OpObserverImpl.
     // Release upon return from this function because this resource is not needed by downstream
     // OpObserver instances.

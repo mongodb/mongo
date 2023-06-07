@@ -106,7 +106,7 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) override;
+                   OpStateAccumulator* opAccumulator = nullptr) override;
 
     void onCreateCollection(OperationContext* opCtx,
                             const CollectionPtr& coll,
@@ -217,7 +217,7 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator end,
                                std::vector<bool> fromMigrate,
                                bool defaultFromMigrate,
-                               InsertsOpStateAccumulator* opAccumulator) {
+                               OpStateAccumulator* opAccumulator) {
     if (onInsertsThrows) {
         uasserted(ErrorCodes::OperationFailed, "insert failed");
     }

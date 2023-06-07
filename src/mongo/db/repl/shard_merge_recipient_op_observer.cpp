@@ -362,7 +362,7 @@ void ShardMergeRecipientOpObserver::onInserts(OperationContext* opCtx,
                                               std::vector<InsertStatement>::const_iterator last,
                                               std::vector<bool> fromMigrate,
                                               bool defaultFromMigrate,
-                                              InsertsOpStateAccumulator* opAccumulator) {
+                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kShardMergeRecipientsNamespace) {
         onShardMergeRecipientsNssInsert(opCtx, first, last);
         return;

@@ -185,7 +185,7 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator end,
                                      std::vector<bool> fromMigrate,
                                      bool defaultFromMigrate,
-                                     InsertsOpStateAccumulator* opAccumulator) {
+                                     OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
     if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {

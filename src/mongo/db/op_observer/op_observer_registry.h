@@ -201,9 +201,9 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) override {
+                   OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
-        InsertsOpStateAccumulator opStateAccumulator;
+        OpStateAccumulator opStateAccumulator;
 
         const auto& nss = coll->ns();
         std::vector<OpObserver*>* observerQueue;

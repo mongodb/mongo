@@ -73,7 +73,7 @@ public:
                    std::vector<InsertStatement>::const_iterator last,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) final;
+                   OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,

@@ -117,7 +117,7 @@ void TenantMigrationRecipientOpObserver::onInserts(
     std::vector<InsertStatement>::const_iterator last,
     std::vector<bool> fromMigrate,
     bool defaultFromMigrate,
-    InsertsOpStateAccumulator* opAccumulator) {
+    OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; it++) {

@@ -73,8 +73,6 @@ private:
     OpStateAccumulator& operator=(const OpStateAccumulator&) = delete;
 };
 
-using InsertsOpStateAccumulator = OpStateAccumulator;
-
 enum class RetryableFindAndModifyLocation {
     // The operation is not retryable, or not a "findAndModify" command. Do not record a
     // pre-image.
@@ -252,7 +250,7 @@ public:
                            std::vector<InsertStatement>::const_iterator end,
                            std::vector<bool> fromMigrate,
                            bool defaultFromMigrate,
-                           InsertsOpStateAccumulator* opAccumulator = nullptr) = 0;
+                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     virtual void onInsertGlobalIndexKey(OperationContext* opCtx,
                                         const NamespaceString& globalIndexNss,

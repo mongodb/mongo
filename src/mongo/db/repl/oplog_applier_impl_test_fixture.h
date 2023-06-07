@@ -80,7 +80,7 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) override;
+                   OpStateAccumulator* opAccumulator = nullptr) override;
 
     /**
      * This function is called whenever OplogApplierImpl deletes a document from a collection.

@@ -61,7 +61,7 @@ void OplogApplierImplOpObserver::onInserts(OperationContext* opCtx,
                                            std::vector<InsertStatement>::const_iterator end,
                                            std::vector<bool> fromMigrate,
                                            bool defaultFromMigrate,
-                                           InsertsOpStateAccumulator* opAccumulator) {
+                                           OpStateAccumulator* opAccumulator) {
     if (!onInsertsFn) {
         return;
     }

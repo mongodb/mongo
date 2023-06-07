@@ -93,7 +93,7 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
                                               std::vector<InsertStatement>::const_iterator end,
                                               std::vector<bool> fromMigrate,
                                               bool defaultFromMigrate,
-                                              InsertsOpStateAccumulator* opAccumulator) {
+                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         for (auto it = begin; it != end; ++it) {
             auto deletionTask = RangeDeletionTask::parse(

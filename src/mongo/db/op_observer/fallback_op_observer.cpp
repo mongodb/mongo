@@ -50,7 +50,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
                                    std::vector<InsertStatement>::const_iterator last,
                                    std::vector<bool> fromMigrate,
                                    bool defaultFromMigrate,
-                                   InsertsOpStateAccumulator* opAccumulator) {
+                                   OpStateAccumulator* opAccumulator) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
