@@ -5,8 +5,7 @@
  * concurrently refining the collection's shard key.
  *
  * @tags: [
- *  featureFlagUpdateOneWithoutShardKey,
- *  requires_fcv_70,
+ *  requires_fcv_71,
  *  requires_sharding,
  *  uses_transactions,
  * ]

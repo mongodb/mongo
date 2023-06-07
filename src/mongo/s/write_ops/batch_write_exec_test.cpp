@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/mock_ns_targeter.h"
@@ -344,6 +345,11 @@ public:
                        boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << MAXKEY))}};
+
+private:
+    // The tests using this fixture expects that a write without shard key is not allowed.
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithoutShardKey", false};
 };
 
 //
@@ -1982,6 +1988,11 @@ public:
     }
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+
+private:
+    // The tests using this fixture expects that a write without shard key is not allowed.
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithoutShardKey", false};
 };
 
 TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {

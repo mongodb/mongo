@@ -5,8 +5,7 @@
  * there are concurrent chunk migrations.
  *
  * @tags: [
- *  featureFlagUpdateOneWithoutShardKey,
- *  requires_fcv_70,
+ *  requires_fcv_71,
  *  requires_sharding,
  *  uses_transactions,
  * ]

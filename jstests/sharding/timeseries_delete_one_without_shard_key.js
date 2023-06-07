@@ -3,10 +3,9 @@
  *
  * @tags: [
  *   # To avoid multiversion tests
- *   requires_fcv_70,
+ *   requires_fcv_71,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   featureFlagUpdateOneWithoutShardKey,
  * ]
  */
 

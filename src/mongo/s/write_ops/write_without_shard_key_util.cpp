@@ -52,6 +52,8 @@ namespace mongo {
 namespace write_without_shard_key {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(skipUseTwoPhaseWriteProtocolCheck);
+
 constexpr auto kIdFieldName = "_id"_sd;
 const FieldRef idFieldRef(kIdFieldName);
 
@@ -137,8 +139,11 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          const BSONObj& collation,
                          const boost::optional<BSONObj>& let,
                          const boost::optional<LegacyRuntimeConstants>& legacyRuntimeConstants) {
+    // For existing unittests that do not expect sharding utilities to be initialized, we can set
+    // this failpoint if we know the test will not use the two phase write protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility) ||
+        MONGO_unlikely(skipUseTwoPhaseWriteProtocolCheck.shouldFail())) {
         return false;
     }
 

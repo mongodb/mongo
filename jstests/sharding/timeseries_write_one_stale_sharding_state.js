@@ -8,7 +8,6 @@
  *   requires_persistence,
  *   # 'NamespaceNotSharded' error is supported since 7.1
  *   requires_fcv_71,
- *   featureFlagUpdateOneWithoutShardKey,
  * ]
  */
 

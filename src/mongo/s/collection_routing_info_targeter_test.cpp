@@ -33,6 +33,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -94,6 +95,10 @@ protected:
     void testTargetDeleteWithRangePrefixHashedShardKey();
     void testTargetDeleteWithHashedPrefixHashedShardKey();
     void testTargetDeleteWithExactId();
+
+    // The tests using this fixture expects that a write without shard key is not allowed.
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithoutShardKey", false};
 };
 
 class CollectionRoutingInfoTargeterWithChunkRangesTest : public CollectionRoutingInfoTargeterTest {

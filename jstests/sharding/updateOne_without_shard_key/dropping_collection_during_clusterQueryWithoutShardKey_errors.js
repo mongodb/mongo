@@ -4,10 +4,9 @@
  *
  * @tags: [
  *    requires_sharding,
- *    requires_fcv_70,
+ *    requires_fcv_71,
  *    uses_transactions,
  *    uses_multi_shard_transaction,
- *    featureFlagUpdateOneWithoutShardKey,
  * ]
  */
 

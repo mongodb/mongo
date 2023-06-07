@@ -4,8 +4,7 @@
  * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster.
  *
  * @tags: [
- *  featureFlagUpdateOneWithoutShardKey,
- *  requires_fcv_70,
+ *  requires_fcv_71,
  *  requires_sharding,
  *  uses_transactions,
  * ]
