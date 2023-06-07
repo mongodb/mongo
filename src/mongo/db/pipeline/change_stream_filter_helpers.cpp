@@ -309,11 +309,8 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
         internalOpTypes.push_back("migrateLastChunkFromShard"_sd);
     }
 
-    if (feature_flags::gFeatureFlagChangeStreamsFurtherEnrichedEvents.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        internalOpTypes.push_back("refineCollectionShardKey"_sd);
-        internalOpTypes.push_back("reshardCollection"_sd);
-    }
+    internalOpTypes.push_back("refineCollectionShardKey"_sd);
+    internalOpTypes.push_back("reshardCollection"_sd);
 
     // Build the oplog filter to match the required internal op types.
     BSONArrayBuilder internalOpTypeOrBuilder;

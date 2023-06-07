@@ -4,8 +4,6 @@
  * operate in a sharded cluster.
  *
  * @tags: [
- *  requires_fcv_61,
- *  featureFlagChangeStreamsFurtherEnrichedEvents,
  *  requires_sharding,
  *  uses_change_streams,
  *  change_stream_does_not_expect_txns,
