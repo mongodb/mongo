@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -130,7 +131,10 @@ public:
      */
     static ResourcePattern forExactSystemBucketsCollection(StringData dbName,
                                                            StringData collectionName) {
-        invariant(!collectionName.startsWith("system.buckets."));
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid namespace '" << dbName << ".system.buckets."
+                              << collectionName << "'",
+                !collectionName.startsWith("system.buckets."));
         return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource,
                                NamespaceString(dbName, collectionName));
     }
