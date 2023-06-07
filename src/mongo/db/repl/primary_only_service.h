@@ -444,7 +444,7 @@ private:
      * PrimaryOnlyService, constructs Instance objects for each document found, and schedules work
      * to run all the newly recreated Instances.
      */
-    void _rebuildInstances(long long term) noexcept;
+    void _rebuildInstances(long long term);
 
     /**
      * Schedules work to call the provided instance's 'run' method and inserts the new instance into
@@ -510,8 +510,11 @@ private:
 
     State _state = State::kPaused;  // (M)
 
-    // If reloading the state documents from disk fails, this Status gets set to a non-ok value and
-    // calls to lookup() or getOrCreate() will throw this status until the node steps down.
+    // If rebuilding the instances fails, for example due to a failure reloading the state documents
+    // from disk, this Status gets set to a non-ok value and calls to lookup() or getOrCreate() will
+    // throw this status until the node steps down. Note that this status must be populated with the
+    // relevant error before _setState is used to change the status to kRebuildFailed and waiters on
+    // _stateChangeCV are notified, as those waiters may attempt to read this status.
     Status _rebuildStatus = Status::OK();  // (M)
 
     // The term that this service is running under.

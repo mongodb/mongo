@@ -440,6 +440,30 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
             }
             _rebuildInstances(newTerm);
         })
+        .onError([this, newTerm](Status s) {
+            LOGV2_ERROR(5165001,
+                        "Failed to rebuild PrimaryOnlyService on stepup.",
+                        "service"_attr = getServiceName(),
+                        "error"_attr = s);
+
+            stdx::lock_guard lk(_mutex);
+            if (_state != State::kRebuilding || _term != newTerm) {
+                // We've either stepped or shut down, or advanced to a new term.
+                // In either case, we rely on the stepdown/shutdown logic or the
+                // step-up of the new term to set _state and do nothing here.
+                bool steppedDown = _state == State::kPaused;
+                bool shutDown = _state == State::kShutdown;
+                bool termAdvanced = _term > newTerm;
+                invariant(
+                    steppedDown || shutDown || termAdvanced,
+                    "Unexpected _state or _term; _state is {}, _term is {}, term was {} "_format(
+                        _getStateString(lk), _term, newTerm));
+                return;
+            }
+            invariant(_state == State::kRebuilding);
+            _rebuildStatus = s;
+            _setState(State::kRebuildFailed, lk);
+        })
         .getAsync([](auto&&) {});  // Ignore the result Future
     lk.unlock();
 }
@@ -676,25 +700,20 @@ bool PrimaryOnlyService::_getHasExecutor() const {
     return _hasExecutor.load();
 }
 
-void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
+void PrimaryOnlyService::_rebuildInstances(long long term) {
     std::vector<BSONObj> stateDocuments;
 
     auto serviceName = getServiceName();
-    LOGV2_INFO(5123005,
-               "Rebuilding PrimaryOnlyService {service} due to stepUp",
-               "Rebuilding PrimaryOnlyService due to stepUp",
-               "service"_attr = serviceName);
+    LOGV2_INFO(
+        5123005, "Rebuilding PrimaryOnlyService due to stepUp", "service"_attr = serviceName);
 
     if (!MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
         auto ns = getStateDocumentsNS();
-        LOGV2_DEBUG(
-            5123004,
-            2,
-            "Querying {namespace} to look for state documents while rebuilding PrimaryOnlyService "
-            "{service}",
-            "Querying to look for state documents while rebuilding PrimaryOnlyService",
-            logAttrs(ns),
-            "service"_attr = serviceName);
+        LOGV2_DEBUG(5123004,
+                    2,
+                    "Querying to look for state documents while rebuilding PrimaryOnlyService",
+                    logAttrs(ns),
+                    "service"_attr = serviceName);
 
         // The PrimaryOnlyServiceClientObserver will make any OpCtx created as part of a
         // PrimaryOnlyService immediately get interrupted if the service is not in state kRunning.
@@ -715,65 +734,45 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
             while (cursor->more()) {
                 stateDocuments.push_back(cursor->nextSafe().getOwned());
             }
-        } catch (const DBException& e) {
-            LOGV2_ERROR(
-                4923601,
-                "Failed to start PrimaryOnlyService {service} because the query on {namespace} "
-                "for state documents failed due to {error}",
-                "Failed to start PrimaryOnlyService because the query for state documents failed",
-                "service"_attr = serviceName,
-                logAttrs(ns),
-                "error"_attr = e);
-
-            Status status = e.toStatus();
-            status.addContext(str::stream()
-                              << "Failed to start PrimaryOnlyService \"" << serviceName
-                              << "\" because the query for state documents on ns \""
-                              << ns.toStringForErrorMsg() << "\" failed");
-
-            stdx::lock_guard lk(_mutex);
-            if (_state != State::kRebuilding || _term != term) {
-                _stateChangeCV.notify_all();
-                return;
-            }
-            _setState(State::kRebuildFailed, lk);
-            _rebuildStatus = std::move(status);
-            return;
+        } catch (DBException& e) {
+            e.addContext(str::stream()
+                         << "Error querying the state document collection "
+                         << ns.toStringForErrorMsg() << " for service " << serviceName);
+            throw;
         }
     }
+
+    LOGV2_DEBUG(5123003,
+                2,
+                "Found state documents while rebuilding PrimaryOnlyService that correspond to "
+                "instances of that service",
+                "service"_attr = serviceName,
+                "numDocuments"_attr = stateDocuments.size());
 
     while (MONGO_unlikely(PrimaryOnlyServiceHangBeforeRebuildingInstances.shouldFail())) {
         {
             stdx::lock_guard lk(_mutex);
             if (_state != State::kRebuilding || _term != term) {  // Node stepped down
-                _stateChangeCV.notify_all();
                 return;
             }
         }
         sleepmillis(100);
     }
 
-    // Must create opCtx before taking _mutex to avoid deadlock.
-    AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
-    auto opCtx = cc().makeOperationContext();
     stdx::lock_guard lk(_mutex);
     if (_state != State::kRebuilding || _term != term) {
         // Node stepped down before finishing rebuilding service from previous stepUp.
-        _stateChangeCV.notify_all();
         return;
     }
     invariant(_activeInstances.empty());
     invariant(_term == term);
 
-    LOGV2_DEBUG(5123003,
+    // Construct new instances using the state documents and add to _activeInstances.
+    LOGV2_DEBUG(5165000,
                 2,
-                "While rebuilding PrimaryOnlyService {service}, found {numDocuments} state "
-                "documents corresponding to instances of that service",
-                "Found state documents while rebuilding PrimaryOnlyService that correspond to "
-                "instances of that service",
+                "Starting to construct and run instances for service",
                 "service"_attr = serviceName,
-                "numDocuments"_attr = stateDocuments.size());
-
+                "numInstances"_attr = stateDocuments.size());
     for (auto&& doc : stateDocuments) {
         auto idElem = doc["_id"];
         fassert(4923602, !idElem.eoo());
@@ -782,6 +781,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         [[maybe_unused]] auto newInstance =
             _insertNewInstance(lk, std::move(instance), std::move(instanceID));
     }
+
     _setState(State::kRunning, lk);
 }
 
