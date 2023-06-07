@@ -102,10 +102,10 @@ std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatche
 resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection) {
     if (!collection || !collection->getDefaultCollator()) {
         if (userCollation.isEmpty()) {
-            return {nullptr, ExpressionContext::CollationMatchesDefault::kNoDefault};
+            return {nullptr, ExpressionContext::CollationMatchesDefault::kYes};
         } else {
             return {getUserCollator(opCtx, userCollation),
-                    ExpressionContext::CollationMatchesDefault::kNoDefault};
+                    ExpressionContext::CollationMatchesDefault::kYes};
         }
     }
 

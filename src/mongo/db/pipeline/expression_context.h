@@ -539,9 +539,9 @@ public:
     bool exprDeprectedForApiV1 = false;
 
     // Tracks whether the collator to use for the aggregation matches the default collation of the
-    // collection or view. For collectionless aggregates this is set to 'kNoDefaultCollation'.
-    enum class CollationMatchesDefault { kNoDefault, kYes, kNo };
-    CollationMatchesDefault collationMatchesDefault = CollationMatchesDefault::kNoDefault;
+    // collection or view.
+    enum class CollationMatchesDefault { kYes, kNo };
+    CollationMatchesDefault collationMatchesDefault = CollationMatchesDefault::kYes;
 
     // When non-empty, contains the unmodified user provided aggregation command.
     BSONObj originalAggregateCommand;
