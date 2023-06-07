@@ -1121,7 +1121,8 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                                        const QueryHints& hints,
                                        const ConstFoldFn& constFold,
                                        const IndexCollationSpec& indexCollationSpec,
-                                       CandidateIndexEntry& entry) {
+                                       CandidateIndexEntry& entry,
+                                       const bool isMultiIndexPlan) {
     auto& fieldProjMap = entry._fieldProjectionMap;
     auto& eqPrefixes = entry._eqPrefixes;
     auto& correlatedProjNames = entry._correlatedProjNames;
@@ -1253,9 +1254,13 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
 
     entry._residualRequirements = residualReqs.finish();
 
-    if (entry._intervalPrefixSize == 0 && !entry._residualRequirements) {
-        // Need to encode at least one query requirement in the index bounds.
-        return false;
+    if (entry._intervalPrefixSize == 0) {
+        if (!entry._residualRequirements || isMultiIndexPlan) {
+            // Need to encode at least one query requirement in the index bounds. Also, if an
+            // unbound index is part of a multi-index plan, discard it as it could be more expensive
+            // than a single collection scan.
+            return false;
+        }
     }
 
     return true;
@@ -1282,7 +1287,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
-                                         const ConstFoldFn& constFold) {
+                                         const ConstFoldFn& constFold,
+                                         const bool isMultiIndexPlan) {
     // A candidate index is one that can directly satisfy the SargableNode, without using
     // any other indexes. Typically a disjunction would require unioning two different indexes,
     // so we bail out if there's a nontrivial disjunction here.
@@ -1338,7 +1344,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                                             hints,
                                                             constFold,
                                                             indexDef.getCollationSpec(),
-                                                            entry);
+                                                            entry,
+                                                            isMultiIndexPlan);
 
             if (success && entry._eqPrefixes.size() >= hints._minIndexEqPrefixes) {
                 result.push_back(std::move(entry));

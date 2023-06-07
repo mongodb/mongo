@@ -1666,7 +1666,8 @@ struct ExploreConvert<SargableNode> {
                                                                 *leftReqs,
                                                                 scanDef,
                                                                 hints,
-                                                                ctx.getConstFold());
+                                                                ctx.getConstFold(),
+                                                                isIndex);
             if (isIndex && leftCandidateIndexes.empty() &&
                 PSRExpr::isSingletonDisjunction(leftReqs->getRoot())) {
                 // Reject rewrite, because further splitting can only be conjunctive,
@@ -1681,7 +1682,8 @@ struct ExploreConvert<SargableNode> {
                                                                 *rightReqs,
                                                                 scanDef,
                                                                 hints,
-                                                                ctx.getConstFold());
+                                                                ctx.getConstFold(),
+                                                                isIndex);
             }
 
             if (isIndex && rightCandidateIndexes.empty() &&

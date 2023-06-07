@@ -331,7 +331,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
-                                         const ConstFoldFn& constFold);
+                                         const ConstFoldFn& constFold,
+                                         bool isMultiIndexPlan = false);
 
 /**
  * Computes a set of residual predicates which will be applied on top of a Scan.

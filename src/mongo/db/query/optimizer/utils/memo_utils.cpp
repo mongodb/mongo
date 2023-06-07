@@ -406,6 +406,11 @@ public:
             const auto& nodeInfo =
                 (altIndex == 0) ? *result._nodeInfo : result._rejectedNodeInfo.at(altIndex - 1);
             const ABT& node = nodeInfo._node;
+            if (nodeInfo._cost.isInfinite()) {
+                // Skip the node with infinity cost as that indicates the failure of physical plan
+                // optimization.
+                continue;
+            }
 
             MemoPhysicalPlanExtractor instance(memo,
                                                metadata,

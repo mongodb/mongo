@@ -2443,7 +2443,7 @@ TEST(PhysRewriter, CompoundIndex1) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(35, 50, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(25, 40, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
     ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
@@ -2535,7 +2535,7 @@ TEST(PhysRewriter, CompoundIndex2) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(50, 70, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(45, 65, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
     ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
@@ -3319,7 +3319,7 @@ TEST(PhysRewriter, IndexResidualReq1) {
     ABT optimized = rootNode;
     phaseManager.getHints()._fastIndexNullHandling = true;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(65, 90, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(31, 52, phaseManager.getMemo().getStats()._physPlanExplorationCount)
 
     // Prefer index1 over index2 and index3 in order to cover all fields.
     ASSERT_EXPLAIN_V2_AUTO(
@@ -3610,7 +3610,7 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(25, 35, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(15, 25, phaseManager.getMemo().getStats()._physPlanExplorationCount)
 
     // We should pick the index, and do at least some filtering before the fetch.
     // We don't have index bounds, both because 'a' is not the first field of the index,
@@ -3772,9 +3772,8 @@ TEST(PhysRewriter, NestedElemMatch) {
     ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We should not generate tight index bounds [2, 2], because nested elemMatch only matches
-    // arrays of arrays, and multikey indexes only unwind one level of arrays.  We can generate
-    // PathArr bounds, but that only tells us which documents have arrays-of-arrays; then we can run
-    // a residual predicate to check that the inner array contains '2'.
+    // arrays of arrays, and multikey indexes only unwind one level of arrays. We run a residual
+    // predicate to check that the inner array contains '2'.
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "Root [{root}]\n"
         "Filter []\n"
@@ -3791,25 +3790,13 @@ TEST(PhysRewriter, NestedElemMatch) {
         "|   |   PathArr []\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_2}, coll1]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   FunctionCall [getArraySize] Variable [sides_0]\n"
-        "|   PathCompare [Eq] Const [2]\n"
-        "GroupBy [{rid_0}]\n"
-        "|   aggregations: \n"
-        "|       [sides_0]\n"
-        "|           FunctionCall [$addToSet] Variable [sideId_0]\n"
-        "Union [{rid_0, sideId_0}]\n"
-        "|   Evaluation [{sideId_0} = Const [1]]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: coll1, indexDefName: index1, interval: "
-        "{[Const [[]], Const [BinData(0, )])}]\n"
-        "Evaluation [{sideId_0} = Const [0]]\n"
+        "Unique [{rid_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_3]\n"
         "|   PathTraverse [1] PathCompare [Eq] Const [2]\n"
-        "IndexScan [{'<indexKey> 0': evalTemp_3, '<rid>': rid_0}, scanDefName: coll1, indexDefNam"
-        "e: index1, interval: {<fully open>}]\n",
+        "IndexScan [{'<indexKey> 0': evalTemp_3, '<rid>': rid_0}, scanDefName: coll1, "
+        "indexDefName: index1, interval: {<fully open>}]\n",
         optimized);
 }
 
@@ -4969,7 +4956,7 @@ TEST(PhysRewriter, IndexSubfieldCovered) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(20, 35, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(13, 22, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Observe we have a covered plan. The filters for subfields "b" and "c" are expressed as
     // residual predicates. Also observe the traverse for "a.c" is removed due to "a" being
@@ -5511,7 +5498,7 @@ TEST(PhysRewriter, ExtractAllPlans) {
     phaseManager.getHints()._disableBranchAndBound = true;
     phaseManager.getHints()._keepRejectedPlans = true;
     auto plans = phaseManager.optimizeNoAssert(std::move(optimized), true /*includeRejected*/);
-    ASSERT_EQ(22, plans.size());
+    ASSERT_EQ(6, plans.size());
 
     // Sort plans by estimated cost. If costs are equal, sort lexicographically by plan explain.
     // This allows us to break ties if costs are equal.
