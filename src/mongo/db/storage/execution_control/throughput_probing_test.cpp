@@ -353,8 +353,8 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
 }
 
 TEST_F(ThroughputProbingTest, ReadWriteRatio) {
-    gReadWriteRatio.store(2);  // 33% of tickets for writes, 66% for reads
-    ON_BLOCK_EXIT([]() { gReadWriteRatio.store(1); });
+    gReadWriteRatio.store(0.67);  // 33% of tickets for writes, 67% for reads
+    ON_BLOCK_EXIT([]() { gReadWriteRatio.store(0.5); });
 
     auto initialReads = _readTicketHolder.outof();
     auto reads = initialReads;

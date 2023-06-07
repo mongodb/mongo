@@ -142,8 +142,7 @@ def generate_mongod_parameters(rng, mode):
                                                          ret["throughputProbingInitialConcurrency"])
     ret["throughputProbingMaxConcurrency"] = rng.randint(ret["throughputProbingInitialConcurrency"],
                                                          128)
-    read_pct = 1 - rng.random()
-    ret["throughputProbingReadWriteRatio"] = read_pct / (1 - read_pct)
+    ret["throughputProbingReadWriteRatio"] = rng.uniform(0, 1)
     ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
 
     if rng.choice(3 * [True] + [False]):
